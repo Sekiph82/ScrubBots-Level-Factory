@@ -399,8 +399,8 @@ Minimum completion rules:
 # 5. MILESTONE OVERVIEW
 
 - [x] **PAG-M00 — Repository Bootstrap & Governance**
-- [~] **PAG-M01 — Canonical SCRUBBOTS Contracts**
-- [ ] **PAG-M02 — Deterministic Generation Core**
+- [x] **PAG-M01 — Canonical SCRUBBOTS Contracts**
+- [~] **PAG-M02 — Deterministic Generation Core**
 - [ ] **PAG-M03 — Mask / Sprite Generator**
 - [ ] **PAG-M04 — Procedural Shape / Rule Generator**
 - [ ] **PAG-M05 — Wave Function Collapse Generator**
@@ -456,60 +456,64 @@ Recovery `RECOVERY-R001`: `AUDIT_PASSED / CLOSED`
 
 # PAG-M01 — Canonical SCRUBBOTS Contracts
 
-H!veAI active cycle: `PAG-M01-C001 — Canonical SCRUBBOTS Contracts`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_STRICT_AUDIT.md`
+M01 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M01-C001 — Canonical SCRUBBOTS Contracts`  
+Closing audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT_AUDIT.md`
 
 ## Sprint PAG-S01.1 — Palette authority
 
-- [ ] PAG-0101 Add machine-readable C01..C16 palette data copied from the owner-locked main-game contract.
-- [ ] PAG-0102 Include palette schema/version metadata.
-- [ ] PAG-0103 Implement canonical palette loader.
-- [ ] PAG-0104 Reject duplicate color IDs.
-- [ ] PAG-0105 Reject duplicate RGB values if they would make ID mapping ambiguous.
-- [ ] PAG-0106 Reject C17+ logical colors.
-- [ ] PAG-0107 Reject BG01 as a logical artwork color.
-- [ ] PAG-0108 Expose deterministic C-ID ↔ RGB lookup.
-- [ ] PAG-0109 Keep local output palette ordered by ascending canonical C-ID.
-- [ ] PAG-0110 Test all 16 exact HEX/RGB values.
+- [x] PAG-0101 Add machine-readable C01..C16 palette data copied from the owner-locked main-game contract.
+- [x] PAG-0102 Include palette schema/version metadata.
+- [x] PAG-0103 Implement canonical palette loader.
+- [x] PAG-0104 Reject duplicate color IDs.
+- [x] PAG-0105 Reject duplicate RGB values if they would make ID mapping ambiguous.
+- [x] PAG-0106 Reject C17+ logical colors.
+- [x] PAG-0107 Reject BG01 as a logical artwork color.
+- [x] PAG-0108 Expose deterministic C-ID ↔ RGB lookup.
+- [x] PAG-0109 Keep local output palette ordered by ascending canonical C-ID.
+- [x] PAG-0110 Test all 16 exact HEX/RGB values.
 
 ## Sprint PAG-S01.2 — Difficulty/dimensions
 
-- [ ] PAG-0111 Implement canonical difficulty enum: EASY, MEDIUM, HARD, VERY_HARD.
-- [ ] PAG-0112 Implement dimension bands: 20–29, 30–39, 40–49, 50–59.
-- [ ] PAG-0113 Validate width independently.
-- [ ] PAG-0114 Validate height independently.
-- [ ] PAG-0115 Explicitly support rectangular boards.
-- [ ] PAG-0116 Reject legacy Extra Hard.
-- [ ] PAG-0117 Reject legacy fixed-size assumptions.
-- [ ] PAG-0118 Implement automatic random dimension selection inside a requested difficulty band.
-- [ ] PAG-0119 Ensure automatic selection can generate both square and rectangular dimensions.
-- [ ] PAG-0120 Test every boundary: 19/20/29/30/39/40/49/50/59/60.
+- [x] PAG-0111 Implement canonical difficulty enum: EASY, MEDIUM, HARD, VERY_HARD.
+- [x] PAG-0112 Implement dimension bands: 20–29, 30–39, 40–49, 50–59.
+- [x] PAG-0113 Validate width independently.
+- [x] PAG-0114 Validate height independently.
+- [x] PAG-0115 Explicitly support rectangular boards.
+- [x] PAG-0116 Reject legacy Extra Hard.
+- [x] PAG-0117 Reject legacy fixed-size assumptions.
+- [x] PAG-0118 Implement automatic random dimension selection inside a requested difficulty band.
+- [x] PAG-0119 Ensure automatic selection can generate both square and rectangular dimensions.
+- [x] PAG-0120 Test every boundary: 19/20/29/30/39/40/49/50/59/60.
 
 ## Sprint PAG-S01.3 — Difficulty color counts
 
-- [ ] PAG-0121 Implement EASY = 3–5 distinct used colors.
-- [ ] PAG-0122 Implement MEDIUM = 6–7.
-- [ ] PAG-0123 Implement HARD = 8–9.
-- [ ] PAG-0124 Implement VERY_HARD = 10–12.
-- [ ] PAG-0125 Count colors from actual logical cell use, not merely requested palette.
-- [ ] PAG-0126 Exclude BG01 from the count.
-- [ ] PAG-0127 Reject outputs outside the required band.
-- [ ] PAG-0128 Create deterministic palette-subset selection from seed/config.
-- [ ] PAG-0129 Support an explicitly supplied valid canonical palette subset.
-- [ ] PAG-0130 Reject explicitly supplied palette subsets incompatible with difficulty.
+- [x] PAG-0121 Implement EASY = 3–5 distinct used colors.
+- [x] PAG-0122 Implement MEDIUM = 6–7.
+- [x] PAG-0123 Implement HARD = 8–9.
+- [x] PAG-0124 Implement VERY_HARD = 10–12.
+- [x] PAG-0125 Count colors from actual logical cell use, not merely requested palette.
+- [x] PAG-0126 Exclude BG01 from the count.
+- [x] PAG-0127 Reject outputs outside the required band.
+- [x] PAG-0128 Create deterministic palette-subset selection from seed/config.
+- [x] PAG-0129 Support an explicitly supplied valid canonical palette subset.
+- [x] PAG-0130 Reject explicitly supplied palette subsets incompatible with difficulty.
 
 ### M01 acceptance
 
-- [ ] PAG-0131 Every legal difficulty can construct a valid generation request.
-- [ ] PAG-0132 Every illegal dimension/color-band combination is rejected before generation.
-- [ ] PAG-0133 Contract tests are independent of generator implementation.
+- [x] PAG-0131 Every legal difficulty can construct a valid generation request.
+- [x] PAG-0132 Every illegal dimension/color-band combination is rejected before generation.
+- [x] PAG-0133 Contract tests are independent of generator implementation.
 
 ---
 
 # PAG-M02 — Deterministic Generation Core
+
+H!veAI active cycle: `PAG-M02-C001 — Deterministic Generation Core`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT_AUDIT.md`
 
 ## Sprint PAG-S02.1 — Generation request
 
