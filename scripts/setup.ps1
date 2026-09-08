@@ -13,7 +13,7 @@ $pyLauncher = Get-Command py.exe -ErrorAction SilentlyContinue
 if ($null -ne $pyLauncher) {
     $launcherProbe = @(& $pyLauncher.Source -3.12 -c $versionProbe 2>&1)
     $launcherExitCode = $LASTEXITCODE
-    if ($launcherExitCode -eq 0 -and $launcherProbe.Count -ge 2) {
+    if ($launcherExitCode -eq 0 -and $launcherProbe.Count -ge 2 -and ([string]$launcherProbe[0] -match '^3\.12\.')) {
         $pythonCommand = $pyLauncher.Source
         $pythonPrefixArgs = @("-3.12")
         $pythonVersion = [string]$launcherProbe[0]

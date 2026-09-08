@@ -173,3 +173,19 @@ Implementation commit: `42ecae4f7408191b3c9f23918cb60627ff76dae6`
 pushed successfully with `git push origin main`, advancing GitHub `main` from
 `7dbf57869fac921be8032d326115f40e40a2717d` to that SHA. The tree was clean
 before the log-only completion append.
+
+## Final narrow correction and regression
+
+After the first log push, the setup path received one final same-finding
+hardening correction: the `py.exe -3.12` probe now also validates its reported
+version explicitly against `3.12.*`, matching the already-validated fallback
+path and `pyproject.toml` range. The exact documented setup command was rerun;
+it selected Python `3.12.10`, recreated only the repository-local `.venv`,
+installed `.[test]`, and completed without PATH changes or manual repair. The
+documented test command then passed all `9` tests in `0.25s`.
+
+The post-correction package import, `pip check`, direct socket adversarial
+check, source-policy/setup-contract checks, metadata dry run, and
+`git diff --check` remained successful. This was a source-only correction to
+the existing C003 implementation scope; no task, tracker, audit, prompt,
+handoff, cycle-index, or prior-log state was changed.
