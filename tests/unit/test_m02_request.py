@@ -41,6 +41,11 @@ def test_typed_seed_prevents_integer_string_collision() -> None:
     assert make_request(seed=1).canonical_bytes() != make_request(seed="1").canonical_bytes()
 
 
+def test_empty_string_seed_preserves_m01_domain_and_is_typed() -> None:
+    request = make_request(seed="")
+    assert json.loads(request.canonical_json())["seed"] == {"type": "string", "value": ""}
+
+
 @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), {"bad"}, b"bytes", object()])
 def test_generator_options_reject_non_canonical_values(bad) -> None:
     with pytest.raises(RequestContractError):

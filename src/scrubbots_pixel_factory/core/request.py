@@ -158,8 +158,6 @@ class GenerationRequest:
             raise RequestContractError(str(exc)) from exc
         if isinstance(self.seed, bool) or not isinstance(self.seed, (int, str)):
             raise RequestContractError("seed must be an integer or string, excluding bool")
-        if isinstance(self.seed, str) and not self.seed:
-            raise RequestContractError("seed string must not be empty")
         mode = GeneratorMode.parse(self.generator_mode)
         if isinstance(self.schema_version, bool) or self.schema_version != GENERATION_REQUEST_SCHEMA_VERSION:
             raise RequestContractError("unsupported generation request schema version")

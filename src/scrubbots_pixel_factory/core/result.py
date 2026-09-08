@@ -6,8 +6,6 @@ from enum import Enum
 import hashlib
 import json
 import re
-from typing import Any
-
 from ..contracts import validate_dimensions, validate_used_color_count
 from .request import (
     GenerationRequest,
@@ -50,7 +48,7 @@ def _nonblank(value: object, label: str) -> str:
     return value
 
 
-def _validate_provenance(value: object) -> Mapping[str, object]:
+def _validate_provenance(value: object, request: GenerationRequest) -> Mapping[str, object]:
     if not isinstance(value, Mapping):
         raise ResultContractError("provenance must be a JSON-compatible mapping")
     try:
@@ -59,6 +57,8 @@ def _validate_provenance(value: object) -> Mapping[str, object]:
         raise ResultContractError(str(exc)) from exc
     if not isinstance(frozen, Mapping):
         raise ResultContractError("provenance must be a mapping")
+    if not set(frozen).issubset({"stage_seeds", "retry_seeds"}):
+        raise ResultContractError("provenance contains unsupported fields")
     stage_seeds = frozen.get("stage_seeds")
     if not isinstance(stage_seeds, Mapping) or set(stage_seeds) != set(STAGE_DOMAINS):
         raise ResultContractError(
@@ -68,6 +68,26 @@ def _validate_provenance(value: object) -> Mapping[str, object]:
         seed = stage_seeds[stage]
         if type(seed) is not str or _HEX_DIGEST.fullmatch(seed) is None:
             raise ResultContractError(f"provenance stage seed is malformed: {stage}")
+    from .rng import DeterministicRNG
+
+    if dict(stage_seeds) != DeterministicRNG(request.seed).stage_seeds():
+        raise ResultContractError("provenance stage seeds do not match the request seed")
+    if "retry_seeds" in frozen:
+        retry_seeds = frozen["retry_seeds"]
+        if not isinstance(retry_seeds, Mapping):
+            raise ResultContractError("provenance.retry_seeds must be a mapping")
+        expected_rng = DeterministicRNG(request.seed)
+        for attempt_key, retry_seed in retry_seeds.items():
+            if type(attempt_key) is not str or re.fullmatch(r"(?:0|[1-9][0-9]*)", attempt_key) is None:
+                raise ResultContractError("retry provenance attempt keys must be canonical non-negative integers")
+            try:
+                expected_retry_seed = expected_rng.retry_seed(int(attempt_key))
+            except (TypeError, ValueError, OverflowError) as exc:
+                raise ResultContractError("retry provenance attempt is invalid") from exc
+            if type(retry_seed) is not str or _HEX_DIGEST.fullmatch(retry_seed) is None:
+                raise ResultContractError("retry provenance seed is malformed")
+            if retry_seed != expected_retry_seed:
+                raise ResultContractError("retry provenance seed does not match the request seed/attempt")
     return frozen
 
 
@@ -92,8 +112,9 @@ class GenerationResult:
     failure_code: FailureCode | None
     failure_reason: str | None
 
-    def __init__(
-        self,
+    @classmethod
+    def _from_validated_fields(
+        cls,
         *,
         status: ResultStatus,
         request: GenerationRequest | None,
@@ -109,23 +130,25 @@ class GenerationResult:
         provenance: Mapping[str, object] | None,
         failure_code: FailureCode | None,
         failure_reason: str | None,
-    ) -> None:
-        object.__setattr__(self, "schema", GENERATION_RESULT_SCHEMA)
-        object.__setattr__(self, "schema_version", GENERATION_RESULT_SCHEMA_VERSION)
-        object.__setattr__(self, "status", status)
-        object.__setattr__(self, "request", request)
-        object.__setattr__(self, "width", width)
-        object.__setattr__(self, "height", height)
-        object.__setattr__(self, "logical_grid", logical_grid)
-        object.__setattr__(self, "used_palette", used_palette)
-        object.__setattr__(self, "generator_mode", generator_mode)
-        object.__setattr__(self, "generator_id", generator_id)
-        object.__setattr__(self, "generator_version", generator_version)
-        object.__setattr__(self, "seed", seed)
-        object.__setattr__(self, "rng_algorithm", rng_algorithm)
-        object.__setattr__(self, "provenance", provenance)
-        object.__setattr__(self, "failure_code", failure_code)
-        object.__setattr__(self, "failure_reason", failure_reason)
+    ) -> "GenerationResult":
+        result = object.__new__(cls)
+        object.__setattr__(result, "schema", GENERATION_RESULT_SCHEMA)
+        object.__setattr__(result, "schema_version", GENERATION_RESULT_SCHEMA_VERSION)
+        object.__setattr__(result, "status", status)
+        object.__setattr__(result, "request", request)
+        object.__setattr__(result, "width", width)
+        object.__setattr__(result, "height", height)
+        object.__setattr__(result, "logical_grid", logical_grid)
+        object.__setattr__(result, "used_palette", used_palette)
+        object.__setattr__(result, "generator_mode", generator_mode)
+        object.__setattr__(result, "generator_id", generator_id)
+        object.__setattr__(result, "generator_version", generator_version)
+        object.__setattr__(result, "seed", seed)
+        object.__setattr__(result, "rng_algorithm", rng_algorithm)
+        object.__setattr__(result, "provenance", provenance)
+        object.__setattr__(result, "failure_code", failure_code)
+        object.__setattr__(result, "failure_reason", failure_reason)
+        return result
 
     @classmethod
     def success(
@@ -172,11 +195,11 @@ class GenerationResult:
             raise ResultContractError("result generator mode does not match the request")
         identifier = _nonblank(generator_id, "generator_id")
         version = _nonblank(generator_version, "generator_version")
-        checked_provenance = _validate_provenance(provenance)
+        checked_provenance = _validate_provenance(provenance, request)
         result_seed = request.seed if seed is None else seed
         if type(result_seed) is bool or not isinstance(result_seed, (int, str)) or result_seed != request.seed:
             raise ResultContractError("result seed does not match the request")
-        return cls(
+        return cls._from_validated_fields(
             status=ResultStatus.SUCCESS,
             request=request,
             width=width,
@@ -208,7 +231,7 @@ class GenerationResult:
         failure_reason = _nonblank(reason, "failure reason")
         if request is not None and not isinstance(request, GenerationRequest):
             raise ResultContractError("failure request must be a GenerationRequest or None")
-        return cls(
+        return cls._from_validated_fields(
             status=ResultStatus.FAILURE,
             request=request,
             width=None,

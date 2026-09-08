@@ -18,6 +18,12 @@ def test_rng_same_seed_domain_and_call_order_properties() -> None:
     assert left.stage_seed("geometry") == DeterministicRNG(5).stage_seed("geometry")
 
 
+def test_empty_string_seed_is_deterministic_and_typed_distinct() -> None:
+    assert DeterministicRNG("").next_bytes(32) == DeterministicRNG("").next_bytes(32)
+    assert DeterministicRNG("").next_bytes(32) != DeterministicRNG(0).next_bytes(32)
+    assert DeterministicRNG("").next_bytes(32) != DeterministicRNG("0").next_bytes(32)
+
+
 def test_randbelow_choice_and_shuffle_are_bounded_and_ordered() -> None:
     rng = DeterministicRNG(9)
     values = [rng.randbelow(7) for _ in range(1000)]

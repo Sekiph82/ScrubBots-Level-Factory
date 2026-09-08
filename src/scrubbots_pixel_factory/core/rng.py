@@ -23,9 +23,14 @@ def _typed_seed_bytes(seed: int | str) -> bytes:
         raise RNGContractError("seed must be an integer or string, excluding bool")
     if isinstance(seed, int):
         return f"int:{seed}".encode("utf-8")
-    if not seed:
-        raise RNGContractError("seed string must not be empty")
     return f"string:{len(seed)}:{seed}".encode("utf-8")
+
+
+def _retry_attempt_bytes(attempt: int) -> bytes:
+    if attempt <= (1 << 128) - 1:
+        return attempt.to_bytes(16, "big")
+    raw = attempt.to_bytes(max(1, (attempt.bit_length() + 7) // 8), "big")
+    return b"extended\0" + len(raw).to_bytes(8, "big") + raw
 
 
 def _domain_bytes(domain: str) -> bytes:
@@ -126,7 +131,7 @@ class DeterministicRNG:
         if isinstance(attempt, bool) or not isinstance(attempt, int) or attempt < 0:
             raise RNGContractError("retry attempt must be a non-negative integer")
         return hashlib.sha256(
-            self._root_material + b"\0retry-seed\0" + attempt.to_bytes(16, "big")
+            self._root_material + b"\0retry-seed\0" + _retry_attempt_bytes(attempt)
         ).hexdigest()
 
     def retry_rng(self, attempt: int) -> "DeterministicRNG":

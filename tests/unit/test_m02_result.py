@@ -6,6 +6,7 @@ from scrubbots_pixel_factory.core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
+from scrubbots_pixel_factory.core.rng import DeterministicRNG
 from tests.support.deterministic_probe import DeterministicContractProbeGenerator
 from tests.unit.test_m02_request import make_request
 
@@ -24,6 +25,13 @@ def test_success_result_is_immutable_canonical_and_records_provenance() -> None:
     assert result.canonical_bytes() == result.canonical_json().encode("utf-8")
     with pytest.raises((AttributeError, TypeError)):
         result.width = 1  # type: ignore[misc]
+    with pytest.raises(TypeError):
+        result.provenance["stage_seeds"]["geometry"] = "0" * 64  # type: ignore[index]
+
+
+def test_public_raw_result_construction_is_impossible() -> None:
+    with pytest.raises(TypeError):
+        GenerationResult(status="SUCCESS", request=None, width=1, height=1, logical_grid=("C17",), used_palette=(), generator_mode="MASK", generator_id=None, generator_version=None, seed=1, rng_algorithm=None, provenance=None, failure_code=None, failure_reason=None)  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("grid", [[], ["C01"] * 399, ["C01"] * 400])
@@ -66,12 +74,79 @@ def test_success_rejects_mode_mismatch_and_malformed_provenance() -> None:
         )
 
 
+def _mutable_provenance(result):
+    return {key: dict(value) if isinstance(value, dict) or hasattr(value, "items") else value for key, value in result.provenance.items()}
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda provenance: provenance["stage_seeds"].update({"geometry": "0" * 64}),
+    lambda provenance: provenance["stage_seeds"].pop("geometry"),
+    lambda provenance: provenance["stage_seeds"].update({"unexpected": "0" * 64}),
+    lambda provenance: provenance["stage_seeds"].update(DeterministicRNG(999).stage_seeds()),
+    lambda provenance: provenance["retry_seeds"].update({"0": "0" * 64}),
+    lambda provenance: provenance["retry_seeds"].update({"01": provenance["retry_seeds"]["0"]}),
+    lambda provenance: provenance["retry_seeds"].update({"1": provenance["retry_seeds"]["0"]}),
+])
+def test_provenance_is_authenticated_not_only_shape_checked(mutate) -> None:
+    result = valid_result()
+    provenance = _mutable_provenance(result)
+    mutate(provenance)
+    with pytest.raises(ResultContractError):
+        GenerationResult.success(
+            request=result.request, width=result.width, height=result.height, logical_grid=result.logical_grid,
+            generator_id=result.generator_id, generator_version=result.generator_version,
+            rng_algorithm=RNG_ALGORITHM, provenance=provenance,
+        )
+
+
+def test_provenance_from_exact_request_and_rng_remains_accepted() -> None:
+    result = valid_result()
+    accepted = GenerationResult.success(
+        request=result.request, width=result.width, height=result.height, logical_grid=result.logical_grid,
+        generator_id=result.generator_id, generator_version=result.generator_version,
+        rng_algorithm=RNG_ALGORITHM, provenance=result.provenance,
+    )
+    assert accepted.canonical_bytes() == result.canonical_bytes()
+
+
+def test_present_null_retry_provenance_is_rejected() -> None:
+    result = valid_result()
+    provenance = _mutable_provenance(result)
+    provenance["retry_seeds"] = None
+    with pytest.raises(ResultContractError):
+        GenerationResult.success(
+            request=result.request, width=result.width, height=result.height, logical_grid=result.logical_grid,
+            generator_id=result.generator_id, generator_version=result.generator_version,
+            rng_algorithm=RNG_ALGORITHM, provenance=provenance,
+        )
+
+
+def test_success_rejects_wrong_seed_and_missing_generator_version() -> None:
+    result = valid_result()
+    with pytest.raises(ResultContractError):
+        GenerationResult.success(
+            request=result.request, width=result.width, height=result.height, logical_grid=result.logical_grid,
+            generator_id=result.generator_id, generator_version=result.generator_version, seed=999,
+            rng_algorithm=RNG_ALGORITHM, provenance=result.provenance,
+        )
+    with pytest.raises(ResultContractError):
+        GenerationResult.success(
+            request=result.request, width=result.width, height=result.height, logical_grid=result.logical_grid,
+            generator_id=result.generator_id, generator_version="", rng_algorithm=RNG_ALGORITHM,
+            provenance=result.provenance,
+        )
+
+
 def test_failure_requires_stable_reason_and_has_no_partial_grid() -> None:
     failure = GenerationResult.failure(code=FailureCode.RETRY_EXHAUSTED, reason="bounded retries exhausted")
     assert not failure.is_success and failure.logical_grid is None and failure.used_palette == ()
     assert failure.failure_reason == "bounded retries exhausted"
     with pytest.raises(ResultContractError):
         GenerationResult.failure(code="GENERATION_FAILED", reason="   ")
+    assert failure.canonical_bytes() == GenerationResult.failure(code=FailureCode.RETRY_EXHAUSTED, reason="bounded retries exhausted").canonical_bytes()
+    for forbidden in ("logical_grid", "width", "height", "used_palette"):
+        with pytest.raises(TypeError):
+            GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason="no partial", **{forbidden: ()})  # type: ignore[call-arg]
 
 
 def test_explicit_very_hard_59_by_59_result_has_exact_logical_cell_count() -> None:

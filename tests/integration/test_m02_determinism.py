@@ -45,3 +45,19 @@ print(DeterministicContractProbeGenerator().generate(request).canonical_json())
         outputs.append(subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=True).stdout)
     assert outputs[0] == outputs[1]
     assert json.loads(outputs[0].splitlines()[1])["status"] == "SUCCESS"
+
+
+def test_empty_string_seed_is_stable_across_processes() -> None:
+    code = """
+from scrubbots_pixel_factory.core import DeterministicRNG, GenerationRequest
+request = GenerationRequest(difficulty='EASY', seed='', generator_mode='MASK')
+print(request.canonical_json())
+print(DeterministicRNG('').stage_seed('geometry'))
+"""
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(SRC_ROOT)
+    env["PYTHONHASHSEED"] = "random"
+    first = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=True).stdout
+    env["PYTHONHASHSEED"] = "42"
+    second = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=True).stdout
+    assert first == second
