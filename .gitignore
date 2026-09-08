@@ -1,0 +1,30 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Packaging, build and coverage output
+build/
+dist/
+*.egg-info/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Generated candidate output: keep only the directory marker.
+output/*
+!output/.gitkeep
+
+# Runtime logs and temporary WFC/cache material
+logs/
+*.log
+.wfc-cache/
+wfc-cache/
+tmp/
+temp/
