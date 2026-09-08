@@ -415,10 +415,11 @@ Minimum completion rules:
 
 # PAG-M00 — Repository Bootstrap & Governance
 
-H!veAI active cycle: `PAG-M00-C001 — Repository Bootstrap & Governance`  
+H!veAI active cycle: `PAG-M00-C002 — Repository Bootstrap & Governance`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`
+Authoritative prompt: `.hiveai/prompts/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`  
+Recovery `RECOVERY-R001`: `AUDIT_PASSED / CLOSED`
 
 ## Sprint PAG-S00.1 — Project bootstrap
 
