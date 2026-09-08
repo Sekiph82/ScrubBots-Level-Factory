@@ -48,19 +48,25 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M00-C003`
-Title: `Bootstrap Reliability & Offline Enforcement Remediation`
+Cycle: `PAG-M01-C001`
+Title: `Canonical SCRUBBOTS Contracts`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
 
 ### PAG-M00-C002 — Repository Bootstrap & Governance
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M00-C003`
 Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_STRICT_AUDIT.md`
+Closes milestone: `PAG-M00 — Repository Bootstrap & Governance`
+
 
 ### RECOVERY-R001 — Revert Mistaken ScrubBots Local Edits
 State: `AUDIT_PASSED / TASK_COMPLETE`
