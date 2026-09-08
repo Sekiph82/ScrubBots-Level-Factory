@@ -10,24 +10,24 @@ You are **not** the independent auditor. ChatGPT is the independent auditor and 
 
 Repository: `Sekiph82/ScrubBots-Level-Factory`
 
+Canonical GitHub authority: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
+
 Branch: `main`
 
-Canonical local repository root:
+Local mirror: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
 
-`C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
-
-Treat Windows path separator/casing normalization as equivalent when verifying the resolved Git root, but do not work from a different repository clone unless the active prompt explicitly authorizes it.
+The GitHub repository is the sole task authority. The local mirror is not a discovery source. Never switch to another local repository because a file or prompt is missing locally. In particular, never select `C:\Users\sekip\Desktop\ScrubBots` as a substitute.
 
 ## Mandatory session start
 
 Before implementation:
 
-1. Run `git fetch origin main`.
-2. Inspect `git rev-list --left-right --count HEAD...origin/main`.
-3. Fast-forward only when safe.
-4. Never reset, automatically rebase, force-push, or discard user changes.
-5. Verify repository root, branch, HEAD, origin, status, stashes, and worktrees where relevant.
-6. Read completely:
+1. Read the authoritative cycle prompt from the full GitHub URL supplied in the handoff.
+2. Verify the repository identity is `Sekiph82/ScrubBots-Level-Factory` and branch is `main`.
+3. If the prompt requires synchronizing the owner's local mirror, synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` with this GitHub repository using non-destructive Git operations.
+4. Never reset, automatically rebase, force-push, discard user changes, or search sibling local repositories to discover work.
+5. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
+6. Read completely from the authorized repository checkout:
    - `AGENTS.md`
    - `GOVERNANCE.md`
    - `tasks.md`
