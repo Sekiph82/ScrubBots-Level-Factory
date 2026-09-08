@@ -3,8 +3,10 @@
 > Repository: https://github.com/Sekiph82/ScrubBots-Level-Factory  
 > Scope: **Offline procedural pixel-art generation engine only**  
 > Target user: SCRUBBOTS development tooling on the owner's Windows laptop  
-> Status: Planning / implementation backlog  
+> Status: Active implementation under H!veAI governance  
 > Primary implementation agent: Codex  
+> Independent auditor / tracker owner: ChatGPT  
+> Canonical local repository root: `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator`  
 > Source-of-truth game repository: https://github.com/Sekiph82/Scrubbots
 
 ---
@@ -368,6 +370,11 @@ Exact file names may change during implementation if Codex documents the reason,
 
 # 4. GLOBAL DEFINITION OF DONE
 
+H!veAI task-state legend: `[x]` validated complete, `[~]` active/in progress, `[ ]` planned/pending, `[!]` blocked.
+
+Only ChatGPT, acting as the independent auditor/tracker owner, may change task completion state or milestone/sprint closure state. Codex builder logs are claims/evidence and never final acceptance.
+
+
 A task may be marked `[x]` only when relevant evidence exists.
 
 Minimum completion rules:
@@ -391,7 +398,7 @@ Minimum completion rules:
 
 # 5. MILESTONE OVERVIEW
 
-- [ ] **PAG-M00 — Repository Bootstrap & Governance**
+- [~] **PAG-M00 — Repository Bootstrap & Governance**
 - [ ] **PAG-M01 — Canonical SCRUBBOTS Contracts**
 - [ ] **PAG-M02 — Deterministic Generation Core**
 - [ ] **PAG-M03 — Mask / Sprite Generator**
@@ -407,6 +414,11 @@ Minimum completion rules:
 ---
 
 # PAG-M00 — Repository Bootstrap & Governance
+
+H!veAI active cycle: `PAG-M00-C001 — Repository Bootstrap & Governance`  
+State: `PROMPT_READY`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`
 
 ## Sprint PAG-S00.1 — Project bootstrap
 
