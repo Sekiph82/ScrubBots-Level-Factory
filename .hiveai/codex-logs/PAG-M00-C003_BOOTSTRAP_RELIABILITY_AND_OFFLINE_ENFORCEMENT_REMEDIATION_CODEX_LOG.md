@@ -167,3 +167,9 @@ independent audit; this record does not declare `PASS` or `CLOSED`.
 
 The implementation commit SHA, final log commit SHA, push results, final
 status, and local/remote equality will be appended after the commits execute.
+
+Implementation commit: `42ecae4f7408191b3c9f23918cb60627ff76dae6`
+(`fix: harden bootstrap and offline boundary`). The implementation commit was
+pushed successfully with `git push origin main`, advancing GitHub `main` from
+`7dbf57869fac921be8032d326115f40e40a2717d` to that SHA. The tree was clean
+before the log-only completion append.
