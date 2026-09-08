@@ -6,12 +6,44 @@ families and SCRUBBOTS contract modules belong to later milestones.
 
 from .offline import OfflinePolicyError, guarded_network_request, offline_runtime
 from .local import deterministic_digest
+from .contracts import (
+    BG01,
+    CANONICAL_PALETTE,
+    ColorUsageContractError,
+    Difficulty,
+    DimensionContractError,
+    PaletteContractError,
+    actual_used_palette_ids,
+    count_used_colors,
+    resolve_dimensions,
+    resolve_palette_subset,
+    select_dimensions,
+    select_palette_subset,
+    validate_dimensions,
+    validate_palette_subset,
+    validate_used_color_count,
+)
 
 __all__ = [
     "OfflinePolicyError",
     "guarded_network_request",
     "offline_runtime",
     "deterministic_digest",
+    "BG01",
+    "CANONICAL_PALETTE",
+    "ColorUsageContractError",
+    "Difficulty",
+    "DimensionContractError",
+    "PaletteContractError",
+    "actual_used_palette_ids",
+    "count_used_colors",
+    "resolve_dimensions",
+    "resolve_palette_subset",
+    "select_dimensions",
+    "select_palette_subset",
+    "validate_dimensions",
+    "validate_palette_subset",
+    "validate_used_color_count",
 ]
 
 __version__ = "0.1.0"

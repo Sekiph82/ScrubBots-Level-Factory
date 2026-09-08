@@ -1,0 +1,63 @@
+"""Generator-independent SCRUBBOTS contract APIs for M01."""
+
+from .color_usage import (
+    ColorUsageContractError,
+    actual_used_palette_ids,
+    count_used_colors,
+    resolve_palette_subset,
+    select_palette_subset,
+    validate_used_color_count,
+    validate_palette_subset,
+)
+from .difficulty import (
+    DIFFICULTY_BANDS,
+    Difficulty,
+    DimensionBand,
+    DimensionContractError,
+    dimension_band,
+    is_legal_dimensions,
+    parse_difficulty,
+    resolve_dimensions,
+    select_dimensions,
+    validate_dimensions,
+    validate_height,
+    validate_width,
+)
+from .palette import (
+    BG01,
+    CANONICAL_PALETTE,
+    CanonicalPalette,
+    PALETTE,
+    PaletteColor,
+    PaletteContractError,
+    load_palette,
+)
+
+__all__ = [
+    "actual_used_palette_ids",
+    "BG01",
+    "CANONICAL_PALETTE",
+    "CanonicalPalette",
+    "ColorUsageContractError",
+    "count_used_colors",
+    "DIFFICULTY_BANDS",
+    "Difficulty",
+    "DimensionBand",
+    "DimensionContractError",
+    "dimension_band",
+    "is_legal_dimensions",
+    "load_palette",
+    "PaletteColor",
+    "PALETTE",
+    "PaletteContractError",
+    "parse_difficulty",
+    "resolve_dimensions",
+    "resolve_palette_subset",
+    "select_dimensions",
+    "select_palette_subset",
+    "validate_dimensions",
+    "validate_height",
+    "validate_palette_subset",
+    "validate_used_color_count",
+    "validate_width",
+]
