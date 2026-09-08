@@ -509,12 +509,12 @@ Closing audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT
 
 # PAG-M02 — Deterministic Generation Core
 
-H!veAI active cycle: `PAG-M02-C002 — Result Integrity & Provenance Remediation`  
+H!veAI active cycle: `PAG-M02-C003 — Result Construction Boundary Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_STRICT_AUDIT.md`  
-C001 verdict: `FAIL / FIX_REQUIRED`
+Authoritative prompt: `.hiveai/prompts/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`  
+C002 verdict: `FAIL / FIX_REQUIRED`
 
 ## Sprint PAG-S02.1 — Generation request
 
@@ -523,7 +523,7 @@ C001 verdict: `FAIL / FIX_REQUIRED`
 - [x] PAG-0203 Include difficulty.
 - [x] PAG-0204 Include optional explicit width.
 - [x] PAG-0205 Include optional explicit height.
-- [~] PAG-0206 Include seed.
+- [x] PAG-0206 Include seed.
 - [x] PAG-0207 Include generator mode.
 - [x] PAG-0208 Include optional style/theme.
 - [x] PAG-0209 Include optional requested palette subset.
