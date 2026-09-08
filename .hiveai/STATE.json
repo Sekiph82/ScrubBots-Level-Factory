@@ -1,0 +1,37 @@
+{
+  "schema": "hiveai-state/v1",
+  "projectKey": "scrubbots-level-factory",
+  "syncStatus": "CURRENT_FROM_HANDOFF",
+  "projectStatus": "ACTIVE",
+  "currentMilestone": "PAG-M00",
+  "currentSprint": "PAG-M00-C003",
+  "currentTaskId": "PAG-M00-C003",
+  "currentTaskTitle": "Bootstrap Reliability & Offline Enforcement Remediation",
+  "workflowState": "READY",
+  "requiredActor": "CODEX",
+  "nextAction": "Execute PAG-M00-C003 authoritative remediation prompt, then return builder evidence for independent ChatGPT re-audit.",
+  "blockers": [
+    "PAG-M01 blocked until M00 receives unconditional independent PASS"
+  ],
+  "progress": {
+    "completed": null,
+    "total": null,
+    "percent": null
+  },
+  "git": {
+    "branch": "main",
+    "head": null,
+    "dirty": null
+  },
+  "lastAudit": {
+    "verdict": "FAIL",
+    "auditId": "PAG-M00-C002"
+  },
+  "lastAgentSession": {
+    "provider": null,
+    "sessionId": null,
+    "status": null
+  },
+  "updatedAt": "2026-09-08T15:30:00Z",
+  "updatedBy": "CHATGPT_BOOTSTRAP_FROM_EXISTING_HANDOFF"
+}
