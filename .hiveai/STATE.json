@@ -3,20 +3,20 @@
   "projectKey": "scrubbots-level-factory",
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
-  "currentMilestone": "PAG-M00",
-  "currentSprint": "PAG-M00-C003",
-  "currentTaskId": "PAG-M00-C003",
-  "currentTaskTitle": "Bootstrap Reliability & Offline Enforcement Remediation",
+  "currentMilestone": "PAG-M01",
+  "currentSprint": "PAG-M01-C001",
+  "currentTaskId": "PAG-M01-C001",
+  "currentTaskTitle": "Canonical SCRUBBOTS Contracts",
   "workflowState": "READY",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M00-C003 authoritative remediation prompt, then return builder evidence for independent ChatGPT re-audit.",
+  "nextAction": "Execute PAG-M01-C001 authoritative implementation prompt, then return builder evidence for independent ChatGPT strict audit.",
   "blockers": [
-    "PAG-M01 blocked until M00 receives unconditional independent PASS"
+    "PAG-M02 blocked until M01 receives unconditional independent PASS"
   ],
   "progress": {
-    "completed": null,
-    "total": null,
-    "percent": null
+    "completed": 22,
+    "total": 380,
+    "percent": 5.79
   },
   "git": {
     "branch": "main",
@@ -24,14 +24,14 @@
     "dirty": null
   },
   "lastAudit": {
-    "verdict": "FAIL",
-    "auditId": "PAG-M00-C002"
+    "verdict": "PASS",
+    "auditId": "PAG-M00-C003"
   },
   "lastAgentSession": {
-    "provider": null,
+    "provider": "CODEX",
     "sessionId": null,
-    "status": null
+    "status": "COMPLETED_PENDING_AUDIT_ACCEPTED"
   },
-  "updatedAt": "2026-09-08T15:30:00Z",
-  "updatedBy": "CHATGPT_BOOTSTRAP_FROM_EXISTING_HANDOFF"
+  "updatedAt": "2026-09-08T17:40:00Z",
+  "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
 }
