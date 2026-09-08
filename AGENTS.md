@@ -1,3 +1,11 @@
+# H!veAI mandatory control-plane adapter
+
+Before project work, read `.hiveai/PROJECT.json`, `.hiveai/RULES.md`, `.hiveai/STATE.json`, `.hiveai/HANDOFF.md`, then the canonical task source.
+
+H!veAI shared files do not override the stricter builder/auditor ownership boundaries below.
+
+---
+
 # ScrubBots Level Factory — Codex Builder Instructions
 
 ## Role
