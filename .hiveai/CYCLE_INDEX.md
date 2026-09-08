@@ -48,14 +48,19 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `RECOVERY-R001`
-Title: `Revert Mistaken ScrubBots Local Edits`
+Cycle: `PAG-M00-C002`
+Title: `Repository Bootstrap & Governance`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
-## Paused cycle
+## Closed cycles
 
-Cycle: `PAG-M00-C001`
-Title: `Repository Bootstrap & Governance`
-State: `PAUSED`
-Reason: RECOVERY-R001 must be independently verified first.
+### RECOVERY-R001 — Revert Mistaken ScrubBots Local Edits
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/RECOVERY-R001_REVERT_MISTAKEN_SCRUBBOTS_LOCAL_EDITS_STRICT_AUDIT.md`
+
+## Superseded cycles
+
+### PAG-M00-C001 — Repository Bootstrap & Governance
+State: `ABORTED_BEFORE_IMPLEMENTATION / SUPERSEDED`
+Reason: initial handoff allowed wrong local-repository discovery; no PAG-M00 implementation was accepted from this cycle.
