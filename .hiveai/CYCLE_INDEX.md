@@ -48,12 +48,19 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M02-C001`
-Title: `Deterministic Generation Core`
+Cycle: `PAG-M02-C002`
+Title: `Result Integrity & Provenance Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
+
+### PAG-M02-C001 — Deterministic Generation Core
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_STRICT_AUDIT.md`
+Open findings: `F-PAG-M02-C001-001`, `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
+Terminal builder-era HEAD independently observed: `e5274894725209834849b59d43be9999b2f31f9a`
+
 
 ### PAG-M00-C002 — Repository Bootstrap & Governance
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M00-C003`
