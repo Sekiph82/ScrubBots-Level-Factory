@@ -183,3 +183,7 @@ The final log completion commit is the subsequent log-only commit created from
 this evidence append. Its exact SHA, push result, and terminal local/remote
 equality are verified in the final handoff after publication. The preserved
 pre-existing `.hiveai/PROJECT.json` edit remains outside the staged set.
+
+Final log completion commit: `9ccc4e7ddee4586ced7cad126aa82e3fd6ec2c18`.
+It was pushed successfully with `git push origin main`; at that publication
+checkpoint local HEAD and `origin/main` were equal at this SHA.
