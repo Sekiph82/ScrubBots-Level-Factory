@@ -4,7 +4,7 @@
 
 Active cycle: `PAG-M00-C001`
 Cycle title: `Repository Bootstrap & Governance`
-Workflow state: `PROMPT_READY`
+Workflow state: `READY_FOR_IMPLEMENTATION`
 Required actor: `CODEX`
 Canonical local repository root: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
 Canonical prompt: `.hiveai/prompts/PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`
