@@ -1,5 +1,5 @@
 {
-  "schema": "hiveai-state/v1",
+  "schema": "hiveai-project-control-plane/v1",
   "projectKey": "scrubbots-level-factory",
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
