@@ -48,10 +48,17 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M00-C002`
-Title: `Repository Bootstrap & Governance`
+Cycle: `PAG-M00-C003`
+Title: `Bootstrap Reliability & Offline Enforcement Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
+
+## Failed / remediation-required cycles
+
+### PAG-M00-C002 — Repository Bootstrap & Governance
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`
+Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
 
