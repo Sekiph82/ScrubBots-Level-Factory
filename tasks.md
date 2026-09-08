@@ -415,42 +415,44 @@ Minimum completion rules:
 
 # PAG-M00 — Repository Bootstrap & Governance
 
-H!veAI active cycle: `PAG-M00-C002 — Repository Bootstrap & Governance`  
+H!veAI active cycle: `PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`  
+Authoritative prompt: `.hiveai/prompts/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`  
+C002 verdict: `FAIL / FIX_REQUIRED`  
 Recovery `RECOVERY-R001`: `AUDIT_PASSED / CLOSED`
 
 ## Sprint PAG-S00.1 — Project bootstrap
 
-- [ ] PAG-0001 Create Python package structure under `src/scrubbots_pixel_factory/`.
-- [ ] PAG-0002 Add `pyproject.toml` with pinned/minimum supported Python and dependencies.
-- [ ] PAG-0003 Add a Windows-friendly local setup command.
-- [ ] PAG-0004 Add a local test command.
-- [ ] PAG-0005 Add `.gitignore` entries for virtualenv, Python caches, generated PNG/JSON, logs and temporary WFC caches.
-- [ ] PAG-0006 Add `output/.gitkeep` while ignoring generated output contents.
-- [ ] PAG-0007 Add a minimal README explaining this repository is Pixel Art Generator V1 only.
-- [ ] PAG-0008 Add an explicit OFFLINE_ONLY policy.
-- [ ] PAG-0009 Add a rule that runtime HTTP/API calls are forbidden.
-- [ ] PAG-0010 Add a test that fails if a production generation path attempts network access.
+- [x] PAG-0001 Create Python package structure under `src/scrubbots_pixel_factory/`.
+- [x] PAG-0002 Add `pyproject.toml` with pinned/minimum supported Python and dependencies.
+- [~] PAG-0003 Add a Windows-friendly local setup command.
+- [x] PAG-0004 Add a local test command.
+- [x] PAG-0005 Add `.gitignore` entries for virtualenv, Python caches, generated PNG/JSON, logs and temporary WFC caches.
+- [x] PAG-0006 Add `output/.gitkeep` while ignoring generated output contents.
+- [x] PAG-0007 Add a minimal README explaining this repository is Pixel Art Generator V1 only.
+- [x] PAG-0008 Add an explicit OFFLINE_ONLY policy.
+- [x] PAG-0009 Add a rule that runtime HTTP/API calls are forbidden.
+- [~] PAG-0010 Add a test that fails if a production generation path attempts network access.
 
 ## Sprint PAG-S00.2 — Third-party provenance
 
-- [ ] PAG-0011 Create `THIRD_PARTY_NOTICES.md`.
-- [ ] PAG-0012 Record `ikarth/wfc_2019f` source URL, license and exact commit/tag used for study/adaptation.
-- [ ] PAG-0013 Record `mxgmn/WaveFunctionCollapse` source URL, license and exact commit/tag.
-- [ ] PAG-0014 Record `mxgmn/MarkovJunior` source URL, license and exact commit/tag.
-- [ ] PAG-0015 Record `zfedoran/pixel-sprite-generator` source URL, license and exact commit/tag.
-- [ ] PAG-0016 Preserve required MIT notices for any copied/substantially adapted code.
-- [ ] PAG-0017 Do not copy example artwork/assets unless their asset license is independently verified.
-- [ ] PAG-0018 Add provenance comments to substantial adapted source modules.
-- [ ] PAG-0019 Document which algorithms were reimplemented from concepts versus copied/adapted code.
+- [x] PAG-0011 Create `THIRD_PARTY_NOTICES.md`.
+- [x] PAG-0012 Record `ikarth/wfc_2019f` source URL, license and exact commit/tag used for study/adaptation.
+- [x] PAG-0013 Record `mxgmn/WaveFunctionCollapse` source URL, license and exact commit/tag.
+- [x] PAG-0014 Record `mxgmn/MarkovJunior` source URL, license and exact commit/tag.
+- [x] PAG-0015 Record `zfedoran/pixel-sprite-generator` source URL, license and exact commit/tag.
+- [x] PAG-0016 Preserve required MIT notices for any copied/substantially adapted code.
+- [x] PAG-0017 Do not copy example artwork/assets unless their asset license is independently verified.
+- [x] PAG-0018 Add provenance comments to substantial adapted source modules.
+- [x] PAG-0019 Document which algorithms were reimplemented from concepts versus copied/adapted code.
 
 ### M00 acceptance
 
-- [ ] PAG-0020 Clean checkout installs locally.
-- [ ] PAG-0021 Tests run locally without requiring Scrubbots main repo.
-- [ ] PAG-0022 Generator package imports without network access.
+- [~] PAG-0020 Clean checkout installs locally.
+- [x] PAG-0021 Tests run locally without requiring Scrubbots main repo.
+- [x] PAG-0022 Generator package imports without network access.
 
 ---
 
