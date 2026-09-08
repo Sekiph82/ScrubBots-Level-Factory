@@ -1,0 +1,70 @@
+[
+  {
+    "name": "easy",
+    "difficulty": "EASY",
+    "seed": 1001,
+    "generator_mode": "MASK",
+    "dimensions": [29, 25],
+    "palette": ["C07", "C08", "C12", "C14", "C15"],
+    "stage_seeds": {
+      "dimension": "4964a9a9c92933de8530db91ebede3aa17563fb51199c25900a3419bf06b5df7",
+      "palette": "f7f2adbd2c29febf9fccc983dd4e17b5a4e20a60eb46482ae1444d4416993fa4",
+      "geometry": "883b7d84d106b3c54af4efa9c9754a9e51bddc8abe86b34005730db86d802d1c",
+      "colorization": "b8187c76189bfe68510cddf439ad73e8b4a170d94a1a39a16fb9cbef1dba2482",
+      "post_processing": "207d28ecb9919421c1c1c609335aa9980bcd0565c6c36fd53d19816b53d05a6f"
+    },
+    "grid_sha256": "25d4b768e04b201cc0f966a31425c88b8dcfd3207bc5f15179bd11f8c1ea6968",
+    "result_sha256": "b99369519a0f276eab63f552b196f0361b52ebe35589e206250f258131b6c0a0"
+  },
+  {
+    "name": "medium",
+    "difficulty": "MEDIUM",
+    "seed": 2002,
+    "generator_mode": "MASK",
+    "dimensions": [37, 32],
+    "palette": ["C01", "C02", "C03", "C04", "C10", "C12", "C16"],
+    "stage_seeds": {
+      "dimension": "2b8e5ae81b59d83954862a8b365d822790b31edb6fc6250fae3e563762bd6b2a",
+      "palette": "9254cda8a34f116a7779f586b10f65a81b89dcd38cba9c99881a2711aafdbab7",
+      "geometry": "f3d0ae7d8ced875b95c3a8bae2ef1eca72bec453f9edfe57f90e985974b52841",
+      "colorization": "9f434a2dc9a891b2e3a566e1afc88fd5f1248ada82a639463b99a9ab4f221ff0",
+      "post_processing": "a48af18de1be2ea7da89fca53cd7c1b746d414e899d072caba19158e42b79a84"
+    },
+    "grid_sha256": "b35f46c211bd10e9f9a531a5d9a676f6f7f4a17c395ca96a03f0163be62066c0",
+    "result_sha256": "6cdb6c0a3b8f0fdf485704e90c8ebcb3e422f76c7aedd087e3bd81c856ef8177"
+  },
+  {
+    "name": "hard",
+    "difficulty": "HARD",
+    "seed": 3003,
+    "generator_mode": "MASK",
+    "dimensions": [44, 47],
+    "palette": ["C01", "C02", "C04", "C07", "C11", "C13", "C14", "C15"],
+    "stage_seeds": {
+      "dimension": "6ab9405d587d4909a278881ad4e3b77e22de25735984231025785f18d2060144",
+      "palette": "613a2d971f24c6d8d6195eb585bf2d5fe39197516140f24525a3d308f8fa294c",
+      "geometry": "1ff1f331f0e9f2db794b135fdd134b97922637ec2ec541bd426b205d2f151542",
+      "colorization": "56983889fce95750d5c73af56eff659210d8cd159edfe492d225ba30f0ef3da5",
+      "post_processing": "a9345e55e063b65068bdf5d961025d845927c76564bc6a8b5e9efee68301a125"
+    },
+    "grid_sha256": "b2bec0411860dbe0e264a54f1a1d57d49d06c6bde41cc28e8722cf72afcdc741",
+    "result_sha256": "26063faf10dc075f5b4f1df7408d37bee0e90f1366e9d658ceef65dc551d9d1a"
+  },
+  {
+    "name": "very_hard",
+    "difficulty": "VERY_HARD",
+    "seed": 4004,
+    "generator_mode": "MASK",
+    "dimensions": [58, 58],
+    "palette": ["C01", "C03", "C04", "C05", "C07", "C08", "C09", "C11", "C12", "C15"],
+    "stage_seeds": {
+      "dimension": "94e006875618cab8bff04277bf49c231f2015e43f42c859b1ee266c2cd4c7b8a",
+      "palette": "b6ebfd2171d0e8eb8b0b80a00dcab84024aec7e9808000dd73c34b224e15941f",
+      "geometry": "82a3453d160bfadfcd3a948bcc67f81272898a54e888d9a9d9a1780805eb120e",
+      "colorization": "e49d1ca968e3f2836dcfaa785a2289b195da89aa18e987afb347273387dcd706",
+      "post_processing": "838ef924eb6e0f3531f130c28760cb0bf986d47bac44b9542c2f415ee3ca249b"
+    },
+    "grid_sha256": "31d4db9cec5d1aa5547a1a5a349a9a94c97855018a4fc3773501658592cd867f",
+    "result_sha256": "b872979f134a8822983679e712887abab84137a706f98fc768e9f52346ef1dfb"
+  }
+]
