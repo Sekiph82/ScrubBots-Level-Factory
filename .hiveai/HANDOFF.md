@@ -2,29 +2,28 @@
 
 ## Current
 
-Active cycle: `PAG-M00-C001`
-Cycle title: `Repository Bootstrap & Governance`
+Active cycle: `RECOVERY-R001`
+Cycle title: `Revert Mistaken ScrubBots Local Edits`
 Workflow state: `READY_FOR_IMPLEMENTATION`
 Required actor: `CODEX`
-Canonical local repository root: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
-Canonical prompt: `.hiveai/prompts/PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`
-Expected Codex log: `.hiveai/codex-logs/PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_CODEX_LOG.md`
-Canonical task ledger: `tasks.md`
+Authority repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
+Canonical recovery prompt: `.hiveai/prompts/RECOVERY-R001_REVERT_MISTAKEN_SCRUBBOTS_LOCAL_EDITS_PROMPT.md`
+Expected Codex log: `.hiveai/codex-logs/RECOVERY-R001_REVERT_MISTAKEN_SCRUBBOTS_LOCAL_EDITS_CODEX_LOG.md`
 
 ## Next
 
-Codex must synchronize `main`, read the active cycle prompt from the repository, implement only that bounded cycle, run the required tests, create the matching immutable Codex log, commit, and push.
+Codex must read the recovery prompt from GitHub, surgically revert only the mistaken local edits in the main ScrubBots worktree, preserve all pre-existing dirty changes, and push only the matching recovery log to this Level Factory repository.
 
-After Codex completion, the required actor becomes ChatGPT for independent strict audit. Codex must not perform that audit or close tracker/task state.
+After Codex completion, ChatGPT performs the independent recovery audit. PAG-M00-C001 remains paused until RECOVERY-R001 is accepted.
 
 ## Blockers
 
-None currently known.
+PAG-M00-C001 is paused pending successful independent verification of RECOVERY-R001.
 
 ## Waiting
 
-Waiting for Codex implementation of `PAG-M00-C001`.
+Waiting for Codex recovery execution.
 
 ## Authority
 
-This handoff is an operational resume file, not task authority. If it conflicts with `tasks.md` or a later accepted independent audit, `tasks.md` and the accepted audit govern.
+This handoff is operational state only. `tasks.md` remains the canonical task ledger. ChatGPT is the sole tracker/audit authority.
