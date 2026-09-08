@@ -12,16 +12,20 @@ to fit a board.
 
 ## Windows setup and tests
 
-From PowerShell at the repository root:
+From PowerShell at the repository root, use the process-scoped execution-policy
+form below. It applies the bypass only to the setup/test child processes and
+does not change the owner's global PowerShell policy:
 
 ```powershell
-.\scripts\setup.ps1
-.\scripts\test.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
 ```
 
-The setup script creates or refreshes the local `.venv` with Python 3.12 and
-installs the package plus its test extra. It does not delete user data. The
-test script uses that environment when present, otherwise the active Python.
+The setup script prefers `py.exe -3.12`, validates any fallback `python.exe`
+before use, creates or refreshes only the repository-local `.venv`, reports the
+selected Python version and executable, and installs the package plus its test
+extra. It does not delete user data or modify `PATH`. The test script uses that
+environment when present, otherwise the active Python.
 
 Direct equivalents are:
 

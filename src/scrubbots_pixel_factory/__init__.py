@@ -4,12 +4,13 @@ M00 intentionally exposes policy and local smoke utilities only. Generator
 families and SCRUBBOTS contract modules belong to later milestones.
 """
 
-from .offline import OfflinePolicyError, guarded_network_request
+from .offline import OfflinePolicyError, guarded_network_request, offline_runtime
 from .local import deterministic_digest
 
 __all__ = [
     "OfflinePolicyError",
     "guarded_network_request",
+    "offline_runtime",
     "deterministic_digest",
 ]
 
