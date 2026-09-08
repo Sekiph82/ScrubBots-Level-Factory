@@ -50,5 +50,5 @@ A correction gets a new cycle ID, for example:
 
 Cycle: `PAG-M00-C001`
 Title: `Repository Bootstrap & Governance`
-State: `PROMPT_READY`
+State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
