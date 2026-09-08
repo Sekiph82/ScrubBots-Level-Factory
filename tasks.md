@@ -509,53 +509,54 @@ Closing audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT
 
 # PAG-M02 — Deterministic Generation Core
 
-H!veAI active cycle: `PAG-M02-C001 — Deterministic Generation Core`  
+H!veAI active cycle: `PAG-M02-C002 — Result Integrity & Provenance Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT_AUDIT.md`
+Authoritative prompt: `.hiveai/prompts/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_STRICT_AUDIT.md`  
+C001 verdict: `FAIL / FIX_REQUIRED`
 
 ## Sprint PAG-S02.1 — Generation request
 
-- [ ] PAG-0201 Define immutable/versioned `GenerationRequest`.
-- [ ] PAG-0202 Include request schema version.
-- [ ] PAG-0203 Include difficulty.
-- [ ] PAG-0204 Include optional explicit width.
-- [ ] PAG-0205 Include optional explicit height.
-- [ ] PAG-0206 Include seed.
-- [ ] PAG-0207 Include generator mode.
-- [ ] PAG-0208 Include optional style/theme.
-- [ ] PAG-0209 Include optional requested palette subset.
-- [ ] PAG-0210 Include generator-specific options under a versioned namespace.
-- [ ] PAG-0211 Canonicalize request serialization so key-order differences cannot alter reproducibility.
+- [x] PAG-0201 Define immutable/versioned `GenerationRequest`.
+- [x] PAG-0202 Include request schema version.
+- [x] PAG-0203 Include difficulty.
+- [x] PAG-0204 Include optional explicit width.
+- [x] PAG-0205 Include optional explicit height.
+- [~] PAG-0206 Include seed.
+- [x] PAG-0207 Include generator mode.
+- [x] PAG-0208 Include optional style/theme.
+- [x] PAG-0209 Include optional requested palette subset.
+- [x] PAG-0210 Include generator-specific options under a versioned namespace.
+- [x] PAG-0211 Canonicalize request serialization so key-order differences cannot alter reproducibility.
 
 ## Sprint PAG-S02.2 — Deterministic RNG
 
-- [ ] PAG-0212 Define one project-owned deterministic RNG abstraction.
-- [ ] PAG-0213 Do not let generator modules call uncontrolled global randomness.
-- [ ] PAG-0214 Derive sub-seeds deterministically for dimension, palette, geometry, colorization and post-processing stages.
-- [ ] PAG-0215 Record RNG algorithm/version in metadata.
-- [ ] PAG-0216 Test same seed + same config = same generated logical grid.
-- [ ] PAG-0217 Test same seed + same config = byte-identical canonical JSON.
-- [ ] PAG-0218 Test different seeds can generate distinct outputs.
-- [ ] PAG-0219 Ensure retries derive deterministic retry seeds.
-- [ ] PAG-0220 Ensure failure/retry order cannot depend on Python hash randomization.
+- [x] PAG-0212 Define one project-owned deterministic RNG abstraction.
+- [x] PAG-0213 Do not let generator modules call uncontrolled global randomness.
+- [x] PAG-0214 Derive sub-seeds deterministically for dimension, palette, geometry, colorization and post-processing stages.
+- [x] PAG-0215 Record RNG algorithm/version in metadata.
+- [x] PAG-0216 Test same seed + same config = same generated logical grid.
+- [x] PAG-0217 Test same seed + same config = byte-identical canonical JSON.
+- [x] PAG-0218 Test different seeds can generate distinct outputs.
+- [x] PAG-0219 Ensure retries derive deterministic retry seeds.
+- [x] PAG-0220 Ensure failure/retry order cannot depend on Python hash randomization.
 
 ## Sprint PAG-S02.3 — Generator interface
 
-- [ ] PAG-0221 Define common `PixelGenerator` interface.
-- [ ] PAG-0222 Define common `GenerationResult`.
-- [ ] PAG-0223 Require exact width×height logical grid.
-- [ ] PAG-0224 Require canonical C-ID logical cells.
-- [ ] PAG-0225 Require generator mode/version.
-- [ ] PAG-0226 Require seed/provenance.
-- [ ] PAG-0227 Require explicit failure reason on unsuccessful generation.
-- [ ] PAG-0228 Never return partially valid production output as success.
+- [x] PAG-0221 Define common `PixelGenerator` interface.
+- [~] PAG-0222 Define common `GenerationResult`.
+- [~] PAG-0223 Require exact width×height logical grid.
+- [~] PAG-0224 Require canonical C-ID logical cells.
+- [~] PAG-0225 Require generator mode/version.
+- [~] PAG-0226 Require seed/provenance.
+- [~] PAG-0227 Require explicit failure reason on unsuccessful generation.
+- [~] PAG-0228 Never return partially valid production output as success.
 
 ### M02 acceptance
 
-- [ ] PAG-0229 Golden deterministic test fixtures exist for at least one Easy, Medium, Hard and Very Hard request.
-- [ ] PAG-0230 Same-request reruns are byte-identical across repeated executions on the same supported environment.
+- [x] PAG-0229 Golden deterministic test fixtures exist for at least one Easy, Medium, Hard and Very Hard request.
+- [x] PAG-0230 Same-request reruns are byte-identical across repeated executions on the same supported environment.
 
 ---
 
