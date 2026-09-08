@@ -398,8 +398,8 @@ Minimum completion rules:
 
 # 5. MILESTONE OVERVIEW
 
-- [~] **PAG-M00 — Repository Bootstrap & Governance**
-- [ ] **PAG-M01 — Canonical SCRUBBOTS Contracts**
+- [x] **PAG-M00 — Repository Bootstrap & Governance**
+- [~] **PAG-M01 — Canonical SCRUBBOTS Contracts**
 - [ ] **PAG-M02 — Deterministic Generation Core**
 - [ ] **PAG-M03 — Mask / Sprite Generator**
 - [ ] **PAG-M04 — Procedural Shape / Rule Generator**
@@ -415,26 +415,24 @@ Minimum completion rules:
 
 # PAG-M00 — Repository Bootstrap & Governance
 
-H!veAI active cycle: `PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`  
-C002 verdict: `FAIL / FIX_REQUIRED`  
+M00 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation`  
+Closing audit: `.hiveai/audits/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_STRICT_AUDIT.md`  
+Previous C002 verdict: `FAIL / REMEDIATED`  
 Recovery `RECOVERY-R001`: `AUDIT_PASSED / CLOSED`
 
 ## Sprint PAG-S00.1 — Project bootstrap
 
 - [x] PAG-0001 Create Python package structure under `src/scrubbots_pixel_factory/`.
 - [x] PAG-0002 Add `pyproject.toml` with pinned/minimum supported Python and dependencies.
-- [~] PAG-0003 Add a Windows-friendly local setup command.
+- [x] PAG-0003 Add a Windows-friendly local setup command.
 - [x] PAG-0004 Add a local test command.
 - [x] PAG-0005 Add `.gitignore` entries for virtualenv, Python caches, generated PNG/JSON, logs and temporary WFC caches.
 - [x] PAG-0006 Add `output/.gitkeep` while ignoring generated output contents.
 - [x] PAG-0007 Add a minimal README explaining this repository is Pixel Art Generator V1 only.
 - [x] PAG-0008 Add an explicit OFFLINE_ONLY policy.
 - [x] PAG-0009 Add a rule that runtime HTTP/API calls are forbidden.
-- [~] PAG-0010 Add a test that fails if a production generation path attempts network access.
+- [x] PAG-0010 Add a test that fails if a production generation path attempts network access.
 
 ## Sprint PAG-S00.2 — Third-party provenance
 
@@ -450,13 +448,19 @@ Recovery `RECOVERY-R001`: `AUDIT_PASSED / CLOSED`
 
 ### M00 acceptance
 
-- [~] PAG-0020 Clean checkout installs locally.
+- [x] PAG-0020 Clean checkout installs locally.
 - [x] PAG-0021 Tests run locally without requiring Scrubbots main repo.
 - [x] PAG-0022 Generator package imports without network access.
 
 ---
 
 # PAG-M01 — Canonical SCRUBBOTS Contracts
+
+H!veAI active cycle: `PAG-M01-C001 — Canonical SCRUBBOTS Contracts`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_STRICT_AUDIT.md`
 
 ## Sprint PAG-S01.1 — Palette authority
 
