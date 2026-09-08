@@ -2,27 +2,38 @@
 
 ## Current
 
-Active cycle: `PAG-M02-C001`
-Cycle title: `Deterministic Generation Core`
+Active cycle: `PAG-M02-C002`
+Cycle title: `Result Integrity & Provenance Remediation`
 Workflow state: `READY_FOR_IMPLEMENTATION`
 Required actor: `CODEX`
 Authority repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
-Canonical implementation prompt: `.hiveai/prompts/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_PROMPT.md`
-Previous independent audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT_AUDIT.md`
-Expected Codex log: `.hiveai/codex-logs/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_CODEX_LOG.md`
+Canonical remediation prompt: `.hiveai/prompts/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_PROMPT.md`
+Previous independent audit: `.hiveai/audits/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_STRICT_AUDIT.md`
+Expected Codex log: `.hiveai/codex-logs/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_CODEX_LOG.md`
 Canonical task ledger: `tasks.md`
 
-## Current milestone
+## Current findings
 
-`PAG-M01 — Canonical SCRUBBOTS Contracts` = `PASS / CLOSED`.
+- `F-PAG-M02-C001-001` — BLOCKER — public GenerationResult constructor bypasses validation.
+- `F-PAG-M02-C001-002` — MAJOR — provenance is not authenticated against request seed/project RNG.
+- `F-PAG-M02-C001-003` — MINOR — empty-string seed compatibility drift from M01.
 
-`PAG-M02 — Deterministic Generation Core` = `ACTIVE`.
+Validated M02 tasks remain closed. Open remediation task IDs:
+
+- `PAG-0206`
+- `PAG-0222`
+- `PAG-0223`
+- `PAG-0224`
+- `PAG-0225`
+- `PAG-0226`
+- `PAG-0227`
+- `PAG-0228`
 
 ## Next
 
-Codex must read the M02-C001 prompt directly from GitHub, implement only the deterministic generation core, create the matching builder log before any source edit, run focused plus full regression evidence, publish implementation and log, and stop.
+Codex must read the C002 remediation prompt directly from GitHub, fix only the audited result/provenance/seed-domain findings, preserve all validated M02 work, run focused plus full regression evidence, publish the matching builder log, and stop.
 
-After publication, ChatGPT independently records terminal Git HEAD and performs the strict audit.
+After publication, ChatGPT performs the independent strict re-audit and records terminal Git HEAD.
 
 PAG-M03 remains blocked until M02 receives an unconditional independent PASS.
 
@@ -33,6 +44,7 @@ PAG-M03 remains blocked until M02 receives an unconditional independent PASS.
 - `PAG-M00-C002` = `AUDIT_FAILED / REMEDIATED`
 - `PAG-M00-C003` = `AUDIT_PASSED / TASK_COMPLETE`
 - `PAG-M01-C001` = `AUDIT_PASSED / TASK_COMPLETE`
+- `PAG-M02-C001` = `AUDIT_FAILED / FIX_REQUIRED`
 
 ## Authority
 
