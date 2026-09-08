@@ -48,7 +48,14 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M00-C001`
-Title: `Repository Bootstrap & Governance`
+Cycle: `RECOVERY-R001`
+Title: `Revert Mistaken ScrubBots Local Edits`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
+
+## Paused cycle
+
+Cycle: `PAG-M00-C001`
+Title: `Repository Bootstrap & Governance`
+State: `PAUSED`
+Reason: RECOVERY-R001 must be independently verified first.
