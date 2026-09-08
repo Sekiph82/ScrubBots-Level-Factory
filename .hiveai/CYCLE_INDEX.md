@@ -48,8 +48,8 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M01-C001`
-Title: `Canonical SCRUBBOTS Contracts`
+Cycle: `PAG-M02-C001`
+Title: `Deterministic Generation Core`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
@@ -61,6 +61,13 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M01-C001 — Canonical SCRUBBOTS Contracts
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT_AUDIT.md`
+Closes milestone: `PAG-M01 — Canonical SCRUBBOTS Contracts`
+Terminal builder-era HEAD independently observed: `41601910c133f42753272877ad648db098ff7306`
+
 
 ### PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation
 State: `AUDIT_PASSED / TASK_COMPLETE`
