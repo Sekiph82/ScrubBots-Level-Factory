@@ -4,9 +4,11 @@
 
 This repository follows an H!veAI-compatible evidence-first development protocol with strict separation between builder and independent auditor.
 
-Canonical local repository root:
+Canonical task and implementation authority:
 
-`C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+`https://github.com/Sekiph82/ScrubBots-Level-Factory`
+
+The owner's Windows folder `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` is a local mirror/worktree only. It is never a task-discovery authority. A prompt may explicitly require synchronization with GitHub, but Codex must never choose a repository or active cycle by searching local sibling folders.
 
 ## Roles
 
@@ -151,6 +153,16 @@ Matching filenames:
 - `PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_PROMPT.md`
 - `PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_CODEX_LOG.md`
 - `PAG-M00-C001_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`
+
+## GitHub authority and local mirror rule
+
+- GitHub repository `Sekiph82/ScrubBots-Level-Factory` is the sole task/prompt/audit authority.
+- Every user-facing Codex handoff must include the full GitHub repository URL and full authoritative prompt URL.
+- When a previous independent audit exists, the handoff must include its full GitHub URL.
+- Codex must read the authoritative prompt from GitHub before acting.
+- Local folders must never be searched to infer the active project or task.
+- `C:\Users\sekip\Desktop\ScrubBots` is the separate main-game repository and is off-limits unless an authoritative prompt names a narrowly scoped read-only or recovery action.
+- `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` may be synchronized from GitHub only when the authoritative prompt explicitly requests that synchronization.
 
 ## Tracker ownership
 
