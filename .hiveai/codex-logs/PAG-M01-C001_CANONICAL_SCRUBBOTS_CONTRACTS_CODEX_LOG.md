@@ -170,3 +170,16 @@ package metadata, and this matching builder log. The implementation commit,
 final log commit, push results, final status, and local/remote equality will be
 appended after commit and push. Builder status remains implementation complete /
 pending independent audit; this log does not declare `PASS` or `CLOSED`.
+
+## Final evidence and publication
+
+Implementation commit: `113e1401eba821460b9887ef84a14e2fb7c67f7c`
+(`feat: add canonical scrubbots contracts`). The implementation commit was
+pushed successfully with `git push origin main`, advancing GitHub `main` from
+`82c29c71f007371bc58059432b1e9678a0e1291d` to that SHA. At this checkpoint,
+local HEAD and `origin/main` were equal at the implementation commit.
+
+The final log completion commit is the subsequent log-only commit created from
+this evidence append. Its exact SHA, push result, and terminal local/remote
+equality are verified in the final handoff after publication. The preserved
+pre-existing `.hiveai/PROJECT.json` edit remains outside the staged set.
