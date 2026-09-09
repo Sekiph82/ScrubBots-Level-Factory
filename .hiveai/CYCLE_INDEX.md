@@ -48,12 +48,19 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M05-C001`
-Title: `Wave Function Collapse Generator`
+Cycle: `PAG-M05-C002`
+Title: `Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
+
+### PAG-M05-C001 — Wave Function Collapse Generator
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`
+Open findings: `F-PAG-M05-C001-001`, `F-PAG-M05-C001-002`, `F-PAG-M05-C001-003`, `F-PAG-M05-C001-004`
+Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48dedbcbc6bde`
+
 
 ### PAG-M04-C001 — Procedural Shape / Rule Generator
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
