@@ -48,15 +48,23 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M03-C002`
-Title: `Reproducibility, Region Quality & Recognizability Remediation`
+Cycle: `PAG-M03-C003`
+Title: `Semantic Role Binding & Weak-Family Recognizability Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
 
-### PAG-M03-C001 — Mask / Sprite Generator
+### PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation
 State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`
+Closed findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`
+Open findings: `F-PAG-M03-C002-001`, `F-PAG-M03-C002-002`
+Terminal builder-era HEAD independently observed: `9dc2eb7ae6620f655d21b6b2481a74c5783149dd`
+
+
+### PAG-M03-C001 — Mask / Sprite Generator
+State: `AUDIT_FAILED / PARTIALLY_REMEDIATED`
 Audit: `.hiveai/audits/PAG-M03-C001_MASK_SPRITE_GENERATOR_STRICT_AUDIT.md`
 Open findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`, `F-PAG-M03-C001-003`, `F-PAG-M03-C001-004`
 Terminal builder-era HEAD independently observed: `15363eb9d49d4e8791bfe0e038f9e83017c503fc`
