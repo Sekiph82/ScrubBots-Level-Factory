@@ -697,11 +697,12 @@ Do not require MarkovJunior/C# at runtime.
 
 # PAG-M05 — Wave Function Collapse Generator
 
-H!veAI active cycle: `PAG-M05-C001 — Wave Function Collapse Generator`  
+H!veAI active cycle: `PAG-M05-C002 — Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_STRICT_AUDIT.md`  
+Authoritative prompt: `.hiveai/prompts/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`  
+C001 verdict: `FAIL / FIX_REQUIRED`  
 M04 forward dependency: `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
 
 Goal: generate new pixel-art arrangements that preserve local pattern language from approved exemplars.
@@ -710,53 +711,53 @@ Primary implementation reference: `ikarth/wfc_2019f`.
 
 ## Sprint PAG-S05.1 — WFC isolation
 
-- [ ] PAG-0501 Pin/document exact upstream reference commit.
-- [ ] PAG-0502 Identify the minimum WFC modules required.
-- [ ] PAG-0503 Remove/avoid irrelevant GUI/logging/demo dependencies.
-- [ ] PAG-0504 Wrap WFC behind the common `PixelGenerator` interface.
-- [ ] PAG-0505 Ensure WFC receives in-memory logical pixel arrays.
-- [ ] PAG-0506 Ensure WFC output dimensions equal requested logical dimensions.
-- [ ] PAG-0507 Prohibit automatic output resampling.
-- [ ] PAG-0508 Pass project deterministic RNG/seed into WFC behavior.
-- [ ] PAG-0509 Make contradiction/retry handling deterministic.
-- [ ] PAG-0510 Bound retries.
+- [x] PAG-0501 Pin/document exact upstream reference commit.
+- [x] PAG-0502 Identify the minimum WFC modules required.
+- [x] PAG-0503 Remove/avoid irrelevant GUI/logging/demo dependencies.
+- [x] PAG-0504 Wrap WFC behind the common `PixelGenerator` interface.
+- [x] PAG-0505 Ensure WFC receives in-memory logical pixel arrays.
+- [x] PAG-0506 Ensure WFC output dimensions equal requested logical dimensions.
+- [x] PAG-0507 Prohibit automatic output resampling.
+- [x] PAG-0508 Pass project deterministic RNG/seed into WFC behavior.
+- [x] PAG-0509 Make contradiction/retry handling deterministic.
+- [x] PAG-0510 Bound retries.
 
 ## Sprint PAG-S05.2 — Exemplar contract
 
-- [ ] PAG-0511 Define exemplar metadata schema.
-- [ ] PAG-0512 Require explicit source/provenance for every exemplar.
-- [ ] PAG-0513 Require exemplar logical pixels to be canonical C01..C16 or pass an explicit deterministic mapping process.
-- [ ] PAG-0514 Reject antialiased/interpolated exemplars.
-- [ ] PAG-0515 Reject exemplars with illegal dimensions only when they are intended as production artifacts; allow smaller training motifs under a separate exemplar role.
-- [ ] PAG-0516 Never treat external project sample images as SCRUBBOTS-owned exemplars.
-- [ ] PAG-0517 Add an empty exemplar inbox/documentation path rather than fabricating owner art.
+- [x] PAG-0511 Define exemplar metadata schema.
+- [x] PAG-0512 Require explicit source/provenance for every exemplar.
+- [x] PAG-0513 Require exemplar logical pixels to be canonical C01..C16 or pass an explicit deterministic mapping process.
+- [x] PAG-0514 Reject antialiased/interpolated exemplars.
+- [~] PAG-0515 Reject exemplars with illegal dimensions only when they are intended as production artifacts; allow smaller training motifs under a separate exemplar role.
+- [x] PAG-0516 Never treat external project sample images as SCRUBBOTS-owned exemplars.
+- [x] PAG-0517 Add an empty exemplar inbox/documentation path rather than fabricating owner art.
 
 ## Sprint PAG-S05.3 — Pattern extraction/configuration
 
-- [ ] PAG-0518 Support pattern width N=2.
-- [ ] PAG-0519 Support pattern width N=3.
-- [ ] PAG-0520 Allow N=4 experimentally but keep it non-default until performance/quality is proven.
-- [ ] PAG-0521 Support configurable input periodicity.
-- [ ] PAG-0522 Support configurable output periodicity.
-- [ ] PAG-0523 Support controlled rotations/reflections.
-- [ ] PAG-0524 Record WFC config in metadata.
-- [ ] PAG-0525 Reject configs that cannot satisfy requested palette legality.
+- [x] PAG-0518 Support pattern width N=2.
+- [x] PAG-0519 Support pattern width N=3.
+- [x] PAG-0520 Allow N=4 experimentally but keep it non-default until performance/quality is proven.
+- [x] PAG-0521 Support configurable input periodicity.
+- [x] PAG-0522 Support configurable output periodicity.
+- [x] PAG-0523 Support controlled rotations/reflections.
+- [~] PAG-0524 Record WFC config in metadata.
+- [x] PAG-0525 Reject configs that cannot satisfy requested palette legality.
 
 ## Sprint PAG-S05.4 — SCRUBBOTS palette enforcement
 
-- [ ] PAG-0526 Ensure WFC cannot introduce unseen/off-palette colors.
-- [ ] PAG-0527 Remap WFC's used colors to the requested canonical palette subset only through deterministic explicit mapping.
-- [ ] PAG-0528 Enforce target distinct-color count after generation.
-- [ ] PAG-0529 Reject rather than silently “fix” an output that violates logical contract.
-- [ ] PAG-0530 Record contradiction/rejection reasons.
+- [x] PAG-0526 Ensure WFC cannot introduce unseen/off-palette colors.
+- [x] PAG-0527 Remap WFC's used colors to the requested canonical palette subset only through deterministic explicit mapping.
+- [x] PAG-0528 Enforce target distinct-color count after generation.
+- [x] PAG-0529 Reject rather than silently “fix” an output that violates logical contract.
+- [~] PAG-0530 Record contradiction/rejection reasons.
 
 ### M05 acceptance
 
-- [ ] PAG-0531 Produce deterministic outputs from at least three legal synthetic/unit-test exemplars.
-- [ ] PAG-0532 Same exemplar + same config + same seed reproduces byte-identical logical output.
-- [ ] PAG-0533 Rectangular WFC outputs are tested.
-- [ ] PAG-0534 59×59 WFC workload is benchmarked.
-- [ ] PAG-0535 No production dependency on network/API/cloud exists.
+- [x] PAG-0531 Produce deterministic outputs from at least three legal synthetic/unit-test exemplars.
+- [x] PAG-0532 Same exemplar + same config + same seed reproduces byte-identical logical output.
+- [~] PAG-0533 Rectangular WFC outputs are tested.
+- [x] PAG-0534 59×59 WFC workload is benchmarked.
+- [x] PAG-0535 No production dependency on network/API/cloud exists.
 
 ---
 
