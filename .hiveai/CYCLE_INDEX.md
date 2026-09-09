@@ -48,12 +48,20 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M05-C002`
-Title: `Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`
-State: `READY_FOR_IMPLEMENTATION`
+Recovery: `RECOVERY-R002`
+Title: `Publish Existing PAG-M05-C002 Work to GitHub`
+State: `PUBLICATION_REQUIRED`
 Actor: `CODEX`
+Target cycle: `PAG-M05-C002`
 
 ## Failed / remediation-required cycles
+
+### RECOVERY-R002 — Publish Existing PAG-M05-C002 Work to GitHub
+State: `PUBLICATION_REQUIRED`
+Prompt: `.hiveai/prompts/RECOVERY-R002_PUBLISH_EXISTING_PAG-M05-C002_WORK_TO_GITHUB_PROMPT.md`
+Reason: owner reported C002 completion but no C002 implementation/log exists on GitHub main or any discovered branch.
+Classification: `PUBLICATION_HANDOFF_FAILURE / NOT_A_PRODUCT_AUDIT_VERDICT`
+
 
 ### PAG-M05-C001 — Wave Function Collapse Generator
 State: `AUDIT_FAILED / FIX_REQUIRED`
