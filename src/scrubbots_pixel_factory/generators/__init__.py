@@ -12,6 +12,7 @@ from .mask import (
     TemplateFamily,
 )
 from .rules import RuleShapeGenerator
+from .wfc import WFCGenerator
 
 __all__ = [
     "FAMILY_NAMES",
@@ -23,4 +24,5 @@ __all__ = [
     "SymmetryMode",
     "TemplateFamily",
     "RuleShapeGenerator",
+    "WFCGenerator",
 ]

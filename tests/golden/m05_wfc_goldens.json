@@ -1,0 +1,35 @@
+{
+  "schema": "scrubbots-wfc-golden-v1",
+  "entries": [
+    {
+      "exemplar": "wfc-synthetic-easy-3.json",
+      "difficulty": "EASY",
+      "seed": 17,
+      "dimensions": [20, 20],
+      "options": {"pattern_size": 2, "input_periodic": true, "output_periodic": false},
+      "result_digest": "eb061e3be928502e570306115373b9c5228c49d3d340d548d83b26b868bdcac9",
+      "pattern_table_digest": "545c361a6d949eba2c24a747bb5ca4e0761737d783bfdaa8deed051a1f1a7965",
+      "used_palette": ["C01", "C02", "C03"]
+    },
+    {
+      "exemplar": "wfc-synthetic-medium-6.json",
+      "difficulty": "MEDIUM",
+      "seed": 23,
+      "dimensions": [30, 30],
+      "options": {"pattern_size": 3, "input_periodic": true, "output_periodic": false, "allow_rotations": true},
+      "result_digest": "aeee481626d92aa8dec73c1145e83ee70fbb1b031391f660a41d4380facefacd",
+      "pattern_table_digest": "94c8e043232898656565e24c3e8d0e4b6fae1eef5e4e487136a20e1d1e80e84a",
+      "used_palette": ["C01", "C02", "C03", "C04", "C05", "C06"]
+    },
+    {
+      "exemplar": "wfc-synthetic-hard-8.json",
+      "difficulty": "HARD",
+      "seed": 47,
+      "dimensions": [40, 40],
+      "options": {"pattern_size": 2, "input_periodic": true, "output_periodic": true},
+      "result_digest": "3c3fa917d9741ed67a7104cad75616511e3181a532766892cd111a5529262576",
+      "pattern_table_digest": "83815c7c31d77214c6fcb52b11c642236ba3b8f3fa446867306a78897cf74a36",
+      "used_palette": ["C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08"]
+    }
+  ]
+}
