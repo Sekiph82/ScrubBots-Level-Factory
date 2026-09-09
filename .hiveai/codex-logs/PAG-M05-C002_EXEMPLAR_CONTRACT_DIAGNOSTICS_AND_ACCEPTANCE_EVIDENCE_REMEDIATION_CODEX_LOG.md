@@ -48,4 +48,11 @@ Further entries will be appended chronologically and truthfully.
 - Dependency command `.\\.venv\\Scripts\\python.exe -m pip check` passed: no broken requirements.
 - An initial broad forbidden-runtime scan intentionally included the repository's cross-process tests and reported expected `subprocess` references there. The corrected production WFC-source-only scan passed: no random module, Python `hash()`, subprocess, eval/exec, network client, socket, URL, or HTTP runtime references.
 - Corrected M06+ source scope scan passed: no PAG-M06, router, or hybrid implementation was found under the M05 WFC source.
+
+## 2026-09-09T21:00:00+03:00 — Publication checkpoint
+
+- GitHub synchronization: fetched `origin/main`, preserved the pre-existing dirty H!veAI control-plane files and the new C002 log in `codex-preserve-preexisting-controls-and-M05-C002-work-before-sync`, fast-forwarded local `main` from `f431b24b2c965e615898020d30d48dedbcbc6bde` to `e808dcab099f049195b3b6fb3daad8c04afcda3d`, reapplied the work, and resolved only control-plane stash conflicts by retaining the pre-existing local dirty versions. Current GitHub prompt/audit/control commits remain in repository history.
+- Final C002 staged file list was limited to: this matching builder log; `exemplars/README.md`; M05 review/benchmark builders and regenerated artifacts; the WFC source model/exemplar/patterns/generator package; and M05 acceptance/golden/unit/integration tests. The five documented synthetic/benchmark fixture files from C001 were preserved unchanged and were not restaged. No ChatGPT-owned task/tracker/H!veAI state, prompt, audit, recovery, or main ScrubBots file was staged.
+- Implementation/remediation commit: `e52559f` (`remediate M05 WFC evidence and diagnostics`). Push result: `e808dca..e52559f main -> main`.
+- This log will be published in a separate log-only commit. Its own final commit SHA is intentionally not written into itself; the terminal repository HEAD will be independently recorded by ChatGPT/H!veAI.
 - `git diff --check` passed with only normal CRLF conversion warnings on changed files and no whitespace errors.
