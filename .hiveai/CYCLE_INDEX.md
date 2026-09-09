@@ -48,12 +48,20 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M06-C001`
-Title: `Hybrid Generator Router`
+Cycle: `PAG-M06-C002`
+Title: `WFC Remap, Stage Replay & Router Evidence Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
+
+### PAG-M06-C001 — Hybrid Generator Router
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M06-C001_HYBRID_GENERATOR_ROUTER_STRICT_AUDIT.md`
+Open findings: `F-PAG-M06-C001-001`, `F-PAG-M06-C001-002`, `F-PAG-M06-C001-003`, `F-PAG-M06-C001-004`
+Terminal builder-era HEAD independently observed: `318b97b9c33a3b35a2ef6bbde9b348331cf74b83`
+Post-builder tracker-v3 migration commit: `279f978dd9e73f08abe2ab3f8b2f313c84260ef2`
+
 
 ### RECOVERY-R002 — Publish Existing PAG-M05-C002 Work to GitHub
 State: `PUBLICATION_REQUIRED`
