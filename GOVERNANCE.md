@@ -21,7 +21,7 @@ ChatGPT owns:
 - acceptance and rejection decisions,
 - task checkbox state in `tasks.md`,
 - milestone, sprint, and cycle closure state,
-- H!veAI handoff and cycle-index state,
+- GitHub-first v3 H!veAI task/event state and cycle-index history,
 - bounded remediation prompt creation,
 - final determination of whether work may advance.
 
@@ -42,7 +42,8 @@ Codex must not:
 - declare `AUDIT_PASSED`,
 - declare a milestone, sprint, or cycle finally accepted,
 - mark tasks complete in `tasks.md`,
-- edit `.hiveai/HANDOFF.md`,
+- edit `.hiveai/TASKS.md` acceptance/current-state fields,
+- edit `.hiveai/EVENTS.jsonl` workflow/audit events,
 - edit `.hiveai/CYCLE_INDEX.md`,
 - author or edit files under `.hiveai/audits/`,
 - rewrite historical prompt/log/audit files,
