@@ -4,34 +4,34 @@
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
   "currentMilestone": "PAG-M03",
-  "currentSprint": "PAG-M03-C001",
-  "currentTaskId": "PAG-M03-C001",
-  "currentTaskTitle": "Mask / Sprite Generator",
+  "currentSprint": "PAG-M03-C002",
+  "currentTaskId": "PAG-M03-C002",
+  "currentTaskTitle": "Reproducibility, Region Quality & Recognizability Remediation",
   "workflowState": "READY",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M03-C001 authoritative implementation prompt, create builder log before any edit, publish MASK generator evidence/review artifacts, then return for independent ChatGPT strict audit.",
+  "nextAction": "Execute PAG-M03-C002 bounded remediation, regenerate review/golden evidence, publish builder evidence, then return for independent ChatGPT strict re-audit.",
   "blockers": [
     "PAG-M04 blocked until M03 receives unconditional independent PASS"
   ],
   "progress": {
-    "completed": 85,
+    "completed": 115,
     "total": 380,
-    "percent": 22.37
+    "percent": 30.26
   },
   "git": {
     "branch": "main",
-    "head": "4f0c803c7c4ab565700356735e6f665aeae7805b",
+    "head": "15363eb9d49d4e8791bfe0e038f9e83017c503fc",
     "dirty": null
   },
   "lastAudit": {
-    "verdict": "PASS",
-    "auditId": "PAG-M02-C003"
+    "verdict": "FAIL",
+    "auditId": "PAG-M03-C001"
   },
   "lastAgentSession": {
     "provider": "CODEX",
     "sessionId": null,
-    "status": "COMPLETED_AND_AUDITED"
+    "status": "COMPLETED_PENDING_REMEDIATION"
   },
-  "updatedAt": "2026-09-09T06:25:00Z",
+  "updatedAt": "2026-09-09T07:38:00Z",
   "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
 }
