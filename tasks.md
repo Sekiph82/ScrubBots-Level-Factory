@@ -559,12 +559,12 @@ Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIA
 
 # PAG-M03 — Mask / Sprite Generator
 
-H!veAI active cycle: `PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation`  
+H!veAI active cycle: `PAG-M03-C003 — Semantic Role Binding & Weak-Family Recognizability Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M03-C001_MASK_SPRITE_GENERATOR_STRICT_AUDIT.md`  
-C001 verdict: `FAIL / FIX_REQUIRED`
+Authoritative prompt: `.hiveai/prompts/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`  
+C002 verdict: `FAIL / FIX_REQUIRED`
 
 Goal: produce recognizable silhouettes and structured pixel-art objects without AI.
 
@@ -610,8 +610,8 @@ Each family:
 
 - [x] PAG-0326 Convert silhouette regions to canonical C01..C16.
 - [x] PAG-0327 Use exactly a legal distinct-color count for difficulty.
-- [~] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
-- [~] PAG-0329 Prefer coherent connected color regions.
+- [x] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
+- [x] PAG-0329 Prefer coherent connected color regions.
 - [~] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
 - [x] PAG-0331 Prevent BG01 assignment to cells.
 - [x] PAG-0332 Ensure every requested palette color actually appears when output is accepted.
