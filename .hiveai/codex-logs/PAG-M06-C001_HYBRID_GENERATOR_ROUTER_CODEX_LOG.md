@@ -76,7 +76,10 @@ The local control plane reports stale/reconciled historical state; this cycle fo
 
 - No runtime dependency, network access, cloud service, owner-approved exemplar, subprocess, eval/exec, global random source, Python hash behavior, resize/resample/interpolation, or M07+ implementation was added.
 - The main ScrubBots repository was not accessed or modified. Task, tracker, H!veAI acceptance, prompt, audit, and cycle-index state remain untouched.
-- Pending: stage only M06 implementation/tests/review/golden files and this matching log, commit the implementation, push `main`, then publish the completed log in a log-only commit. The log-only commit will not be amended merely to place its own final SHA inside itself; final local/origin equality will be checked and recorded as the terminal publication checkpoint.
+- Implementation commit: `f7dd1ae` (`implement M06 hybrid generator router`).
+- Implementation push: `c4682b0..f7dd1ae main -> main` succeeded.
+- The implementation commit contained this log in its required pre-edit-created form. This completion append is being published as a separate log-only commit so the log remains chronological and truthful.
+- The log-only commit will not be amended merely to place its own final SHA inside itself; the terminal local HEAD and `origin/main` equality checkpoint will be independently visible in GitHub/H!veAI.
 
 ## 7. Files changed
 
