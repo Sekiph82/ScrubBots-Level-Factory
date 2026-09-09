@@ -2,22 +2,42 @@
 
 ## Current
 
-Active cycle: `PAG-M05-C002`
-Cycle title: `Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`
-Workflow state: `READY_FOR_IMPLEMENTATION`
+Active recovery: `RECOVERY-R002`
+Title: `Publish Existing PAG-M05-C002 Work to GitHub`
+Workflow state: `PUBLICATION_REQUIRED`
 Required actor: `CODEX`
 Authority repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
-Canonical remediation prompt: `.hiveai/prompts/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`
+Recovery prompt: `.hiveai/prompts/RECOVERY-R002_PUBLISH_EXISTING_PAG-M05-C002_WORK_TO_GITHUB_PROMPT.md`
+Target cycle: `PAG-M05-C002 — Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`
+Expected C002 builder log: `.hiveai/codex-logs/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_CODEX_LOG.md`
+Expected recovery log: `.hiveai/codex-logs/RECOVERY-R002_PUBLISH_EXISTING_PAG-M05-C002_WORK_TO_GITHUB_CODEX_LOG.md`
 Previous independent audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`
-Expected Codex log: `.hiveai/codex-logs/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_CODEX_LOG.md`
 Canonical task ledger: `tasks.md`
 
-## Current findings
+## Publication incident
 
-- `F-PAG-M05-C001-001` — MAJOR — production artifact exemplar dimensions are not validated through M01 difficulty bands.
-- `F-PAG-M05-C001-002` — MAJOR — terminal contradiction/rejection diagnostics are discarded and adversarial retry evidence is missing.
-- `F-PAG-M05-C001-003` — MAJOR — extracted pattern-count metadata is transform-expanded rather than raw-window truth.
-- `F-PAG-M05-C001-004` — MAJOR — review/golden/rectangle acceptance evidence is incomplete.
+The owner reported completion of PAG-M05-C002, but independent GitHub inspection found:
+
+- no C002 builder log on GitHub;
+- no C002 implementation commit on GitHub;
+- no C002 branch on GitHub;
+- canonical main still contains only ChatGPT C002 activation/control-plane commits after the C001 audit.
+
+Therefore no C002 independent audit has started.
+
+This is a publication handoff recovery, not a product-code FAIL.
+
+## Next
+
+Codex must execute RECOVERY-R002 exactly.
+
+If completed C002 work exists in the designated local Level Factory checkout, publish that existing work plus the matching historical C002 builder log and the recovery log without overwriting current GitHub control-plane state.
+
+If completed C002 work does not exist locally, do not implement it during recovery. Publish only a truthful recovery log and stop.
+
+After publication, ChatGPT independently inspects GitHub and either audits C002 or issues a fresh implementation cycle.
+
+## Current technical findings remain unchanged
 
 Open/revalidation task IDs:
 - `PAG-0515`
@@ -25,27 +45,9 @@ Open/revalidation task IDs:
 - `PAG-0530`
 - `PAG-0533`
 
-Cross-cutting review remediation:
-- expand M05 review pack from 4 to >=12 accepted candidates;
-- render exemplar motif beside generated output;
-- add rectangular and 10-color golden evidence.
-
-## Next
-
-Codex must read the C002 remediation prompt directly from GitHub, fix only the four audited findings, preserve the validated WFC core, expand the acceptance/review/golden evidence, rerun >=120 acceptance candidates and full regression, refresh the benchmark, publish the matching builder log, and stop.
-
-After publication, ChatGPT performs the independent strict re-audit.
-
-PAG-M06+ remains blocked until M05 receives unconditional independent PASS.
-
-## Existing forward dependency
+PAG-M06+ remains blocked.
 
 `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
-
-## Historical
-
-- `PAG-M04-C002` = `AUDIT_PASSED / FUNCTIONAL_SCOPE_COMPLETE`
-- `PAG-M05-C001` = `AUDIT_FAILED / FIX_REQUIRED`
 
 ## Authority
 
