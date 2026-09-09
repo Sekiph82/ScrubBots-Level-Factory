@@ -559,11 +559,12 @@ Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIA
 
 # PAG-M03 — Mask / Sprite Generator
 
-H!veAI active cycle: `PAG-M03-C001 — Mask / Sprite Generator`  
+H!veAI active cycle: `PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M03-C001_MASK_SPRITE_GENERATOR_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
+Authoritative prompt: `.hiveai/prompts/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M03-C001_MASK_SPRITE_GENERATOR_STRICT_AUDIT.md`  
+C001 verdict: `FAIL / FIX_REQUIRED`
 
 Goal: produce recognizable silhouettes and structured pixel-art objects without AI.
 
@@ -571,56 +572,56 @@ Primary algorithm reference: `zfedoran/pixel-sprite-generator`.
 
 ## Sprint PAG-S03.1 — Generic mask engine
 
-- [ ] PAG-0301 Implement 2D logical mask representation.
-- [ ] PAG-0302 Support required/forbidden/random mask cells.
-- [ ] PAG-0303 Implement seeded random mask resolution.
-- [ ] PAG-0304 Implement horizontal symmetry.
-- [ ] PAG-0305 Implement optional vertical symmetry.
-- [ ] PAG-0306 Implement asymmetric mode.
-- [ ] PAG-0307 Implement deterministic mutation amount.
-- [ ] PAG-0308 Ensure resulting mask stays inside requested dimensions.
-- [ ] PAG-0309 Support placement/centering inside rectangular boards.
-- [ ] PAG-0310 Add occupancy floor/ceiling controls.
+- [x] PAG-0301 Implement 2D logical mask representation.
+- [x] PAG-0302 Support required/forbidden/random mask cells.
+- [x] PAG-0303 Implement seeded random mask resolution.
+- [x] PAG-0304 Implement horizontal symmetry.
+- [x] PAG-0305 Implement optional vertical symmetry.
+- [x] PAG-0306 Implement asymmetric mode.
+- [x] PAG-0307 Implement deterministic mutation amount.
+- [x] PAG-0308 Ensure resulting mask stays inside requested dimensions.
+- [x] PAG-0309 Support placement/centering inside rectangular boards.
+- [x] PAG-0310 Add occupancy floor/ceiling controls.
 
 ## Sprint PAG-S03.2 — Template families
 
 Create templates as **SCRUBBOTS-owned definitions**, not copied artwork.
 
-- [ ] PAG-0311 Define ROBOT family.
-- [ ] PAG-0312 Define CREATURE family.
-- [ ] PAG-0313 Define FISH family.
-- [ ] PAG-0314 Define OCTOPUS/SEA-CREATURE family.
-- [ ] PAG-0315 Define SPACE_SHIP family.
-- [ ] PAG-0316 Define BUTTERFLY/INSECT family.
-- [ ] PAG-0317 Define FACE/EMBLEM family.
-- [ ] PAG-0318 Define TREE/PLANT family.
-- [ ] PAG-0319 Define CORAL family.
-- [ ] PAG-0320 Define ABSTRACT_SYMBOL family.
+- [x] PAG-0311 Define ROBOT family.
+- [x] PAG-0312 Define CREATURE family.
+- [x] PAG-0313 Define FISH family.
+- [x] PAG-0314 Define OCTOPUS/SEA-CREATURE family.
+- [x] PAG-0315 Define SPACE_SHIP family.
+- [x] PAG-0316 Define BUTTERFLY/INSECT family.
+- [x] PAG-0317 Define FACE/EMBLEM family.
+- [x] PAG-0318 Define TREE/PLANT family.
+- [x] PAG-0319 Define CORAL family.
+- [x] PAG-0320 Define ABSTRACT_SYMBOL family.
 
 Each family:
 
-- [ ] PAG-0321 supports multiple seeds,
-- [ ] PAG-0322 supports all legal difficulty dimensions,
-- [ ] PAG-0323 scales logically without interpolation,
-- [ ] PAG-0324 can intentionally reserve negative/background space,
-- [ ] PAG-0325 produces a non-empty artwork mask.
+- [x] PAG-0321 supports multiple seeds,
+- [x] PAG-0322 supports all legal difficulty dimensions,
+- [x] PAG-0323 scales logically without interpolation,
+- [x] PAG-0324 can intentionally reserve negative/background space,
+- [x] PAG-0325 produces a non-empty artwork mask.
 
 ## Sprint PAG-S03.3 — Region coloring
 
-- [ ] PAG-0326 Convert silhouette regions to canonical C01..C16.
-- [ ] PAG-0327 Use exactly a legal distinct-color count for difficulty.
-- [ ] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
-- [ ] PAG-0329 Prefer coherent connected color regions.
-- [ ] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
-- [ ] PAG-0331 Prevent BG01 assignment to cells.
-- [ ] PAG-0332 Ensure every requested palette color actually appears when output is accepted.
-- [ ] PAG-0333 Add deterministic recoloring while preserving geometry.
+- [x] PAG-0326 Convert silhouette regions to canonical C01..C16.
+- [x] PAG-0327 Use exactly a legal distinct-color count for difficulty.
+- [~] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
+- [~] PAG-0329 Prefer coherent connected color regions.
+- [~] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
+- [x] PAG-0331 Prevent BG01 assignment to cells.
+- [x] PAG-0332 Ensure every requested palette color actually appears when output is accepted.
+- [x] PAG-0333 Add deterministic recoloring while preserving geometry.
 
 ### M03 acceptance
 
-- [ ] PAG-0334 Generate at least 100 deterministic mask candidates across the four difficulties.
-- [ ] PAG-0335 Zero accepted candidates violate palette or dimension contracts.
-- [ ] PAG-0336 Manual contact sheet demonstrates recognizably different families and seeds.
+- [~] PAG-0334 Generate at least 100 deterministic mask candidates across the four difficulties.
+- [~] PAG-0335 Zero accepted candidates violate palette or dimension contracts.
+- [~] PAG-0336 Manual contact sheet demonstrates recognizably different families and seeds.
 
 ---
 
