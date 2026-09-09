@@ -403,8 +403,8 @@ Minimum completion rules:
 - [x] **PAG-M02 — Deterministic Generation Core**
 - [x] **PAG-M03 — Mask / Sprite Generator**
 - [!] **PAG-M04 — Procedural Shape / Rule Generator**
-- [~] **PAG-M05 — Wave Function Collapse Generator**
-- [ ] **PAG-M06 — Hybrid Generator Router**
+- [x] **PAG-M05 — Wave Function Collapse Generator**
+- [~] **PAG-M06 — Hybrid Generator Router**
 - [ ] **PAG-M07 — Artwork Quality & Diversity Filters**
 - [ ] **PAG-M08 — Output / Export Contract**
 - [ ] **PAG-M09 — CLI & Local Batch Generation**
@@ -697,12 +697,10 @@ Do not require MarkovJunior/C# at runtime.
 
 # PAG-M05 — Wave Function Collapse Generator
 
-H!veAI active cycle: `PAG-M05-C002 — Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`  
-C001 verdict: `FAIL / FIX_REQUIRED`  
+M05 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M05-C002 — Exemplar Contract, Diagnostics & Acceptance Evidence Remediation`  
+Closing audit: `.hiveai/audits/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`  
+Process note: RECOVERY-R002 publication objective was achieved, but its dedicated recovery log was not published.  
 M04 forward dependency: `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
 
 Goal: generate new pixel-art arrangements that preserve local pattern language from approved exemplars.
@@ -728,7 +726,7 @@ Primary implementation reference: `ikarth/wfc_2019f`.
 - [x] PAG-0512 Require explicit source/provenance for every exemplar.
 - [x] PAG-0513 Require exemplar logical pixels to be canonical C01..C16 or pass an explicit deterministic mapping process.
 - [x] PAG-0514 Reject antialiased/interpolated exemplars.
-- [~] PAG-0515 Reject exemplars with illegal dimensions only when they are intended as production artifacts; allow smaller training motifs under a separate exemplar role.
+- [x] PAG-0515 Reject exemplars with illegal dimensions only when they are intended as production artifacts; allow smaller training motifs under a separate exemplar role.
 - [x] PAG-0516 Never treat external project sample images as SCRUBBOTS-owned exemplars.
 - [x] PAG-0517 Add an empty exemplar inbox/documentation path rather than fabricating owner art.
 
@@ -740,7 +738,7 @@ Primary implementation reference: `ikarth/wfc_2019f`.
 - [x] PAG-0521 Support configurable input periodicity.
 - [x] PAG-0522 Support configurable output periodicity.
 - [x] PAG-0523 Support controlled rotations/reflections.
-- [~] PAG-0524 Record WFC config in metadata.
+- [x] PAG-0524 Record WFC config in metadata.
 - [x] PAG-0525 Reject configs that cannot satisfy requested palette legality.
 
 ## Sprint PAG-S05.4 — SCRUBBOTS palette enforcement
@@ -749,19 +747,26 @@ Primary implementation reference: `ikarth/wfc_2019f`.
 - [x] PAG-0527 Remap WFC's used colors to the requested canonical palette subset only through deterministic explicit mapping.
 - [x] PAG-0528 Enforce target distinct-color count after generation.
 - [x] PAG-0529 Reject rather than silently “fix” an output that violates logical contract.
-- [~] PAG-0530 Record contradiction/rejection reasons.
+- [x] PAG-0530 Record contradiction/rejection reasons.
 
 ### M05 acceptance
 
 - [x] PAG-0531 Produce deterministic outputs from at least three legal synthetic/unit-test exemplars.
 - [x] PAG-0532 Same exemplar + same config + same seed reproduces byte-identical logical output.
-- [~] PAG-0533 Rectangular WFC outputs are tested.
+- [x] PAG-0533 Rectangular WFC outputs are tested.
 - [x] PAG-0534 59×59 WFC workload is benchmarked.
 - [x] PAG-0535 No production dependency on network/API/cloud exists.
 
 ---
 
 # PAG-M06 — Hybrid Generator Router
+
+H!veAI active cycle: `PAG-M06-C001 — Hybrid Generator Router`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M06-C001_HYBRID_GENERATOR_ROUTER_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`  
+Existing forward dependency: `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
 
 Goal: combine generator families while keeping each generator independently testable.
 
