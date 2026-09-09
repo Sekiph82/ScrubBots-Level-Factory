@@ -2,42 +2,35 @@
 
 ## Current
 
-Active cycle: `PAG-M02-C003`
-Cycle title: `Result Construction Boundary Remediation`
+Active cycle: `PAG-M03-C001`
+Cycle title: `Mask / Sprite Generator`
 Workflow state: `READY_FOR_IMPLEMENTATION`
 Required actor: `CODEX`
 Authority repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
-Canonical remediation prompt: `.hiveai/prompts/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_PROMPT.md`
-Previous independent audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
-Expected Codex log: `.hiveai/codex-logs/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_CODEX_LOG.md`
+Canonical implementation prompt: `.hiveai/prompts/PAG-M03-C001_MASK_SPRITE_GENERATOR_PROMPT.md`
+Previous independent audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
+Expected Codex log: `.hiveai/codex-logs/PAG-M03-C001_MASK_SPRITE_GENERATOR_CODEX_LOG.md`
 Canonical task ledger: `tasks.md`
 
-## Current finding
+## Current milestone
 
-- `F-PAG-M02-C002-001` — BLOCKER — unchecked raw GenerationResult construction remains available through `_from_validated_fields(...)`.
+`PAG-M02 — Deterministic Generation Core` = `PASS / CLOSED`.
 
-Closed by C002:
+`PAG-M03 — Mask / Sprite Generator` = `ACTIVE`.
 
-- `F-PAG-M02-C001-002` — provenance authentication
-- `F-PAG-M02-C001-003` — empty-string seed compatibility
+## Hard process rule
 
-Open M02 task IDs:
+The matching M03 builder log must exist **before the first source/product/review-artifact edit**.
 
-- `PAG-0222`
-- `PAG-0223`
-- `PAG-0224`
-- `PAG-0225`
-- `PAG-0226`
-- `PAG-0227`
-- `PAG-0228`
+Do not repeat `F-PAG-M02-C003-PROC-001`.
 
 ## Next
 
-Codex must read the C003 remediation prompt directly from GitHub, fix only the remaining result-construction boundary, preserve authenticated provenance, seed compatibility, RNG/golden behavior, run focused plus full regression evidence, publish the matching builder log, and stop.
+Codex must read the M03-C001 authoritative prompt directly from GitHub, implement only the MASK/Sprite milestone, create the matching builder log first, run focused/acceptance/golden/full regression evidence, generate the committed review manifest/contact sheet, publish implementation and log, and stop.
 
-After publication, ChatGPT performs the independent strict re-audit and records terminal Git HEAD.
+After publication, ChatGPT performs the independent strict audit and manual review of the committed M03 review evidence.
 
-PAG-M03 remains blocked until M02 receives an unconditional independent PASS.
+PAG-M04 remains blocked until M03 receives an unconditional independent PASS.
 
 ## Historical
 
@@ -46,8 +39,9 @@ PAG-M03 remains blocked until M02 receives an unconditional independent PASS.
 - `PAG-M00-C002` = `AUDIT_FAILED / REMEDIATED`
 - `PAG-M00-C003` = `AUDIT_PASSED / TASK_COMPLETE`
 - `PAG-M01-C001` = `AUDIT_PASSED / TASK_COMPLETE`
-- `PAG-M02-C001` = `AUDIT_FAILED / REMEDIATED_IN_PART`
-- `PAG-M02-C002` = `AUDIT_FAILED / FIX_REQUIRED`
+- `PAG-M02-C001` = `AUDIT_FAILED / PARTIALLY_REMEDIATED`
+- `PAG-M02-C002` = `AUDIT_FAILED / REMEDIATED_BY_C003`
+- `PAG-M02-C003` = `AUDIT_PASSED / TASK_COMPLETE`
 
 ## Authority
 
