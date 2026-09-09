@@ -2,52 +2,35 @@
 
 ## Current
 
-Active cycle: `PAG-M04-C002`
-Cycle title: `Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation`
+Active cycle: `PAG-M05-C001`
+Cycle title: `Wave Function Collapse Generator`
 Workflow state: `READY_FOR_IMPLEMENTATION`
 Required actor: `CODEX`
 Authority repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
-Canonical remediation prompt: `.hiveai/prompts/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_PROMPT.md`
-Previous independent audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
-Expected Codex log: `.hiveai/codex-logs/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_CODEX_LOG.md`
+Canonical implementation prompt: `.hiveai/prompts/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_PROMPT.md`
+Previous independent audit: `.hiveai/audits/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_STRICT_AUDIT.md`
+Expected Codex log: `.hiveai/codex-logs/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_CODEX_LOG.md`
 Canonical task ledger: `tasks.md`
 
-## Current findings
+## Current milestone
 
-- `F-PAG-M04-C001-001` — BLOCKER — final coloring is not bound to RuleCanvas occupied/negative geometry.
-- `F-PAG-M04-C001-002` — MAJOR — POCKET paints instead of carving.
-- `F-PAG-M04-C001-003` — MAJOR — BRIDGE_GAP duplicates FILL_NOTCH behavior.
-- `F-PAG-M04-C001-004` — MAJOR — protected occupied semantic labels can be overwritten.
-- `F-PAG-M04-C001-005` — MAJOR — four recipes are seed-invariant at fixed dimensions.
-- `F-PAG-M04-C001-PROC-001` — MINOR — primitive review singleton diagnostic is hardcoded.
+`PAG-M04 — Procedural Shape / Rule Generator` = `FUNCTIONAL PASS / PERFORMANCE GATE DEFERRED`.
 
-Open/revalidation task IDs:
+`PAG-M05 — Wave Function Collapse Generator` = `ACTIVE`.
 
-- `PAG-0405`
-- `PAG-0421`
-- `PAG-0425`
-- `PAG-0426`
-- `PAG-0428`
-- `PAG-0430`
-- `PAG-0431`
-- `PAG-0433`
-- `PAG-0437`
-- `PAG-0438`
-- `PAG-0439`
-- `PAG-0440`
-- `PAG-0442`
+## M04 forward dependency
 
-Blocked forward dependency:
+`PAG-0441` remains `[!] BLOCKED` until M10 establishes the V1 performance budget.
 
-- `PAG-0441` — M10 V1 performance budget not yet established.
+This does not block M05.
 
 ## Next
 
-Codex must read the C002 remediation prompt directly from GitHub, fix only the audited M04 semantic/diversity findings, preserve validated M04 infrastructure, regenerate affected goldens/review evidence, rerun the 140-candidate acceptance matrix and full regression, refresh 59×59 benchmark evidence without inventing a budget, publish the matching builder log, and stop.
+Codex must read the M05-C001 authoritative prompt directly from GitHub, create the matching builder log before any edit, implement only the deterministic offline WFC milestone, use synthetic test-only exemplars plus an empty owner exemplar inbox, generate golden/review evidence, run the acceptance matrix and 59×59 benchmarks, publish implementation and log, and stop.
 
-After publication, ChatGPT performs the independent strict re-audit and manual review.
+After publication, ChatGPT performs the independent strict audit and review.
 
-PAG-M05+ remains blocked until M04 receives independent acceptance for its currently testable scope.
+PAG-M06+ remains blocked until M05 receives an unconditional independent PASS.
 
 ## Historical
 
@@ -62,7 +45,8 @@ PAG-M05+ remains blocked until M04 receives independent acceptance for its curre
 - `PAG-M03-C001` = `AUDIT_FAILED / PARTIALLY_REMEDIATED`
 - `PAG-M03-C002` = `AUDIT_FAILED / REMEDIATED_BY_C003`
 - `PAG-M03-C003` = `AUDIT_PASSED / TASK_COMPLETE`
-- `PAG-M04-C001` = `AUDIT_FAILED / FIX_REQUIRED`
+- `PAG-M04-C001` = `AUDIT_FAILED / REMEDIATED_BY_C002`
+- `PAG-M04-C002` = `AUDIT_PASSED / FUNCTIONAL_SCOPE_COMPLETE`
 
 ## Authority
 
