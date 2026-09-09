@@ -63,7 +63,9 @@ def resolve_mask(definition: MaskDefinition, rng: DeterministicRNG, config: Mask
     random_stream = rng.child("random-cells")
     for orbit in symmetry_orbits(definition.width, definition.height, config.symmetry):
         if all(states[index] is MaskCellState.RANDOM for index in orbit):
-            value = random_stream.randbelow(100) < 42
+            # Keep optional contour cells connected to their hard silhouette;
+            # the lower M03 color-region policy rejects isolated islands.
+            value = random_stream.randbelow(100) < 68
             for index in orbit:
                 foreground[index] = value
     mutation_stream = rng.child("mutation")
@@ -71,6 +73,26 @@ def resolve_mask(definition: MaskDefinition, rng: DeterministicRNG, config: Mask
     for orbit in mutation_stream.shuffle(mutable_orbits)[:mutation_count]:
         for index in orbit:
             foreground[index] = not foreground[index]
+    # Close only random one-cell negative-space pockets. Hard FORBIDDEN cells
+    # remain untouched, while rendered base-color regions stay coherent.
+    changed = True
+    while changed:
+        changed = False
+        for index, value in enumerate(tuple(foreground)):
+            if value or states[index] is not MaskCellState.RANDOM:
+                continue
+            x, y = index % definition.width, index // definition.width
+            neighbors = tuple(
+                neighbor for neighbor in (
+                    index - 1 if x else -1,
+                    index + 1 if x + 1 < definition.width else -1,
+                    index - definition.width if y else -1,
+                    index + definition.width if y + 1 < definition.height else -1,
+                ) if neighbor >= 0
+            )
+            if len(neighbors) == 4 and all(foreground[neighbor] for neighbor in neighbors):
+                foreground[index] = True
+                changed = True
     total = definition.width * definition.height
     count = sum(foreground)
     if count == 0:

@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from enum import Enum
 
-from .model import MaskCellState, MaskContractError, MaskDefinition
+from .model import MaskCellState, MaskContractError, MaskDefinition, SymmetryMode
 
 
 class TemplateFamily(str, Enum):
@@ -26,8 +26,34 @@ FAMILY_NAMES = tuple(family.value for family in TemplateFamily)
 class TemplateDefinition:
     family: TemplateFamily
 
-    def build(self, width: int, height: int, offset_x: int = 0, offset_y: int = 0) -> MaskDefinition:
-        return _BUILDERS[self.family](width, height, offset_x, offset_y)
+    def build(
+        self,
+        width: int,
+        height: int,
+        offset_x: int = 0,
+        offset_y: int = 0,
+        symmetry: SymmetryMode = SymmetryMode.ASYMMETRIC,
+    ) -> MaskDefinition:
+        definition = _BUILDERS[self.family](width, height, offset_x, offset_y)
+        if symmetry is SymmetryMode.ASYMMETRIC:
+            return definition
+        cells = list(definition.cells)
+        for index, state in enumerate(tuple(cells)):
+            if state is not MaskCellState.REQUIRED:
+                continue
+            x, y = index % width, index // width
+            points = {(x, y)}
+            if symmetry in (SymmetryMode.HORIZONTAL, SymmetryMode.HORIZONTAL_VERTICAL):
+                points.add((width - 1 - x, y))
+            if symmetry in (SymmetryMode.VERTICAL, SymmetryMode.HORIZONTAL_VERTICAL):
+                points.add((x, height - 1 - y))
+            if symmetry is SymmetryMode.HORIZONTAL_VERTICAL:
+                points.add((width - 1 - x, height - 1 - y))
+            for px, py in points:
+                target = py * width + px
+                if cells[target] is MaskCellState.FORBIDDEN:
+                    cells[target] = MaskCellState.RANDOM
+        return MaskDefinition(width, height, tuple(cells))
 
 
 def _canvas(width: int, height: int) -> list[MaskCellState]:
@@ -69,8 +95,7 @@ def _optional_ring(cells: list[MaskCellState], width: int, height: int) -> None:
     required = {index for index, state in enumerate(cells) if state is MaskCellState.REQUIRED}
     for index in tuple(required):
         x, y = index % width, index // width
-        for dy in (-1, 0, 1):
-            for dx in (-1, 0, 1):
+        for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
                 nx, ny = x + dx, y + dy
                 if 0 <= nx < width and 0 <= ny < height:
                     target = ny * width + nx
@@ -81,11 +106,63 @@ def _optional_ring(cells: list[MaskCellState], width: int, height: int) -> None:
 def _finish(family: TemplateFamily, cells: list[MaskCellState], width: int, height: int) -> MaskDefinition:
     if not any(state is MaskCellState.REQUIRED for state in cells):
         raise MaskContractError(f"{family.value} template has no required subject cells")
-    required = [index for index, state in enumerate(cells) if state is MaskCellState.REQUIRED]
-    for index in required:
-        x, y = index % width, index // width
-        for mirror_x, mirror_y in ((width - 1 - x, y), (x, height - 1 - y), (width - 1 - x, height - 1 - y)):
-            _mark(cells, width, height, mirror_x, mirror_y)
+    # Geometry is authored once. Symmetry is an engine option, never a hidden
+    # four-way post-process that erases directional or organic family cues.
+    required = {index for index, state in enumerate(cells) if state is MaskCellState.REQUIRED}
+    while True:
+        components: list[set[int]] = []
+        unseen = set(required)
+        while unseen:
+            component = {unseen.pop()}
+            frontier = list(component)
+            while frontier:
+                index = frontier.pop()
+                x, y = index % width, index // width
+                for neighbor in (
+                    index - 1 if x else -1,
+                    index + 1 if x + 1 < width else -1,
+                    index - width if y else -1,
+                    index + width if y + 1 < height else -1,
+                ):
+                    if neighbor in unseen:
+                        unseen.remove(neighbor)
+                        component.add(neighbor)
+                        frontier.append(neighbor)
+            components.append(component)
+        if len(components) <= 1:
+            break
+        left, right = min(
+            ((a, b) for a in components[0] for b in components[1:][0]),
+            key=lambda pair: (abs(pair[0] % width - pair[1] % width) + abs(pair[0] // width - pair[1] // width), pair),
+        )
+        lx, ly = left % width, left // width
+        rx, ry = right % width, right // width
+        for x in range(min(lx, rx), max(lx, rx) + 1):
+            required.add(ly * width + x)
+        for y in range(min(ly, ry), max(ly, ry) + 1):
+            required.add(y * width + rx)
+        for index in required:
+            cells[index] = MaskCellState.REQUIRED
+    # A one-cell enclosed negative-space pocket would necessarily become a
+    # singleton rendered color region, so close only those tiny hard pockets.
+    changed = True
+    while changed:
+        changed = False
+        for index, state in enumerate(tuple(cells)):
+            if state is not MaskCellState.FORBIDDEN:
+                continue
+            x, y = index % width, index // width
+            neighbors = tuple(
+                neighbor for neighbor in (
+                    index - 1 if x else -1,
+                    index + 1 if x + 1 < width else -1,
+                    index - width if y else -1,
+                    index + width if y + 1 < height else -1,
+                ) if neighbor >= 0
+            )
+            if len(neighbors) == 4 and all(cells[neighbor] is MaskCellState.REQUIRED for neighbor in neighbors):
+                cells[index] = MaskCellState.REQUIRED
+                changed = True
     _optional_ring(cells, width, height)
     return MaskDefinition(width, height, tuple(cells))
 
@@ -130,8 +207,9 @@ def _fish(width: int, height: int, ox: int, oy: int) -> MaskDefinition:
         half = max(2, (y1 - y0) // 2 - distance)
         for x in range(center_x - half, center_x + half + 1):
             _mark(cells, width, height, x, y)
+    # A single tail and offset eye preserve the fish's reading under the
+    # family-preferred vertical symmetry without inventing a second head.
     _line(cells, width, height, [(x1 - 3, center_y - 3), (x1, center_y - 6), (x1, center_y), (x1, center_y + 6), (x1 - 3, center_y + 3)])
-    _line(cells, width, height, [(width - 1 - (x1 - 3), center_y - 3), (width - 1 - x1, center_y - 6), (width - 1 - x1, center_y), (width - 1 - x1, center_y + 6), (width - 1 - (x1 - 3), center_y + 3)])
     _mark(cells, width, height, center_x - 5, center_y - 2)
     _rect(cells, width, height, center_x - 1, y0 - 2, center_x + 3, y0)
     _rect(cells, width, height, center_x - 1, y1, center_x + 3, y1 + 2)
@@ -256,11 +334,40 @@ _BUILDERS = {
 }
 
 
-def template_for(family: TemplateFamily | str, width: int, height: int, offset_x: int = 0, offset_y: int = 0) -> MaskDefinition:
+_PREFERRED_SYMMETRY = {
+    TemplateFamily.ROBOT: SymmetryMode.HORIZONTAL,
+    TemplateFamily.CREATURE: SymmetryMode.ASYMMETRIC,
+    TemplateFamily.FISH: SymmetryMode.VERTICAL,
+    TemplateFamily.SEA_CREATURE: SymmetryMode.ASYMMETRIC,
+    TemplateFamily.SPACE_SHIP: SymmetryMode.HORIZONTAL,
+    TemplateFamily.INSECT: SymmetryMode.HORIZONTAL,
+    TemplateFamily.FACE_EMBLEM: SymmetryMode.HORIZONTAL,
+    TemplateFamily.TREE_PLANT: SymmetryMode.ASYMMETRIC,
+    TemplateFamily.CORAL: SymmetryMode.ASYMMETRIC,
+    TemplateFamily.ABSTRACT_SYMBOL: SymmetryMode.HORIZONTAL_VERTICAL,
+}
+
+
+def preferred_symmetry(family: TemplateFamily | str) -> SymmetryMode:
+    try:
+        selected = family if isinstance(family, TemplateFamily) else TemplateFamily(family)
+    except (TypeError, ValueError) as exc:
+        raise MaskContractError("unknown MASK template family") from exc
+    return _PREFERRED_SYMMETRY[selected]
+
+
+def template_for(
+    family: TemplateFamily | str,
+    width: int,
+    height: int,
+    offset_x: int = 0,
+    offset_y: int = 0,
+    symmetry: SymmetryMode | str = SymmetryMode.ASYMMETRIC,
+) -> MaskDefinition:
     try:
         selected = family if isinstance(family, TemplateFamily) else TemplateFamily(family)
     except (TypeError, ValueError) as exc:
         raise MaskContractError("unknown MASK template family") from exc
     if isinstance(offset_x, bool) or not isinstance(offset_x, int) or isinstance(offset_y, bool) or not isinstance(offset_y, int):
         raise MaskContractError("template placement offsets must be integers")
-    return TemplateDefinition(selected).build(width, height, offset_x, offset_y)
+    return TemplateDefinition(selected).build(width, height, offset_x, offset_y, SymmetryMode.parse(symmetry))

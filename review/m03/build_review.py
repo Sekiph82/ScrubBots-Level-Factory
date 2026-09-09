@@ -8,6 +8,7 @@ from scrubbots_pixel_factory import CANONICAL_PALETTE
 from scrubbots_pixel_factory.core import GenerationRequest
 from scrubbots_pixel_factory.generators import FAMILY_NAMES
 from scrubbots_pixel_factory.generators import MaskSpriteGenerator
+from scrubbots_pixel_factory.generators.mask import color_component_sizes
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -32,6 +33,8 @@ def build_manifest() -> dict[str, object]:
             if not hasattr(candidate, "result") or not candidate.result.is_success:
                 raise RuntimeError(f"review candidate failed: {difficulty}/{family}/{seed}")
             result = candidate.result
+            grid = list(result.logical_grid)
+            component_sizes = color_component_sizes(grid, width, height)
             candidates.append({
                 "label": f"M03-{family_index + 1:02d}-{difficulty}-{seed}",
                 "family": family,
@@ -41,8 +44,30 @@ def build_manifest() -> dict[str, object]:
                 "height": height,
                 "resolved_palette": list(result.used_palette),
                 "foreground_mask": [1 if value else 0 for value in candidate.mask.foreground_cells],
-                "logical_grid": list(result.logical_grid),
+                "logical_grid": grid,
+                "diagnostics": {
+                    "occupancy_pct": round(sum(candidate.mask.foreground_cells) * 100 / (width * height), 3),
+                    "singleton_color_components": sum(size == 1 for sizes in component_sizes.values() for size in sizes),
+                    "total_color_components": sum(len(sizes) for sizes in component_sizes.values()),
+                    "role_counts": {
+                        role.value: candidate.roles.count(role)
+                        for role in sorted(set(candidate.roles), key=lambda value: value.value)
+                    },
+                },
             })
+    for candidate in candidates:
+        peers = [
+            other for other in candidates
+            if other["width"] == candidate["width"] and other["height"] == candidate["height"] and other is not candidate
+        ]
+        mask = candidate["foreground_mask"]
+        scores = []
+        for other in peers:
+            other_mask = other["foreground_mask"]
+            intersection = sum(left and right for left, right in zip(mask, other_mask))
+            union = sum(left or right for left, right in zip(mask, other_mask))
+            scores.append(intersection / union if union else 0.0)
+        candidate["diagnostics"]["top_pairwise_jaccard"] = round(max(scores, default=0.0), 6)
     return {
         "evidence_type": "review-only / non-production / M03 manual audit evidence",
         "generator": "mask-sprite 1.0.0",
@@ -64,7 +89,7 @@ def build_html(manifest: dict[str, object]) -> str:
 <body><h1>M03 Mask / Sprite Contact Sheet</h1><p class="note">{title}. Presentation only: logical source cells remain row-major C-IDs; this sheet uses integer canvas blocks and does not export production art.</p><section id="sheet" class="sheet"></section>
 <script>
 const manifest={data};const colors={colors};const sheet=document.getElementById('sheet');
-for(const candidate of manifest.candidates){{const article=document.createElement('article');const heading=document.createElement('h2');heading.textContent=candidate.label+' · '+candidate.family;article.appendChild(heading);const canvas=document.createElement('canvas');const block=4;canvas.width=candidate.width*block;canvas.height=candidate.height*block;canvas.style.width=(candidate.width*block)+'px';canvas.style.height=(candidate.height*block)+'px';const context=canvas.getContext('2d');context.imageSmoothingEnabled=false;for(let i=0;i<candidate.logical_grid.length;i++){{const x=i%candidate.width;const y=Math.floor(i/candidate.width);context.fillStyle=colors[candidate.logical_grid[i]];context.fillRect(x*block,y*block,block,block);}}article.appendChild(canvas);const meta=document.createElement('p');meta.textContent=candidate.difficulty+' · '+candidate.width+'×'+candidate.height+' · seed '+candidate.seed+' · '+candidate.resolved_palette.join(', ');article.appendChild(meta);sheet.appendChild(article);}}
+for(const candidate of manifest.candidates){{const article=document.createElement('article');const heading=document.createElement('h2');heading.textContent=candidate.label+' · '+candidate.family;article.appendChild(heading);const block=4;const silhouette=document.createElement('canvas');silhouette.width=candidate.width*block;silhouette.height=candidate.height*block;silhouette.style.width=(candidate.width*block)+'px';silhouette.style.height=(candidate.height*block)+'px';const silhouetteContext=silhouette.getContext('2d');silhouetteContext.imageSmoothingEnabled=false;for(let i=0;i<candidate.foreground_mask.length;i++){{const x=i%candidate.width;const y=Math.floor(i/candidate.width);silhouetteContext.fillStyle=candidate.foreground_mask[i]?'#ffffff':'#202533';silhouetteContext.fillRect(x*block,y*block,block,block);}}article.appendChild(silhouette);const canvas=document.createElement('canvas');canvas.width=candidate.width*block;canvas.height=candidate.height*block;canvas.style.width=(candidate.width*block)+'px';canvas.style.height=(candidate.height*block)+'px';const context=canvas.getContext('2d');context.imageSmoothingEnabled=false;for(let i=0;i<candidate.logical_grid.length;i++){{const x=i%candidate.width;const y=Math.floor(i/candidate.width);context.fillStyle=colors[candidate.logical_grid[i]];context.fillRect(x*block,y*block,block,block);}}article.appendChild(canvas);const meta=document.createElement('p');meta.textContent=candidate.difficulty+' · '+candidate.width+'×'+candidate.height+' · seed '+candidate.seed+' · '+candidate.resolved_palette.join(', ')+' · singleton '+candidate.diagnostics.singleton_color_components+' · components '+candidate.diagnostics.total_color_components+' · top Jaccard '+candidate.diagnostics.top_pairwise_jaccard;article.appendChild(meta);sheet.appendChild(article);}}
 </script></body></html>"""
 
 

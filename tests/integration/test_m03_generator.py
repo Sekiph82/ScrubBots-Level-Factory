@@ -47,6 +47,13 @@ def test_mask_generator_fails_closed_for_rng_style_theme_and_options() -> None:
     generator = _generator()
     mismatch = generator.generate(request(seed=11), DeterministicRNG(12))
     assert mismatch.failure_code is FailureCode.INVALID_REQUEST
+    for supplied in (
+        DeterministicRNG(11, "evil"),
+        DeterministicRNG(11, "geometry"),
+        DeterministicRNG(11).child("geometry"),
+        DeterministicRNG(11).retry_rng(0),
+    ):
+        assert generator.generate(request(seed=11), supplied).failure_code is FailureCode.INVALID_REQUEST
     unsupported_style = generator.generate(request(style="UNKNOWN"))
     assert unsupported_style.failure_code is FailureCode.INVALID_REQUEST
     unsupported_theme = generator.generate(request(theme="underwater"))
@@ -91,6 +98,16 @@ def test_same_request_rng_is_byte_identical_and_fixed_seeds_vary() -> None:
     assert first.canonical_bytes() == second.canonical_bytes()
     outputs = {generator.generate(request(seed=seed, style="CREATURE")).canonical_bytes() for seed in (1, 2, 3, 4)}
     assert len(outputs) > 1
+
+
+def test_canonical_root_rng_matches_default_and_provenance() -> None:
+    generator = _generator()
+    request_value = request(seed=44, style="CREATURE")
+    default = generator.generate(request_value)
+    supplied = generator.generate(request_value, DeterministicRNG(44))
+    assert default.is_success and supplied.is_success
+    assert default.canonical_bytes() == supplied.canonical_bytes()
+    assert supplied.provenance["stage_seeds"] == DeterministicRNG(44).stage_seeds()
 
 
 def test_fixed_acceptance_batch_has_120_accepted_candidates_and_zero_contract_violations() -> None:

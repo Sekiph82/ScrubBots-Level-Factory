@@ -1,7 +1,7 @@
 """Production M03 MASK generator integrated with the M02 contracts."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ...contracts import ColorUsageContractError
 from ...core import (
@@ -14,10 +14,10 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
-from .colorize import colorize_mask
+from .colorize import ColorRole, colorize_with_roles
 from .engine import MaskContractError, resolve_mask
 from .model import MaskConfig, ResolvedMask, SymmetryMode
-from .templates import FAMILY_NAMES, TemplateFamily, template_for
+from .templates import FAMILY_NAMES, TemplateFamily, preferred_symmetry, template_for
 
 
 MAX_ATTEMPTS = 4
@@ -30,6 +30,7 @@ class MaskCandidate:
     family: TemplateFamily
     attempt: int
     palette: tuple[str, ...]
+    roles: tuple[ColorRole, ...]
 
 
 class MaskSpriteGenerator:
@@ -42,12 +43,12 @@ class MaskSpriteGenerator:
         return GenerationResult.failure(code=code, reason=reason, request=request)
 
     @staticmethod
-    def _config(request: GenerationRequest) -> MaskConfig:
+    def _config(request: GenerationRequest) -> tuple[MaskConfig, bool]:
         options = request.options
         if options.namespace == "default":
             if options.values:
                 raise MaskContractError("default MASK options namespace must be empty")
-            return MaskConfig()
+            return MaskConfig(), False
         if options.namespace != "mask" or options.version != 1:
             raise MaskContractError("MASK options require namespace mask and version 1")
         allowed = {"symmetry", "mutation", "offset_x", "offset_y", "occupancy_floor_pct", "occupancy_ceiling_pct"}
@@ -63,7 +64,7 @@ class MaskSpriteGenerator:
                 if isinstance(value, bool) or not isinstance(value, int):
                     raise MaskContractError(f"MASK option {key} must be an integer")
                 kwargs[key] = value
-        return MaskConfig(**kwargs)  # type: ignore[arg-type]
+        return MaskConfig(**kwargs), "symmetry" in values  # type: ignore[arg-type]
 
     @staticmethod
     def _family(request: GenerationRequest, geometry_rng: DeterministicRNG) -> TemplateFamily:
@@ -85,14 +86,18 @@ class MaskSpriteGenerator:
         stream = DeterministicRNG(request.seed) if rng is None else rng
         if not isinstance(stream, DeterministicRNG):
             return self._failure(FailureCode.INVALID_REQUEST, "MASK generation requires the project DeterministicRNG", request)
+        if stream.domain != "root":
+            return self._failure(FailureCode.INVALID_REQUEST, "supplied RNG must be the canonical root stream", request)
         if stream.stage_seeds() != DeterministicRNG(request.seed).stage_seeds():
             return self._failure(FailureCode.INVALID_REQUEST, "supplied RNG is incoherent with the request seed", request)
         try:
-            config = self._config(request)
+            config, explicit_symmetry = self._config(request)
             width, height = request.resolve_dimensions()
             palette = request.resolve_palette_subset()
             base_geometry = stream.stage_rng("geometry")
             family = self._family(request, base_geometry)
+            if not explicit_symmetry:
+                config = replace(config, symmetry=preferred_symmetry(family))
         except (TypeError, ValueError, ColorUsageContractError, MaskContractError) as exc:
             message = str(exc).split("\n", 1)[0]
             return self._failure(FailureCode.INVALID_REQUEST, message, request)
@@ -102,14 +107,21 @@ class MaskSpriteGenerator:
             retry_seeds[str(attempt)] = stream.retry_seed(attempt)
             try:
                 attempt_rng = stream.retry_rng(attempt)
-                definition = template_for(family, width, height, config.offset_x, config.offset_y)
+                definition = template_for(
+                    family,
+                    width,
+                    height,
+                    config.offset_x,
+                    config.offset_y,
+                    config.symmetry,
+                )
                 mask = resolve_mask(definition, attempt_rng.stage_rng("geometry"), config)
-                cells = colorize_mask(mask, palette, attempt_rng.stage_rng("colorization"))
+                colorized = colorize_with_roles(mask, palette, attempt_rng.stage_rng("colorization"))
                 result = GenerationResult.success(
                     request=request,
                     width=width,
                     height=height,
-                    logical_grid=cells,
+                    logical_grid=colorized.cells,
                     generator_mode=GeneratorMode.MASK.value,
                     generator_id=self.generator_id,
                     generator_version=self.generator_version,
@@ -117,7 +129,7 @@ class MaskSpriteGenerator:
                     rng_algorithm=RNG_ALGORITHM,
                     provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": dict(retry_seeds)},
                 )
-                return MaskCandidate(result, mask, family, attempt, palette)
+                return MaskCandidate(result, mask, family, attempt, palette, colorized.roles)
             except (TypeError, ValueError, MaskContractError, ResultContractError):
                 continue
         return self._failure(FailureCode.RETRY_EXHAUSTED, "bounded MASK generation attempts exhausted", request)

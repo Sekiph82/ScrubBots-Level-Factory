@@ -22,10 +22,10 @@ def test_all_ten_families_are_original_logical_definitions() -> None:
 
 def test_each_family_varies_across_fixed_seeds() -> None:
     from scrubbots_pixel_factory.generators import FAMILY_NAMES
-    from scrubbots_pixel_factory.generators.mask import MaskConfig, resolve_mask, template_for
+    from scrubbots_pixel_factory.generators.mask import MaskConfig, preferred_symmetry, resolve_mask, template_for
     for family in FAMILY_NAMES:
         masks = {
-            resolve_mask(template_for(family, 29, 23), DeterministicRNG(seed), MaskConfig()).row_major()
+            resolve_mask(template_for(family, 29, 23, symmetry=preferred_symmetry(family)), DeterministicRNG(seed), MaskConfig(symmetry=preferred_symmetry(family))).row_major()
             for seed in (3, 19, 71)
         }
         assert len(masks) > 1, family
@@ -33,11 +33,12 @@ def test_each_family_varies_across_fixed_seeds() -> None:
 
 def test_every_family_supports_all_difficulties_and_rectangles() -> None:
     from scrubbots_pixel_factory.generators import FAMILY_NAMES
-    from scrubbots_pixel_factory.generators.mask import MaskConfig, ResolvedMask, resolve_mask, template_for
+    from scrubbots_pixel_factory.generators.mask import MaskConfig, ResolvedMask, preferred_symmetry, resolve_mask, template_for
     for family in FAMILY_NAMES:
         for difficulty, rectangles in DIFFICULTY_RECTANGLES.items():
             for width, height in rectangles:
-                mask = resolve_mask(template_for(family, width, height), DeterministicRNG(17), MaskConfig())
+                symmetry = preferred_symmetry(family)
+                mask = resolve_mask(template_for(family, width, height, symmetry=symmetry), DeterministicRNG(17), MaskConfig(symmetry=symmetry))
                 assert isinstance(mask, ResolvedMask)
                 assert len(mask.row_major()) == width * height
                 assert 0 < mask.foreground_count < width * height
@@ -46,7 +47,7 @@ def test_every_family_supports_all_difficulties_and_rectangles() -> None:
 def test_horizontal_vertical_and_asymmetric_template_modes_are_supported() -> None:
     from scrubbots_pixel_factory.generators.mask import MaskConfig, SymmetryMode, resolve_mask, template_for
     for mode in SymmetryMode:
-        mask = resolve_mask(template_for("ROBOT", 28, 22), DeterministicRNG(23), MaskConfig(symmetry=mode))
+        mask = resolve_mask(template_for("ROBOT", 28, 22, symmetry=mode), DeterministicRNG(23), MaskConfig(symmetry=mode))
         assert mask.foreground_count > 0
 
 

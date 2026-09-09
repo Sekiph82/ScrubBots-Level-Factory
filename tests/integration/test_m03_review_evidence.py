@@ -25,10 +25,16 @@ def test_review_manifest_is_review_only_and_covers_required_matrix() -> None:
         assert set(candidate["logical_grid"]).issubset(set(CANONICAL_PALETTE.ids))
         assert "BG01" not in candidate["logical_grid"]
         assert 0 < sum(candidate["foreground_mask"]) < width * height
+        diagnostics = candidate["diagnostics"]
+        assert diagnostics["singleton_color_components"] == 0
+        assert diagnostics["total_color_components"] >= len(palette)
+        assert 0 < diagnostics["occupancy_pct"] < 100
+        assert diagnostics["top_pairwise_jaccard"] < 1
+        assert sum(diagnostics["role_counts"].values()) == width * height
 
 
 def test_contact_sheet_is_self_contained_integer_block_presentation() -> None:
     html = (REVIEW / "M03_MASK_CONTACT_SHEET.html").read_text(encoding="utf-8")
-    assert "<script>" in html and "createElement('canvas')" in html and "imageSmoothingEnabled=false" in html
+    assert "<script>" in html and html.count("createElement('canvas')") >= 2 and "imageSmoothingEnabled=false" in html
     assert "http://" not in html and "https://" not in html and "cdn" not in html.lower()
     assert "C01" in html and "#E94B4B" in html
