@@ -124,6 +124,17 @@ def test_fixed_acceptance_batch_has_120_accepted_candidates_and_zero_contract_vi
                 palette = result.request.resolve_palette_subset()
                 if ((result.width, result.height) != (width, height) or len(result.logical_grid) != width * height or set(result.logical_grid) != set(palette) or "BG01" in result.logical_grid):
                     violations.append((difficulty, family, seed))
+                candidate = generator.generate_candidate(request(difficulty=difficulty, seed=seed, style=family, width=width, height=height))
+                if not hasattr(candidate, "role_assignments"):
+                    violations.append((difficulty, family, seed, "missing role assignments"))
+                else:
+                    assignments = {item.color_id: item.role for item in candidate.role_assignments}
+                    observed = {
+                        color: {role for value, role in zip(candidate.result.logical_grid, candidate.roles, strict=True) if value == color}
+                        for color in palette
+                    }
+                    if set(assignments) != set(palette) or any(observed[color] != {assignments[color]} for color in palette):
+                        violations.append((difficulty, family, seed, "role purity"))
                 assert result.canonical_bytes() == generator.generate(request(difficulty=difficulty, seed=seed, style=family, width=width, height=height)).canonical_bytes()
     assert accepted >= 100
     assert accepted == 120

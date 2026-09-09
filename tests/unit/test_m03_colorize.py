@@ -1,5 +1,6 @@
 from scrubbots_pixel_factory import CANONICAL_PALETTE
 from scrubbots_pixel_factory.core import DeterministicRNG
+import pytest
 
 
 def test_colorization_uses_exact_palette_and_no_background_sentinel() -> None:
@@ -63,3 +64,64 @@ def test_colorization_exposes_geometry_roles_and_no_singletons() -> None:
         (role is ColorRole.NEGATIVE_SPACE) is (not foreground)
         for role, foreground in zip(colored.roles, mask.foreground_cells)
     )
+
+
+@pytest.mark.parametrize(
+    ("palette", "dimensions"),
+    [
+        (("C01", "C03", "C05"), (29, 23)),
+        (("C01", "C03", "C05", "C07"), (29, 23)),
+        (("C01", "C03", "C05", "C07", "C09"), (29, 23)),
+        (tuple(f"C{i:02d}" for i in range(1, 11)), (59, 50)),
+        (tuple(f"C{i:02d}" for i in range(1, 13)), (59, 50)),
+    ],
+)
+def test_every_palette_color_has_explicit_pure_role_binding(
+    palette: tuple[str, ...],
+    dimensions: tuple[int, int],
+) -> None:
+    from scrubbots_pixel_factory.generators.mask import (
+        MaskConfig,
+        color_component_sizes,
+        colorize_with_roles,
+        preferred_symmetry,
+        resolve_mask,
+        template_for,
+    )
+    width, height = dimensions
+    symmetry = preferred_symmetry("ROBOT")
+    mask = resolve_mask(
+        template_for("ROBOT", width, height, symmetry=symmetry),
+        DeterministicRNG(23),
+        MaskConfig(symmetry=symmetry),
+    )
+    first = colorize_with_roles(mask, palette, DeterministicRNG(23))
+    second = colorize_with_roles(mask, palette, DeterministicRNG(23))
+    assert first == second
+    assert {item.color_id for item in first.role_assignments} == set(palette)
+    observed = {
+        item.color_id: {
+            role.value
+            for color, role in zip(first.cells, first.roles, strict=True)
+            if color == item.color_id
+        }
+        for item in first.role_assignments
+    }
+    assert all(observed[item.color_id] == {item.role.value} for item in first.role_assignments)
+    assert all(size >= 2 for sizes in color_component_sizes(first.cells, width, height).values() for size in sizes)
+
+
+def test_impossible_role_capacity_fails_closed() -> None:
+    from scrubbots_pixel_factory.generators.mask import (
+        MaskCellState,
+        MaskConfig,
+        MaskDefinition,
+        MaskContractError,
+        SymmetryMode,
+        colorize_with_roles,
+        resolve_mask,
+    )
+    definition = MaskDefinition(4, 4, tuple([MaskCellState.REQUIRED] * 16))
+    mask = resolve_mask(definition, DeterministicRNG(1), MaskConfig(symmetry=SymmetryMode.ASYMMETRIC, mutation=0, occupancy_floor_pct=0, occupancy_ceiling_pct=100))
+    with pytest.raises(MaskContractError):
+        colorize_with_roles(mask, tuple(f"C{i:02d}" for i in range(1, 13)), DeterministicRNG(1))

@@ -35,6 +35,22 @@ def build_manifest() -> dict[str, object]:
             result = candidate.result
             grid = list(result.logical_grid)
             component_sizes = color_component_sizes(grid, width, height)
+            role_assignments = [
+                {
+                    "color_id": assignment.color_id,
+                    "role": assignment.role.value,
+                    "slot": assignment.slot,
+                }
+                for assignment in candidate.role_assignments
+            ]
+            observed_roles = {
+                color_id: sorted({
+                    role.value
+                    for color, role in zip(grid, candidate.roles, strict=True)
+                    if color == color_id
+                })
+                for color_id in result.used_palette
+            }
             candidates.append({
                 "label": f"M03-{family_index + 1:02d}-{difficulty}-{seed}",
                 "family": family,
@@ -49,6 +65,12 @@ def build_manifest() -> dict[str, object]:
                     "occupancy_pct": round(sum(candidate.mask.foreground_cells) * 100 / (width * height), 3),
                     "singleton_color_components": sum(size == 1 for sizes in component_sizes.values() for size in sizes),
                     "total_color_components": sum(len(sizes) for sizes in component_sizes.values()),
+                    "role_to_color_assignments": role_assignments,
+                    "observed_roles_by_color": observed_roles,
+                    "role_color_purity": all(
+                        observed_roles[item["color_id"]] == [item["role"]]
+                        for item in role_assignments
+                    ),
                     "role_counts": {
                         role.value: candidate.roles.count(role)
                         for role in sorted(set(candidate.roles), key=lambda value: value.value)

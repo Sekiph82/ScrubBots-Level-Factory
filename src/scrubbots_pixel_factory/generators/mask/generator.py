@@ -14,7 +14,7 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
-from .colorize import ColorRole, colorize_with_roles
+from .colorize import ColorRole, ColorRoleAssignment, colorize_with_roles
 from .engine import MaskContractError, resolve_mask
 from .model import MaskConfig, ResolvedMask, SymmetryMode
 from .templates import FAMILY_NAMES, TemplateFamily, preferred_symmetry, template_for
@@ -31,6 +31,7 @@ class MaskCandidate:
     attempt: int
     palette: tuple[str, ...]
     roles: tuple[ColorRole, ...]
+    role_assignments: tuple[ColorRoleAssignment, ...]
 
 
 class MaskSpriteGenerator:
@@ -129,7 +130,7 @@ class MaskSpriteGenerator:
                     rng_algorithm=RNG_ALGORITHM,
                     provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": dict(retry_seeds)},
                 )
-                return MaskCandidate(result, mask, family, attempt, palette, colorized.roles)
+                return MaskCandidate(result, mask, family, attempt, palette, colorized.roles, colorized.role_assignments)
             except (TypeError, ValueError, MaskContractError, ResultContractError):
                 continue
         return self._failure(FailureCode.RETRY_EXHAUSTED, "bounded MASK generation attempts exhausted", request)

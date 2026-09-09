@@ -73,6 +73,27 @@ def resolve_mask(definition: MaskDefinition, rng: DeterministicRNG, config: Mask
     for orbit in mutation_stream.shuffle(mutable_orbits)[:mutation_count]:
         for index in orbit:
             foreground[index] = not foreground[index]
+    # A random one-cell foreground island cannot satisfy the M03 connected
+    # region contract. Drop only such optional cells; hard REQUIRED geometry
+    # remains immutable.
+    changed = True
+    while changed:
+        changed = False
+        for index, value in enumerate(tuple(foreground)):
+            if not value or states[index] is not MaskCellState.RANDOM:
+                continue
+            x, y = index % definition.width, index // definition.width
+            neighbors = tuple(
+                neighbor for neighbor in (
+                    index - 1 if x else -1,
+                    index + 1 if x + 1 < definition.width else -1,
+                    index - definition.width if y else -1,
+                    index + definition.width if y + 1 < definition.height else -1,
+                ) if neighbor >= 0
+            )
+            if not any(foreground[neighbor] for neighbor in neighbors):
+                foreground[index] = False
+                changed = True
     # Close only random one-cell negative-space pockets. Hard FORBIDDEN cells
     # remain untouched, while rendered base-color regions stay coherent.
     changed = True

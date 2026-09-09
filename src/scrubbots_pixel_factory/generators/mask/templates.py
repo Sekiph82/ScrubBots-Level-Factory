@@ -91,58 +91,76 @@ def _symmetric_rows(cells: list[MaskCellState], width: int, height: int, y0: int
             _mark(cells, width, height, center - dx, y)
 
 
-def _optional_ring(cells: list[MaskCellState], width: int, height: int) -> None:
+def _optional_ring(
+    cells: list[MaskCellState],
+    width: int,
+    height: int,
+    protected: set[int] | None = None,
+) -> None:
     required = {index for index, state in enumerate(cells) if state is MaskCellState.REQUIRED}
+    protected = protected or set()
     for index in tuple(required):
         x, y = index % width, index // width
         for dx, dy in ((-1, 0), (1, 0), (0, -1), (0, 1)):
-                nx, ny = x + dx, y + dy
-                if 0 <= nx < width and 0 <= ny < height:
-                    target = ny * width + nx
-                    if cells[target] is MaskCellState.FORBIDDEN:
-                        cells[target] = MaskCellState.RANDOM
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < width and 0 <= ny < height:
+                target = ny * width + nx
+                if cells[target] is MaskCellState.FORBIDDEN and target not in protected:
+                    cells[target] = MaskCellState.RANDOM
 
 
-def _finish(family: TemplateFamily, cells: list[MaskCellState], width: int, height: int) -> MaskDefinition:
+def _finish(
+    family: TemplateFamily,
+    cells: list[MaskCellState],
+    width: int,
+    height: int,
+    protected: set[int] | None = None,
+) -> MaskDefinition:
     if not any(state is MaskCellState.REQUIRED for state in cells):
         raise MaskContractError(f"{family.value} template has no required subject cells")
     # Geometry is authored once. Symmetry is an engine option, never a hidden
     # four-way post-process that erases directional or organic family cues.
+    # Tiny required islands are connected; larger lobes retain their negative
+    # space and are handled independently by the color-region allocator.
     required = {index for index, state in enumerate(cells) if state is MaskCellState.REQUIRED}
-    while True:
-        components: list[set[int]] = []
-        unseen = set(required)
-        while unseen:
-            component = {unseen.pop()}
-            frontier = list(component)
-            while frontier:
-                index = frontier.pop()
-                x, y = index % width, index // width
-                for neighbor in (
-                    index - 1 if x else -1,
-                    index + 1 if x + 1 < width else -1,
-                    index - width if y else -1,
-                    index + width if y + 1 < height else -1,
-                ):
-                    if neighbor in unseen:
-                        unseen.remove(neighbor)
-                        component.add(neighbor)
-                        frontier.append(neighbor)
-            components.append(component)
-        if len(components) <= 1:
+    components: list[set[int]] = []
+    unseen = set(required)
+    while unseen:
+        component = {unseen.pop()}
+        frontier = list(component)
+        while frontier:
+            index = frontier.pop()
+            x, y = index % width, index // width
+            for neighbor in (
+                index - 1 if x else -1,
+                index + 1 if x + 1 < width else -1,
+                index - width if y else -1,
+                index + width if y + 1 < height else -1,
+            ):
+                if neighbor in unseen:
+                    unseen.remove(neighbor)
+                    component.add(neighbor)
+                    frontier.append(neighbor)
+        components.append(component)
+    for component in components:
+        if len(component) != 1:
+            continue
+        if len(components) == 1:
             break
-        left, right = min(
-            ((a, b) for a in components[0] for b in components[1:][0]),
-            key=lambda pair: (abs(pair[0] % width - pair[1] % width) + abs(pair[0] // width - pair[1] // width), pair),
+        island = next(iter(component))
+        nearest = min(
+            (index for other in components if other is not component for index in other),
+            key=lambda index: (
+                abs(index % width - island % width) + abs(index // width - island // width),
+                index,
+            ),
         )
-        lx, ly = left % width, left // width
-        rx, ry = right % width, right // width
-        for x in range(min(lx, rx), max(lx, rx) + 1):
-            required.add(ly * width + x)
-        for y in range(min(ly, ry), max(ly, ry) + 1):
-            required.add(y * width + rx)
-        for index in required:
-            cells[index] = MaskCellState.REQUIRED
+        ix, iy = island % width, island // width
+        nx, ny = nearest % width, nearest // width
+        for x in range(min(ix, nx), max(ix, nx) + 1):
+            cells[iy * width + x] = MaskCellState.REQUIRED
+        for y in range(min(iy, ny), max(iy, ny) + 1):
+            cells[y * width + nx] = MaskCellState.REQUIRED
     # A one-cell enclosed negative-space pocket would necessarily become a
     # singleton rendered color region, so close only those tiny hard pockets.
     changed = True
@@ -163,7 +181,7 @@ def _finish(family: TemplateFamily, cells: list[MaskCellState], width: int, heig
             if len(neighbors) == 4 and all(cells[neighbor] is MaskCellState.REQUIRED for neighbor in neighbors):
                 cells[index] = MaskCellState.REQUIRED
                 changed = True
-    _optional_ring(cells, width, height)
+    _optional_ring(cells, width, height, protected)
     return MaskDefinition(width, height, tuple(cells))
 
 
@@ -249,13 +267,19 @@ def _insect(width: int, height: int, ox: int, oy: int) -> MaskDefinition:
     cells = _canvas(width, height)
     x0, y0, x1, y1 = _center_box(width, height, 58, 68, ox, oy)
     center = (width - 1) // 2
-    _rect(cells, width, height, center - 2, y0, center + 2, y1)
-    for row in range(5):
-        y = y0 + 3 + row * 3
-        span = 5 + row
-        _rect(cells, width, height, center - span, y, center - 3, y + 2)
-        _rect(cells, width, height, center + 3, y, center + span, y + 2)
-    _line(cells, width, height, [(center - 2, y0 - 1), (center - 5, y0 - 3), (center + 2, y0 - 1), (center + 5, y0 - 3)])
+    # Narrow segmented thorax with deliberately separated paired wing lobes.
+    _rect(cells, width, height, center - 1, y0 + 2, center + 1, y1 - 2)
+    for row in range(4):
+        y = y0 + 3 + row * 4
+        span = 8 - row
+        _rect(cells, width, height, center - span, y, center - 4, y + 1)
+        _rect(cells, width, height, center + 4, y, center + span, y + 1)
+    _line(cells, width, height, [
+        (center - 1, y0 + 1), (center - 4, y0 - 1), (center - 6, y0 - 2),
+        (center + 1, y0 + 1), (center + 4, y0 - 1), (center + 6, y0 - 2),
+        (center - 1, y0 + 8), (center - 5, y0 + 10),
+        (center + 1, y0 + 13), (center + 5, y0 + 15),
+    ])
     return _finish(TemplateFamily.INSECT, cells, width, height)
 
 
@@ -263,27 +287,41 @@ def _face_emblem(width: int, height: int, ox: int, oy: int) -> MaskDefinition:
     cells = _canvas(width, height)
     x0, y0, x1, y1 = _center_box(width, height, 58, 58, ox, oy)
     center = (width - 1) // 2
-    spans = (4, 6, 7, 8, 8, 7, 6, 4)
+    spans = (3, 5, 7, 8, 9, 9, 8, 7, 5, 3)
     for row, span in enumerate(spans):
-        y = y0 + 1 + row * max(1, (y1 - y0 - 3) // max(1, len(spans) - 1))
+        y = y0 + row * max(1, (y1 - y0 - 2) // max(1, len(spans) - 1))
         _rect(cells, width, height, center - span, y, center + span, y + 1)
-    _rect(cells, width, height, center - 6, y0 + 8, center - 3, y0 + 10)
-    _rect(cells, width, height, center + 3, y0 + 8, center + 6, y0 + 10)
-    _rect(cells, width, height, center - 5, y1 - 5, center + 5, y1 - 3)
-    return _finish(TemplateFamily.FACE_EMBLEM, cells, width, height)
+    # Negative-space eye sockets and a mouth slot are structural holes, not
+    # foreground rectangles that depend on later color paint to read.
+    eye_y = y0 + 5
+    protected = set()
+    for x_start, x_end in ((center - 6, center - 3), (center + 3, center + 6)):
+        _rect(cells, width, height, x_start, eye_y, x_end, eye_y + 1, MaskCellState.FORBIDDEN)
+        protected.update(y * width + x for y in range(eye_y, eye_y + 2) for x in range(x_start, x_end + 1))
+    _rect(cells, width, height, center - 4, y1 - 5, center + 4, y1 - 3, MaskCellState.FORBIDDEN)
+    protected.update(y * width + x for y in range(y1 - 5, y1 - 2) for x in range(center - 4, center + 5))
+    _rect(cells, width, height, center - 5, y0 + 3, center - 2, y0 + 4)
+    _rect(cells, width, height, center + 2, y0 + 3, center + 5, y0 + 4)
+    return _finish(TemplateFamily.FACE_EMBLEM, cells, width, height, protected)
 
 
 def _tree_plant(width: int, height: int, ox: int, oy: int) -> MaskDefinition:
     cells = _canvas(width, height)
     x0, y0, x1, y1 = _center_box(width, height, 55, 72, ox, oy)
     center = (width - 1) // 2
-    for row in range(8):
-        y = y0 + row * 2
-        span = 4 + row // 2
-        _rect(cells, width, height, center - span, y, center + span, y + 2)
-    _rect(cells, width, height, center - 3, y0 + 13, center + 3, y1)
-    _rect(cells, width, height, center - 9, y0 + 17, center - 4, y0 + 19)
-    _rect(cells, width, height, center + 4, y0 + 17, center + 9, y0 + 19)
+    # A narrow stem and separated, uneven crown lobes distinguish the plant
+    # from the insect's paired wings.
+    _rect(cells, width, height, center - 1, y0 + 11, center + 1, y1 - 1)
+    _rect(cells, width, height, center - 5, y1 - 2, center + 5, y1)
+    _rect(cells, width, height, center - 3, y0, center + 3, y0 + 3)
+    _rect(cells, width, height, center - 10, y0 + 5, center - 4, y0 + 8)
+    _rect(cells, width, height, center + 4, y0 + 4, center + 11, y0 + 7)
+    _rect(cells, width, height, center - 7, y0 + 9, center - 3, y0 + 11)
+    _rect(cells, width, height, center + 2, y0 + 9, center + 7, y0 + 12)
+    _line(cells, width, height, [
+        (center - 1, y0 + 10), (center - 4, y0 + 9),
+        (center + 1, y0 + 12), (center + 4, y0 + 10),
+    ])
     return _finish(TemplateFamily.TREE_PLANT, cells, width, height)
 
 

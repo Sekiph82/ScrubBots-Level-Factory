@@ -14,9 +14,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "5280e403e79d4efbeb3d1c61ca5d40de8e75aed47e31f082abcdd10a6fc8e5be",
-    "grid_sha256": "616134f796bcd8d4873cdb854b8704db082ddcb494a6a4ff084b2a46ce86d00b",
-    "result_sha256": "b98c648b7cb63772b15dbd6aac48be8f86e2bdfbc308f87290ce397c72e9e82b"
+    "foreground_mask_sha256": "52ba95d598cf32e27a5e5630b259bcce4356211be11549ce6c7e23259f838fd9",
+    "grid_sha256": "1acd703cf8216bdc93c50580dc3055d907fc87f8e157482cf80f1547e494b66b",
+    "result_sha256": "244aecec00b1a64595d2d0a8a49b47ee031fd18d1159e371a90b08a5f85dbf66"
   },
   {
     "family": "CREATURE",
@@ -33,9 +33,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "139b65c0f3d7cdb2a3415695293bb253be348d4710b9a02378c723cb70e98930",
-    "grid_sha256": "47cd440f0ec2b24db423a5c06b558ba13a8b9aa79be55083835fec4d09e65194",
-    "result_sha256": "75755ba902bd6922677543591867ba5d20bb5dd7273807f01ee78a9ec713993e"
+    "foreground_mask_sha256": "9e41096ece50a41d29d2ac5fab7353fa54721891ca5f19dc05ad7b8369be2d0d",
+    "grid_sha256": "df8129ed9c7cedc97a4998c0ec74e047475ef50407113c76874298559a625313",
+    "result_sha256": "467304eac63523b9b42837f9620056e987f48ffd5fdb22b00dd2956963043910"
   },
   {
     "family": "FISH",
@@ -52,9 +52,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "76d750f3e11e5f81cd588da537cdc536dcb6cbd654948806b6f7377e5a42f5fc",
-    "grid_sha256": "772c4a5531b77d6c6a6a6da10525aae51c90596fcab1286bf221534e854d49b1",
-    "result_sha256": "7ef0b0af02bc67bfccccf96ca83cf77a796df452f1b3bed80002fe2933904843"
+    "foreground_mask_sha256": "83b87c5889228f87832220a1396730628e5655b1cdb293f2c64081d0f4458b64",
+    "grid_sha256": "0c309fb0dca9500851afab19b8f21a9f3059c64a7f3ddb51fcda5b270d6a082f",
+    "result_sha256": "4a9a4364af5d40b4ba1524111d205125b108996ac4c1e16cde4a6c5fb3baa2d3"
   },
   {
     "family": "SEA_CREATURE",
@@ -71,9 +71,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "2dd25e402485659e3352e66d051fa8aca999381dcc445ba9e9cdb4f9f4ce6a34",
-    "grid_sha256": "d4b6f468a946ca62db22bddf4b83127d0b25f24ae2fca985357d7730eea49089",
-    "result_sha256": "86929577ecc86c6fcab055a6e6ae36cdefd3a7bb9190be3ee9e97f685c59d8ce"
+    "foreground_mask_sha256": "8040ca8a6755c2b6f135961cfc331e2d2ae5f7ccfd50446e86cd9963ecec53e2",
+    "grid_sha256": "df36daa8ed5caf163fed4df77ac999f4403dff153e081e92c27c7091c23b2263",
+    "result_sha256": "ba8471d9d015b599b64957abf18b4c817d867e34f00532e2e4352754cdc8170b"
   },
   {
     "family": "SPACE_SHIP",
@@ -90,9 +90,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "f7ddd82a403a36becc3cc880dd6a918c0403485ea6ae3a43a9d2b27f67784215",
-    "grid_sha256": "756b305ddfed4a23e2d520cf94301280b6e15c82f8f1d30bf59ee38ebe76ec28",
-    "result_sha256": "1b39b267ee998dd4c62648379fba25400b837e8e7b858aa26f3a64ec7e0f058b"
+    "foreground_mask_sha256": "c3ea60e00f850ab147fa679db59991b4f4a11d50e82dab21da24a08227ffdb82",
+    "grid_sha256": "b907b800a65a8ded0f94b754417c9440473d0e4105809a0de9f9ca3db9fc4bf7",
+    "result_sha256": "bff8a3fcda9a7e8433f1df7a404c2d04d8b9831515ccdc53236151cfd77919e4"
   },
   {
     "family": "INSECT",
@@ -109,9 +109,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "efef5d68c5aaacc3a3c3948a6366d8f89af04528359828b9ba17a23814d254c4",
-    "grid_sha256": "dacb94de0bce68c0a5c30ed77d53b802c3d911ce98cd99e341e24244fb17360c",
-    "result_sha256": "f04a37385d89399797ba87eb41f9dcc8677fe72ad5be2b6b311e7065ec931fe5"
+    "foreground_mask_sha256": "024f74dbf820da1f17c2ce4334bf5e0e13fdc5f730821bc479d71498fe7eed85",
+    "grid_sha256": "78c40e503a291d9dd4db724e3d7374efaa0b372fb5f99e47d615e397830c5f64",
+    "result_sha256": "422a2a1db2b032b5a2f228768f069e6b6491e41814465f46008dd49e921a376f"
   },
   {
     "family": "FACE_EMBLEM",
@@ -128,9 +128,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "196dc837e229031095caa5c2a403db0751a9b83228a6da8ee0706bef0a95e027",
-    "grid_sha256": "f3c73bc91ff1e34a598681c8d97e7b930fbd848c4cbd68a82a63f53cb390eee6",
-    "result_sha256": "a6dd29d29733359de7f7e2736d26a883a65d5928c882b5fc7d5936312b2c5a8c"
+    "foreground_mask_sha256": "a71ba86a5c3e8e43d9dcfb95c8f80cede2bac12660acee705bc7c92bd982f1b5",
+    "grid_sha256": "6056e66d17a49ddd989279d45999cf88bc1cfd7244ef311603114682a4bc2958",
+    "result_sha256": "f24f61bdfe107cc2ef7bbf4326afd483b375e74feea41407704b7d7a4081d127"
   },
   {
     "family": "TREE_PLANT",
@@ -147,9 +147,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "a6ca8840f57e607df2736411295d86ef2e90ec861fdbb2eb2a851f13b3b52c32",
-    "grid_sha256": "a0063d61a0c7f717801dae07f0a6a519628fffd8bc8550c2252295dc5f8ce2f3",
-    "result_sha256": "0cf825ede7ee8913470f82d57fda7247500c3bf742c0043aca40bf4d52d8769a"
+    "foreground_mask_sha256": "8ac4e1917412b1a1da692c15013b4efcc08fa599bd0803b9b210350193ad4687",
+    "grid_sha256": "465b80fbb82e9be5b8bfc436cc3d09f85117833ecdcd579c479cd6ed44631983",
+    "result_sha256": "4df82305f826fa593d34c16bfe6175febbf2f6ace3f59127529c197abf763ea3"
   },
   {
     "family": "CORAL",
@@ -166,9 +166,9 @@
       "C14",
       "C16"
     ],
-    "foreground_mask_sha256": "1ccabcada3a424e61aa60f603383be1ff9fe5ec3225503e7e75d40e7dd6785b0",
-    "grid_sha256": "5da6fab542604f460396097c168548686bbfb382ba6d1031870ba3d253636350",
-    "result_sha256": "802019bcbe1c97d0478320a10d9d91c1396e9ebb8dc753b6cba2a630d844b32f"
+    "foreground_mask_sha256": "3fb3a28787cd8751052c752bcaf7511a0b77466b20c32baf0371a70d1b36915c",
+    "grid_sha256": "a9812e18d71739f16171b70cd7e8381ab05bc0713f0cf787a0564d19efd387f1",
+    "result_sha256": "19b9f88ed56607200d2e207305d0857da63f9cf26748845be1c8e3c9fbbf61c1"
   },
   {
     "family": "ABSTRACT_SYMBOL",
@@ -186,7 +186,7 @@
       "C16"
     ],
     "foreground_mask_sha256": "bc868f2fe3254ef6184f59d34a87119251ac01ba8572b1458c38023a3e11860b",
-    "grid_sha256": "fdb4a5435975819f6de6454329e8514c59640f059184d5831b04dd02c4560483",
-    "result_sha256": "e496363410a8e1d20a50b37cecf54935ab7ae1ca80efeb35238465d40bf95fe3"
+    "grid_sha256": "31058ccac9c23ec865f00eb9bc6130c25af746cedf5b87b09482ff978969a6db",
+    "result_sha256": "b5234648586367c4e578c2b4372adb6ee959e9e245e61980d29c4a65d6c68880"
   }
 ]
