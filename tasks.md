@@ -401,8 +401,8 @@ Minimum completion rules:
 - [x] **PAG-M00 — Repository Bootstrap & Governance**
 - [x] **PAG-M01 — Canonical SCRUBBOTS Contracts**
 - [x] **PAG-M02 — Deterministic Generation Core**
-- [~] **PAG-M03 — Mask / Sprite Generator**
-- [ ] **PAG-M04 — Procedural Shape / Rule Generator**
+- [x] **PAG-M03 — Mask / Sprite Generator**
+- [~] **PAG-M04 — Procedural Shape / Rule Generator**
 - [ ] **PAG-M05 — Wave Function Collapse Generator**
 - [ ] **PAG-M06 — Hybrid Generator Router**
 - [ ] **PAG-M07 — Artwork Quality & Diversity Filters**
@@ -559,12 +559,9 @@ Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIA
 
 # PAG-M03 — Mask / Sprite Generator
 
-H!veAI active cycle: `PAG-M03-C003 — Semantic Role Binding & Weak-Family Recognizability Remediation`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`  
-C002 verdict: `FAIL / FIX_REQUIRED`
+M03 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M03-C003 — Semantic Role Binding & Weak-Family Recognizability Remediation`  
+Closing audit: `.hiveai/audits/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`
 
 Goal: produce recognizable silhouettes and structured pixel-art objects without AI.
 
@@ -612,20 +609,27 @@ Each family:
 - [x] PAG-0327 Use exactly a legal distinct-color count for difficulty.
 - [x] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
 - [x] PAG-0329 Prefer coherent connected color regions.
-- [~] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
+- [x] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
 - [x] PAG-0331 Prevent BG01 assignment to cells.
 - [x] PAG-0332 Ensure every requested palette color actually appears when output is accepted.
 - [x] PAG-0333 Add deterministic recoloring while preserving geometry.
 
 ### M03 acceptance
 
-- [~] PAG-0334 Generate at least 100 deterministic mask candidates across the four difficulties.
-- [~] PAG-0335 Zero accepted candidates violate palette or dimension contracts.
-- [~] PAG-0336 Manual contact sheet demonstrates recognizably different families and seeds.
+- [x] PAG-0334 Generate at least 100 deterministic mask candidates across the four difficulties.
+- [x] PAG-0335 Zero accepted candidates violate palette or dimension contracts.
+- [x] PAG-0336 Manual contact sheet demonstrates recognizably different families and seeds.
 
 ---
 
 # PAG-M04 — Procedural Shape / Rule Generator
+
+H!veAI active cycle: `PAG-M04-C001 — Procedural Shape / Rule Generator`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`  
+Forward dependency: `PAG-0441` requires the V1 performance budget established later in M10; benchmark now, do not invent a budget.
 
 Goal: build original structured art from reusable procedural geometry.
 
