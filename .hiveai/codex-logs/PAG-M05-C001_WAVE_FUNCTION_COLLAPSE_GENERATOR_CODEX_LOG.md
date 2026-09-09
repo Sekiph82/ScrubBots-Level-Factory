@@ -65,3 +65,10 @@ Further entries will be appended chronologically and truthfully.
 - Regenerated review and benchmark artifacts from the final source with `review/m05/build_review.py` and `scripts/benchmark_m05.py`; review produced 4 candidates and benchmark again accepted all four 59x59 cases.
 - Compilation command `.venv\\Scripts\\python.exe -m compileall -q src tests scripts review/m05` passed. `git diff --check` reported only normal line-ending warnings for existing tracked files, with no whitespace errors.
 - Initial offline scan command used a POSIX-style `exit 0` in PowerShell and failed with a shell parsing error after no match. It was immediately corrected to a PowerShell `$LASTEXITCODE` guard; corrected scan passed with no runtime network/process references in WFC source. The failure did not modify files.
+
+## 2026-09-09T18:30:00+03:00 — Publication
+
+- GitHub synchronization before publication: fetched `origin/main`, preserved the full pre-existing/M05 worktree in `codex-preserve-preexisting-controls-and-M05-work-before-M05-sync`, fast-forwarded `main` from `f482dcd8c1388b93a4763c77a7b2cf96d1e7e5a0` to the GitHub-authoritative `b80cc778935b17411b3b388ffd3d5dd03009051b`, and reapplied the worktree. The pre-existing control-plane files remain dirty and unstaged; the preservation stash remains retained.
+- Staged paths were explicitly limited to the M05 source package, tests, synthetic test fixtures, empty/documented exemplar inbox, review/benchmark evidence, benchmark/review builders, and this matching Codex builder log. No `tasks.md`, `.hiveai/HANDOFF.md`, `.hiveai/CYCLE_INDEX.md`, `.hiveai/STATE.json`, `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT.json`, `.hiveai/EVENT_INDEX.json`, or audit file was staged.
+- Implementation commit created and pushed: `d72669b` (`implement M05 WFC generator`); push result: `b80cc77..d72669b main -> main`.
+- This log is being updated in a separate log-only commit so its own commit SHA is not written into itself. ChatGPT/H!veAI may independently record terminal repository HEAD.
