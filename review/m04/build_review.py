@@ -30,19 +30,36 @@ PRIMITIVE_PARAMETERS = {
 
 def _primitive_entry(name: str) -> dict[str, object]:
     canvas = RuleCanvas(29, 23)
-    geometry = apply_primitive(canvas, name, DeterministicRNG(41), **PRIMITIVE_PARAMETERS[name])
-    occupied = set().union(*geometry.values()) if isinstance(geometry, dict) else set(geometry)
+    primitive_rng = DeterministicRNG(41)
+    pre_carve = None
+    if name == "POCKET":
+        apply_primitive(canvas, "CHAMBER", primitive_rng.child("context"), chamber_width=11, chamber_height=9)
+        pre_carve = set(canvas.occupied)
+        geometry = apply_primitive(canvas, name, primitive_rng.child("target"), **PRIMITIVE_PARAMETERS[name])
+    else:
+        geometry = apply_primitive(canvas, name, primitive_rng, **PRIMITIVE_PARAMETERS[name])
+    occupied = set(canvas.occupied)
     grid = ["C01" if index in occupied else "C02" for index in range(canvas.size)]
     components = connected_components(occupied, canvas) if occupied else ()
+    component_sizes = [len(component) for component in components]
+    diagnostics = {
+        "occupied_cells": len(occupied), "occupied_component_count": len(components),
+        "geometry_sha256": canvas.region_digest() if isinstance(geometry, dict) else canvas.geometry_digest(),
+        "primitive_parameters": PRIMITIVE_PARAMETERS[name],
+        "singleton_count": sum(size == 1 for size in component_sizes),
+        "occupied_component_sizes": component_sizes,
+    }
+    if pre_carve is not None:
+        diagnostics.update({
+            "pre_carve_occupied_cells": len(pre_carve),
+            "carved_cells": len(pre_carve - occupied),
+            "pocket_carves_only": (pre_carve - occupied).issubset(pre_carve) and len(occupied) < len(pre_carve),
+        })
     return {
         "kind": "primitive", "primitive": name, "seed": 41, "dimensions": [29, 23],
         "geometry_mask": [1 if index in occupied else 0 for index in range(canvas.size)],
         "logical_grid": grid, "resolved_palette": ["C01", "C02"],
-        "diagnostics": {
-            "occupied_cells": len(occupied), "occupied_component_count": len(components),
-            "geometry_sha256": canvas.region_digest() if isinstance(geometry, dict) else canvas.geometry_digest(),
-            "primitive_parameters": PRIMITIVE_PARAMETERS[name], "singleton_count": 0,
-        },
+        "diagnostics": diagnostics,
     }
 
 
@@ -54,6 +71,14 @@ def _recipe_entry(generator: RuleShapeGenerator, recipe: str, difficulty: str, s
         raise RuntimeError(f"review candidate failed: {recipe}/{difficulty}/{seed}")
     result = candidate.result
     component_sizes = color_component_sizes(result.logical_grid, width, height)
+    base_color = result.used_palette[0]
+    occupied = set(candidate.canvas.occupied)
+    negative = set(candidate.canvas.negative)
+    base_on_occupied = sum(index in occupied and result.logical_grid[index] == base_color for index in range(width * height))
+    non_base_on_negative = sum(index in negative and result.logical_grid[index] != base_color for index in range(width * height))
+    accent_color = candidate.accent_color
+    accent_sizes = list(component_sizes.get(accent_color, ())) if accent_color else []
+    effective_cap = candidate.recipe.max_color_dominance_pct
     return {
         "kind": "recipe", "recipe": recipe, "recipe_version": candidate.recipe.version, "difficulty": difficulty, "seed": seed,
         "dimensions": [width, height], "geometry_mask": [1 if index in candidate.canvas.occupied else 0 for index in range(width * height)],
@@ -64,6 +89,16 @@ def _recipe_entry(generator: RuleShapeGenerator, recipe: str, difficulty: str, s
             "color_components": {key: list(value) for key, value in component_sizes.items()},
             "singleton_count": sum(size == 1 for sizes in component_sizes.values() for size in sizes),
             "max_color_dominance_pct": round(max(result.logical_grid.count(color) for color in result.used_palette) * 100 / (width * height), 3),
+            "effective_max_dominance_pct": effective_cap,
+            "base_color": base_color,
+            "negative_space_count": len(negative),
+            "occupied_count": len(occupied),
+            "base_on_occupied": base_on_occupied,
+            "non_base_on_negative": non_base_on_negative,
+            "geometry_color_fidelity": base_on_occupied == 0 and non_base_on_negative == 0 and all((result.logical_grid[index] != base_color) == (index in occupied) for index in range(width * height)),
+            "accent_color": accent_color,
+            "accent_component_sizes": accent_sizes,
+            "color_roles": {color: role for color, role in candidate.color_roles},
             "geometry_sha256": candidate.canvas.geometry_digest(), "region_sha256": candidate.canvas.region_digest(),
         },
     }

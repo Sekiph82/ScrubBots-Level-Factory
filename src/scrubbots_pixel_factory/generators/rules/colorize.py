@@ -14,6 +14,8 @@ class ColorizedRules:
     region_labels: tuple[str, ...]
     color_components: dict[str, tuple[int, ...]]
     max_dominance_pct: float
+    color_roles: tuple[tuple[str, str], ...] = ()
+    accent_color: str | None = None
 
 
 def color_component_sizes(cells: tuple[str, ...] | list[str], width: int, height: int) -> dict[str, tuple[int, ...]]:
@@ -50,7 +52,7 @@ def _grow_patch(seed: int, available: set[int], canvas: RuleCanvas, target: int,
     patch = {seed}
     available.remove(seed)
     for _ in range(max(0, target - 1)):
-        frontier = sorted({neighbor for index in patch for neighbor in canvas.neighbors(index) if neighbor in available})
+        frontier = sorted({neighbor for index in sorted(patch) for neighbor in canvas.neighbors(index) if neighbor in available})
         if not frontier:
             break
         chosen = rng.choice(frontier)
@@ -59,7 +61,7 @@ def _grow_patch(seed: int, available: set[int], canvas: RuleCanvas, target: int,
     return patch
 
 
-def _largest_available_component(available: set[int], canvas: RuleCanvas) -> set[int]:
+def _components(available: set[int], canvas: RuleCanvas) -> tuple[tuple[int, ...], ...]:
     remaining = set(available)
     components: list[set[int]] = []
     while remaining:
@@ -75,7 +77,34 @@ def _largest_available_component(available: set[int], canvas: RuleCanvas) -> set
                     component.add(neighbor)
                     frontier.append(neighbor)
         components.append(component)
-    return max(components, key=lambda value: (len(value), -min(value)), default=set())
+    return tuple(sorted((tuple(sorted(component)) for component in components), key=lambda value: (-len(value), value[0])))
+
+
+def _contour(occupied: set[int], canvas: RuleCanvas) -> set[int]:
+    return {index for index in occupied if any(neighbor not in occupied for neighbor in canvas.neighbors(index))}
+
+
+def _role_name(color_index: int, color_count: int) -> str:
+    if color_index == 0:
+        return "NEGATIVE_SPACE"
+    if color_index == 1:
+        return "OUTLINE"
+    if color_index == 2:
+        return "BODY"
+    if color_index == color_count - 1:
+        return "ACCENT"
+    return "SECONDARY"
+
+
+def _seed_candidates(available: set[int], preferred: set[int], canvas: RuleCanvas) -> list[int]:
+    candidates = sorted(preferred & available) or sorted(available)
+    return sorted(
+        candidates,
+        key=lambda index: (
+            -sum(neighbor in available for neighbor in canvas.neighbors(index)),
+            index,
+        ),
+    )
 
 
 def colorize_canvas(canvas: RuleCanvas, palette: tuple[str, ...] | list[str], rng: DeterministicRNG, *, min_region_size: int = 2, max_dominance_pct: int = 82) -> ColorizedRules:
@@ -89,76 +118,80 @@ def colorize_canvas(canvas: RuleCanvas, palette: tuple[str, ...] | list[str], rn
     if min_region_size < 2 or not 50 <= max_dominance_pct <= 100:
         raise RuleContractError("RULES color-region bounds are invalid")
     total = canvas.size
-    max_count = total * max_dominance_pct // 100
+    occupied = set(canvas.occupied)
+    if len(occupied) < (len(selected) - 1) * min_region_size:
+        raise RuleContractError("RULES occupied geometry cannot accommodate the selected palette")
     cells = [selected[0]] * total
-    available = set(range(total))
+    available = set(occupied)
+    contour = _contour(occupied, canvas)
+    body = occupied - contour
     patches: dict[str, set[int]] = {}
-    target = max(min_region_size, total // (2 * len(selected)))
-    for color_index, color in enumerate(selected[1:]):
-        component = _largest_available_component(available, canvas)
-        preferred = sorted(set(canvas.occupied) & component)
-        candidates = preferred or sorted(component)
-        if not candidates:
+    # Seed one connected patch per non-base color. Every patch is grown only
+    # through occupied cells, so the base color remains an exact negative-space
+    # classification and all semantic colors remain geometry-derived.
+    for color_index, color in enumerate(selected[1:], start=1):
+        role = _role_name(color_index, len(selected))
+        preferred = contour if role == "OUTLINE" else body
+        if not preferred:
+            preferred = occupied
+        components = _components(available, canvas)
+        viable = [component for component in components if len(component) >= min_region_size]
+        if not viable:
             raise RuleContractError("RULES color-region capacity exhausted")
-        # Prefer a cell with a broad available frontier. This keeps every
-        # seeded patch growable even when geometry is a one-cell contour.
-        ranked = sorted(
-            candidates,
-            key=lambda index: (-sum(neighbor in available for neighbor in canvas.neighbors(index)), index),
-        )
-        seed = rng.child(f"seed/{color_index}").choice(ranked[: min(16, len(ranked))])
-        patch = _grow_patch(seed, available, canvas, min(target, max_count), rng.child(f"patch/{color_index}"))
+        component = viable[0]
+        candidates = _seed_candidates(set(component), preferred, canvas)
+        seed = rng.child(f"seed/{role}/{color_index}").choice(candidates[: min(16, len(candidates))])
+        patch = _grow_patch(seed, available, canvas, min_region_size, rng.child(f"patch/{role}/{color_index}"))
         if len(patch) < min_region_size:
-            raise RuleContractError("RULES accent region is smaller than configured minimum")
+            raise RuleContractError("RULES color region is smaller than configured minimum")
         patches[color] = patch
-        for index in patch:
+        for index in sorted(patch):
             cells[index] = color
-    # Keep the base/negative-space color below the documented cap by growing the
-    # final coherent region through adjacent remaining cells.
-    base_remaining = {index for index, color in enumerate(cells) if color == selected[0]}
-    if len(base_remaining) > max_count:
-        grow_color = selected[-1]
-        grow = set(patches[grow_color])
-        need = len(base_remaining) - max_count
-        for _ in range(need):
-            frontier = sorted({neighbor for index in grow for neighbor in range(total) if neighbor in base_remaining and neighbor in canvas.neighbors(index)})
-            if not frontier:
-                raise RuleContractError("RULES base dominance cannot be reduced coherently")
-            index = frontier[0]
-            grow.add(index)
-            base_remaining.remove(index)
-            cells[index] = grow_color
-        patches[grow_color] = grow
-    components = color_component_sizes(cells, canvas.width, canvas.height)
-    # Merge any accidental one-cell base island into the adjacent largest patch.
-    for color, sizes in components.items():
-        if color != selected[0] or all(size >= min_region_size for size in sizes):
+
+    # Flood all remaining occupied cells from the existing semantic patches.
+    # A labeled cell is only added adjacent to its own color, preserving
+    # connected color regions while keeping assignment deterministic.
+    unlabeled = set(available)
+    while unlabeled:
+        frontier = []
+        for index in sorted(unlabeled):
+            choices = sorted({cells[neighbor] for neighbor in canvas.neighbors(index) if neighbor in occupied and neighbor not in unlabeled and cells[neighbor] != selected[0]})
+            if choices:
+                frontier.append((index, choices))
+        if frontier:
+            index, choices = frontier[0]
+            color = choices[0]
+            cells[index] = color
+            patches[color].add(index)
+            unlabeled.remove(index)
             continue
-        visited: set[int] = set()
-        for index in range(total):
-            if cells[index] != color or index in visited:
-                continue
-            same = {index}
-            frontier = [index]
-            while frontier:
-                current = frontier.pop()
-                for neighbor in canvas.neighbors(current):
-                    if neighbor not in same and cells[neighbor] == color:
-                        same.add(neighbor)
-                        frontier.append(neighbor)
-            visited.update(same)
-            if len(same) != 1:
-                continue
-            neighbor_colors = [cells[neighbor] for neighbor in canvas.neighbors(index) if cells[neighbor] != color]
-            if neighbor_colors:
-                cells[index] = min(neighbor_colors, key=lambda value: (neighbor_colors.count(value), value))
+        # An unseeded disconnected geometry component is assigned as one
+        # complete component to the accent color; it cannot create a singleton
+        # unless the source geometry itself is an invalid singleton component.
+        component = _components(unlabeled, canvas)[0]
+        # Keep the explicit accent as one connected semantic subregion. Extra
+        # disconnected source components belong to outline/secondary support
+        # rather than splitting the accent across unrelated structures.
+        color = selected[1] if len(selected) >= 4 else selected[-1]
+        for index in component:
+            cells[index] = color
+            patches[color].add(index)
+            unlabeled.remove(index)
+
     components = color_component_sizes(cells, canvas.width, canvas.height)
     if set(cells) != set(selected):
         raise RuleContractError("RULES colorization did not use every selected canonical ID")
     if any(size < min_region_size for sizes in components.values() for size in sizes):
         raise RuleContractError("RULES colorization produced a sub-minimum component")
     largest = max(sum(1 for value in cells if value == color) for color in selected)
-    if largest > max_count:
+    if largest * 100 > max_dominance_pct * total:
         raise RuleContractError("RULES color dominance exceeded configured cap")
-    labels = tuple(canvas._regions.get(index, "NEGATIVE") if index in canvas._occupied else "NEGATIVE" for index in range(total))
-    return ColorizedRules(tuple(cells), labels, components, largest * 100 / total)
+    base = selected[0]
+    if any((cells[index] == base) != (index not in occupied) for index in range(total)):
+        raise RuleContractError("RULES base color is not faithful to RuleCanvas negative space")
+    if any(cells[index] != base and index not in occupied for index in range(total)):
+        raise RuleContractError("RULES foreground color escaped occupied geometry")
+    labels = tuple(canvas._regions.get(index, "NEGATIVE_SPACE") if index in canvas._occupied else "NEGATIVE_SPACE" for index in range(total))
+    roles = tuple((color, _role_name(index, len(selected))) for index, color in enumerate(selected))
+    accent = selected[-1] if len(selected) >= 4 else None
+    return ColorizedRules(tuple(cells), labels, components, largest * 100 / total, roles, accent)

@@ -38,6 +38,24 @@ def test_rules_rectangles_palette_and_provenance() -> None:
         assert result.provenance["stage_seeds"] == DeterministicRNG(31).stage_seeds()
 
 
+def test_rules_geometry_and_color_fidelity_and_explicit_accent() -> None:
+    generator = RuleShapeGenerator()
+    for recipe in RECIPE_NAMES:
+        request = _request("VERY_HARD", 137, recipe, width=59, height=50)
+        candidate = generator.generate_candidate(request)
+        assert isinstance(candidate, RuleCandidate)
+        result = candidate.result
+        base = result.used_palette[0]
+        assert all((cell == base) == (index in candidate.canvas.negative) for index, cell in enumerate(result.logical_grid))
+        assert all(cell != base for index, cell in enumerate(result.logical_grid) if index in candidate.canvas.occupied)
+        assert all(cell == base for index, cell in enumerate(result.logical_grid) if index in candidate.canvas.negative)
+        if len(result.used_palette) >= 4:
+            assert candidate.accent_color == result.used_palette[-1]
+            accent = {index for index, cell in enumerate(result.logical_grid) if cell == candidate.accent_color}
+            assert accent and accent.issubset(candidate.canvas.occupied)
+            assert len(color_component_sizes(result.logical_grid, 59, 50)[candidate.accent_color]) == 1
+
+
 def test_rules_runs_inside_offline_runtime_and_repeats_byte_identically() -> None:
     generator = RuleShapeGenerator()
     request = _request("VERY_HARD", 734, "ORGANIC", width=59, height=59)
@@ -63,7 +81,10 @@ def test_rules_acceptance_batch_has_140_successes_and_zero_contract_violations()
                 result = candidate.result
                 sizes = color_component_sizes(result.logical_grid, width, height)
                 counts = {color: result.logical_grid.count(color) for color in result.used_palette}
-                if (result.width, result.height) != (width, height) or set(result.logical_grid) != set(result.used_palette) or "BG01" in result.logical_grid or any(size < 2 for values in sizes.values() for size in values) or max(counts.values()) * 100 > 82 * width * height or result.canonical_bytes() != generator.generate(request).canonical_bytes():
+                base = result.used_palette[0]
+                faithful = all((cell == base) == (index in candidate.canvas.negative) for index, cell in enumerate(result.logical_grid))
+                effective_cap = candidate.recipe.max_color_dominance_pct
+                if (result.width, result.height) != (width, height) or set(result.logical_grid) != set(result.used_palette) or "BG01" in result.logical_grid or not faithful or any(size < 2 for values in sizes.values() for size in values) or max(counts.values()) * 100 > effective_cap * width * height or result.canonical_bytes() != generator.generate(request).canonical_bytes():
                     violations.append((recipe, difficulty, seed, "contract"))
     assert accepted == 140
     assert violations == []

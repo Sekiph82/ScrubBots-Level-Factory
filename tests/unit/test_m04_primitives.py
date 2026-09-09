@@ -8,12 +8,18 @@ from scrubbots_pixel_factory.generators.rules import (
     RuleCanvas,
     RuleContractError,
     apply_primitive,
+    connected_components,
 )
 
 
 def _render(name: str, seed: int = 17):
     canvas = RuleCanvas(29, 23)
-    geometry = apply_primitive(canvas, name, DeterministicRNG(seed))
+    rng = DeterministicRNG(seed)
+    if name == "POCKET":
+        apply_primitive(canvas, "CHAMBER", rng.child("context"), chamber_width=11, chamber_height=9)
+        geometry = apply_primitive(canvas, name, rng.child("target"), size=3)
+    else:
+        geometry = apply_primitive(canvas, name, rng)
     return canvas, geometry
 
 
@@ -27,6 +33,8 @@ def test_all_twelve_primitives_are_bounded_deterministic_and_rectangular() -> No
         assert first.width == 29 and first.height == 23
         if isinstance(geometry, dict):
             assert set().union(*geometry.values()) == set(range(first.size))
+        elif name == "POCKET":
+            assert set(geometry).isdisjoint(first.occupied)
         else:
             assert set(geometry) == set(first.occupied)
 
@@ -57,6 +65,30 @@ def test_primitive_respects_protected_negative_space() -> None:
     canvas.protect_negative(protected)
     apply_primitive(canvas, "BLOB", DeterministicRNG(9))
     assert protected.isdisjoint(canvas.occupied)
+
+
+def test_pocket_is_a_bounded_carving_primitive() -> None:
+    canvas = RuleCanvas(15, 13)
+    apply_primitive(canvas, "CHAMBER", DeterministicRNG(2), chamber_width=9, chamber_height=9)
+    before = set(canvas.occupied)
+    carved = apply_primitive(canvas, "POCKET", DeterministicRNG(3), size=3)
+    assert isinstance(carved, set)
+    assert carved and carved.issubset(before)
+    assert carved.isdisjoint(canvas.occupied)
+    assert len(before) - len(canvas.occupied) == len(carved)
+    assert len(connected_components(carved, canvas)) == 1
+    assert len(carved) <= 9
+
+
+def test_pocket_fails_closed_on_empty_or_protected_geometry() -> None:
+    with pytest.raises(RuleContractError):
+        apply_primitive(RuleCanvas(15, 13), "POCKET", DeterministicRNG(3), size=3)
+    canvas = RuleCanvas(15, 13)
+    apply_primitive(canvas, "CHAMBER", DeterministicRNG(2), chamber_width=9, chamber_height=9)
+    pocket_cells = {canvas.index(x, y) for y in range(5, 8) for x in range(6, 9)}
+    canvas.protect_occupied(pocket_cells)
+    with pytest.raises(RuleContractError):
+        apply_primitive(canvas, "POCKET", DeterministicRNG(3), size=3)
 
 
 def test_invalid_primitive_parameters_fail_closed() -> None:

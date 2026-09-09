@@ -87,7 +87,7 @@ def dilation(canvas: RuleCanvas, region: set[int] | frozenset[int], iterations: 
         raise RuleContractError("dilation iterations must be bounded to 0..32")
     result = set(region)
     for _ in range(iterations):
-        result.update(neighbor for index in tuple(result) for neighbor in canvas.neighbors(index) if neighbor not in canvas.protected_negative)
+        result.update(neighbor for index in sorted(result) for neighbor in canvas.neighbors(index) if neighbor not in canvas.protected_negative)
     canvas.mark_many(result - set(canvas.protected_negative), label)
     return result
 
@@ -164,8 +164,13 @@ def local_rewrite(canvas: RuleCanvas, rule: RewriteRule, *, label: str = "rewrit
         for index in range(canvas.size):
             neighbors = canvas.neighbors(index)
             occupied_neighbors = sum(neighbor in current for neighbor in neighbors)
-            if rule.name in {"FILL_NOTCH", "BRIDGE_GAP"} and index not in current and occupied_neighbors >= 3 and index not in canvas.protected_negative:
+            if rule.name == "FILL_NOTCH" and index not in current and occupied_neighbors >= 3 and index not in canvas.protected_negative:
                 additions.add(index)
+            elif rule.name == "BRIDGE_GAP" and index not in current and index not in canvas.protected_negative:
+                left_right = len(neighbors) == 4 and neighbors[0] in current and neighbors[1] in current
+                up_down = len(neighbors) == 4 and neighbors[2] in current and neighbors[3] in current
+                if occupied_neighbors == 2 and (left_right or up_down):
+                    additions.add(index)
             elif rule.name == "REMOVE_PROTRUSION" and index in current and occupied_neighbors <= 1 and index not in canvas.protected_occupied:
                 removals.add(index)
         if not additions and not removals:

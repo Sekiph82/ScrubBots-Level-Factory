@@ -13,9 +13,14 @@ def test_all_m04_primitive_goldens_are_deterministic() -> None:
     for fixture in FIXTURES:
         width, height = fixture["dimensions"]
         canvas = RuleCanvas(width, height)
-        geometry = apply_primitive(canvas, fixture["primitive"], DeterministicRNG(fixture["seed"]), **fixture["parameters"])
+        rng = DeterministicRNG(fixture["seed"])
+        if fixture["primitive"] == "POCKET":
+            apply_primitive(canvas, "CHAMBER", rng.child("context"), chamber_width=11, chamber_height=9)
+            geometry = apply_primitive(canvas, fixture["primitive"], rng.child("target"), **fixture["parameters"])
+        else:
+            geometry = apply_primitive(canvas, fixture["primitive"], rng, **fixture["parameters"])
         digest = canvas.region_digest() if isinstance(geometry, dict) else canvas.geometry_digest()
-        count = sum(map(len, geometry.values())) if isinstance(geometry, dict) else len(geometry)
+        count = sum(map(len, geometry.values())) if isinstance(geometry, dict) else (len(canvas.occupied) if fixture["primitive"] == "POCKET" else len(geometry))
         component_count = len(geometry) if isinstance(geometry, dict) else len(connected_components(set(geometry), canvas))
         assert digest == fixture["geometry_sha256"]
         assert count == fixture["occupied_cells"]

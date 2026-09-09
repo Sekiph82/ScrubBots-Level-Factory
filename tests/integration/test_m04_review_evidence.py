@@ -24,8 +24,17 @@ def test_m04_review_manifest_covers_primitives_recipes_and_difficulties() -> Non
         assert len(candidate["geometry_mask"]) == width * height
         assert len(candidate["logical_grid"]) == width * height
         assert diagnostics["singleton_count"] == 0
-        assert diagnostics["max_color_dominance_pct"] <= 82
+        assert diagnostics["geometry_color_fidelity"] is True
+        assert diagnostics["base_on_occupied"] == 0
+        assert diagnostics["non_base_on_negative"] == 0
+        assert diagnostics["max_color_dominance_pct"] <= diagnostics["effective_max_dominance_pct"]
+        if len(candidate["resolved_palette"]) >= 4:
+            assert diagnostics["accent_component_sizes"] and min(diagnostics["accent_component_sizes"]) >= 2
         assert set(candidate["logical_grid"]) == set(candidate["resolved_palette"])
+
+    pocket = next(c for c in candidates if c["kind"] == "primitive" and c["primitive"] == "POCKET")
+    assert pocket["diagnostics"]["pocket_carves_only"] is True
+    assert pocket["diagnostics"]["carved_cells"] >= 2
 
 
 def test_m04_contact_sheet_is_self_contained_integer_block_rendering() -> None:

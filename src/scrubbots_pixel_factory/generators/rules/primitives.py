@@ -4,6 +4,7 @@ from collections.abc import Iterable
 
 from ...core import DeterministicRNG
 from .model import RuleCanvas, RuleContractError
+from .operations import connected_components
 
 
 PRIMITIVE_NAMES = (
@@ -282,6 +283,15 @@ def apply_primitive(canvas: RuleCanvas, primitive: str, rng: DeterministicRNG, *
         for label, cells in geometry.items():
             canvas.mark_many(set(cells) - set(canvas.protected_negative), label)
         return geometry
+    if primitive == "POCKET":
+        eligible = set(geometry) & set(canvas.occupied) - set(canvas.protected_occupied)
+        components = connected_components(eligible, canvas)
+        carved = set(max((component for component in components if len(component) >= 2), key=lambda component: (len(component), -min(component)), default=()))
+        if not carved:
+            raise RuleContractError("POCKET requires at least two eligible occupied cells")
+        for index in sorted(carved):
+            canvas.carve(index)
+        return carved
     safe = set(geometry) - set(canvas.protected_negative)
     canvas.mark_many(safe, primitive)
     return safe

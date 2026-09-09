@@ -125,6 +125,10 @@ class RuleCanvas:
         self.coord(index)
         if index in self._protected_negative:
             raise RuleContractError("protected negative-space cell cannot be occupied")
+        if index in self._protected_occupied:
+            # Protection freezes both geometry and semantic identity. Generic
+            # overlapping operations may include the cell, but cannot relabel it.
+            return
         self._occupied.add(index)
         self._regions[index] = label
         if protected:
@@ -158,6 +162,8 @@ class RuleCanvas:
             raise RuleContractError("only occupied cells may receive a region label")
         if type(label) is not str or not label:
             raise RuleContractError("region label must be non-empty")
+        if index in self._protected_occupied and self._regions.get(index) != label:
+            raise RuleContractError("protected occupied semantic label cannot be changed")
         self._regions[index] = label
 
     def copy(self) -> "RuleCanvas":
@@ -189,3 +195,5 @@ class RuleCandidate:
     attempt: int
     primitive_id: str
     region_labels: tuple[str, ...] = field(default_factory=tuple)
+    color_roles: tuple[tuple[str, str], ...] = field(default_factory=tuple)
+    accent_color: str | None = None

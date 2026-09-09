@@ -45,3 +45,12 @@ def test_recipe_families_preserve_their_structural_signatures() -> None:
 
     sparse = render_recipe(recipe_for("SPARSE_NEGATIVE_SPACE", DeterministicRNG(1)), 29, 23, DeterministicRNG(59))
     assert len(sparse.occupied) * 100 / sparse.size < 50
+
+
+def test_every_recipe_varies_geometry_across_fixed_seeds() -> None:
+    for name in RECIPE_NAMES:
+        digests = {
+            render_recipe(recipe_for(name, DeterministicRNG(1)), 29, 23, DeterministicRNG(seed)).geometry_digest()
+            for seed in (11, 23, 47, 71, 97)
+        }
+        assert len(digests) >= 2, name

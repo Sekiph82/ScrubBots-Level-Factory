@@ -3,7 +3,7 @@
   {"primitive":"ISLAND","dimensions":[29,23],"seed":41,"parameters":{"target":24},"geometry_sha256":"ee966d3328358339f94aafda5ee603b1a6bcf86340bfc2e0971705f4faf24200","occupied_cells":24,"component_count":1},
   {"primitive":"RING","dimensions":[29,23],"seed":41,"parameters":{"radius":7,"thickness":1},"geometry_sha256":"973b929f8caa7a8c93217012c6905b51ba11d1d677694b14b9ebfb6410663196","occupied_cells":56,"component_count":1},
   {"primitive":"CORRIDOR","dimensions":[29,23],"seed":41,"parameters":{"width_cells":2},"geometry_sha256":"2f463308e65fac77bbf23c04d8f9252452512c5b90f449c0bc5872c52196d77a","occupied_cells":90,"component_count":1},
-  {"primitive":"POCKET","dimensions":[29,23],"seed":41,"parameters":{"size":3},"geometry_sha256":"652bfe0fcacda1e3d26e189352f46da7c42d4f7e6468e4ce7a98b0f5310b6d1c","occupied_cells":9,"component_count":1},
+  {"primitive":"POCKET","dimensions":[29,23],"seed":41,"parameters":{"size":3},"geometry_sha256":"530cfc009dcdbbeeaa471f765e5a65dae417f95b61227e04e2f39557f364ef3a","occupied_cells":90,"component_count":1,"pre_carve_occupied_cells":99,"carved_cells":9},
   {"primitive":"SNAKE","dimensions":[29,23],"seed":41,"parameters":{"max_steps":32},"geometry_sha256":"5b24fa4593248011e6b26613de06282474b6c62ca2a4505784315d48494e7e6e","occupied_cells":32,"component_count":1},
   {"primitive":"BRANCH","dimensions":[29,23],"seed":41,"parameters":{"depth":8,"branch_count":3},"geometry_sha256":"c7b1d996b25f0301d1d1462d54d3e9ad0cb4a10f65cde518ef9f5ce6c963c8e8","occupied_cells":36,"component_count":1},
   {"primitive":"CHAMBER","dimensions":[29,23],"seed":41,"parameters":{"chamber_width":11,"chamber_height":9},"geometry_sha256":"7a01815c7a9d54768d73ebf155e374633d7c09ee56317a2a86db8dc008a13dd1","occupied_cells":99,"component_count":1},

@@ -81,3 +81,45 @@ def test_rewrite_cannot_mutate_protected_occupied_cell() -> None:
     canvas.protect_occupied({protected})
     local_rewrite(canvas, RewriteRule("REMOVE_PROTRUSION", 2))
     assert protected in canvas.occupied
+
+
+def test_fill_notch_and_bridge_gap_have_distinct_predicates() -> None:
+    notch = RuleCanvas(7, 7)
+    notch.mark_many({notch.index(3, 2), notch.index(2, 3), notch.index(4, 3)}, "subject")
+    notch_fill = local_rewrite(notch, RewriteRule("FILL_NOTCH", 1))
+    assert notch.index(3, 3) in notch_fill
+
+    gap = RuleCanvas(7, 7)
+    gap.mark_many({gap.index(2, 3), gap.index(4, 3)}, "subject")
+    bridge_fill = local_rewrite(gap, RewriteRule("BRIDGE_GAP", 1))
+    assert gap.index(3, 3) in bridge_fill
+
+    notch_only = RuleCanvas(7, 7)
+    notch_only.mark_many({notch_only.index(3, 2), notch_only.index(2, 3), notch_only.index(4, 3)}, "subject")
+    assert notch_only.index(3, 3) not in local_rewrite(notch_only, RewriteRule("BRIDGE_GAP", 1))
+
+    gap_only = RuleCanvas(7, 7)
+    gap_only.mark_many({gap_only.index(2, 3), gap_only.index(4, 3)}, "subject")
+    assert gap_only.index(3, 3) not in local_rewrite(gap_only, RewriteRule("FILL_NOTCH", 1))
+
+
+def test_bridge_gap_respects_protected_negative_cells() -> None:
+    canvas = RuleCanvas(7, 7)
+    gap = canvas.index(3, 3)
+    canvas.mark_many({canvas.index(2, 3), canvas.index(4, 3)}, "subject")
+    canvas.protect_negative({gap})
+    assert gap not in local_rewrite(canvas, RewriteRule("BRIDGE_GAP", 2))
+
+
+def test_protected_occupied_semantic_label_survives_all_overlapping_operations() -> None:
+    canvas = _canvas()
+    protected = canvas.index(7, 6)
+    canvas.set_region(protected, "CENTRAL_SUBJECT")
+    canvas.protect_occupied({protected}, "CENTRAL_SUBJECT")
+    canvas.mark(protected, "dilation")
+    dilation(canvas, {protected}, 1, label="other")
+    controlled_fragmentation(canvas, set(canvas.occupied), 3, 2, DeterministicRNG(8), label="fragment")
+    local_rewrite(canvas, RewriteRule("FILL_NOTCH", 2), label="rewrite")
+    assert canvas.regions["CENTRAL_SUBJECT"] == frozenset({protected})
+    assert protected in canvas.occupied
+    assert canvas.copy().regions["CENTRAL_SUBJECT"] == frozenset({protected})

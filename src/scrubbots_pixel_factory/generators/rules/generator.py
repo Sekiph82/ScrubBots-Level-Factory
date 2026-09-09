@@ -30,22 +30,22 @@ class RuleShapeGenerator:
         return GenerationResult.failure(code=code, reason=reason, request=request)
 
     @staticmethod
-    def _config(request: GenerationRequest) -> tuple[int, int]:
+    def _config(request: GenerationRequest) -> tuple[int, int | None]:
         options = request.options
         if options.namespace == "default":
             if options.values:
                 raise RuleContractError("default RULES options namespace must be empty")
-            return 2, 82
+            return 2, None
         if options.namespace != "rules" or options.version != 1:
             raise RuleContractError("RULES options require namespace rules and version 1")
         allowed = {"min_color_region_size", "max_color_dominance_pct"}
         if set(options.values) - allowed:
             raise RuleContractError("RULES options contain an unsupported field")
         minimum = options.values.get("min_color_region_size", 2)
-        maximum = options.values.get("max_color_dominance_pct", 82)
+        maximum = options.values.get("max_color_dominance_pct")
         if isinstance(minimum, bool) or not isinstance(minimum, int) or minimum < 2 or minimum > 64:
             raise RuleContractError("min_color_region_size must be an integer in 2..64")
-        if isinstance(maximum, bool) or not isinstance(maximum, int) or not 50 <= maximum <= 100:
+        if maximum is not None and (isinstance(maximum, bool) or not isinstance(maximum, int) or not 50 <= maximum <= 100):
             raise RuleContractError("max_color_dominance_pct must be an integer in 50..100")
         return minimum, maximum
 
@@ -64,7 +64,7 @@ class RuleShapeGenerator:
         if stream.stage_seeds() != DeterministicRNG(request.seed).stage_seeds():
             return self._failure(FailureCode.INVALID_REQUEST, "supplied RNG is incoherent with the request seed", request)
         try:
-            minimum, maximum = self._config(request)
+            minimum, maximum_override = self._config(request)
             width, height = request.resolve_dimensions()
             palette = request.resolve_palette_subset()
             recipe = recipe_for(request.style, stream.stage_rng("geometry"))
@@ -81,6 +81,7 @@ class RuleShapeGenerator:
                 total = width * height
                 if not recipe.occupancy_floor_pct <= foreground * 100 / total <= recipe.occupancy_ceiling_pct:
                     raise RuleContractError("recipe occupancy is outside its documented bounds")
+                maximum = recipe.max_color_dominance_pct if maximum_override is None else maximum_override
                 colored = colorize_canvas(canvas, palette, attempt_rng.stage_rng("colorization"), min_region_size=minimum, max_dominance_pct=maximum)
                 result = GenerationResult.success(
                     request=request,
@@ -94,7 +95,7 @@ class RuleShapeGenerator:
                     rng_algorithm=RNG_ALGORITHM,
                     provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": dict(retry_seeds)},
                 )
-                return RuleCandidate(canvas, recipe, palette, colored.cells, result, attempt, "COMPOSED_RULES", tuple(sorted(canvas.regions)))
+                return RuleCandidate(canvas, recipe, palette, colored.cells, result, attempt, "COMPOSED_RULES", tuple(sorted(canvas.regions)), colored.color_roles, colored.accent_color)
             except (TypeError, ValueError, RuleContractError, ResultContractError):
                 continue
         return self._failure(FailureCode.RETRY_EXHAUSTED, "bounded RULES generation attempts exhausted", request)
