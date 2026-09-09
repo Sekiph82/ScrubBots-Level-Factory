@@ -5,11 +5,16 @@ from __future__ import annotations
 import os
 import subprocess
 import sys
+from collections.abc import Mapping
+from dataclasses import replace
+
+import pytest
 
 from scrubbots_pixel_factory import (
     DeterministicRNG,
     FailureCode,
     GenerationRequest,
+    GenerationResult,
     GeneratorMode,
     GeneratorOptions,
     offline_runtime,
@@ -23,11 +28,12 @@ from scrubbots_pixel_factory.generators.router import (
     reproduce_hybrid,
 )
 from scrubbots_pixel_factory.generators.router.hybrid import _validate_final
+from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
 
 
 def _block_exemplar() -> Exemplar:
-    colors = ("C01", "C02", "C03")
+    colors = ("C11", "C12", "C13")
     pixels = tuple(colors[(x // 2) % 3] for y in range(6) for x in range(6))
     return Exemplar(
         "scrubbots-wfc-exemplar", 1, "m06-blocks", "TRAINING_MOTIF", 6, 6, pixels,
@@ -46,6 +52,26 @@ def _hybrid_request(strategy: str, seed: int | str = 41, **values: object) -> Ge
 def _wfc_hybrid_generator() -> HybridGenerator:
     exemplar = _block_exemplar()
     return HybridGenerator(wfc_generator=WFCGenerator(ExemplarRegistry((exemplar,))))
+
+
+def _mutable(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {key: _mutable(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_mutable(item) for item in value]
+    return value
+
+
+class _AlwaysFail:
+    generator_id = "test-always-fail"
+    generator_version = "1.0.0"
+
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
+    def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG) -> GenerationResult:
+        self.calls.append(request.generator_mode)
+        return GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason="forced test failure", request=request)
 
 
 def test_auto_mode_and_existing_request_bytes_are_stable() -> None:
@@ -73,6 +99,107 @@ def test_explicit_routes_use_the_accepted_engines_without_fallback() -> None:
         direct = direct_engine.generate(request)
         assert result.canonical_bytes() == direct.canonical_bytes()
         assert result.request == request
+
+
+def test_explicit_hybrid_router_matches_direct_hybrid_engine() -> None:
+    request = _hybrid_request(HybridStrategy.MASK_GEOMETRY_RULE_COLOR_REGIONS.value, 13)
+    direct = HybridGenerator().generate(request)
+    routed = GeneratorRouter().generate(request)
+    assert direct.canonical_bytes() == routed.canonical_bytes()
+
+
+def test_auto_default_selection_has_seeded_diversity() -> None:
+    request = GenerationRequest("EASY", 0, "AUTO", width=20, height=20, generator_options=GeneratorOptions("auto", 1, {}))
+    candidates = [GeneratorRouter().generate_candidate(replace(request, seed=seed)) for seed in range(48)]
+    selected = {candidate.selected_mode for candidate in candidates if isinstance(candidate, AutoCandidate)}
+    assert selected == {"MASK", "RULES"}
+
+
+def test_auto_fallback_records_one_failed_attempt_then_success() -> None:
+    failing = _AlwaysFail()
+    router = GeneratorRouter(mask_generator=MaskSpriteGenerator(), wfc_generator=failing)
+    options = GeneratorOptions("auto", 1, {"candidates": ["WFC", "MASK"], "fallback_on_failure": True})
+    seed = next(seed for seed in range(100) if DeterministicRNG(seed).child("auto/selection").randbelow(2) == 0)
+    request = GenerationRequest("EASY", seed, "AUTO", width=20, height=20, palette_subset=("C01", "C02", "C03"), generator_options=options)
+    candidate = router.generate_candidate(request)
+    assert isinstance(candidate, AutoCandidate)
+    assert [attempt.mode for attempt in candidate.attempts] == ["WFC", "MASK"]
+    assert candidate.attempts[0].failure_code == FailureCode.GENERATION_FAILED.value
+    assert candidate.selected_mode == "MASK"
+    assert candidate.result.request == request and candidate.result.generator_mode == "AUTO"
+    assert failing.calls == ["WFC"]
+
+
+def test_auto_fallback_all_fail_is_bounded_and_byte_stable() -> None:
+    failing_wfc = _AlwaysFail()
+    failing_rules = _AlwaysFail()
+    router = GeneratorRouter(rules_generator=failing_rules, wfc_generator=failing_wfc)
+    options = GeneratorOptions("auto", 1, {"candidates": ["WFC", "RULES"], "fallback_on_failure": True})
+    request = GenerationRequest("EASY", 2, "AUTO", width=20, height=20, generator_options=options)
+    first = router.generate(request)
+    second = router.generate(request)
+    assert not first.is_success and first.failure_code is FailureCode.RETRY_EXHAUSTED
+    assert first.canonical_bytes() == second.canonical_bytes()
+    assert failing_wfc.calls == ["WFC", "WFC"]
+    assert failing_rules.calls == ["RULES", "RULES"]
+
+
+def test_wfc_detail_preserves_default_and_explicit_nonidentity_mapping() -> None:
+    generator = _wfc_hybrid_generator()
+    expected_default = (("C11", "C01"), ("C12", "C02"), ("C13", "C03"))
+    explicit = {"C11": "C02", "C12": "C03", "C13": "C01"}
+    for strategy in (HybridStrategy.RULE_BASE_WFC_DETAIL.value, HybridStrategy.MASK_BASE_WFC_DETAIL.value):
+        default = generator.generate_candidate(_hybrid_request(strategy, 0 if "RULE" in strategy else 1, wfc_exemplar_id="m06-blocks"))
+        assert isinstance(default, HybridCandidate) and default.result.is_success
+        assert default.stages[-1].extra["palette_mapping"] == expected_default
+        mapped = generator.generate_candidate(_hybrid_request(
+            strategy, 0 if "RULE" in strategy else 1, wfc_exemplar_id="m06-blocks",
+            wfc_options={"namespace": "wfc", "version": 1, "values": {
+                "pattern_size": 2, "input_periodic": True, "output_periodic": True,
+                "palette_mapping": explicit,
+            }},
+        ))
+        assert isinstance(mapped, HybridCandidate) and mapped.result.is_success
+        assert mapped.stages[-1].extra["palette_mapping"] == tuple((source, target) for source, target in explicit.items())
+    invalid = generator.generate(_hybrid_request(
+        HybridStrategy.RULE_BASE_WFC_DETAIL.value, 0, wfc_exemplar_id="m06-blocks",
+        wfc_options={"namespace": "wfc", "version": 1, "values": {
+            "pattern_size": 2, "input_periodic": True, "output_periodic": True,
+            "palette_mapping": {"C01": "C01", "C02": "C02", "C03": "C03"},
+        }},
+    ))
+    assert not invalid.is_success and invalid.failure_code is FailureCode.RETRY_EXHAUSTED
+
+
+def test_hybrid_replay_rejects_each_corrupted_integrity_field() -> None:
+    generator = _wfc_hybrid_generator()
+    robust_request = _hybrid_request(HybridStrategy.MASK_GEOMETRY_RULE_COLOR_REGIONS.value, 19)
+    robust = generator.generate_candidate(robust_request)
+    assert isinstance(robust, HybridCandidate)
+    fields = (
+        ("derived_seed", "0" * 64),
+        ("child_request_digest", "1" * 64),
+        ("engine_version", "corrupted-version"),
+        ("child_result_digest", "2" * 64),
+        ("geometry_digest", "3" * 64),
+    )
+    for field, value in fields:
+        metadata = _mutable(robust.metadata)
+        metadata["stages"][0][field] = value  # type: ignore[index]
+        corrupted = replace(robust, metadata=metadata)
+        with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
+            reproduce_hybrid(generator, robust_request, corrupted)
+    wfc_request = _hybrid_request(HybridStrategy.RULE_BASE_WFC_DETAIL.value, 0, wfc_exemplar_id="m06-blocks")
+    wfc = generator.generate_candidate(wfc_request)
+    assert isinstance(wfc, HybridCandidate)
+    metadata = _mutable(wfc.metadata)
+    metadata["stages"][-1]["extra"]["pattern_table_digest"] = "4" * 64  # type: ignore[index]
+    with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
+        reproduce_hybrid(generator, wfc_request, replace(wfc, metadata=metadata))
+    metadata = _mutable(robust.metadata)
+    metadata["final_logical_grid_digest"] = "5" * 64  # type: ignore[index]
+    with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
+        reproduce_hybrid(generator, robust_request, replace(robust, metadata=metadata))
 
 
 def test_hybrid_robust_strategies_are_deterministic_and_outer_authoritative() -> None:

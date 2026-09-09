@@ -15,6 +15,7 @@ from ...core import (
     FailureCode,
     GenerationRequest,
     GenerationResult,
+    GeneratorOptions,
     GeneratorMode,
     RNG_ALGORITHM,
     ResultContractError,
@@ -212,6 +213,41 @@ def _candidate_geometry_digest(candidate: object) -> str | None:
     return None
 
 
+def _request_from_canonical(value: object) -> GenerationRequest:
+    if not isinstance(value, Mapping):
+        raise ValueError("INVALID_STAGE_METADATA: child request is not a mapping")
+    try:
+        typed_seed = value["seed"]
+        if not isinstance(typed_seed, Mapping) or typed_seed.get("type") not in {"int", "string"}:
+            raise ValueError
+        options = value["generator_options"]
+        if not isinstance(options, Mapping):
+            raise ValueError
+        return GenerationRequest(
+            value["difficulty"], typed_seed["value"], value["generator_mode"],
+            width=value.get("width"), height=value.get("height"), style=value.get("style"),
+            theme=value.get("theme"), palette_subset=value.get("palette_subset"),
+            generator_options=GeneratorOptions(options["namespace"], options["version"], options["values"]),
+            schema_version=value.get("schema_version", 1),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("INVALID_STAGE_METADATA: child request cannot be reconstructed") from exc
+
+
+def _record_from_metadata(value: object) -> HybridStageMetadata:
+    if not isinstance(value, Mapping):
+        raise ValueError("INVALID_STAGE_METADATA: stage record is not a mapping")
+    try:
+        return HybridStageMetadata(
+            value["stage_index"], value["stage_name"], value["stage_kind"], value["derived_seed"],
+            value["child_request_digest"], value["child_request"], value.get("engine_id"),
+            value.get("engine_version"), value.get("child_result_digest"), value.get("failure_code"),
+            value.get("geometry_digest"), value.get("extra", {}),
+        )
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("INVALID_STAGE_METADATA: malformed stage record") from exc
+
+
 def _stage_failure(candidate: object) -> GenerationResult | None:
     if isinstance(candidate, GenerationResult) and not candidate.is_success:
         return candidate
@@ -367,7 +403,7 @@ class HybridGenerator:
         strategy: str,
         attempt: int,
         values: Mapping[str, object],
-    ) -> tuple[tuple[str, ...], set[int], tuple[HybridStageMetadata, ...], str]:
+    ) -> tuple[tuple[str, ...], set[int], tuple[HybridStageMetadata, ...], str, Mapping[str, set[int]]]:
         mask_options = self._nested_options(values.get("mask_options"), {"namespace": "mask", "version": 1, "values": {"symmetry": "HORIZONTAL"}})
         rules_options = self._nested_options(values.get("rules_options"), {"namespace": "rules", "version": 1, "values": {}})
         wfc_options = self._nested_options(values.get("wfc_options"), {"namespace": "wfc", "version": 1, "values": {}})
@@ -388,8 +424,8 @@ class HybridGenerator:
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(_stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")))
             stage_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")
             synthetic = GenerationRequest(request.difficulty, stage_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options)
-            stages.append(HybridStageMetadata(1, "RULE_COLOR_REGIONS", GeneratorMode.RULES.value, stage_seed, synthetic.digest(), synthetic.canonical_dict(), "rule-colorize", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"canvas_digest": canvas.geometry_digest()}))
-            return colors, occupied, tuple(stages), _topology_digest(occupied, width, height)
+            stages.append(HybridStageMetadata(1, "RULE_COLOR_REGIONS", "COMPOSITION", stage_seed, synthetic.digest(), synthetic.canonical_dict(), "rule-colorize", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"canvas_digest": canvas.geometry_digest()}))
+            return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": occupied, "after": occupied, "final": occupied}
         if strategy == HybridStrategy.RULE_GEOMETRY_MASK_SYMMETRY:
             rules, record = self._run_stage(request, width, height, palette, root, strategy, attempt, 0, "RULE_GEOMETRY", GeneratorMode.RULES.value, style=rules_style, theme=None, options=rules_options)
             stages.append(record)
@@ -408,8 +444,8 @@ class HybridGenerator:
             color_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/MASK_SYMMETRY_COLOR_REGIONS")
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(color_seed))
             synthetic = GenerationRequest(request.difficulty, color_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options)
-            stages.append(HybridStageMetadata(1, "MASK_SYMMETRY_COLOR_REGIONS", GeneratorMode.RULES.value, color_seed, synthetic.digest(), synthetic.canonical_dict(), "rule-colorize", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"symmetry": symmetry.value, "before_topology_digest": _topology_digest(raw, width, height), "after_topology_digest": _topology_digest(occupied, width, height)}))
-            return colors, occupied, tuple(stages), _topology_digest(occupied, width, height)
+            stages.append(HybridStageMetadata(1, "MASK_SYMMETRY_COLOR_REGIONS", "COMPOSITION", color_seed, synthetic.digest(), synthetic.canonical_dict(), "mask-symmetry-compose", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"symmetry": symmetry.value, "before_topology_digest": _topology_digest(raw, width, height), "after_topology_digest": _topology_digest(occupied, width, height)}))
+            return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": raw, "after": occupied, "final": occupied}
         base_mode = GeneratorMode.RULES.value if strategy == HybridStrategy.RULE_BASE_WFC_DETAIL else GeneratorMode.MASK.value
         base_name = "RULE_BASE" if base_mode == GeneratorMode.RULES.value else "MASK_BASE"
         base, base_record = self._run_stage(request, width, height, palette, root, strategy, attempt, 0, base_name, base_mode, style=rules_style if base_mode == GeneratorMode.RULES.value else mask_style, theme=None, options=rules_options if base_mode == GeneratorMode.RULES.value else mask_options)
@@ -420,18 +456,28 @@ class HybridGenerator:
         base_grid = tuple(base.logical_grid if isinstance(base, RuleCandidate) else base.result.logical_grid or ())
         exemplar_id = values["wfc_exemplar_id"]
         wfc_values = dict(wfc_options.get("values", {})) if isinstance(wfc_options.get("values"), Mapping) else {}
-        wfc_values["palette_mapping"] = {source: target for source, target in zip(palette, palette, strict=True)}
+        # Leave the mapping absent unless the caller supplied one. M05 then
+        # performs its canonical source-palette -> outer-palette mapping.
         wfc_child_options = {"namespace": "wfc", "version": 1, "values": wfc_values}
         detail, detail_record = self._run_stage(request, width, height, palette, root, strategy, attempt, 1, "WFC_DETAIL", GeneratorMode.WFC.value, style=exemplar_id, theme=None, options=wfc_child_options)
         stages.append(detail_record)
         if _stage_failure(detail) or not isinstance(detail, WFCCandidate):
             raise RuntimeError("STAGE_FAILED:WFC_DETAIL")
+        detail_record = stages[-1]
+        detail_extra = dict(detail_record.extra)
+        detail_extra["palette_mapping"] = [[source, target] for source, target in detail.wfc_metadata["palette_mapping"]]
+        stages[-1] = HybridStageMetadata(
+            detail_record.stage_index, detail_record.stage_name, detail_record.stage_kind,
+            detail_record.derived_seed, detail_record.child_request_digest, detail_record.child_request,
+            detail_record.engine_id, detail_record.engine_version, detail_record.child_result_digest,
+            detail_record.failure_code, detail_record.geometry_digest, detail_extra,
+        )
         base_color = palette[0]
         final = list(base_grid)
         for index in sorted(occupied):
             if detail.logical_grid[index] != base_color:
                 final[index] = detail.logical_grid[index]
-        return tuple(final), occupied, tuple(stages), _topology_digest(occupied, width, height)
+        return tuple(final), occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": occupied, "after": occupied, "final": occupied}
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> HybridCandidate | GenerationResult:
         if not isinstance(request, GenerationRequest):
@@ -454,7 +500,7 @@ class HybridGenerator:
         failures: list[str] = []
         for attempt in range(attempts):
             try:
-                grid, occupied, stages, topology_digest = self._compose_attempt(request, width, height, palette, stream, strategy, attempt, values)
+                grid, occupied, stages, topology_digest, topology_evidence = self._compose_attempt(request, width, height, palette, stream, strategy, attempt, values)
                 _validate_final(grid, width, height, palette, occupied, base_color=palette[0])
                 result = GenerationResult.success(request=request, width=width, height=height, logical_grid=grid, generator_mode=GeneratorMode.HYBRID.value, generator_id=self.generator_id, generator_version=self.generator_version, seed=request.seed, rng_algorithm=RNG_ALGORITHM, provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": {str(index): stream.retry_seed(index) for index in range(attempt + 1)}})
                 metadata = {
@@ -469,11 +515,138 @@ class HybridGenerator:
                     "final_topology_digest": topology_digest,
                     "final_logical_grid_digest": _grid_digest(grid),
                     "final_result_digest": result.digest(),
+                    "topology_evidence": {
+                        name: [1 if index in cells else 0 for index in range(width * height)]
+                        for name, cells in topology_evidence.items()
+                    },
                 }
                 return HybridCandidate(result, strategy, stages, grid, metadata)
             except (RuntimeError, ValueError, TypeError, ResultContractError, RuleContractError) as exc:
                 failures.append(f"{attempt}:{str(exc).split(':', 1)[0]}")
         return self._failure(FailureCode.RETRY_EXHAUSTED, f"bounded HYBRID generation attempts exhausted [{';'.join(failures)}]", request)
+
+    def replay_candidate(self, request: GenerationRequest, candidate: HybridCandidate) -> HybridCandidate:
+        """Replay every recorded engine/helper stage and verify its evidence."""
+        if not isinstance(request, GenerationRequest) or not isinstance(candidate, HybridCandidate):
+            raise ValueError("INVALID_STAGE_METADATA: replay requires a request and HybridCandidate")
+        if request.generator_mode != GeneratorMode.HYBRID.value:
+            raise ValueError("INVALID_STAGE_METADATA: replay requires HYBRID mode")
+        try:
+            values = self._options(request)
+            metadata = candidate.metadata
+            strategy = metadata["strategy"]
+            attempt = metadata["outer_attempt"]
+            if strategy != values["strategy"] or candidate.strategy != strategy or type(attempt) is not int or attempt < 0:
+                raise ValueError
+            if metadata["outer_master_seed"] != request.seed:
+                raise ValueError
+            width, height = request.resolve_dimensions()
+            palette = request.resolve_palette_subset()
+            if tuple(metadata["resolved_palette"]) != palette or metadata["resolved_dimensions"]["width"] != width or metadata["resolved_dimensions"]["height"] != height:
+                raise ValueError
+            raw_stages = metadata["stages"]
+            records = tuple(_record_from_metadata(value) for value in raw_stages)
+        except (KeyError, TypeError, ValueError, RuleContractError, ColorUsageContractError) as exc:
+            raise ValueError("INVALID_STAGE_METADATA: outer metadata is corrupted") from exc
+        expected_layout = {
+            HybridStrategy.MASK_GEOMETRY_RULE_COLOR_REGIONS: (("MASK_GEOMETRY", "MASK"), ("RULE_COLOR_REGIONS", "COMPOSITION")),
+            HybridStrategy.RULE_GEOMETRY_MASK_SYMMETRY: (("RULE_GEOMETRY", "RULES"), ("MASK_SYMMETRY_COLOR_REGIONS", "COMPOSITION")),
+            HybridStrategy.RULE_BASE_WFC_DETAIL: (("RULE_BASE", "RULES"), ("WFC_DETAIL", "WFC")),
+            HybridStrategy.MASK_BASE_WFC_DETAIL: (("MASK_BASE", "MASK"), ("WFC_DETAIL", "WFC")),
+        }.get(strategy)
+        if expected_layout is None or len(records) != len(expected_layout):
+            raise ValueError("INVALID_STAGE_METADATA: stage order is invalid")
+        if tuple((record.stage_name, record.stage_kind) for record in records) != expected_layout:
+            raise ValueError("INVALID_STAGE_METADATA: stage order/name/kind mismatch")
+        if tuple(stage.as_dict() for stage in candidate.stages) != tuple(record.as_dict() for record in records):
+            raise ValueError("INVALID_STAGE_METADATA: candidate and serialized stage metadata differ")
+
+        root = DeterministicRNG(request.seed)
+        replayed: list[dict[str, object]] = []
+        replay_records: list[HybridStageMetadata] = []
+        for index, record in enumerate(records):
+            expected_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/{index}/{record.stage_name}")
+            if record.stage_index != index or record.derived_seed != expected_seed:
+                raise ValueError("INVALID_STAGE_METADATA: stage seed/order mismatch")
+            child = _request_from_canonical(record.child_request)
+            if child.digest() != record.child_request_digest or child.seed != record.derived_seed:
+                raise ValueError("INVALID_STAGE_METADATA: child request digest mismatch")
+            runtime: dict[str, object]
+            if record.stage_kind == "COMPOSITION":
+                if not replayed:
+                    raise ValueError("INVALID_STAGE_METADATA: composition has no input stage")
+                previous = replayed[0]
+                if record.stage_name == "RULE_COLOR_REGIONS":
+                    mask = previous["candidate"]
+                    if not isinstance(mask, MaskCandidate):
+                        raise ValueError("INVALID_STAGE_METADATA: MASK composition input is invalid")
+                    occupied = _mask_occupied(mask)
+                    canvas = _canvas_from_occupied(width, height, occupied, "MASK_FOREGROUND")
+                    grid = _colorize_geometry(canvas, palette, DeterministicRNG(record.derived_seed))
+                    runtime = {"candidate": None, "grid": grid, "occupied": occupied, "engine_id": "rule-colorize", "engine_version": "1.0.0", "result_digest": _grid_digest(grid), "geometry_digest": canvas.geometry_digest(), "extra": {"canvas_digest": canvas.geometry_digest()}}
+                else:
+                    rules = previous["candidate"]
+                    if not isinstance(rules, RuleCandidate):
+                        raise ValueError("INVALID_STAGE_METADATA: symmetry composition input is invalid")
+                    extra = record.extra
+                    symmetry = SymmetryMode.parse(extra["symmetry"])
+                    raw = set(rules.canvas.occupied)
+                    occupied = set(raw)
+                    for orbit in symmetry_orbits(width, height, symmetry):
+                        if set(orbit) & raw:
+                            occupied.update(orbit)
+                    canvas = _canvas_from_occupied(width, height, occupied, "MASK_SYMMETRY")
+                    grid = _colorize_geometry(canvas, palette, DeterministicRNG(record.derived_seed))
+                    runtime = {"candidate": None, "grid": grid, "occupied": occupied, "engine_id": "mask-symmetry-compose", "engine_version": "1.0.0", "result_digest": _grid_digest(grid), "geometry_digest": canvas.geometry_digest(), "extra": {"symmetry": symmetry.value, "before_topology_digest": _topology_digest(raw, width, height), "after_topology_digest": _topology_digest(occupied, width, height)}}
+            else:
+                engine = {"MASK": self.mask_generator, "RULES": self.rules_generator, "WFC": self.wfc_generator}.get(record.stage_kind)
+                if engine is None:
+                    raise ValueError("INVALID_STAGE_METADATA: unknown stage engine")
+                value = engine.generate_candidate(child, DeterministicRNG(record.derived_seed))
+                if isinstance(value, GenerationResult) or not isinstance(value, (MaskCandidate, RuleCandidate, WFCCandidate)):
+                    raise ValueError("INVALID_STAGE_METADATA: recorded stage no longer succeeds")
+                extra: dict[str, object] = {}
+                if isinstance(value, MaskCandidate):
+                    extra = {"family": value.family.value, "mask_digest": _candidate_geometry_digest(value)}
+                elif isinstance(value, RuleCandidate):
+                    extra = {"recipe_id": value.recipe.recipe_id, "canvas_digest": value.canvas.geometry_digest(), "region_digest": value.canvas.region_digest()}
+                else:
+                    extra = {"exemplar_id": value.exemplar.exemplar_id, "pattern_table_digest": value.pattern_table.digest, "attempt": value.attempt, "palette_mapping": [[source, target] for source, target in value.wfc_metadata["palette_mapping"]]}
+                runtime = {"candidate": value, "grid": value.result.logical_grid, "occupied": _mask_occupied(value) if isinstance(value, MaskCandidate) else set(value.canvas.occupied) if isinstance(value, RuleCandidate) else set(), "engine_id": value.result.generator_id, "engine_version": value.result.generator_version, "result_digest": value.result.digest(), "geometry_digest": _candidate_geometry_digest(value), "extra": extra}
+                if record.stage_name == "WFC_DETAIL" and replayed:
+                    base = replayed[0]
+                    base_candidate = base["candidate"]
+                    if not isinstance(base_candidate, (MaskCandidate, RuleCandidate)) or not isinstance(value, WFCCandidate):
+                        raise ValueError("INVALID_STAGE_METADATA: WFC detail input is invalid")
+                    occupied = _mask_occupied(base_candidate) if isinstance(base_candidate, MaskCandidate) else set(base_candidate.canvas.occupied)
+                    base_grid = tuple(base["grid"])
+                    final = list(base_grid)
+                    for cell_index in sorted(occupied):
+                        if value.logical_grid[cell_index] != palette[0]:
+                            final[cell_index] = value.logical_grid[cell_index]
+                    runtime["grid"] = tuple(final)
+                    runtime["occupied"] = occupied
+                    runtime["geometry_digest"] = _grid_digest(value.logical_grid)
+            actual_extra = runtime["extra"]
+            required_extra = {"family", "mask_digest"} if record.stage_kind == "MASK" else {"recipe_id", "canvas_digest", "region_digest"} if record.stage_kind == "RULES" else {"exemplar_id", "pattern_table_digest", "attempt", "palette_mapping"} if record.stage_kind == "WFC" else {"canvas_digest"} if record.stage_name == "RULE_COLOR_REGIONS" else {"symmetry", "before_topology_digest", "after_topology_digest"}
+            if not required_extra.issubset(set(record.extra)) or any(record.extra[key] != actual_extra.get(key) for key in required_extra):
+                raise ValueError("INVALID_STAGE_METADATA: engine-specific metadata mismatch")
+            for key in ("engine_id", "engine_version", "child_result_digest", "geometry_digest"):
+                if getattr(record, key) != runtime.get({"engine_id": "engine_id", "engine_version": "engine_version", "child_result_digest": "result_digest", "geometry_digest": "geometry_digest"}[key]):
+                    raise ValueError(f"INVALID_STAGE_METADATA: {key} mismatch")
+            replayed.append(runtime)
+            replay_records.append(record)
+
+        final_grid = tuple(replayed[-1]["grid"])
+        final_occupied = set(replayed[-1]["occupied"])
+        final_topology_digest = _topology_digest(final_occupied, width, height)
+        if metadata["final_topology_digest"] != final_topology_digest or metadata["final_logical_grid_digest"] != _grid_digest(final_grid):
+            raise ValueError("INVALID_STAGE_METADATA: final digest mismatch")
+        _validate_final(final_grid, width, height, palette, final_occupied, base_color=palette[0])
+        result = GenerationResult.success(request=request, width=width, height=height, logical_grid=final_grid, generator_mode=GeneratorMode.HYBRID.value, generator_id=self.generator_id, generator_version=self.generator_version, seed=request.seed, rng_algorithm=RNG_ALGORITHM, provenance={"stage_seeds": root.stage_seeds(), "retry_seeds": {str(index): root.retry_seed(index) for index in range(attempt + 1)}})
+        if metadata["final_result_digest"] != result.digest() or candidate.result.digest() != result.digest() or tuple(candidate.logical_grid) != final_grid:
+            raise ValueError("INVALID_STAGE_METADATA: final result digest mismatch")
+        return HybridCandidate(result, strategy, tuple(replay_records), final_grid, dict(metadata))
 
     def generate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> GenerationResult:
         candidate = self.generate_candidate(request, rng)
@@ -481,12 +654,5 @@ class HybridGenerator:
 
 
 def reproduce_hybrid(generator: HybridGenerator, request: GenerationRequest, candidate: HybridCandidate) -> HybridCandidate | GenerationResult:
-    """Re-run a recorded HYBRID request and compare all recorded digests."""
-    replay = generator.generate_candidate(request)
-    if not isinstance(replay, HybridCandidate):
-        return replay
-    if replay.metadata["final_logical_grid_digest"] != candidate.metadata["final_logical_grid_digest"]:
-        raise AssertionError("hybrid final digest changed during reproduction")
-    if tuple(stage.derived_seed for stage in replay.stages) != tuple(stage.derived_seed for stage in candidate.stages):
-        raise AssertionError("hybrid stage seed changed during reproduction")
-    return replay
+    """Replay and verify every recorded engine and composition stage."""
+    return generator.replay_candidate(request, candidate)

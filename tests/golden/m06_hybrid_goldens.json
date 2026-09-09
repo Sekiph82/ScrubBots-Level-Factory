@@ -69,7 +69,7 @@
           "1.0.0"
         ],
         [
-          "rule-colorize",
+          "mask-symmetry-compose",
           "1.0.0"
         ]
       ],
@@ -167,7 +167,7 @@
           "1.0.0"
         ],
         [
-          "rule-colorize",
+          "mask-symmetry-compose",
           "1.0.0"
         ]
       ],
@@ -181,6 +181,88 @@
       ],
       "final_grid_digest": "ff9a054ef7d3f33e69cc441e890dbc49c73d5b0d0e03dbf59474b54bf06e8b68",
       "final_result_digest": "d001dcfc32b14577370f600ae86672d9ba7724564b1c975b36458b0877587a15"
+    },
+    {
+      "case_id": "m06-13",
+      "request": {
+        "difficulty": "EASY",
+        "seed": 101,
+        "generator_mode": "HYBRID",
+        "width": 20,
+        "height": 20,
+        "palette_subset": [
+          "C01",
+          "C02",
+          "C03"
+        ],
+        "generator_options": {
+          "namespace": "hybrid",
+          "version": 1,
+          "values": {
+            "strategy": "RULE_BASE_WFC_DETAIL",
+            "mask_style": "ROBOT",
+            "rules_style": "ORGANIC",
+            "wfc_exemplar_id": "m06-review-synthetic-blocks",
+            "wfc_options": {
+              "namespace": "wfc",
+              "version": 1,
+              "values": {
+                "pattern_size": 2,
+                "input_periodic": true,
+                "output_periodic": true
+              }
+            }
+          }
+        }
+      },
+      "strategy": "RULE_BASE_WFC_DETAIL",
+      "palette": [
+        "C01",
+        "C02",
+        "C03"
+      ],
+      "stage_seeds": [
+        "dee91ccda83fe7f2af6b871d52960cb4c60df242a8063d894315a75f9f87afa0",
+        "b8836aeecb74d4c5b0d91cc7987f664245c1ef0a491d25790a95c1372e7039bf"
+      ],
+      "stage_engines": [
+        [
+          "rule-shape",
+          "1.0.0"
+        ],
+        [
+          "wfc-overlap",
+          "1.0.0"
+        ]
+      ],
+      "stage_request_digests": [
+        "6ef9325496aaa7b41a725360544a31a6ff73ab8f802ab9c1cb52a6933fb55c77",
+        "51b2390a9b0a2b7c38f5b9a1a7cba2262c1597529fd6b54f80cb617c3d30e1d1"
+      ],
+      "stage_result_digests": [
+        "603579fd08d01dba06c5daca8bda88e5afea421b6d916113f6ab5d3455cfb187",
+        "e8207f37f3a75f3c428ecae662333cce674835a7713230a9731163066349e5ba"
+      ],
+      "final_grid_digest": "5a0ae6e458e5c396f99fe80db981545195356d0c4b2a5baa6e1822b6a186c127",
+      "final_result_digest": "e283261a024cab29e1fc81c5a20100b96af7a3b35636b7fd66939714f4350a9a",
+      "exemplar": {
+        "id": "m06-review-synthetic-blocks",
+        "ownership": "SYNTHETIC_TEST_ONLY"
+      },
+      "palette_mapping": [
+        [
+          "C11",
+          "C01"
+        ],
+        [
+          "C12",
+          "C02"
+        ],
+        [
+          "C13",
+          "C03"
+        ]
+      ]
     }
   ]
 }
