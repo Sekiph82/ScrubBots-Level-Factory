@@ -624,12 +624,13 @@ Each family:
 
 # PAG-M04 — Procedural Shape / Rule Generator
 
-H!veAI active cycle: `PAG-M04-C001 — Procedural Shape / Rule Generator`  
+H!veAI active cycle: `PAG-M04-C002 — Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`  
-Forward dependency: `PAG-0441` requires the V1 performance budget established later in M10; benchmark now, do not invent a budget.
+Authoritative prompt: `.hiveai/prompts/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`  
+C001 verdict: `FAIL / FIX_REQUIRED`  
+Forward dependency: `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
 
 Goal: build original structured art from reusable procedural geometry.
 
@@ -639,60 +640,60 @@ Do not require MarkovJunior/C# at runtime.
 
 ## Sprint PAG-S04.1 — Core primitives
 
-- [ ] PAG-0401 Implement BLOB primitive.
-- [ ] PAG-0402 Implement ISLAND primitive.
-- [ ] PAG-0403 Implement RING primitive.
-- [ ] PAG-0404 Implement CORRIDOR primitive.
-- [ ] PAG-0405 Implement POCKET primitive.
-- [ ] PAG-0406 Implement SNAKE/self-avoiding-walk primitive.
-- [ ] PAG-0407 Implement BRANCH primitive.
-- [ ] PAG-0408 Implement CHAMBER primitive.
-- [ ] PAG-0409 Implement SPIRAL primitive.
-- [ ] PAG-0410 Implement WAVE primitive.
-- [ ] PAG-0411 Implement RADIAL/BURST primitive.
-- [ ] PAG-0412 Implement VORONOI-LIKE region primitive.
+- [x] PAG-0401 Implement BLOB primitive.
+- [x] PAG-0402 Implement ISLAND primitive.
+- [x] PAG-0403 Implement RING primitive.
+- [x] PAG-0404 Implement CORRIDOR primitive.
+- [~] PAG-0405 Implement POCKET primitive.
+- [x] PAG-0406 Implement SNAKE/self-avoiding-walk primitive.
+- [x] PAG-0407 Implement BRANCH primitive.
+- [x] PAG-0408 Implement CHAMBER primitive.
+- [x] PAG-0409 Implement SPIRAL primitive.
+- [x] PAG-0410 Implement WAVE primitive.
+- [x] PAG-0411 Implement RADIAL/BURST primitive.
+- [x] PAG-0412 Implement VORONOI-LIKE region primitive.
 
 ## Sprint PAG-S04.2 — Growth operations
 
-- [ ] PAG-0413 Implement seeded frontier growth.
-- [ ] PAG-0414 Implement constrained connected growth.
-- [ ] PAG-0415 Implement erosion.
-- [ ] PAG-0416 Implement dilation.
-- [ ] PAG-0417 Implement hole carving.
-- [ ] PAG-0418 Implement contour/outline extraction.
-- [ ] PAG-0419 Implement nested-region creation.
-- [ ] PAG-0420 Implement controlled fragmentation.
-- [ ] PAG-0421 Implement local rewrite-rule operation.
-- [ ] PAG-0422 Bound every operation by deterministic step/attempt limits.
+- [x] PAG-0413 Implement seeded frontier growth.
+- [x] PAG-0414 Implement constrained connected growth.
+- [x] PAG-0415 Implement erosion.
+- [x] PAG-0416 Implement dilation.
+- [x] PAG-0417 Implement hole carving.
+- [x] PAG-0418 Implement contour/outline extraction.
+- [x] PAG-0419 Implement nested-region creation.
+- [x] PAG-0420 Implement controlled fragmentation.
+- [~] PAG-0421 Implement local rewrite-rule operation.
+- [x] PAG-0422 Bound every operation by deterministic step/attempt limits.
 
 ## Sprint PAG-S04.3 — Composition recipes
 
-- [ ] PAG-0423 Define layered composition recipe format.
-- [ ] PAG-0424 Compose multiple primitives without resizing final grid.
-- [ ] PAG-0425 Prevent accidental overwrite of protected semantic regions.
-- [ ] PAG-0426 Support symmetry recipe.
-- [ ] PAG-0427 Support organic/asymmetric recipe.
-- [ ] PAG-0428 Support central-subject recipe.
-- [ ] PAG-0429 Support multi-island recipe.
-- [ ] PAG-0430 Support border/frame-emblem recipe.
-- [ ] PAG-0431 Support dense-full-board recipe.
-- [ ] PAG-0432 Support sparse-negative-space recipe.
+- [x] PAG-0423 Define layered composition recipe format.
+- [x] PAG-0424 Compose multiple primitives without resizing final grid.
+- [~] PAG-0425 Prevent accidental overwrite of protected semantic regions.
+- [~] PAG-0426 Support symmetry recipe.
+- [x] PAG-0427 Support organic/asymmetric recipe.
+- [~] PAG-0428 Support central-subject recipe.
+- [x] PAG-0429 Support multi-island recipe.
+- [~] PAG-0430 Support border/frame-emblem recipe.
+- [~] PAG-0431 Support dense-full-board recipe.
+- [x] PAG-0432 Support sparse-negative-space recipe.
 
 ## Sprint PAG-S04.4 — Color-region assignment
 
-- [ ] PAG-0433 Color generated regions using legal palette subset.
-- [ ] PAG-0434 Guarantee legal distinct-used-color count.
-- [ ] PAG-0435 Avoid pathological checkerboard noise by default.
-- [ ] PAG-0436 Add minimum region-size controls.
-- [ ] PAG-0437 Add maximum region dominance control.
-- [ ] PAG-0438 Support deliberate accent regions.
+- [~] PAG-0433 Color generated regions using legal palette subset.
+- [x] PAG-0434 Guarantee legal distinct-used-color count.
+- [x] PAG-0435 Avoid pathological checkerboard noise by default.
+- [x] PAG-0436 Add minimum region-size controls.
+- [~] PAG-0437 Add maximum region dominance control.
+- [~] PAG-0438 Support deliberate accent regions.
 
 ### M04 acceptance
 
-- [ ] PAG-0439 Generate deterministic examples for every primitive.
-- [ ] PAG-0440 Generate deterministic examples for every composition recipe.
-- [ ] PAG-0441 59×59 generation completes within the V1 performance budget established in M10.
-- [ ] PAG-0442 Outputs show substantially more structure than uniform random board filling.
+- [~] PAG-0439 Generate deterministic examples for every primitive.
+- [~] PAG-0440 Generate deterministic examples for every composition recipe.
+- [!] PAG-0441 59×59 generation completes within the V1 performance budget established in M10.
+- [~] PAG-0442 Outputs show substantially more structure than uniform random board filling.
 
 ---
 
