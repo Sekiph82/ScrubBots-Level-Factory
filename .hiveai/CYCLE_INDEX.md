@@ -48,12 +48,19 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M03-C001`
-Title: `Mask / Sprite Generator`
+Cycle: `PAG-M03-C002`
+Title: `Reproducibility, Region Quality & Recognizability Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
+
+### PAG-M03-C001 — Mask / Sprite Generator
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M03-C001_MASK_SPRITE_GENERATOR_STRICT_AUDIT.md`
+Open findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`, `F-PAG-M03-C001-003`, `F-PAG-M03-C001-004`
+Terminal builder-era HEAD independently observed: `15363eb9d49d4e8791bfe0e038f9e83017c503fc`
+
 
 ### PAG-M02-C002 — Result Integrity & Provenance Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M02-C003`
