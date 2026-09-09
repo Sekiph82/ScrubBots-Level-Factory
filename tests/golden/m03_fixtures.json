@@ -1,0 +1,102 @@
+[
+  {
+    "family": "ROBOT",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "512bfeb44be74d5794be8586900708d6ef6f5dcccfed6d9c56acd01a070cb8e8",
+    "grid_sha256": "e1abe65e53c7a98c3bc5521a0d56c6d331337658b4c557b5cb78ecc01709821f",
+    "result_sha256": "d3e173cf41a39ee6a1270878b4289c1fc538bba15876573201485bc1b5e86743"
+  },
+  {
+    "family": "CREATURE",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "7ae635eb686b4d2153ea37eb95f0854564c905ed803950bace6d2054891e4678",
+    "grid_sha256": "1f38dfc5caf7efb573f3023217a71e4fef1bfdacf4ecb1d5c77ed8b2180652bf",
+    "result_sha256": "5ff79fa7ee63b493c09707079643d8fbf4ef0117613a55f28c7731af7e351b18"
+  },
+  {
+    "family": "FISH",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "49370972459fc9713c1cab14fe3a73f6165d1c88f328124cab6da1e592d33042",
+    "grid_sha256": "5ae127d93be8c49e9852f42bacc1a7769529b36b4234bc4711e7581d269c17df",
+    "result_sha256": "37ad8b8da29df0bed211efa4e20c0d3d5ec373a5f40de48bc4473de8e1ea9415"
+  },
+  {
+    "family": "SEA_CREATURE",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "d95385017a03e34d181676181e28aec87cc516cb4214167dc9535c7d281743e0",
+    "grid_sha256": "3b9c8c6080b7696c91030643b40b409902626a1c6bb0709802845ebaf36e7e04",
+    "result_sha256": "0f442a72336fb4499865d68a8292bab467c9a7a93ad33bf9ba16b668b1b7edad"
+  },
+  {
+    "family": "SPACE_SHIP",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "f0847ae8a2af324ef8706c0e714fc30bee002e8a421e156264504a777615e8c5",
+    "grid_sha256": "63f3d885061d50a8e642d722ac68329a76befa92e94709221f020904a91e8f98",
+    "result_sha256": "66d677724cbccfe67ccf61ad9f5a771712626eed7a62d191c34130890c39b142"
+  },
+  {
+    "family": "INSECT",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "4abe8b60f0f715a5945619f03e048db9de1e72e735da90d05d7d25f7a8c24357",
+    "grid_sha256": "49190b4306ee6884876800b74ade49b091c5d0267f8b0416fafc71fe02fe3731",
+    "result_sha256": "f6991ef3a08fc1407c2e479a1f2bbbd95ce2bc70e908cccfc1bb8e737bd64380"
+  },
+  {
+    "family": "FACE_EMBLEM",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "65ca19a4442ab1d1de237e399350149e3aaf92e1e062a9e6dec59628642e2933",
+    "grid_sha256": "8c38f27e40b25111b8cc0abe6140361441db54353d82089b9e0bc77c83da061e",
+    "result_sha256": "e719992b26f0086602b17d7f74a6cf5dec38c4d3edd599eb34d8ce57554bd899"
+  },
+  {
+    "family": "TREE_PLANT",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "4cf29c397bf64565eea06cefb241412ea73451147a1b6f70b70453faf28e8ca5",
+    "grid_sha256": "b78754c7ff252a1c51e2fd1eeaa687eda7654b018bfa9fa5538eafe84a192e07",
+    "result_sha256": "8c2002ad9df304686403eb0a674504d1e684b6b6f6c990fc540a2cd1f2778b0c"
+  },
+  {
+    "family": "CORAL",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "26337279e12c1b4696c123ddb11b0411973a524efc6499d2c20857d34153eee6",
+    "grid_sha256": "1a9aa70d26ab2fc8bfd0263a5658b1f174496f5f76c9442d7f5b7fe9f44212f9",
+    "result_sha256": "094ff9d9946140d2adaaf047ca1e964cb09ce730f0d6be87bbddee999b7fc801"
+  },
+  {
+    "family": "ABSTRACT_SYMBOL",
+    "difficulty": "EASY",
+    "seed": 11,
+    "dimensions": [29, 23],
+    "palette": ["C03", "C04", "C11", "C14", "C16"],
+    "foreground_mask_sha256": "062cd47fb0029c8ac9061e811b33bcf1cff0b34910886f31dde9064b7a9362aa",
+    "grid_sha256": "3aa803054b814afd3162b660a99b6cf46c5b7cd017ae8026466e1e4ab05a15f7",
+    "result_sha256": "0d27b91b28e468676717201b7ffb31ab97b79f115de7f0741920171414b78f04"
+  }
+]
