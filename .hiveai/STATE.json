@@ -4,13 +4,14 @@
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
   "currentMilestone": "PAG-M05",
-  "currentSprint": "PAG-M05-C002",
-  "currentTaskId": "PAG-M05-C002",
-  "currentTaskTitle": "Exemplar Contract, Diagnostics & Acceptance Evidence Remediation",
-  "workflowState": "READY",
+  "currentSprint": "RECOVERY-R002",
+  "currentTaskId": "RECOVERY-R002",
+  "currentTaskTitle": "Publish Existing PAG-M05-C002 Work to GitHub",
+  "workflowState": "PUBLICATION_REQUIRED",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M05-C002 bounded remediation, expand M05 review/golden/rectangle evidence, rerun acceptance/benchmark/full regression, publish builder evidence, then return for independent ChatGPT strict re-audit.",
+  "nextAction": "Execute RECOVERY-R002. Publish already-completed local PAG-M05-C002 work if it exists in the designated authorized checkout; otherwise publish a truthful recovery log and stop.",
   "blockers": [
+    "PAG-M05-C002 independent audit blocked because no C002 implementation/log is currently published on GitHub",
     "PAG-M06+ blocked until M05 receives unconditional independent PASS",
     "PAG-0441 remains blocked until M10 establishes the V1 performance budget"
   ],
@@ -21,7 +22,7 @@
   },
   "git": {
     "branch": "main",
-    "head": "f431b24b2c965e615898020d30d48dedbcbc6bde",
+    "head": "f1a1c4f1df18cf8384733d7d372bd6c1aafffc8a",
     "dirty": null
   },
   "lastAudit": {
@@ -31,7 +32,7 @@
   "lastAgentSession": {
     "provider": "CODEX",
     "sessionId": null,
-    "status": "COMPLETED_PENDING_REMEDIATION"
+    "status": "PUBLICATION_NOT_OBSERVED_ON_GITHUB"
   },
   "updatedAt": "2026-09-09T19:09:00+03:00",
   "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
