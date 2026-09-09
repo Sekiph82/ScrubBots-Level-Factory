@@ -35,15 +35,18 @@ Before implementation:
 3. If the prompt requires synchronizing the owner's local mirror, synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` with this GitHub repository using non-destructive Git operations.
 4. Never reset, automatically rebase, force-push, discard user changes, or search sibling local repositories to discover work.
 5. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
-6. Read completely from the authorized repository checkout:
+6. Read completely from the authorized GitHub-first v3 control plane:
+   - `.hiveai/PROJECT.json`
+   - `.hiveai/RULES.md`
+   - the machine block in `.hiveai/TASKS.md`
+   - `.hiveai/EVENTS.jsonl`
    - `AGENTS.md`
    - `GOVERNANCE.md`
-   - `tasks.md`
-   - `.hiveai/PROJECT_DASHBOARD.md`
-   - `.hiveai/HANDOFF.md`
-   - `.hiveai/CYCLE_INDEX.md`
-   - the active prompt identified by `.hiveai/HANDOFF.md`
-7. Create the matching Codex log before product implementation and append chronologically.
+   - `tasks.md` for the detailed project ledger
+   - `.hiveai/CYCLE_INDEX.md` for historical cycle records
+   - the authoritative prompt URL supplied in the handoff
+7. Do not use removed legacy projections such as `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`, or `.hiveai/PROJECT_DASHBOARD.md` as current-state authority.
+8. Create the matching Codex log before product implementation and append chronologically.
 
 If safe synchronization cannot be performed, stop without modifying product files and record the reason only if a matching log can be created safely.
 
@@ -102,11 +105,12 @@ Never record secrets.
 
 ## Repository ownership boundaries
 
-ChatGPT-owned governance/tracker files:
+ChatGPT-owned governance/tracker state:
 
-- `tasks.md` state/checkboxes
-- `.hiveai/HANDOFF.md`
-- `.hiveai/CYCLE_INDEX.md`
+- `.hiveai/TASKS.md` current-state machine block
+- `.hiveai/EVENTS.jsonl` workflow/audit events
+- `tasks.md` detailed task state/checkboxes
+- `.hiveai/CYCLE_INDEX.md` cycle history
 - `.hiveai/audits/**`
 - used `.hiveai/prompts/**`
 
