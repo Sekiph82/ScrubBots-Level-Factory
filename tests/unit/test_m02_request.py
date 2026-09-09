@@ -53,7 +53,6 @@ def test_generator_options_reject_non_canonical_values(bad) -> None:
 
 
 @pytest.mark.parametrize("kwargs", [
-    {"generator_mode": "AUTO"},
     {"width": 19},
     {"height": 60},
     {"palette_subset": ["C01", "C02"]},

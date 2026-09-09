@@ -1,0 +1,186 @@
+{
+  "schema": "scrubbots-m06-hybrid-golden-v1",
+  "entries": [
+    {
+      "case_id": "m06-01",
+      "request": {
+        "difficulty": "EASY",
+        "seed": 1,
+        "generator_mode": "HYBRID",
+        "width": 20,
+        "height": 20
+      },
+      "strategy": "MASK_GEOMETRY_RULE_COLOR_REGIONS",
+      "palette": [
+        "C02",
+        "C04",
+        "C09",
+        "C10",
+        "C14"
+      ],
+      "stage_seeds": [
+        "95efc3a2c2c680804f32bd3cbfd8bc6f6a11ff1e27aeef16f48de355d5495525",
+        "5e613c456dd5fd7e736707df89c07eb74f09741be75ab68480115124c8f5017b"
+      ],
+      "stage_engines": [
+        [
+          "mask-sprite",
+          "1.0.0"
+        ],
+        [
+          "rule-colorize",
+          "1.0.0"
+        ]
+      ],
+      "stage_request_digests": [
+        "0c3b2fb0c58a1fbb26f49fff8a062a654b6d2dfb615a3ef73d5874a3ce554b9b",
+        "f8773cfa9163ee0756d65dcc3b3358f9463b4f2a95d6caada4926bed5f0f7423"
+      ],
+      "stage_result_digests": [
+        "0b9104b23b4ec44ccda96262ef43feaba02e2742952b684793802aac1a45c503",
+        "ea4a9f33ebfaa1b4ba5e00710a16650d1605be3ce3bf75e687f25ae4a6649bcc"
+      ],
+      "final_grid_digest": "ea4a9f33ebfaa1b4ba5e00710a16650d1605be3ce3bf75e687f25ae4a6649bcc",
+      "final_result_digest": "518da90aadf3be9e5709c517bf2d3396e77b33b8bd52d125a4440aca2d677024"
+    },
+    {
+      "case_id": "m06-02",
+      "request": {
+        "difficulty": "EASY",
+        "seed": 2,
+        "generator_mode": "HYBRID",
+        "width": 29,
+        "height": 23
+      },
+      "strategy": "RULE_GEOMETRY_MASK_SYMMETRY",
+      "palette": [
+        "C06",
+        "C07",
+        "C11",
+        "C16"
+      ],
+      "stage_seeds": [
+        "8133ad2225c0396b5d41be9f618651d8a2a22595c359b459add430a146ee1fde",
+        "44b837c906e02190389b5d2da9e1317b534b564c6a5f1c0dc8ad81873f0b8230"
+      ],
+      "stage_engines": [
+        [
+          "rule-shape",
+          "1.0.0"
+        ],
+        [
+          "rule-colorize",
+          "1.0.0"
+        ]
+      ],
+      "stage_request_digests": [
+        "b6ad72aee6fdcbb03680733a7c2fb6cd2163895e5c9d7dc5cf0b5a2e7226cc18",
+        "e14ffa20abbad8334067415a1bdcb43237877b2a5a798d9c2fdf3a23b0fcb4fa"
+      ],
+      "stage_result_digests": [
+        "7800800c54eccfdf00f3cad3212d338e8e1da4f53482624f58dd72f7e8181a12",
+        "b8eaa90744495be22507293616d4a0c46333ebc15a2ff1319c122bb38e676a4e"
+      ],
+      "final_grid_digest": "b8eaa90744495be22507293616d4a0c46333ebc15a2ff1319c122bb38e676a4e",
+      "final_result_digest": "7d2ec2232df9bca9765b5d61acc84c0cb34f24b16dfa4eed1557e720cd6703af"
+    },
+    {
+      "case_id": "m06-11",
+      "request": {
+        "difficulty": "VERY_HARD",
+        "seed": 11,
+        "generator_mode": "HYBRID",
+        "width": 53,
+        "height": 59
+      },
+      "strategy": "MASK_GEOMETRY_RULE_COLOR_REGIONS",
+      "palette": [
+        "C01",
+        "C02",
+        "C03",
+        "C04",
+        "C05",
+        "C07",
+        "C08",
+        "C10",
+        "C11",
+        "C13",
+        "C14",
+        "C16"
+      ],
+      "stage_seeds": [
+        "fd1cc0c839e02a71bdb965c70954978aea519644113c9a71a72ca0bc37472841",
+        "8c10b124d63a4111657e0883a098abd36985727924f5f80acaffbc7ab160a84e"
+      ],
+      "stage_engines": [
+        [
+          "mask-sprite",
+          "1.0.0"
+        ],
+        [
+          "rule-colorize",
+          "1.0.0"
+        ]
+      ],
+      "stage_request_digests": [
+        "2fddf1279540ebb11ce545c41bf3816ce985edfdee8921212ff88c7aa214a3d2",
+        "4b5539ae049f0779c677c77ecaa54c01a568660f0c3df28f599679b2ad8b9eae"
+      ],
+      "stage_result_digests": [
+        "eed8bcf402f38f1ad6e967cd5d0b87a202082b09ac01e6b940a38bef143076e1",
+        "5a43b55c0d50e64eae7585395aaaf4ec7ec32cb42dbdd0fcd8f1749e287f82bf"
+      ],
+      "final_grid_digest": "5a43b55c0d50e64eae7585395aaaf4ec7ec32cb42dbdd0fcd8f1749e287f82bf",
+      "final_result_digest": "3d9618dee31ae26a730c02c0c6c9269b26ce91a992ca1c99a4518a209c0293df"
+    },
+    {
+      "case_id": "m06-12",
+      "request": {
+        "difficulty": "VERY_HARD",
+        "seed": 12,
+        "generator_mode": "HYBRID",
+        "width": 59,
+        "height": 50
+      },
+      "strategy": "RULE_GEOMETRY_MASK_SYMMETRY",
+      "palette": [
+        "C01",
+        "C02",
+        "C04",
+        "C05",
+        "C06",
+        "C07",
+        "C08",
+        "C11",
+        "C12",
+        "C14",
+        "C15",
+        "C16"
+      ],
+      "stage_seeds": [
+        "f1cc0484af758f0b0f665cb66174cbc50591bee2de5c1b716af8ddb4c9d0b4b0",
+        "776f96c84cc98f14ca3cd5dc6721197688ca91a12b2e0e2e4d1d78f1847f9262"
+      ],
+      "stage_engines": [
+        [
+          "rule-shape",
+          "1.0.0"
+        ],
+        [
+          "rule-colorize",
+          "1.0.0"
+        ]
+      ],
+      "stage_request_digests": [
+        "6dfbe7a546c231b54e2dd299443f0b4ad9bf54012ec133a5b2edd4f7d26a785a",
+        "98be25fd94525011ea0968f8a4c5411e68ec8b7759d281ba1763c1c620d937e8"
+      ],
+      "stage_result_digests": [
+        "487d1b6aa32567bb5eeb827e2fd6922f2835e93ffb53e97810d30a20089fc489",
+        "ff9a054ef7d3f33e69cc441e890dbc49c73d5b0d0e03dbf59474b54bf06e8b68"
+      ],
+      "final_grid_digest": "ff9a054ef7d3f33e69cc441e890dbc49c73d5b0d0e03dbf59474b54bf06e8b68",
+      "final_result_digest": "d001dcfc32b14577370f600ae86672d9ba7724564b1c975b36458b0877587a15"
+    }
+  ]
+}

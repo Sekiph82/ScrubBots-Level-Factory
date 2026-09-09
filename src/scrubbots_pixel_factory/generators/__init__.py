@@ -13,6 +13,16 @@ from .mask import (
 )
 from .rules import RuleShapeGenerator
 from .wfc import WFCGenerator
+from .router import (
+    AutoAttempt,
+    AutoCandidate,
+    GeneratorRouter,
+    HybridCandidate,
+    HybridGenerator,
+    HybridStageMetadata,
+    HybridStrategy,
+    reproduce_hybrid,
+)
 
 __all__ = [
     "FAMILY_NAMES",
@@ -25,4 +35,12 @@ __all__ = [
     "TemplateFamily",
     "RuleShapeGenerator",
     "WFCGenerator",
+    "AutoAttempt",
+    "AutoCandidate",
+    "GeneratorRouter",
+    "HybridCandidate",
+    "HybridGenerator",
+    "HybridStageMetadata",
+    "HybridStrategy",
+    "reproduce_hybrid",
 ]

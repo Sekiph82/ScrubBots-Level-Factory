@@ -27,25 +27,21 @@ class RequestContractError(ValueError):
 
 
 class GeneratorMode(str, Enum):
-    """Strict explicit production modes; AUTO is intentionally absent."""
+    """Strict production modes, including deterministic AUTO routing."""
 
     MASK = "MASK"
     RULES = "RULES"
     WFC = "WFC"
     HYBRID = "HYBRID"
+    AUTO = "AUTO"
 
     @classmethod
     def parse(cls, value: object) -> str:
         if isinstance(value, cls):
             return value.value
-        if type(value) is not str or value not in {
-            cls.MASK,
-            cls.RULES,
-            cls.WFC,
-            cls.HYBRID,
-        }:
+        if type(value) is not str or value not in {mode.value for mode in cls}:
             raise RequestContractError(
-                "generator_mode must be exactly MASK, RULES, WFC, or HYBRID"
+                "generator_mode must be exactly MASK, RULES, WFC, HYBRID, or AUTO"
             )
         return value
 

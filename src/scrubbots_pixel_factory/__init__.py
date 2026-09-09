@@ -35,6 +35,16 @@ from .core import (
     RNG_ALGORITHM,
     ResultStatus,
 )
+from .generators.router import (
+    AutoAttempt,
+    AutoCandidate,
+    GeneratorRouter,
+    HybridCandidate,
+    HybridGenerator,
+    HybridStageMetadata,
+    HybridStrategy,
+    reproduce_hybrid,
+)
 
 __all__ = [
     "OfflinePolicyError",
@@ -66,6 +76,14 @@ __all__ = [
     "PixelGenerator",
     "RNG_ALGORITHM",
     "ResultStatus",
+    "AutoAttempt",
+    "AutoCandidate",
+    "GeneratorRouter",
+    "HybridCandidate",
+    "HybridGenerator",
+    "HybridStageMetadata",
+    "HybridStrategy",
+    "reproduce_hybrid",
 ]
 
 __version__ = "0.1.0"
