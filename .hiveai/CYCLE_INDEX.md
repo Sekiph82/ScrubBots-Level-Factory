@@ -48,15 +48,15 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M03-C003`
-Title: `Semantic Role Binding & Weak-Family Recognizability Remediation`
+Cycle: `PAG-M04-C001`
+Title: `Procedural Shape / Rule Generator`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
 
 ### PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M03-C003`
 Audit: `.hiveai/audits/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`
 Closed findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`
 Open findings: `F-PAG-M03-C002-001`, `F-PAG-M03-C002-002`
@@ -91,6 +91,13 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M03-C003 — Semantic Role Binding & Weak-Family Recognizability Remediation
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M03-C003_SEMANTIC_ROLE_BINDING_AND_WEAK_FAMILY_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`
+Closes milestone: `PAG-M03 — Mask / Sprite Generator`
+Terminal builder-era HEAD independently observed: `1fda888a3a080cb4024d542c440f08d00ed393c1`
+
 
 ### PAG-M02-C003 — Result Construction Boundary Remediation
 State: `AUDIT_PASSED / TASK_COMPLETE`
