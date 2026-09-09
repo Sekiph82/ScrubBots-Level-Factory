@@ -48,15 +48,15 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M04-C002`
-Title: `Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation`
+Cycle: `PAG-M05-C001`
+Title: `Wave Function Collapse Generator`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
 
 ### PAG-M04-C001 — Procedural Shape / Rule Generator
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
 Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
 Open findings: `F-PAG-M04-C001-001`, `F-PAG-M04-C001-002`, `F-PAG-M04-C001-003`, `F-PAG-M04-C001-004`, `F-PAG-M04-C001-005`
 Forward dependency: `PAG-0441` blocked on M10 performance budget
@@ -99,6 +99,13 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M04-C002 — Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation
+State: `AUDIT_PASSED / FUNCTIONAL_SCOPE_COMPLETE`
+Audit: `.hiveai/audits/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_STRICT_AUDIT.md`
+Milestone state: `PAG-M04 functional PASS; PAG-0441 deferred to M10 performance budget`
+Terminal builder-era HEAD independently observed: `f482dcd8c1388b93a4763c77a7b2cf96d1e7e5a0`
+
 
 ### PAG-M03-C003 — Semantic Role Binding & Weak-Family Recognizability Remediation
 State: `AUDIT_PASSED / TASK_COMPLETE`
