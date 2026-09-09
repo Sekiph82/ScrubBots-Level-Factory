@@ -48,12 +48,20 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M04-C001`
-Title: `Procedural Shape / Rule Generator`
+Cycle: `PAG-M04-C002`
+Title: `Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
+
+### PAG-M04-C001 — Procedural Shape / Rule Generator
+State: `AUDIT_FAILED / FIX_REQUIRED`
+Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
+Open findings: `F-PAG-M04-C001-001`, `F-PAG-M04-C001-002`, `F-PAG-M04-C001-003`, `F-PAG-M04-C001-004`, `F-PAG-M04-C001-005`
+Forward dependency: `PAG-0441` blocked on M10 performance budget
+Terminal builder-era HEAD independently observed: `315233b77211d4771832b1732d9f9e52af66364a`
+
 
 ### PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M03-C003`
