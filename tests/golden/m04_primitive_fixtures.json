@@ -1,0 +1,14 @@
+[
+  {"primitive":"BLOB","dimensions":[29,23],"seed":41,"parameters":{"target":35},"geometry_sha256":"7cf0d7909bc02a6f80e3b4812a55b35582b8a2e48437a1e4aa6177e76ea189b9","occupied_cells":35,"component_count":1},
+  {"primitive":"ISLAND","dimensions":[29,23],"seed":41,"parameters":{"target":24},"geometry_sha256":"ee966d3328358339f94aafda5ee603b1a6bcf86340bfc2e0971705f4faf24200","occupied_cells":24,"component_count":1},
+  {"primitive":"RING","dimensions":[29,23],"seed":41,"parameters":{"radius":7,"thickness":1},"geometry_sha256":"973b929f8caa7a8c93217012c6905b51ba11d1d677694b14b9ebfb6410663196","occupied_cells":56,"component_count":1},
+  {"primitive":"CORRIDOR","dimensions":[29,23],"seed":41,"parameters":{"width_cells":2},"geometry_sha256":"2f463308e65fac77bbf23c04d8f9252452512c5b90f449c0bc5872c52196d77a","occupied_cells":90,"component_count":1},
+  {"primitive":"POCKET","dimensions":[29,23],"seed":41,"parameters":{"size":3},"geometry_sha256":"652bfe0fcacda1e3d26e189352f46da7c42d4f7e6468e4ce7a98b0f5310b6d1c","occupied_cells":9,"component_count":1},
+  {"primitive":"SNAKE","dimensions":[29,23],"seed":41,"parameters":{"max_steps":32},"geometry_sha256":"5b24fa4593248011e6b26613de06282474b6c62ca2a4505784315d48494e7e6e","occupied_cells":32,"component_count":1},
+  {"primitive":"BRANCH","dimensions":[29,23],"seed":41,"parameters":{"depth":8,"branch_count":3},"geometry_sha256":"c7b1d996b25f0301d1d1462d54d3e9ad0cb4a10f65cde518ef9f5ce6c963c8e8","occupied_cells":36,"component_count":1},
+  {"primitive":"CHAMBER","dimensions":[29,23],"seed":41,"parameters":{"chamber_width":11,"chamber_height":9},"geometry_sha256":"7a01815c7a9d54768d73ebf155e374633d7c09ee56317a2a86db8dc008a13dd1","occupied_cells":99,"component_count":1},
+  {"primitive":"SPIRAL","dimensions":[29,23],"seed":41,"parameters":{"turns":3},"geometry_sha256":"70a8db6130513f30d721bc8c4315584ec28c55ee92e6f071fd199233f433d67c","occupied_cells":234,"component_count":1},
+  {"primitive":"WAVE","dimensions":[29,23],"seed":41,"parameters":{"period":5,"amplitude":3},"geometry_sha256":"6d7943020bdf2650e6ee2b97fc67e52e2eaefd554614382d6e69fb22fac68949","occupied_cells":133,"component_count":1},
+  {"primitive":"RADIAL","dimensions":[29,23],"seed":41,"parameters":{"rays":8,"length":7},"geometry_sha256":"ad42b3535cfbaf50701082b448035b58a71d252c8b207e1adedd27c57fee0682","occupied_cells":105,"component_count":1},
+  {"primitive":"VORONOI","dimensions":[29,23],"seed":41,"parameters":{"regions":4},"geometry_sha256":"f87ad1baf761a59bbda3b2935afc38cae7fdaca88d1a0cac91bc37533484ec49","occupied_cells":667,"component_count":4}
+]

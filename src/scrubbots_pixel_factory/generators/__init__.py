@@ -11,6 +11,7 @@ from .mask import (
     SymmetryMode,
     TemplateFamily,
 )
+from .rules import RuleShapeGenerator
 
 __all__ = [
     "FAMILY_NAMES",
@@ -21,4 +22,5 @@ __all__ = [
     "ResolvedMask",
     "SymmetryMode",
     "TemplateFamily",
+    "RuleShapeGenerator",
 ]
