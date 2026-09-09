@@ -51,3 +51,11 @@ Further entries will be appended chronologically and truthfully.
 - No dependency, license, network, API-key, telemetry, or security-boundary change was made. The main ScrubBots repository was not touched. Task/H!veAI acceptance state, handoff, cycle index, and audit files were not modified.
 
 Further commit and push entries will be appended after the remediation commit and after the completed-log push.
+
+## 2026-09-09T16:45:00+03:00 — Remote synchronization, commit, and push
+
+- The first `git push origin main` for remediation commit `fc2fe4b` was rejected as non-fast-forward because `origin/main` had advanced with seven remote governance commits (`20fbb34` through `1dd267f`) recording the C001 audit failure and C002 readiness/prompt state. No force-push or rebase was used.
+- Preserved the pre-existing dirty control-plane files and untracked event index in `codex-preserve-preexisting-control-plane-edits-before-M04-C002-sync`, fetched `origin/main`, and merged the remote tip non-destructively as `969209e75418f40aa708009dda4f18ad947320a7`. The merge contained only remote governance/prompt/audit state. The preserved control-plane files were reapplied and verified against the preservation stash; they remain unstaged and uncommitted.
+- Remediation commit: `fc2fe4b` (`remediate M04 geometry and recipe semantics`).
+- Push succeeded after synchronization: `1dd267f..969209e main -> main`, publishing the remediation and its initial builder log in the merged main history.
+- The final log append is intentionally not self-referential; the subsequent log-only commit will not be recorded inside itself.
