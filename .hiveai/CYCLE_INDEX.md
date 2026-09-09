@@ -48,15 +48,15 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M02-C003`
-Title: `Result Construction Boundary Remediation`
+Cycle: `PAG-M03-C001`
+Title: `Mask / Sprite Generator`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
 
 ## Failed / remediation-required cycles
 
 ### PAG-M02-C002 — Result Integrity & Provenance Remediation
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M02-C003`
 Audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
 Closed findings: `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
 Open finding: `F-PAG-M02-C002-001`
@@ -76,6 +76,13 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M02-C003 — Result Construction Boundary Remediation
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
+Closes milestone: `PAG-M02 — Deterministic Generation Core`
+Terminal builder-era HEAD independently observed: `4f0c803c7c4ab565700356735e6f665aeae7805b`
+
 
 ### PAG-M01-C001 — Canonical SCRUBBOTS Contracts
 State: `AUDIT_PASSED / TASK_COMPLETE`
