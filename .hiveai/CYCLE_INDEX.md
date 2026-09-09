@@ -48,11 +48,10 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Recovery: `RECOVERY-R002`
-Title: `Publish Existing PAG-M05-C002 Work to GitHub`
-State: `PUBLICATION_REQUIRED`
+Cycle: `PAG-M06-C001`
+Title: `Hybrid Generator Router`
+State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Target cycle: `PAG-M05-C002`
 
 ## Failed / remediation-required cycles
 
@@ -64,7 +63,7 @@ Classification: `PUBLICATION_HANDOFF_FAILURE / NOT_A_PRODUCT_AUDIT_VERDICT`
 
 
 ### PAG-M05-C001 — Wave Function Collapse Generator
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M05-C002`
 Audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`
 Open findings: `F-PAG-M05-C001-001`, `F-PAG-M05-C001-002`, `F-PAG-M05-C001-003`, `F-PAG-M05-C001-004`
 Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48dedbcbc6bde`
@@ -114,6 +113,18 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M05-C002 — Exemplar Contract, Diagnostics & Acceptance Evidence Remediation
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M05-C002_EXEMPLAR_CONTRACT_DIAGNOSTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
+Closes milestone: `PAG-M05 — Wave Function Collapse Generator`
+Terminal builder-era HEAD independently observed: `de4f2556a51e9b2fa49c215c3afea0d087ab3468`
+
+### RECOVERY-R002 — Publish Existing PAG-M05-C002 Work to GitHub
+State: `PUBLICATION_OBJECTIVE_ACHIEVED / PROCESS_LOG_MISSING`
+Result: C002 implementation and historical builder log were published to main; dedicated RECOVERY-R002 log was not published.
+Process finding: `F-PAG-M05-C002-PROC-001`
+
 
 ### PAG-M04-C002 — Geometry Fidelity, Operation Semantics & Recipe Diversity Remediation
 State: `AUDIT_PASSED / FUNCTIONAL_SCOPE_COMPLETE`
