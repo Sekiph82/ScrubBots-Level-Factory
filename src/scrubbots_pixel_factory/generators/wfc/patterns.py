@@ -52,14 +52,19 @@ def extract_pattern_table(exemplar: Exemplar, config: WFCConfig, target_palette:
     max_x = exemplar.width if config.input_periodic else exemplar.width - size + 1
     max_y = exemplar.height if config.input_periodic else exemplar.height - size + 1
     frequency: dict[tuple[str, ...], int] = {}
+    raw_extracted_window_count = 0
+    transformed_observation_count = 0
     for y in range(max_y):
         for x in range(max_x):
+            raw_extracted_window_count += 1
             base = tuple(
                 _cell(mapped, exemplar.width, exemplar.height, x + column, y + row, config.input_periodic)
                 for row in range(size)
                 for column in range(size)
             )
-            for variant in transformed_patterns(base, size, config):
+            variants = transformed_patterns(base, size, config)
+            transformed_observation_count += len(variants)
+            for variant in variants:
                 frequency[variant] = frequency.get(variant, 0) + 1
     ordered_cells = tuple(sorted(frequency, key=lambda cells: tuple(int(value[1:]) for value in cells)))
     patterns = tuple(Pattern(index, cells, frequency[cells]) for index, cells in enumerate(ordered_cells))
@@ -93,6 +98,8 @@ def extract_pattern_table(exemplar: Exemplar, config: WFCConfig, target_palette:
         "source_palette": exemplar.source_palette,
         "target_palette": target_palette,
         "mapping": mapping,
+        "raw_extracted_window_count": raw_extracted_window_count,
+        "transformed_observation_count": transformed_observation_count,
     }
     digest = hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
-    return PatternTable(size, patterns, adjacency, exemplar.source_palette, target_palette, digest)
+    return PatternTable(size, patterns, adjacency, exemplar.source_palette, target_palette, digest, raw_extracted_window_count, transformed_observation_count)

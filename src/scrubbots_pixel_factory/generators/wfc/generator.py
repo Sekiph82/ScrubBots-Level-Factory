@@ -13,7 +13,7 @@ from ...core import (
     ResultContractError,
 )
 from .exemplar import canonical_palette_mapping
-from .model import Exemplar, ExemplarRegistry, WFCConfig, WFCCandidate, WFCContractError
+from .model import Exemplar, ExemplarRegistry, WFCAttemptRecord, WFCConfig, WFCCandidate, WFCContractError
 from .patterns import extract_pattern_table
 from .solver import WFCContradiction, solve_pattern_table
 
@@ -104,7 +104,7 @@ class WFCGenerator:
             return self._failure(FailureCode.INVALID_REQUEST, str(exc).split("\n", 1)[0], request)
 
         retry_seeds: dict[str, str] = {}
-        contradiction_history: list[dict[str, object]] = []
+        contradiction_history: list[WFCAttemptRecord] = []
         for attempt in range(config.max_attempts):
             retry_seeds[str(attempt)] = stream.retry_seed(attempt)
             try:
@@ -129,11 +129,13 @@ class WFCGenerator:
                     "source_palette": list(exemplar.source_palette),
                     "target_palette": list(target_palette),
                     "palette_mapping": [[source, target] for source, target in mapping],
-                    "extracted_pattern_count": sum(pattern.frequency for pattern in table.patterns),
+                    "extracted_pattern_count": table.raw_extracted_window_count,
+                    "raw_extracted_window_count": table.raw_extracted_window_count,
+                    "transformed_observation_count": table.transformed_observation_count,
                     "unique_pattern_count": len(table.patterns),
                     "pattern_table_digest": table.digest,
                     "attempt": attempt,
-                    "contradiction_history": list(contradiction_history),
+                    "contradiction_history": [record.as_dict() for record in contradiction_history],
                     "placement_dimensions": {"width": outcome.placement_width, "height": outcome.placement_height},
                     "output_dimensions": {"width": width, "height": height},
                     "observations": outcome.observations,
@@ -151,12 +153,14 @@ class WFCGenerator:
                     rng_algorithm=RNG_ALGORITHM,
                     provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": dict(retry_seeds)},
                 )
-                return WFCCandidate(result, exemplar, config, outcome.logical_grid, metadata, table, attempt)
+                return WFCCandidate(result, exemplar, config, outcome.logical_grid, metadata, table, attempt, tuple(contradiction_history))
             except WFCContradiction as exc:
-                contradiction_history.append({"attempt": attempt, "code": exc.code, "placement": list(exc.placement), "detail": exc.detail})
+                contradiction_history.append(WFCAttemptRecord(attempt, exc.code, exc.placement, exc.detail))
             except (TypeError, ValueError, ResultContractError) as exc:
-                contradiction_history.append({"attempt": attempt, "code": "CONTRACT_FAILURE", "placement": [0, 0], "detail": str(exc).split("\n", 1)[0]})
-        return self._failure(FailureCode.RETRY_EXHAUSTED, "bounded WFC generation attempts exhausted", request)
+                contradiction_history.append(WFCAttemptRecord(attempt, "CONTRACT_FAILURE", (0, 0), "bounded WFC contract rejection"))
+        summary = ";".join(record.compact() for record in contradiction_history)
+        reason = f"bounded WFC generation attempts exhausted [{summary}]"
+        return self._failure(FailureCode.RETRY_EXHAUSTED, reason[:512], request)
 
     def generate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> GenerationResult:
         candidate = self.generate_candidate(request, rng)

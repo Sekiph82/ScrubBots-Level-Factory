@@ -40,7 +40,25 @@ def test_owner_approval_and_production_difficulty_are_explicit() -> None:
     assert approved in ExemplarRegistry((approved,)).eligible()
     with pytest.raises(WFCContractError):
         _exemplar(role="PRODUCTION_ARTIFACT")
-    assert _exemplar(role="PRODUCTION_ARTIFACT", difficulty="EASY").production_difficulty == "EASY"
+
+
+def _production(width: int, height: int, difficulty: str) -> Exemplar:
+    return Exemplar(
+        "scrubbots-wfc-exemplar", 1, f"production-{difficulty}-{width}x{height}", "PRODUCTION_ARTIFACT", width, height,
+        tuple(("C01", "C02", "C03")[(x + y) % 3] for y in range(height) for x in range(width)),
+        "owner", "owner-locked validation fixture", "OWNER_APPROVED", "test-owner", difficulty,
+    )
+
+
+def test_production_exemplar_dimensions_reuse_m01_contract() -> None:
+    for width, height, difficulty in ((20, 20, "EASY"), (29, 23, "EASY"), (30, 39, "MEDIUM"), (48, 41, "HARD"), (59, 50, "VERY_HARD")):
+        assert _production(width, height, difficulty).production_difficulty == difficulty
+    for width, height in ((19, 20), (20, 30)):
+        with pytest.raises(WFCContractError):
+            _production(width, height, "EASY")
+    with pytest.raises(WFCContractError):
+        _exemplar(role="PRODUCTION_ARTIFACT", difficulty=None)
+    assert _exemplar().width == 3
 
 
 def test_wfc_config_gates_n4_and_bounds_attempts() -> None:

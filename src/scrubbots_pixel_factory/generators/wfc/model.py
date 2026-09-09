@@ -1,10 +1,12 @@
 """Immutable contracts for the project-owned overlapping-pattern WFC engine."""
 
 from dataclasses import dataclass
+import hashlib
+import json
 from types import MappingProxyType
 from typing import Mapping
 
-from ...contracts import CANONICAL_PALETTE
+from ...contracts import CANONICAL_PALETTE, validate_dimensions
 
 
 class WFCContractError(ValueError):
@@ -69,8 +71,10 @@ class Exemplar:
             raise WFCContractError("approved_by is only valid for owner-approved exemplars")
         if self.role == "PRODUCTION_ARTIFACT":
             _require_text(self.production_difficulty, "production_difficulty")
-            if self.production_difficulty not in {"EASY", "MEDIUM", "HARD", "VERY_HARD"}:
-                raise WFCContractError("production_difficulty must be a legal difficulty")
+            try:
+                validate_dimensions(self.production_difficulty, self.width, self.height)
+            except (TypeError, ValueError) as exc:
+                raise WFCContractError("production exemplar dimensions are illegal for its difficulty") from exc
         object.__setattr__(self, "pixels", pixels)
 
     @property
@@ -80,6 +84,16 @@ class Exemplar:
     @property
     def provenance_identity(self) -> str:
         return f"{self.provenance_type}:{self.provenance_description}"
+
+    @property
+    def digest(self) -> str:
+        canonical = {
+            "schema": self.schema, "version": self.version, "exemplar_id": self.exemplar_id,
+            "role": self.role, "width": self.width, "height": self.height, "pixels": self.pixels,
+            "provenance_type": self.provenance_type, "provenance_description": self.provenance_description,
+            "ownership": self.ownership, "approved_by": self.approved_by, "production_difficulty": self.production_difficulty,
+        }
+        return hashlib.sha256(json.dumps(canonical, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
 class ExemplarRegistry:
@@ -163,11 +177,42 @@ class PatternTable:
     source_palette: tuple[str, ...]
     target_palette: tuple[str, ...]
     digest: str
+    raw_extracted_window_count: int = 0
+    transformed_observation_count: int = 0
 
     def __post_init__(self) -> None:
         if not self.patterns:
             raise WFCContractError("WFC pattern table cannot be empty")
+        for label, value in (("raw_extracted_window_count", self.raw_extracted_window_count), ("transformed_observation_count", self.transformed_observation_count)):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                raise WFCContractError(f"{label} must be a non-negative integer")
+        if self.transformed_observation_count and self.transformed_observation_count < self.raw_extracted_window_count:
+            raise WFCContractError("transformed observations cannot be fewer than raw windows")
         object.__setattr__(self, "adjacency", MappingProxyType(dict(self.adjacency)))
+
+
+@dataclass(frozen=True, slots=True)
+class WFCAttemptRecord:
+    """Immutable stable diagnostic for one bounded WFC attempt."""
+
+    attempt: int
+    code: str
+    placement: tuple[int, int]
+    detail: str
+
+    def __post_init__(self) -> None:
+        if isinstance(self.attempt, bool) or not isinstance(self.attempt, int) or self.attempt < 0:
+            raise WFCContractError("WFC attempt diagnostic index must be non-negative")
+        _require_text(self.code, "WFC attempt diagnostic code")
+        if len(self.placement) != 2 or any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in self.placement):
+            raise WFCContractError("WFC attempt diagnostic placement must be a non-negative pair")
+        _require_text(self.detail, "WFC attempt diagnostic detail")
+
+    def as_dict(self) -> dict[str, object]:
+        return {"attempt": self.attempt, "code": self.code, "placement": list(self.placement), "detail": self.detail}
+
+    def compact(self) -> str:
+        return f"{self.attempt}:{self.code}@{self.placement[0]},{self.placement[1]}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -179,9 +224,11 @@ class WFCCandidate:
     metadata: Mapping[str, object]
     pattern_table: PatternTable
     attempt: int
+    attempt_history: tuple[WFCAttemptRecord, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "metadata", MappingProxyType(dict(self.metadata)))
+        object.__setattr__(self, "attempt_history", tuple(self.attempt_history))
 
     @property
     def wfc_metadata(self) -> Mapping[str, object]:

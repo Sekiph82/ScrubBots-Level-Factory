@@ -27,10 +27,13 @@ def test_120_candidate_acceptance_matrix_has_at_least_100_accepted() -> None:
         generator = WFCGenerator(ExemplarRegistry((exemplar,)))
         for seed_offset in range(30):
             total += 1
+            dimensions = dimensions if seed_offset % 2 == 0 else {
+                "EASY": (29, 23), "MEDIUM": (30, 39), "HARD": (48, 41), "VERY_HARD": (59, 50)
+            }[difficulty]
             values = {
                 "pattern_size": 2 if seed_offset % 2 == 0 else 3,
                 "input_periodic": seed_offset % 3 != 0,
-                "output_periodic": seed_offset % 4 == 0,
+                "output_periodic": seed_offset % 6 == 0 and fixture_index > 0 and seed_offset % 2 == 0,
                 "allow_rotations": seed_offset % 5 == 0,
                 "allow_reflections": seed_offset % 7 == 0,
                 "max_attempts": 4,
@@ -43,5 +46,8 @@ def test_120_candidate_acceptance_matrix_has_at_least_100_accepted() -> None:
                 assert len(candidate.logical_grid) == dimensions[0] * dimensions[1]
                 assert set(candidate.logical_grid) == set(exemplar.source_palette)
                 assert candidate.wfc_metadata["attempt"] < values["max_attempts"]
+                assert candidate.wfc_metadata["extracted_pattern_count"] == candidate.wfc_metadata["raw_extracted_window_count"]
+                expected_raw = exemplar.width * exemplar.height if values["input_periodic"] else (exemplar.width - values["pattern_size"] + 1) * (exemplar.height - values["pattern_size"] + 1)
+                assert candidate.wfc_metadata["raw_extracted_window_count"] == expected_raw
     assert total == 120
     assert accepted >= 100

@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from scrubbots_pixel_factory import DeterministicRNG, FailureCode, GenerationRequest, GeneratorOptions, PixelGenerator, offline_runtime
-from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator, WFCCandidate
+from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator, WFCCandidate, WFCContradiction
 
 
 FIXTURE_DIR = Path(__file__).parents[1] / "fixtures" / "wfc"
@@ -65,6 +65,8 @@ def test_wfc_mapping_provenance_dimensions_and_metadata() -> None:
     assert set(candidate.result.logical_grid) == {"C04", "C05", "C06"}
     assert candidate.wfc_metadata["attempt"] == candidate.attempt
     assert candidate.wfc_metadata["palette_mapping"] == [["C01", "C04"], ["C02", "C05"], ["C03", "C06"]]
+    assert candidate.wfc_metadata["extracted_pattern_count"] == candidate.wfc_metadata["raw_extracted_window_count"] == exemplar.width * exemplar.height
+    assert candidate.wfc_metadata["transformed_observation_count"] >= candidate.wfc_metadata["raw_extracted_window_count"]
     assert candidate.result.provenance["stage_seeds"] == DeterministicRNG(91).stage_seeds()
 
 
@@ -84,3 +86,65 @@ def test_wfc_cross_process_digest_is_stable() -> None:
         env = dict(os.environ, PYTHONHASHSEED=hash_seed)
         outputs.append(subprocess.check_output([sys.executable, "-c", code], text=True, env=env).strip())
     assert outputs[0] == outputs[1]
+
+
+def test_wfc_rectangular_generator_cases_cover_all_difficulties() -> None:
+    for name, difficulty, dimensions in (("wfc-synthetic-easy-3.json", "EASY", (29, 23)), ("wfc-synthetic-medium-6.json", "MEDIUM", (30, 39)), ("wfc-synthetic-hard-8.json", "HARD", (48, 41)), ("wfc-synthetic-very-hard-10.json", "VERY_HARD", (59, 50))):
+        exemplar = _load(name)
+        request = _request(exemplar, difficulty, dimensions, 700 + len(exemplar.source_palette), input_periodic=True, output_periodic=False, allow_rotations=True, allow_reflections=True)
+        candidate = WFCGenerator(ExemplarRegistry((exemplar,))).generate_candidate(request)
+        assert isinstance(candidate, WFCCandidate)
+        assert (candidate.result.width, candidate.result.height) == dimensions
+        assert len(candidate.logical_grid) == dimensions[0] * dimensions[1]
+        assert set(candidate.logical_grid) == set(exemplar.source_palette)
+
+
+def test_wfc_terminal_diagnostics_are_bounded_stable_and_reproducible(monkeypatch) -> None:
+    exemplar = _load(FIXTURE_SPECS[0][0])
+    request = _request(exemplar, "EASY", (20, 20), 812, max_attempts=3)
+    import importlib
+    generator_module = importlib.import_module("scrubbots_pixel_factory.generators.wfc.generator")
+
+    def always_fail(table, width, height, rng, output_periodic):
+        raise WFCContradiction("EMPTY_WAVE", (3, 5), "forced test contradiction")
+
+    monkeypatch.setitem(WFCGenerator.generate_candidate.__globals__, "solve_pattern_table", always_fail)
+    generator = WFCGenerator(ExemplarRegistry((exemplar,)))
+    first = generator.generate(request)
+    second = generator.generate(request)
+    assert not first.is_success and first.failure_code is FailureCode.RETRY_EXHAUSTED
+    assert first.failure_reason == second.failure_reason
+    assert first.canonical_bytes() == second.canonical_bytes()
+    assert first.failure_reason == "bounded WFC generation attempts exhausted [0:EMPTY_WAVE@3,5;1:EMPTY_WAVE@3,5;2:EMPTY_WAVE@3,5]"
+    assert len(first.failure_reason) < 512
+
+
+def test_wfc_successful_later_attempt_keeps_prior_diagnostic(monkeypatch) -> None:
+    exemplar = _load(FIXTURE_SPECS[0][0])
+    request = _request(exemplar, "EASY", (20, 20), 813, max_attempts=2)
+    import importlib
+    generator_module = importlib.import_module("scrubbots_pixel_factory.generators.wfc.generator")
+    original = generator_module.solve_pattern_table
+    calls = {"count": 0}
+
+    def fail_once(table, width, height, rng, output_periodic):
+        if calls["count"] == 0:
+            calls["count"] += 1
+            raise WFCContradiction("EMPTY_WAVE", (1, 2), "forced first-attempt contradiction")
+        return original(table, width, height, rng, output_periodic)
+
+    monkeypatch.setitem(WFCGenerator.generate_candidate.__globals__, "solve_pattern_table", fail_once)
+    candidate = WFCGenerator(ExemplarRegistry((exemplar,))).generate_candidate(request)
+    assert isinstance(candidate, WFCCandidate)
+    assert candidate.attempt == 1
+    assert candidate.attempt_history[0].compact() == "0:EMPTY_WAVE@1,2"
+    assert candidate.wfc_metadata["contradiction_history"][0]["code"] == "EMPTY_WAVE"
+
+
+def test_retry_stream_is_independent_of_previous_attempt_consumption() -> None:
+    first = DeterministicRNG("retry").retry_rng(1)
+    expected = first.next_u64()
+    consumed = DeterministicRNG("retry").retry_rng(0)
+    consumed.next_bytes(4096)
+    actual = DeterministicRNG("retry").retry_rng(1).next_u64()
+    assert actual == expected

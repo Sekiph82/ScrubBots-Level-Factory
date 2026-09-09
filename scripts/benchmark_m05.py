@@ -38,15 +38,15 @@ def run() -> list[dict[str, object]]:
             last = candidate
         assert last is not None
         ordered = sorted(timings)
-        rows.append({"pattern_size": n, "output_periodic": periodic, "width": 59, "height": 59, "exemplar_id": exemplar.exemplar_id, "unique_patterns": len(last.pattern_table.patterns), "placement_dimensions": list(last.wfc_metadata["placement_dimensions"].values()), "runs": 3, "median_ms": round(statistics.median(timings), 3), "p95_ms": round(ordered[min(2, len(ordered) - 1)], 3), "worst_ms": round(max(timings), 3)})
+        rows.append({"pattern_size": n, "output_periodic": periodic, "width": 59, "height": 59, "exemplar_id": exemplar.exemplar_id, "raw_windows": last.pattern_table.raw_extracted_window_count, "transformed_observations": last.pattern_table.transformed_observation_count, "unique_patterns": len(last.pattern_table.patterns), "placement_dimensions": list(last.wfc_metadata["placement_dimensions"].values()), "runs": 3, "median_ms": round(statistics.median(timings), 3), "p95_ms": round(ordered[min(2, len(ordered) - 1)], 3), "worst_ms": round(max(timings), 3)})
     return rows
 
 
 if __name__ == "__main__":
     rows = run()
-    lines = ["# M05 WFC 59×59 benchmark evidence", "", "This is measured evidence only; PAG-M10 has not established a V1 performance budget.", "", f"- Python: `{sys.version.split()[0]}`", f"- Platform: `{platform.platform()}`", "- Exemplar: `wfc-synthetic-benchmark-10` (synthetic test-only)", "", "| N | Output periodic | Placement | Unique patterns | Runs | Median ms | P95 ms | Worst ms |", "|---:|:---:|:---:|---:|---:|---:|---:|---:|"]
+    lines = ["# M05 WFC 59×59 benchmark evidence", "", "This is measured evidence only; PAG-M10 has not established a V1 performance budget.", "", f"- Python: `{sys.version.split()[0]}`", f"- Platform: `{platform.platform()}`", "- Exemplar: `wfc-synthetic-benchmark-10` (synthetic test-only)", "", "| N | Output periodic | Placement | Raw windows | Transformed observations | Unique patterns | Runs | Median ms | P95 ms | Worst ms |", "|---:|:---:|:---:|---:|---:|---:|---:|---:|---:|---:|"]
     for row in rows:
-        lines.append(f"| {row['pattern_size']} | {row['output_periodic']} | {row['placement_dimensions'][0]}×{row['placement_dimensions'][1]} | {row['unique_patterns']} | {row['runs']} | {row['median_ms']} | {row['p95_ms']} | {row['worst_ms']} |")
+        lines.append(f"| {row['pattern_size']} | {row['output_periodic']} | {row['placement_dimensions'][0]}×{row['placement_dimensions'][1]} | {row['raw_windows']} | {row['transformed_observations']} | {row['unique_patterns']} | {row['runs']} | {row['median_ms']} | {row['p95_ms']} | {row['worst_ms']} |")
     path = ROOT / "review/m05/M05_WFC_BENCHMARK.md"
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print("\n".join(lines))
