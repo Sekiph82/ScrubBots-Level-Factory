@@ -4,34 +4,34 @@
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
   "currentMilestone": "PAG-M03",
-  "currentSprint": "PAG-M03-C002",
-  "currentTaskId": "PAG-M03-C002",
-  "currentTaskTitle": "Reproducibility, Region Quality & Recognizability Remediation",
+  "currentSprint": "PAG-M03-C003",
+  "currentTaskId": "PAG-M03-C003",
+  "currentTaskTitle": "Semantic Role Binding & Weak-Family Recognizability Remediation",
   "workflowState": "READY",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M03-C002 bounded remediation, regenerate review/golden evidence, publish builder evidence, then return for independent ChatGPT strict re-audit.",
+  "nextAction": "Execute PAG-M03-C003 bounded remediation, regenerate M03 golden/review evidence, publish builder evidence, then return for final ChatGPT M03 strict audit.",
   "blockers": [
     "PAG-M04 blocked until M03 receives unconditional independent PASS"
   ],
   "progress": {
-    "completed": 115,
+    "completed": 117,
     "total": 380,
-    "percent": 30.26
+    "percent": 30.79
   },
   "git": {
     "branch": "main",
-    "head": "15363eb9d49d4e8791bfe0e038f9e83017c503fc",
+    "head": "9dc2eb7ae6620f655d21b6b2481a74c5783149dd",
     "dirty": null
   },
   "lastAudit": {
     "verdict": "FAIL",
-    "auditId": "PAG-M03-C001"
+    "auditId": "PAG-M03-C002"
   },
   "lastAgentSession": {
     "provider": "CODEX",
     "sessionId": null,
     "status": "COMPLETED_PENDING_REMEDIATION"
   },
-  "updatedAt": "2026-09-09T07:38:00Z",
+  "updatedAt": "2026-09-09T09:09:00Z",
   "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
 }
