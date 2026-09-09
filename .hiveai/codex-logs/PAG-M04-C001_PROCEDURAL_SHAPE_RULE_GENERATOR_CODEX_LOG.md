@@ -69,3 +69,10 @@ Further entries will be appended chronologically and truthfully.
 - This log is the matching M04 Codex builder log. Only the files listed above and this log are intended for the M04 commits; the pre-existing `.hiveai` control-plane changes and `.hiveai/EVENT_INDEX.json` remain unstaged.
 
 Further commit and push entries will be appended after the implementation commit and after the log commit is pushed.
+
+## 2026-09-09T15:35:00+03:00 — Implementation commit and push
+
+- Committed the M04 implementation, tests, goldens, review evidence, and this builder log as `6d75900c583c565702467f65f3e79ac3129ef132` (`implement M04 procedural RULES generator`).
+- `git push origin main` succeeded: `134f350..6d75900 main -> main`.
+- Immediately after the implementation push, local `HEAD` and `origin/main` were both `6d75900c583c565702467f65f3e79ac3129ef132`. Only the pre-existing `.hiveai/EVENTS.jsonl`, `.hiveai/HANDOFF.md`, `.hiveai/PROJECT.json`, `.hiveai/STATE.json`, and untracked `.hiveai/EVENT_INDEX.json` remained outside the commit.
+- This final log append records the implementation commit and push without attempting to record the hash of the log commit itself; no self-referential extra commit is required.
