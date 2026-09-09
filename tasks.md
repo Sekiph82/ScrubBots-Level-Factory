@@ -400,8 +400,8 @@ Minimum completion rules:
 
 - [x] **PAG-M00 — Repository Bootstrap & Governance**
 - [x] **PAG-M01 — Canonical SCRUBBOTS Contracts**
-- [~] **PAG-M02 — Deterministic Generation Core**
-- [ ] **PAG-M03 — Mask / Sprite Generator**
+- [x] **PAG-M02 — Deterministic Generation Core**
+- [~] **PAG-M03 — Mask / Sprite Generator**
 - [ ] **PAG-M04 — Procedural Shape / Rule Generator**
 - [ ] **PAG-M05 — Wave Function Collapse Generator**
 - [ ] **PAG-M06 — Hybrid Generator Router**
@@ -509,12 +509,9 @@ Closing audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT
 
 # PAG-M02 — Deterministic Generation Core
 
-H!veAI active cycle: `PAG-M02-C003 — Result Construction Boundary Remediation`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`  
-C002 verdict: `FAIL / FIX_REQUIRED`
+M02 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M02-C003 — Result Construction Boundary Remediation`  
+Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
 
 ## Sprint PAG-S02.1 — Generation request
 
@@ -545,13 +542,13 @@ C002 verdict: `FAIL / FIX_REQUIRED`
 ## Sprint PAG-S02.3 — Generator interface
 
 - [x] PAG-0221 Define common `PixelGenerator` interface.
-- [~] PAG-0222 Define common `GenerationResult`.
-- [~] PAG-0223 Require exact width×height logical grid.
-- [~] PAG-0224 Require canonical C-ID logical cells.
-- [~] PAG-0225 Require generator mode/version.
-- [~] PAG-0226 Require seed/provenance.
-- [~] PAG-0227 Require explicit failure reason on unsuccessful generation.
-- [~] PAG-0228 Never return partially valid production output as success.
+- [x] PAG-0222 Define common `GenerationResult`.
+- [x] PAG-0223 Require exact width×height logical grid.
+- [x] PAG-0224 Require canonical C-ID logical cells.
+- [x] PAG-0225 Require generator mode/version.
+- [x] PAG-0226 Require seed/provenance.
+- [x] PAG-0227 Require explicit failure reason on unsuccessful generation.
+- [x] PAG-0228 Never return partially valid production output as success.
 
 ### M02 acceptance
 
@@ -561,6 +558,12 @@ C002 verdict: `FAIL / FIX_REQUIRED`
 ---
 
 # PAG-M03 — Mask / Sprite Generator
+
+H!veAI active cycle: `PAG-M03-C001 — Mask / Sprite Generator`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M03-C001_MASK_SPRITE_GENERATOR_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
 
 Goal: produce recognizable silhouettes and structured pixel-art objects without AI.
 
