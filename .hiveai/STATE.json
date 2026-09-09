@@ -3,35 +3,36 @@
   "projectKey": "scrubbots-level-factory",
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
-  "currentMilestone": "PAG-M03",
-  "currentSprint": "PAG-M03-C003",
-  "currentTaskId": "PAG-M03-C003",
-  "currentTaskTitle": "Semantic Role Binding & Weak-Family Recognizability Remediation",
+  "currentMilestone": "PAG-M04",
+  "currentSprint": "PAG-M04-C001",
+  "currentTaskId": "PAG-M04-C001",
+  "currentTaskTitle": "Procedural Shape / Rule Generator",
   "workflowState": "READY",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M03-C003 bounded remediation, regenerate M03 golden/review evidence, publish builder evidence, then return for final ChatGPT M03 strict audit.",
+  "nextAction": "Execute PAG-M04-C001 authoritative implementation prompt, publish RULES primitive/recipe/golden/review evidence, benchmark 59x59 without inventing the M10 budget, then return for independent ChatGPT strict audit.",
   "blockers": [
-    "PAG-M04 blocked until M03 receives unconditional independent PASS"
+    "PAG-M05+ blocked until M04 receives independent acceptance for current testable scope",
+    "PAG-0441 performance-budget confirmation deferred until M10 establishes the V1 budget"
   ],
   "progress": {
-    "completed": 117,
+    "completed": 121,
     "total": 380,
-    "percent": 30.79
+    "percent": 31.84
   },
   "git": {
     "branch": "main",
-    "head": "9dc2eb7ae6620f655d21b6b2481a74c5783149dd",
+    "head": "1fda888a3a080cb4024d542c440f08d00ed393c1",
     "dirty": null
   },
   "lastAudit": {
-    "verdict": "FAIL",
-    "auditId": "PAG-M03-C002"
+    "verdict": "PASS",
+    "auditId": "PAG-M03-C003"
   },
   "lastAgentSession": {
     "provider": "CODEX",
     "sessionId": null,
-    "status": "COMPLETED_PENDING_REMEDIATION"
+    "status": "COMPLETED_AND_AUDITED"
   },
-  "updatedAt": "2026-09-09T09:09:00Z",
+  "updatedAt": "2026-09-09T11:39:00Z",
   "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
 }
