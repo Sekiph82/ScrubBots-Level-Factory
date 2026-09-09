@@ -4,35 +4,35 @@
   "syncStatus": "CURRENT_FROM_HANDOFF",
   "projectStatus": "ACTIVE",
   "currentMilestone": "PAG-M05",
-  "currentSprint": "PAG-M05-C001",
-  "currentTaskId": "PAG-M05-C001",
-  "currentTaskTitle": "Wave Function Collapse Generator",
+  "currentSprint": "PAG-M05-C002",
+  "currentTaskId": "PAG-M05-C002",
+  "currentTaskTitle": "Exemplar Contract, Diagnostics & Acceptance Evidence Remediation",
   "workflowState": "READY",
   "requiredActor": "CODEX",
-  "nextAction": "Execute PAG-M05-C001 authoritative WFC prompt, publish implementation/test/golden/review/benchmark evidence, then return for independent ChatGPT strict audit.",
+  "nextAction": "Execute PAG-M05-C002 bounded remediation, expand M05 review/golden/rectangle evidence, rerun acceptance/benchmark/full regression, publish builder evidence, then return for independent ChatGPT strict re-audit.",
   "blockers": [
     "PAG-M06+ blocked until M05 receives unconditional independent PASS",
     "PAG-0441 remains blocked until M10 establishes the V1 performance budget"
   ],
   "progress": {
-    "completed": 162,
+    "completed": 193,
     "total": 380,
-    "percent": 42.63
+    "percent": 50.79
   },
   "git": {
     "branch": "main",
-    "head": "f482dcd8c1388b93a4763c77a7b2cf96d1e7e5a0",
+    "head": "f431b24b2c965e615898020d30d48dedbcbc6bde",
     "dirty": null
   },
   "lastAudit": {
-    "verdict": "PASS",
-    "auditId": "PAG-M04-C002"
+    "verdict": "FAIL",
+    "auditId": "PAG-M05-C001"
   },
   "lastAgentSession": {
     "provider": "CODEX",
     "sessionId": null,
-    "status": "COMPLETED_AND_AUDITED"
+    "status": "COMPLETED_PENDING_REMEDIATION"
   },
-  "updatedAt": "2026-09-09T18:07:00+03:00",
+  "updatedAt": "2026-09-09T19:09:00+03:00",
   "updatedBy": "CHATGPT_INDEPENDENT_AUDITOR"
 }
