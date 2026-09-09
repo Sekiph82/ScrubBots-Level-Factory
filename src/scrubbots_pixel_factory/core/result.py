@@ -112,16 +112,15 @@ class GenerationResult:
     failure_code: FailureCode | None
     failure_reason: str | None
 
-    @classmethod
-    def _from_validated_fields(
-        cls,
+    def __init__(
+        self,
         *,
         status: ResultStatus,
         request: GenerationRequest | None,
         width: int | None,
         height: int | None,
-        logical_grid: tuple[str, ...] | None,
-        used_palette: tuple[str, ...],
+        logical_grid: object,
+        used_palette: object,
         generator_mode: str | None,
         generator_id: str | None,
         generator_version: str | None,
@@ -130,25 +129,108 @@ class GenerationResult:
         provenance: Mapping[str, object] | None,
         failure_code: FailureCode | None,
         failure_reason: str | None,
-    ) -> "GenerationResult":
-        result = object.__new__(cls)
-        object.__setattr__(result, "schema", GENERATION_RESULT_SCHEMA)
-        object.__setattr__(result, "schema_version", GENERATION_RESULT_SCHEMA_VERSION)
-        object.__setattr__(result, "status", status)
-        object.__setattr__(result, "request", request)
-        object.__setattr__(result, "width", width)
-        object.__setattr__(result, "height", height)
-        object.__setattr__(result, "logical_grid", logical_grid)
-        object.__setattr__(result, "used_palette", used_palette)
-        object.__setattr__(result, "generator_mode", generator_mode)
-        object.__setattr__(result, "generator_id", generator_id)
-        object.__setattr__(result, "generator_version", generator_version)
-        object.__setattr__(result, "seed", seed)
-        object.__setattr__(result, "rng_algorithm", rng_algorithm)
-        object.__setattr__(result, "provenance", provenance)
-        object.__setattr__(result, "failure_code", failure_code)
-        object.__setattr__(result, "failure_reason", failure_reason)
-        return result
+    ) -> None:
+        try:
+            normalized_status = status if isinstance(status, ResultStatus) else ResultStatus(status)
+        except (TypeError, ValueError) as exc:
+            raise ResultContractError("result status must be SUCCESS or FAILURE") from exc
+
+        if normalized_status is ResultStatus.SUCCESS:
+            if not isinstance(request, GenerationRequest):
+                raise ResultContractError("successful result requires a GenerationRequest")
+            if isinstance(logical_grid, (str, bytes, bytearray)):
+                raise ResultContractError("logical_grid must be an iterable of C-ID cells")
+            try:
+                cells = tuple(logical_grid)  # type: ignore[arg-type]
+                validate_dimensions(request.difficulty, width, height)
+                if request.width is not None and width != request.width:
+                    raise ResultContractError("result width does not match explicit request width")
+                if request.height is not None and height != request.height:
+                    raise ResultContractError("result height does not match explicit request height")
+                if len(cells) != width * height or any(type(cell) is not str for cell in cells):
+                    raise ResultContractError("logical_grid length must equal width multiplied by height")
+                actual_used = validate_used_color_count(request.difficulty, cells)
+                supplied_palette = tuple(used_palette)  # type: ignore[arg-type]
+            except ResultContractError:
+                raise
+            except (TypeError, ValueError) as exc:
+                raise ResultContractError(str(exc)) from exc
+            if supplied_palette != actual_used:
+                raise ResultContractError("used_palette must equal the actual ascending used C-ID palette")
+            if request.palette_subset is not None and not set(actual_used).issubset(request.palette_subset):
+                raise ResultContractError("logical_grid uses a color outside the requested palette subset")
+            if type(rng_algorithm) is not str or rng_algorithm != RNG_ALGORITHM:
+                raise ResultContractError("result must record the project RNG algorithm/version")
+            try:
+                mode = GeneratorMode.parse(request.generator_mode if generator_mode is None else generator_mode)
+            except RequestContractError as exc:
+                raise ResultContractError(str(exc)) from exc
+            if mode != request.generator_mode:
+                raise ResultContractError("result generator mode does not match the request")
+            identifier = _nonblank(generator_id, "generator_id")
+            version = _nonblank(generator_version, "generator_version")
+            checked_provenance = _validate_provenance(provenance, request)
+            result_seed = request.seed if seed is None else seed
+            if type(result_seed) is bool or not isinstance(result_seed, (int, str)) or result_seed != request.seed:
+                raise ResultContractError("result seed does not match the request")
+            if failure_code is not None or failure_reason is not None:
+                raise ResultContractError("successful result cannot carry failure state")
+            normalized = {
+                "request": request,
+                "width": width,
+                "height": height,
+                "logical_grid": cells,
+                "used_palette": actual_used,
+                "generator_mode": mode,
+                "generator_id": identifier,
+                "generator_version": version,
+                "seed": result_seed,
+                "rng_algorithm": rng_algorithm,
+                "provenance": checked_provenance,
+                "failure_code": None,
+                "failure_reason": None,
+            }
+        else:
+            try:
+                normalized_failure_code = failure_code if isinstance(failure_code, FailureCode) else FailureCode(failure_code)
+            except (TypeError, ValueError) as exc:
+                raise ResultContractError("failure code must be a stable M02 failure code") from exc
+            failure_message = _nonblank(failure_reason, "failure reason")
+            if request is not None and not isinstance(request, GenerationRequest):
+                raise ResultContractError("failure request must be a GenerationRequest or None")
+            try:
+                supplied_palette = tuple(used_palette)
+            except TypeError as exc:
+                raise ResultContractError("failed result used_palette must be empty") from exc
+            if any(value is not None for value in (width, height, logical_grid, generator_id, generator_version, rng_algorithm, provenance)):
+                raise ResultContractError("failed result cannot carry successful output state")
+            if supplied_palette:
+                raise ResultContractError("failed result cannot carry a used palette")
+            expected_mode = request.generator_mode if request is not None else None
+            expected_seed = request.seed if request is not None else None
+            if generator_mode != expected_mode or seed != expected_seed:
+                raise ResultContractError("failed result request metadata is inconsistent")
+            normalized = {
+                "request": request,
+                "width": None,
+                "height": None,
+                "logical_grid": None,
+                "used_palette": (),
+                "generator_mode": expected_mode,
+                "generator_id": None,
+                "generator_version": None,
+                "seed": expected_seed,
+                "rng_algorithm": None,
+                "provenance": None,
+                "failure_code": normalized_failure_code,
+                "failure_reason": failure_message,
+            }
+
+        object.__setattr__(self, "schema", GENERATION_RESULT_SCHEMA)
+        object.__setattr__(self, "schema_version", GENERATION_RESULT_SCHEMA_VERSION)
+        object.__setattr__(self, "status", normalized_status)
+        for field_name, value in normalized.items():
+            object.__setattr__(self, field_name, value)
 
     @classmethod
     def success(
@@ -199,7 +281,7 @@ class GenerationResult:
         result_seed = request.seed if seed is None else seed
         if type(result_seed) is bool or not isinstance(result_seed, (int, str)) or result_seed != request.seed:
             raise ResultContractError("result seed does not match the request")
-        return cls._from_validated_fields(
+        return cls(
             status=ResultStatus.SUCCESS,
             request=request,
             width=width,
@@ -231,7 +313,7 @@ class GenerationResult:
         failure_reason = _nonblank(reason, "failure reason")
         if request is not None and not isinstance(request, GenerationRequest):
             raise ResultContractError("failure request must be a GenerationRequest or None")
-        return cls._from_validated_fields(
+        return cls(
             status=ResultStatus.FAILURE,
             request=request,
             width=None,

@@ -29,9 +29,72 @@ def test_success_result_is_immutable_canonical_and_records_provenance() -> None:
         result.provenance["stage_seeds"]["geometry"] = "0" * 64  # type: ignore[index]
 
 
-def test_public_raw_result_construction_is_impossible() -> None:
-    with pytest.raises(TypeError):
+def test_public_raw_result_construction_revalidates_all_state() -> None:
+    with pytest.raises(ResultContractError):
         GenerationResult(status="SUCCESS", request=None, width=1, height=1, logical_grid=("C17",), used_palette=(), generator_mode="MASK", generator_id=None, generator_version=None, seed=1, rng_algorithm=None, provenance=None, failure_code=None, failure_reason=None)  # type: ignore[call-arg]
+
+
+def _constructor_fields(result):
+    fields = {
+        "status": result.status,
+        "request": result.request,
+        "width": result.width,
+        "height": result.height,
+        "logical_grid": result.logical_grid,
+        "used_palette": result.used_palette,
+        "generator_mode": result.generator_mode,
+        "generator_id": result.generator_id,
+        "generator_version": result.generator_version,
+        "seed": result.seed,
+        "rng_algorithm": result.rng_algorithm,
+        "provenance": result.provenance,
+        "failure_code": result.failure_code,
+        "failure_reason": result.failure_reason,
+    }
+    if result.provenance is not None:
+        fields["provenance"] = {
+            key: dict(value) if hasattr(value, "items") else value
+            for key, value in result.provenance.items()
+        }
+    return fields
+
+
+def test_no_unchecked_internal_result_builder_remains_and_valid_direct_state_works() -> None:
+    result = valid_result()
+    assert not hasattr(GenerationResult, "_from_validated_fields")
+    direct = GenerationResult(**_constructor_fields(result))
+    assert direct.canonical_bytes() == result.canonical_bytes()
+    failure = GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason="bounded failure")
+    direct_failure = GenerationResult(**_constructor_fields(failure))
+    assert direct_failure.canonical_bytes() == failure.canonical_bytes()
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda fields: fields.update(request=None),
+    lambda fields: fields.update(logical_grid=("C17",)),
+    lambda fields: fields.update(width=1, height=1, logical_grid=("C01",)),
+    lambda fields: fields.update(generator_version=""),
+    lambda fields: fields.update(seed=999),
+    lambda fields: fields["provenance"]["stage_seeds"].update({"geometry": "0" * 64}),
+])
+def test_direct_constructor_rejects_each_invalid_success_state(mutate) -> None:
+    fields = _constructor_fields(valid_result())
+    mutate(fields)
+    with pytest.raises(ResultContractError):
+        GenerationResult(**fields)
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda fields: fields.update(logical_grid=("C01",)),
+    lambda fields: fields.update(width=20),
+    lambda fields: fields.update(failure_reason=""),
+    lambda fields: fields.update(used_palette=("C01",)),
+])
+def test_direct_constructor_rejects_each_invalid_failure_state(mutate) -> None:
+    fields = _constructor_fields(GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason="bounded failure"))
+    mutate(fields)
+    with pytest.raises(ResultContractError):
+        GenerationResult(**fields)
 
 
 @pytest.mark.parametrize("grid", [[], ["C01"] * 399, ["C01"] * 400])
