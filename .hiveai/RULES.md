@@ -1,36 +1,13 @@
-# H!veAI Project Control Rules v1
+# H!veAI GitHub-first rules
 
-This repository follows the shared H!veAI control-plane schema while preserving project-specific governance.
+This repository uses the GitHub-first tracking contract v3.
 
-## Read order
+- The tracked GitHub branch is the authoritative source for current milestone, task, workflow state, required actor, next action, blockers, progress, and completion claims.
+- H!veAI must read \`.hiveai/PROJECT.json\`, the v3 machine block in \`.hiveai/TASKS.md\`, \`.hiveai/RULES.md\`, and append-only \`.hiveai/EVENTS.jsonl\` from the tracked remote branch.
+- Local folders are execution workspaces only. Local STATE, HANDOFF, watcher projections, first-open tasks, and provider self-assessment never override remote truth.
+- Remote failure uses the last successful GitHub snapshot with a stale timestamp. With no cache, report UNAVAILABLE. Never fall back to local task files for current truth.
+- Progress is emitted only with an exact scope and internally consistent completed/total/percent values; otherwise all progress fields are null.
+- State-changing work must update TASKS and EVENTS, commit, and push the tracked branch before claiming completion.
+- Builders implement; independent auditors verify. Secrets, tokens, and destructive live provider actions stay out of repository evidence.
+- Preserve historical project-specific governance and docs outside these four canonical v3 files.
 
-1. `.hiveai/PROJECT.json`
-2. `.hiveai/RULES.md`
-3. `.hiveai/STATE.json`
-4. `.hiveai/HANDOFF.md`
-5. `tasks.md`
-6. `AGENTS.md` or provider-specific instructions
-7. active prompt/audit artifacts required by the current cycle
-
-## Authority
-
-- `tasks.md` is the canonical task ledger.
-- `.hiveai/STATE.json` is H!veAI's materialized current-state projection.
-- `.hiveai/HANDOFF.md` is the resume pointer.
-- `.hiveai/EVENTS.jsonl` is append-only lifecycle history.
-- Builder logs are claims only.
-- Independent audits are acceptance authority when project governance says so.
-
-## Actor permissions
-
-Existing repository governance remains authoritative:
-- Codex may not mark task completion/closure.
-- Codex may not rewrite HANDOFF or independent audit history unless an owner-approved prompt explicitly changes governance.
-- ChatGPT, acting as independent auditor/tracker owner, may synchronize accepted task/HANDOFF state.
-- H!veAI may materialize STATE.json from verified repository/app evidence without changing task acceptance truth.
-
-## Live refresh
-
-H!veAI watches tasks.md, PROJECT.json, STATE.json, HANDOFF.md, EVENTS.jsonl, Git HEAD/index/refs, active prompts/logs/audits, and project watcher events. Refresh is event-driven with debounce; 60-second reconciliation is fallback only.
-
-Provider-specific files may add stricter constraints but may not redefine the shared state schema.

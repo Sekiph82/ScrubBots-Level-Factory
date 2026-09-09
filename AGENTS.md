@@ -1,6 +1,6 @@
 # H!veAI mandatory control-plane adapter
 
-Before project work, read `.hiveai/PROJECT.json`, `.hiveai/RULES.md`, `.hiveai/STATE.json`, `.hiveai/HANDOFF.md`, then the canonical task source.
+Before doing project work, read `.hiveai/RULES.md`, `.hiveai/PROJECT.json`, and the v3 machine block in `.hiveai/TASKS.md`. The tracked GitHub branch is current-state authority; local folders are execution workspaces.
 
 H!veAI shared files do not override the stricter builder/auditor ownership boundaries below.
 

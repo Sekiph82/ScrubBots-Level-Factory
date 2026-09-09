@@ -1,27 +1,21 @@
 {
-  "schema": "hiveai-project-control-plane/v1",
+  "schema": "hiveai-project/v3",
   "projectKey": "scrubbots-level-factory",
   "displayName": "ScrubBots - Pixel Art Generator",
   "repository": {
     "owner": "Sekiph82",
-    "name": "ScrubBots-Level-Factory",
-    "branch": "main"
+    "name": "ScrubBots-Level-Factory"
   },
   "trackedBranch": "main",
-  "canonicalTaskSource": "tasks.md",
-  "rules": ".hiveai/RULES.md",
-  "state": ".hiveai/STATE.json",
-  "handoff": ".hiveai/HANDOFF.md",
-  "events": ".hiveai/EVENTS.jsonl",
-  "eventSources": [],
-  "refresh": {
-    "mode": "watcher-first",
-    "debounceMs": 500,
-    "safetyReconcileSeconds": 60
+  "paths": {
+    "project": ".hiveai/PROJECT.json",
+    "tasks": ".hiveai/TASKS.md",
+    "rules": ".hiveai/RULES.md",
+    "events": ".hiveai/EVENTS.jsonl"
   },
-  "governance": {
-    "taskCompletionAuthority": "CHATGPT_INDEPENDENT_AUDITOR",
-    "builderMayMutateTaskState": false,
-    "builderMayMutateHandoff": false
+  "refresh": {
+    "mode": "github-poll",
+    "intervalSeconds": 30,
+    "manualRefresh": true
   }
 }
