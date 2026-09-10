@@ -72,5 +72,10 @@ GitHub `main` is the sole task authority. Removed legacy projections are not use
 
 ## 7. Publication
 
-- Pending the evidence/test commit, push result, final status, and local/origin equality checkpoint. Preserved dirty `.hiveai/EVENTS.jsonl` and `.hiveai/PROJECT.json` plus untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json` remain excluded.
+- Staged only the three C004 paths: this builder log, `tests/golden/test_m06_hybrid_golden.py`, and `tests/integration/test_m06_review_evidence.py`. No production source, generated review artifact, or ChatGPT-owned control-plane path was staged.
+- Implementation/evidence commit: `99f204e8cc01ab4d0312dc56379ade1d692ed7a6` (`close M06 WFC evidence bindings`).
+- Implementation/evidence push: `git push origin main` succeeded, updating GitHub `1cb466b..99f204e`.
+- Final changed-file summary: C004 builder log plus direct WFC golden/review evidence-binding tests. Production router/hybrid code and C003 AUTO/replay tests were unchanged.
+- Immediately after the implementation commit, the only remaining local changes were preserved dirty `.hiveai/EVENTS.jsonl` and `.hiveai/PROJECT.json`, plus untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`.
+- This completed log update is being published separately from the implementation commit. Final local `HEAD` and `origin/main` equality will be verified after the log publication push. No task/H!veAI acceptance state or main ScrubBots repository was modified.
 - No task/H!veAI acceptance state or main ScrubBots repository will be modified.
