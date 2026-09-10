@@ -1320,6 +1320,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "bef20ed5c5dd605c23164f93566ebe2bb12309434be92a926a1424aa355a1ea2",
+        "after": "bef20ed5c5dd605c23164f93566ebe2bb12309434be92a926a1424aa355a1ea2",
+        "final": "bef20ed5c5dd605c23164f93566ebe2bb12309434be92a926a1424aa355a1ea2"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "bef20ed5c5dd605c23164f93566ebe2bb12309434be92a926a1424aa355a1ea2"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "bef20ed5c5dd605c23164f93566ebe2bb12309434be92a926a1424aa355a1ea2"
+        }
+      ],
       "logical_grid": [
         "C02",
         "C02",
@@ -3840,6 +3857,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "f6c803778642c079071bd5d7ab4e95cca745f893bb7e589bdafa48f47996ad81",
+        "after": "36a2e31a429f46b215f1cf57bb15c213c4cfb36f6aac03908592e6bb110ab07a",
+        "final": "36a2e31a429f46b215f1cf57bb15c213c4cfb36f6aac03908592e6bb110ab07a"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "f6c803778642c079071bd5d7ab4e95cca745f893bb7e589bdafa48f47996ad81"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "36a2e31a429f46b215f1cf57bb15c213c4cfb36f6aac03908592e6bb110ab07a"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "36a2e31a429f46b215f1cf57bb15c213c4cfb36f6aac03908592e6bb110ab07a"
+        }
+      ],
       "logical_grid": [
         "C06",
         "C06",
@@ -6248,6 +6287,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "0a156f75e99bfb9aa1f7ad42ac90bddd49d8e31b20dda903195273570fb7bc98",
+        "after": "0a156f75e99bfb9aa1f7ad42ac90bddd49d8e31b20dda903195273570fb7bc98",
+        "final": "0a156f75e99bfb9aa1f7ad42ac90bddd49d8e31b20dda903195273570fb7bc98"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "0a156f75e99bfb9aa1f7ad42ac90bddd49d8e31b20dda903195273570fb7bc98"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "0a156f75e99bfb9aa1f7ad42ac90bddd49d8e31b20dda903195273570fb7bc98"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -9616,6 +9672,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "e2dbd4ccacbd84e85bab1a3c52db318ccd3f4c810c1d03b3287a9a19b8f109e0",
+        "after": "b9bf50375bb97d27f573e6c3f39c739189eb9bc9ff806734ceb804065dc3cff0",
+        "final": "b9bf50375bb97d27f573e6c3f39c739189eb9bc9ff806734ceb804065dc3cff0"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "e2dbd4ccacbd84e85bab1a3c52db318ccd3f4c810c1d03b3287a9a19b8f109e0"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "b9bf50375bb97d27f573e6c3f39c739189eb9bc9ff806734ceb804065dc3cff0"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "b9bf50375bb97d27f573e6c3f39c739189eb9bc9ff806734ceb804065dc3cff0"
+        }
+      ],
       "logical_grid": [
         "C02",
         "C02",
@@ -14414,6 +14492,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "d9a653dba3700412a9866d340d0481373c35a4f351d5b9537d73bf940749b55e",
+        "after": "d9a653dba3700412a9866d340d0481373c35a4f351d5b9537d73bf940749b55e",
+        "final": "d9a653dba3700412a9866d340d0481373c35a4f351d5b9537d73bf940749b55e"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "d9a653dba3700412a9866d340d0481373c35a4f351d5b9537d73bf940749b55e"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "d9a653dba3700412a9866d340d0481373c35a4f351d5b9537d73bf940749b55e"
+        }
+      ],
       "logical_grid": [
         "C02",
         "C02",
@@ -19310,6 +19405,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "a59b6b276293b606175aaa868fff3e1e88c44b0869c684469b8ecdf3e396edef",
+        "after": "e0aead6276e96364b2388cc8ba1408e7b8da916890f8b499ce765cd118b3a195",
+        "final": "e0aead6276e96364b2388cc8ba1408e7b8da916890f8b499ce765cd118b3a195"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "a59b6b276293b606175aaa868fff3e1e88c44b0869c684469b8ecdf3e396edef"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "e0aead6276e96364b2388cc8ba1408e7b8da916890f8b499ce765cd118b3a195"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "e0aead6276e96364b2388cc8ba1408e7b8da916890f8b499ce765cd118b3a195"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -25413,6 +25530,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "40fb24f20d7b657d38f1b484476bdd3cc4b1d1267d04f306e52f5d3f95e5871c",
+        "after": "40fb24f20d7b657d38f1b484476bdd3cc4b1d1267d04f306e52f5d3f95e5871c",
+        "final": "40fb24f20d7b657d38f1b484476bdd3cc4b1d1267d04f306e52f5d3f95e5871c"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "40fb24f20d7b657d38f1b484476bdd3cc4b1d1267d04f306e52f5d3f95e5871c"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "40fb24f20d7b657d38f1b484476bdd3cc4b1d1267d04f306e52f5d3f95e5871c"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -33048,6 +33182,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "15c6c18b894a5876d022ea9fd5c11ac76ecc167bde4780de0dc084a273eff3d4",
+        "after": "3f94e17e465329db92bd8f2e3f31772ca48782080094e5fb0dacabf2e4b1589c",
+        "final": "3f94e17e465329db92bd8f2e3f31772ca48782080094e5fb0dacabf2e4b1589c"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "15c6c18b894a5876d022ea9fd5c11ac76ecc167bde4780de0dc084a273eff3d4"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "3f94e17e465329db92bd8f2e3f31772ca48782080094e5fb0dacabf2e4b1589c"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "3f94e17e465329db92bd8f2e3f31772ca48782080094e5fb0dacabf2e4b1589c"
+        }
+      ],
       "logical_grid": [
         "C02",
         "C02",
@@ -41029,6 +41185,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "ac69bf0f4fac0a3ee81e3e4a44eb7b4d7db1fface41bdf57eeac4e365eb1317e",
+        "after": "ac69bf0f4fac0a3ee81e3e4a44eb7b4d7db1fface41bdf57eeac4e365eb1317e",
+        "final": "ac69bf0f4fac0a3ee81e3e4a44eb7b4d7db1fface41bdf57eeac4e365eb1317e"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "ac69bf0f4fac0a3ee81e3e4a44eb7b4d7db1fface41bdf57eeac4e365eb1317e"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "ac69bf0f4fac0a3ee81e3e4a44eb7b4d7db1fface41bdf57eeac4e365eb1317e"
+        }
+      ],
       "logical_grid": [
         "C02",
         "C02",
@@ -50632,6 +50805,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "c4c17a5c1a4fd67e868e634e1871cc250e135517c580064514428a3049a5b0f2",
+        "after": "043da4ee7b2b9c80e85f0139d7eec99f2b8431e878c467b759cd5bf03dfcd608",
+        "final": "043da4ee7b2b9c80e85f0139d7eec99f2b8431e878c467b759cd5bf03dfcd608"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "c4c17a5c1a4fd67e868e634e1871cc250e135517c580064514428a3049a5b0f2"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "043da4ee7b2b9c80e85f0139d7eec99f2b8431e878c467b759cd5bf03dfcd608"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "043da4ee7b2b9c80e85f0139d7eec99f2b8431e878c467b759cd5bf03dfcd608"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -62655,6 +62850,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "b51fa98aa2f33c22d21d15e9dc31995bb51a98fbaa115b98aed6c7226a46fce0",
+        "after": "b51fa98aa2f33c22d21d15e9dc31995bb51a98fbaa115b98aed6c7226a46fce0",
+        "final": "b51fa98aa2f33c22d21d15e9dc31995bb51a98fbaa115b98aed6c7226a46fce0"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_GEOMETRY",
+          "topology": "before",
+          "digest": "b51fa98aa2f33c22d21d15e9dc31995bb51a98fbaa115b98aed6c7226a46fce0"
+        },
+        {
+          "stage_name": "RULE_COLOR_REGIONS",
+          "topology": "final",
+          "digest": "b51fa98aa2f33c22d21d15e9dc31995bb51a98fbaa115b98aed6c7226a46fce0"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -74775,6 +74987,28 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "be6f86f7b45bf5152eb7bb252e96020adc69991e5cd4235d287165bfa5bd4501",
+        "after": "900881d50fc28c22c2afb3ea4bad6bd7baab964870b48fab4dda813f69068105",
+        "final": "900881d50fc28c22c2afb3ea4bad6bd7baab964870b48fab4dda813f69068105"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_GEOMETRY",
+          "topology": "before",
+          "digest": "be6f86f7b45bf5152eb7bb252e96020adc69991e5cd4235d287165bfa5bd4501"
+        },
+        {
+          "stage_name": "MASK_SYMMETRY_COLOR_REGIONS",
+          "topology": "after",
+          "digest": "900881d50fc28c22c2afb3ea4bad6bd7baab964870b48fab4dda813f69068105"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "900881d50fc28c22c2afb3ea4bad6bd7baab964870b48fab4dda813f69068105"
+        }
+      ],
       "logical_grid": [
         "C08",
         "C08",
@@ -79059,6 +79293,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "0012f531839c7af60e6b59b83c0736b643e6097b6c92030617af249f13bded2b",
+        "after": "0012f531839c7af60e6b59b83c0736b643e6097b6c92030617af249f13bded2b",
+        "final": "0012f531839c7af60e6b59b83c0736b643e6097b6c92030617af249f13bded2b"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "RULE_BASE",
+          "topology": "before",
+          "digest": "0012f531839c7af60e6b59b83c0736b643e6097b6c92030617af249f13bded2b"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "0012f531839c7af60e6b59b83c0736b643e6097b6c92030617af249f13bded2b"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",
@@ -81216,6 +81467,23 @@
           0
         ]
       },
+      "topology_digests": {
+        "before": "ce9a889adf862117c1e52a7e17d212199e3f9891f10c491f8181401b363cb8c0",
+        "after": "ce9a889adf862117c1e52a7e17d212199e3f9891f10c491f8181401b363cb8c0",
+        "final": "ce9a889adf862117c1e52a7e17d212199e3f9891f10c491f8181401b363cb8c0"
+      },
+      "topology_bindings": [
+        {
+          "stage_name": "MASK_BASE",
+          "topology": "before",
+          "digest": "ce9a889adf862117c1e52a7e17d212199e3f9891f10c491f8181401b363cb8c0"
+        },
+        {
+          "stage_name": "FINAL",
+          "topology": "final",
+          "digest": "ce9a889adf862117c1e52a7e17d212199e3f9891f10c491f8181401b363cb8c0"
+        }
+      ],
       "logical_grid": [
         "C01",
         "C01",

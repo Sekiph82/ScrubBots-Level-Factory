@@ -27,7 +27,7 @@ from scrubbots_pixel_factory.generators.router import (
     HybridStrategy,
     reproduce_hybrid,
 )
-from scrubbots_pixel_factory.generators.router.hybrid import _validate_final
+from scrubbots_pixel_factory.generators.router.hybrid import HybridStageMetadata, _validate_final
 from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
 
@@ -74,6 +74,42 @@ class _AlwaysFail:
         return GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason="forced test failure", request=request)
 
 
+class _RecordedSentinel:
+    generator_id = "test-sentinel"
+    generator_version = "1.0.0"
+
+    def __init__(self, mode: str, calls: list[str], succeeds: bool = False) -> None:
+        self.mode = mode
+        self.calls = calls
+        self.succeeds = succeeds
+
+    def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG) -> GenerationResult:
+        self.calls.append(self.mode)
+        if self.succeeds:
+            return MaskSpriteGenerator().generate_candidate(request, rng).result
+        return GenerationResult.failure(code=FailureCode.GENERATION_FAILED, reason=f"sentinel {self.mode} failure", request=request)
+
+
+def _corrupt_stage_copy(candidate: HybridCandidate, index: int, field: str, value: object, *, extra_field: str | None = None) -> HybridCandidate:
+    metadata = _mutable(candidate.metadata)
+    stage_dict = candidate.stages[index].as_dict()
+    if extra_field is None:
+        metadata["stages"][index][field] = value  # type: ignore[index]
+        stage_dict[field] = value
+    else:
+        stage_dict["extra"][extra_field] = value  # type: ignore[index]
+        metadata["stages"][index]["extra"][extra_field] = value  # type: ignore[index]
+    replacement = HybridStageMetadata(
+        stage_dict["stage_index"], stage_dict["stage_name"], stage_dict["stage_kind"], stage_dict["derived_seed"],
+        stage_dict["child_request_digest"], stage_dict["child_request"], stage_dict["engine_id"],
+        stage_dict["engine_version"], stage_dict["child_result_digest"], stage_dict["failure_code"],
+        stage_dict["geometry_digest"], stage_dict["extra"],
+    )
+    stages = list(candidate.stages)
+    stages[index] = replacement
+    return replace(candidate, stages=tuple(stages), metadata=metadata)
+
+
 def test_auto_mode_and_existing_request_bytes_are_stable() -> None:
     explicit = GenerationRequest("EASY", 7, "MASK", width=20, height=20)
     assert explicit.canonical_dict()["generator_mode"] == "MASK"
@@ -85,6 +121,17 @@ def test_auto_mode_and_existing_request_bytes_are_stable() -> None:
     assert candidate.result.request == auto
     assert candidate.result.generator_mode == "AUTO"
     assert candidate.result.generator_id in {"mask-sprite", "rule-shape"}
+
+
+def test_auto_same_request_and_seed_repeats_selection_order_attempts_and_result() -> None:
+    request = GenerationRequest("EASY", 7, "AUTO", width=20, height=20, generator_options=GeneratorOptions("auto", 1, {}))
+    first = GeneratorRouter().generate_candidate(request)
+    second = GeneratorRouter().generate_candidate(request)
+    assert isinstance(first, AutoCandidate) and isinstance(second, AutoCandidate)
+    assert first.selected_mode == second.selected_mode
+    assert first.candidate_order == second.candidate_order
+    assert [attempt.as_dict() for attempt in first.attempts] == [attempt.as_dict() for attempt in second.attempts]
+    assert first.result.canonical_bytes() == second.result.canonical_bytes()
 
 
 def test_explicit_routes_use_the_accepted_engines_without_fallback() -> None:
@@ -125,23 +172,64 @@ def test_auto_fallback_records_one_failed_attempt_then_success() -> None:
     assert isinstance(candidate, AutoCandidate)
     assert [attempt.mode for attempt in candidate.attempts] == ["WFC", "MASK"]
     assert candidate.attempts[0].failure_code == FailureCode.GENERATION_FAILED.value
+    assert candidate.attempts[-1].engine_id == "mask-sprite"
+    assert candidate.attempts[-1].engine_version == "1.0.0"
     assert candidate.selected_mode == "MASK"
     assert candidate.result.request == request and candidate.result.generator_mode == "AUTO"
-    assert failing.calls == ["WFC"]
+    assert candidate.result.seed == request.seed
+    assert (candidate.result.width, candidate.result.height) == request.resolve_dimensions()
+    assert candidate.result.used_palette == request.resolve_palette_subset()
+    repeated = router.generate_candidate(request)
+    assert isinstance(repeated, AutoCandidate)
+    assert repeated.selected_mode == candidate.selected_mode
+    assert [attempt.as_dict() for attempt in repeated.attempts] == [attempt.as_dict() for attempt in candidate.attempts]
+    assert repeated.result.canonical_bytes() == candidate.result.canonical_bytes()
+    assert failing.calls == ["WFC", "WFC"]
+
+
+def test_auto_fallback_false_does_not_call_next_configured_candidate() -> None:
+    selected_calls: list[str] = []
+    next_calls: list[str] = []
+    selected = _RecordedSentinel("WFC", selected_calls)
+    following = _RecordedSentinel("RULES", next_calls)
+    router = GeneratorRouter(rules_generator=following, wfc_generator=selected)
+    options = GeneratorOptions("auto", 1, {"candidates": ["WFC", "RULES"], "fallback_on_failure": False})
+    seed = next(seed for seed in range(100) if DeterministicRNG(seed).child("auto/selection").randbelow(2) == 0)
+    request = GenerationRequest("EASY", seed, "AUTO", width=20, height=20, generator_options=options)
+    first = router.generate(request)
+    second = router.generate(request)
+    assert not first.is_success and first.failure_code is FailureCode.GENERATION_FAILED
+    assert first.request == request and first.generator_mode == "AUTO" and first.seed == request.seed
+    assert "WFC" in (first.failure_reason or "")
+    assert first.canonical_bytes() == second.canonical_bytes()
+    assert selected_calls == ["WFC", "WFC"]
+    assert next_calls == []
 
 
 def test_auto_fallback_all_fail_is_bounded_and_byte_stable() -> None:
-    failing_wfc = _AlwaysFail()
-    failing_rules = _AlwaysFail()
-    router = GeneratorRouter(rules_generator=failing_rules, wfc_generator=failing_wfc)
-    options = GeneratorOptions("auto", 1, {"candidates": ["WFC", "RULES"], "fallback_on_failure": True})
+    candidates = ["WFC", "RULES", "MASK"]
+    options = GeneratorOptions("auto", 1, {"candidates": candidates, "fallback_on_failure": True})
     request = GenerationRequest("EASY", 2, "AUTO", width=20, height=20, generator_options=options)
-    first = router.generate(request)
-    second = router.generate(request)
+    first_calls: list[str] = []
+    first_router = GeneratorRouter(
+        mask_generator=_RecordedSentinel("MASK", first_calls),
+        rules_generator=_RecordedSentinel("RULES", first_calls),
+        wfc_generator=_RecordedSentinel("WFC", first_calls),
+    )
+    first = first_router.generate(request)
+    second_calls: list[str] = []
+    second_router = GeneratorRouter(
+        mask_generator=_RecordedSentinel("MASK", second_calls),
+        rules_generator=_RecordedSentinel("RULES", second_calls),
+        wfc_generator=_RecordedSentinel("WFC", second_calls),
+    )
+    second = second_router.generate(request)
+    selected_index = DeterministicRNG(request.seed).child("auto/selection").randbelow(len(candidates))
+    expected_order = candidates[selected_index:] + candidates[:selected_index]
     assert not first.is_success and first.failure_code is FailureCode.RETRY_EXHAUSTED
     assert first.canonical_bytes() == second.canonical_bytes()
-    assert failing_wfc.calls == ["WFC", "WFC"]
-    assert failing_rules.calls == ["RULES", "RULES"]
+    assert first_calls == expected_order
+    assert second_calls == expected_order
 
 
 def test_wfc_detail_preserves_default_and_explicit_nonidentity_mapping() -> None:
@@ -177,28 +265,29 @@ def test_hybrid_replay_rejects_each_corrupted_integrity_field() -> None:
     robust = generator.generate_candidate(robust_request)
     assert isinstance(robust, HybridCandidate)
     fields = (
-        ("derived_seed", "0" * 64),
-        ("child_request_digest", "1" * 64),
-        ("engine_version", "corrupted-version"),
-        ("child_result_digest", "2" * 64),
-        ("geometry_digest", "3" * 64),
+        ("derived_seed", "0" * 64, "stage seed/order mismatch"),
+        ("child_request_digest", "1" * 64, "child request digest mismatch"),
+        ("engine_version", "corrupted-version", "engine_version mismatch"),
+        ("child_result_digest", "2" * 64, "child_result_digest mismatch"),
+        ("geometry_digest", "3" * 64, "geometry_digest mismatch"),
     )
-    for field, value in fields:
-        metadata = _mutable(robust.metadata)
-        metadata["stages"][0][field] = value  # type: ignore[index]
-        corrupted = replace(robust, metadata=metadata)
-        with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
+    for field, value, reason in fields:
+        corrupted = _corrupt_stage_copy(robust, 0, field, value)
+        with pytest.raises(ValueError, match=reason):
             reproduce_hybrid(generator, robust_request, corrupted)
     wfc_request = _hybrid_request(HybridStrategy.RULE_BASE_WFC_DETAIL.value, 0, wfc_exemplar_id="m06-blocks")
     wfc = generator.generate_candidate(wfc_request)
     assert isinstance(wfc, HybridCandidate)
-    metadata = _mutable(wfc.metadata)
-    metadata["stages"][-1]["extra"]["pattern_table_digest"] = "4" * 64  # type: ignore[index]
-    with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
-        reproduce_hybrid(generator, wfc_request, replace(wfc, metadata=metadata))
+    corrupted = _corrupt_stage_copy(wfc, 1, "extra", "ignored", extra_field="pattern_table_digest")
+    with pytest.raises(ValueError, match="engine-specific metadata mismatch"):
+        reproduce_hybrid(generator, wfc_request, corrupted)
+    metadata = _mutable(robust.metadata)
+    metadata["stages"][0]["derived_seed"] = "6" * 64  # type: ignore[index]
+    with pytest.raises(ValueError, match="candidate and serialized stage metadata differ"):
+        reproduce_hybrid(generator, robust_request, replace(robust, metadata=metadata))
     metadata = _mutable(robust.metadata)
     metadata["final_logical_grid_digest"] = "5" * 64  # type: ignore[index]
-    with pytest.raises(ValueError, match="INVALID_STAGE_METADATA"):
+    with pytest.raises(ValueError, match="final digest mismatch"):
         reproduce_hybrid(generator, robust_request, replace(robust, metadata=metadata))
 
 

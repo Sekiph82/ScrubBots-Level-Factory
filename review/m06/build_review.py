@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from html import escape
+import hashlib
 import json
 from pathlib import Path
 
@@ -52,6 +53,33 @@ def _test_exemplar() -> Exemplar:
     )
 
 
+def _topology_digest(cells: list[int]) -> str:
+    return hashlib.sha256(bytes(cells)).hexdigest()
+
+
+def _topology_details(candidate: HybridCandidate) -> tuple[dict[str, list[int]], dict[str, str], list[dict[str, str]]]:
+    topology = {name: list(cells) for name, cells in candidate.metadata["topology_evidence"].items()}
+    digests = {name: _topology_digest(cells) for name, cells in topology.items()}
+    stages = [stage.as_dict() for stage in candidate.stages]
+    if candidate.strategy == "MASK_GEOMETRY_RULE_COLOR_REGIONS":
+        bindings = [
+            {"stage_name": stages[0]["stage_name"], "topology": "before", "digest": digests["before"]},
+            {"stage_name": stages[1]["stage_name"], "topology": "final", "digest": digests["final"]},
+        ]
+    elif candidate.strategy == "RULE_GEOMETRY_MASK_SYMMETRY":
+        bindings = [
+            {"stage_name": stages[0]["stage_name"], "topology": "before", "digest": digests["before"]},
+            {"stage_name": stages[1]["stage_name"], "topology": "after", "digest": digests["after"]},
+            {"stage_name": "FINAL", "topology": "final", "digest": digests["final"]},
+        ]
+    else:
+        bindings = [
+            {"stage_name": stages[0]["stage_name"], "topology": "before", "digest": digests["before"]},
+            {"stage_name": "FINAL", "topology": "final", "digest": digests["final"]},
+        ]
+    return topology, digests, bindings
+
+
 def build() -> dict[str, object]:
     generator = HybridGenerator()
     entries: list[dict[str, object]] = []
@@ -59,6 +87,7 @@ def build() -> dict[str, object]:
         candidate = generator.generate_candidate(_request(difficulty, width, height, seed, strategy))
         if not isinstance(candidate, HybridCandidate):
             raise RuntimeError(f"review case failed: {difficulty}/{seed}: {candidate.failure_reason}")
+        topology, topology_digests, topology_bindings = _topology_details(candidate)
         entries.append({
             "case_id": f"m06-{len(entries) + 1:02d}",
             "strategy": strategy,
@@ -71,7 +100,9 @@ def build() -> dict[str, object]:
             "final_topology_digest": candidate.metadata["final_topology_digest"],
             "final_logical_grid_digest": candidate.metadata["final_logical_grid_digest"],
             "final_result_digest": candidate.result.digest(),
-            "topology_evidence": {name: list(cells) for name, cells in candidate.metadata["topology_evidence"].items()},
+            "topology_evidence": topology,
+            "topology_digests": topology_digests,
+            "topology_bindings": topology_bindings,
             "logical_grid": list(candidate.logical_grid),
         })
     synthetic = _test_exemplar()
@@ -91,13 +122,14 @@ def build() -> dict[str, object]:
         candidate = injected.generate_candidate(request)
         if not isinstance(candidate, HybridCandidate):
             raise RuntimeError(f"synthetic WFC review case failed: {difficulty}/{seed}: {candidate.failure_reason}")
+        topology, topology_digests, topology_bindings = _topology_details(candidate)
         entries.append({
             "case_id": f"m06-{len(entries) + 1:02d}", "strategy": strategy, "difficulty": difficulty,
             "master_seed": seed, "dimensions": [width, height], "palette": list(candidate.result.used_palette),
             "stage_names": [stage.stage_name for stage in candidate.stages], "stages": [stage.as_dict() for stage in candidate.stages],
             "final_topology_digest": candidate.metadata["final_topology_digest"],
             "final_logical_grid_digest": candidate.metadata["final_logical_grid_digest"],
-            "final_result_digest": candidate.result.digest(), "topology_evidence": {name: list(cells) for name, cells in candidate.metadata["topology_evidence"].items()}, "logical_grid": list(candidate.logical_grid),
+            "final_result_digest": candidate.result.digest(), "topology_evidence": topology, "topology_digests": topology_digests, "topology_bindings": topology_bindings, "logical_grid": list(candidate.logical_grid),
             "exemplar_id": synthetic.exemplar_id,
             "exemplar_ownership": "SYNTHETIC_TEST_ONLY",
         })
