@@ -23,17 +23,16 @@
       "generated-21-wfc-synthetic-test",
       "generated-22-wfc-synthetic-test",
       "good-01-central-subject",
-      "good-02-asymmetric-organic",
-      "good-03-rectangular",
-      "good-04-sparse",
-      "good-05-multi-island",
-      "good-06-near-duplicate"
+      "good-02-sparse",
+      "good-03-multi-island",
+      "good-04-symmetric",
+      "good-05-asymmetric-organic",
+      "good-06-rectangular"
     ],
     "exact_duplicate_groups": [
       [
         6,
-        7,
-        20
+        7
       ]
     ],
     "near_duplicate_pairs": [
@@ -65,15 +64,6 @@
         }
       },
       {
-        "first_index": 6,
-        "second_index": 20,
-        "similarity": {
-          "color_layout_similarity": 1.0,
-          "comparable": true,
-          "occupancy_mask_similarity": 1.0
-        }
-      },
-      {
         "first_index": 7,
         "second_index": 8,
         "similarity": {
@@ -83,17 +73,8 @@
         }
       },
       {
-        "first_index": 7,
-        "second_index": 20,
-        "similarity": {
-          "color_layout_similarity": 1.0,
-          "comparable": true,
-          "occupancy_mask_similarity": 1.0
-        }
-      },
-      {
-        "first_index": 8,
-        "second_index": 20,
+        "first_index": 20,
+        "second_index": 23,
         "similarity": {
           "color_layout_similarity": 0.9975,
           "comparable": true,
@@ -111,6 +92,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "48b37d616ff169cc977bfe4cc41194d164c00be21968782b287065f178bc1141",
       "height": 20,
@@ -134,6 +116,7 @@
         "occupied_bounding_box": null,
         "occupied_center_of_mass": null,
         "occupied_center_of_mass_scaled": null,
+        "occupied_color_counts": {},
         "occupied_component_count": 0,
         "occupied_component_sizes": [],
         "occupied_count": 0,
@@ -149,7 +132,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -182,6 +165,7 @@
           }
         ]
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "1a4ca9f36ad49f12a00d902bdd91cc26b829742a08d7bf2e88c8cb9ea6a8898a",
       "height": 20,
@@ -1521,6 +1505,9 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C02": 324
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           324
@@ -1538,7 +1525,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -1565,6 +1552,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "88d827f9dfe030608468ee37e3ac654350ed560b62621bad65059290a13c1bc6",
       "height": 20,
@@ -1663,7 +1651,7 @@
         "color_entropy_scaled": 141441,
         "horizontal_symmetry_score": 0.96,
         "isolated_occupied_count": 8,
-        "largest_color_dominance": 0.125,
+        "largest_color_dominance": 1.0,
         "largest_occupied_region_dominance": 0.125,
         "negative_space_count": 392,
         "negative_space_ratio": 0.98,
@@ -1681,6 +1669,9 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C02": 8
+        },
         "occupied_component_count": 8,
         "occupied_component_sizes": [
           1,
@@ -1705,7 +1696,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -1733,6 +1724,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "e55e58d4e7f5769de1dc48190063692c894999e97eb424ea6e447e0e75d9ca7c",
       "height": 20,
@@ -1791,7 +1783,7 @@
         "color_entropy_scaled": 80793,
         "horizontal_symmetry_score": 0.98,
         "isolated_occupied_count": 4,
-        "largest_color_dominance": 0.25,
+        "largest_color_dominance": 1.0,
         "largest_occupied_region_dominance": 0.25,
         "negative_space_count": 396,
         "negative_space_ratio": 0.99,
@@ -1809,6 +1801,9 @@
           10000000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C02": 4
+        },
         "occupied_component_count": 4,
         "occupied_component_sizes": [
           1,
@@ -1829,7 +1824,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -1857,6 +1852,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "0b8f2903d5e195b1d135e389ada60972d987ae134c5b4d267bece61512fd0050",
       "height": 20,
@@ -3874,7 +3870,7 @@
         "color_entropy_scaled": 1000000,
         "horizontal_symmetry_score": 0.0,
         "isolated_occupied_count": 200,
-        "largest_color_dominance": 0.005,
+        "largest_color_dominance": 1.0,
         "largest_occupied_region_dominance": 0.005,
         "negative_space_count": 200,
         "negative_space_ratio": 0.5,
@@ -3892,6 +3888,9 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C02": 200
+        },
         "occupied_component_count": 200,
         "occupied_component_sizes": [
           1,
@@ -4108,7 +4107,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -4144,6 +4143,7 @@
           }
         ]
       },
+      "fixture_classification": "REJECTION_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": "559a1afc52310773974d7cfabf3febf3fd722b0e2847f33e537609b3bc2c08cf",
       "height": 20,
@@ -5471,7 +5471,7 @@
         "color_entropy": 0.72592225,
         "color_entropy_scaled": 725922,
         "horizontal_symmetry_score": 0.995,
-        "isolated_occupied_count": 1,
+        "isolated_occupied_count": 0,
         "largest_color_dominance": 0.99691358,
         "largest_occupied_region_dominance": 1.0,
         "negative_space_count": 76,
@@ -5490,6 +5490,10 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C02": 323,
+          "C03": 1
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           324
@@ -5498,8 +5502,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.81,
-        "tiny_region_cell_count": 1,
-        "tiny_region_count": 1,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.995
       },
       "negative_space_color": "C01",
@@ -5535,6 +5539,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "INVALID_INPUT_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": null,
       "height": 20,
@@ -5545,7 +5550,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -5569,6 +5574,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "INVALID_INPUT_FIXTURE",
       "generator_mode": "FIXTURE",
       "grid_hash": null,
       "height": 20,
@@ -5579,7 +5585,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -5602,8 +5608,7 @@
       "diversity": {
         "exact_duplicate_group": [
           "bad-09-exact-duplicate-a",
-          "bad-10-exact-duplicate-b",
-          "good-01-central-subject"
+          "bad-10-exact-duplicate-b"
         ],
         "near_duplicate_pairs": [
           {
@@ -5617,135 +5622,43 @@
             "color_layout_similarity": 0.9975,
             "comparable": true,
             "occupancy_mask_similarity": 1.0
-          },
-          {
-            "candidate_id": "good-01-central-subject",
-            "color_layout_similarity": 1.0,
-            "comparable": true,
-            "occupancy_mask_similarity": 1.0
           }
         ]
       },
+      "fixture_classification": "DIVERSITY_FIXTURE",
       "generator_mode": "FIXTURE",
-      "grid_hash": "deaa08a07a476dcbea9057498016552275ca771ad82ef610b3512d3ec528c38d",
+      "grid_hash": "5947c858c8d64750b9c22f5bd987de47d1f2f3fb5614d012f99ed698c1fd35c9",
       "height": 20,
       "human_review": "",
       "metrics": {
         "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
+        "aggregate_symmetry_score": 1.0,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C02": 40,
-          "C02|C02": 150,
-          "C02|C03": 20,
-          "C03|C03": 8
+          "C01|C01": 618,
+          "C01|C08": 28,
+          "C01|C09": 16,
+          "C08|C08": 62,
+          "C08|C09": 8,
+          "C09|C09": 28
         },
         "color_components": [
           {
             "cells": [
               [
+                4,
+                8
+              ],
+              [
+                5,
+                8
+              ],
+              [
                 6,
-                5
+                8
               ],
               [
                 7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
                 8
               ],
               [
@@ -5753,344 +5666,286 @@
                 8
               ],
               [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
+                4,
                 9
               ],
               [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
+                5,
                 9
               ],
               [
                 6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
+                9
               ],
               [
                 7,
-                15
+                9
               ],
               [
                 8,
-                15
+                9
               ],
               [
-                9,
-                15
+                4,
+                10
               ],
               [
-                10,
-                15
+                5,
+                10
               ],
               [
-                11,
-                15
+                6,
+                10
               ],
               [
-                12,
-                15
+                7,
+                10
               ],
               [
-                13,
-                15
+                8,
+                10
               ],
               [
-                14,
-                15
+                4,
+                11
+              ],
+              [
+                5,
+                11
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
               ]
             ],
-            "color": "C02",
-            "size": 90
+            "color": "C08",
+            "size": 20
           },
           {
             "cells": [
               [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
+                11,
                 8
               ],
               [
-                7,
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                14,
+                8
+              ],
+              [
+                15,
+                8
+              ],
+              [
+                11,
                 9
               ],
               [
-                7,
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                14,
+                9
+              ],
+              [
+                15,
+                9
+              ],
+              [
+                11,
                 10
               ],
               [
-                7,
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                14,
+                10
+              ],
+              [
+                15,
+                10
+              ],
+              [
+                11,
                 11
               ],
               [
-                7,
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                14,
+                11
+              ],
+              [
+                15,
+                11
+              ]
+            ],
+            "color": "C08",
+            "size": 20
+          },
+          {
+            "cells": [
+              [
+                9,
+                5
+              ],
+              [
+                10,
+                5
+              ],
+              [
+                9,
+                6
+              ],
+              [
+                10,
+                6
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                9,
+                9
+              ],
+              [
+                10,
+                9
+              ],
+              [
+                9,
+                10
+              ],
+              [
+                10,
+                10
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                9,
                 12
               ],
               [
-                7,
+                10,
+                12
+              ],
+              [
+                9,
                 13
               ],
               [
-                7,
+                10,
+                13
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
                 14
               ]
             ],
-            "color": "C03",
-            "size": 9
+            "color": "C09",
+            "size": 20
           }
         ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
+        "color_entropy": 0.74758468,
+        "color_entropy_scaled": 747585,
+        "horizontal_symmetry_score": 1.0,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
+        "largest_color_dominance": 0.66666667,
         "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
+        "negative_space_count": 340,
+        "negative_space_ratio": 0.85,
         "occupied_bounding_box": [
-          6,
+          4,
           5,
-          14,
-          15
+          15,
+          14
         ],
         "occupied_center_of_mass": [
-          10.0,
-          10.0
+          9.5,
+          9.5
         ],
         "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
+          9500000,
+          9500000
         ],
+        "occupied_color_counts": {
+          "C08": 40,
+          "C09": 20
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
-          99
+          60
         ],
-        "occupied_count": 99,
+        "occupied_count": 60,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
+        "occupied_ratio": 0.15,
         "tiny_region_cell_count": 0,
         "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
+        "vertical_symmetry_score": 1.0
       },
       "negative_space_color": "C01",
       "policy": {
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -6104,8 +5959,8 @@
       "used_color_count": 3,
       "used_colors": [
         "C01",
-        "C02",
-        "C03"
+        "C08",
+        "C09"
       ],
       "width": 20
     },
@@ -6115,8 +5970,7 @@
       "diversity": {
         "exact_duplicate_group": [
           "bad-09-exact-duplicate-a",
-          "bad-10-exact-duplicate-b",
-          "good-01-central-subject"
+          "bad-10-exact-duplicate-b"
         ],
         "near_duplicate_pairs": [
           {
@@ -6130,135 +5984,43 @@
             "color_layout_similarity": 0.9975,
             "comparable": true,
             "occupancy_mask_similarity": 1.0
-          },
-          {
-            "candidate_id": "good-01-central-subject",
-            "color_layout_similarity": 1.0,
-            "comparable": true,
-            "occupancy_mask_similarity": 1.0
           }
         ]
       },
+      "fixture_classification": "DIVERSITY_FIXTURE",
       "generator_mode": "FIXTURE",
-      "grid_hash": "deaa08a07a476dcbea9057498016552275ca771ad82ef610b3512d3ec528c38d",
+      "grid_hash": "5947c858c8d64750b9c22f5bd987de47d1f2f3fb5614d012f99ed698c1fd35c9",
       "height": 20,
       "human_review": "",
       "metrics": {
         "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
+        "aggregate_symmetry_score": 1.0,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C02": 40,
-          "C02|C02": 150,
-          "C02|C03": 20,
-          "C03|C03": 8
+          "C01|C01": 618,
+          "C01|C08": 28,
+          "C01|C09": 16,
+          "C08|C08": 62,
+          "C08|C09": 8,
+          "C09|C09": 28
         },
         "color_components": [
           {
             "cells": [
               [
+                4,
+                8
+              ],
+              [
+                5,
+                8
+              ],
+              [
                 6,
-                5
+                8
               ],
               [
                 7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
                 8
               ],
               [
@@ -6266,344 +6028,286 @@
                 8
               ],
               [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
+                4,
                 9
               ],
               [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
+                5,
                 9
               ],
               [
                 6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
+                9
               ],
               [
                 7,
-                15
+                9
               ],
               [
                 8,
-                15
+                9
               ],
               [
-                9,
-                15
+                4,
+                10
               ],
               [
-                10,
-                15
+                5,
+                10
               ],
               [
-                11,
-                15
+                6,
+                10
               ],
               [
-                12,
-                15
+                7,
+                10
               ],
               [
-                13,
-                15
+                8,
+                10
               ],
               [
-                14,
-                15
+                4,
+                11
+              ],
+              [
+                5,
+                11
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
               ]
             ],
-            "color": "C02",
-            "size": 90
+            "color": "C08",
+            "size": 20
           },
           {
             "cells": [
               [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
+                11,
                 8
               ],
               [
-                7,
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                14,
+                8
+              ],
+              [
+                15,
+                8
+              ],
+              [
+                11,
                 9
               ],
               [
-                7,
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                14,
+                9
+              ],
+              [
+                15,
+                9
+              ],
+              [
+                11,
                 10
               ],
               [
-                7,
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                14,
+                10
+              ],
+              [
+                15,
+                10
+              ],
+              [
+                11,
                 11
               ],
               [
-                7,
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                14,
+                11
+              ],
+              [
+                15,
+                11
+              ]
+            ],
+            "color": "C08",
+            "size": 20
+          },
+          {
+            "cells": [
+              [
+                9,
+                5
+              ],
+              [
+                10,
+                5
+              ],
+              [
+                9,
+                6
+              ],
+              [
+                10,
+                6
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                9,
+                9
+              ],
+              [
+                10,
+                9
+              ],
+              [
+                9,
+                10
+              ],
+              [
+                10,
+                10
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                9,
                 12
               ],
               [
-                7,
+                10,
+                12
+              ],
+              [
+                9,
                 13
               ],
               [
-                7,
+                10,
+                13
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
                 14
               ]
             ],
-            "color": "C03",
-            "size": 9
+            "color": "C09",
+            "size": 20
           }
         ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
+        "color_entropy": 0.74758468,
+        "color_entropy_scaled": 747585,
+        "horizontal_symmetry_score": 1.0,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
+        "largest_color_dominance": 0.66666667,
         "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
+        "negative_space_count": 340,
+        "negative_space_ratio": 0.85,
         "occupied_bounding_box": [
-          6,
+          4,
           5,
-          14,
-          15
+          15,
+          14
         ],
         "occupied_center_of_mass": [
-          10.0,
-          10.0
+          9.5,
+          9.5
         ],
         "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
+          9500000,
+          9500000
         ],
+        "occupied_color_counts": {
+          "C08": 40,
+          "C09": 20
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
-          99
+          60
         ],
-        "occupied_count": 99,
+        "occupied_count": 60,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
+        "occupied_ratio": 0.15,
         "tiny_region_cell_count": 0,
         "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
+        "vertical_symmetry_score": 1.0
       },
       "negative_space_color": "C01",
       "policy": {
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -6617,8 +6321,8 @@
       "used_color_count": 3,
       "used_colors": [
         "C01",
-        "C02",
-        "C03"
+        "C08",
+        "C09"
       ],
       "width": 20
     },
@@ -6639,436 +6343,29 @@
             "color_layout_similarity": 0.9975,
             "comparable": true,
             "occupancy_mask_similarity": 1.0
-          },
-          {
-            "candidate_id": "good-01-central-subject",
-            "color_layout_similarity": 0.9975,
-            "comparable": true,
-            "occupancy_mask_similarity": 1.0
           }
         ]
       },
+      "fixture_classification": "DIVERSITY_FIXTURE",
       "generator_mode": "FIXTURE",
-      "grid_hash": "214160e11549d3ace54d554c992aa3d81ddf152555ed129fc66f1adcf48f71d2",
+      "grid_hash": "588de01451970e728dc5a769b1b1c01a647e4a74e4156c27934039e864265bfb",
       "height": 20,
       "human_review": "",
       "metrics": {
         "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.92,
+        "aggregate_symmetry_score": 0.995,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C02": 40,
-          "C02|C02": 146,
-          "C02|C03": 20,
-          "C02|C04": 4,
-          "C03|C03": 8
+          "C01|C01": 618,
+          "C01|C08": 28,
+          "C01|C09": 16,
+          "C04|C08": 1,
+          "C04|C09": 3,
+          "C08|C08": 62,
+          "C08|C09": 7,
+          "C09|C09": 25
         },
         "color_components": [
-          {
-            "cells": [
-              [
-                6,
-                5
-              ],
-              [
-                7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
-                8
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
-                9
-              ],
-              [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
-              ],
-              [
-                7,
-                15
-              ],
-              [
-                8,
-                15
-              ],
-              [
-                9,
-                15
-              ],
-              [
-                10,
-                15
-              ],
-              [
-                11,
-                15
-              ],
-              [
-                12,
-                15
-              ],
-              [
-                13,
-                15
-              ],
-              [
-                14,
-                15
-              ]
-            ],
-            "color": "C02",
-            "size": 89
-          },
-          {
-            "cells": [
-              [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                7,
-                9
-              ],
-              [
-                7,
-                10
-              ],
-              [
-                7,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                7,
-                14
-              ]
-            ],
-            "color": "C03",
-            "size": 9
-          },
           {
             "cells": [
               [
@@ -7078,48 +6375,307 @@
             ],
             "color": "C04",
             "size": 1
+          },
+          {
+            "cells": [
+              [
+                4,
+                8
+              ],
+              [
+                5,
+                8
+              ],
+              [
+                6,
+                8
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                8,
+                8
+              ],
+              [
+                4,
+                9
+              ],
+              [
+                5,
+                9
+              ],
+              [
+                6,
+                9
+              ],
+              [
+                7,
+                9
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                4,
+                10
+              ],
+              [
+                5,
+                10
+              ],
+              [
+                6,
+                10
+              ],
+              [
+                7,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                4,
+                11
+              ],
+              [
+                5,
+                11
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
+              ]
+            ],
+            "color": "C08",
+            "size": 20
+          },
+          {
+            "cells": [
+              [
+                11,
+                8
+              ],
+              [
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                14,
+                8
+              ],
+              [
+                15,
+                8
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                14,
+                9
+              ],
+              [
+                15,
+                9
+              ],
+              [
+                11,
+                10
+              ],
+              [
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                14,
+                10
+              ],
+              [
+                15,
+                10
+              ],
+              [
+                11,
+                11
+              ],
+              [
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                14,
+                11
+              ],
+              [
+                15,
+                11
+              ]
+            ],
+            "color": "C08",
+            "size": 20
+          },
+          {
+            "cells": [
+              [
+                9,
+                5
+              ],
+              [
+                10,
+                5
+              ],
+              [
+                9,
+                6
+              ],
+              [
+                10,
+                6
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                9,
+                9
+              ],
+              [
+                9,
+                10
+              ],
+              [
+                10,
+                10
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                9,
+                12
+              ],
+              [
+                10,
+                12
+              ],
+              [
+                9,
+                13
+              ],
+              [
+                10,
+                13
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
+                14
+              ]
+            ],
+            "color": "C09",
+            "size": 19
           }
         ],
-        "color_entropy": 0.93588338,
-        "color_entropy_scaled": 935883,
-        "horizontal_symmetry_score": 0.895,
-        "isolated_occupied_count": 1,
-        "largest_color_dominance": 0.8989899,
+        "color_entropy": 0.76190453,
+        "color_entropy_scaled": 761905,
+        "horizontal_symmetry_score": 0.995,
+        "isolated_occupied_count": 0,
+        "largest_color_dominance": 0.66666667,
         "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
+        "negative_space_count": 340,
+        "negative_space_ratio": 0.85,
         "occupied_bounding_box": [
-          6,
+          4,
           5,
-          14,
-          15
+          15,
+          14
         ],
         "occupied_center_of_mass": [
-          10.0,
-          10.0
+          9.5,
+          9.5
         ],
         "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
+          9500000,
+          9500000
         ],
+        "occupied_color_counts": {
+          "C04": 1,
+          "C08": 40,
+          "C09": 19
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
-          99
+          60
         ],
-        "occupied_count": 99,
+        "occupied_count": 60,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
-        "tiny_region_cell_count": 1,
-        "tiny_region_count": 1,
-        "vertical_symmetry_score": 0.945
+        "occupied_ratio": 0.15,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
+        "vertical_symmetry_score": 0.995
       },
       "negative_space_color": "C01",
       "policy": {
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -7133,9 +6689,9 @@
       "used_color_count": 4,
       "used_colors": [
         "C01",
-        "C02",
-        "C03",
-        "C04"
+        "C04",
+        "C08",
+        "C09"
       ],
       "width": 20
     },
@@ -7146,6 +6702,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M06",
       "generator_mode": "HYBRID",
       "grid_hash": "4db8e3be392eee85b9f0b0cfc2fa76b7cba964685f77f20e6d26ababe28c987e",
       "height": 20,
@@ -7742,6 +7299,12 @@
           9500000,
           9696969
         ],
+        "occupied_color_counts": {
+          "C04": 125,
+          "C11": 3,
+          "C14": 2,
+          "C16": 2
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           132
@@ -7750,8 +7313,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.33,
-        "tiny_region_cell_count": 7,
-        "tiny_region_count": 3,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.795
       },
       "negative_space_color": "C03",
@@ -7759,7 +7322,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -7787,6 +7350,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M03",
       "generator_mode": "MASK",
       "grid_hash": "83f3bbfde3aacd78809575360426a1076c2c6c2628a78a52e2f4fb64be4390fe",
       "height": 20,
@@ -8406,7 +7970,7 @@
         "color_entropy_scaled": 1375153,
         "horizontal_symmetry_score": 0.955,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.47692308,
+        "largest_color_dominance": 0.51538462,
         "largest_occupied_region_dominance": 1.0,
         "negative_space_count": 270,
         "negative_space_ratio": 0.675,
@@ -8424,6 +7988,12 @@
           9500000,
           9523076
         ],
+        "occupied_color_counts": {
+          "C04": 51,
+          "C11": 67,
+          "C14": 6,
+          "C16": 6
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           130
@@ -8432,8 +8002,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.325,
-        "tiny_region_cell_count": 4,
-        "tiny_region_count": 2,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.68
       },
       "negative_space_color": "C03",
@@ -8441,7 +8011,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -8469,6 +8039,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M04",
       "generator_mode": "RULES",
       "grid_hash": "6bdea7463f0086877feb70992aa1f8dfe69f025c593972a5640a609f4470d4f6",
       "height": 20,
@@ -8849,6 +8420,12 @@
           11532467,
           9961038
         ],
+        "occupied_color_counts": {
+          "C04": 17,
+          "C11": 14,
+          "C14": 38,
+          "C16": 8
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           77
@@ -8866,7 +8443,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -8894,6 +8471,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M06",
       "generator_mode": "HYBRID",
       "grid_hash": "08367b69bec9c5fc0dfd76e32e7ed105216f6e1ab69093792e6a7afb62f6d696",
       "height": 20,
@@ -9458,6 +9036,11 @@
           9500000,
           9603174
         ],
+        "occupied_color_counts": {
+          "C10": 74,
+          "C12": 2,
+          "C16": 50
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           126
@@ -9466,8 +9049,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.315,
-        "tiny_region_cell_count": 2,
-        "tiny_region_count": 1,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.77
       },
       "negative_space_color": "C04",
@@ -9475,7 +9058,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -9502,6 +9085,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M03",
       "generator_mode": "MASK",
       "grid_hash": "1fe6120defe458011e0a995851940f29f9e3f31204126632c5ea8699c1df770c",
       "height": 20,
@@ -10104,6 +9688,11 @@
           9500000,
           9468750
         ],
+        "occupied_color_counts": {
+          "C10": 56,
+          "C12": 66,
+          "C16": 6
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           128
@@ -10112,8 +9701,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.32,
-        "tiny_region_cell_count": 6,
-        "tiny_region_count": 2,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.72
       },
       "negative_space_color": "C04",
@@ -10121,7 +9710,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -10148,6 +9737,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M04",
       "generator_mode": "RULES",
       "grid_hash": "c8ae23f2c1db696bd5b1a7b05bfa0ff11351ec85d720b9bff1182bfedad9f57f",
       "height": 20,
@@ -10553,6 +10143,11 @@
           4744186,
           12255813
         ],
+        "occupied_color_counts": {
+          "C10": 13,
+          "C12": 28,
+          "C16": 45
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           86
@@ -10570,7 +10165,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -10597,6 +10192,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M06",
       "generator_mode": "HYBRID",
       "grid_hash": "e1644698c78468a4423f95ef5a3cbb474e06e8e4f97dbe2d6f88b51b9092c613",
       "height": 20,
@@ -11153,6 +10749,10 @@
           9500000,
           9365079
         ],
+        "occupied_color_counts": {
+          "C10": 66,
+          "C15": 60
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           126
@@ -11170,7 +10770,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -11196,6 +10796,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M03",
       "generator_mode": "MASK",
       "grid_hash": "8171de365703058e7f9c2d2cb4a7169aa5dd6c2d93c73cee3ef90f40c8da31ce",
       "height": 20,
@@ -11829,6 +11430,10 @@
           9500000,
           9393939
         ],
+        "occupied_color_counts": {
+          "C10": 50,
+          "C15": 82
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           132
@@ -11837,8 +11442,8 @@
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
         "occupied_ratio": 0.33,
-        "tiny_region_cell_count": 6,
-        "tiny_region_count": 3,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
         "vertical_symmetry_score": 0.7
       },
       "negative_space_color": "C04",
@@ -11846,7 +11451,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -11872,6 +11477,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M04",
       "generator_mode": "RULES",
       "grid_hash": "e610545e8bd06bc5d90c2eeb0df85af3f6ef699f309ab5664a6d81e7fe4fc9eb",
       "height": 20,
@@ -12200,6 +11806,10 @@
           9898550,
           12144927
         ],
+        "occupied_color_counts": {
+          "C10": 27,
+          "C15": 42
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
           69
@@ -12217,7 +11827,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -12243,6 +11853,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M05_SYNTHETIC_TEST_ONLY",
       "generator_mode": "WFC",
       "grid_hash": "929927b7662457818779d27e6ad2d6bef19f972c5baf61b5833f9b6b2f42b827",
       "height": 20,
@@ -14921,8 +14532,8 @@
         "color_entropy": 1.58495349,
         "color_entropy_scaled": 1584953,
         "horizontal_symmetry_score": 0.3,
-        "isolated_occupied_count": 266,
-        "largest_color_dominance": 0.0037594,
+        "isolated_occupied_count": 2,
+        "largest_color_dominance": 0.5,
         "largest_occupied_region_dominance": 0.13909774,
         "negative_space_count": 134,
         "negative_space_ratio": 0.335,
@@ -14940,6 +14551,10 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C01": 133,
+          "C02": 133
+        },
         "occupied_component_count": 14,
         "occupied_component_sizes": [
           1,
@@ -14961,8 +14576,8 @@
         "occupied_edge_touch_count": 50,
         "occupied_edge_touch_ratio": 0.18796992,
         "occupied_ratio": 0.665,
-        "tiny_region_cell_count": 266,
-        "tiny_region_count": 266,
+        "tiny_region_cell_count": 2,
+        "tiny_region_count": 2,
         "vertical_symmetry_score": 0.3
       },
       "negative_space_color": "C03",
@@ -14996,6 +14611,7 @@
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "GENERATED_M05_SYNTHETIC_TEST_ONLY",
       "generator_mode": "WFC",
       "grid_hash": "868b74ec809276fa23466638582541d0252ebbcefbd0764dd5ef02377833ea3e",
       "height": 20,
@@ -17674,8 +17290,8 @@
         "color_entropy": 1.58495349,
         "color_entropy_scaled": 1584953,
         "horizontal_symmetry_score": 0.3,
-        "isolated_occupied_count": 266,
-        "largest_color_dominance": 0.0037594,
+        "isolated_occupied_count": 2,
+        "largest_color_dominance": 0.5,
         "largest_occupied_region_dominance": 0.13909774,
         "negative_space_count": 134,
         "negative_space_ratio": 0.335,
@@ -17693,6 +17309,10 @@
           9500000,
           9500000
         ],
+        "occupied_color_counts": {
+          "C01": 133,
+          "C03": 133
+        },
         "occupied_component_count": 14,
         "occupied_component_sizes": [
           1,
@@ -17714,8 +17334,8 @@
         "occupied_edge_touch_count": 50,
         "occupied_edge_touch_ratio": 0.18796992,
         "occupied_ratio": 0.665,
-        "tiny_region_cell_count": 266,
-        "tiny_region_count": 266,
+        "tiny_region_cell_count": 2,
+        "tiny_region_count": 2,
         "vertical_symmetry_score": 0.3
       },
       "negative_space_color": "C02",
@@ -17746,46 +17366,32 @@
       "candidate_id": "good-01-central-subject",
       "difficulty": null,
       "diversity": {
-        "exact_duplicate_group": [
-          "bad-09-exact-duplicate-a",
-          "bad-10-exact-duplicate-b",
-          "good-01-central-subject"
-        ],
+        "exact_duplicate_group": null,
         "near_duplicate_pairs": [
           {
-            "candidate_id": "bad-09-exact-duplicate-a",
-            "color_layout_similarity": 1.0,
-            "comparable": true,
-            "occupancy_mask_similarity": 1.0
-          },
-          {
-            "candidate_id": "bad-10-exact-duplicate-b",
-            "color_layout_similarity": 1.0,
-            "comparable": true,
-            "occupancy_mask_similarity": 1.0
-          },
-          {
-            "candidate_id": "bad-11-near-duplicate",
+            "candidate_id": "good-04-symmetric",
             "color_layout_similarity": 0.9975,
             "comparable": true,
             "occupancy_mask_similarity": 1.0
           }
         ]
       },
+      "fixture_classification": "CONNECTED_CENTRAL_SUBJECT",
       "generator_mode": "FIXTURE",
-      "grid_hash": "deaa08a07a476dcbea9057498016552275ca771ad82ef610b3512d3ec528c38d",
+      "grid_hash": "6c58b8eca37a2f5cc1c58f1e571103c59d40a5735c3badf0e34784f10c986fd5",
       "height": 20,
       "human_review": "",
       "metrics": {
         "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
+        "aggregate_symmetry_score": 0.995,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C02": 40,
-          "C02|C02": 150,
-          "C02|C03": 20,
-          "C03|C03": 8
+          "C01|C01": 582,
+          "C01|C02": 36,
+          "C02|C02": 126,
+          "C02|C03": 8,
+          "C02|C04": 4,
+          "C03|C03": 4
         },
         "color_components": [
           {
@@ -17823,420 +17429,355 @@
                 5
               ],
               [
-                14,
-                5
-              ],
-              [
                 6,
                 6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
-                8
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
-                9
-              ],
-              [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
               ],
               [
                 7,
-                15
+                6
               ],
               [
                 8,
-                15
+                6
               ],
               [
                 9,
-                15
+                6
               ],
               [
                 10,
-                15
+                6
               ],
               [
                 11,
-                15
-              ],
-              [
-                12,
-                15
+                6
               ],
               [
                 13,
-                15
+                6
               ],
               [
-                14,
-                15
+                6,
+                7
+              ],
+              [
+                7,
+                7
+              ],
+              [
+                8,
+                7
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                11,
+                7
+              ],
+              [
+                12,
+                7
+              ],
+              [
+                13,
+                7
+              ],
+              [
+                6,
+                8
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                8,
+                8
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                11,
+                8
+              ],
+              [
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                6,
+                9
+              ],
+              [
+                7,
+                9
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                6,
+                10
+              ],
+              [
+                7,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                11,
+                10
+              ],
+              [
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                11,
+                11
+              ],
+              [
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                6,
+                12
+              ],
+              [
+                7,
+                12
+              ],
+              [
+                8,
+                12
+              ],
+              [
+                9,
+                12
+              ],
+              [
+                10,
+                12
+              ],
+              [
+                11,
+                12
+              ],
+              [
+                12,
+                12
+              ],
+              [
+                13,
+                12
+              ],
+              [
+                6,
+                13
+              ],
+              [
+                7,
+                13
+              ],
+              [
+                8,
+                13
+              ],
+              [
+                9,
+                13
+              ],
+              [
+                10,
+                13
+              ],
+              [
+                11,
+                13
+              ],
+              [
+                12,
+                13
+              ],
+              [
+                13,
+                13
+              ],
+              [
+                6,
+                14
+              ],
+              [
+                7,
+                14
+              ],
+              [
+                8,
+                14
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
+                14
+              ],
+              [
+                11,
+                14
+              ],
+              [
+                12,
+                14
+              ],
+              [
+                13,
+                14
               ]
             ],
             "color": "C02",
-            "size": 90
+            "size": 75
           },
           {
             "cells": [
               [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                7,
+                9,
                 9
               ],
               [
-                7,
+                10,
+                9
+              ],
+              [
+                9,
                 10
               ],
               [
-                7,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                7,
-                14
+                10,
+                10
               ]
             ],
             "color": "C03",
-            "size": 9
+            "size": 4
+          },
+          {
+            "cells": [
+              [
+                12,
+                6
+              ]
+            ],
+            "color": "C04",
+            "size": 1
           }
         ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
+        "color_entropy": 0.79841021,
+        "color_entropy_scaled": 798410,
+        "horizontal_symmetry_score": 0.995,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
+        "largest_color_dominance": 0.9375,
         "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
+        "negative_space_count": 320,
+        "negative_space_ratio": 0.8,
         "occupied_bounding_box": [
           6,
           5,
-          14,
-          15
+          13,
+          14
         ],
         "occupied_center_of_mass": [
-          10.0,
-          10.0
+          9.5,
+          9.5
         ],
         "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
+          9500000,
+          9500000
         ],
+        "occupied_color_counts": {
+          "C02": 75,
+          "C03": 4,
+          "C04": 1
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
-          99
+          80
         ],
-        "occupied_count": 99,
+        "occupied_count": 80,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
+        "occupied_ratio": 0.2,
         "tiny_region_cell_count": 0,
         "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
+        "vertical_symmetry_score": 0.995
       },
       "negative_space_color": "C01",
       "policy": {
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -18246,7 +17787,236 @@
       },
       "quality_decision": "ACCEPT",
       "rejection_codes": [],
-      "seed": "SYMMETRIC",
+      "seed": "central",
+      "used_color_count": 4,
+      "used_colors": [
+        "C01",
+        "C02",
+        "C03",
+        "C04"
+      ],
+      "width": 20
+    },
+    {
+      "candidate_id": "good-02-sparse",
+      "difficulty": null,
+      "diversity": {
+        "exact_duplicate_group": null,
+        "near_duplicate_pairs": []
+      },
+      "fixture_classification": "SPARSE_NEGATIVE_SPACE",
+      "generator_mode": "FIXTURE",
+      "grid_hash": "26645308bd76808e24502d11628e999b967879dc7f4b27f5a0e00ee21ae88331",
+      "height": 20,
+      "human_review": "",
+      "metrics": {
+        "adjacency_edge_count": 760,
+        "aggregate_symmetry_score": 0.84,
+        "checkerboard_score": 0.0,
+        "color_adjacency": {
+          "C01|C01": 680,
+          "C01|C02": 16,
+          "C01|C03": 16,
+          "C02|C02": 24,
+          "C03|C03": 24
+        },
+        "color_components": [
+          {
+            "cells": [
+              [
+                3,
+                3
+              ],
+              [
+                4,
+                3
+              ],
+              [
+                5,
+                3
+              ],
+              [
+                6,
+                3
+              ],
+              [
+                3,
+                4
+              ],
+              [
+                4,
+                4
+              ],
+              [
+                5,
+                4
+              ],
+              [
+                6,
+                4
+              ],
+              [
+                3,
+                5
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                5,
+                5
+              ],
+              [
+                6,
+                5
+              ],
+              [
+                3,
+                6
+              ],
+              [
+                4,
+                6
+              ],
+              [
+                5,
+                6
+              ],
+              [
+                6,
+                6
+              ]
+            ],
+            "color": "C02",
+            "size": 16
+          },
+          {
+            "cells": [
+              [
+                13,
+                13
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                15,
+                13
+              ],
+              [
+                16,
+                13
+              ],
+              [
+                13,
+                14
+              ],
+              [
+                14,
+                14
+              ],
+              [
+                15,
+                14
+              ],
+              [
+                16,
+                14
+              ],
+              [
+                13,
+                15
+              ],
+              [
+                14,
+                15
+              ],
+              [
+                15,
+                15
+              ],
+              [
+                16,
+                15
+              ],
+              [
+                13,
+                16
+              ],
+              [
+                14,
+                16
+              ],
+              [
+                15,
+                16
+              ],
+              [
+                16,
+                16
+              ]
+            ],
+            "color": "C03",
+            "size": 16
+          }
+        ],
+        "color_entropy": 0.48217919,
+        "color_entropy_scaled": 482179,
+        "horizontal_symmetry_score": 0.84,
+        "isolated_occupied_count": 0,
+        "largest_color_dominance": 0.5,
+        "largest_occupied_region_dominance": 0.5,
+        "negative_space_count": 368,
+        "negative_space_ratio": 0.92,
+        "occupied_bounding_box": [
+          3,
+          3,
+          16,
+          16
+        ],
+        "occupied_center_of_mass": [
+          9.5,
+          9.5
+        ],
+        "occupied_center_of_mass_scaled": [
+          9500000,
+          9500000
+        ],
+        "occupied_color_counts": {
+          "C02": 16,
+          "C03": 16
+        },
+        "occupied_component_count": 2,
+        "occupied_component_sizes": [
+          16,
+          16
+        ],
+        "occupied_count": 32,
+        "occupied_edge_touch_count": 0,
+        "occupied_edge_touch_ratio": 0.0,
+        "occupied_ratio": 0.08,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
+        "vertical_symmetry_score": 0.84
+      },
+      "negative_space_color": "C01",
+      "policy": {
+        "difficulty": null,
+        "full_slab_min_occupied_ratio": 0.8,
+        "max_checkerboard_score": 0.98,
+        "max_color_dominance_ratio": 1.0,
+        "max_isolated_ratio": 0.2,
+        "max_largest_region_ratio": 1.0,
+        "max_tiny_cell_ratio": 0.35,
+        "reject_full_single_shape_slab": true,
+        "tiny_region_max_size": 3,
+        "version": "m07-quality-policy-v1"
+      },
+      "quality_decision": "ACCEPT",
+      "rejection_codes": [],
+      "seed": "sparse",
       "used_color_count": 3,
       "used_colors": [
         "C01",
@@ -18256,467 +18026,277 @@
       "width": 20
     },
     {
-      "candidate_id": "good-02-asymmetric-organic",
+      "candidate_id": "good-03-multi-island",
       "difficulty": null,
       "diversity": {
         "exact_duplicate_group": null,
         "near_duplicate_pairs": []
       },
+      "fixture_classification": "MULTI_ISLAND",
       "generator_mode": "FIXTURE",
-      "grid_hash": "cd3235e495b38d0cf8c83badf51de5aa98108d710ee7d7fefd12d49686cf39a5",
+      "grid_hash": "6926cca006e175b4fb5225829bfff568a4e33c47f5f92071891ceeb7bfd5054e",
       "height": 20,
       "human_review": "",
       "metrics": {
         "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
+        "aggregate_symmetry_score": 0.9125,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C04": 40,
-          "C04|C04": 150,
-          "C04|C05": 20,
-          "C05|C05": 8
+          "C01|C01": 640,
+          "C01|C04": 20,
+          "C01|C05": 20,
+          "C04|C04": 40,
+          "C05|C05": 40
         },
         "color_components": [
           {
             "cells": [
               [
-                6,
-                5
+                2,
+                7
               ],
               [
-                7,
-                5
+                3,
+                7
               ],
               [
-                8,
-                5
+                4,
+                7
               ],
               [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
+                5,
+                7
               ],
               [
                 6,
                 7
               ],
               [
-                8,
-                7
+                2,
+                8
               ],
               [
-                9,
-                7
+                3,
+                8
               ],
               [
-                10,
-                7
+                4,
+                8
               ],
               [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
+                5,
+                8
               ],
               [
                 6,
                 8
               ],
               [
-                8,
-                8
+                2,
+                9
               ],
               [
-                9,
-                8
+                3,
+                9
               ],
               [
-                10,
-                8
+                4,
+                9
               ],
               [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
+                5,
+                9
               ],
               [
                 6,
                 9
               ],
               [
-                8,
-                9
+                2,
+                10
               ],
               [
-                9,
-                9
+                3,
+                10
               ],
               [
-                10,
-                9
+                4,
+                10
               ],
               [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
+                5,
+                10
               ],
               [
                 6,
                 10
               ],
               [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
+                2,
                 11
               ],
               [
-                8,
+                3,
                 11
               ],
               [
-                9,
+                4,
                 11
               ],
               [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
+                5,
                 11
               ],
               [
                 6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
-              ],
-              [
-                7,
-                15
-              ],
-              [
-                8,
-                15
-              ],
-              [
-                9,
-                15
-              ],
-              [
-                10,
-                15
-              ],
-              [
-                11,
-                15
-              ],
-              [
-                12,
-                15
-              ],
-              [
-                13,
-                15
-              ],
-              [
-                14,
-                15
+                11
               ]
             ],
             "color": "C04",
-            "size": 90
+            "size": 25
           },
           {
             "cells": [
               [
-                7,
-                6
-              ],
-              [
-                7,
+                13,
                 7
               ],
               [
-                7,
+                14,
+                7
+              ],
+              [
+                15,
+                7
+              ],
+              [
+                16,
+                7
+              ],
+              [
+                17,
+                7
+              ],
+              [
+                13,
                 8
               ],
               [
-                7,
+                14,
+                8
+              ],
+              [
+                15,
+                8
+              ],
+              [
+                16,
+                8
+              ],
+              [
+                17,
+                8
+              ],
+              [
+                13,
                 9
               ],
               [
-                7,
+                14,
+                9
+              ],
+              [
+                15,
+                9
+              ],
+              [
+                16,
+                9
+              ],
+              [
+                17,
+                9
+              ],
+              [
+                13,
                 10
               ],
               [
-                7,
+                14,
+                10
+              ],
+              [
+                15,
+                10
+              ],
+              [
+                16,
+                10
+              ],
+              [
+                17,
+                10
+              ],
+              [
+                13,
                 11
               ],
               [
-                7,
-                12
+                14,
+                11
               ],
               [
-                7,
-                13
+                15,
+                11
               ],
               [
-                7,
-                14
+                16,
+                11
+              ],
+              [
+                17,
+                11
               ]
             ],
             "color": "C05",
-            "size": 9
+            "size": 25
           }
         ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
+        "color_entropy": 0.66856444,
+        "color_entropy_scaled": 668564,
+        "horizontal_symmetry_score": 0.875,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
-        "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
+        "largest_color_dominance": 0.5,
+        "largest_occupied_region_dominance": 0.5,
+        "negative_space_count": 350,
+        "negative_space_ratio": 0.875,
         "occupied_bounding_box": [
-          6,
-          5,
-          14,
-          15
+          2,
+          7,
+          17,
+          11
         ],
         "occupied_center_of_mass": [
-          10.0,
-          10.0
+          9.5,
+          9.0
         ],
         "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
+          9500000,
+          9000000
         ],
-        "occupied_component_count": 1,
+        "occupied_color_counts": {
+          "C04": 25,
+          "C05": 25
+        },
+        "occupied_component_count": 2,
         "occupied_component_sizes": [
-          99
+          25,
+          25
         ],
-        "occupied_count": 99,
+        "occupied_count": 50,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
+        "occupied_ratio": 0.125,
         "tiny_region_cell_count": 0,
         "tiny_region_count": 0,
         "vertical_symmetry_score": 0.95
@@ -18726,7 +18306,7 @@
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -18736,7 +18316,7 @@
       },
       "quality_decision": "ACCEPT",
       "rejection_codes": [],
-      "seed": "ASYMMETRIC",
+      "seed": "multi-island",
       "used_color_count": 3,
       "used_colors": [
         "C01",
@@ -18746,31 +18326,43 @@
       "width": 20
     },
     {
-      "candidate_id": "good-03-rectangular",
+      "candidate_id": "good-04-symmetric",
       "difficulty": null,
       "diversity": {
         "exact_duplicate_group": null,
-        "near_duplicate_pairs": []
+        "near_duplicate_pairs": [
+          {
+            "candidate_id": "good-01-central-subject",
+            "color_layout_similarity": 0.9975,
+            "comparable": true,
+            "occupancy_mask_similarity": 1.0
+          }
+        ]
       },
+      "fixture_classification": "SYMMETRIC_SUBJECT",
       "generator_mode": "FIXTURE",
-      "grid_hash": "98a3f6a5292543ab3e246236871100d7e99ce1f3f768c6cfe234b5eb24478bc2",
+      "grid_hash": "78dcd9c7b8eca347b75e534620091a1e7d1c577184d98093c60f3533c591e503",
       "height": 20,
       "human_review": "",
       "metrics": {
-        "adjacency_edge_count": 877,
-        "aggregate_symmetry_score": 0.93260869,
+        "adjacency_edge_count": 760,
+        "aggregate_symmetry_score": 1.0,
         "checkerboard_score": 0.0,
         "color_adjacency": {
-          "C01|C01": 636,
-          "C01|C06": 42,
-          "C06|C06": 171,
-          "C06|C07": 20,
-          "C07|C07": 8
+          "C01|C01": 582,
+          "C01|C02": 36,
+          "C02|C02": 130,
+          "C02|C03": 8,
+          "C03|C03": 4
         },
         "color_components": [
           {
             "cells": [
               [
+                6,
+                5
+              ],
+              [
                 7,
                 5
               ],
@@ -18799,468 +18391,348 @@
                 5
               ],
               [
-                14,
-                5
-              ],
-              [
-                15,
-                5
-              ],
-              [
-                16,
-                5
-              ],
-              [
-                7,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                15,
-                6
-              ],
-              [
-                16,
+                6,
                 6
               ],
               [
                 7,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                15,
-                7
-              ],
-              [
-                16,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                15,
-                8
-              ],
-              [
-                16,
-                8
-              ],
-              [
-                7,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                15,
-                9
-              ],
-              [
-                16,
-                9
-              ],
-              [
-                7,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                15,
-                10
-              ],
-              [
-                16,
-                10
-              ],
-              [
-                7,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                15,
-                11
-              ],
-              [
-                16,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                15,
-                12
-              ],
-              [
-                16,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                15,
-                13
-              ],
-              [
-                16,
-                13
-              ],
-              [
-                7,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                15,
-                14
-              ],
-              [
-                16,
-                14
-              ],
-              [
-                7,
-                15
+                6
               ],
               [
                 8,
-                15
+                6
               ],
               [
                 9,
-                15
+                6
               ],
               [
                 10,
-                15
+                6
               ],
               [
                 11,
-                15
+                6
               ],
               [
                 12,
-                15
+                6
               ],
               [
                 13,
-                15
+                6
               ],
               [
-                14,
-                15
+                6,
+                7
               ],
               [
-                15,
-                15
+                7,
+                7
               ],
               [
-                16,
-                15
+                8,
+                7
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                11,
+                7
+              ],
+              [
+                12,
+                7
+              ],
+              [
+                13,
+                7
+              ],
+              [
+                6,
+                8
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                8,
+                8
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                11,
+                8
+              ],
+              [
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                6,
+                9
+              ],
+              [
+                7,
+                9
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                6,
+                10
+              ],
+              [
+                7,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                11,
+                10
+              ],
+              [
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                11,
+                11
+              ],
+              [
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                6,
+                12
+              ],
+              [
+                7,
+                12
+              ],
+              [
+                8,
+                12
+              ],
+              [
+                9,
+                12
+              ],
+              [
+                10,
+                12
+              ],
+              [
+                11,
+                12
+              ],
+              [
+                12,
+                12
+              ],
+              [
+                13,
+                12
+              ],
+              [
+                6,
+                13
+              ],
+              [
+                7,
+                13
+              ],
+              [
+                8,
+                13
+              ],
+              [
+                9,
+                13
+              ],
+              [
+                10,
+                13
+              ],
+              [
+                11,
+                13
+              ],
+              [
+                12,
+                13
+              ],
+              [
+                13,
+                13
+              ],
+              [
+                6,
+                14
+              ],
+              [
+                7,
+                14
+              ],
+              [
+                8,
+                14
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
+                14
+              ],
+              [
+                11,
+                14
+              ],
+              [
+                12,
+                14
+              ],
+              [
+                13,
+                14
               ]
             ],
-            "color": "C06",
-            "size": 101
+            "color": "C02",
+            "size": 76
           },
           {
             "cells": [
               [
-                8,
-                6
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                8,
+                9,
                 9
               ],
               [
-                8,
+                10,
+                9
+              ],
+              [
+                9,
                 10
               ],
               [
-                8,
-                11
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                8,
-                14
+                10,
+                10
               ]
             ],
-            "color": "C07",
-            "size": 9
+            "color": "C03",
+            "size": 4
           }
         ],
-        "color_entropy": 0.8912888,
-        "color_entropy_scaled": 891289,
-        "horizontal_symmetry_score": 0.91304348,
+        "color_entropy": 0.77920749,
+        "color_entropy_scaled": 779207,
+        "horizontal_symmetry_score": 1.0,
         "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.91818182,
+        "largest_color_dominance": 0.95,
         "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 350,
-        "negative_space_ratio": 0.76086957,
+        "negative_space_count": 320,
+        "negative_space_ratio": 0.8,
         "occupied_bounding_box": [
-          7,
+          6,
           5,
-          16,
-          15
+          13,
+          14
         ],
         "occupied_center_of_mass": [
-          11.5,
-          10.0
+          9.5,
+          9.5
         ],
         "occupied_center_of_mass_scaled": [
-          11500000,
-          10000000
+          9500000,
+          9500000
         ],
+        "occupied_color_counts": {
+          "C02": 76,
+          "C03": 4
+        },
         "occupied_component_count": 1,
         "occupied_component_sizes": [
-          110
+          80
         ],
-        "occupied_count": 110,
+        "occupied_count": 80,
         "occupied_edge_touch_count": 0,
         "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.23913043,
+        "occupied_ratio": 0.2,
         "tiny_region_cell_count": 0,
         "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95217391
+        "vertical_symmetry_score": 1.0
       },
       "negative_space_color": "C01",
       "policy": {
         "difficulty": null,
         "full_slab_min_occupied_ratio": 0.8,
         "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
+        "max_color_dominance_ratio": 1.0,
         "max_isolated_ratio": 0.2,
         "max_largest_region_ratio": 1.0,
         "max_tiny_cell_ratio": 0.35,
@@ -19270,1484 +18742,948 @@
       },
       "quality_decision": "ACCEPT",
       "rejection_codes": [],
-      "seed": "RECTANGULAR",
+      "seed": "symmetric",
+      "used_color_count": 3,
+      "used_colors": [
+        "C01",
+        "C02",
+        "C03"
+      ],
+      "width": 20
+    },
+    {
+      "candidate_id": "good-05-asymmetric-organic",
+      "difficulty": null,
+      "diversity": {
+        "exact_duplicate_group": null,
+        "near_duplicate_pairs": []
+      },
+      "fixture_classification": "ASYMMETRIC_ORGANIC",
+      "generator_mode": "FIXTURE",
+      "grid_hash": "6ae6cc50d5745ebf3a06f302f78c54b8c836f49bb27360646184bcc460c58365",
+      "height": 20,
+      "human_review": "",
+      "metrics": {
+        "adjacency_edge_count": 760,
+        "aggregate_symmetry_score": 0.88,
+        "checkerboard_score": 0.0,
+        "color_adjacency": {
+          "C01|C01": 523,
+          "C01|C06": 70,
+          "C06|C06": 149,
+          "C06|C07": 16,
+          "C07|C07": 2
+        },
+        "color_components": [
+          {
+            "cells": [
+              [
+                4,
+                4
+              ],
+              [
+                5,
+                4
+              ],
+              [
+                6,
+                4
+              ],
+              [
+                7,
+                4
+              ],
+              [
+                8,
+                4
+              ],
+              [
+                9,
+                4
+              ],
+              [
+                10,
+                4
+              ],
+              [
+                11,
+                4
+              ],
+              [
+                12,
+                4
+              ],
+              [
+                13,
+                4
+              ],
+              [
+                14,
+                4
+              ],
+              [
+                4,
+                5
+              ],
+              [
+                5,
+                5
+              ],
+              [
+                6,
+                5
+              ],
+              [
+                7,
+                5
+              ],
+              [
+                8,
+                5
+              ],
+              [
+                9,
+                5
+              ],
+              [
+                10,
+                5
+              ],
+              [
+                11,
+                5
+              ],
+              [
+                4,
+                6
+              ],
+              [
+                5,
+                6
+              ],
+              [
+                6,
+                6
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                8,
+                6
+              ],
+              [
+                9,
+                6
+              ],
+              [
+                10,
+                6
+              ],
+              [
+                11,
+                6
+              ],
+              [
+                12,
+                6
+              ],
+              [
+                13,
+                6
+              ],
+              [
+                5,
+                7
+              ],
+              [
+                6,
+                7
+              ],
+              [
+                7,
+                7
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                11,
+                7
+              ],
+              [
+                12,
+                7
+              ],
+              [
+                13,
+                7
+              ],
+              [
+                14,
+                7
+              ],
+              [
+                15,
+                7
+              ],
+              [
+                5,
+                8
+              ],
+              [
+                6,
+                8
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                11,
+                8
+              ],
+              [
+                12,
+                8
+              ],
+              [
+                5,
+                9
+              ],
+              [
+                6,
+                9
+              ],
+              [
+                7,
+                9
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                10,
+                9
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                14,
+                9
+              ],
+              [
+                6,
+                10
+              ],
+              [
+                7,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                10,
+                10
+              ],
+              [
+                11,
+                10
+              ],
+              [
+                6,
+                11
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                11,
+                11
+              ],
+              [
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                6,
+                12
+              ],
+              [
+                7,
+                12
+              ],
+              [
+                8,
+                12
+              ],
+              [
+                9,
+                12
+              ],
+              [
+                10,
+                12
+              ],
+              [
+                11,
+                12
+              ],
+              [
+                12,
+                12
+              ],
+              [
+                13,
+                12
+              ],
+              [
+                14,
+                12
+              ],
+              [
+                15,
+                12
+              ],
+              [
+                7,
+                13
+              ],
+              [
+                8,
+                13
+              ],
+              [
+                9,
+                13
+              ],
+              [
+                10,
+                13
+              ],
+              [
+                11,
+                13
+              ],
+              [
+                12,
+                13
+              ],
+              [
+                7,
+                14
+              ],
+              [
+                8,
+                14
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
+                14
+              ],
+              [
+                11,
+                14
+              ],
+              [
+                12,
+                14
+              ],
+              [
+                13,
+                14
+              ],
+              [
+                14,
+                14
+              ],
+              [
+                7,
+                15
+              ],
+              [
+                8,
+                15
+              ],
+              [
+                9,
+                15
+              ],
+              [
+                10,
+                15
+              ],
+              [
+                11,
+                15
+              ]
+            ],
+            "color": "C06",
+            "size": 96
+          },
+          {
+            "cells": [
+              [
+                8,
+                7
+              ],
+              [
+                8,
+                8
+              ]
+            ],
+            "color": "C07",
+            "size": 2
+          },
+          {
+            "cells": [
+              [
+                9,
+                9
+              ],
+              [
+                9,
+                10
+              ]
+            ],
+            "color": "C07",
+            "size": 2
+          },
+          {
+            "cells": [
+              [
+                10,
+                11
+              ]
+            ],
+            "color": "C07",
+            "size": 1
+          }
+        ],
+        "color_entropy": 0.88699984,
+        "color_entropy_scaled": 887000,
+        "horizontal_symmetry_score": 0.89,
+        "isolated_occupied_count": 0,
+        "largest_color_dominance": 0.95049505,
+        "largest_occupied_region_dominance": 1.0,
+        "negative_space_count": 299,
+        "negative_space_ratio": 0.7475,
+        "occupied_bounding_box": [
+          4,
+          4,
+          15,
+          15
+        ],
+        "occupied_center_of_mass": [
+          9.25742574,
+          8.99009901
+        ],
+        "occupied_center_of_mass_scaled": [
+          9257425,
+          8990099
+        ],
+        "occupied_color_counts": {
+          "C06": 96,
+          "C07": 5
+        },
+        "occupied_component_count": 1,
+        "occupied_component_sizes": [
+          101
+        ],
+        "occupied_count": 101,
+        "occupied_edge_touch_count": 0,
+        "occupied_edge_touch_ratio": 0.0,
+        "occupied_ratio": 0.2525,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
+        "vertical_symmetry_score": 0.87
+      },
+      "negative_space_color": "C01",
+      "policy": {
+        "difficulty": null,
+        "full_slab_min_occupied_ratio": 0.8,
+        "max_checkerboard_score": 0.98,
+        "max_color_dominance_ratio": 1.0,
+        "max_isolated_ratio": 0.2,
+        "max_largest_region_ratio": 1.0,
+        "max_tiny_cell_ratio": 0.35,
+        "reject_full_single_shape_slab": true,
+        "tiny_region_max_size": 3,
+        "version": "m07-quality-policy-v1"
+      },
+      "quality_decision": "ACCEPT",
+      "rejection_codes": [],
+      "seed": "asymmetric",
       "used_color_count": 3,
       "used_colors": [
         "C01",
         "C06",
         "C07"
       ],
+      "width": 20
+    },
+    {
+      "candidate_id": "good-06-rectangular",
+      "difficulty": null,
+      "diversity": {
+        "exact_duplicate_group": null,
+        "near_duplicate_pairs": []
+      },
+      "fixture_classification": "RECTANGULAR_SUBJECT",
+      "generator_mode": "FIXTURE",
+      "grid_hash": "5c55a1c836b3a366dce2fa839b69a9ee40c3598e94d557e9018166396b5343ea",
+      "height": 20,
+      "human_review": "",
+      "metrics": {
+        "adjacency_edge_count": 877,
+        "aggregate_symmetry_score": 0.97391304,
+        "checkerboard_score": 0.0,
+        "color_adjacency": {
+          "C01|C01": 699,
+          "C01|C02": 36,
+          "C02|C02": 130,
+          "C02|C03": 8,
+          "C03|C03": 4
+        },
+        "color_components": [
+          {
+            "cells": [
+              [
+                7,
+                5
+              ],
+              [
+                8,
+                5
+              ],
+              [
+                9,
+                5
+              ],
+              [
+                10,
+                5
+              ],
+              [
+                11,
+                5
+              ],
+              [
+                12,
+                5
+              ],
+              [
+                13,
+                5
+              ],
+              [
+                14,
+                5
+              ],
+              [
+                7,
+                6
+              ],
+              [
+                8,
+                6
+              ],
+              [
+                9,
+                6
+              ],
+              [
+                10,
+                6
+              ],
+              [
+                11,
+                6
+              ],
+              [
+                12,
+                6
+              ],
+              [
+                13,
+                6
+              ],
+              [
+                14,
+                6
+              ],
+              [
+                7,
+                7
+              ],
+              [
+                8,
+                7
+              ],
+              [
+                9,
+                7
+              ],
+              [
+                10,
+                7
+              ],
+              [
+                11,
+                7
+              ],
+              [
+                12,
+                7
+              ],
+              [
+                13,
+                7
+              ],
+              [
+                14,
+                7
+              ],
+              [
+                7,
+                8
+              ],
+              [
+                8,
+                8
+              ],
+              [
+                9,
+                8
+              ],
+              [
+                10,
+                8
+              ],
+              [
+                11,
+                8
+              ],
+              [
+                12,
+                8
+              ],
+              [
+                13,
+                8
+              ],
+              [
+                14,
+                8
+              ],
+              [
+                7,
+                9
+              ],
+              [
+                8,
+                9
+              ],
+              [
+                9,
+                9
+              ],
+              [
+                12,
+                9
+              ],
+              [
+                13,
+                9
+              ],
+              [
+                14,
+                9
+              ],
+              [
+                7,
+                10
+              ],
+              [
+                8,
+                10
+              ],
+              [
+                9,
+                10
+              ],
+              [
+                12,
+                10
+              ],
+              [
+                13,
+                10
+              ],
+              [
+                14,
+                10
+              ],
+              [
+                7,
+                11
+              ],
+              [
+                8,
+                11
+              ],
+              [
+                9,
+                11
+              ],
+              [
+                10,
+                11
+              ],
+              [
+                11,
+                11
+              ],
+              [
+                12,
+                11
+              ],
+              [
+                13,
+                11
+              ],
+              [
+                14,
+                11
+              ],
+              [
+                7,
+                12
+              ],
+              [
+                8,
+                12
+              ],
+              [
+                9,
+                12
+              ],
+              [
+                10,
+                12
+              ],
+              [
+                11,
+                12
+              ],
+              [
+                12,
+                12
+              ],
+              [
+                13,
+                12
+              ],
+              [
+                14,
+                12
+              ],
+              [
+                7,
+                13
+              ],
+              [
+                8,
+                13
+              ],
+              [
+                9,
+                13
+              ],
+              [
+                10,
+                13
+              ],
+              [
+                11,
+                13
+              ],
+              [
+                12,
+                13
+              ],
+              [
+                13,
+                13
+              ],
+              [
+                14,
+                13
+              ],
+              [
+                7,
+                14
+              ],
+              [
+                8,
+                14
+              ],
+              [
+                9,
+                14
+              ],
+              [
+                10,
+                14
+              ],
+              [
+                11,
+                14
+              ],
+              [
+                12,
+                14
+              ],
+              [
+                13,
+                14
+              ],
+              [
+                14,
+                14
+              ]
+            ],
+            "color": "C02",
+            "size": 76
+          },
+          {
+            "cells": [
+              [
+                10,
+                9
+              ],
+              [
+                11,
+                9
+              ],
+              [
+                10,
+                10
+              ],
+              [
+                11,
+                10
+              ]
+            ],
+            "color": "C03",
+            "size": 4
+          }
+        ],
+        "color_entropy": 0.71638652,
+        "color_entropy_scaled": 716387,
+        "horizontal_symmetry_score": 0.94782609,
+        "isolated_occupied_count": 0,
+        "largest_color_dominance": 0.95,
+        "largest_occupied_region_dominance": 1.0,
+        "negative_space_count": 380,
+        "negative_space_ratio": 0.82608696,
+        "occupied_bounding_box": [
+          7,
+          5,
+          14,
+          14
+        ],
+        "occupied_center_of_mass": [
+          10.5,
+          9.5
+        ],
+        "occupied_center_of_mass_scaled": [
+          10500000,
+          9500000
+        ],
+        "occupied_color_counts": {
+          "C02": 76,
+          "C03": 4
+        },
+        "occupied_component_count": 1,
+        "occupied_component_sizes": [
+          80
+        ],
+        "occupied_count": 80,
+        "occupied_edge_touch_count": 0,
+        "occupied_edge_touch_ratio": 0.0,
+        "occupied_ratio": 0.17391304,
+        "tiny_region_cell_count": 0,
+        "tiny_region_count": 0,
+        "vertical_symmetry_score": 1.0
+      },
+      "negative_space_color": "C01",
+      "policy": {
+        "difficulty": null,
+        "full_slab_min_occupied_ratio": 0.8,
+        "max_checkerboard_score": 0.98,
+        "max_color_dominance_ratio": 1.0,
+        "max_isolated_ratio": 0.2,
+        "max_largest_region_ratio": 1.0,
+        "max_tiny_cell_ratio": 0.35,
+        "reject_full_single_shape_slab": true,
+        "tiny_region_max_size": 3,
+        "version": "m07-quality-policy-v1"
+      },
+      "quality_decision": "ACCEPT",
+      "rejection_codes": [],
+      "seed": "rectangular",
+      "used_color_count": 3,
+      "used_colors": [
+        "C01",
+        "C02",
+        "C03"
+      ],
       "width": 23
-    },
-    {
-      "candidate_id": "good-04-sparse",
-      "difficulty": null,
-      "diversity": {
-        "exact_duplicate_group": null,
-        "near_duplicate_pairs": []
-      },
-      "generator_mode": "FIXTURE",
-      "grid_hash": "7287f18e8048ed79860ecfd863608d256e0c05a6a762233b5c27a6903acf7e91",
-      "height": 20,
-      "human_review": "",
-      "metrics": {
-        "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
-        "checkerboard_score": 0.0,
-        "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C08": 40,
-          "C08|C08": 150,
-          "C08|C09": 20,
-          "C09|C09": 8
-        },
-        "color_components": [
-          {
-            "cells": [
-              [
-                6,
-                5
-              ],
-              [
-                7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
-                8
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
-                9
-              ],
-              [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
-              ],
-              [
-                7,
-                15
-              ],
-              [
-                8,
-                15
-              ],
-              [
-                9,
-                15
-              ],
-              [
-                10,
-                15
-              ],
-              [
-                11,
-                15
-              ],
-              [
-                12,
-                15
-              ],
-              [
-                13,
-                15
-              ],
-              [
-                14,
-                15
-              ]
-            ],
-            "color": "C08",
-            "size": 90
-          },
-          {
-            "cells": [
-              [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                7,
-                9
-              ],
-              [
-                7,
-                10
-              ],
-              [
-                7,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                7,
-                14
-              ]
-            ],
-            "color": "C09",
-            "size": 9
-          }
-        ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
-        "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
-        "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
-        "occupied_bounding_box": [
-          6,
-          5,
-          14,
-          15
-        ],
-        "occupied_center_of_mass": [
-          10.0,
-          10.0
-        ],
-        "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
-        ],
-        "occupied_component_count": 1,
-        "occupied_component_sizes": [
-          99
-        ],
-        "occupied_count": 99,
-        "occupied_edge_touch_count": 0,
-        "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
-        "tiny_region_cell_count": 0,
-        "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
-      },
-      "negative_space_color": "C01",
-      "policy": {
-        "difficulty": null,
-        "full_slab_min_occupied_ratio": 0.8,
-        "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
-        "max_isolated_ratio": 0.2,
-        "max_largest_region_ratio": 1.0,
-        "max_tiny_cell_ratio": 0.35,
-        "reject_full_single_shape_slab": true,
-        "tiny_region_max_size": 3,
-        "version": "m07-quality-policy-v1"
-      },
-      "quality_decision": "ACCEPT",
-      "rejection_codes": [],
-      "seed": "SPARSE",
-      "used_color_count": 3,
-      "used_colors": [
-        "C01",
-        "C08",
-        "C09"
-      ],
-      "width": 20
-    },
-    {
-      "candidate_id": "good-05-multi-island",
-      "difficulty": null,
-      "diversity": {
-        "exact_duplicate_group": null,
-        "near_duplicate_pairs": []
-      },
-      "generator_mode": "FIXTURE",
-      "grid_hash": "52827a4568954601f29777fda98627c686e120d2627b5af1d9e2fde1da3f8c5f",
-      "height": 20,
-      "human_review": "",
-      "metrics": {
-        "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
-        "checkerboard_score": 0.0,
-        "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C10": 40,
-          "C10|C10": 150,
-          "C10|C11": 20,
-          "C11|C11": 8
-        },
-        "color_components": [
-          {
-            "cells": [
-              [
-                6,
-                5
-              ],
-              [
-                7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
-                8
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
-                9
-              ],
-              [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
-              ],
-              [
-                7,
-                15
-              ],
-              [
-                8,
-                15
-              ],
-              [
-                9,
-                15
-              ],
-              [
-                10,
-                15
-              ],
-              [
-                11,
-                15
-              ],
-              [
-                12,
-                15
-              ],
-              [
-                13,
-                15
-              ],
-              [
-                14,
-                15
-              ]
-            ],
-            "color": "C10",
-            "size": 90
-          },
-          {
-            "cells": [
-              [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                7,
-                9
-              ],
-              [
-                7,
-                10
-              ],
-              [
-                7,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                7,
-                14
-              ]
-            ],
-            "color": "C11",
-            "size": 9
-          }
-        ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
-        "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
-        "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
-        "occupied_bounding_box": [
-          6,
-          5,
-          14,
-          15
-        ],
-        "occupied_center_of_mass": [
-          10.0,
-          10.0
-        ],
-        "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
-        ],
-        "occupied_component_count": 1,
-        "occupied_component_sizes": [
-          99
-        ],
-        "occupied_count": 99,
-        "occupied_edge_touch_count": 0,
-        "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
-        "tiny_region_cell_count": 0,
-        "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
-      },
-      "negative_space_color": "C01",
-      "policy": {
-        "difficulty": null,
-        "full_slab_min_occupied_ratio": 0.8,
-        "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
-        "max_isolated_ratio": 0.2,
-        "max_largest_region_ratio": 1.0,
-        "max_tiny_cell_ratio": 0.35,
-        "reject_full_single_shape_slab": true,
-        "tiny_region_max_size": 3,
-        "version": "m07-quality-policy-v1"
-      },
-      "quality_decision": "ACCEPT",
-      "rejection_codes": [],
-      "seed": "MULTI_ISLAND",
-      "used_color_count": 3,
-      "used_colors": [
-        "C01",
-        "C10",
-        "C11"
-      ],
-      "width": 20
-    },
-    {
-      "candidate_id": "good-06-near-duplicate",
-      "difficulty": null,
-      "diversity": {
-        "exact_duplicate_group": null,
-        "near_duplicate_pairs": []
-      },
-      "generator_mode": "FIXTURE",
-      "grid_hash": "86f02c421e58eef30711b23708675b31c63bd0942c81f3a3c913cee566fbc259",
-      "height": 20,
-      "human_review": "",
-      "metrics": {
-        "adjacency_edge_count": 760,
-        "aggregate_symmetry_score": 0.925,
-        "checkerboard_score": 0.0,
-        "color_adjacency": {
-          "C01|C01": 542,
-          "C01|C12": 40,
-          "C12|C12": 150,
-          "C12|C13": 20,
-          "C13|C13": 8
-        },
-        "color_components": [
-          {
-            "cells": [
-              [
-                6,
-                5
-              ],
-              [
-                7,
-                5
-              ],
-              [
-                8,
-                5
-              ],
-              [
-                9,
-                5
-              ],
-              [
-                10,
-                5
-              ],
-              [
-                11,
-                5
-              ],
-              [
-                12,
-                5
-              ],
-              [
-                13,
-                5
-              ],
-              [
-                14,
-                5
-              ],
-              [
-                6,
-                6
-              ],
-              [
-                8,
-                6
-              ],
-              [
-                9,
-                6
-              ],
-              [
-                10,
-                6
-              ],
-              [
-                11,
-                6
-              ],
-              [
-                12,
-                6
-              ],
-              [
-                13,
-                6
-              ],
-              [
-                14,
-                6
-              ],
-              [
-                6,
-                7
-              ],
-              [
-                8,
-                7
-              ],
-              [
-                9,
-                7
-              ],
-              [
-                10,
-                7
-              ],
-              [
-                11,
-                7
-              ],
-              [
-                12,
-                7
-              ],
-              [
-                13,
-                7
-              ],
-              [
-                14,
-                7
-              ],
-              [
-                6,
-                8
-              ],
-              [
-                8,
-                8
-              ],
-              [
-                9,
-                8
-              ],
-              [
-                10,
-                8
-              ],
-              [
-                11,
-                8
-              ],
-              [
-                12,
-                8
-              ],
-              [
-                13,
-                8
-              ],
-              [
-                14,
-                8
-              ],
-              [
-                6,
-                9
-              ],
-              [
-                8,
-                9
-              ],
-              [
-                9,
-                9
-              ],
-              [
-                10,
-                9
-              ],
-              [
-                11,
-                9
-              ],
-              [
-                12,
-                9
-              ],
-              [
-                13,
-                9
-              ],
-              [
-                14,
-                9
-              ],
-              [
-                6,
-                10
-              ],
-              [
-                8,
-                10
-              ],
-              [
-                9,
-                10
-              ],
-              [
-                10,
-                10
-              ],
-              [
-                11,
-                10
-              ],
-              [
-                12,
-                10
-              ],
-              [
-                13,
-                10
-              ],
-              [
-                14,
-                10
-              ],
-              [
-                6,
-                11
-              ],
-              [
-                8,
-                11
-              ],
-              [
-                9,
-                11
-              ],
-              [
-                10,
-                11
-              ],
-              [
-                11,
-                11
-              ],
-              [
-                12,
-                11
-              ],
-              [
-                13,
-                11
-              ],
-              [
-                14,
-                11
-              ],
-              [
-                6,
-                12
-              ],
-              [
-                8,
-                12
-              ],
-              [
-                9,
-                12
-              ],
-              [
-                10,
-                12
-              ],
-              [
-                11,
-                12
-              ],
-              [
-                12,
-                12
-              ],
-              [
-                13,
-                12
-              ],
-              [
-                14,
-                12
-              ],
-              [
-                6,
-                13
-              ],
-              [
-                8,
-                13
-              ],
-              [
-                9,
-                13
-              ],
-              [
-                10,
-                13
-              ],
-              [
-                11,
-                13
-              ],
-              [
-                12,
-                13
-              ],
-              [
-                13,
-                13
-              ],
-              [
-                14,
-                13
-              ],
-              [
-                6,
-                14
-              ],
-              [
-                8,
-                14
-              ],
-              [
-                9,
-                14
-              ],
-              [
-                10,
-                14
-              ],
-              [
-                11,
-                14
-              ],
-              [
-                12,
-                14
-              ],
-              [
-                13,
-                14
-              ],
-              [
-                14,
-                14
-              ],
-              [
-                6,
-                15
-              ],
-              [
-                7,
-                15
-              ],
-              [
-                8,
-                15
-              ],
-              [
-                9,
-                15
-              ],
-              [
-                10,
-                15
-              ],
-              [
-                11,
-                15
-              ],
-              [
-                12,
-                15
-              ],
-              [
-                13,
-                15
-              ],
-              [
-                14,
-                15
-              ]
-            ],
-            "color": "C12",
-            "size": 90
-          },
-          {
-            "cells": [
-              [
-                7,
-                6
-              ],
-              [
-                7,
-                7
-              ],
-              [
-                7,
-                8
-              ],
-              [
-                7,
-                9
-              ],
-              [
-                7,
-                10
-              ],
-              [
-                7,
-                11
-              ],
-              [
-                7,
-                12
-              ],
-              [
-                7,
-                13
-              ],
-              [
-                7,
-                14
-              ]
-            ],
-            "color": "C13",
-            "size": 9
-          }
-        ],
-        "color_entropy": 0.91606712,
-        "color_entropy_scaled": 916067,
-        "horizontal_symmetry_score": 0.9,
-        "isolated_occupied_count": 0,
-        "largest_color_dominance": 0.90909091,
-        "largest_occupied_region_dominance": 1.0,
-        "negative_space_count": 301,
-        "negative_space_ratio": 0.7525,
-        "occupied_bounding_box": [
-          6,
-          5,
-          14,
-          15
-        ],
-        "occupied_center_of_mass": [
-          10.0,
-          10.0
-        ],
-        "occupied_center_of_mass_scaled": [
-          10000000,
-          10000000
-        ],
-        "occupied_component_count": 1,
-        "occupied_component_sizes": [
-          99
-        ],
-        "occupied_count": 99,
-        "occupied_edge_touch_count": 0,
-        "occupied_edge_touch_ratio": 0.0,
-        "occupied_ratio": 0.2475,
-        "tiny_region_cell_count": 0,
-        "tiny_region_count": 0,
-        "vertical_symmetry_score": 0.95
-      },
-      "negative_space_color": "C01",
-      "policy": {
-        "difficulty": null,
-        "full_slab_min_occupied_ratio": 0.8,
-        "max_checkerboard_score": 0.98,
-        "max_color_dominance_ratio": 0.97,
-        "max_isolated_ratio": 0.2,
-        "max_largest_region_ratio": 1.0,
-        "max_tiny_cell_ratio": 0.35,
-        "reject_full_single_shape_slab": true,
-        "tiny_region_max_size": 3,
-        "version": "m07-quality-policy-v1"
-      },
-      "quality_decision": "ACCEPT",
-      "rejection_codes": [],
-      "seed": "NEAR_DUPLICATE",
-      "used_color_count": 3,
-      "used_colors": [
-        "C01",
-        "C12",
-        "C13"
-      ],
-      "width": 20
     }
   ],
   "quality_layer": {

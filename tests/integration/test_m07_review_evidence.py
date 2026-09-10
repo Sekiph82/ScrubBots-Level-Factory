@@ -28,6 +28,17 @@ def test_committed_m07_review_manifest_is_deterministic_and_complete() -> None:
         order = {code.value: index for index, code in enumerate(QualityCode)}
         assert entry["rejection_codes"] == sorted(entry["rejection_codes"], key=order.__getitem__)
 
+    by_id = {entry["candidate_id"]: entry for entry in manifest["entries"]}
+    assert by_id["good-02-sparse"]["metrics"]["occupied_ratio"] < 0.20
+    assert by_id["good-03-multi-island"]["metrics"]["occupied_component_count"] >= 2
+    assert by_id["good-04-symmetric"]["metrics"]["horizontal_symmetry_score"] == 1.0
+    assert by_id["good-05-asymmetric-organic"]["metrics"]["horizontal_symmetry_score"] < 1.0
+    assert by_id["good-05-asymmetric-organic"]["metrics"]["vertical_symmetry_score"] < 1.0
+    assert by_id["good-06-rectangular"]["width"] != by_id["good-06-rectangular"]["height"]
+    assert by_id["bad-09-exact-duplicate-a"]["diversity"]["exact_duplicate_group"] == [
+        "bad-09-exact-duplicate-a", "bad-10-exact-duplicate-b"
+    ]
+
 
 def test_contact_sheet_is_self_contained_and_nearest_neighbor_only() -> None:
     contact = (REVIEW_ROOT / "M07_QUALITY_CONTACT_SHEET.html").read_text(encoding="utf-8")
@@ -38,6 +49,13 @@ def test_contact_sheet_is_self_contained_and_nearest_neighbor_only() -> None:
     assert "image-rendering:pixelated" in lowered
     assert "interpolation" not in lowered
     assert "cdn" not in lowered
+    manifest = json.loads((REVIEW_ROOT / "m07_review_manifest.json").read_text(encoding="utf-8"))
+    generated = next(entry for entry in manifest["entries"] if entry["candidate_id"] == "generated-01-mask")
+    assert f"grid SHA-256: {generated['grid_hash']}" in contact
+    assert "exact duplicate group:" in contact
+    assert "near-duplicate partners:" in contact
+    assert "UNAVAILABLE: INVALID_INPUT" in contact
+    assert "isolated " in contact and "tiny " in contact and "dominance region/color" in contact
 
 
 def test_review_serialization_is_reproducible_without_machine_paths() -> None:

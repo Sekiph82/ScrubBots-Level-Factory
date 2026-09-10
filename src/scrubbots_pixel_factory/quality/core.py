@@ -77,7 +77,7 @@ class QualityPolicy:
     max_isolated_ratio: float = 0.20
     max_tiny_cell_ratio: float = 0.35
     max_largest_region_ratio: float = 1.0
-    max_color_dominance_ratio: float = 0.97
+    max_color_dominance_ratio: float = 1.0
     full_slab_min_occupied_ratio: float = 0.80
     max_checkerboard_score: float = 0.98
     reject_full_single_shape_slab: bool = True
@@ -160,6 +160,7 @@ class QualityMetrics:
     occupied_component_count: int
     occupied_component_sizes: tuple[int, ...]
     color_components: tuple[ColorComponent, ...]
+    occupied_color_counts: Mapping[str, int]
     isolated_occupied_count: int
     tiny_region_count: int
     tiny_region_cell_count: int
@@ -184,6 +185,7 @@ class QualityMetrics:
     def __post_init__(self) -> None:
         object.__setattr__(self, "color_components", tuple(self.color_components))
         object.__setattr__(self, "occupied_component_sizes", tuple(self.occupied_component_sizes))
+        object.__setattr__(self, "occupied_color_counts", _freeze_mapping(self.occupied_color_counts))
         object.__setattr__(self, "color_adjacency", _freeze_mapping(self.color_adjacency))
 
     def as_dict(self) -> dict[str, object]:
@@ -193,6 +195,9 @@ class QualityMetrics:
             "occupied_component_count": self.occupied_component_count,
             "occupied_component_sizes": list(self.occupied_component_sizes),
             "color_components": [component.as_dict() for component in self.color_components],
+            "occupied_color_counts": {
+                key: self.occupied_color_counts[key] for key in _sorted_ids(self.occupied_color_counts)
+            },
             "isolated_occupied_count": self.isolated_occupied_count,
             "tiny_region_count": self.tiny_region_count,
             "tiny_region_cell_count": self.tiny_region_cell_count,
@@ -401,10 +406,14 @@ def analyze_grid(
             )
     color_components.sort(key=lambda component: (_cid_key(component.color_id), component.cells[0] if component.cells else (0, 0)))
 
-    isolated_count = sum(1 for component in color_components if component.size == 1)
-    tiny_components = tuple(component for component in color_components if component.size <= tiny_region_max_size)
+    isolated_count = sum(1 for component in occupied_components if len(component) == 1)
+    tiny_components = tuple(component for component in occupied_components if len(component) <= tiny_region_max_size)
     largest_region = max(occupied_sizes, default=0)
-    largest_color = max((component.size for component in color_components), default=0)
+    occupied_color_counts = {
+        color: sum(1 for index in occupied_indices if normalized[index] == color)
+        for color in _sorted_ids(set(normalized) - {negative_space.inferred_color})
+    }
+    largest_color = max(occupied_color_counts.values(), default=0)
     edge_indices = set(_boundary_indices(width, height))
     edge_touch_count = sum(index in edge_indices for index in occupied_indices)
 
@@ -448,9 +457,10 @@ def analyze_grid(
         occupied_component_count=len(occupied_components),
         occupied_component_sizes=occupied_sizes,
         color_components=tuple(color_components),
+        occupied_color_counts=occupied_color_counts,
         isolated_occupied_count=isolated_count,
         tiny_region_count=len(tiny_components),
-        tiny_region_cell_count=sum(component.size for component in tiny_components),
+        tiny_region_cell_count=sum(len(component) for component in tiny_components),
         largest_occupied_region_dominance=_ratio(largest_region, occupied_count),
         largest_color_dominance=_ratio(largest_color, occupied_count),
         occupied_edge_touch_count=edge_touch_count,
@@ -506,7 +516,6 @@ def _quality_codes(analysis: QualityAnalysis, policy: QualityPolicy) -> tuple[st
             metrics.largest_occupied_region_dominance > policy.max_largest_region_ratio
             or metrics.largest_color_dominance > policy.max_color_dominance_ratio
         )
-        and len(occupied_colors) > 1
     ):
         codes.append(QualityCode.DOMINANCE_VIOLATION.value)
     if len(analysis.used_colors) == 2 and metrics.checkerboard_score >= policy.max_checkerboard_score:

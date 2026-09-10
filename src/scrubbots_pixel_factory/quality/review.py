@@ -21,6 +21,7 @@ class ReviewEntry:
     mode: str | None = None
     seed: int | str | None = None
     difficulty: Difficulty | str | None = None
+    classification: str | None = None
     policy: QualityPolicy = QualityPolicy()
 
     def __init__(
@@ -33,6 +34,7 @@ class ReviewEntry:
         mode: str | None = None,
         seed: int | str | None = None,
         difficulty: Difficulty | str | None = None,
+        classification: str | None = None,
         policy: QualityPolicy | None = None,
     ) -> None:
         if type(candidate_id) is not str or not candidate_id:
@@ -44,6 +46,7 @@ class ReviewEntry:
         object.__setattr__(self, "mode", mode)
         object.__setattr__(self, "seed", seed)
         object.__setattr__(self, "difficulty", parse_difficulty(difficulty) if difficulty is not None else None)
+        object.__setattr__(self, "classification", classification)
         object.__setattr__(self, "policy", policy or QualityPolicy())
 
 
@@ -60,6 +63,7 @@ def _entry_dict(entry: ReviewEntry, report: QualityReport) -> dict[str, object]:
         "generator_mode": entry.mode,
         "seed": entry.seed,
         "difficulty": entry.difficulty.value if isinstance(entry.difficulty, Difficulty) else entry.difficulty,
+        "fixture_classification": entry.classification,
         "width": entry.width,
         "height": entry.height,
         "used_color_count": used_count,
@@ -120,6 +124,9 @@ def _cell_color(color_id: str) -> str:
 
 def build_contact_sheet(entries: Iterable[ReviewEntry]) -> str:
     ordered = tuple(sorted(entries, key=lambda entry: entry.candidate_id))
+    manifest_by_id = {
+        str(item["candidate_id"]): item for item in build_review_manifest(ordered)["entries"]  # type: ignore[index]
+    }
     cards: list[str] = []
     for entry in ordered:
         report = _assessed(entry)
@@ -131,21 +138,42 @@ def build_contact_sheet(entries: Iterable[ReviewEntry]) -> str:
                 spans.append(f'<span class="cell" style="background:{_cell_color(cell)}"></span>')
         grid_html = "".join(spans)
         grid_style = f"grid-template-columns:repeat({entry.width},6px);grid-template-rows:repeat({entry.height},6px);"
+        evidence = manifest_by_id[entry.candidate_id]
         metric_summary = "unavailable"
         if analysis:
             metric_summary = (
-                f"occupied {analysis.metrics.occupied_ratio:.4f}; "
+                f"occupied ratio {analysis.metrics.occupied_ratio:.4f}; "
                 f"components {analysis.metrics.occupied_component_count}; "
+                f"isolated {analysis.metrics.isolated_occupied_count}; "
+                f"tiny {analysis.metrics.tiny_region_count}/{analysis.metrics.tiny_region_cell_count}; "
+                f"dominance region/color {analysis.metrics.largest_occupied_region_dominance:.4f}/"
+                f"{analysis.metrics.largest_color_dominance:.4f}; "
+                f"symmetry H/V {analysis.metrics.horizontal_symmetry_score:.4f}/"
+                f"{analysis.metrics.vertical_symmetry_score:.4f}; "
                 f"negative-space {analysis.negative_space.inferred_color}; "
                 f"colors {len(analysis.used_colors)}"
             )
+        grid_hash = evidence["grid_hash"] or "UNAVAILABLE: INVALID_INPUT"
+        diversity = evidence["diversity"]
+        exact_group = diversity["exact_duplicate_group"] or "none"
+        near_pairs = diversity["near_duplicate_pairs"]
+        near_summary = "none" if not near_pairs else "; ".join(
+            f"{pair['candidate_id']} occ={pair['occupancy_mask_similarity']:.4f} color={pair['color_layout_similarity']:.4f}"
+            for pair in near_pairs
+        )
+        difficulty = entry.difficulty.value if isinstance(entry.difficulty, Difficulty) else (entry.difficulty or "N/A")
+        classification = entry.classification or "N/A"
         cards.append(
             "<article class=\"card\">"
             f"<h2>{html.escape(entry.candidate_id)}</h2>"
             f"<p>mode={html.escape(str(entry.mode))} seed={html.escape(str(entry.seed))} "
-            f"difficulty={html.escape(str(entry.difficulty))} dimensions={entry.width}×{entry.height}</p>"
+            f"difficulty={html.escape(str(difficulty))} classification={html.escape(classification)} "
+            f"dimensions={entry.width}×{entry.height}</p>"
             f"<div class=\"grid\" style=\"{grid_style}\">{grid_html}</div>"
             f"<p>{html.escape(metric_summary)}</p>"
+            f"<p>grid SHA-256: {html.escape(str(grid_hash))}</p>"
+            f"<p>exact duplicate group: {html.escape(str(exact_group))}</p>"
+            f"<p>near-duplicate partners: {html.escape(near_summary)}</p>"
             f"<p class=\"{'accept' if report.accepted else 'reject'}\">"
             f"{'ACCEPT' if report.accepted else 'REJECT'} "
             f"{html.escape(', '.join(report.rejection_codes) or 'none')}</p>"

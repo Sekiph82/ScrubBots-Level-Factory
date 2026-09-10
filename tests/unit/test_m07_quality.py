@@ -46,8 +46,10 @@ def test_metrics_are_hand_computable_and_include_all_structural_families() -> No
     assert metrics.color_components[0].size == 8
     assert metrics.color_components[1].color_id == "C03"
     assert metrics.color_components[1].size == 1
-    assert metrics.isolated_occupied_count == 1
-    assert metrics.tiny_region_count == 1
+    assert metrics.isolated_occupied_count == 0
+    assert metrics.tiny_region_count == 0
+    assert metrics.tiny_region_cell_count == 0
+    assert metrics.occupied_color_counts == {"C02": 8, "C03": 1}
     assert metrics.largest_occupied_region_dominance == 1.0
     assert metrics.occupied_edge_touch_count == 0
     assert metrics.occupied_bounding_box == (1, 1, 3, 3)
@@ -82,6 +84,68 @@ def test_rectangular_grid_and_edge_cases() -> None:
     assert analyze_grid(3, 3, ["C01"] * 9).metrics.color_entropy == 0.0
 
 
+def test_known_answer_one_cell_full_interior_and_equal_size_components() -> None:
+    one_cell = ["C01"] * 25
+    one_cell[12] = "C02"
+    one_analysis = analyze_grid(5, 5, one_cell)
+    assert one_analysis.metrics.occupied_count == 1
+    assert one_analysis.metrics.occupied_component_sizes == (1,)
+    assert one_analysis.metrics.isolated_occupied_count == 1
+    assert one_analysis.metrics.tiny_region_count == 1
+
+    full_interior = ["C01"] * 25
+    for y in range(1, 4):
+        for x in range(1, 4):
+            full_interior[y * 5 + x] = "C02"
+    interior_analysis = analyze_grid(5, 5, full_interior)
+    assert interior_analysis.metrics.occupied_count == 9
+    assert interior_analysis.metrics.occupied_component_count == 1
+    assert interior_analysis.metrics.occupied_component_sizes == (9,)
+    assert interior_analysis.metrics.negative_space_count == 16
+
+    equal_components = ["C01"] * 25
+    for index in (6, 11, 13, 18):
+        equal_components[index] = "C02" if index in (6, 11) else "C03"
+    equal_analysis = analyze_grid(5, 5, equal_components)
+    assert equal_analysis.metrics.occupied_component_sizes == (2, 2)
+    assert equal_analysis.metrics.occupied_component_count == 2
+    assert equal_analysis.metrics.tiny_region_count == 2
+    assert equal_analysis.metrics.largest_occupied_region_dominance == 0.5
+    assert equal_analysis.metrics.largest_color_dominance == 0.5
+
+
+def test_directional_symmetry_fixtures_distinguish_axes_and_asymmetry() -> None:
+    horizontal_only = [
+        "C01", "C01", "C01", "C01", "C01",
+        "C01", "C02", "C03", "C02", "C01",
+        "C01", "C02", "C02", "C02", "C01",
+        "C01", "C02", "C04", "C02", "C01",
+        "C01", "C01", "C01", "C01", "C01",
+    ]
+    horizontal_analysis = analyze_grid(5, 5, horizontal_only)
+    assert horizontal_analysis.metrics.horizontal_symmetry_score == 1.0
+    assert horizontal_analysis.metrics.vertical_symmetry_score < 1.0
+
+    vertical_only = [
+        "C01", "C01", "C01", "C01", "C01",
+        "C01", "C02", "C03", "C04", "C01",
+        "C01", "C02", "C02", "C02", "C01",
+        "C01", "C02", "C03", "C04", "C01",
+        "C01", "C01", "C01", "C01", "C01",
+    ]
+    vertical_analysis = analyze_grid(5, 5, vertical_only)
+    assert vertical_analysis.metrics.vertical_symmetry_score == 1.0
+    assert vertical_analysis.metrics.horizontal_symmetry_score < 1.0
+
+    asymmetric = ["C01"] * 25
+    asymmetric[6] = "C02"
+    asymmetric[12] = "C02"
+    asymmetric[18] = "C03"
+    asymmetric_analysis = analyze_grid(5, 5, asymmetric)
+    assert asymmetric_analysis.metrics.horizontal_symmetry_score < 1.0
+    assert asymmetric_analysis.metrics.vertical_symmetry_score < 1.0
+
+
 def test_invalid_grid_input_fails_closed_with_stable_codes() -> None:
     assert evaluate_grid(2, 2, ["C01"]).rejection_codes == (QualityCode.DIMENSION_MISMATCH.value,)
     assert evaluate_grid(2, 2, ["BG01"] * 4).rejection_codes == (QualityCode.OFF_PALETTE.value,)
@@ -92,7 +156,7 @@ def test_invalid_grid_input_fails_closed_with_stable_codes() -> None:
 
 def test_rejection_policy_is_explicit_and_multicode_order_is_stable() -> None:
     noisy = _checkerboard(4, 4)
-    policy = QualityPolicy(max_isolated_ratio=0.1, max_tiny_cell_ratio=0.1, max_checkerboard_score=0.9)
+    policy = QualityPolicy(max_isolated_ratio=0.1, max_tiny_cell_ratio=0.1, max_checkerboard_score=0.9, max_color_dominance_ratio=1.0)
     report = evaluate_grid(4, 4, noisy, policy=policy)
     assert report.accepted is False
     assert report.rejection_codes == (
@@ -128,6 +192,60 @@ def test_required_bad_fixture_classes_and_good_counterexample() -> None:
 
     good = evaluate_grid(5, 5, _subject_grid())
     assert good.accepted is True
+
+
+def test_each_required_rejection_code_is_directly_asserted() -> None:
+    assert evaluate_grid(3, 3, ["C01"] * 9).rejection_codes == (QualityCode.EMPTY_ARTWORK.value,)
+
+    slab = ["C01"] * 400
+    for y in range(1, 19):
+        for x in range(1, 19):
+            slab[y * 20 + x] = "C02"
+    assert QualityCode.FULL_SINGLE_SHAPE_SLAB.value in evaluate_grid(20, 20, slab).rejection_codes
+
+    isolated = ["C01"] * 25
+    for index in (6, 8, 16, 18):
+        isolated[index] = "C02"
+    assert QualityCode.EXCESSIVE_SALT_AND_PEPPER.value in evaluate_grid(5, 5, isolated, policy=QualityPolicy(max_isolated_ratio=0.1)).rejection_codes
+
+    fragmented = ["C01"] * 49
+    for index in (8, 10, 36, 38):
+        fragmented[index] = "C02"
+    assert QualityCode.EXCESSIVE_TINY_REGIONS.value in evaluate_grid(7, 7, fragmented, policy=QualityPolicy(max_tiny_cell_ratio=0.1)).rejection_codes
+
+    dominant = ["C01"] * 25
+    for index in (6, 7, 8, 11, 13, 16, 17, 18):
+        dominant[index] = "C02"
+    dominant[12] = "C03"
+    assert QualityCode.DOMINANCE_VIOLATION.value in evaluate_grid(5, 5, dominant, policy=QualityPolicy(max_color_dominance_ratio=0.5)).rejection_codes
+    assert QualityCode.CHECKERBOARD_NOISE.value in evaluate_grid(4, 4, _checkerboard(4, 4), policy=QualityPolicy(max_checkerboard_score=0.9)).rejection_codes
+    assert QualityCode.DIFFICULTY_COLOR_COUNT.value in evaluate_grid(20, 20, ["C01", "C02"] * 200, policy=QualityPolicy(difficulty="EASY")).rejection_codes
+    assert QualityCode.OFF_PALETTE.value in evaluate_grid(2, 2, ["BG01"] * 4).rejection_codes
+    assert QualityCode.DIMENSION_MISMATCH.value in evaluate_grid(2, 2, ["C01"] * 3).rejection_codes
+
+
+def test_color_dominance_aggregates_split_components_and_honors_one_color_threshold() -> None:
+    split = ["C01"] * 81
+    for y in range(1, 4):
+        for x in (1, 2, 3, 5, 6, 7):
+            split[y * 9 + x] = "C02"
+    for y in range(5, 7):
+        for x in (3, 4):
+            split[y * 9 + x] = "C03"
+    split_analysis = analyze_grid(9, 9, split)
+    assert split_analysis.metrics.occupied_component_count == 3
+    assert split_analysis.metrics.largest_occupied_region_dominance == round(9 / 22, 8)
+    assert split_analysis.metrics.largest_color_dominance == round(18 / 22, 8)
+    assert split_analysis.metrics.occupied_color_counts == {"C02": 18, "C03": 4}
+    assert QualityCode.DOMINANCE_VIOLATION.value in evaluate_grid(9, 9, split, policy=QualityPolicy(max_color_dominance_ratio=0.8)).rejection_codes
+
+    one_color = ["C01"] * 25
+    for y in range(1, 4):
+        for x in range(1, 4):
+            one_color[y * 5 + x] = "C02"
+    strict = evaluate_grid(5, 5, one_color, policy=QualityPolicy(max_color_dominance_ratio=0.5))
+    assert QualityCode.DOMINANCE_VIOLATION.value in strict.rejection_codes
+    assert QualityCode.DOMINANCE_VIOLATION.value not in evaluate_grid(5, 5, one_color).rejection_codes
 
 
 def test_difficulty_color_count_is_checked_only_when_supplied() -> None:
