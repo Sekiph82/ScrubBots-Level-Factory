@@ -4,13 +4,13 @@ This root TASKS.md is the only authoritative project-status tracker consumed by 
 
 ## Project Status
 
-- Current Milestone: PAG-M08
-- Current Sprint: PAG-M08-C003
-- Current Task: PAG-M08-C003 — Deterministic Rich Provenance Binding Closure
+- Current Milestone: PAG-M09
+- Current Sprint: PAG-M09-C001
+- Current Task: PAG-M09-C001 — CLI & Local Batch Generation
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M08-C003 bounded rich-provenance closure prompt, publish deterministic attempt/stage binding evidence, then request independent audit.
+- Next Task/Action: Execute the authoritative PAG-M09-C001 CLI & Local Batch Generation prompt, publish the matching builder log and deterministic single/reproduce/batch evidence, then request independent audit.
 - Required Actor: CODEX
-- Blockers/Waits: PAG-M09+ blocked until PAG-M08 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
+- Blockers/Waits: PAG-M10+ blocked until PAG-M09 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 
@@ -422,8 +422,8 @@ Minimum completion rules:
 - [x] **PAG-M05 — Wave Function Collapse Generator**
 - [x] **PAG-M06 — Hybrid Generator Router**
 - [x] **PAG-M07 — Artwork Quality & Diversity Filters**
-- [~] **PAG-M08 — Output / Export Contract**
-- [ ] **PAG-M09 — CLI & Local Batch Generation**
+- [x] **PAG-M08 — Output / Export Contract**
+- [~] **PAG-M09 — CLI & Local Batch Generation**
 - [ ] **PAG-M10 — Validation, Performance & V1 Acceptance**
 - [ ] **PAG-M11 — Godot/Main-Level-Factory Handoff Gate**
 
@@ -882,59 +882,63 @@ V1 must not pretend these heuristics understand game difficulty.
 
 # PAG-M08 — Output / Export Contract
 
-H!veAI active cycle: `PAG-M08-C003 — Deterministic Rich Provenance Binding Closure`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M08-C002_PROVENANCE_BINDING_RECTANGULAR_GOLDEN_AND_STRICT_PNG_REMEDIATION_STRICT_AUDIT.md`  
-C001 state: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_C002`  
-C002 state: `AUDIT_FAILED / RECTANGULAR_AND_IEND_CLOSED / RICH_PROVENANCE_RESIDUAL_TO_C003`
+M08 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M08-C003 — Deterministic Rich Provenance Binding Closure`  
+Closing audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`  
+C001-C002 findings: `REMEDIATED / CLOSED`  
+M09 is authorized to proceed.
 
 ## Sprint PAG-S08.1 — Logical-grid JSON
 
-- [ ] PAG-0801 Define versioned generator artifact schema.
-- [ ] PAG-0802 Store candidate ID.
-- [ ] PAG-0803 Store difficulty.
-- [ ] PAG-0804 Store exact width and height.
-- [ ] PAG-0805 Store local palette as ascending canonical C-IDs.
-- [ ] PAG-0806 Store row-major logical cells.
-- [ ] PAG-0807 Canonical row-major index = `y * width + x`.
-- [ ] PAG-0808 Store generator mode/version.
-- [ ] PAG-0809 Store master seed.
-- [ ] PAG-0810 Store stage sub-seeds.
-- [ ] PAG-0811 Store generation config/version.
-- [ ] PAG-0812 Store source/exemplar provenance where relevant.
-- [ ] PAG-0813 Store quality metrics.
-- [ ] PAG-0814 Store acceptance/rejection state separately from immutable generated grid.
+- [x] PAG-0801 Define versioned generator artifact schema.
+- [x] PAG-0802 Store candidate ID.
+- [x] PAG-0803 Store difficulty.
+- [x] PAG-0804 Store exact width and height.
+- [x] PAG-0805 Store local palette as ascending canonical C-IDs.
+- [x] PAG-0806 Store row-major logical cells.
+- [x] PAG-0807 Canonical row-major index = `y * width + x`.
+- [x] PAG-0808 Store generator mode/version.
+- [x] PAG-0809 Store master seed.
+- [x] PAG-0810 Store stage sub-seeds.
+- [x] PAG-0811 Store generation config/version.
+- [x] PAG-0812 Store source/exemplar provenance where relevant.
+- [x] PAG-0813 Store quality metrics.
+- [x] PAG-0814 Store acceptance/rejection state separately from immutable generated grid.
 
 ## Sprint PAG-S08.2 — PNG output
 
-- [ ] PAG-0815 Generate logical-resolution PNG exactly width×height.
-- [ ] PAG-0816 One PNG pixel equals one logical cell.
-- [ ] PAG-0817 Use exact canonical RGB for every cell.
-- [ ] PAG-0818 No antialiasing/interpolation.
-- [ ] PAG-0819 Do not bake presentation grid lines into the logical PNG.
-- [ ] PAG-0820 Generate optional enlarged preview PNG using integer nearest-neighbor scaling.
-- [ ] PAG-0821 Optional preview may show BG01 and presentation grid, but logical source PNG/JSON remain unchanged.
+- [x] PAG-0815 Generate logical-resolution PNG exactly width×height.
+- [x] PAG-0816 One PNG pixel equals one logical cell.
+- [x] PAG-0817 Use exact canonical RGB for every cell.
+- [x] PAG-0818 No antialiasing/interpolation.
+- [x] PAG-0819 Do not bake presentation grid lines into the logical PNG.
+- [x] PAG-0820 Generate optional enlarged preview PNG using integer nearest-neighbor scaling.
+- [x] PAG-0821 Optional preview may show BG01 and presentation grid, but logical source PNG/JSON remain unchanged.
 
 ## Sprint PAG-S08.3 — Round-trip validation
 
-- [ ] PAG-0822 Reconstruct PNG from logical JSON.
-- [ ] PAG-0823 Reconstruct logical JSON from generator's own PNG where format permits unambiguous exact mapping.
-- [ ] PAG-0824 Compare raw logical RGB bytes.
-- [ ] PAG-0825 Prove no resize/interpolation occurred.
-- [ ] PAG-0826 Prove JSON cell count = width×height.
-- [ ] PAG-0827 Prove every cell references the local palette.
-- [ ] PAG-0828 Prove local palette is an actually-used ascending C-ID subset.
+- [x] PAG-0822 Reconstruct PNG from logical JSON.
+- [x] PAG-0823 Reconstruct logical JSON from generator's own PNG where format permits unambiguous exact mapping.
+- [x] PAG-0824 Compare raw logical RGB bytes.
+- [x] PAG-0825 Prove no resize/interpolation occurred.
+- [x] PAG-0826 Prove JSON cell count = width×height.
+- [x] PAG-0827 Prove every cell references the local palette.
+- [x] PAG-0828 Prove local palette is an actually-used ascending C-ID subset.
 
 ### M08 acceptance
 
-- [ ] PAG-0829 Golden PNG/JSON pairs pass byte-level round-trip tests.
-- [ ] PAG-0830 Re-running accepted output with same config/seed creates no meaningless diff.
+- [x] PAG-0829 Golden PNG/JSON pairs pass byte-level round-trip tests.
+- [x] PAG-0830 Re-running accepted output with same config/seed creates no meaningless diff.
 
 ---
 
 # PAG-M09 — CLI & Local Batch Generation
+
+H!veAI active cycle: `PAG-M09-C001 — CLI & Local Batch Generation`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_PROMPT.md`  
+Previous milestone closing audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
 
 ## Sprint PAG-S09.1 — Single generation CLI
 
