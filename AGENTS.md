@@ -131,3 +131,10 @@ Do not resize, resample, interpolate, or antialias logical source art to force i
 ## Historical references
 
 `reference/audits/` contains read-only copies of relevant main SCRUBBOTS audit history. Use them as historical evidence only. Current owner-approved contracts and this repository's active task/prompt authority take precedence.
+
+## H!veAI GitHub tracking
+
+- The repository root TASKS.md is the only current project-status tracker.
+- Keep the Project Status fields and task rows current when work changes state.
+- Commit and push TASKS.md with the implementation evidence that it describes.
+- Do not create or revive .hiveai PROJECT/RULES/TASKS/STATE/HANDOFF/EVENTS files as a competing tracker.

@@ -1,20 +1,3 @@
-# ScrubBots - Pixel Art Generator — Canonical GitHub Task State
-
-This root TASKS.md is the only authoritative project-status tracker consumed by H!veAI. GitHub repository metadata and the latest commit are the remaining project-truth inputs. Hidden .hiveai control-plane files are historical only and are not read for current project state.
-
-## Project Status
-
-- Current Milestone: PAG-M08
-- Current Sprint: PAG-M08-C001
-- Current Task: PAG-M08-C001 — Output / Export Contract
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M08-C001 prompt, publish deterministic evidence, then request independent audit.
-- Required Actor: CODEX
-- Blockers/Waits: PAG-M09+ blocked until PAG-M08 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
-- Tracking Repository: Sekiph82/ScrubBots-Level-Factory
-- Tracking Branch: main
-
-## Tasks
 # SCRUBBOTS LEVEL FACTORY — PIXEL ART GENERATOR V1 TASK PLAN
 
 > Repository: https://github.com/Sekiph82/ScrubBots-Level-Factory  
@@ -1263,5 +1246,3 @@ where:
 - the output is ready to be consumed later by the SCRUBBOTS Level Factory.
 
 That is the boundary of Pixel Art Generator V1.
-
-
