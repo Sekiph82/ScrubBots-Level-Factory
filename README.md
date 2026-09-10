@@ -50,3 +50,29 @@ convention are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 `tasks.md` is the canonical task ledger. ChatGPT is the independent auditor
 and tracker owner; Codex is the implementation builder only. Passing builder
 tests are evidence for later independent review and do not close tasks.
+
+## Offline CLI (M09)
+
+The standard-library CLI is available from PowerShell as either
+`python -m scrubbots_pixel_factory.cli` or, after an editable install, the
+`scrubbots-pixel` console command. It provides `generate`, `reproduce` and
+finite `batch` commands and never fetches network data.
+
+Explicit `--seed` values that are canonical decimal integers (for example
+`42` or `-7`) are integer seeds; every other token is a string seed. A single
+`generate` may omit `--seed`, in which case the locally selected entropy seed
+is printed and recorded. Batch generation requires an explicit `--seed`, a
+positive `--count` of accepted unique candidates and a positive
+`--max-attempts` bound.
+
+`generate` writes one accepted M08 bundle below `--output` (default
+`output`). `reproduce path\to\metadata.json` verifies the recorded request,
+logical grid, bundle bytes and rich provenance; WFC-bearing requests require
+the matching local `--exemplar-json`. `batch` writes a canonical
+`batch-manifest.json`, candidate bundles below `candidates/`, and deterministic
+review output below `review/`; resume uses `batch --resume path\to\batch-manifest.json`.
+
+Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
+invalid request/config, `4` generator failure, `5` quality rejection, `6`
+reproduction mismatch/unsupported metadata, `7` batch exhausted before its
+accepted target, and `8` filesystem/output failure.
