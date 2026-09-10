@@ -62,7 +62,7 @@ These rules come from the main SCRUBBOTS repository and must not be silently cha
 Width and height are validated independently. Rectangular boards are allowed.
 
 | Difficulty | Width | Height | Maximum cells |
-| --- | ---: | ---: | ---: |
+| --- | ---: | ---: |
 | EASY | 20–29 | 20–29 | 841 |
 | MEDIUM | 30–39 | 30–39 | 1,521 |
 | HARD | 40–49 | 40–49 | 2,401 |
@@ -404,8 +404,8 @@ Minimum completion rules:
 - [x] **PAG-M03 — Mask / Sprite Generator**
 - [!] **PAG-M04 — Procedural Shape / Rule Generator**
 - [x] **PAG-M05 — Wave Function Collapse Generator**
-- [~] **PAG-M06 — Hybrid Generator Router**
-- [ ] **PAG-M07 — Artwork Quality & Diversity Filters**
+- [x] **PAG-M06 — Hybrid Generator Router**
+- [~] **PAG-M07 — Artwork Quality & Diversity Filters**
 - [ ] **PAG-M08 — Output / Export Contract**
 - [ ] **PAG-M09 — CLI & Local Batch Generation**
 - [ ] **PAG-M10 — Validation, Performance & V1 Acceptance**
@@ -511,7 +511,7 @@ Closing audit: `.hiveai/audits/PAG-M01-C001_CANONICAL_SCRUBBOTS_CONTRACTS_STRICT
 
 M02 final state: `PASS / CLOSED`  
 Closing cycle: `PAG-M02-C003 — Result Construction Boundary Remediation`  
-Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
+Closing audit: `.hiveai/audits/PAG-M02-C003_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
 
 ## Sprint PAG-S02.1 — Generation request
 
@@ -761,12 +761,10 @@ Primary implementation reference: `ikarth/wfc_2019f`.
 
 # PAG-M06 — Hybrid Generator Router
 
-H!veAI active cycle: `PAG-M06-C002 — WFC Remap, Stage Replay & Router Evidence Remediation`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M06-C002_WFC_REMAP_STAGE_REPLAY_AND_ROUTER_EVIDENCE_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M06-C001_HYBRID_GENERATOR_ROUTER_STRICT_AUDIT.md`  
-C001 verdict: `FAIL / FIX_REQUIRED`  
+M06 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M06-C004 — WFC Evidence Binding Closure`  
+Closing audit: `.hiveai/audits/PAG-M06-C004_WFC_EVIDENCE_BINDING_CLOSURE_STRICT_AUDIT.md`  
+C001-C003 findings: `REMEDIATED / CLOSED`  
 Existing forward dependency: `PAG-0441` remains blocked until M10 establishes the V1 performance budget.
 
 Goal: combine generator families while keeping each generator independently testable.
@@ -778,14 +776,14 @@ Goal: combine generator families while keeping each generator independently test
 - [x] PAG-0603 Implement AUTO mode only after explicit modes are stable.
 - [x] PAG-0604 AUTO mode selection must itself be seed-deterministic.
 - [x] PAG-0605 Record actual selected engine/version in result metadata.
-- [~] PAG-0606 Never hide engine failure behind a different mode unless fallback policy explicitly permits it.
+- [x] PAG-0606 Never hide engine failure behind a different mode unless fallback policy explicitly permits it.
 
 ## Sprint PAG-S06.2 — Hybrid strategies
 
 - [x] PAG-0607 MASK_GEOMETRY + RULE_COLOR_REGIONS strategy.
 - [x] PAG-0608 RULE_GEOMETRY + MASK_SYMMETRY strategy.
-- [~] PAG-0609 RULE_BASE + WFC_DETAIL strategy.
-- [~] PAG-0610 MASK_BASE + WFC_DETAIL strategy.
+- [x] PAG-0609 RULE_BASE + WFC_DETAIL strategy.
+- [x] PAG-0610 MASK_BASE + WFC_DETAIL strategy.
 - [x] PAG-0611 Keep final logical dimensions fixed throughout all stages.
 - [x] PAG-0612 Keep final palette inside C01..C16.
 - [x] PAG-0613 Preserve stage-by-stage provenance/sub-seeds.
@@ -794,12 +792,18 @@ Goal: combine generator families while keeping each generator independently test
 ### M06 acceptance
 
 - [x] PAG-0615 At least two hybrid strategies produce valid deterministic outputs.
-- [~] PAG-0616 Hybrid result metadata can reproduce every stage.
+- [x] PAG-0616 Hybrid result metadata can reproduce every stage.
 - [x] PAG-0617 No hybrid path performs interpolation/resizing.
 
 ---
 
 # PAG-M07 — Artwork Quality & Diversity Filters
+
+H!veAI active cycle: `PAG-M07-C001 — Artwork Quality & Diversity Filters`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M07-C001_ARTWORK_QUALITY_AND_DIVERSITY_FILTERS_PROMPT.md`  
+Previous milestone closing audit: `.hiveai/audits/PAG-M06-C004_WFC_EVIDENCE_BINDING_CLOSURE_STRICT_AUDIT.md`
 
 These are **visual/structural quality gates**, not gameplay difficulty or solvability rules.
 
