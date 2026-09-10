@@ -48,29 +48,30 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M07-C003`
-Title: `Review Evidence & Symmetry Contract Closure`
+Cycle: `PAG-M08-C001`
+Title: `Output / Export Contract`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_PROMPT.md`
+Prompt: `.hiveai/prompts/PAG-M08-C001_OUTPUT_EXPORT_CONTRACT_PROMPT.md`
+Previous closing audit: `.hiveai/audits/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_STRICT_AUDIT.md`
 
 ## Failed / remediation-required cycles
 
 ### PAG-M07-C002 — Structural Metric Semantics & Acceptance Evidence Remediation
-State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M07-C003`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M07-C003`
 Audit: `.hiveai/audits/PAG-M07-C002_STRUCTURAL_METRIC_SEMANTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
 Closed functional scope: C001 occupied-mask fragmentation semantics, total occupied color dominance and explicit threshold enforcement, genuine structural fixtures, representative generator acceptance evidence, and per-card rendered hash/diversity evidence.
-Open findings: `F-PAG-M07-C002-001`, `F-PAG-M07-C002-002`
-Open scope: card-local contact-sheet evidence assertions and explicit horizontal/vertical symmetry reflection documentation.
+Original residual findings: `F-PAG-M07-C002-001`, `F-PAG-M07-C002-002`
+Final disposition: both residual findings closed by PAG-M07-C003.
 Implementation/evidence commit: `7c4ef89` as recorded by builder log.
 Builder-log equality checkpoint: `5d3355c78f397b058d53fb03d1aa86f48d6d5c3a`
 Terminal builder-era HEAD independently observed: `4379400527bfd81061512840958f3e939b880e87`
 
 ### PAG-M07-C001 — Artwork Quality & Diversity Filters
-State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M07-C002 / REMAINDER_BY_PAG-M07-C003`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M07-C002_AND_C003`
 Audit: `.hiveai/audits/PAG-M07-C001_ARTWORK_QUALITY_AND_DIVERSITY_FILTERS_STRICT_AUDIT.md`
 Original findings: `F-PAG-M07-C001-001`, `F-PAG-M07-C001-002`, `F-PAG-M07-C001-003`, `F-PAG-M07-C001-004`
-C002 disposition: substantive metric semantics, structural fixtures, generator acceptance evidence and renderer content corrected; residual review evidence binding and symmetry documentation flow through C003.
+Final disposition: substantive metric semantics, structural fixtures, generator acceptance evidence and renderer content corrected by C002; card-local evidence binding and symmetry documentation closed by C003. No open M07 finding remains.
 Implementation/review commit: `81059b10e34c1cdedab9d1fc2152306dd87b5ae4`
 Builder-log publication commits: `e8725a62e23f693adfd66b715ea2207158f6d1d7`, `6eba2c153014b1191aeda895ca19954e58920afc`
 Terminal builder-era HEAD independently observed: `6eba2c153014b1191aeda895ca19954e58920afc`
@@ -110,47 +111,57 @@ Classification: `PUBLICATION_HANDOFF_FAILURE / NOT_A_PRODUCT_AUDIT_VERDICT`
 ### PAG-M05-C001 — Wave Function Collapse Generator
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M05-C002`
 Audit: `.hiveai/audits/PAG-M05-C001_WAVE_FUNCTION_COLLAPSE_GENERATOR_STRICT_AUDIT.md`
-Open findings: `F-PAG-M05-C001-001`, `F-PAG-M05-C001-002`, `F-PAG-M05-C001-003`, `F-PAG-M05-C001-004`
+Original findings: `F-PAG-M05-C001-001`, `F-PAG-M05-C001-002`, `F-PAG-M05-C001-003`, `F-PAG-M05-C001-004`
 Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48dedbcbc6bde`
 
 ### PAG-M04-C001 — Procedural Shape / Rule Generator
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
 Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
 Forward dependency: `PAG-0441` blocked on M10 performance budget
-Terminal builder-era HEAD independently observed: `315233b77211d4771832b1732d9f9e52af66364a`
+Terminal builder-era HEAD independently observed: `315233b77211d4771832b173d9f9e52af66364a`
 
 ### PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M03-C003`
 Audit: `.hiveai/audits/PAG-M03-C002_REPRODUCIBILITY_REGION_QUALITY_AND_RECOGNIZABILITY_REMEDIATION_STRICT_AUDIT.md`
 Closed findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`
-Open findings: `F-PAG-M03-C002-001`, `F-PAG-M03-C002-002`
+Original remaining findings: `F-PAG-M03-C002-001`, `F-PAG-M03-C002-002`
 Terminal builder-era HEAD independently observed: `9dc2eb7ae6620f655d21b6b2481a74c5783149dd`
 
 ### PAG-M03-C001 — Mask / Sprite Generator
-State: `AUDIT_FAILED / PARTIALLY_REMEDIATED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M03-C002_AND_C003`
 Audit: `.hiveai/audits/PAG-M03-C001_MASK_SPRITE_GENERATOR_STRICT_AUDIT.md`
-Open findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`, `F-PAG-M03-C001-003`, `F-PAG-M03-C001-004`
+Original findings: `F-PAG-M03-C001-001`, `F-PAG-M03-C001-002`, `F-PAG-M03-C001-003`, `F-PAG-M03-C001-004`
 Terminal builder-era HEAD independently observed: `15363eb9d49d4e8791bfe0e038f9e83017c503fc`
 
 ### PAG-M02-C002 — Result Integrity & Provenance Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M02-C003`
 Audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
 Closed findings: `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
-Open finding: `F-PAG-M02-C002-001`
+Original remaining finding: `F-PAG-M02-C002-001`
 Terminal builder-era HEAD independently observed: `7ccbc1ad3209d0e2d3f4e03d4c19127a69b33ce6`
 
 ### PAG-M02-C001 — Deterministic Generation Core
-State: `AUDIT_FAILED / PARTIALLY_REMEDIATED`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M02-C002_AND_C003`
 Audit: `.hiveai/audits/PAG-M02-C001_DETERMINISTIC_GENERATION_CORE_STRICT_AUDIT.md`
-Open findings: `F-PAG-M02-C001-001`, `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
+Original findings: `F-PAG-M02-C001-001`, `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
 Terminal builder-era HEAD independently observed: `e5274894725209834849b59d43be9999b2f31f9a`
 
 ### PAG-M00-C002 — Repository Bootstrap & Governance
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M00-C003`
 Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`
-Open findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
+Original findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M07-C003 — Review Evidence & Symmetry Contract Closure
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_STRICT_AUDIT.md`
+Closes findings: `F-PAG-M07-C002-001`, `F-PAG-M07-C002-002`
+Closes milestone: `PAG-M07 — Artwork Quality & Diversity Filters`
+Implementation/evidence commit: `fd6bea1f4d410b16e0246b41dcc14505191eb48c`
+Builder-log publication/equality commits: `529ede25d6b09e25506e40243c9e2eb879eef109`, `0479d5d873560d180c8a5a204d126cf4b8e30d5a`
+Terminal builder-era HEAD independently observed: `0479d5d873560d180c8a5a204d126cf4b8e30d5a`
+Audit result: M07 PASS / CLOSED, 38/38 task IDs eligible for tracker completion.
 
 ### PAG-M06-C004 — WFC Evidence Binding Closure
 State: `AUDIT_PASSED / TASK_COMPLETE`
