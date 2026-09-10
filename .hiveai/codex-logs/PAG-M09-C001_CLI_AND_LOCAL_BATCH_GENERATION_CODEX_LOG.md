@@ -44,4 +44,5 @@ This matching M09 builder log was created before the first M09 source, test, fix
 
 - Implementation commit: `23f27f3e73dc4a6ef34338378139aac842f3fde6` (`Implement M09 offline CLI and batch generation`). It contains only the M09 CLI package, entry point/docs, M09 tests, and this matching builder log.
 - `git push origin main` succeeded; remote advanced `ed5d2c3..23f27f3`.
-- The completed builder log is published in the next log-publication commit. The terminal post-publication equality check will be run immediately after that push and recorded.
+- Completed-log publication commit: `5f1324dade158315dfc062a079d4dbde716fd409` (`Complete M09 C001 builder log`), pushed successfully to `origin/main`.
+- Terminal post-completed-log equality verification: after `git fetch origin main`, local `HEAD` was `5f1324dade158315dfc062a079d4dbde716fd409`, `origin/main` was `5f1324dade158315dfc062a079d4dbde716fd409`, and `git rev-list --left-right --count HEAD...origin/main` returned `0 0`.
