@@ -5,10 +5,10 @@ This root TASKS.md is the only authoritative project-status tracker consumed by 
 ## Project Status
 
 - Current Milestone: PAG-M08
-- Current Sprint: PAG-M08-C001
-- Current Task: PAG-M08-C001 — Output / Export Contract
+- Current Sprint: PAG-M08-C003
+- Current Task: PAG-M08-C003 — Deterministic Rich Provenance Binding Closure
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M08-C001 prompt, publish deterministic evidence, then request independent audit.
+- Next Task/Action: Execute the authoritative PAG-M08-C003 bounded rich-provenance closure prompt, publish deterministic attempt/stage binding evidence, then request independent audit.
 - Required Actor: CODEX
 - Blockers/Waits: PAG-M09+ blocked until PAG-M08 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
@@ -390,7 +390,6 @@ Exact file names may change during implementation if Codex documents the reason,
 H!veAI task-state legend: `[x]` validated complete, `[~]` active/in progress, `[ ]` planned/pending, `[!]` blocked.
 
 Only ChatGPT, acting as the independent auditor/tracker owner, may change task completion state or milestone/sprint closure state. Codex builder logs are claims/evidence and never final acceptance.
-
 
 A task may be marked `[x]` only when relevant evidence exists.
 
@@ -883,11 +882,13 @@ V1 must not pretend these heuristics understand game difficulty.
 
 # PAG-M08 — Output / Export Contract
 
-H!veAI active cycle: `PAG-M08-C001 — Output / Export Contract`  
+H!veAI active cycle: `PAG-M08-C003 — Deterministic Rich Provenance Binding Closure`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M08-C001_OUTPUT_EXPORT_CONTRACT_PROMPT.md`  
-Previous milestone closing audit: `.hiveai/audits/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_STRICT_AUDIT.md`
+Authoritative prompt: `.hiveai/prompts/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M08-C002_PROVENANCE_BINDING_RECTANGULAR_GOLDEN_AND_STRICT_PNG_REMEDIATION_STRICT_AUDIT.md`  
+C001 state: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_C002`  
+C002 state: `AUDIT_FAILED / RECTANGULAR_AND_IEND_CLOSED / RICH_PROVENANCE_RESIDUAL_TO_C003`
 
 ## Sprint PAG-S08.1 — Logical-grid JSON
 
@@ -1263,5 +1264,3 @@ where:
 - the output is ready to be consumed later by the SCRUBBOTS Level Factory.
 
 That is the boundary of Pixel Art Generator V1.
-
-
