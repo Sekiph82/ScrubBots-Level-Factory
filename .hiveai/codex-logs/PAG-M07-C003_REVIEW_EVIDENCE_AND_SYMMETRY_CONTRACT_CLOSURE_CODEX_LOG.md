@@ -70,9 +70,13 @@ The initial M03-M06 run without `PYTHONPATH` reported `126 passed, 1 failed` onl
 
 The manifest did not change. No `.hiveai/TASKS.md`, `.hiveai/EVENTS.jsonl`, `tasks.md`, `.hiveai/CYCLE_INDEX.md`, `.hiveai/audits/**`, used prompt, M07 metric core, generator, dependency, or sibling repository file was intentionally changed.
 
-## Publication
+## Publication and final equality checkpoint
 
-Pending. Record final diff/status, commit SHA(s), push result, and post-log-publication local `HEAD` / `origin/main` equality here after publication.
+- Final C003 implementation/evidence commit: `fd6bea1f4d410b16e0246b41dcc14505191eb48c` (`close M07 C003 evidence and symmetry contracts`). It contains this matching builder log together with the six C003 implementation/test/documentation/review files listed above.
+- Push result: successful `git push origin main`, `daebc48..fd6bea1`.
+- Immediately after that publication, local `HEAD` was `fd6bea1f4d410b16e0246b41dcc14505191eb48c`, `origin/main` was `fd6bea1f4d410b16e0246b41dcc14505191eb48c`, and `git rev-list --left-right --count HEAD...origin/main` returned `0 0`.
+- The final diff scope contains no unstaged C003 product changes. The only remaining worktree entries are the preserved pre-existing local control-plane changes: modified `.hiveai/EVENTS.jsonl`, modified `.hiveai/PROJECT.json`, and untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`.
+- This log update records the post-publication equality checkpoint and will be pushed as the final log-publication update. No tracker, task, audit, prompt, or acceptance state was modified.
 
 ## Implementation record
 
