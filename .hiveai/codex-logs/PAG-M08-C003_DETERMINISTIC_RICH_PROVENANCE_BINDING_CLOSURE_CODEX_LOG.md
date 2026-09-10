@@ -36,4 +36,5 @@ This matching C003 log was created before the first C003 source or test edit. Ex
 
 - Implementation/evidence commit: `f9fc4bc` (`Close M08 C003 rich provenance binding`). The commit contains only `src/scrubbots_pixel_factory/output/bundle.py` and `tests/integration/test_m08_export_integration.py`.
 - `git push origin main` succeeded; remote advanced `b3f6fbd..f9fc4bc`.
-- The matching completed C003 builder log is published in the following log-publication commit. Immediately after its push, `git fetch origin main` and the local `HEAD`/`origin/main` equality and divergence check will be run and recorded.
+- Completed-log publication commit: `f4023b5084763a9627aaccd9bbe0f974a7a575f2` (`Complete M08 C003 builder log`), pushed successfully to `origin/main`.
+- Terminal post-publication equality verification: after `git fetch origin main`, local `HEAD` was `f4023b5084763a9627aaccd9bbe0f974a7a575f2`, `origin/main` was `f4023b5084763a9627aaccd9bbe0f974a7a575f2`, and `git rev-list --left-right --count HEAD...origin/main` returned `0 0`. A final verification will be repeated after this truthful publication-record update.
