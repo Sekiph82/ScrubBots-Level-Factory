@@ -118,7 +118,7 @@ Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
 Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
 Forward dependency: `PAG-0441` blocked on M10 performance budget
-Terminal builder-era HEAD independently observed: `315233b77211d4771832b173d9f9e52af66364a`
+Terminal builder-era HEAD independently observed: `315233b77211d4771832b1732d9f9e52af66364a`
 
 ### PAG-M03-C002 — Reproducibility, Region Quality & Recognizability Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M03-C003`
@@ -197,7 +197,7 @@ Terminal builder-era HEAD independently observed: `1fda888a3a080cb4024d542c440f0
 
 ### PAG-M02-C003 — Result Construction Boundary Remediation
 State: `AUDIT_PASSED / TASK_COMPLETE`
-Audit: `.hiveai/audits/PAG-M02-C003_RESULT_CONSTRUCTION_BOUNDARY_REMEDIATION_STRICT_AUDIT.md`
+Audit: `.hiveai/audits/PAG-M02-C003_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
 Closes milestone: `PAG-M02 — Deterministic Generation Core`
 Terminal builder-era HEAD independently observed: `4f0c803c7c4ab565700356735e6f665aeae7805b`
 
