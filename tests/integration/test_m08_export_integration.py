@@ -57,6 +57,41 @@ def test_m08_representative_mask_rules_hybrid_auto_and_wfc_provenance() -> None:
     assert wfc_bundle.metadata["generator_metadata"]["payload"]["data"]["exemplar_id"] == "wfc-synthetic-easy-3"
 
 
+def test_m08_rich_raw_results_require_explicit_authoritative_metadata() -> None:
+    wfc = _wfc_candidate()
+    hybrid = HybridGenerator().generate_candidate(GenerationRequest("EASY", 47, "HYBRID", width=20, height=20, generator_options=GeneratorOptions("hybrid", 1, {"strategy": "MASK_GEOMETRY_RULE_COLOR_REGIONS", "mask_style": "ROBOT", "rules_style": "ORGANIC", "mask_symmetry": "HORIZONTAL"})))
+    auto = GeneratorRouter().generate_candidate(GenerationRequest("EASY", 17, "AUTO", width=20, height=20, generator_options=GeneratorOptions("auto", 1, {"candidates": ["MASK", "RULES"], "fallback_on_failure": True})))
+    assert hasattr(wfc, "result") and hasattr(hybrid, "result") and hasattr(auto, "result")
+    for candidate in (wfc, hybrid, auto):
+        with pytest.raises(OutputContractError):
+            build_export_bundle(candidate.result, "raw-rich")
+    with TemporaryDirectory() as temp:
+        for name, candidate in (("wfc", wfc), ("hybrid", hybrid), ("auto", auto)):
+            read_bundle(write_bundle(build_export_bundle(candidate, f"rich-{name}"), temp))
+    for name, candidate, metadata in (("wfc", wfc, wfc.wfc_metadata), ("hybrid", hybrid, hybrid.hybrid_metadata), ("auto", auto, auto.auto_metadata)):
+        wrapper = build_export_bundle(candidate, f"explicit-{name}")
+        explicit = build_export_bundle(candidate.result, f"explicit-{name}", generator_metadata=metadata)
+        assert wrapper.files == explicit.files
+    with pytest.raises(OutputContractError):
+        build_export_bundle(wfc.result, "wrong-namespace", generator_metadata={"namespace": "auto", "data": dict(wfc.wfc_metadata)})
+
+
+def test_m08_rich_provenance_tampering_fails_on_bundle_read() -> None:
+    wfc = _wfc_candidate()
+    hybrid = HybridGenerator().generate_candidate(GenerationRequest("EASY", 47, "HYBRID", width=20, height=20, generator_options=GeneratorOptions("hybrid", 1, {"strategy": "MASK_GEOMETRY_RULE_COLOR_REGIONS", "mask_style": "ROBOT", "rules_style": "ORGANIC", "mask_symmetry": "HORIZONTAL"})))
+    auto = GeneratorRouter().generate_candidate(GenerationRequest("EASY", 17, "AUTO", width=20, height=20, generator_options=GeneratorOptions("auto", 1, {"candidates": ["MASK", "RULES"], "fallback_on_failure": True})))
+    cases = ((wfc, "exemplar_id", "unrelated-exemplar"), (hybrid, "final_result_digest", "0" * 64), (auto, "selected_engine_id", "tampered-engine"))
+    for candidate, field, replacement in cases:
+        with TemporaryDirectory() as temp:
+            path = write_bundle(build_export_bundle(candidate, f"tamper-{field}"), temp)
+            metadata_path = path / "metadata.json"
+            value = json.loads(metadata_path.read_text(encoding="utf-8"))
+            value["generator_metadata"]["payload"]["data"][field] = replacement
+            metadata_path.write_text(json.dumps(value), encoding="utf-8")
+            with pytest.raises(OutputContractError):
+                read_bundle(path)
+
+
 def test_m08_bundle_round_trip_rectangular_preview_and_rewrite() -> None:
     result = MaskSpriteGenerator().generate(GenerationRequest("EASY", 31, "MASK", width=20, height=27, style="ROBOT"))
     assert result.is_success

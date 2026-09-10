@@ -9,11 +9,12 @@ import json
 import math
 import os
 from pathlib import Path
+import re
 import shutil
 import tempfile
 from typing import Any
 
-from ..core import GenerationResult, ResultStatus
+from ..core import DeterministicRNG, GenerationResult, ResultStatus
 from ..quality import QualityPolicy, QualityReport, evaluate_grid
 from .artwork import ArtworkArtifact, ArtworkContractError, canonical_json_bytes
 from .png import PNGContractError, decode_logical_png, decode_png, encode_logical_png, encode_preview_png
@@ -23,6 +24,8 @@ METADATA_SCHEMA = "scrubbots-output-metadata"
 METADATA_SCHEMA_VERSION = 1
 GENERATOR_METADATA_SCHEMA = "scrubbots-generator-metadata"
 GENERATOR_METADATA_VERSION = 1
+_RICH_MODES = {"WFC", "HYBRID", "AUTO"}
+_RICH_NAMESPACES = {"WFC": "wfc", "HYBRID": "hybrid", "AUTO": "auto"}
 
 
 class OutputContractError(ValueError):
@@ -63,22 +66,45 @@ def _sha256(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def _candidate_payload(candidate: object) -> tuple[GenerationResult, Mapping[str, object]]:
+def _candidate_payload(candidate: object, explicit_metadata: Mapping[str, object] | None = None) -> tuple[GenerationResult, Mapping[str, object]]:
     result = candidate if isinstance(candidate, GenerationResult) else getattr(candidate, "result", None)
     if not isinstance(result, GenerationResult):
         raise OutputContractError("export requires a GenerationResult or an existing generator candidate wrapper")
     if not result.is_success or result.status is not ResultStatus.SUCCESS:
         raise OutputContractError("failed GenerationResult cannot be exported as a successful bundle")
-    if isinstance(candidate, GenerationResult):
+    candidate_payload: dict[str, object] | None = None
+    if not isinstance(candidate, GenerationResult):
+        for property_name in ("wfc_metadata", "hybrid_metadata", "auto_metadata"):
+            payload = getattr(candidate, property_name, None)
+            if isinstance(payload, Mapping):
+                candidate_payload = {"namespace": property_name.removesuffix("_metadata"), "data": _mapping_copy(payload, property_name)}
+                break
+        if candidate_payload is None:
+            payload = getattr(candidate, "metadata", None)
+            if isinstance(payload, Mapping):
+                candidate_payload = {"namespace": "generator", "data": _mapping_copy(payload, "candidate.metadata")}
+    supplied_payload: dict[str, object] | None = None
+    if explicit_metadata is not None:
+        supplied = _mapping_copy(explicit_metadata, "generator_metadata")
+        if set(supplied) == {"namespace", "data"}:
+            namespace = supplied["namespace"]
+            data = _mapping_copy(supplied["data"], "generator_metadata.data")
+            if type(namespace) is not str:
+                raise OutputContractError("generator metadata namespace must be a string")
+            supplied_payload = {"namespace": namespace, "data": data}
+        else:
+            supplied_payload = {"namespace": _RICH_NAMESPACES.get(result.generator_mode or "", "generator"), "data": supplied}
+    if candidate_payload is not None and supplied_payload is not None and candidate_payload != supplied_payload:
+        raise OutputContractError("explicit generator metadata conflicts with candidate metadata")
+    payload = supplied_payload or candidate_payload
+    if result.generator_mode in _RICH_MODES and payload is None:
+        raise OutputContractError(f"successful {result.generator_mode} export requires an authoritative candidate wrapper or generator_metadata")
+    if payload is None:
         return result, {}
-    for property_name in ("wfc_metadata", "hybrid_metadata", "auto_metadata"):
-        payload = getattr(candidate, property_name, None)
-        if isinstance(payload, Mapping):
-            return result, {"namespace": property_name.removesuffix("_metadata"), "data": _mapping_copy(payload, property_name)}
-    payload = getattr(candidate, "metadata", None)
-    if isinstance(payload, Mapping):
-        return result, {"namespace": "generator", "data": _mapping_copy(payload, "candidate.metadata")}
-    return result, {}
+    expected_namespace = _RICH_NAMESPACES.get(result.generator_mode or "")
+    if expected_namespace is not None and payload["namespace"] != expected_namespace:
+        raise OutputContractError("generator metadata namespace does not match the GenerationResult mode")
+    return result, payload
 
 
 def _quality_binding(report: QualityReport, artwork: ArtworkArtifact) -> dict[str, object]:
@@ -139,6 +165,178 @@ def _metadata_for(result: GenerationResult, artwork: ArtworkArtifact, generator_
     }
 
 
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+
+
+def _request_parts(result_dict: Mapping[str, object]) -> tuple[Mapping[str, object], Mapping[str, object]]:
+    request = _mapping_copy(result_dict.get("request"), "generation.result.request")
+    options = _mapping_copy(request.get("generator_options"), "generation.result.request.generator_options")
+    return request, _mapping_copy(options.get("values"), "generation.result.request.generator_options.values")
+
+
+def _typed_seed_value(value: object, path: str) -> int | str:
+    seed = _mapping_copy(value, path)
+    if seed.get("type") not in {"int", "string"} or type(seed.get("value")) is not (int if seed.get("type") == "int" else str):
+        raise OutputContractError(f"{path} is not a valid typed seed")
+    return seed["value"]  # type: ignore[return-value]
+
+
+def _validate_wfc_metadata(data: Mapping[str, object], result_dict: Mapping[str, object], artwork: ArtworkArtifact) -> None:
+    if data.get("schema") != "scrubbots-wfc-metadata" or data.get("version") != 1:
+        raise OutputContractError("WFC generator metadata schema/version is invalid")
+    request, options = _request_parts(result_dict)
+    if request.get("style") is not None and data.get("exemplar_id") != request.get("style"):
+        raise OutputContractError("WFC exemplar_id does not match the request style")
+    if data.get("target_palette") != list(artwork.palette) or data.get("target_palette") != result_dict.get("used_palette"):
+        raise OutputContractError("WFC target palette does not match the exported result")
+    if data.get("output_dimensions") != {"width": artwork.width, "height": artwork.height}:
+        raise OutputContractError("WFC output dimensions do not match the artwork")
+    defaults = {
+        "pattern_size": 2,
+        "input_periodic": False,
+        "output_periodic": False,
+        "allow_rotations": False,
+        "allow_reflections": False,
+        "experimental_n4": False,
+        "max_attempts": 4,
+    }
+    for key, default in defaults.items():
+        if key in data and data[key] != options.get(key, default):
+            raise OutputContractError(f"WFC metadata option binding is invalid: {key}")
+    source_palette = data.get("source_palette")
+    mapping = data.get("palette_mapping")
+    if not isinstance(source_palette, list) or not isinstance(mapping, list):
+        raise OutputContractError("WFC palette provenance is malformed")
+    pairs: list[list[object]] = []
+    for pair in mapping:
+        if not isinstance(pair, list) or len(pair) != 2:
+            raise OutputContractError("WFC palette mapping pair is malformed")
+        pairs.append(pair)
+    if [pair[0] for pair in pairs] != source_palette or [pair[1] for pair in pairs] != list(artwork.palette):
+        raise OutputContractError("WFC palette mapping is not bound to source and target palettes")
+    requested_mapping = options.get("palette_mapping")
+    if isinstance(requested_mapping, Mapping):
+        expected_mapping = [[key, requested_mapping[key]] for key in sorted(requested_mapping, key=lambda value: int(value[1:]) if value.startswith("C") and value[1:].isdigit() else value)]
+        if pairs != expected_mapping:
+            raise OutputContractError("WFC palette mapping does not match the request options")
+    attempt = data.get("attempt")
+    max_attempts = data.get("max_attempts", options.get("max_attempts", 4))
+    if type(attempt) is not int or type(max_attempts) is not int or not 0 <= attempt < max_attempts:
+        raise OutputContractError("WFC attempt metadata is outside the bounded attempt range")
+    history = data.get("contradiction_history")
+    if not isinstance(history, list):
+        raise OutputContractError("WFC contradiction history is malformed")
+    for entry in history:
+        if not isinstance(entry, Mapping) or type(entry.get("attempt")) is not int or not 0 <= entry["attempt"] < attempt:
+            raise OutputContractError("WFC contradiction history is not ordered before the successful attempt")
+
+
+def _grid_digest(cells: object) -> str:
+    if not isinstance(cells, list) or any(type(cell) is not str for cell in cells):
+        raise OutputContractError("logical grid digest input is malformed")
+    return _sha256("\n".join(cells).encode("ascii"))
+
+
+def _topology_digest(cells: list[str], width: int, height: int, base_color: str) -> str:
+    occupied = bytes(1 if cell != base_color else 0 for cell in cells)
+    if len(occupied) != width * height:
+        raise OutputContractError("topology digest dimensions are invalid")
+    return _sha256(occupied)
+
+
+def _validate_hybrid_metadata(data: Mapping[str, object], result_dict: Mapping[str, object], artwork: ArtworkArtifact) -> None:
+    if data.get("schema") != "scrubbots-hybrid-metadata" or data.get("version") != 1:
+        raise OutputContractError("HYBRID generator metadata schema/version is invalid")
+    request, options = _request_parts(result_dict)
+    if data.get("strategy") != options.get("strategy") or data.get("outer_master_seed") != _typed_seed_value(result_dict.get("seed"), "generation.result.seed"):
+        raise OutputContractError("HYBRID strategy or master-seed binding is invalid")
+    if data.get("resolved_dimensions") != {"width": artwork.width, "height": artwork.height} or data.get("resolved_palette") != list(artwork.palette):
+        raise OutputContractError("HYBRID dimensions or palette binding is invalid")
+    attempt = data.get("outer_attempt")
+    if type(attempt) is not int or attempt < 0:
+        raise OutputContractError("HYBRID outer attempt is invalid")
+    stages = data.get("stages")
+    if not isinstance(stages, list) or not stages:
+        raise OutputContractError("HYBRID stage metadata is missing")
+    for index, raw_stage in enumerate(stages):
+        stage = _mapping_copy(raw_stage, f"hybrid.stages[{index}]")
+        if stage.get("stage_index") != index or type(stage.get("derived_seed")) is not str or _DIGEST.fullmatch(stage["derived_seed"]) is None:
+            raise OutputContractError("HYBRID stages are not deterministically ordered")
+        child_request = _mapping_copy(stage.get("child_request"), f"hybrid.stages[{index}].child_request")
+        if stage.get("child_request_digest") != _sha256(canonical_json_bytes(child_request)):
+            raise OutputContractError("HYBRID child request digest is invalid")
+        child_seed = _mapping_copy(child_request.get("seed"), f"hybrid.stages[{index}].child_request.seed")
+        if child_seed.get("type") != "string" or child_seed.get("value") != stage.get("derived_seed"):
+            raise OutputContractError("HYBRID child request seed does not match its stage seed")
+        if child_request.get("width") != artwork.width or child_request.get("height") != artwork.height or child_request.get("palette_subset") != list(artwork.palette):
+            raise OutputContractError("HYBRID child request dimensions or palette are inconsistent")
+        for field in ("child_result_digest", "geometry_digest"):
+            digest = stage.get(field)
+            if digest is not None and (type(digest) is not str or _DIGEST.fullmatch(digest) is None):
+                raise OutputContractError(f"HYBRID stage {field} is malformed")
+    cells = result_dict.get("logical_grid")
+    if data.get("final_logical_grid_digest") != _grid_digest(cells):
+        raise OutputContractError("HYBRID final logical-grid digest is invalid")
+    if data.get("final_result_digest") != _sha256(canonical_json_bytes(result_dict)):
+        raise OutputContractError("HYBRID final result digest is invalid")
+    if data.get("final_topology_digest") != _topology_digest(cells, artwork.width, artwork.height, artwork.palette[0]):  # type: ignore[arg-type]
+        raise OutputContractError("HYBRID final topology digest is invalid")
+    evidence = data.get("topology_evidence")
+    if not isinstance(evidence, Mapping):
+        raise OutputContractError("HYBRID topology evidence is malformed")
+    expected_final = [0 if cell == artwork.palette[0] else 1 for cell in cells]  # type: ignore[union-attr]
+    if "final" in evidence and evidence["final"] != expected_final:
+        raise OutputContractError("HYBRID final topology evidence is not bound to artwork")
+    for name, values in evidence.items():
+        if name not in {"before", "after", "final"} or not isinstance(values, list) or len(values) != artwork.width * artwork.height or any(value not in {0, 1} for value in values):
+            raise OutputContractError("HYBRID topology evidence shape is invalid")
+
+
+def _validate_auto_metadata(data: Mapping[str, object], result_dict: Mapping[str, object], artwork: ArtworkArtifact) -> None:
+    if data.get("schema") != "scrubbots-auto-metadata" or data.get("version") != 1:
+        raise OutputContractError("AUTO generator metadata schema/version is invalid")
+    request, options = _request_parts(result_dict)
+    candidates = options.get("candidates", ["MASK", "RULES"])
+    fallback = options.get("fallback_on_failure", False)
+    if data.get("candidate_order") != candidates or data.get("fallback_on_failure") != fallback:
+        raise OutputContractError("AUTO candidate order or fallback binding is invalid")
+    if not isinstance(candidates, list) or not candidates or data.get("initial_selection") not in candidates:
+        raise OutputContractError("AUTO initial selection is invalid")
+    selected_index = DeterministicRNG(_typed_seed_value(result_dict.get("seed"), "generation.result.seed")).child("auto/selection").randbelow(len(candidates))
+    if data.get("initial_selection") != candidates[selected_index]:
+        raise OutputContractError("AUTO initial selection is not bound to the root seed")
+    attempts = data.get("attempts")
+    if not isinstance(attempts, list) or not attempts:
+        raise OutputContractError("AUTO attempt metadata is missing")
+    initial = data["initial_selection"]
+    start = candidates.index(initial)
+    expected_modes = candidates[start:] + candidates[:start] if fallback else [initial]
+    if [item.get("mode") for item in attempts if isinstance(item, Mapping)] != expected_modes[: len(attempts)]:
+        raise OutputContractError("AUTO attempt order does not match configured fallback semantics")
+    successful: list[Mapping[str, object]] = []
+    for index, raw_attempt in enumerate(attempts):
+        attempt = _mapping_copy(raw_attempt, f"auto.attempts[{index}]")
+        mode = attempt.get("mode")
+        expected_seed = DeterministicRNG(_typed_seed_value(result_dict.get("seed"), "generation.result.seed")).child(f"auto/{mode}/{index}").next_bytes(32).hex()
+        if attempt.get("stage_seed") != expected_seed:
+            raise OutputContractError("AUTO stage seed is not deterministic for the configured attempt")
+        digest = attempt.get("result_digest")
+        if digest is not None and (type(digest) is not str or _DIGEST.fullmatch(digest) is None):
+            raise OutputContractError("AUTO attempt result digest is malformed")
+        if digest is not None:
+            successful.append(attempt)
+        elif not attempt.get("failure_code"):
+            raise OutputContractError("AUTO unsuccessful attempt lacks a failure code")
+    if len(successful) != 1 or not isinstance(attempts[-1], Mapping) or attempts[-1].get("result_digest") is None:
+        raise OutputContractError("AUTO export must identify exactly one successful selected attempt")
+    selected = successful[0]
+    if data.get("selected_engine_id") != selected.get("engine_id") or data.get("selected_engine_version") != selected.get("engine_version"):
+        raise OutputContractError("AUTO selected engine binding is invalid")
+    generator = _mapping_copy(result_dict.get("generator"), "generation.result.generator")
+    if selected.get("engine_id") != generator.get("id") or selected.get("engine_version") != generator.get("version"):
+        raise OutputContractError("AUTO selected engine does not match the exported result")
+
+
 @dataclass(frozen=True, slots=True)
 class ExportBundle:
     """Fully materialized deterministic bundle bytes and immutable truth."""
@@ -168,10 +366,17 @@ def build_export_bundle(
     *,
     quality_report: QualityReport | None = None,
     preview_scale: int | None = None,
+    generator_metadata: Mapping[str, object] | None = None,
 ) -> ExportBundle:
-    """Build deterministic bytes from a successful result or candidate wrapper."""
+    """Build deterministic bytes from a result or wrapper.
 
-    result, candidate_metadata = _candidate_payload(candidate)
+    Rich WFC/HYBRID/AUTO results require their candidate wrapper, or an
+    explicit authoritative ``generator_metadata`` mapping. The explicit form
+    may be either the wrapper's ``{"namespace": ..., "data": ...}`` payload
+    or the raw mode-specific metadata mapping.
+    """
+
+    result, candidate_metadata = _candidate_payload(candidate, generator_metadata)
     try:
         artwork = ArtworkArtifact.from_result(result, candidate_id)
         report = quality_report if quality_report is not None else evaluate_grid(artwork.width, artwork.height, artwork.cells)
@@ -191,6 +396,7 @@ def build_export_bundle(
         else:
             metadata["preview"] = {"enabled": False, "scale": None, "width": None, "height": None}
             metadata_json = canonical_json_bytes(metadata)
+        _validate_metadata(metadata, artwork)
     except (ArtworkContractError, PNGContractError, TypeError, ValueError) as exc:
         if isinstance(exc, OutputContractError):
             raise
@@ -221,7 +427,7 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
     result_dict = _mapping_copy(generation.get("result"), "metadata.generation.result")
     if result_dict.get("status") != ResultStatus.SUCCESS.value:
         raise OutputContractError("metadata cannot bind a failed GenerationResult")
-    if result_dict.get("logical_grid") != list(artwork.cells) or result_dict.get("resolved_dimensions") != {"width": artwork.width, "height": artwork.height}:
+    if result_dict.get("logical_grid") != list(artwork.cells) or result_dict.get("used_palette") != list(artwork.palette) or result_dict.get("resolved_dimensions") != {"width": artwork.width, "height": artwork.height}:
         raise OutputContractError("metadata GenerationResult does not match artwork")
     if generation.get("result_digest") != _sha256(canonical_json_bytes(result_dict)):
         raise OutputContractError("metadata GenerationResult digest is invalid")
@@ -267,6 +473,19 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
         or generator_metadata.get("present") != bool(generator_metadata["payload"])
     ):
         raise OutputContractError("generator metadata binding is invalid")
+    generator_mode = generation.get("generator_mode")
+    if generator_mode in _RICH_MODES:
+        payload = generator_metadata["payload"]
+        namespace = payload.get("namespace") if isinstance(payload, Mapping) else None
+        if namespace != _RICH_NAMESPACES[generator_mode]:
+            raise OutputContractError("rich generator metadata namespace does not match the generating mode")
+        data = _mapping_copy(payload.get("data") if isinstance(payload, Mapping) else None, "metadata.generator_metadata.data")
+        if generator_mode == "WFC":
+            _validate_wfc_metadata(data, result_dict, artwork)
+        elif generator_mode == "HYBRID":
+            _validate_hybrid_metadata(data, result_dict, artwork)
+        else:
+            _validate_auto_metadata(data, result_dict, artwork)
     preview = _mapping_copy(value["preview"], "metadata.preview")
     enabled = preview.get("enabled")
     if enabled not in {True, False}:
@@ -362,8 +581,9 @@ def export_candidate(
     *,
     quality_report: QualityReport | None = None,
     preview_scale: int | None = None,
+    generator_metadata: Mapping[str, object] | None = None,
 ) -> Path:
-    return write_bundle(build_export_bundle(candidate, candidate_id, quality_report=quality_report, preview_scale=preview_scale), destination)
+    return write_bundle(build_export_bundle(candidate, candidate_id, quality_report=quality_report, preview_scale=preview_scale, generator_metadata=generator_metadata), destination)
 
 
 def export_result(
@@ -373,8 +593,9 @@ def export_result(
     *,
     quality_report: QualityReport | None = None,
     preview_scale: int | None = None,
+    generator_metadata: Mapping[str, object] | None = None,
 ) -> Path:
-    return export_candidate(result, candidate_id, destination, quality_report=quality_report, preview_scale=preview_scale)
+    return export_candidate(result, candidate_id, destination, quality_report=quality_report, preview_scale=preview_scale, generator_metadata=generator_metadata)
 
 
 __all__ = [

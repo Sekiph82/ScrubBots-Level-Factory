@@ -19,3 +19,12 @@ is never changed. `metadata.json` binds candidate identity, dimensions,
 palette, grid hash, successful GenerationResult digest/request/RNG provenance,
 supplied WFC/HYBRID/AUTO metadata, and the exact M07 quality report. Quality
 ACCEPT/REJECT and rejection codes never become artwork truth.
+
+Raw successful MASK/RULES results may be exported directly. Raw successful
+WFC, HYBRID, and AUTO results are rejected unless their candidate wrapper is
+passed through, or the caller supplies authoritative mode-specific metadata
+via `generator_metadata=`. The explicit metadata may be the raw mode mapping
+or the canonical `{"namespace": ..., "data": ...}` envelope. The reader
+verifies the namespace and reconstructible exemplar, palette, option, stage,
+attempt, digest, and seed bindings; it never relabels or silently repairs
+rich provenance.

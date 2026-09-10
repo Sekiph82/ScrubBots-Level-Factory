@@ -124,6 +124,8 @@ def _parse_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
         raise PNGContractError("PNG contains an unsupported chunk")
     if sum(kind == b"IHDR" for kind, _ in chunks) != 1 or sum(kind == b"IEND" for kind, _ in chunks) != 1:
         raise PNGContractError("PNG must contain exactly one IHDR and IEND")
+    if next(chunk_data for kind, chunk_data in chunks if kind == b"IEND") != b"":
+        raise PNGContractError("PNG IEND payload must be empty")
     if not any(kind == b"IDAT" for kind, _ in chunks):
         raise PNGContractError("PNG must contain IDAT data")
     return chunks
