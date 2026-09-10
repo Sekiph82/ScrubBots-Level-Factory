@@ -45,6 +45,23 @@ from .generators.router import (
     HybridStrategy,
     reproduce_hybrid,
 )
+from .quality import (
+    DiversityReport,
+    DuplicatePair,
+    GridInput,
+    QualityCode,
+    QualityInputError,
+    QualityPolicy,
+    QualityReport,
+    ReviewEntry,
+    analyze_grid,
+    compare_grids,
+    diversity_report,
+    evaluate_grid,
+    exact_duplicate_groups,
+    logical_grid_hash,
+    write_review_pack,
+)
 
 __all__ = [
     "OfflinePolicyError",
@@ -84,6 +101,21 @@ __all__ = [
     "HybridStageMetadata",
     "HybridStrategy",
     "reproduce_hybrid",
+    "DiversityReport",
+    "DuplicatePair",
+    "GridInput",
+    "QualityCode",
+    "QualityInputError",
+    "QualityPolicy",
+    "QualityReport",
+    "ReviewEntry",
+    "analyze_grid",
+    "compare_grids",
+    "diversity_report",
+    "evaluate_grid",
+    "exact_duplicate_groups",
+    "logical_grid_hash",
+    "write_review_pack",
 ]
 
 __version__ = "0.1.0"
