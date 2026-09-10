@@ -6,7 +6,7 @@
 > Status: Active implementation under H!veAI governance  
 > Primary implementation agent: Codex  
 > Independent auditor / tracker owner: ChatGPT  
-> Canonical local repository root: `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator`  
+> Canonical local repository root: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`  
 > Source-of-truth game repository: https://github.com/Sekiph82/Scrubbots
 
 ---
@@ -405,8 +405,8 @@ Minimum completion rules:
 - [!] **PAG-M04 — Procedural Shape / Rule Generator**
 - [x] **PAG-M05 — Wave Function Collapse Generator**
 - [x] **PAG-M06 — Hybrid Generator Router**
-- [~] **PAG-M07 — Artwork Quality & Diversity Filters**
-- [ ] **PAG-M08 — Output / Export Contract**
+- [x] **PAG-M07 — Artwork Quality & Diversity Filters**
+- [~] **PAG-M08 — Output / Export Contract**
 - [ ] **PAG-M09 — CLI & Local Batch Generation**
 - [ ] **PAG-M10 — Validation, Performance & V1 Acceptance**
 - [ ] **PAG-M11 — Godot/Main-Level-Factory Handoff Gate**
@@ -799,11 +799,11 @@ Goal: combine generator families while keeping each generator independently test
 
 # PAG-M07 — Artwork Quality & Diversity Filters
 
-H!veAI active cycle: `PAG-M07-C001 — Artwork Quality & Diversity Filters`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M07-C001_ARTWORK_QUALITY_AND_DIVERSITY_FILTERS_PROMPT.md`  
-Previous milestone closing audit: `.hiveai/audits/PAG-M06-C004_WFC_EVIDENCE_BINDING_CLOSURE_STRICT_AUDIT.md`
+M07 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M07-C003 — Review Evidence & Symmetry Contract Closure`  
+Closing audit: `.hiveai/audits/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_STRICT_AUDIT.md`  
+C001-C002 findings: `REMEDIATED / CLOSED`  
+M08 is authorized to proceed.
 
 These are **visual/structural quality gates**, not gameplay difficulty or solvability rules.
 
@@ -811,60 +811,66 @@ V1 must not pretend these heuristics understand game difficulty.
 
 ## Sprint PAG-S07.1 — Structural quality metrics
 
-- [ ] PAG-0701 Compute occupied-cell ratio.
-- [ ] PAG-0702 Compute number of connected occupied components.
-- [ ] PAG-0703 Compute connected components per color.
-- [ ] PAG-0704 Compute isolated single-cell count.
-- [ ] PAG-0705 Compute tiny-region count.
-- [ ] PAG-0706 Compute largest-region dominance.
-- [ ] PAG-0707 Compute edge-touch ratio.
-- [ ] PAG-0708 Compute symmetry score.
-- [ ] PAG-0709 Compute color-distribution entropy.
-- [ ] PAG-0710 Compute color adjacency statistics.
-- [ ] PAG-0711 Compute bounding box and center-of-mass.
-- [ ] PAG-0712 Compute negative-space ratio.
+- [x] PAG-0701 Compute occupied-cell ratio.
+- [x] PAG-0702 Compute number of connected occupied components.
+- [x] PAG-0703 Compute connected components per color.
+- [x] PAG-0704 Compute isolated single-cell count.
+- [x] PAG-0705 Compute tiny-region count.
+- [x] PAG-0706 Compute largest-region dominance.
+- [x] PAG-0707 Compute edge-touch ratio.
+- [x] PAG-0708 Compute symmetry score.
+- [x] PAG-0709 Compute color-distribution entropy.
+- [x] PAG-0710 Compute color adjacency statistics.
+- [x] PAG-0711 Compute bounding box and center-of-mass.
+- [x] PAG-0712 Compute negative-space ratio.
 
 ## Sprint PAG-S07.2 — Reject obvious garbage
 
-- [ ] PAG-0713 Reject empty artwork.
-- [ ] PAG-0714 Reject effectively full single-shape slabs when outside configured style.
-- [ ] PAG-0715 Reject excessive salt-and-pepper single pixels.
-- [ ] PAG-0716 Reject excessive tiny fragmented regions.
-- [ ] PAG-0717 Reject illegal color dominance thresholds when configured.
-- [ ] PAG-0718 Reject accidental all-checkerboard/noise patterns.
-- [ ] PAG-0719 Reject color-count violations.
-- [ ] PAG-0720 Reject any off-palette data.
-- [ ] PAG-0721 Reject dimension mismatch.
-- [ ] PAG-0722 Produce machine-readable rejection codes.
+- [x] PAG-0713 Reject empty artwork.
+- [x] PAG-0714 Reject effectively full single-shape slabs when outside configured style.
+- [x] PAG-0715 Reject excessive salt-and-pepper single pixels.
+- [x] PAG-0716 Reject excessive tiny fragmented regions.
+- [x] PAG-0717 Reject illegal color dominance thresholds when configured.
+- [x] PAG-0718 Reject accidental all-checkerboard/noise patterns.
+- [x] PAG-0719 Reject color-count violations.
+- [x] PAG-0720 Reject any off-palette data.
+- [x] PAG-0721 Reject dimension mismatch.
+- [x] PAG-0722 Produce machine-readable rejection codes.
 
 ## Sprint PAG-S07.3 — Diversity
 
-- [ ] PAG-0723 Define logical-grid hash.
-- [ ] PAG-0724 Detect exact duplicates.
-- [ ] PAG-0725 Define a deterministic near-duplicate metric.
-- [ ] PAG-0726 Measure occupancy-mask similarity.
-- [ ] PAG-0727 Measure color-layout similarity separately.
-- [ ] PAG-0728 Allow batch-level duplicate threshold.
-- [ ] PAG-0729 Keep “visual quality” and “diversity” scores separate.
-- [ ] PAG-0730 Never silently mutate an accepted candidate to make it different; regenerate with a recorded seed instead.
+- [x] PAG-0723 Define logical-grid hash.
+- [x] PAG-0724 Detect exact duplicates.
+- [x] PAG-0725 Define a deterministic near-duplicate metric.
+- [x] PAG-0726 Measure occupancy-mask similarity.
+- [x] PAG-0727 Measure color-layout similarity separately.
+- [x] PAG-0728 Allow batch-level duplicate threshold.
+- [x] PAG-0729 Keep “visual quality” and “diversity” scores separate.
+- [x] PAG-0730 Never silently mutate an accepted candidate to make it different; regenerate with a recorded seed instead.
 
 ## Sprint PAG-S07.4 — Human review artifacts
 
-- [ ] PAG-0731 Generate contact sheet of candidates.
-- [ ] PAG-0732 Show candidate ID, mode, seed, difficulty, dimensions and color count.
-- [ ] PAG-0733 Allow nearest-neighbor preview scaling only.
-- [ ] PAG-0734 Make preview scaling presentation-only; logical PNG remains exact logical dimensions unless a separate preview file is explicitly produced.
-- [ ] PAG-0735 Add simple ACCEPT/REJECT review manifest format for future UI use.
+- [x] PAG-0731 Generate contact sheet of candidates.
+- [x] PAG-0732 Show candidate ID, mode, seed, difficulty, dimensions and color count.
+- [x] PAG-0733 Allow nearest-neighbor preview scaling only.
+- [x] PAG-0734 Make preview scaling presentation-only; logical PNG remains exact logical dimensions unless a separate preview file is explicitly produced.
+- [x] PAG-0735 Add simple ACCEPT/REJECT review manifest format for future UI use.
 
 ### M07 acceptance
 
-- [ ] PAG-0736 Quality filters eliminate deliberately constructed garbage fixtures.
-- [ ] PAG-0737 Good fixtures are not systematically rejected.
-- [ ] PAG-0738 Scores/reasons are reproducible from logical grid alone.
+- [x] PAG-0736 Quality filters eliminate deliberately constructed garbage fixtures.
+- [x] PAG-0737 Good fixtures are not systematically rejected.
+- [x] PAG-0738 Scores/reasons are reproducible from logical grid alone.
 
 ---
 
 # PAG-M08 — Output / Export Contract
+
+H!veAI active cycle: `PAG-M08-C001 — Output / Export Contract`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M08-C001_OUTPUT_EXPORT_CONTRACT_PROMPT.md`  
+Previous milestone closing audit: `.hiveai/audits/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_STRICT_AUDIT.md`
 
 ## Sprint PAG-S08.1 — Logical-grid JSON
 
