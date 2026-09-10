@@ -48,19 +48,29 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M07-C002`
-Title: `Structural Metric Semantics & Acceptance Evidence Remediation`
+Cycle: `PAG-M07-C003`
+Title: `Review Evidence & Symmetry Contract Closure`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M07-C002_STRUCTURAL_METRIC_SEMANTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`
+Prompt: `.hiveai/prompts/PAG-M07-C003_REVIEW_EVIDENCE_AND_SYMMETRY_CONTRACT_CLOSURE_PROMPT.md`
 
 ## Failed / remediation-required cycles
 
+### PAG-M07-C002 — Structural Metric Semantics & Acceptance Evidence Remediation
+State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M07-C003`
+Audit: `.hiveai/audits/PAG-M07-C002_STRUCTURAL_METRIC_SEMANTICS_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
+Closed functional scope: C001 occupied-mask fragmentation semantics, total occupied color dominance and explicit threshold enforcement, genuine structural fixtures, representative generator acceptance evidence, and per-card rendered hash/diversity evidence.
+Open findings: `F-PAG-M07-C002-001`, `F-PAG-M07-C002-002`
+Open scope: card-local contact-sheet evidence assertions and explicit horizontal/vertical symmetry reflection documentation.
+Implementation/evidence commit: `7c4ef89` as recorded by builder log.
+Builder-log equality checkpoint: `5d3355c78f397b058d53fb03d1aa86f48d6d5c3a`
+Terminal builder-era HEAD independently observed: `4379400527bfd81061512840958f3e939b880e87`
+
 ### PAG-M07-C001 — Artwork Quality & Diversity Filters
-State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M07-C002`
+State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M07-C002 / REMAINDER_BY_PAG-M07-C003`
 Audit: `.hiveai/audits/PAG-M07-C001_ARTWORK_QUALITY_AND_DIVERSITY_FILTERS_STRICT_AUDIT.md`
-Open findings: `F-PAG-M07-C001-001`, `F-PAG-M07-C001-002`, `F-PAG-M07-C001-003`, `F-PAG-M07-C001-004`
-Open scope: occupied fragmentation semantics, total color dominance semantics/policy, mandatory acceptance fixtures/tests, and complete review-card grid-hash/diversity evidence.
+Original findings: `F-PAG-M07-C001-001`, `F-PAG-M07-C001-002`, `F-PAG-M07-C001-003`, `F-PAG-M07-C001-004`
+C002 disposition: substantive metric semantics, structural fixtures, generator acceptance evidence and renderer content corrected; residual review evidence binding and symmetry documentation flow through C003.
 Implementation/review commit: `81059b10e34c1cdedab9d1fc2152306dd87b5ae4`
 Builder-log publication commits: `e8725a62e23f693adfd66b715ea2207158f6d1d7`, `6eba2c153014b1191aeda895ca19954e58920afc`
 Terminal builder-era HEAD independently observed: `6eba2c153014b1191aeda895ca19954e58920afc`
