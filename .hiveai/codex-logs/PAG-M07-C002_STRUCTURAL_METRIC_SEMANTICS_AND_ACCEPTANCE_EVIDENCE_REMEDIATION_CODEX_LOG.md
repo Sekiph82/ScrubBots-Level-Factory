@@ -102,4 +102,9 @@ No M03/M04/M05/M06 production generator, M02 result contract, owner-locked palet
 
 ### Publication
 
-Pending final staged diff inspection, C002 implementation/evidence commit, push, completed-log publication and final `HEAD == origin/main` checkpoint.
+- C002 implementation/evidence commit: `7c4ef89` (`remediate M07 metric semantics and evidence`).
+- `git push origin main` succeeded, updating GitHub `bd8384d..7c4ef89`.
+- The implementation commit contains only the nine listed C002 paths. No M03–M06 production generator, M02 contract, tracker/audit state, M08+ scope, dependency/license file, third-party asset, or main ScrubBots path was staged.
+- Preserved local control-plane changes remain unstaged: `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT.json`, `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`.
+- This completed C002 log is being published in a separate log-only commit. After that push, `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, `git rev-list --left-right --count HEAD...origin/main`, and `git status --short` will be run; the actual equality result will be recorded in this log and returned for independent ChatGPT strict audit.
+- No task/H!veAI acceptance state, audit file, M08+ implementation, or main ScrubBots repository was modified.
