@@ -48,20 +48,29 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M06-C003`
-Title: `Replay, AUTO & Evidence Gate Closure`
+Cycle: `PAG-M06-C004`
+Title: `WFC Evidence Binding Closure`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M06-C003_REPLAY_AUTO_AND_EVIDENCE_GATE_CLOSURE_PROMPT.md`
+Prompt: `.hiveai/prompts/PAG-M06-C004_WFC_EVIDENCE_BINDING_CLOSURE_PROMPT.md`
 
 ## Failed / remediation-required cycles
 
+### PAG-M06-C003 — Replay, AUTO & Evidence Gate Closure
+State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M06-C004`
+Audit: `.hiveai/audits/PAG-M06-C003_REPLAY_AUTO_AND_EVIDENCE_GATE_CLOSURE_STRICT_AUDIT.md`
+Closed scope: exact AUTO acceptance evidence and semantic replay-corruption strengthening.
+Open finding: `F-PAG-M06-C003-001`
+Open scope: direct WFC-detail strategy/topology evidence binding to generated stage metadata.
+Implementation/evidence commit: `1a0ba2c0c36f2e4e8581762958a029f16fdb71fa`
+Terminal builder-era HEAD independently observed: `cf67cad1b1375ee16fe208f04973e2f41a016cf6`
+
 ### PAG-M06-C002 — WFC Remap, Stage Replay & Router Evidence Remediation
-State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M06-C003`
+State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M06-C003`
 Audit: `.hiveai/audits/PAG-M06-C002_WFC_REMAP_STAGE_REPLAY_AND_ROUTER_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
 Closed functional scope: C001 WFC source→target remap defect and whole-request replay defect materially repaired.
-Open findings: `F-PAG-M06-C002-001`, `F-PAG-M06-C002-002`
-Open scope: WFC-detail golden/review digest evidence and exact AUTO acceptance evidence.
+Original open findings: `F-PAG-M06-C002-001`, `F-PAG-M06-C002-002`
+C003 disposition: AUTO evidence closed; WFC evidence-binding residue continues through C004.
 Terminal builder-era HEAD independently observed: `9cc8f4b4ca8757427fbbe88d239e1acb6092a764`
 Implementation commit: `2c786e47aea8ce7b3fc10fa4877f264605fb77f2`
 
@@ -69,7 +78,7 @@ Implementation commit: `2c786e47aea8ce7b3fc10fa4877f264605fb77f2`
 State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M06-C002`
 Audit: `.hiveai/audits/PAG-M06-C001_HYBRID_GENERATOR_ROUTER_STRICT_AUDIT.md`
 Original findings: `F-PAG-M06-C001-001`, `F-PAG-M06-C001-002`, `F-PAG-M06-C001-003`, `F-PAG-M06-C001-004`
-C002 disposition: core WFC-remap and true-replay implementation defects closed; AUTO/evidence acceptance continues through C003.
+C002 disposition: core WFC-remap and true-replay implementation defects closed; evidence acceptance continues through C004.
 Terminal builder-era HEAD independently observed: `318b97b9c33a3b35a2ef6bbde9b348331cf74b83`
 Post-builder tracker-v3 migration commit: `279f978dd9e73f08abe2ab3f8b2f313c84260ef2`
 
@@ -90,8 +99,7 @@ Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48
 
 ### PAG-M04-C001 — Procedural Shape / Rule Generator
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
-Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
-Open findings: `F-PAG-M04-C001-001`, `F-PAG-M04-C001-002`, `F-PAG-M04-C001-003`, `F-PAG-M04-C001-004`, `F-PAG-M04-C001-005`
+Audit: `.hiveai/audits/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_STRICT_AUDIT.md`
 Forward dependency: `PAG-0441` blocked on M10 performance budget
 Terminal builder-era HEAD independently observed: `315233b77211d4771832b1732d9f9e52af66364a`
 
