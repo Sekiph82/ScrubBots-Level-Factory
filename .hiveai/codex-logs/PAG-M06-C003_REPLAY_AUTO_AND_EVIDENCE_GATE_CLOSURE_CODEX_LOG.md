@@ -83,5 +83,5 @@ The v3 GitHub branch is the sole task authority. Removed legacy projections are 
 - Implementation/evidence push: `git push origin main` succeeded, updating GitHub `921660d..1a0ba2c`.
 - Final changed-file summary for the implementation commit: matching C003 builder log; M06 review builder, manifest, and contact sheet; M06 golden data/test; M06 review evidence test; M06 router/AUTO/replay test. Production source was unchanged.
 - Immediately after the implementation commit, the only remaining local changes were the preserved dirty `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT.json`, and untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`.
-- This log is complete and is being published in the implementation commit; the terminal local HEAD and `origin/main` equality checkpoint is verified after push. No task/H!veAI acceptance state or main ScrubBots repository was modified.
+- This log is complete and is being published in a separate log-only commit after the implementation commit; the terminal local HEAD and `origin/main` equality checkpoint is verified after push. No task/H!veAI acceptance state or main ScrubBots repository was modified.
 - No task/H!veAI acceptance state or main ScrubBots repository will be modified.
