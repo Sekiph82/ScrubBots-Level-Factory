@@ -127,7 +127,7 @@ State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M02-C003`
 Audit: `.hiveai/audits/PAG-M02-C002_RESULT_INTEGRITY_AND_PROVENANCE_REMEDIATION_STRICT_AUDIT.md`
 Closed findings: `F-PAG-M02-C001-002`, `F-PAG-M02-C001-003`
 Open finding: `F-PAG-M02-C002-001`
-Terminal builder-era HEAD independently observed: `7ccbc1ad3209d2d3f4e03d4c19127a69b33ce6`
+Terminal builder-era HEAD independently observed: `7ccbc1ad3209d0e2d3f4e03d4c19127a69b33ce6`
 
 ### PAG-M02-C001 — Deterministic Generation Core
 State: `AUDIT_FAILED / PARTIALLY_REMEDIATED`
