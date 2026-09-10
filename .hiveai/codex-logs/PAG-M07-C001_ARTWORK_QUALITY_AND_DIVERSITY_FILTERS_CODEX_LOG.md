@@ -102,4 +102,11 @@ No dependency, license, third-party source/artwork, tracker/audit state, M08+ im
 
 ### Verification and publication
 
-Pending final static checks after staging, implementation/review commit, push, completed-log publication, final status, and the required post-log-publication `HEAD == origin/main` checkpoint.
+### Final publication checkpoint
+
+- Final M07 implementation/review commit: `81059b1` (`implement M07 artwork quality filters`).
+- `git push origin main` succeeded, updating GitHub `2fe708c..81059b1`.
+- The implementation commit contains only the 12 listed M07 paths: the quality package and public exports, focused M07 tests, deterministic M07 review builder/manifest/contact sheet, and this builder log. No production generator-family implementation was changed.
+- Before the separate log-only publication, the preserved local control-plane state remained unstaged: `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT.json`, `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`.
+- The completed builder log is being published in a separate log-only commit. Immediately after that push, `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, `git rev-list --left-right --count HEAD...origin/main`, and `git status --short` will be run. The resulting final local `HEAD == origin/main` equality will be recorded in this log publication checkpoint and returned to ChatGPT for independent strict audit.
+- No task/H!veAI acceptance state, audit file, M08+ implementation, or main ScrubBots repository was modified.
