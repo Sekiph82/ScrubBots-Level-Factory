@@ -48,21 +48,32 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M08-C002`
-Title: `Provenance Binding, Rectangular Golden & Strict PNG Remediation`
+Cycle: `PAG-M09-C001`
+Title: `CLI & Local Batch Generation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M08-C002_PROVENANCE_BINDING_RECTANGULAR_GOLDEN_AND_STRICT_PNG_REMEDIATION_PROMPT.md`
-Previous audit: `.hiveai/audits/PAG-M08-C001_OUTPUT_EXPORT_CONTRACT_STRICT_AUDIT.md`
+Prompt: `.hiveai/prompts/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_PROMPT.md`
+Previous closing audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
+Current-state authority: root `TASKS.md`.
 
 ## Failed / remediation-required cycles
 
+### PAG-M08-C002 — Provenance Binding, Rectangular Golden & Strict PNG Remediation
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M08-C003`
+Audit: `.hiveai/audits/PAG-M08-C002_PROVENANCE_BINDING_RECTANGULAR_GOLDEN_AND_STRICT_PNG_REMEDIATION_STRICT_AUDIT.md`
+Closed in C002: genuine rectangular row-major/committed JSON+PNG golden evidence and strict empty-IEND validation.
+Residual finding: `F-PAG-M08-C002-001` deterministic WFC/HYBRID/AUTO rich provenance binding.
+Final disposition: residual finding closed by PAG-M08-C003; no open M08 finding remains.
+Implementation/evidence commit: `cddb738a71eda0dc614cbcc4d06b19cb9ac31c4a`
+Completed-log publication commit: `53fdac71eef517f633f1e99fd7489e201be296db`
+Terminal builder-era HEAD independently observed: `cca76e86f7690660c24f386f80b36a9091f8ca85`
+
 ### PAG-M08-C001 — Output / Export Contract
-State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M08-C002`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M08-C002_AND_C003`
 Audit: `.hiveai/audits/PAG-M08-C001_OUTPUT_EXPORT_CONTRACT_STRICT_AUDIT.md`
-Open findings: `F-PAG-M08-C001-001`, `F-PAG-M08-C001-002`, `F-PAG-M08-C001-003`
-Open scope: fail-closed rich WFC/HYBRID/AUTO provenance preservation and cross-binding, genuine rectangular row-major + committed rectangular golden evidence, and strict empty-IEND validation.
-Accepted C001 scope preserved into remediation: immutable artwork/quality separation, exact logical RGB PNG, integer preview replication, GenerationResult/request/RNG and quality binding, deterministic bundle publication, 59x59 and cross-process coverage.
+Original findings: `F-PAG-M08-C001-001`, `F-PAG-M08-C001-002`, `F-PAG-M08-C001-003`.
+Final disposition: rectangular evidence and strict IEND closed by C002; rich provenance omission/cross-binding closed through C002-C003. No open M08 finding remains.
+Accepted foundation: immutable artwork/quality separation, exact logical RGB PNG, integer preview replication, GenerationResult/request/RNG and quality binding, deterministic bundle publication, 59x59 and cross-process coverage.
 Implementation/evidence commit: `3612cc2e58917c40d430fa2de3b6a2e4e02beb4c`
 Builder-log publication commit: `55e2a13bcc5f2d1afcc4941d8c84a4ebaf05d0e6`
 Terminal builder-era HEAD independently observed: `88be1da62da458f63a987ad477ca676b6074118b`
@@ -162,6 +173,17 @@ Audit: `.hiveai/audits/PAG-M00-C002_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_A
 Original findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
+
+### PAG-M08-C003 — Deterministic Rich Provenance Binding Closure
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
+Closes finding: `F-PAG-M08-C002-001`
+Closes milestone: `PAG-M08 — Output / Export Contract`
+Implementation/evidence commit: `f9fc4bcb62b5b0d840b2d752b9608942415240ed`
+Completed-log publication/equality commits: `f4023b5084763a9627aaccd9bbe0f974a7a575f2`, `ed624e1877388dee17374b66663eecb2efbe8c89`
+Terminal builder-era HEAD independently observed: `ed624e1877388dee17374b66663eecb2efbe8c89`
+Audit result: M08 PASS / CLOSED, 30/30 task IDs independently validated.
+Process note: equality after the completed-log publication commit was recorded in the evidence-only final log record; no product acceptance defect remains.
 
 ### PAG-M07-C003 — Review Evidence & Symmetry Contract Closure
 State: `AUDIT_PASSED / TASK_COMPLETE`
