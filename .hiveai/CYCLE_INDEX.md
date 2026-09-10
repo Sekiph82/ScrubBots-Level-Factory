@@ -99,7 +99,7 @@ Terminal builder-era HEAD independently observed: `f431b24b2c965e615898020d30d48
 
 ### PAG-M04-C001 — Procedural Shape / Rule Generator
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M04-C002`
-Audit: `.hiveai/audits/PAG-M04-C002_GEOMETRY_FIDELITY_OPERATION_SEMANTICS_AND_RECIPE_DIVERSITY_REMEDIATION_STRICT_AUDIT.md`
+Audit: `.hiveai/audits/PAG-M04-C001_PROCEDURAL_SHAPE_RULE_GENERATOR_STRICT_AUDIT.md`
 Forward dependency: `PAG-0441` blocked on M10 performance budget
 Terminal builder-era HEAD independently observed: `315233b77211d4771832b1732d9f9e52af66364a`
 
