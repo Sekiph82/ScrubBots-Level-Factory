@@ -114,7 +114,9 @@ def test_known_answer_one_cell_full_interior_and_equal_size_components() -> None
     assert equal_analysis.metrics.largest_color_dominance == 0.5
 
 
-def test_directional_symmetry_fixtures_distinguish_axes_and_asymmetry() -> None:
+def test_directional_symmetry_reflections_match_documented_axes() -> None:
+    # horizontal_symmetry_score is left-right reflection across the vertical
+    # centerline: (x, y) compares with (width - 1 - x, y).
     horizontal_only = [
         "C01", "C01", "C01", "C01", "C01",
         "C01", "C02", "C03", "C02", "C01",
@@ -126,6 +128,8 @@ def test_directional_symmetry_fixtures_distinguish_axes_and_asymmetry() -> None:
     assert horizontal_analysis.metrics.horizontal_symmetry_score == 1.0
     assert horizontal_analysis.metrics.vertical_symmetry_score < 1.0
 
+    # vertical_symmetry_score is top-bottom reflection across the horizontal
+    # centerline: (x, y) compares with (x, height - 1 - y).
     vertical_only = [
         "C01", "C01", "C01", "C01", "C01",
         "C01", "C02", "C03", "C04", "C01",

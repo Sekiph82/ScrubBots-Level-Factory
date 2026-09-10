@@ -131,6 +131,7 @@ def build_contact_sheet(entries: Iterable[ReviewEntry]) -> str:
     for entry in ordered:
         report = _assessed(entry)
         analysis = report.analysis
+        candidate_id_html = html.escape(entry.candidate_id, quote=True)
         cells = entry.cells
         spans: list[str] = []
         if analysis:
@@ -164,8 +165,8 @@ def build_contact_sheet(entries: Iterable[ReviewEntry]) -> str:
         difficulty = entry.difficulty.value if isinstance(entry.difficulty, Difficulty) else (entry.difficulty or "N/A")
         classification = entry.classification or "N/A"
         cards.append(
-            "<article class=\"card\">"
-            f"<h2>{html.escape(entry.candidate_id)}</h2>"
+            f"<article class=\"card\" data-candidate-id=\"{candidate_id_html}\">"
+            f"<h2>{candidate_id_html}</h2>"
             f"<p>mode={html.escape(str(entry.mode))} seed={html.escape(str(entry.seed))} "
             f"difficulty={html.escape(str(difficulty))} classification={html.escape(classification)} "
             f"dimensions={entry.width}×{entry.height}</p>"
