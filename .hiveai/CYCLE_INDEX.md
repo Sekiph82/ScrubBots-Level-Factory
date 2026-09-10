@@ -48,17 +48,28 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M06-C002`
-Title: `WFC Remap, Stage Replay & Router Evidence Remediation`
+Cycle: `PAG-M06-C003`
+Title: `Replay, AUTO & Evidence Gate Closure`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
+Prompt: `.hiveai/prompts/PAG-M06-C003_REPLAY_AUTO_AND_EVIDENCE_GATE_CLOSURE_PROMPT.md`
 
 ## Failed / remediation-required cycles
 
+### PAG-M06-C002 — WFC Remap, Stage Replay & Router Evidence Remediation
+State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M06-C003`
+Audit: `.hiveai/audits/PAG-M06-C002_WFC_REMAP_STAGE_REPLAY_AND_ROUTER_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
+Closed functional scope: C001 WFC source→target remap defect and whole-request replay defect materially repaired.
+Open findings: `F-PAG-M06-C002-001`, `F-PAG-M06-C002-002`
+Open scope: WFC-detail golden/review digest evidence and exact AUTO acceptance evidence.
+Terminal builder-era HEAD independently observed: `9cc8f4b4ca8757427fbbe88d239e1acb6092a764`
+Implementation commit: `2c786e47aea8ce7b3fc10fa4877f264605fb77f2`
+
 ### PAG-M06-C001 — Hybrid Generator Router
-State: `AUDIT_FAILED / FIX_REQUIRED`
+State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M06-C002`
 Audit: `.hiveai/audits/PAG-M06-C001_HYBRID_GENERATOR_ROUTER_STRICT_AUDIT.md`
-Open findings: `F-PAG-M06-C001-001`, `F-PAG-M06-C001-002`, `F-PAG-M06-C001-003`, `F-PAG-M06-C001-004`
+Original findings: `F-PAG-M06-C001-001`, `F-PAG-M06-C001-002`, `F-PAG-M06-C001-003`, `F-PAG-M06-C001-004`
+C002 disposition: core WFC-remap and true-replay implementation defects closed; AUTO/evidence acceptance continues through C003.
 Terminal builder-era HEAD independently observed: `318b97b9c33a3b35a2ef6bbde9b348331cf74b83`
 Post-builder tracker-v3 migration commit: `279f978dd9e73f08abe2ab3f8b2f313c84260ef2`
 
