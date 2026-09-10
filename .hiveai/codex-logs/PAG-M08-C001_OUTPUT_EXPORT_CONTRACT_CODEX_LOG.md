@@ -66,4 +66,5 @@ This matching log was created before any M08 implementation, test, golden, or do
 - Implementation/evidence commit: `3612cc2e58917c40d430fa2de3b6a2e4e02beb4c` (`Implement M08 deterministic output export contract`).
 - Push command: `git push origin main` — succeeded; remote advanced `8790113..3612cc2`.
 - Post-push equality checkpoint: after `git fetch origin main`, local `HEAD` was `3612cc2e58917c40d430fa2de3b6a2e4e02beb4c`, `origin/main` was `3612cc2e58917c40d430fa2de3b6a2e4e02beb4c`, and divergence was `0 0`.
-- The completed builder log is published in the following log-publication commit. Immediately after pushing that commit, local `HEAD` and `origin/main` are verified equal; the terminal verification is reported with this published log.
+- Completed-log publication commit: `55e2a13bcc5f2d1afcc4941d8c84a4ebaf05d0e6` (`Complete M08 builder log`), pushed successfully to `origin/main`.
+- Terminal equality verification after publishing that log: `git fetch origin main` reported local `HEAD` `55e2a13bcc5f2d1afcc4941d8c84a4ebaf05d0e6`, `origin/main` `55e2a13bcc5f2d1afcc4941d8c84a4ebaf05d0e6`, and divergence `0 0`. Only the preserved pre-existing control-plane changes remain in the worktree.
