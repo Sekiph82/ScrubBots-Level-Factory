@@ -44,8 +44,5 @@ This matching log was created before the first C002 source, test, or golden edit
 - Implementation/evidence commit: `cddb738a71eda0dc614cbcc4d06b19cb9ac31c4a` (`Remediate M08 provenance and rectangular export evidence`).
 - `git push origin main` succeeded; remote advanced `7600427..cddb738`.
 - Post-implementation push checkpoint: after `git fetch origin main`, local `HEAD` and `origin/main` were both `cddb738a71eda0dc614cbcc4d06b19cb9ac31c4a`, with divergence `0 0`.
-- The completed C002 builder log is published in the following log-publication commit. The terminal post-publication equality check is performed immediately after its push and recorded with the published log.
-
-## Publication record
-
-Pending. Record the implementation/evidence commit, completed-log publication, push results, and exact final local `HEAD == origin/main` verification.
+- Completed-log publication commit: `53fdac71eef517f633f1e99fd7489e201be296db` (`Complete M08 C002 builder log`), pushed successfully to `origin/main`.
+- Terminal post-publication equality verification: after `git fetch origin main`, local `HEAD` was `53fdac71eef517f633f1e99fd7489e201be296db`, `origin/main` was `53fdac71eef517f633f1e99fd7489e201be296db`, and divergence was `0 0`. Only the preserved pre-existing control-plane changes remain in the worktree.
