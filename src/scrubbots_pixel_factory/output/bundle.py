@@ -174,6 +174,11 @@ def _request_parts(result_dict: Mapping[str, object]) -> tuple[Mapping[str, obje
     return request, _mapping_copy(options.get("values"), "generation.result.request.generator_options.values")
 
 
+def _retry_provenance(result_dict: Mapping[str, object], path: str = "generation.result.rng.provenance") -> Mapping[str, object]:
+    rng = _mapping_copy(result_dict.get("rng"), "generation.result.rng")
+    return _mapping_copy(rng.get("provenance"), path)
+
+
 def _typed_seed_value(value: object, path: str) -> int | str:
     seed = _mapping_copy(value, path)
     if seed.get("type") not in {"int", "string"} or type(seed.get("value")) is not (int if seed.get("type") == "int" else str):
@@ -223,11 +228,17 @@ def _validate_wfc_metadata(data: Mapping[str, object], result_dict: Mapping[str,
     max_attempts = data.get("max_attempts", options.get("max_attempts", 4))
     if type(attempt) is not int or type(max_attempts) is not int or not 0 <= attempt < max_attempts:
         raise OutputContractError("WFC attempt metadata is outside the bounded attempt range")
+    retry_seeds = _mapping_copy(_retry_provenance(result_dict).get("retry_seeds"), "WFC result retry provenance")
+    expected_retry_keys = {str(index) for index in range(attempt + 1)}
+    if set(retry_seeds) != expected_retry_keys or len(retry_seeds) != attempt + 1:
+        raise OutputContractError("WFC attempt does not match the GenerationResult retry provenance")
     history = data.get("contradiction_history")
     if not isinstance(history, list):
         raise OutputContractError("WFC contradiction history is malformed")
-    for entry in history:
-        if not isinstance(entry, Mapping) or type(entry.get("attempt")) is not int or not 0 <= entry["attempt"] < attempt:
+    if len(history) != attempt:
+        raise OutputContractError("WFC contradiction history count does not match the successful attempt")
+    for index, entry in enumerate(history):
+        if not isinstance(entry, Mapping) or entry.get("attempt") != index:
             raise OutputContractError("WFC contradiction history is not ordered before the successful attempt")
 
 
@@ -253,19 +264,44 @@ def _validate_hybrid_metadata(data: Mapping[str, object], result_dict: Mapping[s
     if data.get("resolved_dimensions") != {"width": artwork.width, "height": artwork.height} or data.get("resolved_palette") != list(artwork.palette):
         raise OutputContractError("HYBRID dimensions or palette binding is invalid")
     attempt = data.get("outer_attempt")
-    if type(attempt) is not int or attempt < 0:
+    max_attempts = options.get("max_attempts", 4)
+    if type(attempt) is not int or type(max_attempts) is not int or not 0 <= attempt < max_attempts:
         raise OutputContractError("HYBRID outer attempt is invalid")
+    retry_seeds = _mapping_copy(_retry_provenance(result_dict).get("retry_seeds"), "HYBRID result retry provenance")
+    expected_retry_keys = {str(index) for index in range(attempt + 1)}
+    if set(retry_seeds) != expected_retry_keys or len(retry_seeds) != attempt + 1:
+        raise OutputContractError("HYBRID outer attempt does not match the GenerationResult retry provenance")
     stages = data.get("stages")
     if not isinstance(stages, list) or not stages:
         raise OutputContractError("HYBRID stage metadata is missing")
+    strategy = data.get("strategy")
+    layouts = {
+        "MASK_GEOMETRY_RULE_COLOR_REGIONS": (("MASK_GEOMETRY", "MASK", "MASK"), ("RULE_COLOR_REGIONS", "COMPOSITION", "RULES")),
+        "RULE_GEOMETRY_MASK_SYMMETRY": (("RULE_GEOMETRY", "RULES", "RULES"), ("MASK_SYMMETRY_COLOR_REGIONS", "COMPOSITION", "RULES")),
+        "RULE_BASE_WFC_DETAIL": (("RULE_BASE", "RULES", "RULES"), ("WFC_DETAIL", "WFC", "WFC")),
+        "MASK_BASE_WFC_DETAIL": (("MASK_BASE", "MASK", "MASK"), ("WFC_DETAIL", "WFC", "WFC")),
+    }
+    expected_layout = layouts.get(strategy)
+    if expected_layout is None or len(stages) != len(expected_layout):
+        raise OutputContractError("HYBRID strategy-specific stage layout is invalid")
     for index, raw_stage in enumerate(stages):
         stage = _mapping_copy(raw_stage, f"hybrid.stages[{index}]")
-        if stage.get("stage_index") != index or type(stage.get("derived_seed")) is not str or _DIGEST.fullmatch(stage["derived_seed"]) is None:
+        expected_name, expected_kind, expected_mode = expected_layout[index]
+        if (stage.get("stage_index"), stage.get("stage_name"), stage.get("stage_kind")) != (index, expected_name, expected_kind):
+            raise OutputContractError("HYBRID stage name/kind does not match its strategy")
+        if type(stage.get("derived_seed")) is not str or _DIGEST.fullmatch(stage["derived_seed"]) is None:
             raise OutputContractError("HYBRID stages are not deterministically ordered")
+        expected_seed = DeterministicRNG(_typed_seed_value(result_dict.get("seed"), "generation.result.seed")).child(
+            f"hybrid/{strategy}/{attempt}/{index}/{expected_name}"
+        ).next_bytes(32).hex()
+        if stage.get("derived_seed") != expected_seed:
+            raise OutputContractError("HYBRID stage seed does not match the accepted M06 deterministic derivation")
         child_request = _mapping_copy(stage.get("child_request"), f"hybrid.stages[{index}].child_request")
         if stage.get("child_request_digest") != _sha256(canonical_json_bytes(child_request)):
             raise OutputContractError("HYBRID child request digest is invalid")
         child_seed = _mapping_copy(child_request.get("seed"), f"hybrid.stages[{index}].child_request.seed")
+        if child_request.get("generator_mode") != expected_mode:
+            raise OutputContractError("HYBRID child request mode contradicts its strategy stage")
         if child_seed.get("type") != "string" or child_seed.get("value") != stage.get("derived_seed"):
             raise OutputContractError("HYBRID child request seed does not match its stage seed")
         if child_request.get("width") != artwork.width or child_request.get("height") != artwork.height or child_request.get("palette_subset") != list(artwork.palette):
@@ -313,6 +349,10 @@ def _validate_auto_metadata(data: Mapping[str, object], result_dict: Mapping[str
     expected_modes = candidates[start:] + candidates[:start] if fallback else [initial]
     if [item.get("mode") for item in attempts if isinstance(item, Mapping)] != expected_modes[: len(attempts)]:
         raise OutputContractError("AUTO attempt order does not match configured fallback semantics")
+    retry_seeds = _mapping_copy(_retry_provenance(result_dict).get("retry_seeds"), "AUTO result retry provenance")
+    expected_retry_keys = {str(index) for index in range(len(attempts))}
+    if set(retry_seeds) != expected_retry_keys or len(retry_seeds) != len(attempts):
+        raise OutputContractError("AUTO attempt count does not match the GenerationResult retry provenance")
     successful: list[Mapping[str, object]] = []
     for index, raw_attempt in enumerate(attempts):
         attempt = _mapping_copy(raw_attempt, f"auto.attempts[{index}]")

@@ -19,6 +19,7 @@ from scrubbots_pixel_factory.output import (
     BundleConflictError,
     OutputContractError,
     build_export_bundle,
+    canonical_json_bytes,
     export_result,
     read_bundle,
     write_bundle,
@@ -90,6 +91,98 @@ def test_m08_rich_provenance_tampering_fails_on_bundle_read() -> None:
             metadata_path.write_text(json.dumps(value), encoding="utf-8")
             with pytest.raises(OutputContractError):
                 read_bundle(path)
+
+
+def _assert_tampered_bundle_rejected(candidate: object, candidate_id: str, mutate) -> None:
+    with TemporaryDirectory() as temp:
+        path = write_bundle(build_export_bundle(candidate, candidate_id), temp)
+        metadata_path = path / "metadata.json"
+        value = json.loads(metadata_path.read_text(encoding="utf-8"))
+        mutate(value)
+        metadata_path.write_text(json.dumps(value), encoding="utf-8")
+        with pytest.raises(OutputContractError):
+            read_bundle(path)
+
+
+def test_m08_c003_wfc_retry_history_and_second_binding_evidence() -> None:
+    wfc = _wfc_candidate()
+
+    def attempt_changed(value):
+        data = value["generator_metadata"]["payload"]["data"]
+        data["attempt"] = 1
+        data["contradiction_history"] = [{"attempt": 0, "code": "X", "placement": [0, 0], "detail": "X"}]
+
+    def history_missing(value):
+        data = value["generator_metadata"]["payload"]["data"]
+        data["attempt"] = 1
+        data["contradiction_history"] = []
+
+    def history_duplicate(value):
+        data = value["generator_metadata"]["payload"]["data"]
+        data["attempt"] = 2
+        data["contradiction_history"] = [
+            {"attempt": 0, "code": "X", "placement": [0, 0], "detail": "X"},
+            {"attempt": 0, "code": "Y", "placement": [0, 0], "detail": "Y"},
+        ]
+
+    def history_out_of_order(value):
+        data = value["generator_metadata"]["payload"]["data"]
+        data["attempt"] = 2
+        data["contradiction_history"] = [
+            {"attempt": 1, "code": "X", "placement": [0, 0], "detail": "X"},
+            {"attempt": 0, "code": "Y", "placement": [0, 0], "detail": "Y"},
+        ]
+
+    def target_palette_tamper(value):
+        value["generator_metadata"]["payload"]["data"]["target_palette"] = ["C01", "C02", "C04"]
+
+    def output_dimensions_tamper(value):
+        value["generator_metadata"]["payload"]["data"]["output_dimensions"] = {"width": 21, "height": 20}
+
+    for suffix, mutate in (("attempt", attempt_changed), ("missing", history_missing), ("duplicate", history_duplicate), ("order", history_out_of_order), ("palette", target_palette_tamper), ("dimensions", output_dimensions_tamper)):
+        _assert_tampered_bundle_rejected(wfc, f"wfc-c003-{suffix}", mutate)
+
+
+def test_m08_c003_hybrid_attempt_layout_seed_and_child_mode_binding() -> None:
+    hybrid = HybridGenerator().generate_candidate(GenerationRequest("EASY", 47, "HYBRID", width=20, height=20, generator_options=GeneratorOptions("hybrid", 1, {"strategy": "MASK_GEOMETRY_RULE_COLOR_REGIONS", "mask_style": "ROBOT", "rules_style": "ORGANIC", "mask_symmetry": "HORIZONTAL"})))
+
+    def outer_attempt_tamper(value):
+        value["generator_metadata"]["payload"]["data"]["outer_attempt"] = 1
+
+    def illegal_name(value):
+        value["generator_metadata"]["payload"]["data"]["stages"][0]["stage_name"] = "ILLEGAL"
+
+    def illegal_kind(value):
+        value["generator_metadata"]["payload"]["data"]["stages"][0]["stage_kind"] = "COMPOSITION"
+
+    def non_deterministic_seed(value):
+        stage = value["generator_metadata"]["payload"]["data"]["stages"][0]
+        stage["derived_seed"] = "a" * 64
+        stage["child_request"]["seed"]["value"] = "a" * 64
+        stage["child_request_digest"] = hashlib.sha256(canonical_json_bytes(stage["child_request"])).hexdigest()
+
+    def contradictory_child_mode(value):
+        stage = value["generator_metadata"]["payload"]["data"]["stages"][0]
+        stage["child_request"]["generator_mode"] = "RULES"
+        stage["child_request_digest"] = hashlib.sha256(canonical_json_bytes(stage["child_request"])).hexdigest()
+
+    for suffix, mutate in (("attempt", outer_attempt_tamper), ("name", illegal_name), ("kind", illegal_kind), ("seed", non_deterministic_seed), ("mode", contradictory_child_mode)):
+        _assert_tampered_bundle_rejected(hybrid, f"hybrid-c003-{suffix}", mutate)
+
+
+def test_m08_c003_auto_attempt_count_binds_to_retry_provenance() -> None:
+    auto = GeneratorRouter().generate_candidate(GenerationRequest("EASY", 17, "AUTO", width=20, height=20, generator_options=GeneratorOptions("auto", 1, {"candidates": ["MASK", "RULES"], "fallback_on_failure": True})))
+
+    def extra_retry_provenance(value):
+        generation = value["generation"]
+        result = generation["result"]
+        provenance = result["rng"]["provenance"]
+        provenance["retry_seeds"]["1"] = "0" * 64
+        generation["rng"]["provenance"] = provenance
+        generation["provenance"] = provenance
+        generation["result_digest"] = hashlib.sha256(canonical_json_bytes(result)).hexdigest()
+
+    _assert_tampered_bundle_rejected(auto, "auto-c003-retry-count", extra_retry_provenance)
 
 
 def test_m08_bundle_round_trip_rectangular_preview_and_rewrite() -> None:
