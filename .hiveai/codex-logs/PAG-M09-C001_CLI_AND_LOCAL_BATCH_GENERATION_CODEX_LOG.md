@@ -42,4 +42,6 @@ This matching M09 builder log was created before the first M09 source, test, fix
 
 ## Publication record
 
-Pending implementation and completed-log publication; append commit SHAs, push results, and the post-publication `HEAD == origin/main` check after scoped commits are published.
+- Implementation commit: `23f27f3e73dc4a6ef34338378139aac842f3fde6` (`Implement M09 offline CLI and batch generation`). It contains only the M09 CLI package, entry point/docs, M09 tests, and this matching builder log.
+- `git push origin main` succeeded; remote advanced `ed5d2c3..23f27f3`.
+- The completed builder log is published in the next log-publication commit. The terminal post-publication equality check will be run immediately after that push and recorded.
