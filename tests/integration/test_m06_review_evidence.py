@@ -47,8 +47,17 @@ def test_m06_review_manifest_is_self_contained_and_complete() -> None:
         if strategy == "MASK_GEOMETRY_RULE_COLOR_REGIONS":
             assert stages[0]["geometry_digest"] == entry["topology_digests"]["before"]
         if strategy in {"RULE_BASE_WFC_DETAIL", "MASK_BASE_WFC_DETAIL"}:
+            assert topology["before"] == topology["final"]
+            assert entry["topology_digests"]["before"] == stages[0]["geometry_digest"]
+            assert entry["topology_digests"]["final"] == entry["final_topology_digest"]
             assert entry["topology_bindings"][0]["stage_name"] == stages[0]["stage_name"]
+            assert entry["topology_bindings"][0]["digest"] == stages[0]["geometry_digest"]
             assert entry["topology_bindings"][-1]["stage_name"] == "FINAL"
+            assert entry["topology_bindings"][-1]["digest"] == entry["final_topology_digest"]
+            if strategy == "RULE_BASE_WFC_DETAIL":
+                assert stages[0]["extra"]["canvas_digest"] == entry["topology_digests"]["before"]
+            else:
+                assert stages[0]["extra"]["mask_digest"] == entry["topology_digests"]["before"]
             assert entry.get("exemplar_ownership") == "SYNTHETIC_TEST_ONLY"
         assert all(len(stage["derived_seed"]) == 64 for stage in entry["stages"])
     html = (ROOT / "review/m06/M06_HYBRID_CONTACT_SHEET.html").read_text(encoding="utf-8")

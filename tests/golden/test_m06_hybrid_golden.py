@@ -4,6 +4,8 @@ import json
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
 from scrubbots_pixel_factory.generators.router import HybridCandidate, HybridGenerator
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
@@ -62,13 +64,22 @@ def test_m06_hybrid_goldens() -> None:
         if "exemplar" in golden:
             assert raw["generator_mode"] == "HYBRID"
             assert set(raw) >= {"difficulty", "seed", "generator_mode", "width", "height", "palette_subset", "generator_options"}
+            assert golden["strategy"] == candidate.strategy
+            assert golden["strategy"] == raw["generator_options"]["values"]["strategy"]
             assert candidate.stages[-1].extra["exemplar_id"] == golden["exemplar"]["id"]
             assert [list(pair) for pair in candidate.stages[-1].extra["palette_mapping"]] == golden["palette_mapping"]
             assert golden["stage_geometry_digests"] == [stage.geometry_digest for stage in candidate.stages]
             topology = {name: list(cells) for name, cells in candidate.metadata["topology_evidence"].items()}
             assert golden["topology_evidence"] == topology
             assert golden["topology_digests"] == {name: _topology_digest(cells) for name, cells in topology.items()}
-            assert golden["stage_topology_digests"] == [golden["topology_digests"]["before"], None]
+            assert golden["stage_topology_digests"][0] == candidate.stages[0].geometry_digest
+            assert golden["stage_topology_digests"][0] == golden["topology_digests"]["before"]
+            assert golden["stage_topology_digests"][1] is None
+            if golden["strategy"] == "RULE_BASE_WFC_DETAIL":
+                assert candidate.stages[0].extra["canvas_digest"] == golden["stage_topology_digests"][0]
+            else:
+                assert golden["strategy"] == "MASK_BASE_WFC_DETAIL"
+                assert candidate.stages[0].extra["mask_digest"] == golden["stage_topology_digests"][0]
             assert golden["topology_bindings"] == [
                 {"stage_name": candidate.stages[0].stage_name, "topology": "before", "digest": golden["topology_digests"]["before"]},
                 {"stage_name": "FINAL", "topology": "final", "digest": golden["topology_digests"]["final"]},
@@ -76,3 +87,21 @@ def test_m06_hybrid_goldens() -> None:
             assert golden["final_topology_digest"] == candidate.metadata["final_topology_digest"]
             assert golden["wfc_pattern_table_digest"] == candidate.stages[-1].extra["pattern_table_digest"]
             assert golden["wfc_attempt"] == candidate.stages[-1].extra["attempt"]
+
+
+def test_m06_wfc_golden_strategy_corruption_is_rejected() -> None:
+    golden = next(entry for entry in GOLDENS["entries"] if "exemplar" in entry)
+    raw = golden["request"]
+    exemplar = _synthetic_exemplar()
+    generator = HybridGenerator(wfc_generator=WFCGenerator(ExemplarRegistry((exemplar,))))
+    request = GenerationRequest(
+        raw["difficulty"], raw["seed"], raw["generator_mode"], width=raw["width"], height=raw["height"],
+        palette_subset=tuple(raw["palette_subset"]),
+        generator_options=GeneratorOptions(raw["generator_options"]["namespace"], raw["generator_options"]["version"], raw["generator_options"]["values"]),
+    )
+    candidate = generator.generate_candidate(request)
+    assert isinstance(candidate, HybridCandidate)
+    corrupted = dict(golden)
+    corrupted["strategy"] = "MASK_BASE_WFC_DETAIL" if golden["strategy"] == "RULE_BASE_WFC_DETAIL" else "RULE_BASE_WFC_DETAIL"
+    with pytest.raises(AssertionError):
+        assert corrupted["strategy"] == candidate.strategy
