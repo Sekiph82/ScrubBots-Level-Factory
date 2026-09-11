@@ -14,5 +14,6 @@
   "request_digest": "ef56dd7904dcab5b21e1d66d70a5031343cca2393378462d6122f8e1e1dcefbb",
   "schema": "scrubbots-pixellab-job",
   "schema_version": 1,
+  "style_strength": null,
   "workflow_version": "sp02-workflow-v1"
 }

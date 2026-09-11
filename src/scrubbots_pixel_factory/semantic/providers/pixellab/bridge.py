@@ -188,6 +188,7 @@ class PixelLabJobSpec:
     style_image_sha256: str | None
     color_image_sha256: str | None
     init_strength: int | None
+    style_strength: int | None
     schema: str = PIXELLAB_JOB_SCHEMA
     schema_version: int = PIXELLAB_JOB_SCHEMA_VERSION
 
@@ -215,6 +216,7 @@ class PixelLabJobSpec:
             request.description, request.negative_description, _map_control("outline", request.outline), _map_control("shading", request.shading), _map_control("detail", request.detail), _map_control("view", request.view), _map_control("direction", request.direction), request.isometric, request.no_background, request.coverage_percentage,
             by_role.get(ImageInputRole.INIT), by_role.get(ImageInputRole.STYLE), by_role.get(ImageInputRole.COLOR_REFERENCE),
             None if request.init_strength is None else round(request.init_strength * 1000),
+            None if selected != "BITFORGE" or request.style_strength is None else round(request.style_strength * 100),
         )
 
     def canonical_dict(self) -> dict[str, object]:
@@ -229,6 +231,7 @@ class PixelLabJobSpec:
             "no_background": self.no_background, "coverage_percentage": self.coverage_percentage,
             "image_bindings": {"INIT": self.init_image_sha256, "STYLE": self.style_image_sha256, "COLOR_REFERENCE": self.color_image_sha256},
             "init_strength": self.init_strength,
+            "style_strength": self.style_strength,
         }
 
     def canonical_bytes(self) -> bytes:
@@ -263,6 +266,7 @@ class PixelLabJobSpec:
             if binding is None:
                 raise SemanticProviderError("STYLE bytes are missing for PixelLab execution")
             kwargs["style_image"] = _decode_pil(binding.image_bytes)
+            kwargs["style_strength"] = self.style_strength if self.style_strength is not None else 0
         return kwargs
 
 
@@ -320,6 +324,31 @@ class PixelLabResultManifest:
     schema: str = PIXELLAB_RESULT_SCHEMA
     schema_version: int = PIXELLAB_RESULT_SCHEMA_VERSION
 
+    def __post_init__(self) -> None:
+        for label, value in (("provider_id", self.provider_id), ("provider_version", self.provider_version), ("provider_config_version", self.provider_config_version), ("engine", self.engine), ("workflow_version", self.workflow_version)):
+            _text(value, label)
+        try:
+            status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
+        except (TypeError, ValueError) as exc:
+            raise SemanticProviderError("PixelLab result status is invalid") from exc
+        if status is CandidateStatus.SUCCESS:
+            if type(self.raw_image_sha256) is not str or len(self.raw_image_sha256) != 64 or any(char not in "0123456789abcdef" for char in self.raw_image_sha256):
+                raise SemanticProviderError("successful PixelLab result raw hash is invalid")
+            if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 8192 for value in (self.returned_width, self.returned_height)):
+                raise SemanticProviderError("successful PixelLab result dimensions are invalid")
+            if self.media_type is None or not self.media_type.strip() or self.failure_reason is not None:
+                raise SemanticProviderError("successful PixelLab result metadata is inconsistent")
+        else:
+            if any(value is not None for value in (self.returned_width, self.returned_height, self.raw_image_sha256, self.media_type)):
+                raise SemanticProviderError("non-success PixelLab result cannot fabricate image data")
+            if self.failure_reason is None or not self.failure_reason.strip():
+                raise SemanticProviderError("non-success PixelLab result requires failure_reason")
+        if self.usage_usd is not None and (isinstance(self.usage_usd, bool) or not isinstance(self.usage_usd, (int, float)) or self.usage_usd < 0):
+            raise SemanticProviderError("PixelLab usage_usd must be a non-negative number")
+        if not isinstance(self.audit_metadata, Mapping):
+            raise SemanticProviderError("PixelLab audit_metadata must be a mapping")
+        object.__setattr__(self, "status", status)
+
     @classmethod
     def from_candidate(cls, candidate: SemanticImageCandidate, job: PixelLabJobSpec, *, usage_usd: float | None = None) -> "PixelLabResultManifest":
         return cls(candidate.request_digest, job.digest(), candidate.provider_id, candidate.provider_version, job.provider_config_version, job.engine, candidate.workflow_version, job.original_seed, job.provider_seed, candidate.returned_width, candidate.returned_height, candidate.raw_image_sha256, "image/png" if candidate.is_success else None, candidate.status, usage_usd, candidate.failure_reason, {})
@@ -335,11 +364,14 @@ class PixelLabResultManifest:
     def canonical_dict(self) -> dict[str, object]:
         return {"schema": self.schema, "schema_version": self.schema_version, "request_digest": self.request_digest, "job_digest": self.job_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version}, "engine": self.engine, "workflow_version": self.workflow_version, "original_seed": typed_seed(self.original_seed), "provider_seed": self.provider_seed, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None, "raw_image_sha256": self.raw_image_sha256, "media_type": self.media_type, "status": self.status.value if isinstance(self.status, CandidateStatus) else self.status, "usage": {"usd": self.usage_usd} if self.usage_usd is not None else None, "failure_reason": self.failure_reason, "audit_metadata": dict(self.audit_metadata)}
 
+    def identity_dict(self) -> dict[str, object]:
+        return {"schema": self.schema, "schema_version": self.schema_version, "request_digest": self.request_digest, "job_digest": self.job_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version}, "engine": self.engine, "workflow_version": self.workflow_version, "original_seed": typed_seed(self.original_seed), "provider_seed": self.provider_seed, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None, "raw_image_sha256": self.raw_image_sha256, "media_type": self.media_type, "status": self.status.value if isinstance(self.status, CandidateStatus) else self.status, "failure_reason": self.failure_reason}
+
     def canonical_bytes(self) -> bytes:
         return canonical_bytes(self.canonical_dict())
 
     def digest(self) -> str:
-        return canonical_digest(self.canonical_dict())
+        return canonical_digest(self.identity_dict())
 
 
 class PixelLabProvider(SemanticGeneratorProvider):

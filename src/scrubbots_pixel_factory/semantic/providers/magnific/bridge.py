@@ -18,7 +18,6 @@ from ...contracts import (
     CandidateStatus,
     ImageInputDescriptor,
     ImageInputRole,
-    ProviderUnavailableError,
     SemanticGenerationRequest,
     SemanticImageCandidate,
     SemanticProviderError,
@@ -37,6 +36,15 @@ MAGNIFIC_JOB_SCHEMA_VERSION = 1
 MAGNIFIC_RESULT_SCHEMA = "scrubbots-magnific-result"
 MAGNIFIC_RESULT_SCHEMA_VERSION = 1
 MAGNIFIC_EXECUTION_SURFACE = "external-manual-orchestrator"
+MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION = "magnific-aspect-ratios-v1"
+MAGNIFIC_SUPPORTED_ASPECT_RATIOS = ("1:1", "21:9", "16:9", "9:16", "2:3", "3:4", "1:2", "2:1", "5:4", "4:5", "3:2", "4:3")
+MAGNIFIC_MODEL_ASPECT_RATIOS = {
+    "recraft-v4-1": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
+    "seedream-5-pro": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
+    "imagen-nano-banana-2-lite": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
+    "imagen-nano-banana-2": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
+    "gpt-2": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
+}
 
 
 def _text(value: object, label: str) -> str:
@@ -46,8 +54,35 @@ def _text(value: object, label: str) -> str:
 
 
 def _aspect_ratio(width: int, height: int) -> str:
-    divisor = math.gcd(width, height)
-    return f"{width // divisor}:{height // divisor}"
+    target = width / height
+    exact = [ratio for ratio in MAGNIFIC_SUPPORTED_ASPECT_RATIOS if _ratio_value(ratio) == target]
+    if exact:
+        return exact[0]
+    # Absolute ratio distance is deterministic and easy to audit. The tuple
+    # order above is the explicit tie-break for equally close ratios.
+    return min(MAGNIFIC_SUPPORTED_ASPECT_RATIOS, key=lambda ratio: (abs(_ratio_value(ratio) - target), MAGNIFIC_SUPPORTED_ASPECT_RATIOS.index(ratio)))
+
+
+def _ratio_value(value: str) -> float:
+    numerator, denominator = value.split(":", 1)
+    return int(numerator) / int(denominator)
+
+
+def _map_aspect_ratio(width: int, height: int, supported: Sequence[str]) -> str:
+    target = width / height
+    normalized = tuple(supported)
+    if not normalized:
+        raise SemanticProviderError("Magnific model has no supported aspect ratios")
+    for ratio in normalized:
+        if ratio not in MAGNIFIC_SUPPORTED_ASPECT_RATIOS:
+            raise SemanticProviderError("Magnific model capability snapshot contains an unsupported aspect ratio")
+    exact = [ratio for ratio in normalized if _ratio_value(ratio) == target]
+    if exact:
+        return exact[0]
+    return min(normalized, key=lambda ratio: (abs(_ratio_value(ratio) - target), normalized.index(ratio)))
+
+
+map_magnific_aspect_ratio = _map_aspect_ratio
 
 
 @dataclass(frozen=True, slots=True)
@@ -146,6 +181,8 @@ class MagnificJobSpec:
     logical_height: int = 0
     original_seed: int | str = ""
     provider_seed_supported: bool = False
+    aspect_ratio_vocabulary_version: str = MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION
+    model_supported_aspect_ratios: tuple[str, ...] = MAGNIFIC_SUPPORTED_ASPECT_RATIOS
     schema: str = MAGNIFIC_JOB_SCHEMA
     schema_version: int = MAGNIFIC_JOB_SCHEMA_VERSION
 
@@ -159,6 +196,7 @@ class MagnificJobSpec:
         quality: str | None = None,
         resolution: str | None = None,
         candidate_count: int | None = None,
+        model_aspect_ratios: Sequence[str] | None = None,
     ) -> "MagnificJobSpec":
         if not isinstance(request, SemanticGenerationRequest):
             raise TypeError("Magnific job requires SemanticGenerationRequest")
@@ -169,11 +207,15 @@ class MagnificJobSpec:
         model = model_slug if model_slug is not None else request.provider_model
         if model is None or model.upper() == "AUTO":
             raise SemanticProviderError("Magnific requires an explicit model slug")
+        if model_slug is not None and model_slug != request.provider_model:
+            raise SemanticProviderError("Magnific model_slug override must equal request.provider_model")
         width, height = request.resolved_dimensions()
         count = request.desired_candidate_count if candidate_count is None else candidate_count
         if type(count) is not int or isinstance(count, bool) or count < 1:
             raise SemanticRequestError("Magnific candidate_count must be a positive integer")
         ref_bindings = _normalize_bindings(request, bindings)
+        supported = tuple(model_aspect_ratios) if model_aspect_ratios is not None else tuple(MAGNIFIC_MODEL_ASPECT_RATIOS.get(model, MAGNIFIC_SUPPORTED_ASPECT_RATIOS))
+        mapped_ratio = _map_aspect_ratio(width, height, supported)
         return cls(
             request_digest=request.digest(),
             provider_id=MAGNIFIC_PROVIDER_ID,
@@ -182,7 +224,7 @@ class MagnificJobSpec:
             execution_surface=MAGNIFIC_EXECUTION_SURFACE,
             model_slug=_text(model, "model_slug"),
             rendered_prompt=_render_prompt(request),
-            aspect_ratio=_aspect_ratio(width, height),
+            aspect_ratio=mapped_ratio,
             candidate_count=count,
             provider_quality=None if quality is None else _text(quality, "quality"),
             provider_resolution=None if resolution is None else _text(resolution, "resolution"),
@@ -190,6 +232,8 @@ class MagnificJobSpec:
             logical_width=width,
             logical_height=height,
             original_seed=request.seed,
+            aspect_ratio_vocabulary_version=MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION,
+            model_supported_aspect_ratios=supported,
         )
 
     def canonical_dict(self) -> dict[str, object]:
@@ -202,6 +246,8 @@ class MagnificJobSpec:
             "model_slug": self.model_slug,
             "rendered_prompt": self.rendered_prompt,
             "aspect_ratio": self.aspect_ratio,
+            "aspect_ratio_vocabulary_version": self.aspect_ratio_vocabulary_version,
+            "model_supported_aspect_ratios": list(self.model_supported_aspect_ratios),
             "candidate_count": self.candidate_count,
             "quality": self.provider_quality,
             "resolution": self.provider_resolution,
@@ -232,7 +278,7 @@ class MagnificResultManifest:
     execution_surface: str
     model_slug: str
     actual_model_slug: str
-    creation_id: str
+    creation_id: str | None
     returned_width: int | None
     returned_height: int | None
     raw_image_sha256: str | None
@@ -243,13 +289,57 @@ class MagnificResultManifest:
     schema: str = MAGNIFIC_RESULT_SCHEMA
     schema_version: int = MAGNIFIC_RESULT_SCHEMA_VERSION
 
+    def __post_init__(self) -> None:
+        for label, value in (("provider_id", self.provider_id), ("provider_version", self.provider_version), ("provider_config_version", self.provider_config_version), ("execution_surface", self.execution_surface), ("model_slug", self.model_slug), ("actual_model_slug", self.actual_model_slug)):
+            _text(value, label)
+        try:
+            status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
+        except (TypeError, ValueError) as exc:
+            raise SemanticProviderError("Magnific result status is invalid") from exc
+        if status is CandidateStatus.SUCCESS:
+            if not self.creation_id or not self.creation_id.strip():
+                raise SemanticProviderError("successful Magnific result requires a provider creation id")
+            if type(self.raw_image_sha256) is not str or len(self.raw_image_sha256) != 64 or any(char not in "0123456789abcdef" for char in self.raw_image_sha256):
+                raise SemanticProviderError("successful Magnific result raw hash is invalid")
+            if any(isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 8192 for value in (self.returned_width, self.returned_height)):
+                raise SemanticProviderError("successful Magnific result dimensions are invalid")
+            if self.media_type is None or not self.media_type.strip() or self.failure_reason is not None:
+                raise SemanticProviderError("successful Magnific result metadata is inconsistent")
+        else:
+            if any(value is not None for value in (self.returned_width, self.returned_height, self.raw_image_sha256, self.media_type)):
+                raise SemanticProviderError("non-success Magnific result cannot fabricate image data")
+            if self.failure_reason is None or not self.failure_reason.strip():
+                raise SemanticProviderError("non-success Magnific result requires failure_reason")
+        if not isinstance(self.audit_metadata, Mapping):
+            raise SemanticProviderError("Magnific audit_metadata must be a mapping")
+        object.__setattr__(self, "status", status)
+
     @classmethod
     def success(cls, job: MagnificJobSpec, *, raw_image_sha256: str, returned_width: int, returned_height: int, creation_id: str, media_type: str = "image/png", actual_model_slug: str | None = None, audit_metadata: Mapping[str, object] | None = None) -> "MagnificResultManifest":
-        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, actual_model_slug or job.model_slug, _text(creation_id, "creation_id"), returned_width, returned_height, raw_image_sha256, _text(media_type, "media_type"), CandidateStatus.SUCCESS, audit_metadata or {})
+        actual = job.model_slug if actual_model_slug is None else _text(actual_model_slug, "actual_model_slug")
+        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, actual, _text(creation_id, "creation_id"), returned_width, returned_height, raw_image_sha256, _text(media_type, "media_type"), CandidateStatus.SUCCESS, audit_metadata or {})
 
     @classmethod
     def failure(cls, job: MagnificJobSpec, *, reason: str, audit_metadata: Mapping[str, object] | None = None) -> "MagnificResultManifest":
-        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, job.model_slug, "external-failure", None, None, None, None, CandidateStatus.FAILURE, audit_metadata or {}, _text(reason, "failure_reason"))
+        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, job.model_slug, None, None, None, None, None, CandidateStatus.FAILURE, audit_metadata or {}, _text(reason, "failure_reason"))
+
+    def identity_dict(self) -> dict[str, object]:
+        return {
+            "schema": self.schema,
+            "schema_version": self.schema_version,
+            "request_digest": self.request_digest,
+            "job_digest": self.job_digest,
+            "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version},
+            "execution_surface": self.execution_surface,
+            "model_slug": self.model_slug,
+            "actual_model_slug": self.actual_model_slug,
+            "creation_id": self.creation_id,
+            "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None,
+            "raw_image_sha256": self.raw_image_sha256,
+            "media_type": self.media_type,
+            "status": self.status.value,
+            "failure_reason": self.failure_reason,
+        }
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -274,10 +364,10 @@ class MagnificResultManifest:
         return canonical_bytes(self.canonical_dict())
 
     def digest(self) -> str:
-        return canonical_digest(self.canonical_dict())
+        return canonical_digest(self.identity_dict())
 
     def import_result(self, request: SemanticGenerationRequest, job: MagnificJobSpec, raw_bytes: bytes | None) -> SemanticImageCandidate:
-        if self.request_digest != request.digest() or self.job_digest != job.digest() or self.provider_id != MAGNIFIC_PROVIDER_ID or self.provider_version != MAGNIFIC_ADAPTER_VERSION or self.provider_config_version != request.provider_config_version or self.execution_surface != job.execution_surface or self.model_slug != job.model_slug:
+        if self.request_digest != request.digest() or self.job_digest != job.digest() or self.provider_id != MAGNIFIC_PROVIDER_ID or self.provider_version != MAGNIFIC_ADAPTER_VERSION or self.provider_config_version != request.provider_config_version or self.execution_surface != job.execution_surface or self.model_slug != job.model_slug or request.provider_model != job.model_slug or self.actual_model_slug != job.model_slug:
             raise SemanticProviderError("Magnific result manifest is not bound to the request/job")
         try:
             status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
@@ -285,17 +375,16 @@ class MagnificResultManifest:
             raise SemanticProviderError("Magnific result status is invalid") from exc
         candidate_id = f"magnific-{self.job_digest[:24]}"
         if status is not CandidateStatus.SUCCESS:
+            if raw_bytes is not None:
+                raise SemanticProviderError("non-success Magnific result cannot import raw image bytes")
             return SemanticImageCandidate.failure(request, candidate_id=candidate_id, provider_id=MAGNIFIC_PROVIDER_ID, provider_version=MAGNIFIC_ADAPTER_VERSION, workflow_version=request.provider_workflow_version, reason=self.failure_reason or "Magnific external execution failed", status=status)
         if not isinstance(raw_bytes, bytes) or not raw_bytes:
             raise SemanticProviderError("successful Magnific result requires non-empty raw bytes")
         if self.raw_image_sha256 != hashlib.sha256(raw_bytes).hexdigest():
             raise SemanticProviderError("Magnific raw bytes hash does not match result manifest")
-        width, height = request.resolved_dimensions()
-        if (self.returned_width, self.returned_height) != (width, height):
-            raise SemanticProviderError("Magnific result dimensions do not match the requested dimensions")
         if self.returned_width is None or self.returned_height is None or self.media_type is None or not self.creation_id:
             raise SemanticProviderError("successful Magnific result is incomplete")
-        return SemanticImageCandidate.success(request, candidate_id=candidate_id, provider_id=MAGNIFIC_PROVIDER_ID, provider_version=MAGNIFIC_ADAPTER_VERSION, workflow_version=request.provider_workflow_version, image_bytes=raw_bytes, returned_width=self.returned_width, returned_height=self.returned_height, model_id=request.provider_model, generation_metadata={"job_digest": job.digest(), "execution_surface": self.execution_surface, "actual_model_slug": self.actual_model_slug, "creation_id": self.creation_id, "media_type": self.media_type, "audit_metadata": dict(self.audit_metadata)})
+        return SemanticImageCandidate.success(request, candidate_id=candidate_id, provider_id=MAGNIFIC_PROVIDER_ID, provider_version=MAGNIFIC_ADAPTER_VERSION, workflow_version=request.provider_workflow_version, image_bytes=raw_bytes, returned_width=self.returned_width, returned_height=self.returned_height, model_id=job.model_slug, generation_metadata={"job_digest": job.digest(), "execution_surface": self.execution_surface, "actual_model_slug": self.actual_model_slug, "creation_id": self.creation_id, "media_type": self.media_type, "audit_metadata": dict(self.audit_metadata)})
 
 
 class MagnificProvider(SemanticGeneratorProvider):
@@ -311,7 +400,7 @@ class MagnificProvider(SemanticGeneratorProvider):
 
     @property
     def capabilities(self) -> SemanticCapabilities:
-        return SemanticCapabilities(text_to_image=True, negative_prompt=True, transparent_background=True, reference_images=True, style_image=True, view_direction_controls=True, isometric=True)
+        return SemanticCapabilities(text_to_image=True, reference_images=True, style_image=True)
 
     @property
     def capability_metadata(self) -> dict[str, object]:
@@ -323,6 +412,10 @@ class MagnificProvider(SemanticGeneratorProvider):
             "style_bindings": True,
             "provider_seed_control": False,
             "exact_logical_dimensions": False,
+            "prompt_guided_negative_description": True,
+            "prompt_guided_transparent_background": True,
+            "prompt_guided_view_direction": True,
+            "prompt_guided_isometric": True,
             "supported_output": "raw provider artwork imported without normalization",
         }
 
@@ -348,5 +441,5 @@ class MagnificProvider(SemanticGeneratorProvider):
 
 
 __all__ = [
-    "MAGNIFIC_ADAPTER_VERSION", "MAGNIFIC_CONFIG_VERSION", "MAGNIFIC_EXECUTION_SURFACE", "MAGNIFIC_JOB_SCHEMA", "MAGNIFIC_PROVIDER_ID", "MAGNIFIC_RESULT_SCHEMA", "MagnificExecutionBinding", "MagnificJobSpec", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest",
+    "MAGNIFIC_ADAPTER_VERSION", "MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION", "MAGNIFIC_CONFIG_VERSION", "MAGNIFIC_EXECUTION_SURFACE", "MAGNIFIC_JOB_SCHEMA", "MAGNIFIC_MODEL_ASPECT_RATIOS", "MAGNIFIC_PROVIDER_ID", "MAGNIFIC_RESULT_SCHEMA", "MAGNIFIC_SUPPORTED_ASPECT_RATIOS", "MagnificExecutionBinding", "MagnificJobSpec", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "map_magnific_aspect_ratio",
 ]
