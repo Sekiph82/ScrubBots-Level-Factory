@@ -48,32 +48,33 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M09-C003`
-Title: `Deterministic Candidate Identity & Acceptance Matrix Closure`
+Cycle: `PAG-M10-C001`
+Title: `Validation, Performance & V1 Review Pack Preparation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_PROMPT.md`
-Previous audit: `.hiveai/audits/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
+Prompt: `.hiveai/prompts/PAG-M10-C001_VALIDATION_PERFORMANCE_AND_V1_REVIEW_PACK_PREPARATION_PROMPT.md`
+Previous closing audit: `.hiveai/audits/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_STRICT_AUDIT.md`
 Current-state authority: root `TASKS.md`.
+Owner-only gates after builder/audit preparation: `PAG-1033`, `PAG-1034`, `PAG-1050`.
 
 ## Failed / remediation-required cycles
 
 ### PAG-M09-C002 — Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation
-State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M09-C003`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M09-C003`
 Audit: `.hiveai/audits/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`
-Residual findings: `F-PAG-M09-C002-001`, `F-PAG-M09-C002-002`.
+Original residual findings: `F-PAG-M09-C002-001`, `F-PAG-M09-C002-002`.
 Closed in C002: exact recorded M08 quality-policy fidelity; complete immutable batch identity including exemplar identities/provenance and persisted quality policy; strict attempt seed/status/root-state validation; accepted-record and accepted-bundle cross-binding; deterministic prior-attempt replay; substantial cross-process/PYTHONHASHSEED and corruption evidence.
-Residual scope: enforce exact deterministic accepted candidate ID/path derivation during resume and complete the still-missing direct strict reproduce/determinism/path acceptance evidence matrix.
+Final disposition: deterministic accepted candidate-ID/path derivation and remaining direct acceptance evidence were closed by PAG-M09-C003; no M09 finding remains.
 Implementation commit: `e5d3c5b951ae4cd95198860a042e955912b6b030`
 Merge with authority tip: `a8045f0bafd17460e98058a6b6e3972e8f6ccb31`
-Completed-log publication / terminal builder-era HEAD: `cd23b5d3d7ec4663e7c2b65e7d2d1630a18ec9f3`
+Completed-log publication / terminal builder-era checkpoint: `cd23b5d3d7ec4663e7c2b65e7d2d1630a18ec9f3`
 
 ### PAG-M09-C001 — CLI & Local Batch Generation
-State: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_PAG-M09-C002 / REMAINDER_BY_PAG-M09-C003`
+State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M09-C002_AND_C003`
 Audit: `.hiveai/audits/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_STRICT_AUDIT.md`
 Original findings: `F-PAG-M09-C001-001`, `F-PAG-M09-C001-002`, `F-PAG-M09-C001-003`, `F-PAG-M09-C001-004`.
-C002 disposition: recorded quality-policy fidelity closed; batch environment identity closed for new generation; manifest history/state semantics substantially closed. Residual deterministic candidate-ID/path binding and evidence completeness continue in C003.
-Accepted C001 foundation preserved: dependency-free Windows CLI, generate/reproduce/batch command surface, local-only exemplar loading, candidate-wrapper routing, M07 quality gating, M08 export, deterministic attempt derivation, atomic manifest writes and exact grid duplicate comparison.
+Final disposition: quality-policy fidelity and batch-environment identity closed in C002; deterministic candidate-ID/path closure and remaining acceptance evidence closed in C003. No open M09 finding remains.
+Accepted foundation: dependency-free Windows CLI, generate/reproduce/batch surface, local-only exemplar loading, candidate-wrapper routing, M07 quality gating, M08 export, deterministic attempt derivation, atomic manifest writes and exact grid duplicate comparison.
 Implementation commit: `23f27f3e73dc4a6ef34338378139aac842f3fde6`
 Completed-log publication commit: `5f1324dade158315dfc062a079d4dbde716fd409`
 Terminal builder-era HEAD independently observed: `fe1a5e09a271c78e29703976cf78739ba7ccf72b`
@@ -194,6 +195,18 @@ Original findings: `F-PAG-M00-C002-001`, `F-PAG-M00-C002-002`
 
 ## Closed cycles
 
+### PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure
+State: `AUDIT_PASSED / TASK_COMPLETE`
+Audit: `.hiveai/audits/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_STRICT_AUDIT.md`
+Closes findings: `F-PAG-M09-C002-001`, `F-PAG-M09-C002-002`, and remaining residual scope from M09 C001.
+Closes milestone: `PAG-M09 — CLI & Local Batch Generation`
+Implementation/evidence commit: `9d29c46ffad083158e33ae227191a72920445a86`
+Builder publication checkpoint commit / terminal builder-era HEAD: `be0aa3d1efb108a200a261a3f02e677cee399960`
+Independent audit commit: `7f537305faa656410905546ea7e89eb7eb58dac7`
+Audit result: M09 PASS / CLOSED, 30/30 task IDs independently validated.
+Builder full-suite evidence: `347 passed`.
+Process note: GitHub exposes no CI/status run for terminal builder HEAD; this is NOTE only.
+
 ### PAG-M08-C003 — Deterministic Rich Provenance Binding Closure
 State: `AUDIT_PASSED / TASK_COMPLETE`
 Audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
@@ -261,7 +274,7 @@ Terminal builder-era HEAD independently observed: `41601910c133f42753272877ad648
 
 ### PAG-M00-C003 — Bootstrap Reliability & Offline Enforcement Remediation
 State: `AUDIT_PASSED / TASK_COMPLETE`
-Audit: `.hiveai/audits/PAG-M00-C003_BOOTSTRAP_RELIABILITY_AND_OFFLINE_ENFORCEMENT_REMEDIATION_STRICT_AUDIT.md`
+Audit: `.hiveai/audits/PAG-M00-C003_REPOSITORY_BOOTSTRAP_AND_GOVERNANCE_STRICT_AUDIT.md`
 Closes milestone: `PAG-M00 — Repository Bootstrap & Governance`
 
 ### RECOVERY-R001 — Revert Mistaken ScrubBots Local Edits
