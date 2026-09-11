@@ -4,13 +4,13 @@ This root TASKS.md is the only authoritative project-status tracker consumed by 
 
 ## Project Status
 
-- Current Milestone: PAG-M09
-- Current Sprint: PAG-M09-C003
-- Current Task: PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure
+- Current Milestone: PAG-M10
+- Current Sprint: PAG-M10-C001
+- Current Task: PAG-M10-C001 — Validation, Performance & V1 Review Pack Preparation
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M09-C003 bounded closure prompt, publish the matching builder log and deterministic candidate-identity/acceptance-matrix evidence, then request independent audit.
+- Next Task/Action: Execute the authoritative PAG-M10-C001 validation/performance/review-pack prompt, publish measured laptop performance evidence and the deterministic 100-candidate owner review pack, then request independent audit and owner-review preparation.
 - Required Actor: CODEX
-- Blockers/Waits: PAG-M10+ blocked until PAG-M09 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
+- Blockers/Waits: PAG-M11 blocked until PAG-M10 receives independent technical acceptance plus required owner visual acceptance; PAG-0441 remains pending until M10 establishes and independently accepts the measured V1 performance budget.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 
@@ -423,8 +423,8 @@ Minimum completion rules:
 - [x] **PAG-M06 — Hybrid Generator Router**
 - [x] **PAG-M07 — Artwork Quality & Diversity Filters**
 - [x] **PAG-M08 — Output / Export Contract**
-- [~] **PAG-M09 — CLI & Local Batch Generation**
-- [ ] **PAG-M10 — Validation, Performance & V1 Acceptance**
+- [x] **PAG-M09 — CLI & Local Batch Generation**
+- [~] **PAG-M10 — Validation, Performance & V1 Acceptance**
 - [ ] **PAG-M11 — Godot/Main-Level-Factory Handoff Gate**
 
 ---
@@ -622,7 +622,7 @@ Each family:
 ## Sprint PAG-S03.3 — Region coloring
 
 - [x] PAG-0326 Convert silhouette regions to canonical C01..C16.
-- [x] PAG-0327 Use exactly a legal distinct-used-color count for difficulty.
+- [x] PAG-0327 Use exactly a legal distinct-color count for difficulty.
 - [x] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
 - [x] PAG-0329 Prefer coherent connected color regions.
 - [x] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
@@ -934,13 +934,11 @@ M09 is authorized to proceed.
 
 # PAG-M09 — CLI & Local Batch Generation
 
-H!veAI active cycle: `PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure`  
-State: `READY_FOR_IMPLEMENTATION`  
-Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`  
-C001 state: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_C002`  
-C002 state: `AUDIT_FAILED / REMEDIATION_BY_PAG-M09-C003`
+M09 final state: `PASS / CLOSED`  
+Closing cycle: `PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure`  
+Closing audit: `.hiveai/audits/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_STRICT_AUDIT.md`  
+C001-C002 findings: `REMEDIATED / CLOSED`  
+M10 is authorized to proceed.
 
 ## Sprint PAG-S09.1 — Single generation CLI
 
@@ -956,25 +954,25 @@ scrubbots-pixel generate \
   --seed 849323
 ```
 
-- [ ] PAG-0901 Implement `generate` CLI command.
-- [ ] PAG-0902 Support explicit difficulty.
-- [ ] PAG-0903 Support optional width/height.
-- [ ] PAG-0904 Auto-select legal width/height when omitted.
-- [ ] PAG-0905 Support explicit seed.
-- [ ] PAG-0906 Generate and print a seed when seed is omitted, then record it.
-- [ ] PAG-0907 Support mode.
-- [ ] PAG-0908 Support style/theme.
-- [ ] PAG-0909 Support output directory.
-- [ ] PAG-0910 Print concise success/failure summary.
-- [ ] PAG-0911 Return non-zero exit code for invalid/rejected generation.
+- [x] PAG-0901 Implement `generate` CLI command.
+- [x] PAG-0902 Support explicit difficulty.
+- [x] PAG-0903 Support optional width/height.
+- [x] PAG-0904 Auto-select legal width/height when omitted.
+- [x] PAG-0905 Support explicit seed.
+- [x] PAG-0906 Generate and print a seed when seed is omitted, then record it.
+- [x] PAG-0907 Support mode.
+- [x] PAG-0908 Support style/theme.
+- [x] PAG-0909 Support output directory.
+- [x] PAG-0910 Print concise success/failure summary.
+- [x] PAG-0911 Return non-zero exit code for invalid/rejected generation.
 
 ## Sprint PAG-S09.2 — Reproduce CLI
 
-- [ ] PAG-0912 Implement `reproduce <metadata.json>`.
-- [ ] PAG-0913 Reproduce candidate from recorded config.
-- [ ] PAG-0914 Compare reproduced logical-grid hash.
-- [ ] PAG-0915 Fail loudly if generator version/config is unsupported.
-- [ ] PAG-0916 Never silently substitute current defaults for missing historical parameters.
+- [x] PAG-0912 Implement `reproduce <metadata.json>`.
+- [x] PAG-0913 Reproduce candidate from recorded config.
+- [x] PAG-0914 Compare reproduced logical-grid hash.
+- [x] PAG-0915 Fail loudly if generator version/config is unsupported.
+- [x] PAG-0916 Never silently substitute current defaults for missing historical parameters.
 
 ## Sprint PAG-S09.3 — Batch CLI
 
@@ -988,27 +986,34 @@ scrubbots-pixel batch \
   --seed 100000
 ```
 
-- [ ] PAG-0917 Implement deterministic batch orchestration.
-- [ ] PAG-0918 Separate attempts from accepted count.
-- [ ] PAG-0919 Record every attempted seed.
-- [ ] PAG-0920 Record rejection codes.
-- [ ] PAG-0921 Stop at explicit max attempts.
-- [ ] PAG-0922 Never loop forever chasing acceptance.
-- [ ] PAG-0923 Support resumable batch manifest.
-- [ ] PAG-0924 Prevent duplicate candidate IDs.
-- [ ] PAG-0925 Detect exact duplicate logical grids.
-- [ ] PAG-0926 Generate contact sheet/report.
-- [ ] PAG-0927 Batch rerun from same manifest is deterministic.
+- [x] PAG-0917 Implement deterministic batch orchestration.
+- [x] PAG-0918 Separate attempts from accepted count.
+- [x] PAG-0919 Record every attempted seed.
+- [x] PAG-0920 Record rejection codes.
+- [x] PAG-0921 Stop at explicit max attempts.
+- [x] PAG-0922 Never loop forever chasing acceptance.
+- [x] PAG-0923 Support resumable batch manifest.
+- [x] PAG-0924 Prevent duplicate candidate IDs.
+- [x] PAG-0925 Detect exact duplicate logical grids.
+- [x] PAG-0926 Generate contact sheet/report.
+- [x] PAG-0927 Batch rerun from same manifest is deterministic.
 
 ### M09 acceptance
 
-- [ ] PAG-0928 Owner can generate valid candidates from Windows command line without opening Godot.
-- [ ] PAG-0929 No internet connection is needed during generation.
-- [ ] PAG-0930 Single and batch generation both preserve provenance.
+- [x] PAG-0928 Owner can generate valid candidates from Windows command line without opening Godot.
+- [x] PAG-0929 No internet connection is needed during generation.
+- [x] PAG-0930 Single and batch generation both preserve provenance.
 
 ---
 
 # PAG-M10 — Validation, Performance & V1 Acceptance
+
+H!veAI active cycle: `PAG-M10-C001 — Validation, Performance & V1 Review Pack Preparation`  
+State: `READY_FOR_IMPLEMENTATION`  
+Required actor: `CODEX`  
+Authoritative prompt: `.hiveai/prompts/PAG-M10-C001_VALIDATION_PERFORMANCE_AND_V1_REVIEW_PACK_PREPARATION_PROMPT.md`  
+Previous milestone closing audit: `.hiveai/audits/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_STRICT_AUDIT.md`  
+Owner-only gates `PAG-1033`, `PAG-1034`, and `PAG-1050` remain reserved for owner/ChatGPT review after the pack is prepared.
 
 ## Sprint PAG-S10.1 — Property/fuzz tests
 
