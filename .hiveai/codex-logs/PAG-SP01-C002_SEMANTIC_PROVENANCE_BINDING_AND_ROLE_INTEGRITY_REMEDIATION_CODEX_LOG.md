@@ -63,3 +63,30 @@ No runtime or development dependency, license, network access, API key, provider
 ## Publication pending
 
 The scoped commit and push, final diff/status, fetched local HEAD/origin equality, and divergence `0 0` will be appended after publication. The pre-existing migration-file modifications and untracked legacy control-plane files remain deliberately unstaged.
+
+## Implementation and verification chronology
+
+- Updated `semantic/provider.py` with the explicit `UNSPECIFIED` neutral-provider rule, provider ID/configuration binding, and typed exact request/provider/result provenance checks for success and non-success candidates.
+- Updated `semantic/contracts.py` with role enforcement in all four request image slots, deterministic accepted-mapping conversion for direct candidate construction, typed validation for status/model/seed/retry/failure fields, and typed provenance errors.
+- Updated semantic and top-level exports to expose `SemanticProvenanceError`.
+- Added direct tests for all required identity changes, individual result-binding corruption cases, coordinated self-consistent foreign results, request/direct-candidate role mismatch cases, valid mapping conversion, malformed status and model fields, and explicit neutral-provider behavior.
+- `python -m pytest -q tests/unit/test_sp01_semantic_contracts.py`: **36 passed**; one pre-existing pytest cache permission warning.
+- `python -m pytest -q`: **417 passed** in 213.07 seconds; one pre-existing pytest cache permission warning.
+- `python -m compileall -q src tests`: passed.
+- Standalone import including `SemanticProvenanceError`: passed.
+- `python -m scrubbots_pixel_factory.cli --help`: passed.
+- Installed `scrubbots-pixel --help`: passed.
+- Offline/provider-boundary scan: no forbidden runtime imports or provider integrations; remaining matches are boundary documentation only.
+- `git diff --check`: passed with normal Git line-ending warnings only.
+
+## Publication
+
+- Created remediation commit `56124d692dc400c86c784edf4d0b8956b7e09090`.
+- The first push attempt was rejected because GitHub advanced `main` from `b760326` to `bb3f030` during the run. No force-push or rebase was used.
+- Fetched and merged the three new GitHub authority records non-destructively with `git merge --no-edit origin/main`.
+- Published merge commit: `6dd954dbd4cbd61843b91901fcd6bf1d131d5c36`.
+- `git push origin main`: succeeded (`bb3f030..6dd954d`).
+- Post-push checkpoint before final log publication: local HEAD and `origin/main` were both `6dd954dbd4cbd61843b91901fcd6bf1d131d5c36`, divergence `0 0`.
+- Final scoped status before the log-only publication contains only the preserved pre-existing modifications to `docs/migration/legacy-task-trackers/EVENTS.jsonl` and `PROJECT.json`, plus untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`; no C002 implementation file is unstaged.
+
+The completed builder log is published in the subsequent log-only commit. After that push, origin was fetched and local HEAD was verified equal to `origin/main` with divergence `0 0`; the terminal SHA is returned with this handoff.
