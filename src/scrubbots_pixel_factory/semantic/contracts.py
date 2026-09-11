@@ -560,7 +560,7 @@ class SemanticImageCandidate:
     @classmethod
     def failure(cls, request: SemanticGenerationRequest, *, candidate_id: str, provider_id: str, provider_version: str, workflow_version: str, reason: str, status: CandidateStatus | str = CandidateStatus.FAILURE, retry_reason: str | None = None) -> "SemanticImageCandidate":
         width, height = request.resolved_dimensions()
-        return cls(candidate_id, request.digest(), provider_id, provider_version, workflow_version, None, request.seed, width, height, None, None, None, None, status, reason, retry_reason)
+        return cls(candidate_id, request.digest(), provider_id, provider_version, workflow_version, request.provider_model, request.seed, width, height, None, None, None, None, status, reason, retry_reason, reference_images=request.reference_images, style_image=request.style_image, init_image=request.init_image, color_reference=request.color_reference)
 
     @property
     def is_success(self) -> bool:

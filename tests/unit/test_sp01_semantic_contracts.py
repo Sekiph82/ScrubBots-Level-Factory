@@ -167,25 +167,41 @@ def bound_request() -> SemanticGenerationRequest:
 
 
 @pytest.mark.parametrize(
-    "field,value",
+    "field,value,error_label",
     [
-        ("request_digest", "0" * 64),
-        ("provider_id", "other-provider"),
-        ("provider_version", "other-version"),
-        ("workflow_version", "other-workflow"),
-        ("model_id", "other-model"),
-        ("seed", "other-seed"),
-        ("requested_width", 21),
-        ("reference_images", (ImageInputDescriptor("REFERENCE", "2" * 64),)),
-        ("style_image", ImageInputDescriptor("STYLE", "2" * 64)),
-        ("init_image", ImageInputDescriptor("INIT", "2" * 64)),
-        ("color_reference", ImageInputDescriptor("COLOR_REFERENCE", "2" * 64)),
+        ("request_digest", "0" * 64, "request_digest"),
+        ("provider_id", "other-provider", "provider_id"),
+        ("provider_version", "other-version", "provider_version"),
+        ("workflow_version", "other-workflow", "workflow_version"),
+        ("model_id", "other-model", "model_id"),
+        ("seed", "other-seed", "seed"),
+        ("requested_width", 21, "requested_width"),
+        ("reference_images", (ImageInputDescriptor("REFERENCE", "2" * 64),), "reference_images"),
+        ("style_image", ImageInputDescriptor("STYLE", "2" * 64), "style_image"),
+        ("init_image", ImageInputDescriptor("INIT", "2" * 64), "init_image"),
+        ("color_reference", ImageInputDescriptor("COLOR_REFERENCE", "2" * 64), "color_reference"),
     ],
 )
-def test_generate_checked_rejects_each_corrupted_provenance_binding(field: str, value: object) -> None:
+def test_generate_checked_rejects_each_corrupted_provenance_binding(field: str, value: object, error_label: str) -> None:
     request = bound_request()
-    with pytest.raises(SemanticProvenanceError):
+    with pytest.raises(SemanticProvenanceError, match=error_label):
         BindingProvider(lambda result: replace(result, **{field: value})).generate_checked(request)
+
+
+def test_reference_model_bearing_non_success_baseline_is_provenance_complete() -> None:
+    request = bound_request()
+    result = BindingProvider().generate_checked(request)
+    assert result.status is CandidateStatus.UNAVAILABLE
+    assert result.model_id == request.provider_model
+    assert result.seed == request.seed
+    assert (result.requested_width, result.requested_height) == request.resolved_dimensions()
+    assert result.reference_images == request.reference_images
+    assert result.style_image == request.style_image
+    assert result.init_image == request.init_image
+    assert result.color_reference == request.color_reference
+    assert "logical_grid" not in result.canonical_dict()
+    with pytest.raises(SemanticNormalizationRequiredError):
+        result.as_m08_artwork()
 
 
 def test_generate_checked_rejects_coordinated_self_consistent_but_foreign_result() -> None:
