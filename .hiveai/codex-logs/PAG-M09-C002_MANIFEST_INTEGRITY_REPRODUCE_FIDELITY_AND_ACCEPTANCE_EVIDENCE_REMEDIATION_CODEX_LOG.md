@@ -60,3 +60,10 @@ Implementation, commands, tests, corrections, changed files, dependency/security
 - Corrected full command: `python -m pytest -q`
 - Result: PASS — 327 tests passed in 3:43.78 (same pre-existing pytest cache permission warning).
 - Offline/source-policy check: the focused offline-boundary test passed; no runtime dependency, network API, key, telemetry, or third-party asset was added. `pyproject.toml` continues to declare `dependencies = []`.
+
+### Publication and synchronization
+
+- Implementation commit created: `e5d3c5b951ae4cd95198860a042e955912b6b030` (`Implement M09 C002 manifest integrity remediation`).
+- First `git push origin main` was rejected with `fetch first` because GitHub had advanced `origin/main` from `fe1a5e09a271c78e29703976cf78739ba7ccf72b` to `91a3d85e76ee201efa026c8773db89db2770d538` with the owner’s C002 tracker/prompt/audit-authority updates.
+- Fetched origin and merged the GitHub tip non-destructively with `git merge --no-edit origin/main`; no reset, rebase, force-push, or discard was used. Merge commit: `a8045f0bafd17460e98058a6b6e3972e8f6ccb31`.
+- The pre-existing migration/control-plane worktree dirt remained untouched and unstaged throughout.
