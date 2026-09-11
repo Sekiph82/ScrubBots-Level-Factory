@@ -30,7 +30,13 @@ Do not begin M11. Do not ask the owner to visually approve the 100-candidate pac
 
 ## 2. Current authority / builder boundary
 
-Root `TASKS.md` is the only current project-state authority.
+Root `TASKS.md` remains the canonical project-state tracker.
+
+### Temporary tracker reconciliation note
+
+The C001 independent strict audit has issued `FAIL` and this C002 prompt is the explicit ChatGPT authorization for the bounded remediation that follows. At publication time the large root `TASKS.md` file may still display the preceding C001 cycle because the auditor has not performed a risky whole-file replacement merely to change the current-cycle header. This is a temporary state-display lag only: it does not undo the C001 FAIL verdict and does not authorize M11 or any task completion.
+
+For this bounded cycle, treat this C002 prompt together with the C001 strict audit as the implementation authorization. Codex MUST NOT edit root `TASKS.md` to reconcile the lag, MUST NOT mark any M10 checkbox complete, and MUST NOT reinterpret the stale C001 display as permission to rerun C001 unchanged. ChatGPT will reconcile canonical task state after a safe audited transition.
 
 Codex is builder only. Do not edit root task checkboxes/status. Do not author an independent audit. Do not mark PAG-0441, PAG-1048 or any owner-only gate accepted.
 
