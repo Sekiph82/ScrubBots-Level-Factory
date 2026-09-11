@@ -36,6 +36,9 @@ Document role: CODEX BUILDER LOG
 - Final scoped review before commit: M10 changes are limited to `tools/m10_prepare.py`, `tests/property/test_m10_property_corpus.py`, `tests/performance/test_m10_performance_evidence.py`, `tests/integration/test_m10_review_pack.py`, `review/m10/**`, this M10 log, and the README evidence section. Pre-existing migration/legacy dirt remains untouched. No root `TASKS.md` change.
 - Commit created: `36c8e3b` (`Implement M10 validation performance and review pack`).
 - First `git push origin main` was rejected because GitHub had advanced `main`. Fetched origin and merged the four remote tracker/prompt/audit commits non-destructively with `git merge --no-edit origin/main`; no local tracker edit was authored. Merge HEAD at this checkpoint: `4c5320a97ed48da2e893718ed81bf5550e3f89cc`, ahead/behind `2 0` before republishing.
+- Republish succeeded: `git push origin main` advanced GitHub from `cb9dd7a` to `1b453015af61e351e0c694ca7ff7ef9a2c30ff44`. A transient DNS failure occurred once immediately before the successful retry.
+- Final publication checkpoint after `git fetch origin`: local HEAD `1b453015af61e351e0c694ca7ff7ef9a2c30ff44` equals `origin/main` exactly; `git rev-list --left-right --count HEAD...origin/main` returned `0 0`.
+- This checkpoint entry is committed and pushed as the completed builder-log publication. The final log-publication commit itself is the terminal repository commit; the same equality/divergence check is rerun after that push and reported in the handoff.
 
 ## Pending final checks
 
