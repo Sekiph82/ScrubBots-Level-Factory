@@ -79,36 +79,43 @@ Closing strict audit:
 
 `.hiveai/audits/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_STRICT_AUDIT.md`
 
+## SP02 Current State
+
+`PAG-SP02-C001 — Magnific + PixelLab Provider Bridges & Result Ingestion` -> **AUDIT FAILED / BOUNDED REMEDIATION REQUIRED**
+
+Strict audit:
+
+`.hiveai/audits/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_STRICT_AUDIT.md`
+
+The provider-neutral direction and much of the C001 bridge foundation are retained. The failed audit identified bounded contract defects in Magnific raw-raster handling, supported aspect-ratio/capability truth, result identity separation, Magnific model binding, BitForge style strength, and smoke readiness.
+
 ## Current implementation cycle
 
-`PAG-SP02-C001 — Magnific + PixelLab Provider Bridges & Result Ingestion`
+`PAG-SP02-C002 — Provider Contract Fidelity, Result Identity & Smoke Readiness Remediation`
 
 Authoritative prompt:
 
-`.hiveai/prompts/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_PROMPT.md`
+`.hiveai/prompts/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_PROMPT.md`
 
-The previous Magnific-only SP02 prompt is superseded and must not be executed.
+C002 must preserve:
 
-SP02 is authorized.
-
-SP02 must implement:
-
-- Magnific canonical external job-spec/result-import bridge;
-- PixelLab official direct API/SDK provider path;
 - explicit provider selection;
+- Magnific external-orchestration boundary;
+- PixelLab official direct API/SDK provider path;
 - secret-safe PixelLab configuration;
-- exact provider/request/result provenance;
-- mocked/offline implementation tests;
-- no semantic image normalization yet.
+- SP01 exact provenance contracts;
+- accepted M00-M10 foundation;
+- no semantic normalization before SP03;
+- no paid live generation from Codex.
 
-A real Magnific smoke generation may be run later through the connected owner-authorized Magnific integration.
+A real provider smoke is deferred until independent audit accepts the corrected C002 bridge as smoke-ready.
 
-A real PixelLab smoke generation requires owner-provided `PIXELLAB_SECRET` and explicit live-run authorization. Codex must not spend provider credits by default.
+A real PixelLab smoke additionally requires owner-provided `PIXELLAB_SECRET` and explicit live-run authorization.
 
 ## Downstream gates
 
 SP03 normalization remains blocked until SP02 receives independent technical acceptance.
 
-SP04 is now **Semantic Provider / Model / Workflow Qualification** and must compare Magnific and PixelLab where access/cost permits.
+SP04 is **Semantic Provider / Model / Workflow Qualification** and remains blocked until provider bridges are accepted.
 
 M11 remains blocked until a semantic generation path produces an owner-accepted replacement visual review pack.
