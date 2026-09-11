@@ -1,4 +1,5 @@
 import hashlib
+from dataclasses import replace
 
 import pytest
 
@@ -10,7 +11,9 @@ from scrubbots_pixel_factory import (
     SemanticGenerationRequest,
     SemanticGeneratorProvider,
     SemanticImageCandidate,
+    SemanticCandidateError,
     SemanticNormalizationRequiredError,
+    SemanticProvenanceError,
     SemanticRequestError,
     UnsupportedCapabilityError,
 )
@@ -79,6 +82,23 @@ def test_request_identity_is_canonical_and_path_independent() -> None:
     assert level_request(provider_model="model-b").digest() != first.digest()
 
 
+def test_request_identity_changes_for_every_material_generation_field() -> None:
+    base = level_request()
+    variants = (
+        level_request(description="a different subject").digest(),
+        level_request(seed="different-seed").digest(),
+        level_request(provider_id="different-provider").digest(),
+        level_request(provider_workflow_version="workflow-v2").digest(),
+        level_request(provider_model="model-b").digest(),
+        level_request(provider_config_version="2").digest(),
+        level_request(reference_images=(ImageInputDescriptor("REFERENCE", "0" * 64),)).digest(),
+    )
+    assert all(digest != base.digest() for digest in variants)
+    asset_a = SemanticGenerationRequest(output_class="ASSET_ART", description="asset", width=16, height=16, seed=7)
+    asset_b = SemanticGenerationRequest(output_class="ASSET_ART", description="asset", width=24, height=16, seed=7)
+    assert asset_a.digest() != asset_b.digest()
+
+
 class TextOnlyProvider(SemanticGeneratorProvider):
     @property
     def provider_id(self) -> str:
@@ -93,19 +113,127 @@ class TextOnlyProvider(SemanticGeneratorProvider):
         return SemanticCapabilities(text_to_image=True)
 
     def generate(self, request: SemanticGenerationRequest) -> SemanticImageCandidate:
-        return SemanticImageCandidate.failure(request, candidate_id="failed-1", provider_id=self.provider_id, provider_version=self.provider_version, workflow_version="workflow-v1", reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
+        return SemanticImageCandidate.failure(request, candidate_id="failed-1", provider_id=self.provider_id, provider_version=self.provider_version, workflow_version=request.provider_workflow_version, reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
 
 
 def test_provider_capabilities_and_typed_failure_boundary() -> None:
     provider = TextOnlyProvider()
-    provider.validate_request(level_request())
+    provider.validate_request(level_request(provider_id="UNSPECIFIED", provider_model=None))
     with pytest.raises(UnsupportedCapabilityError):
-        provider.validate_request(level_request(negative_description="no blur"))
-    result = provider.generate_checked(level_request())
+        provider.validate_request(level_request(provider_id="UNSPECIFIED", provider_model=None, negative_description="no blur"))
+    result = provider.generate_checked(level_request(provider_id="UNSPECIFIED", provider_model=None))
     assert result.status is CandidateStatus.UNAVAILABLE
     assert result.is_success is False
     with pytest.raises(SemanticNormalizationRequiredError):
         result.as_m08_artwork()
+
+
+def test_concrete_request_provider_mismatch_is_rejected_but_neutral_is_explicit() -> None:
+    provider = TextOnlyProvider()
+    with pytest.raises(SemanticProvenanceError):
+        provider.generate_checked(level_request(provider_id="provider-A", provider_model=None))
+    assert provider.generate_checked(level_request(provider_id="UNSPECIFIED", provider_model=None)).provider_id == provider.provider_id
+
+
+class BindingProvider(SemanticGeneratorProvider):
+    @property
+    def provider_id(self) -> str:
+        return "binding-provider"
+
+    @property
+    def provider_version(self) -> str:
+        return "adapter-v1"
+
+    @property
+    def capabilities(self) -> SemanticCapabilities:
+        return SemanticCapabilities(text_to_image=True, negative_prompt=True, transparent_background=True, reference_images=True, style_image=True, init_image=True, palette_color_reference=True, view_direction_controls=True, isometric=True)
+
+    def __init__(self, mutate=None) -> None:
+        self._mutate = mutate
+
+    def generate(self, request: SemanticGenerationRequest) -> SemanticImageCandidate:
+        result = SemanticImageCandidate.failure(request, candidate_id="bound-failure", provider_id=self.provider_id, provider_version=self.provider_version, workflow_version=request.provider_workflow_version, reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
+        return self._mutate(result) if self._mutate is not None else result
+
+
+def bound_request() -> SemanticGenerationRequest:
+    return level_request(
+        provider_id="binding-provider",
+        reference_images=(ImageInputDescriptor("REFERENCE", IMAGE_HASH),),
+        style_image=ImageInputDescriptor("STYLE", IMAGE_HASH),
+        init_image=ImageInputDescriptor("INIT", "0" * 64),
+        color_reference=ImageInputDescriptor("COLOR_REFERENCE", "1" * 64),
+    )
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("request_digest", "0" * 64),
+        ("provider_id", "other-provider"),
+        ("provider_version", "other-version"),
+        ("workflow_version", "other-workflow"),
+        ("model_id", "other-model"),
+        ("seed", "other-seed"),
+        ("requested_width", 21),
+        ("reference_images", (ImageInputDescriptor("REFERENCE", "2" * 64),)),
+        ("style_image", ImageInputDescriptor("STYLE", "2" * 64)),
+        ("init_image", ImageInputDescriptor("INIT", "2" * 64)),
+        ("color_reference", ImageInputDescriptor("COLOR_REFERENCE", "2" * 64)),
+    ],
+)
+def test_generate_checked_rejects_each_corrupted_provenance_binding(field: str, value: object) -> None:
+    request = bound_request()
+    with pytest.raises(SemanticProvenanceError):
+        BindingProvider(lambda result: replace(result, **{field: value})).generate_checked(request)
+
+
+def test_generate_checked_rejects_coordinated_self_consistent_but_foreign_result() -> None:
+    request = bound_request()
+    foreign_request = level_request(provider_id="binding-provider", provider_model="model-a", seed="foreign-seed")
+    foreign = SemanticImageCandidate.failure(foreign_request, candidate_id="foreign", provider_id="binding-provider", provider_version="adapter-v1", workflow_version=foreign_request.provider_workflow_version, reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
+    with pytest.raises(SemanticProvenanceError):
+        BindingProvider(lambda _: foreign).generate_checked(request)
+
+
+@pytest.mark.parametrize(
+    "slot,descriptor",
+    [
+        ("reference_images", (ImageInputDescriptor("STYLE", IMAGE_HASH),)),
+        ("style_image", ImageInputDescriptor("REFERENCE", IMAGE_HASH)),
+        ("init_image", ImageInputDescriptor("REFERENCE", IMAGE_HASH)),
+        ("color_reference", ImageInputDescriptor("REFERENCE", IMAGE_HASH)),
+    ],
+)
+def test_request_rejects_contradictory_image_slot_roles(slot: str, descriptor: object) -> None:
+    with pytest.raises(SemanticRequestError):
+        level_request(**{slot: descriptor})
+
+
+@pytest.mark.parametrize(
+    "slot,descriptor",
+    [
+        ("reference_images", ({"role": "STYLE", "content_sha256": IMAGE_HASH},)),
+        ("style_image", {"role": "REFERENCE", "content_sha256": IMAGE_HASH}),
+        ("init_image", {"role": "REFERENCE", "content_sha256": IMAGE_HASH}),
+        ("color_reference", {"role": "REFERENCE", "content_sha256": IMAGE_HASH}),
+    ],
+)
+def test_direct_candidate_rejects_contradictory_image_slot_roles(slot: str, descriptor: object) -> None:
+    base = SemanticImageCandidate.failure(bound_request(), candidate_id="direct", provider_id="binding-provider", provider_version="adapter-v1", workflow_version="semantic-workflow-v1", reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
+    with pytest.raises(SemanticCandidateError):
+        replace(base, **{slot: descriptor})
+
+
+def test_direct_candidate_converts_valid_mappings_and_rejects_malformed_fields() -> None:
+    request = level_request(provider_id="binding-provider", provider_model=None)
+    base = SemanticImageCandidate.failure(request, candidate_id="direct", provider_id="binding-provider", provider_version="adapter-v1", workflow_version=request.provider_workflow_version, reason="provider unavailable", status=CandidateStatus.UNAVAILABLE)
+    converted = replace(base, reference_images=({"role": "REFERENCE", "content_sha256": IMAGE_HASH},))
+    assert converted.reference_images[0].role.value == "REFERENCE"
+    with pytest.raises(SemanticCandidateError):
+        replace(base, status="not-a-status")
+    with pytest.raises(SemanticCandidateError):
+        replace(base, model_id=" ")
 
 
 def test_successful_semantic_candidate_preserves_raw_provenance_without_m08_masquerade() -> None:

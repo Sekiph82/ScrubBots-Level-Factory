@@ -47,6 +47,10 @@ class SemanticProviderError(SemanticContractError):
     """Base provider-boundary error."""
 
 
+class SemanticProvenanceError(SemanticProviderError):
+    """Raised when a typed result is not bound to its executing request/provider."""
+
+
 class UnsupportedCapabilityError(SemanticProviderError):
     """Raised when a provider cannot truthfully satisfy a request feature."""
 
@@ -149,6 +153,13 @@ def _request_nonblank(value: object, label: str) -> str:
         return _nonblank(value, label)
     except SemanticContractError as exc:
         raise SemanticRequestError(str(exc)) from exc
+
+
+def _candidate_nonblank(value: object, label: str) -> str:
+    try:
+        return _nonblank(value, label)
+    except SemanticContractError as exc:
+        raise SemanticCandidateError(str(exc)) from exc
 
 
 def _seed(value: object) -> int | str:
@@ -293,9 +304,17 @@ class SemanticGenerationRequest:
             references = tuple(item if isinstance(item, ImageInputDescriptor) else ImageInputDescriptor(**item) for item in self.reference_images)  # type: ignore[arg-type]
         except (TypeError, SemanticContractError) as exc:
             raise SemanticRequestError("reference_images must contain image descriptors") from exc
+        if any(image.role is not ImageInputRole.REFERENCE for image in references):
+            raise SemanticRequestError("reference_images entries must use the REFERENCE role")
         for label, image in (("style_image", self.style_image), ("init_image", self.init_image), ("color_reference", self.color_reference)):
             if image is not None and not isinstance(image, ImageInputDescriptor):
                 raise SemanticRequestError(f"{label} must be an ImageInputDescriptor")
+        if self.style_image is not None and self.style_image.role is not ImageInputRole.STYLE:
+            raise SemanticRequestError("style_image must use the STYLE role")
+        if self.init_image is not None and self.init_image.role is not ImageInputRole.INIT:
+            raise SemanticRequestError("init_image must use the INIT role")
+        if self.color_reference is not None and self.color_reference.role is not ImageInputRole.COLOR_REFERENCE:
+            raise SemanticRequestError("color_reference must use the COLOR_REFERENCE role")
         style_strength = _optional_strength(self.style_strength, "style_strength")
         init_strength = _optional_strength(self.init_strength, "init_strength")
         if self.style_image is None and style_strength is not None:
@@ -466,15 +485,19 @@ class SemanticImageCandidate:
     generation_metadata: Mapping[str, object] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        candidate_id = _nonblank(self.candidate_id, "candidate_id")
-        if _SHA256.fullmatch(self.request_digest) is None:
+        candidate_id = _candidate_nonblank(self.candidate_id, "candidate_id")
+        if type(self.request_digest) is not str or _SHA256.fullmatch(self.request_digest) is None:
             raise SemanticCandidateError("request_digest must be a SHA-256 hex digest")
-        provider_id, provider_version, workflow = _nonblank(self.provider_id, "provider_id"), _nonblank(self.provider_version, "provider_version"), _nonblank(self.workflow_version, "workflow_version")
-        status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
+        provider_id, provider_version, workflow = (_candidate_nonblank(self.provider_id, "provider_id"), _candidate_nonblank(self.provider_version, "provider_version"), _candidate_nonblank(self.workflow_version, "workflow_version"))
+        model_id = None if self.model_id is None else _candidate_nonblank(self.model_id, "model_id")
+        try:
+            status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
+        except (TypeError, ValueError) as exc:
+            raise SemanticCandidateError("candidate status is invalid") from exc
         for label, value in (("requested_width", self.requested_width), ("requested_height", self.requested_height), ("returned_width", self.returned_width), ("returned_height", self.returned_height)):
             if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 1024):
                 raise SemanticCandidateError(f"{label} is invalid")
-        if isinstance(self.seed, bool) or self.seed is not None and not isinstance(self.seed, (int, str)):
+        if isinstance(self.seed, bool) or self.seed is not None and not isinstance(self.seed, (int, str)) or isinstance(self.seed, str) and not self.seed:
             raise SemanticCandidateError("candidate seed is invalid")
         raw = self.image_bytes
         if raw is not None and not isinstance(raw, bytes):
@@ -492,18 +515,42 @@ class SemanticImageCandidate:
         else:
             if raw is not None or self.raw_image_sha256 is not None or self.returned_width is not None or self.returned_height is not None:
                 raise SemanticCandidateError("non-success candidate cannot carry image output")
-            if self.failure_reason is None or not self.failure_reason.strip():
+            if type(self.failure_reason) is not str or not self.failure_reason.strip():
                 raise SemanticCandidateError("non-success candidate requires failure_reason")
+        if self.retry_reason is not None and (type(self.retry_reason) is not str or not self.retry_reason.strip()):
+            raise SemanticCandidateError("retry_reason must be a non-empty string when supplied")
         frozen = _freeze(self.generation_metadata, "generation_metadata")
         if not isinstance(frozen, Mapping):
             raise SemanticCandidateError("generation_metadata must be a mapping")
+        try:
+            references = tuple(image if isinstance(image, ImageInputDescriptor) else ImageInputDescriptor(**image) for image in self.reference_images)  # type: ignore[arg-type]
+        except (TypeError, SemanticContractError) as exc:
+            raise SemanticCandidateError("reference_images must contain image descriptors") from exc
+        if any(image.role is not ImageInputRole.REFERENCE for image in references):
+            raise SemanticCandidateError("reference_images entries must use the REFERENCE role")
+        images: dict[str, ImageInputDescriptor | None] = {}
+        for label, image, role in (("style_image", self.style_image, ImageInputRole.STYLE), ("init_image", self.init_image, ImageInputRole.INIT), ("color_reference", self.color_reference, ImageInputRole.COLOR_REFERENCE)):
+            if image is None:
+                images[label] = None
+                continue
+            try:
+                descriptor = image if isinstance(image, ImageInputDescriptor) else ImageInputDescriptor(**image)  # type: ignore[arg-type]
+            except (TypeError, SemanticContractError) as exc:
+                raise SemanticCandidateError(f"{label} must be an image descriptor") from exc
+            if descriptor.role is not role:
+                raise SemanticCandidateError(f"{label} must use the {role.value} role")
+            images[label] = descriptor
         object.__setattr__(self, "candidate_id", candidate_id)
         object.__setattr__(self, "provider_id", provider_id)
         object.__setattr__(self, "provider_version", provider_version)
         object.__setattr__(self, "workflow_version", workflow)
+        object.__setattr__(self, "model_id", model_id)
         object.__setattr__(self, "status", status)
         object.__setattr__(self, "generation_metadata", frozen)
-        object.__setattr__(self, "reference_images", tuple(image if isinstance(image, ImageInputDescriptor) else ImageInputDescriptor(**image) for image in self.reference_images))  # type: ignore[arg-type]
+        object.__setattr__(self, "reference_images", references)
+        object.__setattr__(self, "style_image", images["style_image"])
+        object.__setattr__(self, "init_image", images["init_image"])
+        object.__setattr__(self, "color_reference", images["color_reference"])
 
     @classmethod
     def success(cls, request: SemanticGenerationRequest, *, candidate_id: str, provider_id: str, provider_version: str, workflow_version: str, image_bytes: bytes, returned_width: int, returned_height: int, model_id: str | None = None, generation_metadata: Mapping[str, object] | None = None) -> "SemanticImageCandidate":
@@ -546,5 +593,5 @@ SemanticResult = SemanticImageCandidate
 
 
 __all__ = [
-    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
+    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
 ]
