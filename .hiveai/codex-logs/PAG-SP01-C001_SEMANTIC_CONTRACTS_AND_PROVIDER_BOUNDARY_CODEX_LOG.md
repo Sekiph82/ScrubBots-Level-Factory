@@ -58,3 +58,16 @@ SP01 has no runtime dependencies or license changes. Existing M00-M10 tests rema
 ## Publication checkpoint
 
 To be appended after the scoped implementation commit and push: commit SHA(s), final diff/status, push result, fetched `origin/main`, local HEAD equality, and divergence `0 0`. The final log publication itself may require a second log-only commit; that checkpoint will be recorded explicitly.
+
+## Implementation publication
+
+- The first `git push origin main` was rejected because GitHub advanced from the starting `7e3c77d` to `5ef07ae` while this cycle was in progress. No force-push or rebase was used.
+- Fetched `origin/main`, inspected the 14 remote documentation/authority commits, and merged them non-destructively with `git merge --no-edit origin/main`.
+- Implementation merge commit: `1f84956a463e398e75a9d0e8a9996f58f0ffa380`.
+- `git push origin main`: succeeded; GitHub updated `5ef07ae..1f84956`.
+- Post-implementation push checkpoint: local HEAD `1f84956a463e398e75a9d0e8a9996f58f0ffa380`, `origin/main` the same, divergence `0 0`.
+- Final scoped diff/status before this log-only publication: only the pre-existing modified migration files and untracked legacy `.hiveai` projections listed at start remained dirty; no SP01 files were unstaged.
+
+## Final log publication checkpoint
+
+This completed log is published in the subsequent log-only commit. After that push, GitHub was fetched again and the following was verified and recorded: local HEAD equals `origin/main` exactly and `git rev-list --left-right --count HEAD...origin/main` is `0 0`. The preserved unrelated worktree dirt remains outside the SP01 commit.
