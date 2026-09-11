@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "decision_date": "2026-09-11",
+  "review_pack": "review/m10/M10_REVIEW_MANIFEST.json",
+  "owner_decision": "REJECT_ALL",
+  "total_candidates": 100,
+  "accepted_count": 0,
+  "rejected_count": 100,
+  "by_difficulty": {
+    "EASY": {"reviewed": 25, "accepted": 0, "rejected": 25},
+    "MEDIUM": {"reviewed": 25, "accepted": 0, "rejected": 25},
+    "HARD": {"reviewed": 25, "accepted": 0, "rejected": 25},
+    "VERY_HARD": {"reviewed": 25, "accepted": 0, "rejected": 25}
+  },
+  "reason_code": "SEMANTIC_RECOGNIZABILITY_FAILURE",
+  "owner_reason": "The candidates are structurally valid procedural pixel patterns but do not reliably present identifiable objects, characters, events or scenes without metadata labels.",
+  "pag_1033": "EXECUTED",
+  "pag_1034": "100_REJECTED_SEMANTIC_PIVOT_REQUIRED",
+  "pag_1050": "FAILED_NOT_ACCEPTED",
+  "next_plan": "docs/PAG_V2_SEMANTIC_PIXEL_STUDIO_CONVERSION_PLAN.md"
+}
