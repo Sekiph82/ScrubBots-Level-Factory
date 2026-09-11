@@ -81,3 +81,14 @@ Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
 invalid request/config, `4` generator failure, `5` quality rejection, `6`
 reproduction mismatch/unsupported metadata, `7` batch exhausted before its
 accepted target, and `8` filesystem/output failure.
+
+## M10 validation and owner review evidence
+
+The deterministic M10 evidence builder is `python tools/m10_prepare.py`. It
+records the versioned property corpus, actual-laptop generation measurements
+(including the explicit RULES 59x59 PAG-0441 row), and the self-contained
+review pack under `review/m10/`. The pack contains exactly 25 structurally
+accepted candidates per difficulty, but every candidate remains
+`PENDING_OWNER_REVIEW`; the gate matrix is not an acceptance declaration.
+Only local synthetic WFC fixtures are used for technical evidence, so the
+visual WFC pack is explicitly skipped until an owner-approved exemplar exists.
