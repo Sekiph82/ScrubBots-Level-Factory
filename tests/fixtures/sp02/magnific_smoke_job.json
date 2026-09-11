@@ -1,0 +1,17 @@
+{
+  "aspect_ratio": "1:1",
+  "candidate_count": 1,
+  "execution_surface": "external-manual-orchestrator",
+  "logical_dimensions": {"height": 16, "width": 16},
+  "model_slug": "magnific-sd3",
+  "original_seed": {"type": "string", "value": "sp02-magnific-fixture"},
+  "provider": {"config_version": "1", "id": "MAGNIFIC", "version": "magnific-adapter-v1"},
+  "provider_seed_supported": false,
+  "quality": null,
+  "reference_bindings": [],
+  "rendered_prompt": "16 by 16 pixel wizard; outline=NONE; shading=FLAT; detail=MEDIUM; view=FRONT; direction=S; isometric=False; transparent_background=False; coverage_percentage=80.0; Return raw provider artwork; logical dimensions are provenance only.",
+  "request_digest": "7d5fb04f70c3693e7fa2a7cda1ab58c23455198f7f16511a4ccdf0fcdb8f1f69",
+  "resolution": null,
+  "schema": "scrubbots-magnific-job",
+  "schema_version": 1
+}

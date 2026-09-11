@@ -1,0 +1,18 @@
+{
+  "controls": {"detail": "medium detail", "direction": "south", "isometric": false, "outline": "lineless", "shading": "flat shading", "view": null},
+  "coverage_percentage": 80.0,
+  "description": "16 by 16 pixel wizard",
+  "engine": "PIXFLUX",
+  "image_bindings": {"COLOR_REFERENCE": null, "INIT": null, "STYLE": null},
+  "image_size": {"height": 16, "width": 16},
+  "init_strength": null,
+  "negative_description": null,
+  "no_background": false,
+  "original_seed": {"type": "string", "value": "sp02-pixellab-fixture"},
+  "provider": {"config_version": "1", "id": "PIXELLAB", "version": "pixellab-adapter-v1"},
+  "provider_seed": 1073214016,
+  "request_digest": "ef56dd7904dcab5b21e1d66d70a5031343cca2393378462d6122f8e1e1dcefbb",
+  "schema": "scrubbots-pixellab-job",
+  "schema_version": 1,
+  "workflow_version": "sp02-workflow-v1"
+}
