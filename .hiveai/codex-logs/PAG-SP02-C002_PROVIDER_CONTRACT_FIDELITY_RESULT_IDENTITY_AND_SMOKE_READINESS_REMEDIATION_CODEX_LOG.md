@@ -69,3 +69,15 @@ The preserved pre-existing migration modifications and untracked legacy files
 remain unstaged. Root `TASKS.md`, hidden tracker files, prompts, audits,
 M00-M10 production algorithms, and the main ScrubBots repository were not
 modified.
+
+## Publication checkpoint
+
+- Remediation commit: `0131e14bb7cc43beb8216308e5a5664925f10511`.
+- `git push origin main`: succeeded, advancing `origin/main` from `09d3732d529bb231d40f8f0b45bfce39fbe4ad4e`.
+- Post-push fetched checkpoint timestamp: `2026-09-12T00:14:51.8930290+03:00`.
+- At that checkpoint local `HEAD` and `origin/main` were both `0131e14bb7cc43beb8216308e5a5664925f10511`; `git rev-list --left-right --count HEAD...origin/main` reported `0 0`.
+- Final status at the checkpoint contained only the preserved pre-existing migration modifications and untracked legacy files listed in the start checkpoint. No task, audit, prompt, or accepted-production files were dirty.
+
+This remains builder evidence for independent ChatGPT strict audit. No
+provider credits, credentials, live calls, audit verdict, acceptance state, or
+downstream milestone work were performed.
