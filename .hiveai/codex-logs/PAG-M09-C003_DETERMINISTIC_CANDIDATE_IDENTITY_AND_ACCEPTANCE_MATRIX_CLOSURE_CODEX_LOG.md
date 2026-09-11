@@ -81,3 +81,12 @@ Implementation decisions, commands, failures/corrections, tests, changed files, 
 - Command: `git diff --check`
 - Result: PASS; only Git’s expected LF/CRLF conversion warnings were emitted.
 - Scoped working diff before commit: `README.md` (2 insertions), `src/scrubbots_pixel_factory/cli/main.py` (26 insertions/changes), and `tests/integration/test_m09_cli_integration.py` (216 insertions). The C003 log is a new file. Pre-existing modified `docs/migration/legacy-task-trackers/EVENTS.jsonl`, `docs/migration/legacy-task-trackers/PROJECT.json`, and untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, `.hiveai/STATE.json` remained outside the scoped change.
+
+## Publication and terminal checkpoint
+
+- Implementation commit: `9d29c46ffad083158e33ae227191a72920445a86` (`Close M09 C003 candidate identity and acceptance matrix`).
+- `git push origin main`: PASS — `a10c772..9d29c46` published normally without force-push.
+- After publication, executed `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main`.
+- Observed checkpoint: local HEAD `9d29c46ffad083158e33ae227191a72920445a86` == `origin/main` `9d29c46ffad083158e33ae227191a72920445a86`; divergence `0 0`; branch `main`.
+- Final status retained only the pre-existing user changes listed above; all C003 scoped files were committed.
+- Builder evidence only: no audit, acceptance declaration, task/tracker state change, M10/M11 work, legacy tracker revival, M03-M08 production change, or main ScrubBots repository access occurred.
