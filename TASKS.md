@@ -5,10 +5,10 @@ This root TASKS.md is the only authoritative project-status tracker consumed by 
 ## Project Status
 
 - Current Milestone: PAG-M09
-- Current Sprint: PAG-M09-C002
-- Current Task: PAG-M09-C002 — Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation
+- Current Sprint: PAG-M09-C003
+- Current Task: PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M09-C002 bounded remediation prompt, publish the matching builder log and manifest/reproduce/determinism evidence, then request independent audit.
+- Next Task/Action: Execute the authoritative PAG-M09-C003 bounded closure prompt, publish the matching builder log and deterministic candidate-identity/acceptance-matrix evidence, then request independent audit.
 - Required Actor: CODEX
 - Blockers/Waits: PAG-M10+ blocked until PAG-M09 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
@@ -934,12 +934,13 @@ M09 is authorized to proceed.
 
 # PAG-M09 — CLI & Local Batch Generation
 
-H!veAI active cycle: `PAG-M09-C002 — Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation`  
+H!veAI active cycle: `PAG-M09-C003 — Deterministic Candidate Identity & Acceptance Matrix Closure`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`  
-Previous strict audit: `.hiveai/audits/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_STRICT_AUDIT.md`  
-C001 state: `AUDIT_FAILED / REMEDIATION_BY_PAG-M09-C002`
+Authoritative prompt: `.hiveai/prompts/PAG-M09-C003_DETERMINISTIC_CANDIDATE_IDENTITY_AND_ACCEPTANCE_MATRIX_CLOSURE_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_STRICT_AUDIT.md`  
+C001 state: `AUDIT_FAILED / PARTIALLY_REMEDIATED_BY_C002`  
+C002 state: `AUDIT_FAILED / REMEDIATION_BY_PAG-M09-C003`
 
 ## Sprint PAG-S09.1 — Single generation CLI
 
