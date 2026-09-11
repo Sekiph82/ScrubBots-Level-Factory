@@ -67,3 +67,9 @@ Implementation, commands, tests, corrections, changed files, dependency/security
 - First `git push origin main` was rejected with `fetch first` because GitHub had advanced `origin/main` from `fe1a5e09a271c78e29703976cf78739ba7ccf72b` to `91a3d85e76ee201efa026c8773db89db2770d538` with the owner’s C002 tracker/prompt/audit-authority updates.
 - Fetched origin and merged the GitHub tip non-destructively with `git merge --no-edit origin/main`; no reset, rebase, force-push, or discard was used. Merge commit: `a8045f0bafd17460e98058a6b6e3972e8f6ccb31`.
 - The pre-existing migration/control-plane worktree dirt remained untouched and unstaged throughout.
+
+### Terminal publication verification
+
+- After publication commit `cd23b5d3d7ec4663e7c2b65e7d2d1630a18ec9f3` was pushed, executed `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main`.
+- Observed: local HEAD `cd23b5d3d7ec4663e7c2b65e7d2d1630a18ec9f3` == `origin/main` `cd23b5d3d7ec4663e7c2b65e7d2d1630a18ec9f3`; divergence `0 0`; branch `main`.
+- This builder log records implementation evidence only. No audit, acceptance declaration, tracker mutation, M10/M11 work, or main ScrubBots repository access was performed.
