@@ -1,0 +1,27 @@
+{
+  "schema": "scrubbots-m10-owner-review-decision",
+  "version": 1,
+  "decision_date": "2026-09-11",
+  "review_manifest": {
+    "path": "review/m10/M10_REVIEW_MANIFEST.json",
+    "git_blob_sha": "ddc73575977736694977ca3cde3b48252730c4fc",
+    "scope": "ALL_ENTRIES"
+  },
+  "reviewed_count": 100,
+  "accepted_count": 0,
+  "rejected_count": 100,
+  "owner_visual_verdict": "REJECT",
+  "reasons": [
+    "The generated images do not reliably present a recognizable object, character, or event without relying on metadata labels.",
+    "Structural validity and palette/dimension correctness are not sufficient for the intended product-level pixel-art quality.",
+    "The current MASK/RULES/HYBRID visual synthesis approach does not meet the owner's PixelLab-like semantic image-generation objective."
+  ],
+  "gates": {
+    "PAG-1033": "COMPLETE_OWNER_REVIEWED_100_OF_100",
+    "PAG-1034": "COMPLETE_ALL_CURRENT_STYLES_FAMILIES_REJECTED_NEEDS_SEMANTIC_GENERATION_TRANSFORMATION",
+    "PAG-1050": "REJECTED"
+  },
+  "m11_state": "BLOCKED",
+  "promotion_allowed": false,
+  "next_direction": "Transform the existing ScrubBots-Level-Factory pipeline into a PixelLab-like semantic AI pixel-art generation system while preserving reusable deterministic contracts, validation, provenance, export, batch, and review infrastructure."
+}
