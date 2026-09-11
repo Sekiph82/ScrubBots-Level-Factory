@@ -2,18 +2,23 @@
 
 This root `TASKS.md` is the **only current project-status tracker**. Historical H!veAI control-plane trackers are not current authority. Detailed M00-M10 evidence remains in Git history, `.hiveai/audits/`, `.hiveai/codex-logs/`, and published project documents.
 
+Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or milestones accepted/closed. Codex builder logs are implementation evidence, never acceptance.
+
 ## Project Status
 
 - Current Milestone: **PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion**
-- Current Sprint: **PAG-SP02-C001**
-- Current Task: **Magnific + PixelLab Provider Bridges & Result Ingestion**
+- Current Sprint: **PAG-SP02-C002**
+- Current Task: **Provider Contract Fidelity, Result Identity & Smoke Readiness Remediation**
 - Current Task Status: **READY_FOR_IMPLEMENTATION**
 - Required Actor: **CODEX**
-- Next Task/Action: Execute the authoritative multi-provider SP02-C001 prompt; implement Magnific external job/result bridge plus PixelLab official direct API/SDK provider; publish tests/log; stop for independent ChatGPT audit.
-- Blockers/Waits: SP03+ blocked until SP02 receives independent technical acceptance. M11 remains blocked until the semantic pipeline produces an owner-accepted replacement visual review pack.
+- Previous Cycle: `PAG-SP02-C001` → **FAIL / REMEDIATION REQUIRED**
+- Previous Strict Audit: `.hiveai/audits/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_STRICT_AUDIT.md`
+- Current Prompt: `.hiveai/prompts/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_PROMPT.md`
+- Next Task/Action: Execute SP02-C002 only, close the bounded provider-contract findings, publish tests/log, commit/push `main`, then stop for independent ChatGPT audit.
+- Blockers/Waits: **SP03, SP04 and M11 remain blocked** until SP02 receives independent technical acceptance. Live paid provider smoke is also blocked until the corrected bridge is independently accepted as smoke-ready.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
-- Provider Selection: **explicit per request/job; no silent fallback**
-- Magnific Mode: owner-authorized external orchestration while credits are available.
+- Provider Selection: **explicit per request/job; no silent provider or model fallback**
+- Magnific Mode: owner-authorized external orchestration while owner credits are available.
 - PixelLab Mode: official Developer API / Python SDK direct provider, opt-in network execution only.
 - Provider Architecture: **provider-neutral**; providers may later be replaced without rewriting Factory core.
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
@@ -24,15 +29,13 @@ This root `TASKS.md` is the **only current project-status tracker**. Historical 
 
 Convert the accepted deterministic Pixel Art Generator foundation into a **PixelLab-like Semantic Pixel Studio** that can generate recognizable small pixel art from text/reference/style inputs, then route it through existing ScrubBots provenance, validation, review, batch and export machinery.
 
-Target owner-visible flow:
-
 ```text
 TEXT / REFERENCE / STYLE
           ↓
  EXPLICIT SEMANTIC PROVIDER
    MAGNIFIC | PIXELLAB
           ↓
- recognizable raw pixel-art candidate
+ recognizable raw semantic artwork
           ↓
  deterministic ingestion / normalization
           ↓
@@ -43,7 +46,7 @@ TEXT / REFERENCE / STYLE
           ↓
  owner review
           ↓
- M08 export / M09 batch-reproduce / future Level Factory handoff
+ M08 export / M09 batch-reproduce / Level Factory handoff
 ```
 
 The previous M10 100-image owner pack is **REJECTED 100/100** as semantic artwork. It remains a permanent negative regression set. The failure was semantic recognizability, not board resolution.
@@ -67,22 +70,24 @@ These remain hard legality unless the owner explicitly changes them:
 - no interpolation/antialiasing inside logical cells
 - deterministic project provenance and exact export remain required
 
-`ASSET_ART` is separate from LevelData and may use explicit sizes such as 16x16, 24x24, 32x32, 48x48, 64x64 and rectangles under its own later asset policy.
+`ASSET_ART` is separate from LevelData and may use explicit sizes such as 16x16, 24x24, 32x32, 48x48, 64x64 and rectangles under its own asset policy.
 
 ## Provider Rules
 
 ### MAGNIFIC
 
 - approved semantic provider while owner credits are available;
-- local Factory does not scrape/drive Magnific website;
-- no undocumented/private endpoint usage;
-- execution begins as owner-authorized external orchestration;
-- current surfaced integration does not expose exact logical raster size or provider seed;
-- raw result must be imported with exact job/provider/image provenance.
+- local Factory must not scrape/drive Magnific website or use undocumented/private endpoints;
+- initial execution is owner-authorized external orchestration;
+- current surfaced integration does not expose provider seed or exact logical raster size;
+- requested logical dimensions and returned provider raster dimensions are separate provenance fields;
+- raw provider raster remains raw until SP03 normalization;
+- only provider-native capabilities may be advertised as native;
+- provider/model selection is explicit, never silent fallback.
 
 ### PIXELLAB
 
-Official inspected SDK authority: `https://github.com/pixellab-code/pixellab-python`.
+Official SDK authority: `https://github.com/pixellab-code/pixellab-python`.
 
 - provider id: `PIXELLAB`;
 - official package: `pixellab`;
@@ -90,11 +95,11 @@ Official inspected SDK authority: `https://github.com/pixellab-code/pixellab-pyt
 - default API base: `https://api.pixellab.ai/v1`;
 - secret from `PIXELLAB_SECRET` only;
 - optional base URL from `PIXELLAB_BASE_URL`;
-- official PixFlux generation supports exact `image_size`, negative prompt, outline, shading, detail, view/direction, isometric, transparent/no-background, coverage, init image, color/forced-palette image and integer seed;
-- official BitForge additionally exposes style image and richer edit/reference inputs;
+- PixFlux supports exact `image_size`, negative description, outline, shading, detail, view/direction, isometric, no-background, coverage, init image, forced color image and integer seed;
+- BitForge additionally exposes style image and `style_strength`, plus richer edit/reference inputs;
 - direct PixelLab network access is allowed only inside explicit PIXELLAB provider execution;
 - package import, job preparation and historical procedural generation remain network-free;
-- secrets never enter source control, canonical JSON, manifests or logs.
+- secrets never enter source control, canonical identity, manifests or logs.
 
 ## Authority Documents
 
@@ -103,12 +108,6 @@ Official inspected SDK authority: `https://github.com/pixellab-code/pixellab-pyt
 - `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
 - `docs/SEMANTIC_PIVOT_AUTHORITY_V01.md`
 - `review/m10/M10_OWNER_REVIEW_DECISION.md`
-
-Current authoritative implementation prompt:
-
-`.hiveai/prompts/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_PROMPT.md`
-
-The previous Magnific-only SP02 prompt is **SUPERSEDED** and must not be executed.
 
 ---
 
@@ -169,13 +168,9 @@ Final state: `PASS / CLOSED`
 
 Final state: `PASS / CLOSED`
 
-Closing cycle:
+Closing cycle: `PAG-SP01-C003 — Non-Success Provenance Echo & Mismatch-Test Sensitivity Closure`
 
-`PAG-SP01-C003 — Non-Success Provenance Echo & Mismatch-Test Sensitivity Closure`
-
-Closing audit:
-
-`.hiveai/audits/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_STRICT_AUDIT.md`
+Closing audit: `.hiveai/audits/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_STRICT_AUDIT.md`
 
 - [x] SP01-001 Define `LEVEL_ART` and `ASSET_ART` output classes.
 - [x] SP01-002 Define immutable/versioned `SemanticGenerationRequest`.
@@ -195,71 +190,82 @@ Closing audit:
 
 # PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 
-State: `ACTIVE / READY_FOR_IMPLEMENTATION`
+State: `ACTIVE / C002_REMEDIATION`
 
-## Sprint PAG-SP02-C001 — Magnific + PixelLab Provider Bridges & Result Ingestion
+## Cycle PAG-SP02-C001 — Magnific + PixelLab Provider Bridges & Result Ingestion
 
-Authoritative prompt:
+State: **FAIL / REMEDIATION REQUIRED**
 
-`.hiveai/prompts/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_PROMPT.md`
+Strict audit: `.hiveai/audits/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_STRICT_AUDIT.md`
 
-### Shared provider layer
+Builder evidence established useful foundations:
 
-- [ ] SP02-001 Define deterministic explicit provider registry for `MAGNIFIC` and `PIXELLAB`.
-- [ ] SP02-002 Reject unknown providers and silent cross-provider fallback.
-- [ ] SP02-003 Preserve SP01 exact request/provider/result provenance binding.
-- [ ] SP02-004 Keep provider SDK/network imports isolated from Factory core and historical generators.
+- [~] SP02-001 deterministic explicit provider registry for `MAGNIFIC` and `PIXELLAB`; technically present, final acceptance pending C002
+- [~] SP02-002 unknown provider/silent fallback rejection; final acceptance pending C002
+- [~] SP02-003 SP01 exact provider/result provenance integration; residual model/result-identity defects pending C002
+- [~] SP02-004 provider SDK/network isolation from Factory core; technically present, final acceptance pending C002
+- [~] SP02-005 Magnific identity/version/config contracts present
+- [~] SP02-006 Magnific job spec present but aspect-ratio/model contracts require C002
+- [~] SP02-010 Magnific content-hash creation bindings present
+- [~] SP02-011 Magnific result manifest present but requires C002 corrections
+- [~] SP02-014 PixelLab identity/version/config contracts present
+- [~] SP02-015 official `pixellab` SDK added as optional/lazy dependency
+- [~] SP02-016 PixelLab env-secret boundary implemented; final acceptance pending C002
+- [~] SP02-017 PIXFLUX/BITFORGE explicit engine selection present
+- [~] SP02-018 PixelLab job spec present
+- [~] SP02-019 deterministic ScrubBots seed -> PixelLab integer seed present
+- [~] SP02-020 exact PixelLab requested image size mapping present
+- [~] SP02-021 explicit control mapping present; unsupported mappings fail closed
+- [~] SP02-023 PixFlux INIT/COLOR_REFERENCE byte/hash binding present
+- [~] SP02-024 BitForge STYLE path present but style-strength fidelity requires C002
+- [~] SP02-026 injectable/mockable PixelLab client path present
+- [~] SP02-031/SP02-032 smoke fixtures present but Magnific fixture requires a current valid model slug
+- [~] SP02-033/SP02-034/SP02-035 focused offline tests present but C002 sensitivity coverage required
+- [~] SP02-036 builder reported full repository regression green; final acceptance pending independent C002 audit
 
-### Magnific bridge
+C001 strict-audit findings:
 
-- [ ] SP02-005 Define stable `MAGNIFIC` provider identity/version/config contract.
-- [ ] SP02-006 Define canonical versioned Magnific job spec from `SemanticGenerationRequest`.
-- [ ] SP02-007 Require explicit Magnific model slug for canonical provider intent.
-- [ ] SP02-008 Deterministically render supported art-direction intent into Magnific prompt/job payload.
-- [ ] SP02-009 Deterministically map logical aspect ratio while retaining logical dimensions separately.
-- [ ] SP02-010 Define content-hash -> Magnific creation execution bindings.
-- [ ] SP02-011 Define Magnific success/failure result manifest.
-- [ ] SP02-012 Verify raw bytes SHA-256 and import exact provenance-complete `SemanticImageCandidate`.
-- [ ] SP02-013 Keep Magnific browser scraping/private endpoint use forbidden.
+- [!] `F-PAG-SP02-C001-001` Magnific returned provider raster was incorrectly required to equal logical target dimensions.
+- [!] `F-PAG-SP02-C001-002` Magnific arbitrary aspect ratios and prompt-only controls were misrepresented as executable/native capabilities.
+- [!] `F-PAG-SP02-C001-003` result identity included audit/cost/transient metadata.
+- [!] `F-PAG-SP02-C001-004` Magnific request/job/actual-model provenance was not fail-closed.
+- [!] `F-PAG-SP02-C001-005` BitForge STYLE support silently omitted native `style_strength`.
+- [!] `F-PAG-SP02-C001-006` Magnific smoke fixture used a model slug not present in the current connected catalog.
+- [!] `F-PAG-SP02-C001-007` builder consulted stale hidden `.hiveai` trackers as current authority.
 
-### PixelLab direct API bridge
+## Cycle PAG-SP02-C002 — Provider Contract Fidelity, Result Identity & Smoke Readiness Remediation
 
-- [ ] SP02-014 Define stable `PIXELLAB` provider identity/version/config contract.
-- [ ] SP02-015 Integrate official `pixellab` SDK as an optional/lazy provider dependency; do not vendor SDK source.
-- [ ] SP02-016 Read PixelLab secret only from environment and prove secret non-leakage.
-- [ ] SP02-017 Define explicit PixelLab engine identity, at least `pixflux`; BitForge may be added only if truthfully mapped/tested.
-- [ ] SP02-018 Define canonical versioned PixelLab job spec.
-- [ ] SP02-019 Deterministically map ScrubBots int/string seed to PixelLab integer seed without Python `hash()`.
-- [ ] SP02-020 Send exact resolved SP01 logical width/height as PixelLab `image_size`.
-- [ ] SP02-021 Implement explicit tested SP01 -> PixelLab outline/shading/detail/view/direction/isometric mappings.
-- [ ] SP02-022 Support native negative description and no-background where exposed by official API.
-- [ ] SP02-023 Support PixFlux INIT and COLOR_REFERENCE bindings only when bytes/hash/role verify exactly.
-- [ ] SP02-024 Support BitForge STYLE mapping only if BitForge is actually implemented/tested in C001.
-- [ ] SP02-025 Reject generic REFERENCE/unsupported semantic controls where no truthful PixelLab mapping exists.
-- [ ] SP02-026 Implement injectable/mockable direct PixelLab SDK execution adapter.
-- [ ] SP02-027 Capture PixelLab returned raw image bytes/hash/dimensions and available usage USD without making cost metadata identity.
-- [ ] SP02-028 Define PixelLab success/failure result manifest with exact request/job/engine/seed provenance.
-- [ ] SP02-029 Scope direct network permission only to deliberate PIXELLAB provider execution.
-- [ ] SP02-030 Prove package import/job preparation/historical procedural generation remain offline.
+State: **READY_FOR_IMPLEMENTATION**
 
-### Smoke fixtures and tests
+Authoritative prompt: `.hiveai/prompts/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_PROMPT.md`
 
-- [ ] SP02-031 Publish one deterministic 16x16 wizard Magnific smoke fixture without executing it from Codex.
-- [ ] SP02-032 Publish one deterministic exact-16x16 PixFlux wizard smoke fixture with fixed seed without executing paid API from Codex.
-- [ ] SP02-033 Add mocked/offline Magnific bridge tests.
-- [ ] SP02-034 Add mocked/offline PixelLab SDK/API tests.
-- [ ] SP02-035 Add provider-secret leak tests.
-- [ ] SP02-036 Full SP01 and repository regression suites remain green.
+- [ ] SP02-C002-001 Preserve logical requested dimensions separately from Magnific returned provider raster dimensions; allow valid larger raw raster imports.
+- [ ] SP02-C002-002 Implement deterministic supported Magnific aspect-ratio mapping with documented tie-break and model/surface compatibility.
+- [ ] SP02-C002-003 Make Magnific native capability declarations truthful; keep prompt-guidance distinct from native provider capability.
+- [ ] SP02-C002-004 Split deterministic result identity from audit/cost/transient metadata for both Magnific and PixelLab.
+- [ ] SP02-C002-005 Enforce exact Magnific request/job/actual-model binding with no silent model override/fallback.
+- [ ] SP02-C002-006 Map BitForge `style_strength` truthfully to official SDK semantics or disable advertised STYLE support.
+- [ ] SP02-C002-007 Replace Magnific smoke fixture with a current catalog-valid explicit model slug without executing a paid generation.
+- [ ] SP02-C002-008 Harden Magnific success/failure manifest consistency without fabricated creation/image data.
+- [ ] SP02-C002-009 Add sensitivity-safe tests for raw raster vs logical size, ratios, capability truth, identity invariance, model binding and BitForge style strength.
+- [ ] SP02-C002-010 Preserve optional/lazy PixelLab SDK loading, env-secret safety, exact image-size/seed mapping and provider isolation.
+- [ ] SP02-C002-011 Preserve SP01 exact provenance contracts and accepted M00-M10 behavior.
+- [ ] SP02-C002-012 Full focused + full repository regression remains green.
+- [ ] SP02-C002-013 Builder uses root `TASKS.md` and current GitHub authority docs only, not stale hidden H!veAI trackers.
 
-### SP02 acceptance
+### SP02 acceptance after C002
 
-- [ ] SP02-037 Same semantic request + same provider bindings produces byte-identical canonical provider job spec.
-- [ ] SP02-038 Imported/generated raw result is cryptographically/provenance bound to exact request/job/provider/engine/model.
-- [ ] SP02-039 Normal provider failure remains provenance-complete and typed for both provider paths.
-- [ ] SP02-040 No raw provider image is treated as normalized logical artwork.
-- [ ] SP02-041 Historical offline procedural paths remain unaffected.
-- [ ] SP02-042 Independent owner-authorized Magnific smoke proves real external bridge metadata.
-- [ ] SP02-043 Owner-authorized PixelLab smoke, when `PIXELLAB_SECRET` is available, proves exact 16x16 direct API generation path.
+- [ ] SP02-A01 Same semantic request + same provider bindings produces byte-identical canonical provider job identity.
+- [ ] SP02-A02 Raw result is cryptographically/provenance bound to exact request/job/provider/engine/model.
+- [ ] SP02-A03 Audit URL/timestamp/cost changes do not alter deterministic result identity.
+- [ ] SP02-A04 Magnific can import a normal larger provider raster while retaining logical target dimensions for future SP03.
+- [ ] SP02-A05 PixelLab retains exact-size provider intent and deterministic request-to-provider-seed mapping.
+- [ ] SP02-A06 Normal provider failures remain provenance-complete and typed.
+- [ ] SP02-A07 No raw provider image is treated as normalized logical artwork.
+- [ ] SP02-A08 Historical offline procedural paths remain unaffected.
+- [ ] SP02-A09 Independent audit marks bridge technically smoke-ready.
+- [ ] SP02-A10 Owner-authorized live Magnific smoke proves real external bridge metadata after technical PASS.
+- [ ] SP02-A11 Owner-authorized PixelLab smoke, when `PIXELLAB_SECRET` is available, proves exact 16x16 direct API path after technical PASS.
 
 ---
 
@@ -394,4 +400,4 @@ Authoritative prompt:
 
 ## Current Stop Rule
 
-Do not begin SP03, SP04 or M11 until SP02-C001 is implemented, independently audited, and its required provider bridge evidence is accepted.
+Do not begin SP03, SP04 or M11. Do not spend provider credits. First execute **PAG-SP02-C002**, publish the builder log, and obtain independent ChatGPT strict audit. Only a technical PASS may authorize a real owner-approved smoke generation and later downstream work.
