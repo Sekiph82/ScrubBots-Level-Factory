@@ -92,3 +92,15 @@ The pre-existing dirty files under `docs/migration/legacy-task-trackers/` and
 untracked legacy migration/control-plane files under `.hiveai/` were not
 staged, changed, or removed. Root `TASKS.md`, `.hiveai/TASKS.md`, task ledgers,
 events, cycle index, prompts, and audits were not modified.
+
+### Implementation publication checkpoint
+
+- Implementation commit: `9e6945c4e53b19851731853ff221da7552f1e06d`.
+- `git push origin main`: succeeded, advancing `origin/main` from `a29cd55d0e016140b8e2e640b01e81f10d039f06`.
+- Post-push fetch checkpoint timestamp: `2026-09-11T21:42:34.0813400+03:00`.
+- At that checkpoint local `HEAD` and `origin/main` were both `9e6945c4e53b19851731853ff221da7552f1e06d`; `git rev-list --left-right --count HEAD...origin/main` reported `0 0`.
+- The only remaining worktree dirt was the preserved pre-existing migration modifications and untracked legacy files listed above. The completed SP02 log publication is the only subsequent scoped change.
+
+This is builder evidence for independent ChatGPT audit; no audit or acceptance
+state was authored by this run, and no provider execution or credit spend was
+performed.
