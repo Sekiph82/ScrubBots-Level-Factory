@@ -10,17 +10,20 @@ Branch: main
 Read first:
 
 1. `docs/PAG_SEMANTIC_PIXEL_STUDIO_CONVERSION_PLAN_V01.md`
-2. `review/m10/M10_OWNER_REVIEW_DECISION.md`
-3. root `TASKS.md` for historical M00-M10 contracts
-4. `AGENTS.md`, `GOVERNANCE.md`, `CLAUDE.md`
+2. `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
+3. `review/m10/M10_OWNER_REVIEW_DECISION.md`
+4. root `TASKS.md` for historical M00-M10 contracts
+5. `AGENTS.md`, `GOVERNANCE.md`, `CLAUDE.md`
 
 The owner has rejected the M10 visual pack 100/100. M00-M10 deterministic/validation/export infrastructure remains retained. This cycle begins the semantic conversion and must not restart or rewrite accepted subsystems.
+
+Owner provider decision: **Magnific is the primary semantic AI provider while owner credits are available.** The architecture remains provider-neutral so Magnific can later be replaced without rewriting the Factory.
 
 ## Mission
 
 Implement **SP01 only**: the provider-neutral semantic generation contracts and boundary.
 
-Do not install or integrate ComfyUI/model workflows yet. Do not begin SP02.
+Do not integrate Magnific generation yet. Do not install ComfyUI. Do not begin SP02.
 
 ## Required production work
 
@@ -62,7 +65,7 @@ Add an immutable/canonical/versioned request model containing at least:
 - optional init-image descriptor + strength;
 - optional color/palette-reference descriptor;
 - provider id;
-- provider workflow/config version;
+- provider workflow/model/config version;
 - desired candidate count where appropriate.
 
 Canonical serialization must be deterministic and must not use timestamps/UUIDs/Python hash as identity.
@@ -88,10 +91,10 @@ Provider methods must support at least:
 - provider identity/version;
 - capability declaration;
 - request validation;
-- generation returning typed result(s);
+- generation returning typed result(s) or a provider job/import boundary;
 - explicit unavailable/unsupported/failure result rather than partially valid success.
 
-Core contracts must not import ComfyUI-specific code.
+Core contracts must not import Magnific-specific, ComfyUI-specific, browser-automation or provider SDK code.
 
 ### 5. SemanticImageCandidate / provider result
 
@@ -140,7 +143,7 @@ Prove:
 
 - same canonical request => same request digest;
 - field-order differences do not change identity;
-- material prompt/seed/dimension/provider/workflow/reference-image changes do change identity;
+- material prompt/seed/dimension/provider/workflow-or-model/reference-image changes do change identity;
 - non-identity audit timestamps do not alter canonical identity;
 - machine-specific path differences cannot alter identity when source content is identical.
 
@@ -174,6 +177,7 @@ Add focused unit/property/integration tests covering at least:
 - source descriptor content-hash identity;
 - same content with different local path remains same canonical source identity;
 - changed reference image hash changes request digest;
+- provider/model identity changes request digest where it is part of canonical generation intent;
 - provider capability validation;
 - unsupported capability fails closed;
 - failed provider result cannot be consumed as success;
@@ -188,8 +192,10 @@ Explicitly document:
 
 - PixelLab-like controls are product/interface inspiration only;
 - PixelLab proprietary backend is not copied;
-- first automated provider target will be local ComfyUI in SP02;
-- no new paid image API is required by architecture;
+- Magnific is the owner-selected primary semantic provider for SP02 while credits are available;
+- provider-neutral contracts remain mandatory so Magnific can be replaced later;
+- SP01 does not call Magnific or consume credits;
+- local Factory code must never scrape the Magnific website or use undocumented private endpoints;
 - LEVEL_ART and ASSET_ART are separate contracts;
 - current procedural generators are retained as downstream/control infrastructure.
 
@@ -212,10 +218,10 @@ Record start HEAD/origin/divergence before production edits, focused tests, full
 ## Forbidden
 
 - Do not delete/rewrite M00-M10 accepted infrastructure.
-- Do not implement ComfyUI yet.
+- Do not implement Magnific integration yet.
+- Do not install or implement ComfyUI.
 - Do not add model weights.
-- Do not add a paid image API.
-- Do not scrape/automate PixelLab website.
+- Do not scrape/automate Magnific or PixelLab website UIs.
 - Do not copy PixelLab proprietary backend code.
 - Do not begin Studio UI.
 - Do not modify the rejected M10 grids.
