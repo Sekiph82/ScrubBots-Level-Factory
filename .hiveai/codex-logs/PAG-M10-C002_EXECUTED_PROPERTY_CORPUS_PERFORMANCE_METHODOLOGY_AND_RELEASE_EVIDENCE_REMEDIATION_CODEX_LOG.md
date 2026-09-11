@@ -60,3 +60,10 @@ Document role: CODEX BUILDER LOG
 - Added C002 execution, distinct benchmark and review-evidence tests under `tests/`.
 - Regenerated the deterministic corpus, execution report, distinct benchmark manifest/performance report, 100-candidate review manifest/HTML/metrics, attribution re-audit, and full gate matrix under `review/m10/`.
 - This builder log is the only `.hiveai` file in scope. Root `TASKS.md`, hidden legacy tracker files, audit files and the pre-existing unrelated dirty files were not edited.
+
+## Publication checkpoint
+
+- Implementation/artifact commit: `36c9640` (`Implement M10 C002 validation evidence remediation`).
+- `git push origin main`: succeeded, updating GitHub from `76a5375` to `36c9640`.
+- Immediately after that push, `git fetch origin` and `git rev-list --left-right --count HEAD...origin/main` recorded local `HEAD=36c9640`, `origin/main=36c9640`, divergence `0 0`.
+- The completed builder log is published in the following log-only commit; the terminal equality check is repeated after that publication and reported in the final response. No task, acceptance, tracker, audit, or legacy control-plane state was modified.
