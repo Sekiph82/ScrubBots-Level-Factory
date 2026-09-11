@@ -50,21 +50,22 @@ Provider-specific execution is governed by:
 
 `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
 
-Previous cycle:
+Previous cycles:
 
-`PAG-SP01-C001 — Semantic Contracts & Provider Boundary` -> **AUDIT_FAILED / BOUNDED_REMEDIATION_REQUIRED**
+- `PAG-SP01-C001 — Semantic Contracts & Provider Boundary` -> **AUDIT_FAILED / REMEDIATED_IN_C002**
+- `PAG-SP01-C002 — Semantic Provenance Binding & Role Integrity Remediation` -> **AUDIT_FAILED / ONE_BOUNDED_RESIDUAL**
 
-Closing audit:
+Latest strict audit:
 
-`.hiveai/audits/PAG-SP01-C001_SEMANTIC_CONTRACTS_AND_PROVIDER_BOUNDARY_STRICT_AUDIT.md`
+`.hiveai/audits/PAG-SP01-C002_SEMANTIC_PROVENANCE_BINDING_AND_ROLE_INTEGRITY_REMEDIATION_STRICT_AUDIT.md`
 
 Current implementation cycle:
 
-`PAG-SP01-C002 — Semantic Provenance Binding & Role Integrity Remediation`
+`PAG-SP01-C003 — Non-Success Provenance Echo & Mismatch-Test Sensitivity Closure`
 
 Authoritative prompt:
 
-`.hiveai/prompts/PAG-SP01-C002_SEMANTIC_PROVENANCE_BINDING_AND_ROLE_INTEGRITY_REMEDIATION_PROMPT.md`
+`.hiveai/prompts/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_PROMPT.md`
 
 SP02 is **Magnific Provider Bridge & Result Ingestion** and remains blocked until SP01 receives independent PASS.
 
