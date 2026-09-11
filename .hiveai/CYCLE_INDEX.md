@@ -48,15 +48,25 @@ A correction gets a new cycle ID, for example:
 
 ## Active cycle
 
-Cycle: `PAG-M09-C001`
-Title: `CLI & Local Batch Generation`
+Cycle: `PAG-M09-C002`
+Title: `Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation`
 State: `READY_FOR_IMPLEMENTATION`
 Actor: `CODEX`
-Prompt: `.hiveai/prompts/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_PROMPT.md`
-Previous closing audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
+Prompt: `.hiveai/prompts/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`
+Previous audit: `.hiveai/audits/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_STRICT_AUDIT.md`
 Current-state authority: root `TASKS.md`.
 
 ## Failed / remediation-required cycles
+
+### PAG-M09-C001 — CLI & Local Batch Generation
+State: `AUDIT_FAILED / FIX_REQUIRED / REMEDIATION_BY_PAG-M09-C002`
+Audit: `.hiveai/audits/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_STRICT_AUDIT.md`
+Open findings: `F-PAG-M09-C001-001`, `F-PAG-M09-C001-002`, `F-PAG-M09-C001-003`, `F-PAG-M09-C001-004`.
+Open scope: fail-closed resume history/terminal-state binding, exact recorded M08 quality-policy reproduction, batch identity binding to exemplar/provenance + policy environment, and completion of the mandatory reproduce/determinism/path evidence matrix.
+Accepted C001 foundation preserved into remediation: dependency-free Windows CLI, generate/reproduce/batch command surface, local-only exemplar loading, candidate-wrapper routing, M07 quality gating, M08 export, deterministic attempt derivation, atomic manifest writes and exact grid duplicate comparison.
+Implementation commit: `23f27f3e73dc4a6ef34338378139aac842f3fde6`
+Completed-log publication commit: `5f1324dade158315dfc062a079d4dbde716fd409`
+Terminal builder-era HEAD independently observed: `fe1a5e09a271c78e29703976cf78739ba7ccf72b`
 
 ### PAG-M08-C002 — Provenance Binding, Rectangular Golden & Strict PNG Remediation
 State: `AUDIT_FAILED / REMEDIATED_BY_PAG-M08-C003`

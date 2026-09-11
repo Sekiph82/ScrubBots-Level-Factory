@@ -5,10 +5,10 @@ This root TASKS.md is the only authoritative project-status tracker consumed by 
 ## Project Status
 
 - Current Milestone: PAG-M09
-- Current Sprint: PAG-M09-C001
-- Current Task: PAG-M09-C001 — CLI & Local Batch Generation
+- Current Sprint: PAG-M09-C002
+- Current Task: PAG-M09-C002 — Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Execute the authoritative PAG-M09-C001 CLI & Local Batch Generation prompt, publish the matching builder log and deterministic single/reproduce/batch evidence, then request independent audit.
+- Next Task/Action: Execute the authoritative PAG-M09-C002 bounded remediation prompt, publish the matching builder log and manifest/reproduce/determinism evidence, then request independent audit.
 - Required Actor: CODEX
 - Blockers/Waits: PAG-M10+ blocked until PAG-M09 receives unconditional independent PASS; PAG-0441 remains blocked until M10 establishes the V1 performance budget.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
@@ -622,7 +622,7 @@ Each family:
 ## Sprint PAG-S03.3 — Region coloring
 
 - [x] PAG-0326 Convert silhouette regions to canonical C01..C16.
-- [x] PAG-0327 Use exactly a legal distinct-color count for difficulty.
+- [x] PAG-0327 Use exactly a legal distinct-used-color count for difficulty.
 - [x] PAG-0328 Avoid single-pixel color salt unless style explicitly requests it.
 - [x] PAG-0329 Prefer coherent connected color regions.
 - [x] PAG-0330 Support outline/body/detail semantic color roles without introducing non-canonical colors.
@@ -934,11 +934,12 @@ M09 is authorized to proceed.
 
 # PAG-M09 — CLI & Local Batch Generation
 
-H!veAI active cycle: `PAG-M09-C001 — CLI & Local Batch Generation`  
+H!veAI active cycle: `PAG-M09-C002 — Manifest Integrity, Reproduce Fidelity & Acceptance Evidence Remediation`  
 State: `READY_FOR_IMPLEMENTATION`  
 Required actor: `CODEX`  
-Authoritative prompt: `.hiveai/prompts/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_PROMPT.md`  
-Previous milestone closing audit: `.hiveai/audits/PAG-M08-C003_DETERMINISTIC_RICH_PROVENANCE_BINDING_CLOSURE_STRICT_AUDIT.md`
+Authoritative prompt: `.hiveai/prompts/PAG-M09-C002_MANIFEST_INTEGRITY_REPRODUCE_FIDELITY_AND_ACCEPTANCE_EVIDENCE_REMEDIATION_PROMPT.md`  
+Previous strict audit: `.hiveai/audits/PAG-M09-C001_CLI_AND_LOCAL_BATCH_GENERATION_STRICT_AUDIT.md`  
+C001 state: `AUDIT_FAILED / REMEDIATION_BY_PAG-M09-C002`
 
 ## Sprint PAG-S09.1 — Single generation CLI
 
