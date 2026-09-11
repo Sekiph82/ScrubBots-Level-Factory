@@ -421,6 +421,14 @@ def _batch_id(
     return f"batch-{hashlib.sha256(canonical_json_bytes(immutable)).hexdigest()}"
 
 
+def _batch_candidate_id(manifest_or_batch_id: Mapping[str, object] | str, attempt_index: int) -> str:
+    """Return the sole deterministic identity formula for an accepted batch attempt."""
+    batch_id = manifest_or_batch_id.get("batch_id") if isinstance(manifest_or_batch_id, Mapping) else manifest_or_batch_id
+    if type(batch_id) is not str or not batch_id or type(attempt_index) is not int or attempt_index < 0:
+        raise CLIError("batch candidate identity inputs are invalid")
+    return f"{batch_id}-{attempt_index:06d}"
+
+
 def _safe_relative_path(value: object, label: str) -> Path:
     if type(value) is not str or not value or "\\" in value:
         raise CLIError(f"{label} is not a portable relative path")
@@ -529,8 +537,11 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
                     raise CLIError(f"attempt {index} accepted fields are inconsistent")
                 if type(record["candidate_id"]) is not str or not _PORTABLE_ID.fullmatch(record["candidate_id"]):
                     raise CLIError(f"attempt {index} candidate ID is invalid")
+                expected_candidate_id = _batch_candidate_id(value, index)
+                if record["candidate_id"] != expected_candidate_id:
+                    raise CLIError(f"attempt {index} candidate ID is not deterministic for the batch")
                 relative = _safe_relative_path(record["relative_path"], f"attempts[{index}].relative_path")
-                if relative.as_posix() != f"candidates/{record['candidate_id']}":
+                if relative.as_posix() != f"candidates/{expected_candidate_id}":
                     raise CLIError(f"attempt {index} candidate path is not canonical")
                 accepted_attempts.append(record)
                 accepted_ids_so_far.add(record["candidate_id"])
@@ -547,7 +558,8 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
             raise CLIError(f"accepted record {index} does not exactly match its ACCEPTED attempt")
         candidate_id = record["candidate_id"]
         relative = _safe_relative_path(record["relative_path"], f"accepted[{index}].relative_path")
-        if type(candidate_id) is not str or not _PORTABLE_ID.fullmatch(candidate_id) or relative.as_posix() != f"candidates/{candidate_id}":
+        expected_candidate_id = _batch_candidate_id(value, attempt_index)
+        if type(candidate_id) is not str or not _PORTABLE_ID.fullmatch(candidate_id) or candidate_id != expected_candidate_id or relative.as_posix() != f"candidates/{expected_candidate_id}":
             raise CLIError(f"accepted record {index} has a non-canonical candidate identity/path")
         if candidate_id in seen_ids or relative.as_posix() in seen_paths:
             raise CLIError("accepted candidate IDs and paths must be unique")
@@ -612,6 +624,11 @@ def _accepted_grids(root: Path, manifest: Mapping[str, object]) -> list[tuple[Ma
             raise CLIError(f"accepted bundle is invalid during resume: {exc}") from exc
         if bundle.artwork.candidate_id != record["candidate_id"] or bundle.artwork.grid_hash != record["grid_hash"]:
             raise CLIError("accepted bundle identity or hash does not match the batch manifest")
+        expected_candidate_id = _batch_candidate_id(manifest, int(record["attempt_index"]))
+        if bundle.artwork.candidate_id != expected_candidate_id:
+            raise CLIError("accepted bundle candidate ID is not deterministic for the batch")
+        if relative.as_posix() != f"candidates/{expected_candidate_id}":
+            raise CLIError("accepted bundle path is not deterministic for the batch")
         if (bundle.artwork.width, bundle.artwork.height) != (record["width"], record["height"]):
             raise CLIError("accepted bundle dimensions do not match the batch manifest")
         generation = bundle.metadata.get("generation")
@@ -669,6 +686,9 @@ def _validate_attempt_history(
             continue
         if record["status"] != "ACCEPTED" or record["attempt_index"] not in accepted_by_index:
             raise CLIError(f"attempt {index} does not reproduce its accepted relationship")
+        expected_candidate_id = _batch_candidate_id(manifest, index)
+        if record["candidate_id"] != expected_candidate_id:
+            raise CLIError(f"attempt {index} accepted candidate ID is not deterministic for the batch")
         accepted_record, bundle_cells = accepted_by_index[record["attempt_index"]]
         if accepted_record["candidate_id"] != record["candidate_id"] or accepted_record["grid_hash"] != digest or bundle_cells != result.logical_grid:
             raise CLIError(f"attempt {index} accepted bundle does not reproduce its recorded grid")
@@ -798,7 +818,7 @@ def _batch(args: argparse.Namespace) -> ExitCode:
                     record["status"] = "DUPLICATE"
                     record["duplicate_of"] = equal[1]
                 else:
-                    candidate_id = f"{manifest['batch_id']}-{index:06d}"
+                    candidate_id = _batch_candidate_id(manifest, index)
                     destination = export_candidate(candidate, candidate_id, root / "candidates", quality_report=report)
                     record.update({"status": "ACCEPTED", "candidate_id": candidate_id, "relative_path": destination.relative_to(root).as_posix()})
                     manifest["accepted"].append({"attempt_index": index, "attempt_seed": _typed_seed(attempt_seed), "candidate_id": candidate_id, "grid_hash": record["grid_hash"], "relative_path": record["relative_path"], "width": result.width, "height": result.height})  # type: ignore[union-attr]

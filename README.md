@@ -74,6 +74,8 @@ review output below `review/`; resume uses `batch --resume path\to\batch-manifes
 For deliberate non-default M07 thresholds, `generate` and a new batch accept a
 canonical local `--quality-policy-json`; the policy is persisted and used
 exactly during reproduction and resume, while resume rejects policy overrides.
+Accepted batch IDs use the deterministic `<batch-id>-<zero-padded-attempt-index>`
+formula everywhere, including resume validation and bundle paths.
 
 Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
 invalid request/config, `4` generator failure, `5` quality rejection, `6`

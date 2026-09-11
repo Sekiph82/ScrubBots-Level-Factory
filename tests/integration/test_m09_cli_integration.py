@@ -5,6 +5,7 @@ import importlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -13,6 +14,7 @@ import pytest
 from scrubbots_pixel_factory import DeterministicRNG, GenerationRequest, GeneratorOptions, GenerationResult, GeneratorMode, QualityPolicy, RNG_ALGORITHM, evaluate_grid, offline_runtime
 from scrubbots_pixel_factory.cli import main as cli_main
 from scrubbots_pixel_factory.generators.router import GeneratorRouter
+from scrubbots_pixel_factory.output import canonical_json_bytes, read_bundle
 
 cli_module = importlib.import_module("scrubbots_pixel_factory.cli.main")
 
@@ -287,3 +289,217 @@ def test_mask_reproduce_is_byte_exact_and_candidate_path_is_local(tmp_path: Path
     assert all((first_root / relative).read_bytes() == (second_root / relative).read_bytes() for relative in first_files)
     traversal = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "909", "--candidate-id", "../escape", "--output", str(tmp_path / "traversal"))
     assert traversal.returncode != 0
+
+
+def test_single_explicit_request_has_default_id_and_byte_identical_bundles(tmp_path: Path) -> None:
+    roots = (tmp_path / "one", tmp_path / "two")
+    results = [_run("generate", "--difficulty", "EASY", "--mode", "RULES", "--width", "20", "--height", "20", "--seed", "910", "--output", str(root), env={"PYTHONHASHSEED": seed}) for root, seed in zip(roots, ("1", "random"), strict=True)]
+    assert all(result.returncode == 0 for result in results), [result.stderr for result in results]
+    bundles = [next(root.rglob("metadata.json")).parent for root in roots]
+    assert bundles[0].name == bundles[1].name
+    files = sorted(path.name for path in bundles[0].iterdir() if path.is_file())
+    assert files == sorted(path.name for path in bundles[1].iterdir() if path.is_file())
+    assert all((bundles[0] / name).read_bytes() == (bundles[1] / name).read_bytes() for name in files)
+
+
+def test_single_auto_dimensions_record_exact_legal_resolution(tmp_path: Path) -> None:
+    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--seed", "911", "--output", str(tmp_path))
+    assert result.returncode == 0, result.stderr
+    bundle = read_bundle(next(tmp_path.rglob("metadata.json")).parent)
+    request = bundle.metadata["generation"]["request"]
+    resolved = bundle.metadata["generation"]["result"]["resolved_dimensions"]
+    assert request["width"] is None and request["height"] is None
+    assert resolved == {"width": bundle.artwork.width, "height": bundle.artwork.height}
+    assert 20 <= bundle.artwork.width <= 29 and 20 <= bundle.artwork.height <= 29
+
+
+@pytest.mark.parametrize("kind", ("invalid-mode", "malformed-options", "unsupported-options"))
+def test_invalid_mode_and_options_are_stable_nonzero_without_traceback(tmp_path: Path, kind: str) -> None:
+    args: tuple[str, ...]
+    if kind == "invalid-mode":
+        args = ("--mode", "NOT_A_MODE")
+    else:
+        options = tmp_path / f"{kind}.json"
+        options.write_text("{malformed}" if kind == "malformed-options" else json.dumps({"namespace": "unsupported", "version": 99, "values": {}}), encoding="utf-8")
+        args = ("--options-json", str(options))
+    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--seed", "912", *args, "--output", str(tmp_path / "bad"))
+    assert result.returncode != 0 and "Traceback" not in result.stderr
+
+
+def test_every_attempt_seed_and_candidate_id_use_the_canonical_helpers(tmp_path: Path) -> None:
+    result = _run("batch", "--difficulty", "EASY", "--count", "3", "--mode", "MASK", "--seed", "913", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(tmp_path))
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads((tmp_path / "batch-manifest.json").read_text(encoding="utf-8"))
+    from scrubbots_pixel_factory.cli.main import _batch_candidate_id
+    root_seed = manifest["root_seed"]["value"]
+    for index, attempt in enumerate(manifest["attempts"]):
+        assert attempt["attempt_seed"] == {"type": "string", "value": DeterministicRNG(root_seed).retry_seed(index)}
+        if attempt["status"] == "ACCEPTED":
+            assert attempt["candidate_id"] == _batch_candidate_id(manifest, index)
+    accepted_ids = [record["candidate_id"] for record in manifest["accepted"]]
+    assert len(accepted_ids) == len(set(accepted_ids)) == 3
+
+
+def test_two_known_root_seeds_produce_different_accepted_sets(tmp_path: Path) -> None:
+    roots = (tmp_path / "seed-a", tmp_path / "seed-b")
+    for root, seed in zip(roots, ("1", "2"), strict=True):
+        result = _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", seed, "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root))
+        assert result.returncode == 0, result.stderr
+    accepted_sets = [
+        {record["grid_hash"] for record in json.loads((root / "batch-manifest.json").read_text(encoding="utf-8"))["accepted"]}
+        for root in roots
+    ]
+    assert accepted_sets[0] != accepted_sets[1]
+
+
+def test_single_quality_rejection_has_exact_exit_and_stable_codes(tmp_path: Path) -> None:
+    policy = QualityPolicy(difficulty="EASY", max_largest_region_ratio=0.0)
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
+    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "916", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "output"))
+    assert result.returncode == 5
+    assert "QUALITY_REJECTED" in result.stderr and "DOMINANCE_VIOLATION" in result.stderr
+    assert not (tmp_path / "output").exists() or not list((tmp_path / "output").rglob("metadata.json"))
+
+
+def test_direct_reproduce_negative_matrix_includes_remaining_m08_cases(tmp_path: Path) -> None:
+    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "10", "--output", str(tmp_path))
+    assert generated.returncode == 0
+    metadata = next(tmp_path.rglob("metadata.json"))
+    original = metadata.read_bytes()
+    mutations = ("malformed-json", "request-version", "options-namespace", "options-version", "generator-version", "original-grid-hash")
+    for name in mutations:
+        shutil.rmtree(tmp_path / name, ignore_errors=True)
+        case = tmp_path / name
+        shutil.copytree(metadata.parent, case)
+        case_metadata = case / "metadata.json"
+        case_artwork = case / "artwork.json"
+        if name == "malformed-json":
+            case_metadata.write_text("{not-json", encoding="utf-8")
+        elif name == "original-grid-hash":
+            artwork = json.loads(case_artwork.read_text(encoding="utf-8"))
+            artwork["grid_hash"] = "0" * 64
+            case_artwork.write_bytes(canonical_json_bytes(artwork))
+        else:
+            value = json.loads(case_metadata.read_text(encoding="utf-8"))
+            if name == "request-version":
+                value["generation"]["request"]["schema_version"] = 99
+            elif name == "options-namespace":
+                value["generation"]["request"]["generator_options"]["namespace"] = "unsupported"
+            elif name == "options-version":
+                value["generation"]["request"]["generator_options"]["version"] = 99
+            else:
+                value["generation"]["generator_version"] = "9.9.9"
+            case_metadata.write_bytes(canonical_json_bytes(value))
+        reproduced = _run("reproduce", str(case_metadata))
+        assert reproduced.returncode != 0 and "Traceback" not in reproduced.stderr, name
+
+
+def test_controlled_regeneration_with_different_grid_returns_reproduce_mismatch(tmp_path: Path, monkeypatch) -> None:
+    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "918", "--output", str(tmp_path))
+    assert generated.returncode == 0
+    metadata = next(tmp_path.rglob("metadata.json"))
+    bundle = read_bundle(metadata.parent)
+    request = cli_module._request_from_canonical(bundle.metadata["generation"]["request"])
+    cells = list(bundle.artwork.cells)
+    cells[0] = next(color for color in cells[1:] if color != cells[0])
+    changed = GenerationResult.success(request=request, width=bundle.artwork.width, height=bundle.artwork.height, logical_grid=cells, generator_mode="MASK", generator_id="mask-sprite", generator_version="1.0.0", seed=request.seed, rng_algorithm=RNG_ALGORITHM, provenance={"stage_seeds": DeterministicRNG(request.seed).stage_seeds()})
+
+    class DifferentRouter:
+        def generate_candidate(self, _request):
+            return changed
+
+    monkeypatch.setattr(cli_module, "_router", lambda registry: DifferentRouter())
+    assert cli_main(["reproduce", str(metadata)]) == 6
+
+
+def test_coordinated_candidate_id_path_and_m08_binding_rewrite_is_rejected(tmp_path: Path) -> None:
+    root = tmp_path / "batch"
+    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "919", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    assert generated.returncode == 0
+    manifest_path = root / "batch-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    old_id = manifest["accepted"][0]["candidate_id"]
+    new_id = old_id + "-rewritten"
+    old_dir = root / "candidates" / old_id
+    new_dir = root / "candidates" / new_id
+    for filename in ("artwork.json", "metadata.json"):
+        file_path = old_dir / filename
+        value = json.loads(file_path.read_text(encoding="utf-8"))
+        if filename == "artwork.json":
+            value["candidate_id"] = new_id
+        else:
+            value["candidate_id"] = new_id
+            value["artwork"]["candidate_id"] = new_id
+            value["quality"]["candidate_id"] = new_id
+        file_path.write_bytes(canonical_json_bytes(value))
+    old_dir.rename(new_dir)
+    manifest["attempts"][0]["candidate_id"] = new_id
+    manifest["attempts"][0]["relative_path"] = f"candidates/{new_id}"
+    manifest["accepted"][0]["candidate_id"] = new_id
+    manifest["accepted"][0]["relative_path"] = f"candidates/{new_id}"
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+    assert read_bundle(new_dir).artwork.candidate_id == new_id
+    resumed = _run("batch", "--resume", str(manifest_path))
+    assert resumed.returncode != 0 and "Traceback" not in resumed.stderr
+
+
+@pytest.mark.parametrize("relative_path", ("C:/absolute/path", "candidates\\unsafe"))
+def test_resume_rejects_absolute_and_nonportable_accepted_paths(tmp_path: Path, relative_path: str) -> None:
+    root = tmp_path / "batch"
+    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "920", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    manifest_path = root / "batch-manifest.json"
+    value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    value["accepted"][0]["relative_path"] = relative_path
+    manifest_path.write_bytes(canonical_json_bytes(value))
+    assert _run("batch", "--resume", str(manifest_path)).returncode != 0
+
+
+@pytest.mark.parametrize("tamper", ("bundle-hash", "embedded-seed"))
+def test_resume_rejects_accepted_bundle_cross_binding_tamper(tmp_path: Path, tamper: str) -> None:
+    root = tmp_path / tamper
+    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "921", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    manifest = json.loads((root / "batch-manifest.json").read_text(encoding="utf-8"))
+    bundle_dir = root / manifest["accepted"][0]["relative_path"]
+    if tamper == "bundle-hash":
+        artwork = json.loads((bundle_dir / "artwork.json").read_text(encoding="utf-8"))
+        artwork["grid_hash"] = "0" * 64
+        (bundle_dir / "artwork.json").write_bytes(canonical_json_bytes(artwork))
+    else:
+        metadata = json.loads((bundle_dir / "metadata.json").read_text(encoding="utf-8"))
+        metadata["generation"]["request"]["seed"] = {"type": "string", "value": "wrong-seed"}
+        (bundle_dir / "metadata.json").write_bytes(canonical_json_bytes(metadata))
+    resumed = _run("batch", "--resume", str(root / "batch-manifest.json"))
+    assert resumed.returncode != 0 and "Traceback" not in resumed.stderr
+
+
+@pytest.mark.parametrize("state", ("COMPLETE", "IN_PROGRESS"))
+def test_resume_rejects_forged_terminal_states_on_exhausted_history(tmp_path: Path, state: str) -> None:
+    root = tmp_path / state
+    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "WFC", "--seed", "922", "--max-attempts", "1", "--width", "20", "--height", "20", "--output", str(root)).returncode == 7
+    manifest_path = root / "batch-manifest.json"
+    value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    value["terminal_state"] = state
+    manifest_path.write_bytes(canonical_json_bytes(value))
+    assert _run("batch", "--resume", str(manifest_path)).returncode != 0
+
+
+def test_resume_rejects_forged_exhausted_state_on_complete_history(tmp_path: Path) -> None:
+    root = tmp_path / "complete"
+    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "923", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    manifest_path = root / "batch-manifest.json"
+    value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    value["terminal_state"] = "EXHAUSTED"
+    manifest_path.write_bytes(canonical_json_bytes(value))
+    assert _run("batch", "--resume", str(manifest_path)).returncode != 0
+
+
+@pytest.mark.parametrize("field", ("candidate_id", "relative_path"))
+def test_resume_rejects_duplicate_accepted_identity_or_path(tmp_path: Path, field: str) -> None:
+    root = tmp_path / field
+    assert _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "924", "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    manifest_path = root / "batch-manifest.json"
+    value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    value["accepted"][1][field] = value["accepted"][0][field]
+    manifest_path.write_bytes(canonical_json_bytes(value))
+    assert _run("batch", "--resume", str(manifest_path)).returncode != 0
