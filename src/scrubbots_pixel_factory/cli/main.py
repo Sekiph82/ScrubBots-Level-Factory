@@ -22,6 +22,7 @@ from .. import (
     GeneratorMode,
     GeneratorOptions,
     GeneratorRouter,
+    FailureCode,
     QualityPolicy,
     ReviewEntry,
     evaluate_grid,
@@ -60,6 +61,15 @@ _MANIFEST_SCHEMA = "scrubbots-batch-manifest"
 _MANIFEST_VERSION = 1
 _BATCH_MODES = {mode.value for mode in GeneratorMode}
 _CANDIDATE_TYPES = (MaskCandidate, RuleCandidate, WFCCandidate, HybridCandidate, AutoCandidate)
+_ATTEMPT_FIELDS = {
+    "attempt_index", "attempt_seed", "status", "failure_code", "quality_decision",
+    "rejection_codes", "grid_hash", "duplicate_of", "candidate_id", "relative_path",
+    "width", "height",
+}
+_ACCEPTED_FIELDS = {"attempt_index", "attempt_seed", "candidate_id", "grid_hash", "relative_path", "width", "height"}
+_ATTEMPT_STATUSES = {"GENERATOR_FAILURE", "QUALITY_REJECTED", "DUPLICATE", "ACCEPTED"}
+_DIGEST = re.compile(r"^[0-9a-f]{64}$")
+_PORTABLE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
 class CLIError(ValueError):
@@ -176,6 +186,14 @@ def _exemplar_identities(registry: ExemplarRegistry) -> list[dict[str, object]]:
             "role": exemplar.role,
             "provenance_identity": exemplar.provenance_identity,
             "ownership": exemplar.ownership,
+            "schema": exemplar.schema,
+            "version": exemplar.version,
+            "width": exemplar.width,
+            "height": exemplar.height,
+            "provenance_type": exemplar.provenance_type,
+            "provenance_description": exemplar.provenance_description,
+            "approved_by": exemplar.approved_by,
+            "production_difficulty": exemplar.production_difficulty,
         }
         for exemplar in registry.exemplars
     ]
@@ -198,6 +216,23 @@ def _candidate_id(request: GenerationRequest, explicit: str | None = None) -> st
 
 def _quality_policy(request: GenerationRequest) -> QualityPolicy:
     return QualityPolicy(difficulty=request.difficulty)
+
+
+def _quality_policy_from_json(path: Path | None, request: GenerationRequest) -> QualityPolicy:
+    if path is None:
+        return _quality_policy(request)
+    value = _json_load(path, "quality policy JSON")
+    if not isinstance(value, Mapping):
+        raise CLIError("quality policy JSON must be an object")
+    try:
+        policy = QualityPolicy(**value)  # type: ignore[arg-type]
+    except (TypeError, ValueError) as exc:
+        raise CLIError(f"invalid quality policy: {exc}") from exc
+    if policy.as_dict() != dict(value):
+        raise CLIError("quality policy JSON is not the canonical versioned policy")
+    if policy.difficulty is None or policy.difficulty.value != request.difficulty.value:
+        raise CLIError("quality policy difficulty must match the generation request")
+    return policy
 
 
 def _request_from_canonical(value: object, path: str = "request") -> GenerationRequest:
@@ -255,7 +290,7 @@ def _generate(args: argparse.Namespace) -> ExitCode:
     if not result.is_success:
         print(f"GENERATION_FAILURE code={result.failure_code.value if result.failure_code else 'GENERATION_FAILED'}", file=sys.stderr)
         return ExitCode.GENERATION_FAILURE
-    report = evaluate_grid(result.width, result.height, result.logical_grid, policy=_quality_policy(request))  # type: ignore[arg-type]
+    report = evaluate_grid(result.width, result.height, result.logical_grid, policy=_quality_policy_from_json(args.quality_policy_json, request))  # type: ignore[arg-type]
     if not report.accepted:
         print(f"QUALITY_REJECTED codes={','.join(report.rejection_codes)}", file=sys.stderr)
         return ExitCode.QUALITY_REJECTED
@@ -288,7 +323,28 @@ def _reproduce(args: argparse.Namespace) -> ExitCode:
     if not result.is_success or reproduced_hash != bundle.artwork.grid_hash or result.logical_grid != bundle.artwork.cells:
         print("MISMATCH", file=sys.stderr)
         return ExitCode.REPRODUCE_MISMATCH
-    report = evaluate_grid(result.width, result.height, result.logical_grid, policy=_quality_policy(request))  # type: ignore[arg-type]
+    try:
+        quality = bundle.metadata["quality"]
+        if not isinstance(quality, Mapping):
+            raise CLIError("metadata quality binding is malformed", ExitCode.REPRODUCE_MISMATCH)
+        recorded = quality.get("report")
+        if not isinstance(recorded, Mapping):
+            raise CLIError("metadata quality report is missing", ExitCode.REPRODUCE_MISMATCH)
+        policy_data = recorded.get("policy")
+        if not isinstance(policy_data, Mapping):
+            raise CLIError("metadata quality policy is missing", ExitCode.REPRODUCE_MISMATCH)
+        policy = QualityPolicy(**policy_data)  # type: ignore[arg-type]
+        if policy.as_dict() != dict(policy_data):
+            raise CLIError("metadata quality policy is not canonical", ExitCode.REPRODUCE_MISMATCH)
+        report = evaluate_grid(result.width, result.height, result.logical_grid, policy=policy)  # type: ignore[arg-type]
+        if report.as_dict() != dict(recorded):
+            raise CLIError("metadata quality report does not reproduce under its recorded policy", ExitCode.REPRODUCE_MISMATCH)
+        if quality.get("decision") != ("ACCEPT" if report.accepted else "REJECT") or quality.get("rejection_codes") != list(report.rejection_codes):
+            raise CLIError("metadata quality decision binding is invalid", ExitCode.REPRODUCE_MISMATCH)
+    except CLIError:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise CLIError(f"metadata quality policy is invalid: {exc}", ExitCode.REPRODUCE_MISMATCH) from exc
     try:
         regenerated = build_export_bundle(candidate, bundle.artwork.candidate_id, quality_report=report, preview_scale=(bundle.metadata.get("preview") or {}).get("scale") if (bundle.metadata.get("preview") or {}).get("enabled") else None)  # type: ignore[union-attr]
     except (OSError, TypeError, ValueError) as exc:
@@ -329,6 +385,10 @@ def _atomic_manifest_write(path: Path, value: Mapping[str, object]) -> None:
 
 def _batch_config(args: argparse.Namespace, seed: int | str, registry: ExemplarRegistry) -> tuple[GenerationRequest, dict[str, object]]:
     request = _request_from_args(args, seed=seed)
+    return request, _request_template(request)
+
+
+def _request_template(request: GenerationRequest) -> dict[str, object]:
     config = {
         "difficulty": request.difficulty.value,
         "width": request.width,
@@ -339,11 +399,25 @@ def _batch_config(args: argparse.Namespace, seed: int | str, registry: ExemplarR
         "palette_subset": list(request.palette_subset) if request.palette_subset is not None else None,
         "generator_options": request.options.canonical_dict(),
     }
-    return request, config
+    return config
 
 
-def _batch_id(config: Mapping[str, object], seed: int | str, count: int, max_attempts: int) -> str:
-    immutable = {"config": config, "root_seed": _typed_seed(seed), "requested_count": count, "max_attempts": max_attempts}
+def _batch_id(
+    config: Mapping[str, object],
+    seed: int | str,
+    count: int,
+    max_attempts: int,
+    exemplar_identities: Sequence[Mapping[str, object]],
+    quality_policy: Mapping[str, object],
+) -> str:
+    immutable = {
+        "request_template": config,
+        "root_seed": _typed_seed(seed),
+        "requested_count": count,
+        "max_attempts": max_attempts,
+        "exemplar_identities": list(exemplar_identities),
+        "quality_policy": quality_policy,
+    }
     return f"batch-{hashlib.sha256(canonical_json_bytes(immutable)).hexdigest()}"
 
 
@@ -366,9 +440,9 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
         raise CLIError("resume input must be named batch-manifest.json")
     if type(value["requested_count"]) is not int or value["requested_count"] <= 0 or type(value["max_attempts"]) is not int or value["max_attempts"] <= 0:
         raise CLIError("batch manifest counts are invalid")
-    if type(value["next_attempt_index"]) is not int or value["next_attempt_index"] < 0:
+    if type(value["next_attempt_index"]) is not int or not 0 <= value["next_attempt_index"] <= value["max_attempts"]:
         raise CLIError("batch manifest next attempt index is invalid")
-    if type(value["accepted_count"]) is not int or value["accepted_count"] < 0:
+    if type(value["accepted_count"]) is not int or not 0 <= value["accepted_count"] <= value["requested_count"]:
         raise CLIError("batch manifest accepted count is invalid")
     if value["terminal_state"] not in {"IN_PROGRESS", "COMPLETE", "EXHAUSTED"}:
         raise CLIError("batch manifest terminal state is invalid")
@@ -380,25 +454,114 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
     if not isinstance(template["generator_options"], Mapping) or set(template["generator_options"]) != {"namespace", "version", "values"}:
         raise CLIError("batch manifest generator options are malformed")
     root_seed = _parse_typed_seed(value["root_seed"], "manifest.root_seed")
-    if value["batch_id"] != _batch_id(template, root_seed, int(value["requested_count"]), int(value["max_attempts"])):
-        raise CLIError("batch manifest identity does not match its immutable configuration")
     try:
-        _request_from_manifest(dict(value), DeterministicRNG(root_seed).retry_seed(0))
-        QualityPolicy(**value["quality_policy"])  # type: ignore[arg-type]
+        first_request = _request_from_manifest(dict(value), DeterministicRNG(root_seed).retry_seed(0))
+        if template != _request_template(first_request):
+            raise CLIError("batch manifest request template is not canonical")
+        policy_data = value["quality_policy"]
+        if not isinstance(policy_data, Mapping):
+            raise CLIError("batch manifest quality policy is malformed")
+        policy = QualityPolicy(**policy_data)  # type: ignore[arg-type]
+        if policy.as_dict() != dict(policy_data) or policy.difficulty is None or policy.difficulty.value != first_request.difficulty.value:
+            raise CLIError("batch manifest quality policy is not the exact request policy")
     except (TypeError, ValueError) as exc:
         raise CLIError(f"batch manifest contains an invalid immutable contract: {exc}") from exc
+    exemplar_fields = {
+        "exemplar_id", "digest", "role", "provenance_identity", "ownership", "schema", "version",
+        "width", "height", "provenance_type", "provenance_description", "approved_by", "production_difficulty",
+    }
+    for index, identity in enumerate(value["exemplar_identities"]):
+        if not isinstance(identity, Mapping) or set(identity) != exemplar_fields:
+            raise CLIError(f"manifest exemplar identity {index} is incomplete")
+        if type(identity["exemplar_id"]) is not str or type(identity["digest"]) is not str or not _DIGEST.fullmatch(identity["digest"]):
+            raise CLIError(f"manifest exemplar identity {index} is malformed")
+        if type(identity["schema"]) is not str or identity["schema"] != "scrubbots-wfc-exemplar" or identity["version"] != 1:
+            raise CLIError(f"manifest exemplar identity {index} has an unsupported schema")
+        if type(identity["width"]) is not int or type(identity["height"]) is not int or identity["width"] < 2 or identity["height"] < 2:
+            raise CLIError(f"manifest exemplar identity {index} has invalid dimensions")
+    expected_batch_id = _batch_id(
+        template, root_seed, int(value["requested_count"]), int(value["max_attempts"]),
+        value["exemplar_identities"], value["quality_policy"],  # type: ignore[arg-type]
+    )
+    if value["batch_id"] != expected_batch_id:
+        raise CLIError("batch manifest identity does not match its complete immutable configuration")
     if len(value["attempts"]) != value["next_attempt_index"]:
         raise CLIError("batch manifest attempts are not contiguous with next_attempt_index")
     accepted = value["accepted"]
     if len(accepted) != value["accepted_count"]:
         raise CLIError("batch manifest accepted count is inconsistent")
+    accepted_attempts: list[Mapping[str, object]] = []
+    accepted_ids_so_far: set[str] = set()
     for index, record in enumerate(value["attempts"]):
-        if not isinstance(record, Mapping) or record.get("attempt_index") != index:
-            raise CLIError("batch manifest attempt history is not ordered")
+        if not isinstance(record, Mapping) or set(record) != _ATTEMPT_FIELDS or record.get("attempt_index") != index:
+            raise CLIError("batch manifest attempt history is not ordered or complete")
+        if record["attempt_seed"] != _typed_seed(DeterministicRNG(root_seed).retry_seed(index)):
+            raise CLIError(f"attempt {index} seed is not derived from the manifest root seed")
+        status = record["status"]
+        if status not in _ATTEMPT_STATUSES:
+            raise CLIError(f"attempt {index} has an unsupported status")
+        if type(record["rejection_codes"]) is not list or any(type(code) is not str or not code for code in record["rejection_codes"]):
+            raise CLIError(f"attempt {index} rejection codes are malformed")
+        request = _request_from_manifest(dict(value), _parse_typed_seed(record["attempt_seed"], f"attempts[{index}].attempt_seed"))
+        expected_width, expected_height = request.resolve_dimensions()
+        if status == "GENERATOR_FAILURE":
+            if type(record["failure_code"]) is not str or record["failure_code"] not in {code.value for code in FailureCode}:
+                raise CLIError(f"attempt {index} failure code is invalid")
+            if any(record[key] is not None for key in ("quality_decision", "grid_hash", "duplicate_of", "candidate_id", "relative_path", "width", "height")) or record["rejection_codes"]:
+                raise CLIError(f"attempt {index} generator failure contains success data")
+        else:
+            if record["failure_code"] is not None or record["quality_decision"] not in {"ACCEPT", "REJECT"}:
+                raise CLIError(f"attempt {index} successful result fields are malformed")
+            if record["width"] != expected_width or record["height"] != expected_height or type(record["width"]) is not int or type(record["height"]) is not int:
+                raise CLIError(f"attempt {index} dimensions do not match its request")
+            if type(record["grid_hash"]) is not str or not _DIGEST.fullmatch(record["grid_hash"]):
+                raise CLIError(f"attempt {index} grid hash is invalid")
+            if status == "QUALITY_REJECTED":
+                if record["quality_decision"] != "REJECT" or not record["rejection_codes"] or any(record[key] is not None for key in ("duplicate_of", "candidate_id", "relative_path")):
+                    raise CLIError(f"attempt {index} quality rejection fields are inconsistent")
+            elif status == "DUPLICATE":
+                if record["quality_decision"] != "ACCEPT" or record["rejection_codes"] or type(record["duplicate_of"]) is not str or not _PORTABLE_ID.fullmatch(record["duplicate_of"]) or record["duplicate_of"] not in accepted_ids_so_far:
+                    raise CLIError(f"attempt {index} duplicate fields are inconsistent")
+                if any(record[key] is not None for key in ("candidate_id", "relative_path")):
+                    raise CLIError(f"attempt {index} duplicate contains a new candidate path")
+            else:
+                if record["quality_decision"] != "ACCEPT" or record["rejection_codes"] or record["duplicate_of"] is not None:
+                    raise CLIError(f"attempt {index} accepted fields are inconsistent")
+                if type(record["candidate_id"]) is not str or not _PORTABLE_ID.fullmatch(record["candidate_id"]):
+                    raise CLIError(f"attempt {index} candidate ID is invalid")
+                relative = _safe_relative_path(record["relative_path"], f"attempts[{index}].relative_path")
+                if relative.as_posix() != f"candidates/{record['candidate_id']}":
+                    raise CLIError(f"attempt {index} candidate path is not canonical")
+                accepted_attempts.append(record)
+                accepted_ids_so_far.add(record["candidate_id"])
+    seen_ids: set[str] = set()
+    seen_paths: set[str] = set()
     for index, record in enumerate(accepted):
-        if not isinstance(record, Mapping) or type(record.get("attempt_index")) is not int or record.get("attempt_index") < 0:
-            raise CLIError("batch manifest accepted history is malformed")
-        _safe_relative_path(record.get("relative_path"), f"accepted[{index}].relative_path")
+        if not isinstance(record, Mapping) or set(record) != _ACCEPTED_FIELDS:
+            raise CLIError("batch manifest accepted history is incomplete")
+        attempt_index = record["attempt_index"]
+        if type(attempt_index) is not int or not 0 <= attempt_index < len(value["attempts"]):
+            raise CLIError("batch manifest accepted history index is invalid")
+        attempt = value["attempts"][attempt_index]
+        if not isinstance(attempt, Mapping) or attempt.get("status") != "ACCEPTED" or record != {key: attempt[key] for key in _ACCEPTED_FIELDS}:
+            raise CLIError(f"accepted record {index} does not exactly match its ACCEPTED attempt")
+        candidate_id = record["candidate_id"]
+        relative = _safe_relative_path(record["relative_path"], f"accepted[{index}].relative_path")
+        if type(candidate_id) is not str or not _PORTABLE_ID.fullmatch(candidate_id) or relative.as_posix() != f"candidates/{candidate_id}":
+            raise CLIError(f"accepted record {index} has a non-canonical candidate identity/path")
+        if candidate_id in seen_ids or relative.as_posix() in seen_paths:
+            raise CLIError("accepted candidate IDs and paths must be unique")
+        seen_ids.add(candidate_id)
+        seen_paths.add(relative.as_posix())
+    if len(accepted_attempts) != value["accepted_count"] or [record["attempt_index"] for record in accepted_attempts] != [record["attempt_index"] for record in accepted]:
+        raise CLIError("accepted records are not one-to-one with ACCEPTED attempt history")
+    accepted_count = int(value["accepted_count"])
+    next_index = int(value["next_attempt_index"])
+    maximum = int(value["max_attempts"])
+    target = int(value["requested_count"])
+    expected_state = "COMPLETE" if accepted_count == target else "EXHAUSTED" if next_index == maximum else "IN_PROGRESS"
+    if value["terminal_state"] != expected_state:
+        raise CLIError("batch manifest terminal state is inconsistent with counts and attempt bound")
     return dict(value)
 
 
@@ -441,16 +604,75 @@ def _accepted_grids(root: Path, manifest: Mapping[str, object]) -> list[tuple[Ma
     for record in manifest["accepted"]:  # type: ignore[union-attr]
         relative = _safe_relative_path(record["relative_path"], "accepted.relative_path")  # type: ignore[index]
         candidate_root = (root / relative).resolve()
-        if root.resolve() not in candidate_root.parents:
+        if candidate_root == root.resolve() or root.resolve() not in candidate_root.parents:
             raise CLIError("accepted bundle path escapes the batch root")
         try:
             bundle = read_bundle(candidate_root)
         except (OSError, TypeError, ValueError) as exc:
             raise CLIError(f"accepted bundle is invalid during resume: {exc}") from exc
-        if bundle.artwork.grid_hash != record["grid_hash"]:
-            raise CLIError("accepted bundle hash does not match the batch manifest")
+        if bundle.artwork.candidate_id != record["candidate_id"] or bundle.artwork.grid_hash != record["grid_hash"]:
+            raise CLIError("accepted bundle identity or hash does not match the batch manifest")
+        if (bundle.artwork.width, bundle.artwork.height) != (record["width"], record["height"]):
+            raise CLIError("accepted bundle dimensions do not match the batch manifest")
+        generation = bundle.metadata.get("generation")
+        expected_request = _request_from_manifest(
+            manifest, _parse_typed_seed(record["attempt_seed"], "accepted.attempt_seed")
+        )
+        if not isinstance(generation, Mapping) or generation.get("request") != expected_request.canonical_dict() or generation.get("seed") != record["attempt_seed"]:
+            raise CLIError("accepted bundle request or seed does not match the recorded attempt")
+        quality = bundle.metadata.get("quality")
+        if not isinstance(quality, Mapping) or not isinstance(quality.get("report"), Mapping) or quality["report"].get("policy") != manifest["quality_policy"]:
+            raise CLIError("accepted bundle quality policy is not the persisted batch policy")
         output.append((record, bundle.artwork.cells))
     return output
+
+
+def _validate_attempt_history(
+    manifest: Mapping[str, object],
+    registry: ExemplarRegistry,
+    accepted: Sequence[tuple[Mapping[str, object], tuple[str, ...]]],
+) -> None:
+    """Replay every recorded attempt before allowing a resume.
+
+    The manifest is an execution journal, not merely a progress cache.  Replaying
+    the bounded deterministic attempts makes edits to hashes, quality decisions,
+    rejection codes, failure codes, duplicate links, and accepted relationships
+    fail closed even when the edited JSON remains structurally valid.
+    """
+    policy = QualityPolicy(**manifest["quality_policy"])  # type: ignore[arg-type]
+    accepted_by_index = {record["attempt_index"]: (record, cells) for record, cells in accepted}
+    prior: list[tuple[str, tuple[str, ...], str]] = []
+    router = _router(registry)
+    root_seed = _parse_typed_seed(manifest["root_seed"], "manifest.root_seed")
+    for index, raw_record in enumerate(manifest["attempts"]):  # type: ignore[union-attr]
+        record = raw_record
+        request = _request_from_manifest(manifest, DeterministicRNG(root_seed).retry_seed(index))
+        candidate = router.generate_candidate(request)
+        result = _candidate_result(candidate)
+        if not result.is_success:
+            if record["status"] != "GENERATOR_FAILURE" or record["failure_code"] != (result.failure_code.value if result.failure_code else "GENERATION_FAILED"):
+                raise CLIError(f"attempt {index} does not reproduce its generator failure")
+            continue
+        width, height = result.width, result.height
+        digest = logical_grid_hash(width, height, result.logical_grid)  # type: ignore[arg-type]
+        report = evaluate_grid(width, height, result.logical_grid, policy=policy)  # type: ignore[arg-type]
+        if record["width"] != width or record["height"] != height or record["grid_hash"] != digest or record["quality_decision"] != ("ACCEPT" if report.accepted else "REJECT") or record["rejection_codes"] != list(report.rejection_codes):
+            raise CLIError(f"attempt {index} result, quality, or grid history does not reproduce")
+        if not report.accepted:
+            if record["status"] != "QUALITY_REJECTED":
+                raise CLIError(f"attempt {index} is not a truthful quality rejection")
+            continue
+        duplicate = next(((candidate_id, grid) for prior_hash, grid, candidate_id in prior if prior_hash == digest and grid == result.logical_grid), None)
+        if duplicate is not None:
+            if record["status"] != "DUPLICATE" or record["duplicate_of"] != duplicate[0]:
+                raise CLIError(f"attempt {index} does not reproduce its duplicate relationship")
+            continue
+        if record["status"] != "ACCEPTED" or record["attempt_index"] not in accepted_by_index:
+            raise CLIError(f"attempt {index} does not reproduce its accepted relationship")
+        accepted_record, bundle_cells = accepted_by_index[record["attempt_index"]]
+        if accepted_record["candidate_id"] != record["candidate_id"] or accepted_record["grid_hash"] != digest or bundle_cells != result.logical_grid:
+            raise CLIError(f"attempt {index} accepted bundle does not reproduce its recorded grid")
+        prior.append((digest, tuple(result.logical_grid), str(record["candidate_id"])))
 
 
 def _write_batch_review(root: Path, manifest: Mapping[str, object]) -> None:
@@ -488,8 +710,9 @@ def _new_manifest(args: argparse.Namespace, root: Path, registry: ExemplarRegist
         raise CLIError("batch requires a positive --max-attempts")
     seed = _canonical_seed(args.seed)
     request, config = _batch_config(args, seed, registry)
-    policy = _quality_policy(request)
-    batch_id = _batch_id(config, seed, args.count, args.max_attempts)
+    policy = _quality_policy_from_json(args.quality_policy_json, request)
+    identities = _exemplar_identities(registry)
+    batch_id = _batch_id(config, seed, args.count, args.max_attempts, identities, policy.as_dict())
     return {
         "schema": _MANIFEST_SCHEMA,
         "version": _MANIFEST_VERSION,
@@ -498,7 +721,7 @@ def _new_manifest(args: argparse.Namespace, root: Path, registry: ExemplarRegist
         "max_attempts": args.max_attempts,
         "root_seed": _typed_seed(seed),
         "request_template": config,
-        "exemplar_identities": _exemplar_identities(registry),
+        "exemplar_identities": identities,
         "quality_policy": policy.as_dict(),
         "next_attempt_index": 0,
         "attempts": [],
@@ -513,17 +736,10 @@ def _batch(args: argparse.Namespace) -> ExitCode:
         root = args.resume.parent
         raw = _json_load(args.resume, "batch manifest")
         manifest = _validate_manifest(raw, args.resume)
-        forbidden = (args.difficulty, args.count, args.max_attempts, args.mode, args.width, args.height, args.style, args.theme, args.seed, args.palette, args.options_json, args.output)
+        forbidden = (args.difficulty, args.count, args.max_attempts, args.mode, args.width, args.height, args.style, args.theme, args.seed, args.palette, args.options_json, args.output, args.quality_policy_json)
         if any(value is not None for value in forbidden):
             raise CLIError("--resume cannot be combined with immutable batch configuration flags")
         registry = _resume_registry(manifest, args.exemplar_json)
-        if manifest["terminal_state"] == "COMPLETE":
-            _accepted_grids(root, manifest)
-            print(f"COMPLETE batch_id={manifest['batch_id']} accepted={manifest['accepted_count']} attempts={manifest['next_attempt_index']}")
-            return ExitCode.SUCCESS
-        if manifest["terminal_state"] == "EXHAUSTED":
-            print(f"EXHAUSTED batch_id={manifest['batch_id']} accepted={manifest['accepted_count']} attempts={manifest['next_attempt_index']}", file=sys.stderr)
-            return ExitCode.BATCH_EXHAUSTED
     else:
         root = args.output or Path("batch-output")
         manifest_path = root / "batch-manifest.json"
@@ -535,6 +751,13 @@ def _batch(args: argparse.Namespace) -> ExitCode:
         _atomic_manifest_write(manifest_path, manifest)
 
     accepted = _accepted_grids(root, manifest)
+    _validate_attempt_history(manifest, registry, accepted)
+    if args.resume is not None and manifest["terminal_state"] == "COMPLETE":
+        print(f"COMPLETE batch_id={manifest['batch_id']} accepted={manifest['accepted_count']} attempts={manifest['next_attempt_index']}")
+        return ExitCode.SUCCESS
+    if args.resume is not None and manifest["terminal_state"] == "EXHAUSTED":
+        print(f"EXHAUSTED batch_id={manifest['batch_id']} accepted={manifest['accepted_count']} attempts={manifest['next_attempt_index']}", file=sys.stderr)
+        return ExitCode.BATCH_EXHAUSTED
     accepted_hashes = [(record["grid_hash"], cells, record["candidate_id"]) for record, cells in accepted]
     router = _router(registry)
     target = int(manifest["requested_count"])
@@ -608,6 +831,7 @@ def _parser() -> argparse.ArgumentParser:
     generate.add_argument("--candidate-id")
     generate.add_argument("--preview-scale", type=int)
     generate.add_argument("--exemplar-json", type=Path)
+    generate.add_argument("--quality-policy-json", type=Path, help="canonical local M07 QualityPolicy JSON")
     generate.set_defaults(handler=_generate)
 
     reproduce = sub.add_parser("reproduce", help="reproduce and verify a recorded metadata.json")
@@ -624,6 +848,7 @@ def _parser() -> argparse.ArgumentParser:
     batch.add_argument("--max-attempts", type=int)
     batch.add_argument("--output", type=Path)
     batch.add_argument("--exemplar-json", type=Path)
+    batch.add_argument("--quality-policy-json", type=Path, help="canonical local M07 QualityPolicy JSON for a new batch")
     batch.set_defaults(handler=_batch)
     return parser
 

@@ -10,7 +10,7 @@ import sys
 
 import pytest
 
-from scrubbots_pixel_factory import DeterministicRNG, GenerationRequest, GeneratorOptions, GenerationResult, GeneratorMode, RNG_ALGORITHM, offline_runtime
+from scrubbots_pixel_factory import DeterministicRNG, GenerationRequest, GeneratorOptions, GenerationResult, GeneratorMode, QualityPolicy, RNG_ALGORITHM, evaluate_grid, offline_runtime
 from scrubbots_pixel_factory.cli import main as cli_main
 from scrubbots_pixel_factory.generators.router import GeneratorRouter
 
@@ -157,3 +157,133 @@ def test_cli_generation_succeeds_inside_network_blocked_boundary(tmp_path: Path)
     with offline_runtime():
         result = cli_main(["generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "55", "--output", str(tmp_path)])
     assert result == 0
+
+
+def test_batch_outputs_are_identical_across_processes_and_hash_seeds(tmp_path: Path) -> None:
+    roots = [tmp_path / "hash-one", tmp_path / "hash-two"]
+    results = [
+        _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "hash-seed", "--max-attempts", "4", "--width", "20", "--height", "21", "--output", str(root), env={"PYTHONHASHSEED": value})
+        for root, value in zip(roots, ("1", "random"), strict=True)
+    ]
+    assert all(result.returncode == 0 for result in results), [result.stderr for result in results]
+    files = sorted(path.relative_to(roots[0]).as_posix() for path in roots[0].rglob("*") if path.is_file())
+    assert files == sorted(path.relative_to(roots[1]).as_posix() for path in roots[1].rglob("*") if path.is_file())
+    assert all((roots[0] / relative).read_bytes() == (roots[1] / relative).read_bytes() for relative in files)
+
+
+def test_batch_identity_and_candidate_ids_bind_exemplar_environment(tmp_path: Path) -> None:
+    plain_root = tmp_path / "plain"
+    exemplar_root = tmp_path / "exemplar"
+    plain = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(plain_root))
+    with_exemplar = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--exemplar-json", str(FIXTURE), "--output", str(exemplar_root))
+    assert plain.returncode == with_exemplar.returncode == 0
+    first = json.loads((plain_root / "batch-manifest.json").read_text(encoding="utf-8"))
+    second = json.loads((exemplar_root / "batch-manifest.json").read_text(encoding="utf-8"))
+    assert first["batch_id"] != second["batch_id"]
+    assert first["accepted"][0]["candidate_id"] != second["accepted"][0]["candidate_id"]
+    assert second["exemplar_identities"][0]["provenance_description"]
+
+
+def test_batch_autodimensions_and_rectangular_manifest_bindings(tmp_path: Path) -> None:
+    auto_root = tmp_path / "auto"
+    rectangular_root = tmp_path / "rectangular"
+    auto = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "902", "--max-attempts", "2", "--output", str(auto_root))
+    rectangular = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "RULES", "--seed", "903", "--max-attempts", "2", "--width", "20", "--height", "21", "--output", str(rectangular_root))
+    assert auto.returncode == rectangular.returncode == 0
+    auto_manifest = json.loads((auto_root / "batch-manifest.json").read_text(encoding="utf-8"))
+    rect_manifest = json.loads((rectangular_root / "batch-manifest.json").read_text(encoding="utf-8"))
+    assert auto_manifest["request_template"]["width"] is None and auto_manifest["request_template"]["height"] is None
+    assert auto_manifest["accepted"][0]["width"] > 0 and auto_manifest["accepted"][0]["height"] > 0
+    assert (rect_manifest["accepted"][0]["width"], rect_manifest["accepted"][0]["height"]) == (20, 21)
+
+
+def test_reproduce_uses_non_default_recorded_quality_policy(tmp_path: Path) -> None:
+    policy_path = tmp_path / "policy.json"
+    policy = QualityPolicy(difficulty="EASY", max_isolated_ratio=0.31)
+    policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
+    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "904", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "bundle"))
+    assert generated.returncode == 0, generated.stderr
+    metadata = next((tmp_path / "bundle").rglob("metadata.json"))
+    value = json.loads(metadata.read_text(encoding="utf-8"))
+    assert value["quality"]["report"]["policy"] == policy.as_dict()
+    reproduced = _run("reproduce", str(metadata))
+    assert reproduced.returncode == 0 and "MATCH" in reproduced.stdout
+
+
+def test_quality_policy_can_produce_a_truthful_rejected_batch_attempt(tmp_path: Path) -> None:
+    policy_path = tmp_path / "reject-policy.json"
+    policy = QualityPolicy(difficulty="EASY", max_largest_region_ratio=0.0)
+    policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
+    result = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "905", "--max-attempts", "1", "--width", "20", "--height", "20", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "rejected"))
+    assert result.returncode == 7
+    manifest = json.loads((tmp_path / "rejected" / "batch-manifest.json").read_text(encoding="utf-8"))
+    attempt = manifest["attempts"][0]
+    assert attempt["status"] == "QUALITY_REJECTED" and attempt["quality_decision"] == "REJECT" and attempt["rejection_codes"]
+    assert attempt["candidate_id"] is None and attempt["relative_path"] is None
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value["attempts"][0]["attempt_seed"].update(value="tampered"),
+        lambda value: value["attempts"][0].update(status="QUALITY_REJECTED"),
+        lambda value: value["attempts"][0].update(grid_hash="0" * 64),
+        lambda value: value["attempts"][0].update(rejection_codes=["FORGED"]),
+        lambda value: value["accepted"][0].update(candidate_id="forged-candidate"),
+        lambda value: value["accepted"][0].update(relative_path="../escape"),
+        lambda value: value["accepted"][0].update(width=21),
+        lambda value: value.update(accepted_count=0),
+        lambda value: value.update(next_attempt_index=0),
+        lambda value: value.update(terminal_state="EXHAUSTED"),
+    ),
+)
+def test_resume_rejects_semantically_tampered_manifest_history(tmp_path: Path, mutation) -> None:
+    root = tmp_path / "batch"
+    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "906", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    assert generated.returncode == 0, generated.stderr
+    manifest_path = root / "batch-manifest.json"
+    value = json.loads(manifest_path.read_text(encoding="utf-8"))
+    mutation(value)
+    manifest_path.write_text(json.dumps(value), encoding="utf-8")
+    resumed = _run("batch", "--resume", str(manifest_path))
+    assert resumed.returncode != 0
+    assert "Traceback" not in resumed.stderr
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        lambda value: value.update(schema="forged-schema"),
+        lambda value: value["generation"]["request"].pop("generator_options"),
+        lambda value: value["generation"]["request"]["seed"].update(value="forged-seed"),
+        lambda value: value["generation"].update(generator_mode="RULES"),
+        lambda value: value["generation"]["result"].update(logical_grid=["C01"] + value["generation"]["result"]["logical_grid"][1:]),
+        lambda value: value["quality"]["report"]["policy"].update(max_largest_region_ratio=0.0),
+    ),
+)
+def test_reproduce_rejects_each_metadata_corruption_class(tmp_path: Path, mutation) -> None:
+    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "907", "--output", str(tmp_path))
+    assert generated.returncode == 0
+    metadata = next(tmp_path.rglob("metadata.json"))
+    original = json.loads(metadata.read_text(encoding="utf-8"))
+    mutation(original)
+    metadata.write_text(json.dumps(original), encoding="utf-8")
+    reproduced = _run("reproduce", str(metadata))
+    assert reproduced.returncode != 0
+    assert "Traceback" not in reproduced.stderr
+
+
+def test_mask_reproduce_is_byte_exact_and_candidate_path_is_local(tmp_path: Path) -> None:
+    first_root = tmp_path / "first"
+    second_root = tmp_path / "second"
+    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "21", "--seed", "908", "--output", str(first_root))
+    assert generated.returncode == 0
+    metadata = next(first_root.rglob("metadata.json"))
+    reproduced = _run("reproduce", str(metadata), "--output", str(second_root))
+    assert reproduced.returncode == 0
+    first_files = sorted(path.relative_to(first_root).as_posix() for path in first_root.rglob("*") if path.is_file())
+    second_files = sorted(path.relative_to(second_root).as_posix() for path in second_root.rglob("*") if path.is_file())
+    assert first_files == second_files
+    assert all((first_root / relative).read_bytes() == (second_root / relative).read_bytes() for relative in first_files)
+    traversal = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "909", "--candidate-id", "../escape", "--output", str(tmp_path / "traversal"))
+    assert traversal.returncode != 0

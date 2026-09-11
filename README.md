@@ -71,6 +71,9 @@ logical grid, bundle bytes and rich provenance; WFC-bearing requests require
 the matching local `--exemplar-json`. `batch` writes a canonical
 `batch-manifest.json`, candidate bundles below `candidates/`, and deterministic
 review output below `review/`; resume uses `batch --resume path\to\batch-manifest.json`.
+For deliberate non-default M07 thresholds, `generate` and a new batch accept a
+canonical local `--quality-policy-json`; the policy is persisted and used
+exactly during reproduction and resume, while resume rejects policy overrides.
 
 Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
 invalid request/config, `4` generator failure, `5` quality rejection, `6`
