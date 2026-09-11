@@ -8,8 +8,8 @@ REPORT = Path("review/m10/M10_PERFORMANCE_REPORT.json")
 def test_m10_performance_report_contains_measured_statistics_and_budgets() -> None:
     report = json.loads(REPORT.read_text(encoding="utf-8"))
     assert report["schema"] == "scrubbots-m10-performance-report"
-    assert report["harness"]["clock"] == "time.perf_counter_ns"
-    assert report["harness"]["memory"] == "tracemalloc peak"
+    assert report["methodology"]["clock"] == "time.perf_counter_ns"
+    assert report["methodology"]["memory"] == "tracemalloc peak"
     summaries = report["summaries"]
     assert len(summaries) >= 20
     assert {summary["mode"] for summary in summaries} >= {"MASK", "RULES", "WFC", "HYBRID"}
@@ -24,7 +24,8 @@ def test_m10_performance_report_contains_measured_statistics_and_budgets() -> No
     assert gate["median_ns"] > 0 and gate["p95_ns"] >= gate["median_ns"]
     assert gate["peak_memory_bytes"] > 0
     assert gate["proposed_budget_ns"] >= gate["p95_ns"]
-    assert "measured" in gate["derivation"]
+    assert "distinct cases" in gate["budget_derivation"]
     for summary in summaries:
-        assert summary["sample_count"] == len(next(case["samples"] for case in report["cases"] if case["mode"] == summary["mode"] and case["strategy"] == summary["strategy"] and case["difficulty"] == summary["difficulty"] and case["dimensions"] == summary["dimensions"]))
-        assert all("elapsed_ns" in sample and "peak_memory_bytes" in sample for case in report["cases"] for sample in case["samples"] if case["mode"] == summary["mode"] and case["strategy"] == summary["strategy"] and case["difficulty"] == summary["difficulty"] and case["dimensions"] == summary["dimensions"])
+        group = next(group for group in report["groups"] if group["mode"] == summary["mode"] and group["strategy"] == summary["strategy"] and group["difficulty"] == summary["difficulty"] and group["dimensions"] == summary["dimensions"])
+        assert summary["sample_count"] == len(group["samples"])
+        assert all("elapsed_ns" in sample and "peak_memory_bytes" in sample for sample in group["samples"])

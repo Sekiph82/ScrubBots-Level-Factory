@@ -6,7 +6,7 @@ import pytest
 from scrubbots_pixel_factory import GenerationRequest, GeneratorRouter, QualityPolicy, evaluate_grid, logical_grid_hash, select_palette_subset
 from scrubbots_pixel_factory.core.request import RequestContractError
 from scrubbots_pixel_factory.contracts.difficulty import dimension_band
-from tools.m10_prepare import DIFFICULTIES, build_property_corpus, _request
+from tools.m10_prepare import DIFFICULTIES, ROBUST_HYBRIDS, build_property_corpus, _request
 
 
 CORPUS_PATH = Path("review/m10/M10_PROPERTY_CORPUS.json")
@@ -15,7 +15,7 @@ CORPUS_PATH = Path("review/m10/M10_PROPERTY_CORPUS.json")
 def test_m10_corpus_is_versioned_and_has_required_valid_cases() -> None:
     corpus = json.loads(CORPUS_PATH.read_text(encoding="utf-8"))
     assert corpus["schema"] == "scrubbots-m10-property-corpus"
-    assert corpus["corpus_version"] == "m10-property-corpus-v1"
+    assert corpus["corpus_version"] == "m10-property-corpus-v2-executed"
     assert corpus["case_count"] >= 2000
     assert len(corpus["cases"]) == corpus["case_count"]
     assert {case["request"]["difficulty"] for case in corpus["cases"]} == set(DIFFICULTIES)
@@ -28,7 +28,8 @@ def test_m10_corpus_is_versioned_and_has_required_valid_cases() -> None:
 @pytest.mark.parametrize("mode", ("MASK", "RULES", "HYBRID", "AUTO"))
 def test_m10_successful_samples_preserve_logical_contracts(difficulty: str, mode: str) -> None:
     palette = select_palette_subset(difficulty, f"m10-property-sample-{difficulty}-{mode}")
-    request = _request(difficulty, f"m10-property-sample-{difficulty}-{mode}", mode, 1, dimensions=(dimension_band(difficulty).minimum, dimension_band(difficulty).minimum + 1), palette=palette)
+    strategy = ROBUST_HYBRIDS[1] if mode == "HYBRID" else None
+    request = _request(difficulty, f"m10-property-sample-{difficulty}-{mode}", mode, 1, dimensions=(dimension_band(difficulty).minimum, dimension_band(difficulty).minimum + 1), palette=palette, strategy=strategy)
     first = GeneratorRouter().generate_candidate(request)
     second = GeneratorRouter().generate_candidate(request)
     result = first.result if hasattr(first, "result") else first
