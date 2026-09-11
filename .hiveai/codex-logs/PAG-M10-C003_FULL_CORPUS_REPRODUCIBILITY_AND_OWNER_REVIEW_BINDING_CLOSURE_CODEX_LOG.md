@@ -49,3 +49,11 @@ Document role: CODEX BUILDER LOG
 
 - Changed only `tools/m10_prepare.py`, the C003 M10 closure test, regenerated `review/m10/M10_PROPERTY_EXECUTION_REPORT.json` and `M10_REVIEW_INDEX.html`, and this C003 log. Accepted M03-M09 production algorithms, benchmark data, logical review grids, root `TASKS.md`, audit files, tracker state, and the main `C:\Users\sekip\Desktop\ScrubBots` repository were not modified.
 - No runtime dependency, network access, resizing, interpolation, grid mutation, owner acceptance, or M11 work was introduced.
+
+## Publication checkpoint
+
+- Implementation commit: `12ce7de4aef8c666090bb254a480401decdfe3dc` (`Close M10 C003 replay and review binding findings`).
+- `git push origin main`: succeeded, updating GitHub from `c7f2a6b5a1c26bd63e3f4326f038f9d556304ae4` to `12ce7de4aef8c666090bb254a480401decdfe3dc`.
+- Immediately after that push, `git fetch origin` recorded local `HEAD=12ce7de4aef8c666090bb254a480401decdfe3dc`, `origin/main=12ce7de4aef8c666090bb254a480401decdfe3dc`, and `git rev-list --left-right --count HEAD...origin/main` = `0 0`.
+- Final scoped status before this evidence-only log publication: only the pre-existing modified `docs/migration/legacy-task-trackers/EVENTS.jsonl`, modified `docs/migration/legacy-task-trackers/PROJECT.json`, and untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, `.hiveai/STATE.json` remained; no scoped C003 file was unstaged.
+- This checkpoint is published in the evidence-only log commit below. Per the prompt’s publication-recursion rule, the final post-log-commit equality is verified again and reported to the user; the log records the latest equality checkpoint available before its own final evidence-only commit.
