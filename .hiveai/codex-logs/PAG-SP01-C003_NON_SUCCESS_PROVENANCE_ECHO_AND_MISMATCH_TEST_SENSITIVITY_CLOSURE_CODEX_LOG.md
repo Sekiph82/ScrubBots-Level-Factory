@@ -56,3 +56,14 @@ No M00-M10 algorithm, tracker, audit, prompt, cycle record, rejected M10 visual 
 ## Publication pending
 
 The scoped C003 commit and push, final status/diff, fetched equality, and divergence `0 0` will be appended after publication. Existing unrelated migration-file modifications and untracked legacy control-plane files remain deliberately unstaged.
+
+## Publication chronology
+
+- Created implementation commit `7e83d9f00277505255bd7e5a5ca80df7a68ba89a` (`Complete SP01 non-success provenance closure`).
+- The first push was rejected because GitHub advanced `main` from `f98b979` to `2162632` during the run. No force-push or rebase was used.
+- Fetched and merged the newly published C003 authority records non-destructively with `git merge --no-edit origin/main`.
+- Published merge commit `476341c2a54ba94eeb686048f7150d8ba1fab3b5`; `git push origin main` succeeded (`2162632..476341c`).
+- Post-implementation publication checkpoint: local HEAD and `origin/main` both equal `476341c2a54ba94eeb686048f7150d8ba1fab3b5`, divergence `0 0`.
+- Final scoped status before this log-only publication contains only the preserved modifications to `docs/migration/legacy-task-trackers/EVENTS.jsonl` and `PROJECT.json`, plus untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, and `.hiveai/STATE.json`; no C003 implementation file is unstaged.
+
+The completed C003 builder log is published in the subsequent log-only commit. After that push, origin will be fetched and the final local HEAD/origin equality and divergence `0 0` will be verified; the terminal SHA will be returned in the handoff.
