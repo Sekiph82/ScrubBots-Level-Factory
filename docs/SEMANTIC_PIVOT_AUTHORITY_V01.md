@@ -9,8 +9,11 @@ This document resolves the temporary conflict between the historical root `TASKS
 
 1. Owner decision: `review/m10/M10_OWNER_REVIEW_DECISION.md`
 2. Current conversion master plan: `docs/PAG_SEMANTIC_PIXEL_STUDIO_CONVERSION_PLAN_V01.md`
-3. Active versioned ChatGPT implementation prompt under `.hiveai/prompts/`
-4. Root `TASKS.md` remains authoritative for the accepted historical M00-M10 technical task record and unchanged ScrubBots contracts.
+3. Owner provider decision: `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
+4. Active versioned ChatGPT implementation prompt under `.hiveai/prompts/`
+5. Root `TASKS.md` remains authoritative for the accepted historical M00-M10 technical task record and unchanged ScrubBots contracts.
+
+If provider-specific wording in the conversion master plan conflicts with `MAGNIFIC_PROVIDER_AUTHORITY_V01.md`, the Magnific provider authority wins. Magnific is the primary semantic AI provider while owner credits are available; provider-neutral boundaries remain mandatory.
 
 ## Superseded post-M10 assumptions
 
@@ -19,7 +22,8 @@ The following old V1 assumptions must NOT control new implementation after the M
 - that owner-visible art must be produced only by offline procedural MASK/WFC/RULES generation;
 - that AI/semantic image generation is permanently out of scope;
 - that M11 handoff may begin before semantic visual acceptance is repaired;
-- that structural-quality acceptance is equivalent to semantic visual acceptance.
+- that structural-quality acceptance is equivalent to semantic visual acceptance;
+- that local ComfyUI is the required/default first semantic provider.
 
 ## Preserved assumptions
 
@@ -42,8 +46,14 @@ The active post-M10 roadmap is SP01 through SP14 in:
 
 `docs/PAG_SEMANTIC_PIXEL_STUDIO_CONVERSION_PLAN_V01.md`
 
+Provider-specific execution is governed by:
+
+`docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
+
 Current implementation cycle:
 
 `PAG-SP01-C001 — Semantic Contracts & Provider Boundary`
+
+SP02 is now **Magnific Provider Bridge & Result Ingestion**, not local-ComfyUI integration.
 
 M11 remains blocked until a semantic generation path produces an owner-accepted replacement visual review pack.
