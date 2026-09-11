@@ -13,6 +13,7 @@ import platform
 import statistics
 import subprocess
 import sys
+import threading
 import time
 import tracemalloc
 
@@ -143,17 +144,42 @@ def _validate_success(request: GenerationRequest, result: object) -> list[str]:
     return errors
 
 
-_WORKER_ROUTER: GeneratorRouter | None = None
+_WORKER_CONTEXT = threading.local()
+
+
+def _worker_router() -> GeneratorRouter:
+    router = getattr(_WORKER_CONTEXT, "router", None)
+    if router is None:
+        router = _make_runner()
+        _WORKER_CONTEXT.router = router
+    return router
+
+
+def _result_identity(result: object) -> dict[str, object]:
+    return {
+        "result_digest": result.digest(),
+        "grid_hash": logical_grid_hash(result.width, result.height, result.logical_grid),
+        "resolved_dimensions": {"width": result.width, "height": result.height},
+        "generator": {"id": result.generator_id, "version": result.generator_version},
+    }
 
 
 def _execute_property_case(case: dict[str, object]) -> tuple[dict[str, object], list[str]]:
-    global _WORKER_ROUTER
-    if _WORKER_ROUTER is None:
-        _WORKER_ROUTER = _make_runner()
     request = _request_from_canonical(case["request"])
-    result = _candidate_result(_WORKER_ROUTER.generate_candidate(request))
+    result = _candidate_result(_worker_router().generate_candidate(request))
     errors = _validate_success(request, result)
-    return ({"index": case["index"], "request_digest": request.digest(), "mode": request.generator_mode, "difficulty": request.difficulty.value, "status": result.status.value, "result_digest": result.digest(), "failure_code": result.failure_code.value if not result.is_success else None, "grid_hash": logical_grid_hash(result.width, result.height, result.logical_grid) if result.is_success else None}, errors)
+    record: dict[str, object] = {"index": case["index"], "request_digest": request.digest(), "mode": request.generator_mode, "difficulty": request.difficulty.value, "status": result.status.value, "result_digest": result.digest(), "failure_code": result.failure_code.value if not result.is_success else None, "grid_hash": logical_grid_hash(result.width, result.height, result.logical_grid) if result.is_success else None, "resolved_dimensions": {"width": result.width, "height": result.height} if result.is_success else None, "generator": {"id": result.generator_id, "version": result.generator_version} if result.is_success else None, "replay_checked": False, "replay": None}
+    if result.is_success:
+        replay = _candidate_result(_make_runner().generate_candidate(request))
+        replay_identity = _result_identity(replay) if replay.is_success else None
+        record["replay_checked"] = True
+        record["replay"] = replay_identity
+        expected = _result_identity(result)
+        if not replay.is_success:
+            errors.append("replay_failure")
+        elif replay_identity != expected:
+            errors.append("replay_identity_mismatch")
+    return record, errors
 
 
 def execute_invalid_corpus(cases: list[dict[str, object]]) -> dict[str, object]:
@@ -178,7 +204,6 @@ def execute_property_corpus(corpus: dict[str, object]) -> dict[str, object]:
     cases = list(corpus["cases"])
     with ThreadPoolExecutor(max_workers=max(2, min(8, os.cpu_count() or 2))) as pool:
         outcomes = list(pool.map(_execute_property_case, cases))
-    replay_cases: dict[tuple[str, str], dict[str, object]] = {}
     for case, outcome in zip(cases, outcomes, strict=True):
         record, errors = outcome
         if errors:
@@ -188,19 +213,14 @@ def execute_property_corpus(corpus: dict[str, object]) -> dict[str, object]:
         bucket["total"] += 1
         if record["status"] == "SUCCESS":
             bucket["success"] += 1
-            # Every case is executed once; two deterministic replay probes per
-            # mode/difficulty keep the full corpus practical while proving the
-            # same request path remains byte-stable for every exercised mode.
-            if bucket["reproducibility_checks"] < 2:
-                bucket["reproducibility_checks"] += 1
-                replay_router = _make_runner()
-                repeat = _candidate_result(replay_router.generate_candidate(request))
-                if not repeat.is_success or repeat.digest() != record["result_digest"]: bucket["reproducibility_mismatch"] += 1
+            bucket["reproducibility_checks"] += int(bool(record["replay_checked"]))
+            bucket["reproducibility_mismatch"] += int("replay_identity_mismatch" in errors or "replay_failure" in errors)
         elif record["failure_code"] == "RETRY_EXHAUSTED": bucket["retry_exhausted"] += 1
         else: bucket["generator_failure"] += 1
         records.append(record)
     invalid = execute_invalid_corpus(corpus["invalid_cases"])
-    return {"schema": "scrubbots-m10-property-execution", "version": 1, "corpus_version": corpus["corpus_version"], "advertised_case_count": corpus["case_count"], "executed_case_count": len(records), "successful_result_count": sum(item["status"] == "SUCCESS" for item in records), "generator_failure_count": sum(item["status"] == "FAILURE" and item["failure_code"] != "RETRY_EXHAUSTED" for item in records), "retry_exhausted_count": sum(item["failure_code"] == "RETRY_EXHAUSTED" for item in records), "reproducibility_mismatch_count": sum(bucket["reproducibility_mismatch"] for mode in buckets.values() for bucket in mode.values()), "counts_by_mode_difficulty": buckets, "case_records": records, "invalid_corpus": invalid}
+    successful_result_count = sum(item["status"] == "SUCCESS" for item in records)
+    return {"schema": "scrubbots-m10-property-execution", "version": 2, "corpus_version": corpus["corpus_version"], "advertised_case_count": corpus["case_count"], "executed_case_count": len(records), "successful_result_count": successful_result_count, "reproducibility_check_count": sum(int(bool(item["replay_checked"])) for item in records), "reproducibility_mismatch_count": sum(bucket["reproducibility_mismatch"] for mode in buckets.values() for bucket in mode.values()), "generator_failure_count": sum(item["status"] == "FAILURE" and item["failure_code"] != "RETRY_EXHAUSTED" for item in records), "retry_exhausted_count": sum(item["failure_code"] == "RETRY_EXHAUSTED" for item in records), "counts_by_mode_difficulty": buckets, "case_records": records, "invalid_corpus": invalid}
 
 
 def _make_runner() -> GeneratorRouter:
@@ -337,7 +357,7 @@ def _review_html(entries: list[dict[str, object]]) -> str:
             f'<article class="card" data-candidate="{entry["candidate_id"]}" data-difficulty="{entry["difficulty"]}" data-mode="{entry["mode"]}">'
             f'<h2>{entry["candidate_id"]}</h2><p><b>{entry["difficulty"]}</b> · {entry["mode"]} · {html.escape(str(semantic))} · '
             f'<span class="status">PENDING_OWNER_REVIEW</span> · ACCEPT (owner review pending)</p>'
-            f'<canvas width="{dimensions["width"] * 5}" height="{dimensions["height"] * 5}"></canvas><dl>'
+            f'<canvas data-candidate="{entry["candidate_id"]}" width="{dimensions["width"] * 5}" height="{dimensions["height"] * 5}"></canvas><dl>'
             f'<dt>Seed</dt><dd>{html.escape(json.dumps(entry["seed"], sort_keys=True))}</dd>'
             f'<dt>Dimensions</dt><dd>{dimensions["width"]}x{dimensions["height"]}</dd>'
             f'<dt>Grid hash</dt><dd class="grid-hash">{entry["grid_hash"]}</dd>'
@@ -352,7 +372,7 @@ def _review_html(entries: list[dict[str, object]]) -> str:
     return f'''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>M10 V1 Owner Review Pack</title>
 <style>body{{background:#202533;color:#eee;font:14px system-ui;margin:2rem}}.group{{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:1rem}}.card{{background:#30394d;padding:1rem;border:1px solid #66708a;border-radius:6px}}.card canvas{{image-rendering:pixelated;background:#202533;max-width:100%;height:auto}}.card dd{{overflow-wrap:anywhere;font-family:monospace;font-size:11px}}.status{{color:#ffd166}}.legend{{position:sticky;top:0;background:#202533;padding:1rem 0;z-index:1}}</style></head>
 <body><div class="legend"><h1>M10 V1 Owner Review Pack</h1><p>Offline logical-cell previews. All 100 quality-ACCEPTED candidates remain PENDING_OWNER_REVIEW. WFC visual pack skipped: WFC_VISUAL_PACK_SKIPPED_NO_APPROVED_EXEMPLAR.</p></div>{sections}
-<script>const pack={payload};document.querySelectorAll('canvas').forEach((canvas,i)=>{{const e=pack.entries[i],ctx=canvas.getContext('2d'),w=e.resolved_dimensions.width;ctx.imageSmoothingEnabled=false;e.logical_grid.forEach((c,n)=>{{ctx.fillStyle=pack.palette[c];ctx.fillRect((n%w)*5,Math.floor(n/w)*5,5,5)}})}});</script></body></html>'''
+<script>const pack={payload};const entriesById=new Map(pack.entries.map((entry)=>[entry.candidate_id,entry]));if(entriesById.size!==pack.entries.length)throw new Error('duplicate review candidate identity');document.querySelectorAll('canvas').forEach((canvas)=>{{const candidateId=canvas.dataset.candidate;const entry=entriesById.get(candidateId);if(!candidateId||!entry)throw new Error('missing review candidate identity: '+candidateId);const context=canvas.getContext('2d'),width=entry.resolved_dimensions.width;canvas.dataset.gridHash=entry.grid_hash;context.imageSmoothingEnabled=false;entry.logical_grid.forEach((cell,index)=>{{context.fillStyle=pack.palette[cell];context.fillRect((index%width)*5,Math.floor(index/width)*5,5,5)}})}});</script></body></html>'''
 
 
 def build_review_pack() -> tuple[dict[str, object], dict[str, object]]:
