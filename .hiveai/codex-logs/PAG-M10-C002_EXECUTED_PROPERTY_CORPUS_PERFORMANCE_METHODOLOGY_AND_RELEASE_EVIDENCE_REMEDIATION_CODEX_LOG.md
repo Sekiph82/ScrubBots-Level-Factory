@@ -67,3 +67,8 @@ Document role: CODEX BUILDER LOG
 - `git push origin main`: succeeded, updating GitHub from `76a5375` to `36c9640`.
 - Immediately after that push, `git fetch origin` and `git rev-list --left-right --count HEAD...origin/main` recorded local `HEAD=36c9640`, `origin/main=36c9640`, divergence `0 0`.
 - The completed builder log is published in the following log-only commit; the terminal equality check is repeated after that publication and reported in the final response. No task, acceptance, tracker, audit, or legacy control-plane state was modified.
+
+## Post-publication terminal verification
+
+- After the completed log publication at `737a6da55c853fe29ec65574dab71cbea739cc4f`, `git fetch origin` recorded `HEAD=737a6da55c853fe29ec65574dab71cbea739cc4f`, `origin/main=737a6da55c853fe29ec65574dab71cbea739cc4f`, and `git rev-list --left-right --count HEAD...origin/main` = `0 0`.
+- This equality record is published with the final log checkpoint below; the same commands are rerun after that publication. The only remaining local dirt is the pre-existing unrelated legacy-migration modifications and untracked legacy files listed at the start.
