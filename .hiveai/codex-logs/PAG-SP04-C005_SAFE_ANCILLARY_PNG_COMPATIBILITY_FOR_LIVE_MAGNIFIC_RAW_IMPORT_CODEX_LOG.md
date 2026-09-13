@@ -65,7 +65,3 @@ Files changed in this cycle:
 - The completed log is being published in a separate evidence-only commit so its publication checkpoint can contain the real implementation SHA and final repository equality; no source or policy changes are included in that publication commit.
 - Final fetch/equality checkpoint for the completed-log publication: immediately after `git push origin main` and `git fetch origin`, `git rev-parse HEAD` and `git rev-parse origin/main` both returned `85832a57c035eeae083b2b7e3e274e6564f5f2dc`, and `git rev-list --left-right --count HEAD...origin/main` returned `0 0`.
 - The only subsequent publication operation is this evidence-only log checkpoint commit; the final handoff independently records the terminal commit and repeats the equality check. No product, test, provider, palette, or tracker files are changed after the implementation commit.
-
-## Publication checkpoint
-
-_To be appended after implementation commit, push, log publication, fetch, and final equality verification._
