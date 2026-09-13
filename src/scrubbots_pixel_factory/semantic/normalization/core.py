@@ -130,7 +130,11 @@ def _png_chunks(raw: bytes) -> list[tuple[bytes, bytes]]:
         position += 4
         kind = raw[position : position + 4]
         position += 4
-        if len(kind) != 4 or length > len(raw) - position - 4:
+        if len(kind) != 4 or any(byte < ord("A") or (ord("Z") < byte < ord("a")) or byte > ord("z") for byte in kind):
+            raise SemanticDecodeError("PNG chunk type code is malformed")
+        if kind[2] not in range(ord("A"), ord("Z") + 1):
+            raise SemanticDecodeError("PNG chunk type reserved bit is invalid")
+        if length > len(raw) - position - 4:
             raise SemanticDecodeError("PNG chunk length exceeds available bytes")
         chunk_data = raw[position : position + length]
         position += length
@@ -143,8 +147,8 @@ def _png_chunks(raw: bytes) -> list[tuple[bytes, bytes]]:
         raise SemanticDecodeError("PNG must begin with IHDR and end with IEND")
     if chunks[-1][1] != b"":
         raise SemanticDecodeError("PNG IEND payload must be empty")
-    if any(kind not in {b"IHDR", b"IDAT", b"IEND"} for kind, _data in chunks):
-        raise SemanticDecodeError("PNG contains an unsupported ancillary or palette chunk")
+    if any(kind not in {b"IHDR", b"IDAT", b"IEND"} and kind[0] in range(ord("A"), ord("Z") + 1) for kind, _data in chunks):
+        raise SemanticDecodeError("PNG contains an unsupported critical chunk")
     if sum(kind == b"IHDR" for kind, _data in chunks) != 1 or sum(kind == b"IEND" for kind, _data in chunks) != 1:
         raise SemanticDecodeError("PNG must contain exactly one IHDR and IEND")
     if not any(kind == b"IDAT" for kind, _data in chunks):
