@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import struct
 import zlib
+from types import MappingProxyType
 
 from ..contracts import (
     CandidateStatus,
@@ -45,6 +46,7 @@ ALPHA_POLICIES = frozenset({"PRESERVE_ALPHA", "OPAQUE_AS_IS"})
 ASSET_PALETTE_POLICY = "PRESERVE_SOURCE_RGBA"
 FUTURE_LEVEL_PALETTE_POLICY = "SCRUBBOTS_C01_C16"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN = object()
 
 
 class SemanticNormalizationError(SemanticContractError):
@@ -168,13 +170,30 @@ def _decode_png_rgba(raw: bytes) -> _DecodedRGBA:
     expected_length = height * (row_bytes + 1)
     compressed = b"".join(data for kind, data in chunks if kind == b"IDAT")
     decompressor = zlib.decompressobj()
+    scanline_budget = expected_length + 1
+    scanlines_buffer = bytearray()
+    compressed_cursor = 0
     try:
-        scanlines = decompressor.decompress(compressed, expected_length + 1)
-        scanlines += decompressor.flush()
+        while compressed_cursor < len(compressed):
+            chunk = compressed[compressed_cursor : compressed_cursor + 65_536]
+            compressed_cursor += len(chunk)
+            while chunk:
+                remaining = scanline_budget - len(scanlines_buffer)
+                if remaining <= 0:
+                    raise SemanticDecodeError("PNG decompressed output exceeds exact budget")
+                scanlines_buffer.extend(decompressor.decompress(chunk, remaining))
+                if len(scanlines_buffer) > expected_length:
+                    raise SemanticDecodeError("PNG decompressed output exceeds exact budget")
+                chunk = decompressor.unconsumed_tail
+            if decompressor.eof:
+                if compressed_cursor != len(compressed) or decompressor.unused_data:
+                    raise SemanticDecodeError("PNG IDAT stream contains trailing data")
+                break
     except zlib.error as exc:
         raise SemanticDecodeError("PNG IDAT stream is invalid zlib data") from exc
-    if not decompressor.eof or decompressor.unused_data or len(scanlines) != expected_length:
+    if not decompressor.eof or len(scanlines_buffer) != expected_length:
         raise SemanticDecodeError("PNG decompressed scanline length or stream termination is invalid")
+    scanlines = bytes(scanlines_buffer)
     rows: list[bytes] = []
     cursor = 0
     previous = bytes(row_bytes)
@@ -441,8 +460,8 @@ class SemanticNormalizationRequest:
             raise SemanticNormalizationError("unsupported deterministic crop/pad policy")
         if output_class is OutputClass.ASSET_ART and self.palette_policy != ASSET_PALETTE_POLICY:
             raise SemanticNormalizationError("ASSET_ART C001 requires PRESERVE_SOURCE_RGBA")
-        if output_class is OutputClass.LEVEL_ART and self.palette_policy != FUTURE_LEVEL_PALETTE_POLICY:
-            raise SemanticNormalizationError("LEVEL_ART normalization requires the future SCRUBBOTS_C01_C16 palette policy")
+        if output_class is OutputClass.LEVEL_ART:
+            raise SemanticNormalizationError("LEVEL_ART normalization requests are not legal until the canonical palette and difficulty policy is implemented")
         object.__setattr__(self, "output_class", output_class)
 
     @property
@@ -500,7 +519,13 @@ class SemanticNormalizationReport:
         status = self.status if isinstance(self.status, NormalizationStatus) else NormalizationStatus(self.status)
         if not isinstance(self.crop_pad, Mapping) or any(type(key) is not str for key in self.crop_pad):
             raise SemanticNormalizationError("normalization crop/pad report is invalid")
+        frozen_crop_pad = {}
+        for key, value in self.crop_pad.items():
+            if type(value) not in {int, str}:
+                raise SemanticNormalizationError("normalization crop/pad report values are invalid")
+            frozen_crop_pad[key] = value
         object.__setattr__(self, "status", status)
+        object.__setattr__(self, "crop_pad", MappingProxyType(frozen_crop_pad))
         object.__setattr__(self, "warnings", tuple(self.warnings))
 
     def canonical_dict(self) -> dict[str, object]:
@@ -511,6 +536,82 @@ class SemanticNormalizationReport:
 
     def digest(self) -> str:
         return _sha256(self.canonical_bytes())
+
+
+@dataclass(frozen=True, slots=True)
+class SemanticSourceProvenance:
+    """Exact immutable provider/source snapshot carried into normalization."""
+
+    raw_artifact_digest: str
+    raw_sha256: str
+    provider_candidate_digest: str
+    provider_id: str
+    provider_version: str
+    workflow_version: str
+    model_id: str | None
+    request_digest: str
+    requested_width: int
+    requested_height: int
+    returned_width: int
+    returned_height: int
+    media_type: str
+    source_status: CandidateStatus | str
+    reference_images: tuple[ImageInputDescriptor, ...] = ()
+    style_image: ImageInputDescriptor | None = None
+    init_image: ImageInputDescriptor | None = None
+    color_reference: ImageInputDescriptor | None = None
+
+    @classmethod
+    def from_raw_artifact(cls, raw_artifact: SemanticRawArtifact) -> "SemanticSourceProvenance":
+        if not isinstance(raw_artifact, SemanticRawArtifact):
+            raise SemanticNormalizationError("source provenance requires a typed raw artifact")
+        return cls(
+            raw_artifact.digest(), raw_artifact.raw_sha256, raw_artifact.provider_candidate_digest,
+            raw_artifact.provider_id, raw_artifact.provider_version, raw_artifact.workflow_version,
+            raw_artifact.model_id, raw_artifact.request_digest, raw_artifact.requested_width,
+            raw_artifact.requested_height, raw_artifact.returned_width, raw_artifact.returned_height,
+            raw_artifact.media_type, raw_artifact.source_status, raw_artifact.reference_images,
+            raw_artifact.style_image, raw_artifact.init_image, raw_artifact.color_reference,
+        )
+
+    def __post_init__(self) -> None:
+        _sha256_text(self.raw_artifact_digest, "raw_artifact_digest")
+        _sha256_text(self.raw_sha256, "raw_sha256")
+        _sha256_text(self.provider_candidate_digest, "provider_candidate_digest")
+        _sha256_text(self.request_digest, "request_digest")
+        for label, value in (("provider_id", self.provider_id), ("provider_version", self.provider_version), ("workflow_version", self.workflow_version), ("media_type", self.media_type)):
+            _text(value, label)
+        for label, value in (("requested_width", self.requested_width), ("requested_height", self.requested_height), ("returned_width", self.returned_width), ("returned_height", self.returned_height)):
+            _dimension(value, label, SEMANTIC_RAW_RASTER_MAX_DIMENSION)
+        try:
+            status = self.source_status if isinstance(self.source_status, CandidateStatus) else CandidateStatus(self.source_status)
+        except (TypeError, ValueError) as exc:
+            raise SemanticNormalizationError("source provenance status is invalid") from exc
+        if status is not CandidateStatus.SUCCESS:
+            raise SemanticNormalizationError("source provenance status must be SUCCESS")
+        if not isinstance(self.reference_images, tuple) or any(not isinstance(item, ImageInputDescriptor) for item in self.reference_images):
+            raise SemanticNormalizationError("source provenance reference images are invalid")
+        object.__setattr__(self, "source_status", status)
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "raw_artifact_digest": self.raw_artifact_digest,
+            "raw_sha256": self.raw_sha256,
+            "provider_candidate_digest": self.provider_candidate_digest,
+            "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id},
+            "request_digest": self.request_digest,
+            "requested_dimensions": {"width": self.requested_width, "height": self.requested_height},
+            "returned_dimensions": {"width": self.returned_width, "height": self.returned_height},
+            "media_type": self.media_type,
+            "source_status": self.source_status.value,
+            "reference_images": [item.canonical_dict() for item in self.reference_images],
+            "style_image": self.style_image.canonical_dict() if self.style_image else None,
+            "init_image": self.init_image.canonical_dict() if self.init_image else None,
+            "color_reference": self.color_reference.canonical_dict() if self.color_reference else None,
+        }
+
+    def digest(self) -> str:
+        return _digest(self.canonical_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -533,8 +634,18 @@ class SemanticNormalizedArtifact:
     request_digest: str
     schema: str = NORMALIZATION_SCHEMA
     schema_version: int = NORMALIZATION_SCHEMA_VERSION
+    source_provenance: SemanticSourceProvenance | None = field(default=None, repr=False, compare=False)
+    normalization_request: SemanticNormalizationRequest | None = field(default=None, repr=False, compare=False)
+    _construction_token: object = field(default=None, repr=False, compare=False)
+    _construction_fingerprint: str | None = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        if self._construction_token is not _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN:
+            raise SemanticNormalizationError("normalized artifacts require checked construction from a raw artifact")
+        if not isinstance(self.source_provenance, SemanticSourceProvenance):
+            raise SemanticNormalizationError("normalized artifact source provenance is missing")
+        if not isinstance(self.normalization_request, SemanticNormalizationRequest):
+            raise SemanticNormalizationError("normalized artifact normalization request is missing")
         _dimension(self.target_width, "target_width")
         _dimension(self.target_height, "target_height")
         if self.output_class is not OutputClass.ASSET_ART:
@@ -552,9 +663,36 @@ class SemanticNormalizedArtifact:
         _text(self.provider_id, "provider_id")
         _text(self.provider_version, "provider_version")
         _text(self.workflow_version, "workflow_version")
-        if not isinstance(self.report, SemanticNormalizationReport) or self.report.output_rgba_sha256 != self.normalized_rgba_sha256 or self.report.source_raw_artifact_digest != self.source_raw_artifact_digest or self.report.request_digest != self.normalization_request_digest or (self.report.target_width, self.report.target_height) != (self.target_width, self.target_height):
+        source = self.source_provenance
+        request = self.normalization_request
+        if self.source_raw_artifact_digest != source.raw_artifact_digest or self.request_digest != source.request_digest or self.provider_id != source.provider_id or self.provider_version != source.provider_version or self.workflow_version != source.workflow_version or self.model_id != source.model_id or self.normalization_request_digest != request.digest() or request.source_raw_artifact_digest != source.raw_artifact_digest or request.output_class is not OutputClass.ASSET_ART or (request.target_width, request.target_height) != (self.target_width, self.target_height) or self.palette_policy != request.palette_policy:
+            raise SemanticNormalizationError("normalized provider provenance is not bound to the raw source snapshot")
+        if not isinstance(self.report, SemanticNormalizationReport) or self.report.output_rgba_sha256 != self.normalized_rgba_sha256 or self.report.source_raw_artifact_digest != self.source_raw_artifact_digest or self.report.request_digest != self.normalization_request_digest or (self.report.target_width, self.report.target_height) != (self.target_width, self.target_height) or self.report.input_raw_sha256 != source.raw_sha256 or self.report.alpha_policy != request.alpha_policy or self.report.palette_policy != request.palette_policy:
             raise SemanticNormalizationError("normalized report is not bound to output pixels")
         object.__setattr__(self, "rgba8", bytes(self.rgba8))
+        fingerprint = _digest({"source_provenance": source.digest(), "normalization_request": request.digest(), "report": self.report.digest(), "output": self.normalized_rgba_sha256, "target": [self.target_width, self.target_height], "provider": [self.provider_id, self.provider_version, self.workflow_version, self.model_id], "request_digest": self.request_digest})
+        if self._construction_fingerprint is None:
+            object.__setattr__(self, "_construction_fingerprint", fingerprint)
+        elif self._construction_fingerprint != fingerprint:
+            raise SemanticNormalizationError("normalized artifact immutable provenance fingerprint is invalid")
+
+    @classmethod
+    def from_raw_artifact(cls, raw_artifact: SemanticRawArtifact, request: SemanticNormalizationRequest, rgba8: bytes, report: SemanticNormalizationReport) -> "SemanticNormalizedArtifact":
+        if not isinstance(raw_artifact, SemanticRawArtifact) or not isinstance(request, SemanticNormalizationRequest):
+            raise SemanticNormalizationError("checked normalized construction requires typed raw artifact and request")
+        if request.source_raw_artifact_digest != raw_artifact.digest():
+            raise SemanticNormalizationError("normalization request is not bound to the raw artifact")
+        if request.output_class is not OutputClass.ASSET_ART:
+            raise SemanticNormalizationError("checked normalized construction only supports ASSET_ART")
+        source = SemanticSourceProvenance.from_raw_artifact(raw_artifact)
+        if report.source_raw_artifact_digest != source.raw_artifact_digest or report.request_digest != request.digest() or report.input_raw_sha256 != source.raw_sha256 or report.alpha_policy != request.alpha_policy or report.palette_policy != request.palette_policy or (report.target_width, report.target_height) != (request.target_width, request.target_height) or report.output_rgba_sha256 != _sha256(rgba8):
+            raise SemanticNormalizationError("normalization report is not bound to the exact raw source and request")
+        return cls(
+            source.raw_artifact_digest, request.digest(), OutputClass.ASSET_ART, request.target_width, request.target_height,
+            bytes(rgba8), _sha256(rgba8), report, request.palette_policy, source.provider_id, source.provider_version,
+            source.workflow_version, source.model_id, source.request_digest, NORMALIZATION_SCHEMA, NORMALIZATION_SCHEMA_VERSION,
+            source, request, _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN, None,
+        )
 
     @property
     def normalized_pixel_sha256(self) -> str:
@@ -573,7 +711,7 @@ class SemanticNormalizedArtifact:
         return self.report.digest()
 
     def identity_dict(self) -> dict[str, object]:
-        return {"schema": self.schema, "schema_version": self.schema_version, "source_raw_artifact_digest": self.source_raw_artifact_digest, "normalization_request_digest": self.normalization_request_digest, "output_class": self.output_class.value, "target_dimensions": {"width": self.target_width, "height": self.target_height}, "normalized_rgba_sha256": self.normalized_rgba_sha256, "report_digest": self.report_digest, "palette_policy": self.palette_policy, "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id}, "request_digest": self.request_digest}
+        return {"schema": self.schema, "schema_version": self.schema_version, "source_raw_artifact_digest": self.source_raw_artifact_digest, "normalization_request_digest": self.normalization_request_digest, "output_class": self.output_class.value, "target_dimensions": {"width": self.target_width, "height": self.target_height}, "normalized_rgba_sha256": self.normalized_rgba_sha256, "report_digest": self.report_digest, "palette_policy": self.palette_policy, "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id}, "request_digest": self.request_digest, "source_provenance_digest": self.source_provenance.digest()}
 
     def canonical_dict(self) -> dict[str, object]:
         return {**self.identity_dict(), "rgba8_base64": base64.b64encode(self.rgba8).decode("ascii"), "report": self.report.canonical_dict()}
@@ -613,11 +751,7 @@ def normalize_semantic_artifact(raw_artifact: SemanticRawArtifact, request: Sema
         raw_artifact.digest(), request.digest(), decoded.width, decoded.height, request.target_width, request.target_height,
         exact, not exact, resampler, crop_pad, request.alpha_policy, request.palette_policy, raw_artifact.raw_sha256, output_hash,
     )
-    return SemanticNormalizedArtifact(
-        raw_artifact.digest(), request.digest(), OutputClass.ASSET_ART, request.target_width, request.target_height,
-        normalized, output_hash, report, request.palette_policy, raw_artifact.provider_id, raw_artifact.provider_version,
-        raw_artifact.workflow_version, raw_artifact.model_id, raw_artifact.request_digest,
-    )
+    return SemanticNormalizedArtifact.from_raw_artifact(raw_artifact, request, normalized, report)
 
 
 normalize = normalize_semantic_artifact
@@ -633,5 +767,5 @@ class SemanticNormalizer:
 
 
 __all__ = [
-    "ALPHA_POLICIES", "ASSET_PALETTE_POLICY", "FUTURE_LEVEL_PALETTE_POLICY", "MAX_DECODE_PIXELS", "NORMALIZATION_POLICY_VERSION", "NORMALIZATION_REPORT_SCHEMA", "NORMALIZATION_REPORT_VERSION", "NORMALIZATION_SCHEMA", "NORMALIZATION_SCHEMA_VERSION", "RAW_ARTIFACT_MAX_BYTES", "RAW_ARTIFACT_SCHEMA", "RAW_ARTIFACT_SCHEMA_VERSION", "SemanticDecodeError", "SemanticNormalizedArtifact", "SemanticNormalizationError", "SemanticNormalizationReport", "SemanticNormalizationRequest", "SemanticNormalizer", "SemanticRawArtifact", "normalize", "normalize_artifact", "normalize_semantic_artifact",
+    "ALPHA_POLICIES", "ASSET_PALETTE_POLICY", "FUTURE_LEVEL_PALETTE_POLICY", "MAX_DECODE_PIXELS", "NORMALIZATION_POLICY_VERSION", "NORMALIZATION_REPORT_SCHEMA", "NORMALIZATION_REPORT_VERSION", "NORMALIZATION_SCHEMA", "NORMALIZATION_SCHEMA_VERSION", "RAW_ARTIFACT_MAX_BYTES", "RAW_ARTIFACT_SCHEMA", "RAW_ARTIFACT_SCHEMA_VERSION", "SemanticDecodeError", "SemanticNormalizedArtifact", "SemanticNormalizationError", "SemanticNormalizationReport", "SemanticNormalizationRequest", "SemanticNormalizer", "SemanticRawArtifact", "SemanticSourceProvenance", "normalize", "normalize_artifact", "normalize_semantic_artifact",
 ]

@@ -25,6 +25,15 @@ PNG profile only (8-bit non-interlaced grayscale, RGB, grayscale-alpha, or
 RGBA, with no color-management/palette chunks). JPEG and WebP are rejected
 until a future cycle explicitly adds and tests a deterministic decoder.
 
+SP03-C002 keeps PNG zlib decoding incrementally bounded to the exact scanline
+length plus one sentinel byte. It never performs an unrestricted decompressor
+flush and rejects truncation, trailing bytes, missing EOF, and overlength
+streams. Normalization reports copy their nested crop/pad facts into an
+immutable mapping. A normalized artifact is only created through its checked
+raw-artifact constructor, which snapshots and cross-binds the provider/source
+provenance, exact normalization request, report policies, dimensions, and
+output hash.
+
 The baseline uses exact-size preservation or deterministic integer-weighted
 box-area resampling with centered letterboxing. `PRESERVE_ALPHA` and
 `OPAQUE_AS_IS` are explicit policies, and ASSET_ART uses

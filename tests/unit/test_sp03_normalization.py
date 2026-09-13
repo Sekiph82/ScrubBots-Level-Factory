@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 from pathlib import Path
 import struct
 import zlib
@@ -32,8 +33,14 @@ def _chunk(kind: bytes, payload: bytes) -> bytes:
 def rgba_png(width: int, height: int, pixels: bytes) -> bytes:
     assert len(pixels) == width * height * 4
     rows = b"".join(b"\x00" + pixels[row * width * 4 : (row + 1) * width * 4] for row in range(height))
+    return png_with_scanlines(width, height, rows)
+
+
+def png_with_scanlines(width: int, height: int, scanlines: bytes, compressed: bytes | None = None) -> bytes:
     header = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
-    return b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", header) + _chunk(b"IDAT", zlib.compress(rows, 9)) + _chunk(b"IEND", b"")
+    if compressed is None:
+        compressed = zlib.compress(scanlines, 9)
+    return b"\x89PNG\r\n\x1a\n" + _chunk(b"IHDR", header) + _chunk(b"IDAT", compressed) + _chunk(b"IEND", b"")
 
 
 def asset_request(**changes: object) -> SemanticGenerationRequest:
@@ -138,12 +145,62 @@ def test_level_art_requires_future_palette_policy_and_never_masquerades_as_m08()
     raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((220, 30, 40, 255)) * (24 * 24)), 24, 24))
     with pytest.raises(SemanticNormalizationError):
         SemanticNormalizationRequest(raw.digest(), "LEVEL_ART", 20, 20)
-    request = SemanticNormalizationRequest(raw.digest(), "LEVEL_ART", 20, 20, palette_policy="SCRUBBOTS_C01_C16")
     with pytest.raises(SemanticNormalizationError):
-        normalize_semantic_artifact(raw, request)
+        SemanticNormalizationRequest(raw.digest(), "LEVEL_ART", 20, 20, palette_policy="SCRUBBOTS_C01_C16")
     normalized = normalize_semantic_artifact(raw, SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 24, 24))
     with pytest.raises(SemanticNormalizationRequiredError):
         normalized.as_m08_artwork()
+
+
+def test_normalization_report_crop_pad_is_deeply_immutable() -> None:
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(8, 4, bytes((10, 20, 30, 255)) * 32), 8, 4))
+    normalized = normalize_semantic_artifact(raw, SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 8, 8))
+    with pytest.raises(TypeError):
+        normalized.report.crop_pad["offset_x"] = 99  # type: ignore[index]
+    assert normalized.report.crop_pad["offset_x"] == 0
+    caller_mapping = {"operation": "CALLER_CONTROLLED"}
+    report = replace(normalized.report, crop_pad=caller_mapping)
+    caller_mapping["operation"] = "MUTATED"
+    assert report.crop_pad["operation"] == "CALLER_CONTROLLED"
+    with pytest.raises(TypeError):
+        report.crop_pad["operation"] = "MUTATED"  # type: ignore[index]
+
+
+def test_png_decoder_rejects_compact_decompression_bomb_without_giant_allocation() -> None:
+    compressor = zlib.compressobj(level=9)
+    pieces = [compressor.compress(bytes(65_536)) for _ in range(32)]
+    compressed = b"".join(pieces) + compressor.flush()
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(png_with_scanlines(1, 1, b"", compressed), 1, 1))
+    with pytest.raises(SemanticDecodeError, match="exact budget"):
+        normalize_semantic_artifact(raw, SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 1, 1))
+
+
+def test_png_decoder_rejects_expected_plus_one_truncated_and_trailing_streams() -> None:
+    pixel = bytes((1, 2, 3, 255))
+    cases = (
+        (png_with_scanlines(1, 1, b"\x00" + pixel + b"\x00"), "exact budget"),
+        (png_with_scanlines(1, 1, b"", zlib.compress(b"\x00" + pixel)[:-2]), "termination"),
+        (png_with_scanlines(1, 1, b"", zlib.compress(b"\x00" + pixel) + b"trailing"), "trailing"),
+    )
+    for encoded, message in cases:
+        raw = SemanticRawArtifact.from_candidate(candidate_for_png(encoded, 1, 1))
+        with pytest.raises(SemanticDecodeError, match=message):
+            normalize_semantic_artifact(raw, SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 1, 1))
+
+
+def test_normalized_artifact_provenance_is_checked_against_the_raw_source_and_request() -> None:
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((1, 2, 3, 255)) * (24 * 24)), 24, 24))
+    request = SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 24, 24)
+    normalized = normalize_semantic_artifact(raw, request)
+    with pytest.raises(SemanticNormalizationError, match="provenance"):
+        replace(normalized, provider_id="forged-provider")
+    with pytest.raises(SemanticNormalizationError, match="provenance"):
+        replace(normalized, request_digest=hashlib.sha256(b"other-request").hexdigest())
+    foreign = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((4, 5, 6, 255)) * (24 * 24)), 24, 24, seed="foreign-seed"))
+    with pytest.raises(SemanticNormalizationError, match="provenance"):
+        replace(normalized, source_provenance=normalized.source_provenance.__class__.from_raw_artifact(foreign))
+    with pytest.raises(SemanticNormalizationError, match="bound"):
+        replace(normalized, report=replace(normalized.report, input_raw_sha256=foreign.raw_sha256))
 
 
 def test_local_normalization_cli_writes_manifest_without_overwriting_source(tmp_path: Path) -> None:

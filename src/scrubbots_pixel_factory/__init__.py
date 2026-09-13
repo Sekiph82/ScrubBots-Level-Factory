@@ -115,6 +115,7 @@ from .semantic import (
     SemanticNormalizationRequest,
     SemanticNormalizer,
     SemanticRawArtifact,
+    SemanticSourceProvenance,
     normalize_semantic_artifact,
     UnsupportedCapabilityError,
 )
@@ -222,6 +223,7 @@ __all__ = [
     "SemanticNormalizationRequest",
     "SemanticNormalizer",
     "SemanticRawArtifact",
+    "SemanticSourceProvenance",
     "normalize_semantic_artifact",
     "UnsupportedCapabilityError",
 ]
