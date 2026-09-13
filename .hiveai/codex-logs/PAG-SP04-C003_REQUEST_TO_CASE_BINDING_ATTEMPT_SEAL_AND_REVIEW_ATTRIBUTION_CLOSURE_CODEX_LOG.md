@@ -65,3 +65,14 @@ Implementation and verification are in progress.
 - `.hiveai/codex-logs/PAG-SP04-C003_REQUEST_TO_CASE_BINDING_ATTEMPT_SEAL_AND_REVIEW_ATTRIBUTION_CLOSURE_CODEX_LOG.md`
 
 Pre-existing unrelated worktree dirt was preserved and excluded from the C003 commit. Commit and publication checkpoint are pending.
+
+## Publication checkpoint
+
+- Scoped implementation/test/log commit: `453a47ff5e95ae397163b564e1be9815a95c5799` (`Implement SP04 C003 qualification binding closure`).
+- The first push was rejected because GitHub `origin/main` advanced concurrently. `git fetch origin` observed remote commits opening/tracking C003; the local branch was merged with `git merge origin/main -m "Merge GitHub authority before SP04 C003 publication"` without reset, rebase, force-push, or discarded changes.
+- Authority merge commit: `e9fdbf9514cd0204c500f715519b9afce68c24d4`.
+- The merged implementation was pushed successfully with `git push origin main`.
+- At the post-push checkpoint, local HEAD and `origin/main` were both `e9fdbf9514cd0204c500f715519b9afce68c24d4`; `git rev-list --left-right --count HEAD...origin/main` was `0 0`.
+- This final log update is intentionally a log-only publication commit; the implementation/test terminal SHA above remains the source/test checkpoint. No self-referential SHA loop is used.
+
+Final log-only commit and its remote equality checkpoint will be recorded by the builder response after this log publication.
