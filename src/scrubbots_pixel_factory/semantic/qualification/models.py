@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
+import hashlib
 import math
 
-from ..contracts import OutputClass, SemanticContractError, SemanticGenerationRequest
+from ..contracts import CandidateStatus, OutputClass, SemanticContractError, SemanticGenerationRequest, SemanticImageCandidate
 from ..providers.common import canonical_digest, typed_seed
 
 
@@ -393,9 +394,109 @@ class RawImportEvidence:
         return {"raw_artifact_digest": self.raw_artifact_digest, "raw_sha256": self.raw_sha256, "raw_media_type": self.raw_media_type, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height}, "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id, "result_identity": self.provider_result_identity}, "request_digest": self.request_digest, "local_raw_artifact_digest": self.local_raw_artifact_digest, "compatibility": self.compatibility.value}
 
 
+_PROVIDER_CAPTURE_TOKEN = object()
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class ProviderCaptureEvidence:
+    """Sealed proof of one successful typed provider return."""
+
+    candidate: SemanticImageCandidate | None
+    source_raw_import: RawImportEvidence | None
+    provider_candidate_digest: str
+    request_digest: str
+    provider_id: str
+    provider_version: str
+    workflow_version: str
+    model_id: str
+    returned_width: int
+    returned_height: int
+    raw_image_sha256: str
+    status: CandidateStatus
+    reference_images: tuple[object, ...]
+    style_image: object | None
+    init_image: object | None
+    color_reference: object | None
+    _construction_token: object
+    _construction_fingerprint: str
+
+    @classmethod
+    def from_candidate(cls, candidate: SemanticImageCandidate) -> "ProviderCaptureEvidence":
+        if not isinstance(candidate, SemanticImageCandidate) or candidate.status is not CandidateStatus.SUCCESS:
+            raise SemanticContractError("provider capture requires a successful typed SemanticImageCandidate")
+        if candidate.model_id is None or candidate.returned_width is None or candidate.returned_height is None or candidate.raw_image_sha256 is None or candidate.image_bytes is None:
+            raise SemanticContractError("provider capture requires non-null model, returned dimensions, and raw bytes")
+        instance = object.__new__(cls)
+        values = {"candidate": candidate, "source_raw_import": None, "provider_candidate_digest": candidate.digest(), "request_digest": candidate.request_digest, "provider_id": candidate.provider_id, "provider_version": candidate.provider_version, "workflow_version": candidate.workflow_version, "model_id": candidate.model_id, "returned_width": candidate.returned_width, "returned_height": candidate.returned_height, "raw_image_sha256": candidate.raw_image_sha256, "status": candidate.status, "reference_images": candidate.reference_images, "style_image": candidate.style_image, "init_image": candidate.init_image, "color_reference": candidate.color_reference, "_construction_token": _PROVIDER_CAPTURE_TOKEN}
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        instance._validate()
+        object.__setattr__(instance, "_construction_fingerprint", instance._fingerprint())
+        instance._assert_integrity()
+        return instance
+
+    @classmethod
+    def from_raw_import(cls, raw_import: RawImportEvidence) -> "ProviderCaptureEvidence":
+        if not isinstance(raw_import, RawImportEvidence):
+            raise SemanticContractError("provider capture derivation requires sealed raw-import evidence")
+        raw_import._assert_integrity()
+        if raw_import.model_id is None:
+            raise SemanticContractError("provider capture requires non-null model from raw provenance")
+        instance = object.__new__(cls)
+        values = {"candidate": None, "source_raw_import": raw_import, "provider_candidate_digest": raw_import.provider_result_identity, "request_digest": raw_import.request_digest, "provider_id": raw_import.provider_id, "provider_version": raw_import.provider_version, "workflow_version": raw_import.workflow_version, "model_id": raw_import.model_id, "returned_width": raw_import.returned_width, "returned_height": raw_import.returned_height, "raw_image_sha256": raw_import.raw_sha256, "status": raw_import.raw_artifact.source_status, "reference_images": raw_import.raw_artifact.reference_images, "style_image": raw_import.raw_artifact.style_image, "init_image": raw_import.raw_artifact.init_image, "color_reference": raw_import.raw_artifact.color_reference, "_construction_token": _PROVIDER_CAPTURE_TOKEN}
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        instance._validate()
+        object.__setattr__(instance, "_construction_fingerprint", instance._fingerprint())
+        instance._assert_integrity()
+        return instance
+
+    def __post_init__(self) -> None:
+        raise SemanticContractError("ProviderCaptureEvidence must be constructed from typed provider evidence")
+
+    def _validate(self) -> None:
+        if self._construction_token is not _PROVIDER_CAPTURE_TOKEN or self.status is not CandidateStatus.SUCCESS:
+            raise SemanticContractError("provider capture construction seal is invalid")
+        _digest(self.provider_candidate_digest, "provider_candidate_digest")
+        _digest(self.request_digest, "request_digest")
+        _digest(self.raw_image_sha256, "raw_image_sha256")
+        for name in ("provider_id", "provider_version", "workflow_version", "model_id"):
+            _text(getattr(self, name), name)
+        _dimensions(self.returned_width, self.returned_height, "provider returned dimensions", MAX_RAW_DIMENSION)
+        if self.candidate is not None:
+            if not isinstance(self.candidate, SemanticImageCandidate) or self.candidate.status is not CandidateStatus.SUCCESS or self.candidate.model_id is None:
+                raise SemanticContractError("provider capture candidate is not successful and model-authenticated")
+            if self.candidate.digest() != self.provider_candidate_digest or self.candidate.request_digest != self.request_digest or self.candidate.provider_id != self.provider_id or self.candidate.provider_version != self.provider_version or self.candidate.workflow_version != self.workflow_version or self.candidate.model_id != self.model_id or (self.candidate.returned_width, self.candidate.returned_height) != (self.returned_width, self.returned_height) or type(self.candidate.image_bytes) is not bytes or not self.candidate.image_bytes or self.candidate.raw_image_sha256 != hashlib.sha256(self.candidate.image_bytes).hexdigest() or self.candidate.raw_image_sha256 != self.raw_image_sha256 or self.candidate.reference_images != self.reference_images or self.candidate.style_image != self.style_image or self.candidate.init_image != self.init_image or self.candidate.color_reference != self.color_reference:
+                raise SemanticContractError("provider capture is not bound to the exact typed candidate")
+        elif not isinstance(self.source_raw_import, RawImportEvidence):
+            raise SemanticContractError("provider capture must retain a typed candidate or raw derivation")
+        else:
+            self.source_raw_import._assert_integrity()
+            raw = self.source_raw_import
+            if raw.provider_result_identity != self.provider_candidate_digest or raw.request_digest != self.request_digest or raw.provider_id != self.provider_id or raw.provider_version != self.provider_version or raw.workflow_version != self.workflow_version or raw.model_id != self.model_id or (raw.returned_width, raw.returned_height) != (self.returned_width, self.returned_height) or raw.raw_sha256 != self.raw_image_sha256 or raw.raw_artifact.reference_images != self.reference_images or raw.raw_artifact.style_image != self.style_image or raw.raw_artifact.init_image != self.init_image or raw.raw_artifact.color_reference != self.color_reference:
+                raise SemanticContractError("derived provider capture is not bound to the exact raw import")
+
+    def canonical_dict(self) -> dict[str, object]:
+        self._validate()
+        return {"provider_candidate_digest": self.provider_candidate_digest, "request_digest": self.request_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id}, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height}, "raw_image_sha256": self.raw_image_sha256, "status": self.status.value, "reference_images": [item.canonical_dict() for item in self.reference_images], "style_image": None if self.style_image is None else self.style_image.canonical_dict(), "init_image": None if self.init_image is None else self.init_image.canonical_dict(), "color_reference": None if self.color_reference is None else self.color_reference.canonical_dict()}
+
+    def _fingerprint(self) -> str:
+        return canonical_digest(self.canonical_dict())
+
+    def _assert_integrity(self) -> None:
+        self._validate()
+        if self._construction_fingerprint != self._fingerprint():
+            raise SemanticContractError("provider capture construction fingerprint is invalid")
+
+    def digest(self) -> str:
+        self._assert_integrity()
+        return canonical_digest(self.canonical_dict())
+
+
 _NORMALIZATION_EVIDENCE_TOKEN = object()
 _ATTEMPT_TOKEN = object()
 _REQUEST_BINDING_TOKEN = object()
+_REVIEW_BINDING_TOKEN = object()
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -524,6 +625,79 @@ class QualificationRequestBinding:
 
 
 @dataclass(frozen=True, slots=True, init=False)
+class QualificationReviewBinding:
+    """Sealed proof that one exact ready attempt entered blind review."""
+
+    attempt_id: str
+    pre_review_attempt_digest: str
+    plan_digest: str
+    plan_entry_id: str
+    case_id: str
+    case_digest: str
+    subject_label: str
+    target_width: int
+    target_height: int
+    normalized_artifact_digest: str
+    normalized_rgba_sha256: str
+    request_binding_digest: str
+    review_seed: int | str
+    expected_review_id: str
+    review_pack_version: str
+    _construction_token: object
+    _construction_fingerprint: str
+
+    @classmethod
+    def from_attempt(cls, attempt: "QualificationAttemptRecord", review_seed: int | str, *, review_pack_version: str = REVIEW_PACK_VERSION) -> "QualificationReviewBinding":
+        if not isinstance(attempt, QualificationAttemptRecord):
+            raise SemanticContractError("review binding requires a typed qualification attempt")
+        attempt._assert_integrity()
+        if attempt.lifecycle is not QualificationLifecycle.READY_FOR_BLIND_REVIEW or attempt.owner_disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW or attempt.normalization is None or attempt.request_binding is None:
+            raise SemanticContractError("review binding requires a ready, pending, fully bound attempt")
+        expected_review_id = f"review-{canonical_digest({"seed": typed_seed(review_seed), "attempt": attempt.review_binding_digest()})[:24]}"
+        instance = object.__new__(cls)
+        values = {"attempt_id": attempt.attempt_id, "pre_review_attempt_digest": attempt.review_binding_digest(), "plan_digest": attempt.plan_digest, "plan_entry_id": attempt.plan_entry_id, "case_id": attempt.case_id, "case_digest": attempt.case_digest, "subject_label": attempt.case_subject, "target_width": attempt.normalization.target_width, "target_height": attempt.normalization.target_height, "normalized_artifact_digest": attempt.normalization.normalized_artifact_digest, "normalized_rgba_sha256": attempt.normalization.normalized_rgba_sha256, "request_binding_digest": attempt.request_binding.digest(), "review_seed": review_seed, "expected_review_id": expected_review_id, "review_pack_version": review_pack_version, "_construction_token": _REVIEW_BINDING_TOKEN}
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        instance._validate()
+        object.__setattr__(instance, "_construction_fingerprint", instance._fingerprint())
+        instance._assert_integrity()
+        return instance
+
+    def __post_init__(self) -> None:
+        raise SemanticContractError("QualificationReviewBinding must be constructed from a checked ready attempt")
+
+    def _validate(self) -> None:
+        if self._construction_token is not _REVIEW_BINDING_TOKEN:
+            raise SemanticContractError("review binding construction seal is invalid")
+        for name in ("attempt_id", "plan_entry_id", "case_id", "subject_label", "review_pack_version", "expected_review_id"):
+            _text(getattr(self, name), name)
+        for name in ("pre_review_attempt_digest", "plan_digest", "case_digest", "normalized_artifact_digest", "normalized_rgba_sha256", "request_binding_digest"):
+            _digest(getattr(self, name), name)
+        _dimensions(self.target_width, self.target_height, "review target dimensions")
+        typed_seed(self.review_seed)
+        if not self.expected_review_id.startswith("review-") or self.expected_review_id != f"review-{canonical_digest({"seed": typed_seed(self.review_seed), "attempt": self.pre_review_attempt_digest})[:24]}":
+            raise SemanticContractError("review binding expected ID is invalid")
+        if self.review_pack_version != REVIEW_PACK_VERSION:
+            raise SemanticContractError("review binding protocol version is unsupported")
+
+    def canonical_dict(self) -> dict[str, object]:
+        self._validate()
+        return {"attempt_id": self.attempt_id, "pre_review_attempt_digest": self.pre_review_attempt_digest, "plan_digest": self.plan_digest, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "subject_label": self.subject_label, "target_dimensions": {"width": self.target_width, "height": self.target_height}, "normalized_artifact_digest": self.normalized_artifact_digest, "normalized_rgba_sha256": self.normalized_rgba_sha256, "request_binding_digest": self.request_binding_digest, "review_seed": typed_seed(self.review_seed), "expected_review_id": self.expected_review_id, "review_pack_version": self.review_pack_version}
+
+    def _fingerprint(self) -> str:
+        return canonical_digest(self.canonical_dict())
+
+    def _assert_integrity(self) -> None:
+        self._validate()
+        if self._construction_fingerprint != self._fingerprint():
+            raise SemanticContractError("review binding construction fingerprint is invalid")
+
+    def digest(self) -> str:
+        self._assert_integrity()
+        return canonical_digest(self.canonical_dict())
+
+
+@dataclass(frozen=True, slots=True, init=False)
 class NormalizationEvidence:
     """Sealed evidence derived from one checked SP03 normalized artifact."""
 
@@ -627,6 +801,7 @@ class QualificationAttemptRecord:
     model_or_engine: str
     workflow_version: str
     lifecycle: QualificationLifecycle = QualificationLifecycle.PLANNED
+    provider_capture: ProviderCaptureEvidence | None = None
     raw_import: RawImportEvidence | None = None
     normalization: NormalizationEvidence | None = None
     owner_disposition: OwnerReviewDisposition = OwnerReviewDisposition.PENDING_OWNER_REVIEW
@@ -638,6 +813,7 @@ class QualificationAttemptRecord:
     plan_digest: str | None = None
     request_digest: str | None = None
     request_binding: QualificationRequestBinding | None = None
+    review_binding: QualificationReviewBinding | None = None
     case_subject: str | None = None
     target_width: int | None = None
     target_height: int | None = None
@@ -645,7 +821,7 @@ class QualificationAttemptRecord:
     _construction_fingerprint: str = field(init=False, repr=False, compare=False, default="")
 
     @classmethod
-    def from_plan_entry(cls, plan: QualificationPlan, entry: QualificationPlanEntry, request: SemanticGenerationRequest | QualificationRequestBinding | None = None, *, request_binding: QualificationRequestBinding | None = None, lifecycle: QualificationLifecycle = QualificationLifecycle.PLANNED, raw_import: RawImportEvidence | None = None, normalization: NormalizationEvidence | None = None, owner_disposition: OwnerReviewDisposition = OwnerReviewDisposition.PENDING_OWNER_REVIEW, cost_usage: CostUsageRecord | None = None, attempt_id: str | None = None) -> "QualificationAttemptRecord":
+    def from_plan_entry(cls, plan: QualificationPlan, entry: QualificationPlanEntry, request: SemanticGenerationRequest | QualificationRequestBinding | None = None, *, request_binding: QualificationRequestBinding | None = None, provider_capture: ProviderCaptureEvidence | None = None, review_binding: QualificationReviewBinding | None = None, lifecycle: QualificationLifecycle = QualificationLifecycle.PLANNED, raw_import: RawImportEvidence | None = None, normalization: NormalizationEvidence | None = None, owner_disposition: OwnerReviewDisposition = OwnerReviewDisposition.PENDING_OWNER_REVIEW, cost_usage: CostUsageRecord | None = None, attempt_id: str | None = None) -> "QualificationAttemptRecord":
         if not isinstance(plan, QualificationPlan) or not isinstance(entry, QualificationPlanEntry):
             raise SemanticContractError("attempt construction requires a typed qualification plan and entry")
         selected = next((candidate for candidate in plan.entries if candidate.entry_id == entry.entry_id), None)
@@ -665,8 +841,10 @@ class QualificationAttemptRecord:
             binding = QualificationRequestBinding.from_plan_entry(plan, entry, request)
         else:
             raise SemanticContractError("attempt construction requires an actual typed request binding")
+        if provider_capture is None and raw_import is not None:
+            provider_capture = ProviderCaptureEvidence.from_raw_import(raw_import)
         instance = object.__new__(cls)
-        values = {"attempt_id": attempt_id or f"attempt-{entry.entry_id[6:]}", "plan_entry_id": entry.entry_id, "case_id": case.case_id, "provider_id": spec.provider_id, "model_or_engine": spec.model_or_engine, "workflow_version": spec.workflow_version, "lifecycle": lifecycle, "raw_import": raw_import, "normalization": normalization, "owner_disposition": owner_disposition, "cost_usage": cost_usage or CostUsageRecord(), "review_item_id": None, "provider_version": spec.provider_version, "provider_matrix_id": spec.matrix_id, "case_digest": case.digest(), "plan_digest": plan.digest(), "request_digest": binding.request_digest, "request_binding": binding, "case_subject": case.subject, "target_width": plan.target_width, "target_height": plan.target_height, "_construction_token": _ATTEMPT_TOKEN}
+        values = {"attempt_id": attempt_id or f"attempt-{entry.entry_id[6:]}", "plan_entry_id": entry.entry_id, "case_id": case.case_id, "provider_id": spec.provider_id, "model_or_engine": spec.model_or_engine, "workflow_version": spec.workflow_version, "lifecycle": lifecycle, "provider_capture": provider_capture, "raw_import": raw_import, "normalization": normalization, "owner_disposition": owner_disposition, "cost_usage": cost_usage or CostUsageRecord(), "review_item_id": None if review_binding is None else review_binding.expected_review_id, "provider_version": spec.provider_version, "provider_matrix_id": spec.matrix_id, "case_digest": case.digest(), "plan_digest": plan.digest(), "request_digest": binding.request_digest, "request_binding": binding, "review_binding": review_binding, "case_subject": case.subject, "target_width": plan.target_width, "target_height": plan.target_height, "_construction_token": _ATTEMPT_TOKEN}
         for name, value in values.items():
             object.__setattr__(instance, name, value)
         instance.__post_init__()
@@ -699,6 +877,8 @@ class QualificationAttemptRecord:
             raise SemanticContractError("advanced attempts require request provenance")
         if lifecycle in {QualificationLifecycle.RAW_IMPORT_VERIFIED, QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW, QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.raw_import is None:
             raise SemanticContractError("lifecycle requires raw-import evidence")
+        if lifecycle in {QualificationLifecycle.RAW_PROVIDER_CAPTURED, QualificationLifecycle.RAW_IMPORT_VERIFIED, QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW, QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.provider_capture is None:
+            raise SemanticContractError("lifecycle requires checked provider-capture evidence")
         if lifecycle in {QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW, QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.normalization is None:
             raise SemanticContractError("lifecycle requires normalization evidence")
         if lifecycle is QualificationLifecycle.READY_FOR_BLIND_REVIEW and self.raw_import.compatibility is not NormalizationCompatibility.PASS:
@@ -709,6 +889,12 @@ class QualificationAttemptRecord:
             raise SemanticContractError("owner-accepted lifecycle requires owner disposition")
         if lifecycle is QualificationLifecycle.OWNER_REJECTED and disposition is not OwnerReviewDisposition.OWNER_REJECTED:
             raise SemanticContractError("owner-rejected lifecycle requires owner disposition")
+        if self.provider_capture is not None and not isinstance(self.provider_capture, ProviderCaptureEvidence):
+            raise SemanticContractError("attempt provider capture must be sealed typed evidence")
+        if self.provider_capture is not None:
+            self.provider_capture._assert_integrity()
+            if not trusted or self.request_binding is None or self.provider_capture.request_digest != self.request_binding.request_digest or self.provider_capture.provider_id != self.provider_id or self.provider_capture.provider_version != self.provider_version or self.provider_capture.workflow_version != self.workflow_version or self.provider_capture.model_id != self.model_or_engine:
+                raise SemanticContractError("provider capture is not bound to the exact request/provider cell")
         if self.raw_import is not None and not isinstance(self.raw_import, RawImportEvidence):
             raise SemanticContractError("attempt raw evidence must be sealed SP03-derived evidence")
         if self.normalization is not None and not isinstance(self.normalization, NormalizationEvidence):
@@ -725,6 +911,8 @@ class QualificationAttemptRecord:
             raise SemanticContractError("raw-import workflow is not bound to attempt")
         if self.raw_import is not None and self.raw_import.model_id != self.model_or_engine:
             raise SemanticContractError("raw-import model is not bound to attempt")
+        if self.raw_import is not None and self.provider_capture is not None and (self.raw_import.provider_result_identity != self.provider_capture.provider_candidate_digest or self.raw_import.request_digest != self.provider_capture.request_digest or self.raw_import.provider_id != self.provider_capture.provider_id or self.raw_import.provider_version != self.provider_capture.provider_version or self.raw_import.workflow_version != self.provider_capture.workflow_version or self.raw_import.model_id != self.provider_capture.model_id or self.raw_import.raw_sha256 != self.provider_capture.raw_image_sha256 or (self.raw_import.returned_width, self.raw_import.returned_height) != (self.provider_capture.returned_width, self.provider_capture.returned_height)):
+            raise SemanticContractError("provider capture is not cross-bound to exact raw import")
         if self.normalization is not None and self.raw_import is not None and (self.normalization.raw_import_sha256 != self.raw_import.raw_sha256 or self.normalization.source_raw_artifact_digest != self.raw_import.local_raw_artifact_digest):
             raise SemanticContractError("normalization is not bound to exact raw import")
         if self.request_digest is not None:
@@ -735,8 +923,18 @@ class QualificationAttemptRecord:
             raise SemanticContractError("raw request digest is not bound to attempt")
         if self.normalization is not None and self.target_width is not None and (self.normalization.target_width, self.normalization.target_height) != (self.target_width, self.target_height):
             raise SemanticContractError("normalization dimensions are not bound to attempt")
-        if self.lifecycle in {QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.review_item_id is None:
-            raise SemanticContractError("terminal owner disposition requires a review binding")
+        if self.review_binding is not None:
+            if not isinstance(self.review_binding, QualificationReviewBinding):
+                raise SemanticContractError("attempt review proof must be sealed")
+            self.review_binding._assert_integrity()
+            if not trusted or self.review_binding.attempt_id != self.attempt_id or self.review_binding.pre_review_attempt_digest != self.review_binding_digest() or self.review_binding.plan_digest != self.plan_digest or self.review_binding.plan_entry_id != self.plan_entry_id or self.review_binding.case_id != self.case_id or self.review_binding.case_digest != self.case_digest or self.review_binding.subject_label != self.case_subject or self.review_binding.request_binding_digest != self.request_binding.digest():
+                raise SemanticContractError("review proof is not bound to the exact attempt")
+            if self.review_item_id != self.review_binding.expected_review_id:
+                raise SemanticContractError("review item ID is not derived from sealed review proof")
+        elif self.review_item_id is not None:
+            raise SemanticContractError("review item ID requires sealed review proof")
+        if self.lifecycle in {QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.review_binding is None:
+            raise SemanticContractError("terminal owner disposition requires sealed review-entry evidence")
         if self.review_item_id is not None:
             _text(self.review_item_id, "review_item_id")
         if self.case_subject is not None:
@@ -745,10 +943,10 @@ class QualificationAttemptRecord:
         object.__setattr__(self, "owner_disposition", disposition)
 
     def identity_dict(self) -> dict[str, object]:
-        return {"attempt_id": self.attempt_id, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "case_subject": self.case_subject, "plan_digest": self.plan_digest, "provider_matrix_id": self.provider_matrix_id, "provider_id": self.provider_id, "provider_version": self.provider_version, "model_or_engine": self.model_or_engine, "workflow_version": self.workflow_version, "request_binding": None if self.request_binding is None else self.request_binding.canonical_dict(), "request_digest": self.request_digest, "target_dimensions": None if self.target_width is None else {"width": self.target_width, "height": self.target_height}, "raw_import": None if self.raw_import is None else self.raw_import.canonical_dict(), "normalization": None if self.normalization is None else self.normalization.canonical_dict()}
+        return {"attempt_id": self.attempt_id, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "case_subject": self.case_subject, "plan_digest": self.plan_digest, "provider_matrix_id": self.provider_matrix_id, "provider_id": self.provider_id, "provider_version": self.provider_version, "model_or_engine": self.model_or_engine, "workflow_version": self.workflow_version, "provider_capture": None if self.provider_capture is None else self.provider_capture.canonical_dict(), "request_binding": None if self.request_binding is None else self.request_binding.canonical_dict(), "request_digest": self.request_digest, "target_dimensions": None if self.target_width is None else {"width": self.target_width, "height": self.target_height}, "raw_import": None if self.raw_import is None else self.raw_import.canonical_dict(), "normalization": None if self.normalization is None else self.normalization.canonical_dict()}
 
     def canonical_dict(self) -> dict[str, object]:
-        return {**self.identity_dict(), "lifecycle": self.lifecycle.value, "owner_disposition": self.owner_disposition.value, "cost_usage": self.cost_usage.canonical_dict()}
+        return {**self.identity_dict(), "review_binding": None if self.review_binding is None else self.review_binding.canonical_dict(), "lifecycle": self.lifecycle.value, "owner_disposition": self.owner_disposition.value, "cost_usage": self.cost_usage.canonical_dict()}
 
     def digest(self) -> str:
         return canonical_digest(self.identity_dict())
@@ -758,7 +956,7 @@ class QualificationAttemptRecord:
         return self.digest()
 
     def _fingerprint(self) -> str:
-        return self.digest()
+        return canonical_digest({"identity": self.identity_dict(), "review_binding": None if self.review_binding is None else self.review_binding.canonical_dict()})
 
     def _assert_integrity(self) -> None:
         if self._construction_token is not _ATTEMPT_TOKEN:
@@ -770,10 +968,12 @@ class QualificationAttemptRecord:
         self._assert_integrity()
         return self._copy_bound(cost_usage=cost_usage)
 
-    def with_review_binding(self, review_item_id: str) -> "QualificationAttemptRecord":
+    def with_review_binding(self, review_binding: QualificationReviewBinding) -> "QualificationAttemptRecord":
         self._assert_integrity()
-        _text(review_item_id, "review_item_id")
-        return self._copy_bound(review_item_id=review_item_id)
+        if not isinstance(review_binding, QualificationReviewBinding):
+            raise SemanticContractError("review binding requires checked QualificationReviewBinding evidence")
+        review_binding._assert_integrity()
+        return self._copy_bound(review_binding=review_binding, review_item_id=review_binding.expected_review_id)
 
     def with_lifecycle(self, lifecycle: QualificationLifecycle, *, owner_disposition: OwnerReviewDisposition | None = None) -> "QualificationAttemptRecord":
         self._assert_integrity()
@@ -788,7 +988,7 @@ class QualificationAttemptRecord:
     def _copy_bound(self, **changes: object) -> "QualificationAttemptRecord":
         instance = object.__new__(type(self))
         self._assert_integrity()
-        for name in ("attempt_id", "plan_entry_id", "case_id", "provider_id", "model_or_engine", "workflow_version", "lifecycle", "raw_import", "normalization", "owner_disposition", "cost_usage", "review_item_id", "provider_version", "provider_matrix_id", "case_digest", "plan_digest", "request_digest", "request_binding", "case_subject", "target_width", "target_height"):
+        for name in ("attempt_id", "plan_entry_id", "case_id", "provider_id", "model_or_engine", "workflow_version", "lifecycle", "provider_capture", "raw_import", "normalization", "owner_disposition", "cost_usage", "review_item_id", "provider_version", "provider_matrix_id", "case_digest", "plan_digest", "request_digest", "request_binding", "review_binding", "case_subject", "target_width", "target_height"):
             object.__setattr__(instance, name, changes.get(name, getattr(self, name)))
         object.__setattr__(instance, "_construction_token", _ATTEMPT_TOKEN)
         instance.__post_init__()
@@ -840,6 +1040,8 @@ class MetadataBlindReviewPack:
             attempt._assert_integrity()
             if attempt.lifecycle is not QualificationLifecycle.READY_FOR_BLIND_REVIEW or attempt.owner_disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW:
                 raise SemanticContractError("blind review hidden attempts must be ready and pending")
+            if attempt.review_binding is None:
+                raise SemanticContractError("blind review hidden attempts require sealed review-entry evidence")
         ordered = sorted(self.hidden_attempts, key=lambda record: _review_sort_key(record, self.review_seed))
         expected_by_attempt = {attempt.attempt_id: (sequence, _expected_review_id(attempt, self.review_seed)) for sequence, attempt in enumerate(ordered, 1)}
         for item in self.items:
@@ -874,13 +1076,16 @@ def build_metadata_blind_review_pack(attempts: Iterable[QualificationAttemptReco
         record._assert_integrity()
     ordered = sorted(records, key=lambda record: _review_sort_key(record, review_seed))
     items: list[MetadataBlindReviewItem] = []
+    bindings: list[QualificationReviewBinding] = []
     for sequence, record in enumerate(ordered, 1):
         if record.normalization is None:
             raise SemanticContractError("review-ready attempt lacks normalization evidence")
-        review_id = _expected_review_id(record, review_seed)
+        binding = QualificationReviewBinding.from_attempt(record, review_seed)
+        bindings.append(binding)
+        review_id = binding.expected_review_id
         items.append(MetadataBlindReviewItem(review_id, sequence, record.case_subject, record.normalization.target_width, record.normalization.target_height, record.attempt_id))
     item_tuple = tuple(items)
-    return MetadataBlindReviewPack(review_seed, item_tuple, tuple(record.with_review_binding(item.review_id) for record, item in zip(ordered, item_tuple)))
+    return MetadataBlindReviewPack(review_seed, item_tuple, tuple(record.with_review_binding(binding) for record, binding in zip(ordered, bindings)))
 
 
 def _review_sort_key(record: QualificationAttemptRecord, review_seed: int | str) -> str:
