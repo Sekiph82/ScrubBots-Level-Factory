@@ -1,21 +1,20 @@
 # ScrubBots Semantic Pixel Studio — Canonical GitHub Task State
 
-This root `TASKS.md` is the **only current project-status tracker**. Historical H!veAI control-plane trackers are not current authority. Detailed M00-M10 evidence remains in Git history, `.hiveai/audits/`, `.hiveai/codex-logs/`, and published project documents.
+This root `TASKS.md` is the **only current project-status tracker**. Historical H!veAI control-plane trackers are not current authority. Detailed M00-M10 evidence and previous cycle detail remain in Git history, `.hiveai/audits/`, `.hiveai/codex-logs/`, and published project documents.
 
 Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or milestones accepted/closed. Codex builder logs are implementation evidence, never acceptance.
 
 ## Project Status
 
 - Current Milestone: **PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion**
-- Current Sprint: **PAG-SP02-C003**
-- Current Task: **Model Capability Snapshot, Raw Raster Ceiling & Cross-Provenance Closure**
-- Current Task Status: **READY_FOR_IMPLEMENTATION**
-- Required Actor: **CODEX**
-- Previous Cycle: `PAG-SP02-C002` → **FAIL / BOUNDED REMEDIATION REQUIRED**
-- Previous Strict Audit: `.hiveai/audits/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_STRICT_AUDIT.md`
-- Current Prompt: `.hiveai/prompts/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_PROMPT.md`
-- Next Task/Action: Execute SP02-C003 only, close the four remaining provider-contract findings, publish tests/log, commit/push `main`, then stop for independent ChatGPT audit.
-- Blockers/Waits: **SP03, SP04, live provider smoke and M11 remain blocked** until SP02 receives independent technical acceptance.
+- Current Sprint: **SP02 Live Provider Smoke**
+- Current Task: **Owner-authorized Magnific smoke using the accepted `recraft-v4-1` wizard fixture**
+- Current Task Status: **TECHNICAL_PASS / READY_FOR_OWNER_SMOKE**
+- Required Actor: **CHATGPT + OWNER-AUTHORIZED MAGNIFIC CONNECTION**
+- Closing Code Cycle: `PAG-SP02-C003` → **PASS / CLOSED**
+- Closing Strict Audit: `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
+- Next Task/Action: Run exactly one controlled Magnific smoke candidate, capture provider/model/creation/result provenance, then record smoke disposition.
+- Blockers/Waits: **SP04 qualification and M11 remain blocked** until real provider evidence exists. SP03 normalization implementation should begin only after the first raw provider smoke artifact is captured so normalization tests can include real evidence.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
 - Provider Selection: **explicit per request/job; no silent provider or model fallback**
 - Magnific Mode: owner-authorized external orchestration while owner credits are available.
@@ -27,7 +26,7 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 
 ## Current Product Goal
 
-Convert the accepted deterministic Pixel Art Generator foundation into a **PixelLab-like Semantic Pixel Studio** that can generate recognizable small pixel art from text/reference/style inputs, then route it through existing ScrubBots provenance, validation, review, batch and export machinery.
+Convert the accepted deterministic Pixel Art Generator foundation into a **PixelLab-like Semantic Pixel Studio** that generates recognizable small pixel art from text/reference/style inputs, then routes raw provider artwork through deterministic ScrubBots normalization, validation, provenance, review, batch and export machinery.
 
 ```text
 TEXT / REFERENCE / STYLE
@@ -37,10 +36,10 @@ TEXT / REFERENCE / STYLE
           ↓
  recognizable raw semantic artwork
           ↓
- deterministic ingestion / normalization
+ SP03 deterministic normalization
           ↓
  existing MASK / RULES / WFC / HYBRID
- as control / puzzle / style infrastructure
+ control / puzzle / style infrastructure
           ↓
  structural QA + semantic recognizability gate
           ↓
@@ -72,7 +71,7 @@ These remain hard legality unless the owner explicitly changes them:
 
 `ASSET_ART` is separate from LevelData and may use explicit sizes such as 16x16, 24x24, 32x32, 48x48, 64x64 and rectangles under its own asset policy.
 
-Raw provider output dimensions are a separate concept from logical requested dimensions. A provider may return a much larger raster, but that raw raster cannot become logical artwork until SP03 normalization.
+Raw provider output dimensions are separate from logical requested dimensions. Provider rasters may be much larger, up to the versioned semantic raw-raster bound, but raw provider output cannot become logical artwork until SP03 normalization.
 
 ## Provider Rules
 
@@ -80,13 +79,14 @@ Raw provider output dimensions are a separate concept from logical requested dim
 
 - approved semantic provider while owner credits are available;
 - local Factory must not scrape/drive Magnific website or use undocumented/private endpoints;
-- initial execution is owner-authorized external orchestration;
-- current surfaced integration does not expose provider seed or exact logical raster size;
+- execution is owner-authorized external orchestration;
+- provider seed and exact logical raster size are not claimed where the surfaced provider does not expose them;
 - requested logical dimensions and returned provider raster dimensions are separate provenance fields;
 - raw provider raster remains raw until SP03 normalization;
-- provider-native capability truth is **model-specific** where the connected catalog differs by model;
-- model capability snapshots used by deterministic jobs must be pinned/versioned and truthful;
-- unknown/unpinned model slugs must fail closed in SP02;
+- provider capability truth is model-specific;
+- deterministic jobs use pinned/versioned model capability snapshots;
+- unknown/unpinned model slugs fail closed;
+- current smoke model: `recraft-v4-1`, 1:1, count 1, wizard fixture;
 - provider/model selection is explicit, never silent fallback.
 
 ### PIXELLAB
@@ -95,13 +95,13 @@ Official SDK authority: `https://github.com/pixellab-code/pixellab-python`.
 
 - provider id: `PIXELLAB`;
 - official package: `pixellab`;
-- inspected SDK version: `1.0.8`;
+- inspected SDK version baseline: `1.0.8`;
 - default API base: `https://api.pixellab.ai/v1`;
 - secret from `PIXELLAB_SECRET` only;
 - optional base URL from `PIXELLAB_BASE_URL`;
 - PixFlux supports exact `image_size`, negative description, outline, shading, detail, view/direction, isometric, no-background, coverage, init image, forced color image and integer seed;
-- BitForge additionally exposes style image and `style_strength`, plus richer edit/reference inputs;
-- direct PixelLab network access is allowed only inside explicit PIXELLAB provider execution;
+- BitForge additionally exposes style image and `style_strength` plus richer edit/reference inputs;
+- direct PixelLab network access is allowed only inside explicit PIXELLAB execution;
 - package import, job preparation and historical procedural generation remain network-free;
 - secrets never enter source control, canonical identity, manifests or logs.
 
@@ -112,6 +112,7 @@ Official SDK authority: `https://github.com/pixellab-code/pixellab-python`.
 - `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
 - `docs/SEMANTIC_PIVOT_AUTHORITY_V01.md`
 - `review/m10/M10_OWNER_REVIEW_DECISION.md`
+- `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
 
 ---
 
@@ -139,7 +140,7 @@ M10 technical performance decision retained: RULES 59x59 V1 offline-factory budg
 
 - [x] **PAG-SP00 — Owner Rejection & Semantic Pivot Record**
 - [x] **PAG-SP01 — Semantic Contracts & Provider Boundary**
-- [~] **PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion**
+- [~] **PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion** — code technical PASS, live smoke pending
 - [ ] **PAG-SP03 — Semantic Normalization Pipeline**
 - [ ] **PAG-SP04 — Semantic Provider / Model / Workflow Qualification**
 - [ ] **PAG-SP05 — LEVEL_ART Semantic Integration**
@@ -159,12 +160,12 @@ M10 technical performance decision retained: RULES 59x59 V1 offline-factory budg
 
 Final state: `PASS / CLOSED`
 
-- [x] SP00-001 Record owner rejection of the entire M10 100-image review pack.
-- [x] SP00-002 Preserve the rejected pack as negative regression evidence.
-- [x] SP00-003 Publish Semantic Pixel Studio conversion plan.
-- [x] SP00-004 Select Magnific as an approved semantic provider while credits are available.
-- [x] SP00-005 Preserve provider-neutral architecture.
-- [x] SP00-006 Authorize PixelLab official Developer API / Python SDK as an additional direct semantic provider.
+- [x] Record owner rejection of the M10 100-image review pack.
+- [x] Preserve rejected pack as negative regression evidence.
+- [x] Publish Semantic Pixel Studio conversion plan.
+- [x] Approve Magnific as semantic provider while owner credits are available.
+- [x] Preserve provider-neutral architecture.
+- [x] Authorize PixelLab official Developer API / Python SDK as an additional provider.
 
 ---
 
@@ -176,116 +177,74 @@ Closing cycle: `PAG-SP01-C003 — Non-Success Provenance Echo & Mismatch-Test Se
 
 Closing audit: `.hiveai/audits/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_STRICT_AUDIT.md`
 
-- [x] SP01-001 Define `LEVEL_ART` and `ASSET_ART` output classes.
-- [x] SP01-002 Define immutable/versioned `SemanticGenerationRequest`.
-- [x] SP01-003 Define content-identified image input descriptors.
-- [x] SP01-004 Define provider-neutral `SemanticGeneratorProvider` boundary.
-- [x] SP01-005 Define typed raw `SemanticImageCandidate` success/failure boundary.
-- [x] SP01-006 Define truthful provider capability schema.
-- [x] SP01-007 Define deterministic request/result identity rules.
-- [x] SP01-008 Bind LEVEL_ART dimensions to existing ScrubBots difficulty contracts.
-- [x] SP01-009 Keep ASSET_ART independent of LevelData difficulty legality.
-- [x] SP01-010 Enforce REFERENCE / STYLE / INIT / COLOR_REFERENCE role integrity.
-- [x] SP01-011 Bind provider/result provenance exactly to the checked request.
-- [x] SP01-012 Make non-success candidates provenance-complete.
-- [x] SP01-013 Prevent raw semantic candidates from masquerading as M08 logical artwork before normalization.
+- [x] `LEVEL_ART` and `ASSET_ART` output classes.
+- [x] Immutable/versioned `SemanticGenerationRequest`.
+- [x] Content-identified image input descriptors.
+- [x] Provider-neutral `SemanticGeneratorProvider` boundary.
+- [x] Typed raw `SemanticImageCandidate` success/failure boundary.
+- [x] Truthful provider capability schema.
+- [x] Deterministic request/result identity rules.
+- [x] LEVEL_ART dimensions bound to existing ScrubBots difficulty contracts.
+- [x] ASSET_ART independent from LevelData difficulty legality.
+- [x] REFERENCE / STYLE / INIT / COLOR_REFERENCE role integrity.
+- [x] Exact provider/result provenance binding.
+- [x] Provenance-complete non-success candidates.
+- [x] Raw semantic candidates blocked from M08 artwork before normalization.
 
 ---
 
 # PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 
-State: `ACTIVE / C003_REMEDIATION`
+State: `TECHNICAL_PASS / LIVE_SMOKE_PENDING`
 
-## Cycle PAG-SP02-C001 — Magnific + PixelLab Provider Bridges & Result Ingestion
+Cycle history:
 
-State: **FAIL / REMEDIATED BY C002**
+- `PAG-SP02-C001` → FAIL, bounded remediation opened.
+- `PAG-SP02-C002` → FAIL, four production-facing residuals remained.
+- `PAG-SP02-C003` → **PASS / CLOSED**.
 
-Strict audit: `.hiveai/audits/PAG-SP02-C001_MAGNIFIC_AND_PIXELLAB_PROVIDER_BRIDGES_STRICT_AUDIT.md`
+Closing strict audit:
 
-C001 established the useful multi-provider foundation but failed on Magnific raw-raster handling, executable capability truth, result identity, exact model binding, BitForge style strength and smoke readiness.
+`.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
 
-C001 strict-audit findings:
+C003 technical closure:
 
-- [x] `F-PAG-SP02-C001-001` original logical==raw raster equality defect removed in C002; a >1024 cross-layer residual remains under C002 finding 001.
-- [~] `F-PAG-SP02-C001-002` arbitrary ratio algorithm/native prompt-control overclaim largely fixed in C002; model-specific snapshot fidelity remains under C002 finding 002.
-- [~] `F-PAG-SP02-C001-003` audit/cost identity contamination fixed for success/audit metadata; failure diagnostic identity residual remains under C002 finding 003.
-- [x] `F-PAG-SP02-C001-004` request/job/actual success-model drift closed in C002; broader cross-object binding tracked separately under C002 finding 004.
-- [x] `F-PAG-SP02-C001-005` BitForge style-strength omission closed in C002.
-- [x] `F-PAG-SP02-C001-006` stale Magnific smoke slug replaced with current `recraft-v4-1` in C002.
-- [x] `F-PAG-SP02-C001-007` legacy hidden tracker authority misuse corrected in C002 builder process.
+- [x] SP02-C003-001 Raw returned-provider raster validation separated from logical/requested dimensions; 2048/4096/8192 accepted.
+- [x] SP02-C003-002 LEVEL_ART and ASSET_ART requested/logical legality preserved.
+- [x] SP02-C003-003 Versioned per-model Magnific capability snapshot implemented.
+- [x] SP02-C003-004 Exact supported aspect-ratio sets pinned for deliberate Magnific candidate models.
+- [x] SP02-C003-005 Model-specific REFERENCE/STYLE role support enforced during job preparation.
+- [x] SP02-C003-006 Unknown/unpinned Magnific models fail closed before canonical job creation.
+- [x] SP02-C003-007 Explicit Magnific resolution/quality overrides validated against pinned model support.
+- [x] SP02-C003-008 `recraft-v4-1` smoke fixture regenerated with exact pinned capability snapshot and no unsupported `21:9`.
+- [x] SP02-C003-009 Free-text failure diagnostics removed from Magnific/PixelLab deterministic result-manifest digest identity.
+- [x] SP02-C003-010 Magnific request↔job↔manifest coordinated provenance binding closed.
+- [x] SP02-C003-011 PixelLab request↔job↔candidate↔manifest coordinated provenance binding closed.
+- [x] SP02-C003-012 Magnific failure observed-actual-model provenance is optional/truthful; reported drift fails closed.
+- [x] SP02-C003-013 Sensitivity tests added for raw raster bounds, pinned model truth, unknown models, failure identity and coordinated mismatches.
+- [x] SP02-C003-014 Accepted C002 PixelLab seed/size/style-strength/secret/isolation behavior preserved.
+- [x] SP02-C003-015 Builder reports final 445-test repository regression green; independent auditor replay UNVERIFIED due audit-container DNS.
+- [x] SP02-C003-016 No paid provider execution, live PixelLab call or Magnific browser/private endpoint automation occurred.
 
-## Cycle PAG-SP02-C002 — Provider Contract Fidelity, Result Identity & Smoke Readiness Remediation
+SP02 technical acceptance:
 
-State: **FAIL / BOUNDED C003 REQUIRED**
+- [x] SP02-A01 Same semantic request + same explicit provider/model bindings produces byte-identical canonical provider job identity.
+- [x] SP02-A02 Raw result is cryptographically/provenance bound to exact request/job/provider/engine/model chain.
+- [x] SP02-A03 Audit URL/timestamp/cost/failure prose do not alter deterministic provider-result identity.
+- [x] SP02-A04 Magnific can represent normal 2k/4k raw provider raster while retaining logical target dimensions.
+- [x] SP02-A05 Magnific capability truth is pinned per selected model; unknown models fail closed.
+- [x] SP02-A06 PixelLab retains exact-size provider intent and deterministic request-to-provider-seed mapping.
+- [x] SP02-A07 BitForge STYLE retains explicit style-strength semantics.
+- [x] SP02-A08 Provider failures remain typed/provenance-complete without fabricated observed execution facts.
+- [x] SP02-A09 Raw provider image remains blocked from normalized logical artwork.
+- [x] SP02-A10 Historical offline procedural paths remain unaffected.
+- [x] SP02-A11 Independent C003 audit marks bridge technically smoke-ready.
+- [ ] SP02-A12 Run one owner-authorized live Magnific smoke and record creation/result/import evidence.
+- [ ] SP02-A13 Run owner-authorized PixelLab smoke when `PIXELLAB_SECRET` is available in the authorized execution environment.
 
-Authoritative prompt: `.hiveai/prompts/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_PROMPT.md`
+Non-blocking C003 MINOR:
 
-Strict audit: `.hiveai/audits/PAG-SP02-C002_PROVIDER_CONTRACT_FIDELITY_RESULT_IDENTITY_AND_SMOKE_READINESS_REMEDIATION_STRICT_AUDIT.md`
-
-Builder reported 54 focused SP01+SP02 tests and 435 full repository tests passing. Independent audit runtime replay was blocked by audit-container GitHub DNS, but static/provider-contract findings are definitive.
-
-C002 task disposition:
-
-- [~] SP02-C002-001 Logical requested dimensions are separated from Magnific raw dimensions, but raw `SemanticImageCandidate` still caps returned rasters at 1024.
-- [~] SP02-C002-002 Deterministic ratio mapping exists, but pinned per-model capability sets are inaccurate/fail-open.
-- [x] SP02-C002-003 Magnific negative prompt/transparency/view/isometric prompt hints are no longer advertised as native capabilities.
-- [~] SP02-C002-004 Audit/cost/transient metadata are excluded from success identity, but free-text failure diagnostics still affect manifest digest.
-- [x] SP02-C002-005 Exact request/job/actual success-model drift is rejected.
-- [x] SP02-C002-006 BitForge `style_strength` maps 0..1 -> 0..100 and reaches SDK kwargs.
-- [x] SP02-C002-007 Smoke fixture now uses current catalog-valid `recraft-v4-1` model slug.
-- [~] SP02-C002-008 Success/failure manifest consistency improved, but coordinated cross-object binding and failure actual-model semantics remain incomplete.
-- [~] SP02-C002-009 Sensitivity tests improved but do not cover >1024 rasters, model-specific catalog truth, failure-reason identity or coordinated mismatches.
-- [x] SP02-C002-010 Optional/lazy PixelLab SDK loading, env-secret safety, exact image-size/seed mapping and provider isolation preserved.
-- [~] SP02-C002-011 SP01 architecture preserved, but exact request↔job↔candidate/manifest binding still has residual gaps.
-- [~] SP02-C002-012 Builder full suite green; independent replay UNVERIFIED due auditor DNS.
-- [x] SP02-C002-013 Builder used root `TASKS.md` and current GitHub authority docs rather than stale hidden trackers.
-
-C002 strict-audit residuals:
-
-- [!] `F-PAG-SP02-C002-001` raw semantic candidate returned dimensions still reject valid provider rasters above 1024.
-- [!] `F-PAG-SP02-C002-002` Magnific model capability snapshots are inaccurate/fail-open for aspect ratios/reference roles and explicit resolution/quality.
-- [!] `F-PAG-SP02-C002-003` provider result-manifest digest still includes mutable free-text `failure_reason`.
-- [!] `F-PAG-SP02-C002-004` exact request↔job↔candidate/manifest coordinated provenance binding remains incomplete.
-- [!] `F-PAG-SP02-C002-005` Magnific failure `actual_model_slug` is over-specified when no actual execution model was observed.
-
-## Cycle PAG-SP02-C003 — Model Capability Snapshot, Raw Raster Ceiling & Cross-Provenance Closure
-
-State: **READY_FOR_IMPLEMENTATION**
-
-Authoritative prompt: `.hiveai/prompts/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_PROMPT.md`
-
-- [ ] SP02-C003-001 Separate raw returned-provider raster validation bound from requested/logical dimensions; support at least 2048 and 4096 raw output without normalization.
-- [ ] SP02-C003-002 Keep LEVEL_ART and ASSET_ART requested/logical dimension legality unchanged.
-- [ ] SP02-C003-003 Replace permissive Magnific metadata with a versioned per-model capability snapshot.
-- [ ] SP02-C003-004 Pin exact model-specific aspect ratios for the deliberately supported Magnific smoke/SP04 candidate set.
-- [ ] SP02-C003-005 Validate selected-model REFERENCE/STYLE role support; do not treat provider union capability as model truth.
-- [ ] SP02-C003-006 Reject unknown/unpinned Magnific model slugs in SP02 instead of inheriting a global permissive default.
-- [ ] SP02-C003-007 Validate explicit Magnific resolution/quality overrides against pinned model capability or reject them when unsupported/unpinned.
-- [ ] SP02-C003-008 Regenerate the `recraft-v4-1` smoke fixture with its exact pinned capability snapshot, excluding unsupported `21:9`.
-- [ ] SP02-C003-009 Remove free-text `failure_reason` from Magnific and PixelLab result-manifest deterministic digest identity while retaining full audit serialization.
-- [ ] SP02-C003-010 Add exact Magnific request↔job binding before manifest import and reject coordinated request-A/job-B mismatches.
-- [ ] SP02-C003-011 Add exact PixelLab request↔job↔candidate binding before result-manifest creation and reject coordinated mismatches.
-- [ ] SP02-C003-012 Make Magnific failure observed-actual-model provenance optional/truthful while retaining requested model provenance.
-- [ ] SP02-C003-013 Add sensitivity tests for >1024 raw rasters, pinned model capabilities, unknown models, failure identity invariance and coordinated provenance mismatches.
-- [ ] SP02-C003-014 Preserve all accepted C002 PixelLab seed/size/style-strength/secret/isolation behavior.
-- [ ] SP02-C003-015 Full focused + SP01 + full repository regression green.
-- [ ] SP02-C003-016 No paid provider execution, no live PixelLab call, no Magnific browser/private API automation.
-
-### SP02 technical acceptance after C003
-
-- [ ] SP02-A01 Same semantic request + same explicit provider/model bindings produces byte-identical canonical provider job identity.
-- [ ] SP02-A02 Raw result is cryptographically/provenance bound to the exact request/job/provider/engine/model chain.
-- [ ] SP02-A03 Audit URL/timestamp/cost/failure diagnostic prose changes do not alter deterministic provider-result identity.
-- [ ] SP02-A04 Magnific can represent a normal 2k/4k raw provider raster while retaining logical target dimensions for future SP03.
-- [ ] SP02-A05 Magnific job capabilities are truthful for the selected pinned model and unknown models fail closed.
-- [ ] SP02-A06 PixelLab retains exact-size provider intent and deterministic request-to-provider-seed mapping.
-- [ ] SP02-A07 BitForge STYLE retains explicit style-strength semantics.
-- [ ] SP02-A08 Normal provider failures remain provenance-complete and typed without fabricated observed execution facts.
-- [ ] SP02-A09 No raw provider image is treated as normalized logical artwork.
-- [ ] SP02-A10 Historical offline procedural paths remain unaffected.
-- [ ] SP02-A11 Independent audit marks C003/SP02 technically smoke-ready.
-- [ ] SP02-A12 Owner-authorized live Magnific smoke may run only after technical PASS.
-- [ ] SP02-A13 Owner-authorized PixelLab smoke may run only after technical PASS plus available `PIXELLAB_SECRET` and explicit authorization.
+- [~] Align documentation-only Magnific snapshot observation date (`2026-09-11` code vs `2026-09-12` README) on next docs touch. It is excluded from deterministic identity.
 
 ---
 
@@ -420,4 +379,4 @@ Authoritative prompt: `.hiveai/prompts/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_R
 
 ## Current Stop Rule
 
-Do not begin SP03, SP04 or M11. Do not spend provider credits. First execute **PAG-SP02-C003**, publish the builder log, and obtain independent ChatGPT strict audit. Only a technical PASS may authorize a real owner-approved provider smoke generation and later downstream work.
+No further SP02 Codex remediation is authorized from C003. Do not begin SP04 qualification or M11 yet. First run **one controlled owner-authorized Magnific smoke** using the accepted `recraft-v4-1` wizard fixture and capture provider/result provenance. After that smoke evidence is recorded, SP03 normalization may begin against both synthetic fixtures and the real provider artifact.
