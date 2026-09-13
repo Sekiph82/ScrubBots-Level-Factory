@@ -66,8 +66,10 @@ The required C002 log path was verified absent in the current workspace before t
 ## Publication checkpoint
 
 - Final verification timestamp before commit: 2026-09-13T12:42:28.8265939+03:00.
-- Commit and push: pending.
-- Final local HEAD, `origin/main`, divergence, and final scoped status: pending publication verification.
+- Implementation/merge publication commit: `e0059176ec2a599a80c80d945de73ec2a2beec03`.
+- Builder-log publication commit: `ff7395e8e03db757e6eaf61838274dc61a4d7780`.
+- Verified after `git fetch origin` at the final pre-log-update checkpoint: local HEAD `ff7395e8e03db757e6eaf61838274dc61a4d7780` equals `origin/main` `ff7395e8e03db757e6eaf61838274dc61a4d7780`; divergence `0 0`.
+- Final scoped status: no staged or unstaged C002 files. Preserved unrelated dirt remains exactly as listed in the start checkpoint.
 
 ## Push correction and final publication
 
@@ -75,3 +77,5 @@ The required C002 log path was verified absent in the current workspace before t
 - Fetched `origin`, confirmed local `HEAD...origin/main` was `1 3`, and merged `origin/main` with the non-destructive `ort` strategy. The merge brought in only the GitHub-authoritative C002 prompt/audit and tracker changes; no local product or preserved dirty file was discarded.
 - Merge checkpoint timestamp: 2026-09-13T12:43:27.8252301+03:00. Merge HEAD: `e0059176ec2a599a80c80d945de73ec2a2beec03`; `origin/main`: `b28b55bb04223574ecf9137d93d98963059cd169`; pre-publication divergence: `2 0`.
 - The final log update and publication commit are being created after the implementation and merge chronology above; this is the final log-only publication step.
+
+The final log-only publication update itself is intentionally not self-recorded by SHA inside this file. After its push, `git fetch origin` and equality verification are required to complete the terminal checkpoint without creating a further self-referential commit.
