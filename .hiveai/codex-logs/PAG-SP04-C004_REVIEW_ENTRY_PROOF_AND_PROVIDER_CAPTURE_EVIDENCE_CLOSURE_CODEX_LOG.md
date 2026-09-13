@@ -66,3 +66,5 @@ No C004 test command failed; no correction was required after the final focused 
 ## Publication
 
 Commit and push are pending. The implementation/test terminal SHA will be recorded before the final log-only publication step. Per the C004 no-self-referential-loop rule, the final response will verify the terminal log-only HEAD equals `origin/main` with divergence `0 0`.
+
+Implementation/test terminal commit: `5f1d189570506aad13c3d8c19ef9b9ef88004bd7` (`Implement SP04 C004 review and capture evidence closure`). It was pushed successfully to `main`; the immediate post-push fetch verified local HEAD and `origin/main` equal at that SHA with divergence `0 0`. The subsequent publication commit contains only this completed builder-log update; the final response will report its terminal SHA and repeat the equality check.
