@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import base64
+from dataclasses import replace
 from types import SimpleNamespace
 from pathlib import Path
 
@@ -17,7 +18,9 @@ from scrubbots_pixel_factory.semantic import (
     ImageInputRole,
     OutputClass,
     SemanticNormalizationRequiredError,
+    SemanticCandidateError,
     SemanticGenerationRequest,
+    SemanticImageCandidate,
     SemanticProviderError,
 )
 from scrubbots_pixel_factory.semantic.providers import (
@@ -30,6 +33,8 @@ from scrubbots_pixel_factory.semantic.providers.magnific import (
     MagnificProvider,
     MagnificReferenceBinding,
     MagnificResultManifest,
+    MAGNIFIC_MODEL_ASPECT_RATIOS,
+    get_magnific_model_snapshot,
     map_magnific_aspect_ratio,
 )
 from scrubbots_pixel_factory.semantic.providers.pixellab import (
@@ -95,7 +100,7 @@ def test_committed_provider_job_fixtures_are_executable_canonical_examples() -> 
 
 def test_magnific_reference_and_style_bindings_are_role_hash_exact() -> None:
     ref_payload, style_payload = b"reference", b"style"
-    request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1", reference_images=(image(ImageInputRole.REFERENCE, ref_payload),), style_image=image(ImageInputRole.STYLE, style_payload))
+    request = asset_request(provider_id="MAGNIFIC", provider_model="seedream-5-pro", reference_images=(image(ImageInputRole.REFERENCE, ref_payload),), style_image=image(ImageInputRole.STYLE, style_payload))
     bindings = (
         MagnificReferenceBinding("REFERENCE", hashlib.sha256(ref_payload).hexdigest(), "creation-ref"),
         MagnificReferenceBinding("STYLE", hashlib.sha256(style_payload).hexdigest(), "creation-style"),
@@ -124,6 +129,16 @@ def test_magnific_result_import_verifies_manifest_bytes_dimensions_and_request()
         manifest.import_result(wrong, job, raw)
 
 
+def test_magnific_rejects_manifest_and_job_from_a_different_request_together() -> None:
+    request_a = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1", seed="request-a")
+    request_b = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1", seed="request-b")
+    job_b = MagnificJobSpec.from_request(request_b)
+    raw = b"request-bound-raster"
+    manifest_b = MagnificResultManifest.success(job_b, raw_image_sha256=hashlib.sha256(raw).hexdigest(), returned_width=16, returned_height=16, creation_id="creation-b")
+    with pytest.raises(SemanticProviderError):
+        manifest_b.import_result(request_a, job_b, raw)
+
+
 def test_magnific_accepts_larger_raw_raster_without_normalizing_logical_dimensions() -> None:
     request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1")
     job = MagnificJobSpec.from_request(request)
@@ -134,6 +149,59 @@ def test_magnific_accepts_larger_raw_raster_without_normalizing_logical_dimensio
     assert (candidate.returned_width, candidate.returned_height) == (1024, 1024)
     with pytest.raises(SemanticNormalizationRequiredError):
         candidate.as_m08_artwork()
+
+
+@pytest.mark.parametrize("dimension", [2048, 4096, 8192])
+def test_magnific_raw_raster_ceiling_accepts_provider_sizes_through_8192(dimension: int) -> None:
+    request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1")
+    job = MagnificJobSpec.from_request(request)
+    raw = f"provider-raster-{dimension}".encode()
+    manifest = MagnificResultManifest.success(job, raw_image_sha256=hashlib.sha256(raw).hexdigest(), returned_width=dimension, returned_height=dimension, creation_id=f"creation-{dimension}")
+    candidate = manifest.import_result(request, job, raw)
+    assert (candidate.returned_width, candidate.returned_height) == (dimension, dimension)
+
+
+def test_magnific_raw_raster_ceiling_rejects_above_versioned_bound() -> None:
+    request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1")
+    with pytest.raises(SemanticCandidateError):
+        SemanticImageCandidate.success(request, candidate_id="too-large", provider_id="MAGNIFIC", provider_version="magnific-adapter-v1", workflow_version=request.provider_workflow_version, image_bytes=b"raw", returned_width=8193, returned_height=8193, model_id="recraft-v4-1")
+
+
+def test_magnific_model_snapshots_are_exact_role_ratio_and_option_boundaries() -> None:
+    recraft = get_magnific_model_snapshot("recraft-v4-1")
+    seedream = get_magnific_model_snapshot("seedream-5-pro")
+    assert recraft.supported_aspect_ratios == MAGNIFIC_MODEL_ASPECT_RATIOS["recraft-v4-1"]
+    assert recraft.supported_aspect_ratios == ("1:1", "2:1", "1:2", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16")
+    assert "21:9" not in recraft.supported_aspect_ratios
+    assert recraft.supported_reference_roles == (ImageInputRole.STYLE,)
+    assert seedream.supported_aspect_ratios == ("1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9")
+    assert seedream.supported_resolutions == ("1.5k", "2k")
+    with pytest.raises(SemanticProviderError):
+        get_magnific_model_snapshot("unapproved-model")
+    with pytest.raises(SemanticProviderError):
+        MagnificJobSpec.from_request(asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1"), resolution="2k")
+    style_payload = b"snapshot-style"
+    style = image(ImageInputRole.STYLE, style_payload)
+    seedream_request = asset_request(provider_id="MAGNIFIC", provider_model="seedream-5-pro", style_image=style)
+    assert MagnificJobSpec.from_request(seedream_request, resolution="1.5k", bindings=(MagnificReferenceBinding("STYLE", style.content_sha256, "style-1"),)).model_capability_snapshot == seedream
+
+
+def test_magnific_model_snapshot_rejects_generic_reference_for_recraft() -> None:
+    payload = b"generic-reference"
+    request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1", reference_images=(image(ImageInputRole.REFERENCE, payload),))
+    with pytest.raises(SemanticProviderError):
+        MagnificJobSpec.from_request(request, bindings=(MagnificReferenceBinding("REFERENCE", hashlib.sha256(payload).hexdigest(), "ref-1"),))
+
+
+def test_external_failure_reason_is_audit_only_and_actual_model_semantics_are_fail_closed() -> None:
+    request = asset_request(provider_id="MAGNIFIC", provider_model="recraft-v4-1")
+    job = MagnificJobSpec.from_request(request)
+    first = MagnificResultManifest.failure(job, reason="network wording A")
+    second = MagnificResultManifest.failure(job, reason="network wording B")
+    assert first.digest() == second.digest()
+    drift = replace(first, actual_model_slug="other-model")
+    with pytest.raises(SemanticProviderError):
+        drift.import_result(request, job, None)
 
 
 def test_magnific_supported_aspect_mapping_is_exact_nearest_and_tie_stable() -> None:
@@ -270,6 +338,33 @@ def test_pixellab_injected_client_calls_only_selected_method_and_verifies_dimens
     manifest = provider.manifest_for(candidate, asset_request())
     assert manifest.workflow_version == "sp02-test-workflow"
     assert manifest.canonical_dict()["engine"] == "PIXFLUX"
+
+
+def test_pixellab_manifest_checked_path_binds_candidate_request_and_job() -> None:
+    raw = b"checked-pixellab-result"
+    response = SimpleNamespace(image=FakeImage(raw, (16, 16)))
+    provider = PixelLabProvider(client=FakeClient(response), runtime_config=PixelLabRuntimeConfig())
+    request = asset_request()
+    candidate = provider.generate_checked(request)
+    job = provider.prepare_job(request)
+    manifest = PixelLabResultManifest.from_candidate(candidate, job, request=request)
+    assert manifest.request_digest == request.digest()
+    other_request = asset_request(seed="different-request")
+    with pytest.raises(SemanticProviderError):
+        PixelLabResultManifest.from_candidate(candidate, provider.prepare_job(other_request), request=other_request)
+    with pytest.raises(SemanticProviderError):
+        PixelLabResultManifest.from_candidate(replace(candidate, provider_version="forged-provider"), job, request=request)
+    with pytest.raises(SemanticProviderError):
+        PixelLabResultManifest.from_candidate(candidate, replace(job, provider_seed=job.provider_seed + 1), request=request)
+    with pytest.raises(SemanticProviderError):
+        PixelLabResultManifest.from_candidate(replace(candidate, returned_width=15), job, request=request)
+
+
+def test_pixellab_failure_reason_is_not_result_identity() -> None:
+    job = PixelLabJobSpec.from_request(asset_request())
+    first = PixelLabResultManifest.failure(job, reason="provider wording A")
+    second = PixelLabResultManifest.failure(job, reason="provider wording B")
+    assert first.digest() == second.digest()
 
 
 def test_pixellab_without_secret_is_typed_unavailable_and_does_not_import_or_call_sdk(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -302,6 +302,65 @@ def _response_image_bytes(response: object) -> tuple[bytes, tuple[int, int]]:
     return stream.getvalue(), (int(size[0]), int(size[1]))
 
 
+def _validate_candidate_binding(candidate: SemanticImageCandidate, request: SemanticGenerationRequest, job: PixelLabJobSpec) -> None:
+    """Fail closed unless candidate, request, and prepared job are one execution."""
+    if not isinstance(candidate, SemanticImageCandidate) or not isinstance(request, SemanticGenerationRequest) or not isinstance(job, PixelLabJobSpec):
+        raise SemanticProviderError("PixelLab manifest requires typed candidate, request, and job")
+    width, height = request.resolved_dimensions()
+    expected_engine = (request.provider_model or "").upper()
+    if expected_engine not in ("PIXFLUX", "BITFORGE"):
+        raise SemanticProviderError("PixelLab request engine is invalid")
+    expected_bindings = _expected_bindings(request, expected_engine)
+    expected_hashes = {role: descriptor.content_sha256 for role, descriptor in expected_bindings}
+    expected_provider_seed = _provider_seed(request.seed, request.digest())
+    expected_strength = None if request.init_strength is None else round(request.init_strength * 1000)
+    expected_style_strength = None if expected_engine != "BITFORGE" or request.style_strength is None else round(request.style_strength * 100)
+    job_matches = (
+        job.schema == PIXELLAB_JOB_SCHEMA
+        and job.schema_version == PIXELLAB_JOB_SCHEMA_VERSION
+        and job.request_digest == request.digest()
+        and job.provider_id == PIXELLAB_PROVIDER_ID
+        and job.provider_version == PIXELLAB_ADAPTER_VERSION
+        and job.provider_config_version == request.provider_config_version == PIXELLAB_CONFIG_VERSION
+        and job.engine == expected_engine
+        and job.workflow_version == request.provider_workflow_version
+        and (job.width, job.height) == (width, height)
+        and job.original_seed == request.seed
+        and job.provider_seed == expected_provider_seed
+        and job.description == request.description
+        and job.negative_description == request.negative_description
+        and job.outline == _map_control("outline", request.outline)
+        and job.shading == _map_control("shading", request.shading)
+        and job.detail == _map_control("detail", request.detail)
+        and job.view == _map_control("view", request.view)
+        and job.direction == _map_control("direction", request.direction)
+        and job.isometric == request.isometric
+        and job.no_background == request.no_background
+        and job.coverage_percentage == request.coverage_percentage
+        and job.init_image_sha256 == expected_hashes.get(ImageInputRole.INIT)
+        and job.style_image_sha256 == expected_hashes.get(ImageInputRole.STYLE)
+        and job.color_image_sha256 == expected_hashes.get(ImageInputRole.COLOR_REFERENCE)
+        and job.init_strength == expected_strength
+        and job.style_strength == expected_style_strength
+    )
+    candidate_matches = (
+        candidate.request_digest == request.digest()
+        and candidate.provider_id == PIXELLAB_PROVIDER_ID
+        and candidate.provider_version == PIXELLAB_ADAPTER_VERSION
+        and candidate.workflow_version == request.provider_workflow_version
+        and candidate.model_id == request.provider_model
+        and candidate.seed == request.seed
+        and (candidate.requested_width, candidate.requested_height) == (width, height)
+        and candidate.reference_images == request.reference_images
+        and candidate.style_image == request.style_image
+        and candidate.init_image == request.init_image
+        and candidate.color_reference == request.color_reference
+        and (not candidate.is_success or (candidate.returned_width, candidate.returned_height) == (job.width, job.height))
+    )
+    if not job_matches or not candidate_matches:
+        raise SemanticProviderError("PixelLab candidate, request, and job provenance are not exactly bound")
+
+
 @dataclass(frozen=True, slots=True)
 class PixelLabResultManifest:
     request_digest: str
@@ -350,7 +409,8 @@ class PixelLabResultManifest:
         object.__setattr__(self, "status", status)
 
     @classmethod
-    def from_candidate(cls, candidate: SemanticImageCandidate, job: PixelLabJobSpec, *, usage_usd: float | None = None) -> "PixelLabResultManifest":
+    def from_candidate(cls, candidate: SemanticImageCandidate, job: PixelLabJobSpec, *, request: SemanticGenerationRequest, usage_usd: float | None = None) -> "PixelLabResultManifest":
+        _validate_candidate_binding(candidate, request, job)
         return cls(candidate.request_digest, job.digest(), candidate.provider_id, candidate.provider_version, job.provider_config_version, job.engine, candidate.workflow_version, job.original_seed, job.provider_seed, candidate.returned_width, candidate.returned_height, candidate.raw_image_sha256, "image/png" if candidate.is_success else None, candidate.status, usage_usd, candidate.failure_reason, {})
 
     @classmethod
@@ -365,7 +425,7 @@ class PixelLabResultManifest:
         return {"schema": self.schema, "schema_version": self.schema_version, "request_digest": self.request_digest, "job_digest": self.job_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version}, "engine": self.engine, "workflow_version": self.workflow_version, "original_seed": typed_seed(self.original_seed), "provider_seed": self.provider_seed, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None, "raw_image_sha256": self.raw_image_sha256, "media_type": self.media_type, "status": self.status.value if isinstance(self.status, CandidateStatus) else self.status, "usage": {"usd": self.usage_usd} if self.usage_usd is not None else None, "failure_reason": self.failure_reason, "audit_metadata": dict(self.audit_metadata)}
 
     def identity_dict(self) -> dict[str, object]:
-        return {"schema": self.schema, "schema_version": self.schema_version, "request_digest": self.request_digest, "job_digest": self.job_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version}, "engine": self.engine, "workflow_version": self.workflow_version, "original_seed": typed_seed(self.original_seed), "provider_seed": self.provider_seed, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None, "raw_image_sha256": self.raw_image_sha256, "media_type": self.media_type, "status": self.status.value if isinstance(self.status, CandidateStatus) else self.status, "failure_reason": self.failure_reason}
+        return {"schema": self.schema, "schema_version": self.schema_version, "request_digest": self.request_digest, "job_digest": self.job_digest, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version}, "engine": self.engine, "workflow_version": self.workflow_version, "original_seed": typed_seed(self.original_seed), "provider_seed": self.provider_seed, "returned_dimensions": {"width": self.returned_width, "height": self.returned_height} if self.returned_width is not None else None, "raw_image_sha256": self.raw_image_sha256, "media_type": self.media_type, "status": self.status.value if isinstance(self.status, CandidateStatus) else self.status}
 
     def canonical_bytes(self) -> bytes:
         return canonical_bytes(self.canonical_dict())
@@ -461,8 +521,9 @@ class PixelLabProvider(SemanticGeneratorProvider):
             # Never echo SDK errors: they may contain credentials or URLs.
             return SemanticImageCandidate.failure(request, candidate_id=f"pixellab-{job.digest()[:24]}", provider_id=PIXELLAB_PROVIDER_ID, provider_version=PIXELLAB_ADAPTER_VERSION, workflow_version=request.provider_workflow_version, reason="PixelLab execution failed", status=CandidateStatus.FAILURE)
 
-    def manifest_for(self, candidate: SemanticImageCandidate, request: SemanticGenerationRequest, *, usage_usd: float | None = None) -> PixelLabResultManifest:
-        return PixelLabResultManifest.from_candidate(candidate, self.prepare_job(request), usage_usd=usage_usd)
+    def manifest_for(self, candidate: SemanticImageCandidate, request: SemanticGenerationRequest, *, job: PixelLabJobSpec | None = None, usage_usd: float | None = None) -> PixelLabResultManifest:
+        actual_job = self.prepare_job(request) if job is None else job
+        return PixelLabResultManifest.from_candidate(candidate, actual_job, request=request, usage_usd=usage_usd)
 
 
 PixelLabDirectProvider = PixelLabProvider

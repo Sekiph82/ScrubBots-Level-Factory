@@ -107,6 +107,7 @@ from .semantic import (
     SemanticOutputClass,
     SemanticProviderCapabilities,
     SemanticResult,
+    SEMANTIC_RAW_RASTER_MAX_DIMENSION,
     UnsupportedCapabilityError,
 )
 
@@ -205,6 +206,7 @@ __all__ = [
     "SemanticProviderResult",
     "SemanticRequestError",
     "SemanticResult",
+    "SEMANTIC_RAW_RASTER_MAX_DIMENSION",
     "UnsupportedCapabilityError",
 ]
 

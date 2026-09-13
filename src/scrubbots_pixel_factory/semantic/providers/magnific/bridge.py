@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 import hashlib
 import math
+from types import MappingProxyType
 from typing import Any
 
 from ...contracts import (
@@ -37,14 +38,57 @@ MAGNIFIC_RESULT_SCHEMA = "scrubbots-magnific-result"
 MAGNIFIC_RESULT_SCHEMA_VERSION = 1
 MAGNIFIC_EXECUTION_SURFACE = "external-manual-orchestrator"
 MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION = "magnific-aspect-ratios-v1"
+MAGNIFIC_MODEL_SNAPSHOT_VERSION = "magnific-model-snapshot-v1"
 MAGNIFIC_SUPPORTED_ASPECT_RATIOS = ("1:1", "21:9", "16:9", "9:16", "2:3", "3:4", "1:2", "2:1", "5:4", "4:5", "3:2", "4:3")
-MAGNIFIC_MODEL_ASPECT_RATIOS = {
-    "recraft-v4-1": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
-    "seedream-5-pro": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
-    "imagen-nano-banana-2-lite": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
-    "imagen-nano-banana-2": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
-    "gpt-2": MAGNIFIC_SUPPORTED_ASPECT_RATIOS,
-}
+
+
+@dataclass(frozen=True, slots=True)
+class MagnificModelCapabilitySnapshot:
+    """Pinned, minimal model capability data used for deterministic jobs."""
+
+    model_slug: str
+    supported_aspect_ratios: tuple[str, ...]
+    supported_reference_roles: tuple[ImageInputRole, ...]
+    supported_resolutions: tuple[str, ...]
+    supported_qualities: tuple[str, ...]
+    snapshot_version: str = MAGNIFIC_MODEL_SNAPSHOT_VERSION
+    observation_date: str | None = field(default=None, compare=False)
+
+    def __post_init__(self) -> None:
+        if type(self.model_slug) is not str or not self.model_slug.strip():
+            raise SemanticProviderError("Magnific model snapshot slug is invalid")
+        if type(self.snapshot_version) is not str or not self.snapshot_version.strip():
+            raise SemanticProviderError("Magnific model snapshot version is invalid")
+        if not self.supported_aspect_ratios:
+            raise SemanticProviderError("Magnific model snapshot needs an aspect-ratio set")
+        if any(item not in MAGNIFIC_SUPPORTED_ASPECT_RATIOS for item in self.supported_aspect_ratios):
+            raise SemanticProviderError("Magnific model snapshot contains an unsupported aspect ratio")
+        if any(role not in (ImageInputRole.REFERENCE, ImageInputRole.STYLE) for role in self.supported_reference_roles):
+            raise SemanticProviderError("Magnific model snapshot contains an unsupported reference role")
+
+    def identity_dict(self) -> dict[str, object]:
+        return {"model_slug": self.model_slug, "supported_aspect_ratios": list(self.supported_aspect_ratios), "supported_reference_roles": [role.value for role in self.supported_reference_roles], "supported_resolutions": list(self.supported_resolutions), "supported_qualities": list(self.supported_qualities), "snapshot_version": self.snapshot_version}
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {**self.identity_dict(), "observation_date": self.observation_date}
+
+
+_RECRAFT_RATIOS = ("1:1", "2:1", "1:2", "3:2", "2:3", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16")
+_SEEDREAM_RATIOS = ("1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9")
+_IMAGEN_LITE_RATIOS = ("1:1", "2:3", "3:2", "4:3", "3:4", "5:4", "4:5", "16:9", "9:16", "21:9")
+MAGNIFIC_MODEL_CAPABILITY_SNAPSHOTS = MappingProxyType({
+    "recraft-v4-1": MagnificModelCapabilitySnapshot("recraft-v4-1", _RECRAFT_RATIOS, (ImageInputRole.STYLE,), (), (), observation_date="2026-09-11"),
+    "seedream-5-pro": MagnificModelCapabilitySnapshot("seedream-5-pro", _SEEDREAM_RATIOS, (ImageInputRole.REFERENCE, ImageInputRole.STYLE), ("1.5k", "2k"), (), observation_date="2026-09-11"),
+    "imagen-nano-banana-2-lite": MagnificModelCapabilitySnapshot("imagen-nano-banana-2-lite", _IMAGEN_LITE_RATIOS, (ImageInputRole.REFERENCE, ImageInputRole.STYLE), (), (), observation_date="2026-09-11"),
+})
+MAGNIFIC_MODEL_ASPECT_RATIOS = MappingProxyType({key: snapshot.supported_aspect_ratios for key, snapshot in MAGNIFIC_MODEL_CAPABILITY_SNAPSHOTS.items()})
+
+
+def get_magnific_model_snapshot(model_slug: str) -> MagnificModelCapabilitySnapshot:
+    try:
+        return MAGNIFIC_MODEL_CAPABILITY_SNAPSHOTS[model_slug]
+    except (KeyError, TypeError) as exc:
+        raise SemanticProviderError("Magnific model is absent from the pinned capability snapshot") from exc
 
 
 def _text(value: object, label: str) -> str:
@@ -116,8 +160,11 @@ def _expected_images(request: SemanticGenerationRequest) -> list[tuple[ImageInpu
     return result
 
 
-def _normalize_bindings(request: SemanticGenerationRequest, bindings: Iterable[MagnificReferenceBinding] | Mapping[object, object] | None) -> tuple[MagnificReferenceBinding, ...]:
+def _normalize_bindings(request: SemanticGenerationRequest, bindings: Iterable[MagnificReferenceBinding] | Mapping[object, object] | None, snapshot: MagnificModelCapabilitySnapshot) -> tuple[MagnificReferenceBinding, ...]:
     expected = _expected_images(request)
+    unsupported_roles = [role.value for role, _image in expected if role not in snapshot.supported_reference_roles]
+    if unsupported_roles:
+        raise SemanticProviderError(f"Magnific model {snapshot.model_slug!r} does not support reference roles: {', '.join(unsupported_roles)}")
     if bindings is None:
         if expected:
             raise SemanticProviderError("Magnific image inputs require explicit creation bindings")
@@ -183,6 +230,7 @@ class MagnificJobSpec:
     provider_seed_supported: bool = False
     aspect_ratio_vocabulary_version: str = MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION
     model_supported_aspect_ratios: tuple[str, ...] = MAGNIFIC_SUPPORTED_ASPECT_RATIOS
+    model_capability_snapshot: MagnificModelCapabilitySnapshot | None = None
     schema: str = MAGNIFIC_JOB_SCHEMA
     schema_version: int = MAGNIFIC_JOB_SCHEMA_VERSION
 
@@ -213,8 +261,15 @@ class MagnificJobSpec:
         count = request.desired_candidate_count if candidate_count is None else candidate_count
         if type(count) is not int or isinstance(count, bool) or count < 1:
             raise SemanticRequestError("Magnific candidate_count must be a positive integer")
-        ref_bindings = _normalize_bindings(request, bindings)
-        supported = tuple(model_aspect_ratios) if model_aspect_ratios is not None else tuple(MAGNIFIC_MODEL_ASPECT_RATIOS.get(model, MAGNIFIC_SUPPORTED_ASPECT_RATIOS))
+        snapshot = get_magnific_model_snapshot(model)
+        if model_aspect_ratios is not None and tuple(model_aspect_ratios) != snapshot.supported_aspect_ratios:
+            raise SemanticProviderError("ad hoc Magnific model capability snapshots are not permitted")
+        supported = snapshot.supported_aspect_ratios
+        if quality is not None and quality not in snapshot.supported_qualities:
+            raise SemanticProviderError("selected Magnific model does not expose that quality value")
+        if resolution is not None and resolution not in snapshot.supported_resolutions:
+            raise SemanticProviderError("selected Magnific model does not expose that resolution value")
+        ref_bindings = _normalize_bindings(request, bindings, snapshot)
         mapped_ratio = _map_aspect_ratio(width, height, supported)
         return cls(
             request_digest=request.digest(),
@@ -234,6 +289,7 @@ class MagnificJobSpec:
             original_seed=request.seed,
             aspect_ratio_vocabulary_version=MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION,
             model_supported_aspect_ratios=supported,
+            model_capability_snapshot=snapshot,
         )
 
     def canonical_dict(self) -> dict[str, object]:
@@ -248,6 +304,7 @@ class MagnificJobSpec:
             "aspect_ratio": self.aspect_ratio,
             "aspect_ratio_vocabulary_version": self.aspect_ratio_vocabulary_version,
             "model_supported_aspect_ratios": list(self.model_supported_aspect_ratios),
+            "model_capability_snapshot": self.model_capability_snapshot.identity_dict() if self.model_capability_snapshot is not None else None,
             "candidate_count": self.candidate_count,
             "quality": self.provider_quality,
             "resolution": self.provider_resolution,
@@ -277,7 +334,7 @@ class MagnificResultManifest:
     provider_config_version: str
     execution_surface: str
     model_slug: str
-    actual_model_slug: str
+    actual_model_slug: str | None
     creation_id: str | None
     returned_width: int | None
     returned_height: int | None
@@ -290,13 +347,14 @@ class MagnificResultManifest:
     schema_version: int = MAGNIFIC_RESULT_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
-        for label, value in (("provider_id", self.provider_id), ("provider_version", self.provider_version), ("provider_config_version", self.provider_config_version), ("execution_surface", self.execution_surface), ("model_slug", self.model_slug), ("actual_model_slug", self.actual_model_slug)):
+        for label, value in (("provider_id", self.provider_id), ("provider_version", self.provider_version), ("provider_config_version", self.provider_config_version), ("execution_surface", self.execution_surface), ("model_slug", self.model_slug)):
             _text(value, label)
         try:
             status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
         except (TypeError, ValueError) as exc:
             raise SemanticProviderError("Magnific result status is invalid") from exc
         if status is CandidateStatus.SUCCESS:
+            _text(self.actual_model_slug, "actual_model_slug")
             if not self.creation_id or not self.creation_id.strip():
                 raise SemanticProviderError("successful Magnific result requires a provider creation id")
             if type(self.raw_image_sha256) is not str or len(self.raw_image_sha256) != 64 or any(char not in "0123456789abcdef" for char in self.raw_image_sha256):
@@ -306,6 +364,8 @@ class MagnificResultManifest:
             if self.media_type is None or not self.media_type.strip() or self.failure_reason is not None:
                 raise SemanticProviderError("successful Magnific result metadata is inconsistent")
         else:
+            if self.actual_model_slug is not None:
+                _text(self.actual_model_slug, "actual_model_slug")
             if any(value is not None for value in (self.returned_width, self.returned_height, self.raw_image_sha256, self.media_type)):
                 raise SemanticProviderError("non-success Magnific result cannot fabricate image data")
             if self.failure_reason is None or not self.failure_reason.strip():
@@ -321,7 +381,7 @@ class MagnificResultManifest:
 
     @classmethod
     def failure(cls, job: MagnificJobSpec, *, reason: str, audit_metadata: Mapping[str, object] | None = None) -> "MagnificResultManifest":
-        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, job.model_slug, None, None, None, None, None, CandidateStatus.FAILURE, audit_metadata or {}, _text(reason, "failure_reason"))
+        return cls(job.request_digest, job.digest(), job.provider_id, job.provider_version, job.provider_config_version, job.execution_surface, job.model_slug, None, None, None, None, None, None, CandidateStatus.FAILURE, audit_metadata or {}, _text(reason, "failure_reason"))
 
     def identity_dict(self) -> dict[str, object]:
         return {
@@ -338,7 +398,6 @@ class MagnificResultManifest:
             "raw_image_sha256": self.raw_image_sha256,
             "media_type": self.media_type,
             "status": self.status.value,
-            "failure_reason": self.failure_reason,
         }
 
     def canonical_dict(self) -> dict[str, object]:
@@ -367,12 +426,44 @@ class MagnificResultManifest:
         return canonical_digest(self.identity_dict())
 
     def import_result(self, request: SemanticGenerationRequest, job: MagnificJobSpec, raw_bytes: bytes | None) -> SemanticImageCandidate:
-        if self.request_digest != request.digest() or self.job_digest != job.digest() or self.provider_id != MAGNIFIC_PROVIDER_ID or self.provider_version != MAGNIFIC_ADAPTER_VERSION or self.provider_config_version != request.provider_config_version or self.execution_surface != job.execution_surface or self.model_slug != job.model_slug or request.provider_model != job.model_slug or self.actual_model_slug != job.model_slug:
-            raise SemanticProviderError("Magnific result manifest is not bound to the request/job")
         try:
             status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise SemanticProviderError("Magnific result status is invalid") from exc
+        expected_width, expected_height = request.resolved_dimensions()
+        expected_snapshot = get_magnific_model_snapshot(request.provider_model or "")
+        expected_reference_keys = {(role.value, image.content_sha256) for role, image in _expected_images(request)}
+        job_reference_keys = {(item.role.value, item.content_sha256) for item in job.reference_bindings}
+        job_snapshot_matches = job.model_capability_snapshot is not None and job.model_capability_snapshot.identity_dict() == expected_snapshot.identity_dict()
+        if (
+            self.request_digest != request.digest()
+            or job.request_digest != request.digest()
+            or self.job_digest != job.digest()
+            or self.provider_id != MAGNIFIC_PROVIDER_ID
+            or self.provider_version != MAGNIFIC_ADAPTER_VERSION
+            or self.provider_config_version != request.provider_config_version
+            or job.provider_id != MAGNIFIC_PROVIDER_ID
+            or job.provider_version != MAGNIFIC_ADAPTER_VERSION
+            or job.provider_config_version != request.provider_config_version
+            or self.execution_surface != job.execution_surface
+            or self.model_slug != job.model_slug
+            or request.provider_model != job.model_slug
+            or (job.logical_width, job.logical_height) != (expected_width, expected_height)
+            or job.original_seed != request.seed
+            or job.candidate_count != request.desired_candidate_count
+            or job.aspect_ratio_vocabulary_version != MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION
+            or job.model_supported_aspect_ratios != expected_snapshot.supported_aspect_ratios
+            or job.aspect_ratio != _map_aspect_ratio(expected_width, expected_height, expected_snapshot.supported_aspect_ratios)
+            or job.rendered_prompt != _render_prompt(request)
+            or job.provider_seed_supported is not False
+            or job_reference_keys != expected_reference_keys
+            or not job_snapshot_matches
+        ):
+            raise SemanticProviderError("Magnific result manifest is not bound to the request/job")
+        if status is CandidateStatus.SUCCESS and self.actual_model_slug != job.model_slug:
+            raise SemanticProviderError("Magnific successful result actual model is not bound to the requested model")
+        if status is not CandidateStatus.SUCCESS and self.actual_model_slug is not None and self.actual_model_slug != job.model_slug:
+            raise SemanticProviderError("Magnific failure actual model is not bound to the requested model")
         candidate_id = f"magnific-{self.job_digest[:24]}"
         if status is not CandidateStatus.SUCCESS:
             if raw_bytes is not None:
@@ -441,5 +532,5 @@ class MagnificProvider(SemanticGeneratorProvider):
 
 
 __all__ = [
-    "MAGNIFIC_ADAPTER_VERSION", "MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION", "MAGNIFIC_CONFIG_VERSION", "MAGNIFIC_EXECUTION_SURFACE", "MAGNIFIC_JOB_SCHEMA", "MAGNIFIC_MODEL_ASPECT_RATIOS", "MAGNIFIC_PROVIDER_ID", "MAGNIFIC_RESULT_SCHEMA", "MAGNIFIC_SUPPORTED_ASPECT_RATIOS", "MagnificExecutionBinding", "MagnificJobSpec", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "map_magnific_aspect_ratio",
+    "MAGNIFIC_ADAPTER_VERSION", "MAGNIFIC_ASPECT_RATIO_VOCABULARY_VERSION", "MAGNIFIC_CONFIG_VERSION", "MAGNIFIC_EXECUTION_SURFACE", "MAGNIFIC_JOB_SCHEMA", "MAGNIFIC_MODEL_ASPECT_RATIOS", "MAGNIFIC_MODEL_CAPABILITY_SNAPSHOTS", "MAGNIFIC_MODEL_SNAPSHOT_VERSION", "MAGNIFIC_PROVIDER_ID", "MAGNIFIC_RESULT_SCHEMA", "MAGNIFIC_SUPPORTED_ASPECT_RATIOS", "MagnificExecutionBinding", "MagnificJobSpec", "MagnificModelCapabilitySnapshot", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "get_magnific_model_snapshot", "map_magnific_aspect_ratio",
 ]

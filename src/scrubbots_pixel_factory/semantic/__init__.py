@@ -15,6 +15,7 @@ from .contracts import (
     SEMANTIC_CANDIDATE_SCHEMA_VERSION,
     SEMANTIC_CAPABILITIES_SCHEMA,
     SEMANTIC_CAPABILITIES_SCHEMA_VERSION,
+    SEMANTIC_RAW_RASTER_MAX_DIMENSION,
     SEMANTIC_REQUEST_SCHEMA,
     SEMANTIC_REQUEST_SCHEMA_VERSION,
     SemanticCandidateError,
@@ -40,10 +41,10 @@ from .provider import SemanticGeneratorProvider
 
 def __getattr__(name: str) -> object:
     """Lazily expose SP02 bridges without importing optional SDKs."""
-    if name in {"MagnificJobSpec", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest"}:
-        from .providers.magnific import MagnificJobSpec, MagnificProvider, MagnificReferenceBinding, MagnificResultManifest
+    if name in {"MagnificJobSpec", "MagnificModelCapabilitySnapshot", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "get_magnific_model_snapshot"}:
+        from .providers.magnific import MagnificJobSpec, MagnificModelCapabilitySnapshot, MagnificProvider, MagnificReferenceBinding, MagnificResultManifest, get_magnific_model_snapshot
 
-        return {"MagnificJobSpec": MagnificJobSpec, "MagnificProvider": MagnificProvider, "MagnificReferenceBinding": MagnificReferenceBinding, "MagnificResultManifest": MagnificResultManifest}[name]
+        return {"MagnificJobSpec": MagnificJobSpec, "MagnificModelCapabilitySnapshot": MagnificModelCapabilitySnapshot, "MagnificProvider": MagnificProvider, "MagnificReferenceBinding": MagnificReferenceBinding, "MagnificResultManifest": MagnificResultManifest, "get_magnific_model_snapshot": get_magnific_model_snapshot}[name]
     if name in {"PixelLabExecutionBinding", "PixelLabJobSpec", "PixelLabProvider", "PixelLabResultManifest", "PixelLabRuntimeConfig"}:
         from .providers.pixellab import PixelLabExecutionBinding, PixelLabJobSpec, PixelLabProvider, PixelLabResultManifest, PixelLabRuntimeConfig
 
@@ -51,6 +52,6 @@ def __getattr__(name: str) -> object:
     raise AttributeError(name)
 
 __all__ = [
-    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticGeneratorProvider", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
-    "MagnificJobSpec", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "PixelLabExecutionBinding", "PixelLabJobSpec", "PixelLabProvider", "PixelLabResultManifest", "PixelLabRuntimeConfig",
+    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_RAW_RASTER_MAX_DIMENSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticGeneratorProvider", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
+    "MagnificJobSpec", "MagnificModelCapabilitySnapshot", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "get_magnific_model_snapshot", "PixelLabExecutionBinding", "PixelLabJobSpec", "PixelLabProvider", "PixelLabResultManifest", "PixelLabRuntimeConfig",
 ]

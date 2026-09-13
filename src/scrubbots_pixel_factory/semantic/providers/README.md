@@ -4,14 +4,16 @@ SP02 adds two explicit provider boundaries while keeping the semantic core and
 default installation offline:
 
 - `MAGNIFIC` is a local job-spec/result-import bridge. It records the explicit
-  model, rendered prompt, supported aspect ratio, ordered role/hash-to-creation
-  bindings, logical dimensions as provenance, and the original seed without
-  claiming provider seed control or exact logical output. The versioned static
-  ratio vocabulary is `1:1`, `21:9`, `16:9`, `9:16`, `2:3`, `3:4`, `1:2`,
-  `2:1`, `5:4`, `4:5`, `3:2`, and `4:3`. Exact ratios win; other ratios use
-  nearest absolute ratio distance and vocabulary order as the deterministic
-  tie-break. The selected model's recorded capability snapshot travels in job
-  identity, so mutable catalog queries are not required at runtime.
+  model, rendered prompt, model-specific capability snapshot, supported aspect
+  ratio, ordered role/hash-to-creation bindings, logical dimensions as
+  provenance, and the original seed without claiming provider seed control or
+  exact logical output. The pinned snapshots are model-specific: `recraft-v4-1`
+  supports 11 ratios excluding `21:9` and STYLE only; `seedream-5-pro` supports
+  eight ratios, REFERENCE/STYLE, and `1.5k`/`2k`; `imagen-nano-banana-2-lite`
+  supports ten ratios and REFERENCE/STYLE. Unknown models fail closed. Exact
+  ratios win; other ratios use nearest absolute ratio distance and snapshot
+  order as the deterministic tie-break. The immutable snapshot identity travels
+  in job identity, so mutable catalog queries are not required at runtime.
 - `PIXELLAB` is an optional official-package adapter. Its package is lazy and
   its secret is read only from `PIXELLAB_SECRET` (with optional
   `PIXELLAB_BASE_URL`). PIXFLUX supports exact requested dimensions, including
@@ -44,4 +46,5 @@ metadata, not a permanent/default model selection.
 Result manifests expose both `canonical_dict()` (full deterministic/audit
 serialization) and `identity_dict()` (request/job/provider/model/status/raw
 hash/dimension identity). `digest()` hashes only `identity_dict()`, excluding
-timestamps, transient URLs, audit metadata and PixelLab usage/cost.
+failure prose, timestamps, transient URLs, audit metadata and PixelLab
+usage/cost.

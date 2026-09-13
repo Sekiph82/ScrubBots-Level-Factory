@@ -28,6 +28,7 @@ SEMANTIC_CANDIDATE_SCHEMA = "scrubbots-semantic-image-candidate"
 SEMANTIC_CANDIDATE_SCHEMA_VERSION = 1
 SEMANTIC_CAPABILITIES_SCHEMA = "scrubbots-semantic-provider-capabilities"
 SEMANTIC_CAPABILITIES_SCHEMA_VERSION = 1
+SEMANTIC_RAW_RASTER_MAX_DIMENSION = 8192
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -494,8 +495,11 @@ class SemanticImageCandidate:
             status = self.status if isinstance(self.status, CandidateStatus) else CandidateStatus(self.status)
         except (TypeError, ValueError) as exc:
             raise SemanticCandidateError("candidate status is invalid") from exc
-        for label, value in (("requested_width", self.requested_width), ("requested_height", self.requested_height), ("returned_width", self.returned_width), ("returned_height", self.returned_height)):
-            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 1024):
+        for label, value in (("requested_width", self.requested_width), ("requested_height", self.requested_height)):
+            if isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 1024:
+                raise SemanticCandidateError(f"{label} is invalid")
+        for label, value in (("returned_width", self.returned_width), ("returned_height", self.returned_height)):
+            if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > SEMANTIC_RAW_RASTER_MAX_DIMENSION):
                 raise SemanticCandidateError(f"{label} is invalid")
         if isinstance(self.seed, bool) or self.seed is not None and not isinstance(self.seed, (int, str)) or isinstance(self.seed, str) and not self.seed:
             raise SemanticCandidateError("candidate seed is invalid")
@@ -593,5 +597,5 @@ SemanticResult = SemanticImageCandidate
 
 
 __all__ = [
-    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
+    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_RAW_RASTER_MAX_DIMENSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
 ]
