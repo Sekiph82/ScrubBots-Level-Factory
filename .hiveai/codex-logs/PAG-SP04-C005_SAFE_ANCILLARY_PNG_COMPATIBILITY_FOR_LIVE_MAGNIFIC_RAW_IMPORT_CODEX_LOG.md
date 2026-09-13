@@ -60,7 +60,10 @@ Files changed in this cycle:
 
 ## Publication checkpoint
 
-_Implementation and log publication details to be appended after commit, push, fetch, and final equality verification._
+- Implementation commit: `03825da` (`Implement SP04-C005 ancillary PNG compatibility`).
+- Implementation commit push: succeeded with `git push origin main` (`9fcaaf2..03825da main -> main`).
+- The completed log is being published in a separate evidence-only commit so its publication checkpoint can contain the real implementation SHA and final repository equality; no source or policy changes are included in that publication commit.
+- Final fetch/equality checkpoint: _to be appended after the completed-log publication push and final fetch_.
 
 ## Publication checkpoint
 
