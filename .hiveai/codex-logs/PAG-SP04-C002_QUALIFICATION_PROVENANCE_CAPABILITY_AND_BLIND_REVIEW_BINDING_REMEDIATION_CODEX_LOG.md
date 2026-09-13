@@ -54,3 +54,5 @@ Implementation commit: `293fc5a8fe1a8024425ddf3c3a1e30a49f7cfa44` (`Remediate SP
 Final closure checkpoint after `git fetch origin`: timestamp `2026-09-13T18:20:58.6200579+03:00`; local HEAD `293fc5a8fe1a8024425ddf3c3a1e30a49f7cfa44`; `origin/main` `293fc5a8fe1a8024425ddf3c3a1e30a49f7cfa44`; `git rev-list --left-right --count HEAD...origin/main` = `0 0`. Final status preserves only the pre-existing unrelated dirt listed at start: modified `docs/migration/legacy-task-trackers/EVENTS.jsonl`, modified `docs/migration/legacy-task-trackers/PROJECT.json`, untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`, and `review/m10.zip`.
 
 This closure edits only the builder log and therefore advances HEAD after the implementation commit. The subsequent log-publication commit and final fetch checkpoint will record its terminal SHA and equality explicitly.
+
+Post-publication closure: the completed-log publication commit is `cdaa87941ec2475dbad0780e7f4fdde20dadb19e`; this subsequent closure line records that prior log commit as required before the final terminal fetch.
