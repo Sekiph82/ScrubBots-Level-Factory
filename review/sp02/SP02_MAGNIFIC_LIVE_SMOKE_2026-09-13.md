@@ -8,9 +8,13 @@ Document role: CHATGPT LIVE PROVIDER SMOKE EVIDENCE
 
 **EXACT 24x24 DERIVATIVE: PASS**
 
+**OWNER VISUAL ACCEPTANCE: PASS**
+
+**OWNER 24x24 BASELINE ACCEPTANCE: PASS**
+
 **LOCAL FACTORY RAW-BYTE IMPORT: UNVERIFIED**
 
-The owner explicitly authorized one live Magnific smoke generation using available credits.
+The owner explicitly authorized one live Magnific smoke generation using available credits and subsequently approved both the resulting visual direction and the 24x24 px dimensions.
 
 ## Requested target
 
@@ -54,7 +58,17 @@ Observed derivative metadata:
 
 Total provider-surface credit charge observed for this owner-authorized smoke sequence: `100`.
 
-The 24x24 derivative is a smoke artifact only. It is **not** evidence that ScrubBots SP03 normalization is implemented or accepted, and it must not be promoted as canonical normalized artwork merely because its dimensions are 24x24.
+## Owner acceptance
+
+Owner decision recorded on 2026-09-13:
+
+- the generated visual is accepted as a valid semantic direction;
+- the 24x24 px dimensions are accepted;
+- 24x24 becomes the first owner-approved `ASSET_ART` baseline target for Semantic Pixel Studio qualification and normalization work;
+- this approval does not modify the separate `LEVEL_ART` 20–59 difficulty-dimension contracts;
+- this approval does not yet imply C01..C16 palette compliance or SP03 normalization acceptance.
+
+The accepted 24x24 wizard should be treated as the first positive semantic reference, while the rejected M10 100-image pack remains the negative semantic regression set.
 
 ## Privacy / repository provenance policy
 
@@ -68,13 +82,12 @@ The connected Magnific surface provided creation metadata and rendered artifacts
 - project-owned SHA-256 of the live raw PNG bytes;
 - end-to-end request -> external provider -> local raw-byte import proof;
 - SP03 deterministic normalization;
-- palette quantization or ScrubBots C01..C16 compliance;
-- semantic owner acceptance of the resulting artwork.
+- palette quantization or ScrubBots C01..C16 compliance.
 
-The next engineering step should ingest a real provider image as immutable bytes into the accepted SP02 bridge, then use that captured raw artifact as the first real fixture for SP03 normalization.
+The next engineering step is SP03 normalization, using the owner-approved 24x24 wizard as the first positive target/evidence artifact. The raw provider creation must be ingested as immutable bytes before it can become a canonical normalization fixture.
 
 ## Smoke conclusion
 
-The live provider itself is reachable and generated the requested wizard candidate with the pinned `recraft-v4-1` model. The provider also produced an exact 24x24 derivative on request.
+The live provider is reachable, generated the requested recognizable wizard candidate with the pinned `recraft-v4-1` model, and produced an exact 24x24 derivative. The owner accepted both the visual direction and 24x24 target size.
 
-SP02 code remains technically accepted by the C003 strict audit. The live provider generation portion of the smoke is now proven. Local Factory live-byte ingestion remains the only unverified SP02 smoke leg before treating the external bridge as end-to-end exercised.
+SP02 code remains technically accepted by the C003 strict audit. Live provider generation and owner visual acceptance are now proven. Local Factory live-byte ingestion remains the only unverified smoke leg and becomes an SP03 input-capture requirement rather than a reason to reopen SP02 code.
