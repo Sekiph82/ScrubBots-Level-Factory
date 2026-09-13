@@ -108,6 +108,14 @@ from .semantic import (
     SemanticProviderCapabilities,
     SemanticResult,
     SEMANTIC_RAW_RASTER_MAX_DIMENSION,
+    SemanticDecodeError,
+    SemanticNormalizedArtifact,
+    SemanticNormalizationError,
+    SemanticNormalizationReport,
+    SemanticNormalizationRequest,
+    SemanticNormalizer,
+    SemanticRawArtifact,
+    normalize_semantic_artifact,
     UnsupportedCapabilityError,
 )
 
@@ -207,6 +215,14 @@ __all__ = [
     "SemanticRequestError",
     "SemanticResult",
     "SEMANTIC_RAW_RASTER_MAX_DIMENSION",
+    "SemanticDecodeError",
+    "SemanticNormalizedArtifact",
+    "SemanticNormalizationError",
+    "SemanticNormalizationReport",
+    "SemanticNormalizationRequest",
+    "SemanticNormalizer",
+    "SemanticRawArtifact",
+    "normalize_semantic_artifact",
     "UnsupportedCapabilityError",
 ]
 

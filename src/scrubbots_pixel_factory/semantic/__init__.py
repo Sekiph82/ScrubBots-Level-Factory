@@ -38,6 +38,17 @@ from .contracts import (
 )
 from .provider import SemanticGeneratorProvider
 
+from .normalization import (
+    SemanticDecodeError,
+    SemanticNormalizedArtifact,
+    SemanticNormalizationError,
+    SemanticNormalizationReport,
+    SemanticNormalizationRequest,
+    SemanticNormalizer,
+    SemanticRawArtifact,
+    normalize_semantic_artifact,
+)
+
 
 def __getattr__(name: str) -> object:
     """Lazily expose SP02 bridges without importing optional SDKs."""
@@ -53,5 +64,5 @@ def __getattr__(name: str) -> object:
 
 __all__ = [
     "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_RAW_RASTER_MAX_DIMENSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticGeneratorProvider", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
-    "MagnificJobSpec", "MagnificModelCapabilitySnapshot", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "get_magnific_model_snapshot", "PixelLabExecutionBinding", "PixelLabJobSpec", "PixelLabProvider", "PixelLabResultManifest", "PixelLabRuntimeConfig",
+    "MagnificJobSpec", "MagnificModelCapabilitySnapshot", "MagnificProvider", "MagnificReferenceBinding", "MagnificResultManifest", "get_magnific_model_snapshot", "PixelLabExecutionBinding", "PixelLabJobSpec", "PixelLabProvider", "PixelLabResultManifest", "PixelLabRuntimeConfig", "SemanticDecodeError", "SemanticNormalizedArtifact", "SemanticNormalizationError", "SemanticNormalizationReport", "SemanticNormalizationRequest", "SemanticNormalizer", "SemanticRawArtifact", "normalize_semantic_artifact",
 ]

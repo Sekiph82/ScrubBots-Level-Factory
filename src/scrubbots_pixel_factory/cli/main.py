@@ -43,6 +43,15 @@ from ..output import (
     export_candidate,
     read_bundle,
 )
+from ..semantic.normalization import (
+    ASSET_PALETTE_POLICY,
+    SUPPORTED_CROP_PAD_POLICY,
+    SUPPORTED_MEDIA_TYPE,
+    SUPPORTED_RESIZE_POLICY,
+    SemanticNormalizationRequest,
+    SemanticRawArtifact,
+    normalize_semantic_artifact,
+)
 
 
 class ExitCode(IntEnum):
@@ -301,6 +310,30 @@ def _generate(args: argparse.Namespace) -> ExitCode:
         raise CLIError(f"could not export candidate: {exc}", ExitCode.FILESYSTEM) from exc
     print(f"seed_selected={json.dumps(_typed_seed(request.seed), sort_keys=True, separators=(',', ':'))}")
     print(_summary(result, candidate_id, destination))
+    return ExitCode.SUCCESS
+
+
+def _semantic_normalize(args: argparse.Namespace) -> ExitCode:
+    input_path = args.input
+    output_path = args.output or input_path.with_name(f"{input_path.stem}.normalized.json")
+    try:
+        if input_path.resolve() == output_path.resolve():
+            raise CLIError("normalization output must not overwrite the raw source")
+        raw = SemanticRawArtifact.from_local_file(input_path, media_type=args.media_type)
+        request = SemanticNormalizationRequest(
+            raw.digest(), args.output_class, args.width, args.height,
+            alpha_policy=args.alpha_policy, resize_policy=args.resize_policy,
+            crop_pad_policy=args.crop_pad_policy, palette_policy=args.palette_policy,
+        )
+        artifact = normalize_semantic_artifact(raw, request)
+        manifest = {"schema": "scrubbots-semantic-normalization-manifest", "schema_version": 1, "raw_artifact": raw.canonical_dict(), "normalization_request": request.canonical_dict(), "normalized_artifact": artifact.canonical_dict()}
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(canonical_json_bytes(manifest))
+    except CLIError:
+        raise
+    except (OSError, TypeError, ValueError) as exc:
+        raise CLIError(f"could not normalize local image: {exc}", ExitCode.INVALID_REQUEST) from exc
+    print(f"NORMALIZED source={input_path} output={output_path} artifact_digest={artifact.digest()} dimensions={artifact.target_width}x{artifact.target_height}")
     return ExitCode.SUCCESS
 
 
@@ -870,6 +903,19 @@ def _parser() -> argparse.ArgumentParser:
     batch.add_argument("--exemplar-json", type=Path)
     batch.add_argument("--quality-policy-json", type=Path, help="canonical local M07 QualityPolicy JSON for a new batch")
     batch.set_defaults(handler=_batch)
+
+    normalize = sub.add_parser("semantic-normalize", help="normalize one local raw semantic PNG without network access")
+    normalize.add_argument("input", type=Path, help="local raw PNG input; it is never overwritten")
+    normalize.add_argument("--output-class", required=True, choices=("ASSET_ART", "LEVEL_ART"))
+    normalize.add_argument("--width", type=int, required=True)
+    normalize.add_argument("--height", type=int, required=True)
+    normalize.add_argument("--media-type", default=SUPPORTED_MEDIA_TYPE)
+    normalize.add_argument("--alpha-policy", choices=("OPAQUE_AS_IS", "PRESERVE_ALPHA"), default="PRESERVE_ALPHA")
+    normalize.add_argument("--resize-policy", choices=(SUPPORTED_RESIZE_POLICY,), default=SUPPORTED_RESIZE_POLICY)
+    normalize.add_argument("--crop-pad-policy", choices=(SUPPORTED_CROP_PAD_POLICY,), default=SUPPORTED_CROP_PAD_POLICY)
+    normalize.add_argument("--palette-policy", choices=(ASSET_PALETTE_POLICY, "SCRUBBOTS_C01_C16"), default=ASSET_PALETTE_POLICY)
+    normalize.add_argument("--output", type=Path)
+    normalize.set_defaults(handler=_semantic_normalize)
     return parser
 
 
