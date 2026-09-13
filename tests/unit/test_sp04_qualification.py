@@ -6,7 +6,7 @@ import zlib
 import pytest
 
 from scrubbots_pixel_factory.semantic import (
-    BenchmarkCase, CostUsageRecord, MetadataBlindReviewPack,
+    BenchmarkCase, CostUsageRecord, MetadataBlindReviewPack, QualificationRequestBinding,
     NormalizationCompatibility, NormalizationEvidence, OutputClass,
     OwnerReviewDisposition, ProviderWorkflowSpec, QualificationAttemptRecord,
     QualificationLifecycle, RawImportEvidence, SemanticContractError,
@@ -75,14 +75,17 @@ def _ready_attempt(entry_index=0):
     def chunk(kind, payload):
         return struct.pack(">I", len(payload)) + kind + payload + struct.pack(">I", zlib.crc32(kind + payload) & 0xffffffff)
     png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(rows, 9)) + chunk(b"IEND", b"")
-    request = SemanticGenerationRequest(output_class=OutputClass.ASSET_ART, description="wizard qualification fixture", width=24, height=24, seed="sp04-fixture")
-    candidate = SemanticImageCandidate.success(request, candidate_id="sp04-candidate", provider_id="MAGNIFIC", provider_version="magnific-adapter-v1", workflow_version="semantic-magnific-workflow-v1", model_id="recraft-v4-1", image_bytes=png, returned_width=24, returned_height=24)
+    plan = build_qualification_plan()
+    entry = plan.entries[entry_index]
+    case = next(item for item in plan.cases if item.case_id == entry.case_id)
+    spec = next(item for item in plan.provider_matrix if item.matrix_id == entry.provider_matrix_id)
+    request = SemanticGenerationRequest(output_class=OutputClass.ASSET_ART, description=case.description, negative_description=case.negative_description, semantic_category=case.category, width=24, height=24, seed="sp04-fixture", provider_id=spec.provider_id, provider_workflow_version=spec.workflow_version, provider_model=spec.model_or_engine, provider_config_version=spec.config_version)
+    candidate = SemanticImageCandidate.success(request, candidate_id="sp04-candidate", provider_id=spec.provider_id, provider_version=spec.provider_version, workflow_version=spec.workflow_version, model_id=spec.model_or_engine, image_bytes=png, returned_width=24, returned_height=24)
     typed_raw = SemanticRawArtifact.from_candidate(candidate)
     typed_normalized = normalize_semantic_artifact(typed_raw, SemanticNormalizationRequest(typed_raw.digest(), OutputClass.ASSET_ART, 24, 24))
     raw = RawImportEvidence.from_sp03(typed_raw)
     normalized = NormalizationEvidence.from_sp03(typed_normalized)
-    plan = build_qualification_plan()
-    return QualificationAttemptRecord.from_plan_entry(plan, plan.entries[entry_index], lifecycle=QualificationLifecycle.READY_FOR_BLIND_REVIEW, raw_import=raw, normalization=normalized)
+    return QualificationAttemptRecord.from_plan_entry(plan, entry, request, lifecycle=QualificationLifecycle.READY_FOR_BLIND_REVIEW, raw_import=raw, normalization=normalized)
 
 
 def test_raw_import_and_normalized_evidence_are_required_and_bound():
@@ -117,7 +120,8 @@ def test_review_requires_ready_pending_and_owner_state_is_separate():
         build_metadata_blind_review_pack([replace(_ready_attempt(), lifecycle=QualificationLifecycle.NORMALIZED)], review_seed=1)
     with pytest.raises(SemanticContractError):
         replace(_ready_attempt(), owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED)
-    assert _ready_attempt().with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED)
+    reviewed = _ready_attempt().with_review_binding("review-fixed")
+    assert reviewed.with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED)
 
 
 def test_cost_usage_is_unknown_and_separate_from_identity():
@@ -200,8 +204,9 @@ def test_evidence_seals_detect_coordinated_provenance_tampering():
 
 def test_lifecycle_transitions_require_sealed_chain_and_owner_terminal_prerequisites():
     record = _ready_attempt()
-    assert record.with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED).lifecycle is QualificationLifecycle.OWNER_ACCEPTED
-    assert record.with_lifecycle(QualificationLifecycle.OWNER_REJECTED, owner_disposition=OwnerReviewDisposition.OWNER_REJECTED).lifecycle is QualificationLifecycle.OWNER_REJECTED
+    reviewed = record.with_review_binding("review-fixed")
+    assert reviewed.with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED).lifecycle is QualificationLifecycle.OWNER_ACCEPTED
+    assert reviewed.with_lifecycle(QualificationLifecycle.OWNER_REJECTED, owner_disposition=OwnerReviewDisposition.OWNER_REJECTED).lifecycle is QualificationLifecycle.OWNER_REJECTED
     with pytest.raises(SemanticContractError):
         record.with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED)
     object.__setattr__(record.raw_import, "compatibility", NormalizationCompatibility.FAIL)
@@ -233,8 +238,67 @@ def test_review_binding_is_idempotent_and_ignores_cost_but_tracks_artifact_ident
 
 def test_summary_terminal_states_are_not_reported_as_no_ready():
     plan = build_qualification_plan()
-    accepted = _ready_attempt().with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED)
-    rejected = _ready_attempt(3).with_lifecycle(QualificationLifecycle.OWNER_REJECTED, owner_disposition=OwnerReviewDisposition.OWNER_REJECTED)
+    accepted = _ready_attempt().with_review_binding("review-accepted").with_lifecycle(QualificationLifecycle.OWNER_ACCEPTED, owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED)
+    rejected = _ready_attempt(3).with_review_binding("review-rejected").with_lifecycle(QualificationLifecycle.OWNER_REJECTED, owner_disposition=OwnerReviewDisposition.OWNER_REJECTED)
     assert summarize_qualification(plan, [accepted]).gate_status == "OWNER_ACCEPTED"
     assert summarize_qualification(plan, [rejected]).gate_status == "OWNER_REJECTED"
     assert summarize_qualification(plan, [accepted, rejected]).gate_status == "MIXED"
+
+
+def test_request_binding_is_exact_case_provider_and_request_provenance():
+    record = _ready_attempt()
+    binding = record.request_binding
+    assert binding.request_digest == record.raw_import.request_digest
+    assert binding.case_subject == "wizard"
+    plan = build_qualification_plan()
+    request = binding.request
+    with pytest.raises(SemanticContractError):
+        QualificationRequestBinding.from_plan_entry(plan, plan.entries[0], replace(request, description="a different subject"))
+    with pytest.raises(SemanticContractError):
+        QualificationRequestBinding.from_plan_entry(plan, plan.entries[0], replace(request, provider_model=None))
+    planned = QualificationAttemptRecord.from_plan_entry(plan, plan.entries[0], request_binding=binding)
+    assert planned.request_binding.digest() == binding.digest()
+
+
+def test_unsealed_attempts_cannot_be_promoted_or_summarized():
+    plan = build_qualification_plan()
+    unsealed = QualificationAttemptRecord("attempt-unsealed", "entry-unsealed", "case", "MAGNIFIC", "recraft-v4-1", "workflow")
+    with pytest.raises(SemanticContractError):
+        unsealed.with_lifecycle(QualificationLifecycle.RAW_PROVIDER_CAPTURED)
+    with pytest.raises(SemanticContractError):
+        summarize_qualification(plan, [unsealed])
+    with pytest.raises(SemanticContractError):
+        replace(_ready_attempt(), lifecycle=QualificationLifecycle.RAW_PROVIDER_CAPTURED)
+
+
+def test_lifecycle_is_monotonic_and_nonterminal_disposition_is_pending():
+    record = _ready_attempt()
+    with pytest.raises(SemanticContractError):
+        record.with_lifecycle(QualificationLifecycle.NORMALIZED)
+    with pytest.raises(SemanticContractError):
+        QualificationAttemptRecord.from_plan_entry(
+            build_qualification_plan(),
+            build_qualification_plan().entries[0],
+            record.request_binding.request,
+            lifecycle=QualificationLifecycle.NORMALIZED,
+            raw_import=record.raw_import,
+            normalization=record.normalization,
+            owner_disposition=OwnerReviewDisposition.OWNER_ACCEPTED,
+        )
+
+
+def test_summary_rejects_attempts_from_another_plan():
+    record = _ready_attempt()
+    with pytest.raises(SemanticContractError):
+        summarize_qualification(build_qualification_plan(review_seed="other"), [record])
+
+
+def test_review_cards_bind_subject_dimensions_and_hidden_identity():
+    first, second = _ready_attempt(), _ready_attempt(3)
+    pack = build_metadata_blind_review_pack([first, second], review_seed="review")
+    assert {item.subject_label for item in pack.items} == {"wizard", "warrior"}
+    with pytest.raises(SemanticContractError):
+        MetadataBlindReviewPack(pack.review_seed, tuple(replace(pack.items[0], subject_label="tampered-subject") if item is pack.items[0] else item for item in pack.items), pack.hidden_attempts)
+    swapped = tuple(replace(item, hidden_attempt_id=pack.items[1 - index].hidden_attempt_id, review_id=pack.items[1 - index].review_id) for index, item in enumerate(pack.items))
+    with pytest.raises(SemanticContractError):
+        MetadataBlindReviewPack(pack.review_seed, swapped, pack.hidden_attempts)

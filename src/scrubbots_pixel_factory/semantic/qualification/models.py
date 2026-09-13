@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 import math
 
-from ..contracts import OutputClass, SemanticContractError
+from ..contracts import OutputClass, SemanticContractError, SemanticGenerationRequest
 from ..providers.common import canonical_digest, typed_seed
 
 
@@ -395,6 +395,132 @@ class RawImportEvidence:
 
 _NORMALIZATION_EVIDENCE_TOKEN = object()
 _ATTEMPT_TOKEN = object()
+_REQUEST_BINDING_TOKEN = object()
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class QualificationRequestBinding:
+    """Sealed binding between a validated plan cell, benchmark case, and request."""
+
+    plan_digest: str
+    plan_entry_id: str
+    case_id: str
+    case_digest: str
+    case_subject: str
+    provider_matrix_id: str
+    provider_id: str
+    provider_version: str
+    provider_config_version: str
+    model_or_engine: str
+    workflow_version: str
+    request: SemanticGenerationRequest
+    request_digest: str
+    output_class: OutputClass
+    target_width: int
+    target_height: int
+    category: str
+    description: str
+    negative_description: str | None
+    requires_reference: bool
+    requires_style: bool
+    _construction_token: object
+    _construction_fingerprint: str
+
+    @classmethod
+    def from_plan_entry(cls, plan: QualificationPlan, entry: QualificationPlanEntry, request: SemanticGenerationRequest) -> "QualificationRequestBinding":
+        if not isinstance(plan, QualificationPlan) or not isinstance(entry, QualificationPlanEntry):
+            raise SemanticContractError("request binding requires a typed qualification plan and entry")
+        if not isinstance(request, SemanticGenerationRequest):
+            raise SemanticContractError("request binding requires an actual SemanticGenerationRequest")
+        selected = next((candidate for candidate in plan.entries if candidate.entry_id == entry.entry_id), None)
+        if selected is None or selected.canonical_dict() != entry.canonical_dict():
+            raise SemanticContractError("request binding entry is not an exact member of the validated plan")
+        case = next(case for case in plan.cases if case.case_id == entry.case_id)
+        spec = next(spec for spec in plan.provider_matrix if spec.matrix_id == entry.provider_matrix_id)
+        width, height = request.resolved_dimensions()
+        if (
+            request.output_class is not OutputClass.ASSET_ART
+            or (width, height) != (plan.target_width, plan.target_height)
+            or request.provider_id != spec.provider_id
+            or request.provider_model != spec.model_or_engine
+            or request.provider_workflow_version != spec.workflow_version
+            or request.provider_config_version != spec.config_version
+            or request.description != case.description
+            or request.negative_description != case.negative_description
+            or request.semantic_category != case.category
+            or bool(request.reference_images) != case.requires_reference
+            or (request.style_image is not None) != case.requires_style
+        ):
+            raise SemanticContractError("semantic request is not exactly bound to its benchmark case and provider cell")
+        if request.provider_model is None:
+            raise SemanticContractError("provider-backed qualification requests require an explicit model or engine")
+        instance = object.__new__(cls)
+        values = {
+            "plan_digest": plan.digest(),
+            "plan_entry_id": entry.entry_id,
+            "case_id": case.case_id,
+            "case_digest": case.digest(),
+            "case_subject": case.subject,
+            "provider_matrix_id": spec.matrix_id,
+            "provider_id": spec.provider_id,
+            "provider_version": spec.provider_version,
+            "provider_config_version": spec.config_version,
+            "model_or_engine": spec.model_or_engine,
+            "workflow_version": spec.workflow_version,
+            "request": request,
+            "request_digest": request.digest(),
+            "output_class": request.output_class,
+            "target_width": width,
+            "target_height": height,
+            "category": case.category,
+            "description": case.description,
+            "negative_description": case.negative_description,
+            "requires_reference": case.requires_reference,
+            "requires_style": case.requires_style,
+            "_construction_token": _REQUEST_BINDING_TOKEN,
+        }
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        instance._validate()
+        object.__setattr__(instance, "_construction_fingerprint", instance._fingerprint())
+        instance._assert_integrity()
+        return instance
+
+    def __post_init__(self) -> None:
+        raise SemanticContractError("QualificationRequestBinding must be constructed from a validated plan entry and typed request")
+
+    def _validate(self) -> None:
+        if self._construction_token is not _REQUEST_BINDING_TOKEN or not isinstance(self.request, SemanticGenerationRequest):
+            raise SemanticContractError("request binding construction seal is invalid")
+        _digest(self.plan_digest, "plan_digest")
+        _digest(self.case_digest, "case_digest")
+        _digest(self.request_digest, "request_digest")
+        for name in ("plan_entry_id", "case_id", "case_subject", "provider_matrix_id", "provider_id", "provider_version", "provider_config_version", "model_or_engine", "workflow_version", "category", "description"):
+            _text(getattr(self, name), name)
+        if self.negative_description is not None:
+            _text(self.negative_description, "negative_description")
+        if self.request.digest() != self.request_digest:
+            raise SemanticContractError("request binding request digest is invalid")
+        if self.request.provider_model != self.model_or_engine or self.request.provider_id != self.provider_id or self.request.provider_workflow_version != self.workflow_version or self.request.provider_config_version != self.provider_config_version or self.request.output_class is not self.output_class or self.request.resolved_dimensions() != (self.target_width, self.target_height):
+            raise SemanticContractError("request binding provider or output fields are not authentic")
+        if self.request.provider_model is None:
+            raise SemanticContractError("request binding requires a non-null provider model")
+
+    def _fingerprint(self) -> str:
+        return canonical_digest(self.canonical_dict())
+
+    def _assert_integrity(self) -> None:
+        self._validate()
+        if self._construction_fingerprint != self._fingerprint():
+            raise SemanticContractError("request binding construction fingerprint is invalid")
+
+    def canonical_dict(self) -> dict[str, object]:
+        self._validate()
+        return {"plan_digest": self.plan_digest, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "case_subject": self.case_subject, "provider_matrix_id": self.provider_matrix_id, "provider": {"id": self.provider_id, "version": self.provider_version, "config_version": self.provider_config_version, "model_or_engine": self.model_or_engine, "workflow_version": self.workflow_version}, "request_digest": self.request_digest, "output_class": self.output_class.value, "target_dimensions": {"width": self.target_width, "height": self.target_height}, "category": self.category, "description": self.description, "negative_description": self.negative_description, "requires_reference": self.requires_reference, "requires_style": self.requires_style}
+
+    def digest(self) -> str:
+        self._assert_integrity()
+        return canonical_digest(self.canonical_dict())
 
 
 @dataclass(frozen=True, slots=True, init=False)
@@ -511,13 +637,15 @@ class QualificationAttemptRecord:
     case_digest: str | None = None
     plan_digest: str | None = None
     request_digest: str | None = None
+    request_binding: QualificationRequestBinding | None = None
+    case_subject: str | None = None
     target_width: int | None = None
     target_height: int | None = None
     _construction_token: object = field(init=False, repr=False, compare=False, default=None)
     _construction_fingerprint: str = field(init=False, repr=False, compare=False, default="")
 
     @classmethod
-    def from_plan_entry(cls, plan: QualificationPlan, entry: QualificationPlanEntry, *, lifecycle: QualificationLifecycle = QualificationLifecycle.PLANNED, raw_import: RawImportEvidence | None = None, normalization: NormalizationEvidence | None = None, owner_disposition: OwnerReviewDisposition = OwnerReviewDisposition.PENDING_OWNER_REVIEW, cost_usage: CostUsageRecord | None = None, attempt_id: str | None = None) -> "QualificationAttemptRecord":
+    def from_plan_entry(cls, plan: QualificationPlan, entry: QualificationPlanEntry, request: SemanticGenerationRequest | QualificationRequestBinding | None = None, *, request_binding: QualificationRequestBinding | None = None, lifecycle: QualificationLifecycle = QualificationLifecycle.PLANNED, raw_import: RawImportEvidence | None = None, normalization: NormalizationEvidence | None = None, owner_disposition: OwnerReviewDisposition = OwnerReviewDisposition.PENDING_OWNER_REVIEW, cost_usage: CostUsageRecord | None = None, attempt_id: str | None = None) -> "QualificationAttemptRecord":
         if not isinstance(plan, QualificationPlan) or not isinstance(entry, QualificationPlanEntry):
             raise SemanticContractError("attempt construction requires a typed qualification plan and entry")
         selected = next((candidate for candidate in plan.entries if candidate.entry_id == entry.entry_id), None)
@@ -525,8 +653,20 @@ class QualificationAttemptRecord:
             raise SemanticContractError("attempt entry is not an exact member of the validated plan")
         case = next(case for case in plan.cases if case.case_id == entry.case_id)
         spec = next(spec for spec in plan.provider_matrix if spec.matrix_id == entry.provider_matrix_id)
+        supplied_binding = request_binding if request_binding is not None else (request if isinstance(request, QualificationRequestBinding) else None)
+        if supplied_binding is not None:
+            if request_binding is not None and isinstance(request, QualificationRequestBinding):
+                raise SemanticContractError("provide either request or request_binding, not both")
+            supplied_binding._assert_integrity()
+            binding = QualificationRequestBinding.from_plan_entry(plan, entry, supplied_binding.request)
+            if binding.canonical_dict() != supplied_binding.canonical_dict():
+                raise SemanticContractError("request binding is not the exact validated plan-entry binding")
+        elif isinstance(request, SemanticGenerationRequest):
+            binding = QualificationRequestBinding.from_plan_entry(plan, entry, request)
+        else:
+            raise SemanticContractError("attempt construction requires an actual typed request binding")
         instance = object.__new__(cls)
-        values = {"attempt_id": attempt_id or f"attempt-{entry.entry_id[6:]}", "plan_entry_id": entry.entry_id, "case_id": case.case_id, "provider_id": spec.provider_id, "model_or_engine": spec.model_or_engine, "workflow_version": spec.workflow_version, "lifecycle": lifecycle, "raw_import": raw_import, "normalization": normalization, "owner_disposition": owner_disposition, "cost_usage": cost_usage or CostUsageRecord(), "review_item_id": None, "provider_version": spec.provider_version, "provider_matrix_id": spec.matrix_id, "case_digest": case.digest(), "plan_digest": plan.digest(), "request_digest": None if raw_import is None else raw_import.request_digest, "target_width": plan.target_width, "target_height": plan.target_height, "_construction_token": _ATTEMPT_TOKEN}
+        values = {"attempt_id": attempt_id or f"attempt-{entry.entry_id[6:]}", "plan_entry_id": entry.entry_id, "case_id": case.case_id, "provider_id": spec.provider_id, "model_or_engine": spec.model_or_engine, "workflow_version": spec.workflow_version, "lifecycle": lifecycle, "raw_import": raw_import, "normalization": normalization, "owner_disposition": owner_disposition, "cost_usage": cost_usage or CostUsageRecord(), "review_item_id": None, "provider_version": spec.provider_version, "provider_matrix_id": spec.matrix_id, "case_digest": case.digest(), "plan_digest": plan.digest(), "request_digest": binding.request_digest, "request_binding": binding, "case_subject": case.subject, "target_width": plan.target_width, "target_height": plan.target_height, "_construction_token": _ATTEMPT_TOKEN}
         for name, value in values.items():
             object.__setattr__(instance, name, value)
         instance.__post_init__()
@@ -539,23 +679,32 @@ class QualificationAttemptRecord:
             _text(getattr(self, name), name)
         lifecycle = self.lifecycle if isinstance(self.lifecycle, QualificationLifecycle) else QualificationLifecycle(self.lifecycle)
         disposition = self.owner_disposition if isinstance(self.owner_disposition, OwnerReviewDisposition) else OwnerReviewDisposition(self.owner_disposition)
-        advanced = lifecycle is not QualificationLifecycle.PLANNED
-        if advanced and self._construction_token is not _ATTEMPT_TOKEN:
-            raise SemanticContractError("advanced attempts require checked construction from a validated plan entry")
-        if advanced and any(value is None for value in (self.provider_matrix_id, self.case_digest, self.plan_digest, self.target_width, self.target_height)):
-            raise SemanticContractError("advanced attempts require complete plan binding")
-        if advanced:
+        trusted = self._construction_token is _ATTEMPT_TOKEN
+        if trusted and any(value is None for value in (self.provider_matrix_id, self.case_digest, self.plan_digest, self.target_width, self.target_height, self.request_binding, self.case_subject)):
+            raise SemanticContractError("trusted attempts require complete plan and request binding")
+        if trusted:
             _digest(self.case_digest, "case_digest")
             _digest(self.plan_digest, "plan_digest")
             _dimensions(self.target_width, self.target_height, "attempt target dimensions")
+            if not isinstance(self.request_binding, QualificationRequestBinding):
+                raise SemanticContractError("attempt request binding must be sealed")
+            self.request_binding._assert_integrity()
+            if self.request_binding.plan_digest != self.plan_digest or self.request_binding.plan_entry_id != self.plan_entry_id or self.request_binding.case_id != self.case_id or self.request_binding.case_digest != self.case_digest or self.request_binding.case_subject != self.case_subject or self.request_binding.provider_matrix_id != self.provider_matrix_id or self.request_binding.provider_id != self.provider_id or self.request_binding.provider_version != self.provider_version or self.request_binding.model_or_engine != self.model_or_engine or self.request_binding.workflow_version != self.workflow_version or self.request_binding.request_digest != self.request_digest:
+                raise SemanticContractError("attempt request binding is not bound to its exact plan entry")
+        elif self.request_binding is not None:
+            raise SemanticContractError("unsealed attempts cannot carry a request binding")
+        if lifecycle is not QualificationLifecycle.PLANNED and not trusted:
+            raise SemanticContractError("advanced attempts require checked construction from a validated plan entry")
+        if lifecycle is not QualificationLifecycle.PLANNED and self.request_digest is None:
+            raise SemanticContractError("advanced attempts require request provenance")
         if lifecycle in {QualificationLifecycle.RAW_IMPORT_VERIFIED, QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW, QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.raw_import is None:
             raise SemanticContractError("lifecycle requires raw-import evidence")
         if lifecycle in {QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW, QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.normalization is None:
             raise SemanticContractError("lifecycle requires normalization evidence")
         if lifecycle is QualificationLifecycle.READY_FOR_BLIND_REVIEW and self.raw_import.compatibility is not NormalizationCompatibility.PASS:
             raise SemanticContractError("review-ready lifecycle requires raw-import compatibility PASS")
-        if lifecycle is QualificationLifecycle.READY_FOR_BLIND_REVIEW and disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW:
-            raise SemanticContractError("review-ready attempts must be pending owner review")
+        if lifecycle in {QualificationLifecycle.PLANNED, QualificationLifecycle.RAW_PROVIDER_CAPTURED, QualificationLifecycle.RAW_IMPORT_VERIFIED, QualificationLifecycle.NORMALIZED, QualificationLifecycle.READY_FOR_BLIND_REVIEW} and disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW:
+            raise SemanticContractError("non-terminal attempts must be pending owner review")
         if lifecycle is QualificationLifecycle.OWNER_ACCEPTED and disposition is not OwnerReviewDisposition.OWNER_ACCEPTED:
             raise SemanticContractError("owner-accepted lifecycle requires owner disposition")
         if lifecycle is QualificationLifecycle.OWNER_REJECTED and disposition is not OwnerReviewDisposition.OWNER_REJECTED:
@@ -574,23 +723,29 @@ class QualificationAttemptRecord:
             raise SemanticContractError("raw-import provider version is not bound to attempt")
         if self.raw_import is not None and self.raw_import.workflow_version != self.workflow_version:
             raise SemanticContractError("raw-import workflow is not bound to attempt")
-        if self.raw_import is not None and self.raw_import.model_id is not None and self.raw_import.model_id != self.model_or_engine:
+        if self.raw_import is not None and self.raw_import.model_id != self.model_or_engine:
             raise SemanticContractError("raw-import model is not bound to attempt")
         if self.normalization is not None and self.raw_import is not None and (self.normalization.raw_import_sha256 != self.raw_import.raw_sha256 or self.normalization.source_raw_artifact_digest != self.raw_import.local_raw_artifact_digest):
             raise SemanticContractError("normalization is not bound to exact raw import")
         if self.request_digest is not None:
             _digest(self.request_digest, "request_digest")
+        if trusted and self.request_binding is not None and self.request_digest != self.request_binding.request_digest:
+            raise SemanticContractError("request binding digest is not bound to attempt")
         if self.raw_import is not None and self.request_digest is not None and self.request_digest != self.raw_import.request_digest:
             raise SemanticContractError("raw request digest is not bound to attempt")
         if self.normalization is not None and self.target_width is not None and (self.normalization.target_width, self.normalization.target_height) != (self.target_width, self.target_height):
             raise SemanticContractError("normalization dimensions are not bound to attempt")
+        if self.lifecycle in {QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and self.review_item_id is None:
+            raise SemanticContractError("terminal owner disposition requires a review binding")
         if self.review_item_id is not None:
             _text(self.review_item_id, "review_item_id")
+        if self.case_subject is not None:
+            _text(self.case_subject, "case_subject")
         object.__setattr__(self, "lifecycle", lifecycle)
         object.__setattr__(self, "owner_disposition", disposition)
 
     def identity_dict(self) -> dict[str, object]:
-        return {"attempt_id": self.attempt_id, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "plan_digest": self.plan_digest, "provider_matrix_id": self.provider_matrix_id, "provider_id": self.provider_id, "provider_version": self.provider_version, "model_or_engine": self.model_or_engine, "workflow_version": self.workflow_version, "request_digest": self.request_digest, "target_dimensions": None if self.target_width is None else {"width": self.target_width, "height": self.target_height}, "raw_import": None if self.raw_import is None else self.raw_import.canonical_dict(), "normalization": None if self.normalization is None else self.normalization.canonical_dict()}
+        return {"attempt_id": self.attempt_id, "plan_entry_id": self.plan_entry_id, "case_id": self.case_id, "case_digest": self.case_digest, "case_subject": self.case_subject, "plan_digest": self.plan_digest, "provider_matrix_id": self.provider_matrix_id, "provider_id": self.provider_id, "provider_version": self.provider_version, "model_or_engine": self.model_or_engine, "workflow_version": self.workflow_version, "request_binding": None if self.request_binding is None else self.request_binding.canonical_dict(), "request_digest": self.request_digest, "target_dimensions": None if self.target_width is None else {"width": self.target_width, "height": self.target_height}, "raw_import": None if self.raw_import is None else self.raw_import.canonical_dict(), "normalization": None if self.normalization is None else self.normalization.canonical_dict()}
 
     def canonical_dict(self) -> dict[str, object]:
         return {**self.identity_dict(), "lifecycle": self.lifecycle.value, "owner_disposition": self.owner_disposition.value, "cost_usage": self.cost_usage.canonical_dict()}
@@ -606,7 +761,9 @@ class QualificationAttemptRecord:
         return self.digest()
 
     def _assert_integrity(self) -> None:
-        if self._construction_token is _ATTEMPT_TOKEN and self._construction_fingerprint != self._fingerprint():
+        if self._construction_token is not _ATTEMPT_TOKEN:
+            raise SemanticContractError("attempt construction seal is invalid")
+        if self._construction_fingerprint != self._fingerprint():
             raise SemanticContractError("attempt construction fingerprint is invalid")
 
     def with_cost_usage(self, cost_usage: CostUsageRecord) -> "QualificationAttemptRecord":
@@ -620,11 +777,18 @@ class QualificationAttemptRecord:
 
     def with_lifecycle(self, lifecycle: QualificationLifecycle, *, owner_disposition: OwnerReviewDisposition | None = None) -> "QualificationAttemptRecord":
         self._assert_integrity()
+        target = lifecycle if isinstance(lifecycle, QualificationLifecycle) else QualificationLifecycle(lifecycle)
+        order = list(QualificationLifecycle)
+        if order.index(target) < order.index(self.lifecycle):
+            raise SemanticContractError("attempt lifecycle cannot move backwards")
+        if self.lifecycle in {QualificationLifecycle.OWNER_ACCEPTED, QualificationLifecycle.OWNER_REJECTED} and target is not self.lifecycle:
+            raise SemanticContractError("terminal attempts cannot transition")
         return self._copy_bound(lifecycle=lifecycle, owner_disposition=owner_disposition or self.owner_disposition)
 
     def _copy_bound(self, **changes: object) -> "QualificationAttemptRecord":
         instance = object.__new__(type(self))
-        for name in ("attempt_id", "plan_entry_id", "case_id", "provider_id", "model_or_engine", "workflow_version", "lifecycle", "raw_import", "normalization", "owner_disposition", "cost_usage", "review_item_id", "provider_version", "provider_matrix_id", "case_digest", "plan_digest", "request_digest", "target_width", "target_height"):
+        self._assert_integrity()
+        for name in ("attempt_id", "plan_entry_id", "case_id", "provider_id", "model_or_engine", "workflow_version", "lifecycle", "raw_import", "normalization", "owner_disposition", "cost_usage", "review_item_id", "provider_version", "provider_matrix_id", "case_digest", "plan_digest", "request_digest", "request_binding", "case_subject", "target_width", "target_height"):
             object.__setattr__(instance, name, changes.get(name, getattr(self, name)))
         object.__setattr__(instance, "_construction_token", _ATTEMPT_TOKEN)
         instance.__post_init__()
@@ -641,6 +805,14 @@ class MetadataBlindReviewItem:
     target_width: int
     target_height: int
     hidden_attempt_id: str
+
+    def __post_init__(self) -> None:
+        _text(self.review_id, "review_id")
+        if isinstance(self.sequence, bool) or not isinstance(self.sequence, int) or self.sequence < 1:
+            raise SemanticContractError("review sequence must be a positive integer")
+        _text(self.subject_label, "subject_label")
+        _dimensions(self.target_width, self.target_height, "review target dimensions")
+        _text(self.hidden_attempt_id, "hidden_attempt_id")
 
     def visible_dict(self) -> dict[str, object]:
         return {"review_id": self.review_id, "sequence": self.sequence, "subject_label": self.subject_label, "target_dimensions": {"width": self.target_width, "height": self.target_height}}
@@ -666,12 +838,23 @@ class MetadataBlindReviewPack:
             raise SemanticContractError("hidden review attempts must have unique IDs")
         for attempt in self.hidden_attempts:
             attempt._assert_integrity()
+            if attempt.lifecycle is not QualificationLifecycle.READY_FOR_BLIND_REVIEW or attempt.owner_disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW:
+                raise SemanticContractError("blind review hidden attempts must be ready and pending")
+        ordered = sorted(self.hidden_attempts, key=lambda record: _review_sort_key(record, self.review_seed))
+        expected_by_attempt = {attempt.attempt_id: (sequence, _expected_review_id(attempt, self.review_seed)) for sequence, attempt in enumerate(ordered, 1)}
         for item in self.items:
             attempt = hidden.get(item.hidden_attempt_id)
             if attempt is None:
                 raise SemanticContractError("visible review item references an orphan hidden attempt")
             if attempt.review_item_id != item.review_id:
                 raise SemanticContractError("visible review ID is not bound to its hidden attempt")
+            expected_sequence, expected_review_id = expected_by_attempt[item.hidden_attempt_id]
+            if item.sequence != expected_sequence or item.review_id != expected_review_id:
+                raise SemanticContractError("visible review item is not deterministically bound to its hidden attempt")
+            if item.subject_label != attempt.case_subject:
+                raise SemanticContractError("visible subject label is not bound to its benchmark case")
+            if attempt.normalization is None or (item.target_width, item.target_height) != (attempt.normalization.target_width, attempt.normalization.target_height):
+                raise SemanticContractError("visible target dimensions are not bound to normalized evidence")
 
     def visible_dict(self) -> dict[str, object]:
         return {"schema": self.pack_version, "items": [item.visible_dict() for item in self.items]}
@@ -687,15 +870,25 @@ def build_metadata_blind_review_pack(attempts: Iterable[QualificationAttemptReco
     records = tuple(attempts)
     if any(record.lifecycle is not QualificationLifecycle.READY_FOR_BLIND_REVIEW or record.owner_disposition is not OwnerReviewDisposition.PENDING_OWNER_REVIEW for record in records):
         raise SemanticContractError("only technically ready, pending attempts may enter blind review")
-    ordered = sorted(records, key=lambda record: canonical_digest({"review_seed": typed_seed(review_seed), "attempt": record.digest()}))
+    for record in records:
+        record._assert_integrity()
+    ordered = sorted(records, key=lambda record: _review_sort_key(record, review_seed))
     items: list[MetadataBlindReviewItem] = []
     for sequence, record in enumerate(ordered, 1):
         if record.normalization is None:
             raise SemanticContractError("review-ready attempt lacks normalization evidence")
-        review_id = f"review-{canonical_digest({"seed": typed_seed(review_seed), "attempt": record.review_binding_digest()})[:24]}"
-        items.append(MetadataBlindReviewItem(review_id, sequence, record.case_id, record.normalization.target_width, record.normalization.target_height, record.attempt_id))
+        review_id = _expected_review_id(record, review_seed)
+        items.append(MetadataBlindReviewItem(review_id, sequence, record.case_subject, record.normalization.target_width, record.normalization.target_height, record.attempt_id))
     item_tuple = tuple(items)
     return MetadataBlindReviewPack(review_seed, item_tuple, tuple(record.with_review_binding(item.review_id) for record, item in zip(ordered, item_tuple)))
+
+
+def _review_sort_key(record: QualificationAttemptRecord, review_seed: int | str) -> str:
+    return canonical_digest({"review_seed": typed_seed(review_seed), "attempt": record.digest()})
+
+
+def _expected_review_id(record: QualificationAttemptRecord, review_seed: int | str) -> str:
+    return f"review-{canonical_digest({"seed": typed_seed(review_seed), "attempt": record.review_binding_digest()})[:24]}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -731,6 +924,19 @@ class QualificationSummary:
 
 def summarize_qualification(plan: QualificationPlan, attempts: Iterable[QualificationAttemptRecord]) -> QualificationSummary:
     records = tuple(attempts)
+    if not isinstance(plan, QualificationPlan):
+        raise SemanticContractError("summary requires a typed qualification plan")
+    entries = {entry.entry_id: entry for entry in plan.entries}
+    if len({record.attempt_id for record in records}) != len(records):
+        raise SemanticContractError("summary attempts must have unique IDs")
+    if len({record.plan_entry_id for record in records}) != len(records):
+        raise SemanticContractError("summary attempts must map one-to-one to plan entries")
+    for record in records:
+        record._assert_integrity()
+        entry = entries.get(record.plan_entry_id)
+        spec = None if entry is None else next((candidate for candidate in plan.provider_matrix if candidate.matrix_id == entry.provider_matrix_id), None)
+        if entry is None or spec is None or record.plan_digest != plan.digest() or record.case_id != entry.case_id or record.provider_matrix_id != entry.provider_matrix_id or record.provider_id != entry.provider_id or record.provider_version != entry.provider_version or record.model_or_engine != entry.model_or_engine or record.workflow_version != entry.workflow_version or record.case_digest != entry.case_digest or record.target_width != plan.target_width or record.target_height != plan.target_height or record.request_binding is None or record.request_binding.plan_digest != plan.digest() or record.request_binding.plan_entry_id != entry.entry_id or record.request_binding.provider_config_version != spec.config_version:
+            raise SemanticContractError("summary attempt is not an exact member of the validated plan")
     lifecycle_counts = tuple((state.value, sum(record.lifecycle is state for record in records)) for state in QualificationLifecycle if any(record.lifecycle is state for record in records))
     disposition_counts = tuple((state.value, sum(record.owner_disposition is state for record in records)) for state in OwnerReviewDisposition if any(record.owner_disposition is state for record in records))
     ready = sum(record.lifecycle is QualificationLifecycle.READY_FOR_BLIND_REVIEW for record in records)
