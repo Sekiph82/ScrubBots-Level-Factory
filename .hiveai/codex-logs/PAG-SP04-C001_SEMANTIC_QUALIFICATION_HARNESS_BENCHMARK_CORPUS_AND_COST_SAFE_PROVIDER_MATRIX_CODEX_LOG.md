@@ -49,4 +49,10 @@ An initial preflight tooling mistake briefly created SP04 source/test files befo
 
 ## Finalization
 
-Implementation commit and push pending. The final log checkpoint will record the exact commit SHA, push result, fetched `origin/main`, local HEAD equality, divergence `0 0`, and final scoped status.
+Implementation commit: `9b644f77d2062500f0beaec55a63d1eaad0da747` (`Implement SP04 semantic qualification harness`). The first push encountered a non-fast-forward because GitHub had added the owner’s SP04 opening commits. `git fetch origin` showed local 1 / remote 3 divergence with no production overlap; `git merge --no-edit origin/main` integrated those authority commits non-destructively. The resulting merge commit was pushed successfully to `origin/main`.
+
+Post-merge verification: `python -m pytest -q tests/unit/test_sp04_qualification.py` — PASS, 11 passed; `python -m compileall -q src tests` — PASS; standalone package import and finite plan construction — PASS; `git diff --check` — PASS.
+
+Final publication checkpoint (after `git fetch origin`): timestamp `2026-09-13T17:49:03.1928208+03:00`; local HEAD `a87b5ee325432ea82fad8e283a3ed227b4ddcebb`; `origin/main` `a87b5ee325432ea82fad8e283a3ed227b4ddcebb`; `git rev-list --left-right --count HEAD...origin/main` = `0 0`. Final status contains only the preserved unrelated dirt listed above: modified `docs/migration/legacy-task-trackers/EVENTS.jsonl`, modified `docs/migration/legacy-task-trackers/PROJECT.json`, untracked `.hiveai/EVENT_INDEX.json`, `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`, and `review/m10.zip`; all SP04 files are committed and clean.
+
+This is the completed CODEX builder log. It does not declare independent audit or SP04 acceptance.
