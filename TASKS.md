@@ -7,18 +7,18 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 ## Project Status
 
 - Current Milestone: **PAG-SP04 — Semantic Provider / Model / Workflow Qualification**
-- Current Sprint: **PAG-SP04-C003**
-- Current Task: **Request-to-Case Binding, Attempt Seal & Review Attribution Closure**
+- Current Sprint: **PAG-SP04-C004**
+- Current Task: **Review Entry Proof & Provider Capture Evidence Closure**
 - Current Task Status: **READY_FOR_IMPLEMENTATION**
 - Required Actor: **CODEX**
-- Previous Cycle: `PAG-SP04-C002` → **FAIL / 5 MAJOR + 1 MINOR**
-- Previous Strict Audit: `.hiveai/audits/PAG-SP04-C002_QUALIFICATION_PROVENANCE_CAPABILITY_AND_BLIND_REVIEW_BINDING_REMEDIATION_STRICT_AUDIT.md`
-- Current Prompt: `.hiveai/prompts/PAG-SP04-C003_REQUEST_TO_CASE_BINDING_ATTEMPT_SEAL_AND_REVIEW_ATTRIBUTION_CLOSURE_PROMPT.md`
+- Previous Cycle: `PAG-SP04-C003` → **FAIL / 2 MAJOR + 1 MINOR**
+- Previous Strict Audit: `.hiveai/audits/PAG-SP04-C003_REQUEST_TO_CASE_BINDING_ATTEMPT_SEAL_AND_REVIEW_ATTRIBUTION_CLOSURE_STRICT_AUDIT.md`
+- Current Prompt: `.hiveai/prompts/PAG-SP04-C004_REVIEW_ENTRY_PROOF_AND_PROVIDER_CAPTURE_EVIDENCE_CLOSURE_PROMPT.md`
 - Previous Milestone: `PAG-SP03 — Semantic Normalization Pipeline` → **PASS / CLOSED FOR CURRENT TECHNICAL FOUNDATION**
 - Live Smoke Evidence: `review/sp02/SP02_MAGNIFIC_LIVE_SMOKE_2026-09-13.md`
 - Owner Decision: **Magnific wizard visual direction accepted; 24x24 px accepted as first ASSET_ART baseline target**
-- Next Task/Action: Execute SP04-C003 only, close the remaining qualification request/state/review binding defects, publish builder log/tests, commit/push `main`, then stop for independent ChatGPT audit.
-- Blockers/Waits: **SP04 live provider generation, SP05 and M11 remain blocked** until C003 receives independent PASS. No provider credits are authorized in C003.
+- Next Task/Action: Execute SP04-C004 only, close deterministic blind-review proof and truthful provider-capture evidence, publish builder log/tests, commit/push `main`, then stop for independent ChatGPT audit.
+- Blockers/Waits: **SP04 live provider generation, SP05 and M11 remain blocked** until C004 receives independent PASS. No provider credits are authorized in C004.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
 - Provider Architecture: **provider-neutral; explicit provider/model/engine selection; no silent fallback**
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
@@ -81,7 +81,7 @@ Unchanged:
 - [x] PAG-SP01 — Semantic Contracts & Provider Boundary
 - [x] PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 - [x] PAG-SP03 — Semantic Normalization Pipeline technical foundation
-- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — C003 active
+- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — C004 active
 - [ ] PAG-SP05 — LEVEL_ART Semantic Integration
 - [ ] PAG-SP06 — Semantic Quality / Recognizability Gate
 - [ ] PAG-SP07 — Reference / Style Generation
@@ -119,18 +119,10 @@ Retained foundation:
 
 ## C002 — Qualification Provenance, Capability & Blind-Review Binding Remediation
 
-State: **FAIL / C003 REQUIRED**
+State: **FAIL / REMEDIATED IN C003 WITH RESIDUALS**
 
 Strict audit:
 `.hiveai/audits/PAG-SP04-C002_QUALIFICATION_PROVENANCE_CAPABILITY_AND_BLIND_REVIEW_BINDING_REMEDIATION_STRICT_AUDIT.md`
-
-Builder reported:
-
-- 20 SP04 focused tests passed;
-- 100 SP01-SP04 focused tests passed;
-- 481 full repository tests passed;
-- compile/import/CLI/offline checks passed;
-- no provider calls or credit spend.
 
 Accepted C002 closure:
 
@@ -141,46 +133,70 @@ Accepted C002 closure:
 - [x] raw SHA + raw artifact + normalization source/report/RGBA binding;
 - [x] provider/workflow/version binding improvements;
 - [x] stable review-ID concept independent of cost/owner/review link;
-- [x] accepted/rejected summary labels no longer collapse automatically to NO_READY;
-- [x] C002 builder log created before implementation edits.
+- [x] terminal summary labels improved.
 
-C002 residual findings:
+## C003 — Request-to-Case Binding, Attempt Seal & Review Attribution Closure
 
-- [!] `F-PAG-SP04-C002-001` **MAJOR** — a directly constructed unsealed PLANNED attempt can use public helper methods to mint a sealed advanced record without validated plan-entry origin.
-- [!] `F-PAG-SP04-C002-002` **MAJOR** — selected benchmark case is not exactly bound to the actual typed `SemanticGenerationRequest`; semantic subject misattribution is possible.
-- [!] `F-PAG-SP04-C002-003` **MAJOR** — explicit matrix model/engine equality can be bypassed when raw evidence carries `model_id=None`.
-- [!] `F-PAG-SP04-C002-004` **MAJOR** — lifecycle transitions and owner disposition are not fully monotonic/coherent.
-- [!] `F-PAG-SP04-C002-005` **MAJOR** — summary and visible review metadata are not fully cross-bound to supplied plan/hidden attempt.
-- [~] `F-PAG-SP04-C002-006` **MINOR process** — final log-only terminal SHA/equality is not self-recorded inside the log; product source scope remains published.
+State: **FAIL / C004 REQUIRED**
+
+Strict audit:
+`.hiveai/audits/PAG-SP04-C003_REQUEST_TO_CASE_BINDING_ATTEMPT_SEAL_AND_REVIEW_ATTRIBUTION_CLOSURE_STRICT_AUDIT.md`
+
+Builder reported:
+
+- 24 SP04 focused tests passed;
+- 105 SP01-SP04 focused tests passed;
+- 486 full repository tests passed;
+- compile/import/CLI/offline checks passed;
+- no provider calls or credit spend.
+
+Accepted C003 closure:
+
+- [x] sealed `QualificationRequestBinding` binds benchmark case to actual typed semantic request;
+- [x] exact semantic description/negative/category/target/provider/model/workflow/config binding;
+- [x] request digest cross-bound into raw provider evidence;
+- [x] unsealed direct PLANNED attempts cannot mint trusted advanced state through helpers;
+- [x] `dataclasses.replace()` cannot mint/reset trusted attempt seal;
+- [x] exact raw model comparison when typed raw evidence exists, with no `None` bypass;
+- [x] backward lifecycle transitions forbidden and terminal transitions final;
+- [x] every non-terminal state requires pending owner disposition;
+- [x] summary rejects unsealed/wrong-plan/unknown-entry attempts;
+- [x] visible blind-review subject, target, sequence and review ID cross-bound to exact hidden attempt;
+- [x] coordinated visible review misattribution rejected;
+- [x] cost separation and C002 typed SP03 evidence preserved.
+
+C003 residual findings:
+
+- [!] `F-PAG-SP04-C003-001` **MAJOR** — terminal OWNER_ACCEPTED/OWNER_REJECTED can use an arbitrary free-form `review_item_id`; no sealed deterministic proof that candidate entered metadata-blind review protocol is required.
+- [!] `F-PAG-SP04-C003-002` **MAJOR** — `RAW_PROVIDER_CAPTURED` can be constructed without typed provider-capture/result evidence, so returned provider model/result identity is not proven at that lifecycle state.
+- [~] `F-PAG-SP04-C003-003` **MINOR process** — C003 builder log was recreated after prior product edits were already present rather than existing before all C003 edits.
 
 ---
 
-# PAG-SP04-C003 — Request-to-Case Binding, Attempt Seal & Review Attribution Closure
+# PAG-SP04-C004 — Review Entry Proof & Provider Capture Evidence Closure
 
 State: **READY_FOR_IMPLEMENTATION**
 
 Authoritative prompt:
-`.hiveai/prompts/PAG-SP04-C003_REQUEST_TO_CASE_BINDING_ATTEMPT_SEAL_AND_REVIEW_ATTRIBUTION_CLOSURE_PROMPT.md`
+`.hiveai/prompts/PAG-SP04-C004_REVIEW_ENTRY_PROOF_AND_PROVIDER_CAPTURE_EVIDENCE_CLOSURE_PROMPT.md`
 
 Required closure:
 
-- [ ] SP04-C003-001 Add checked plan/case/provider-matrix ↔ typed `SemanticGenerationRequest` binding.
-- [ ] SP04-C003-002 Bind request semantic intent, target, provider, model/engine, workflow/config and required reference/style roles exactly.
-- [ ] SP04-C003-003 Require raw request digest to equal checked qualification request binding digest target.
-- [ ] SP04-C003-004 Make trusted attempts checked-construction-only or otherwise prevent any unsealed record from minting a trusted seal.
-- [ ] SP04-C003-005 Make `dataclasses.replace()` unable to mint/reset attempt seal.
-- [ ] SP04-C003-006 Require non-null exact raw model/engine equality for advanced provider attempts.
-- [ ] SP04-C003-007 Enforce monotonic lifecycle transitions; forbid backward/terminal escape transitions.
-- [ ] SP04-C003-008 Require PENDING owner disposition for every non-terminal lifecycle state.
-- [ ] SP04-C003-009 Require terminal owner state to derive from exact review-bound technically ready candidate.
-- [ ] SP04-C003-010 Make summary reject unsealed, incoherent, wrong-plan and unknown-entry attempts.
-- [ ] SP04-C003-011 Cross-bind visible review subject/target/sequence to exact hidden attempt and deterministic review ID.
-- [ ] SP04-C003-012 Add coordinated review-misattribution sensitivity tests.
-- [ ] SP04-C003-013 Preserve C002 typed SP03 evidence, capability gating, plan integrity and cost separation.
-- [ ] SP04-C003-014 SP01-SP04 focused + full regression + compile/import/CLI/offline/security checks green.
-- [ ] SP04-C003-015 No provider execution, credits, live qualification, SP05/SP06/UI/M11.
+- [ ] SP04-C004-001 Replace free-form terminal review proof with sealed deterministic review-entry evidence.
+- [ ] SP04-C004-002 Bind review seed, expected review ID, exact pre-review attempt identity, case subject and normalized target/artifact identity.
+- [ ] SP04-C004-003 Make arbitrary review strings unable to authorize OWNER_ACCEPTED/OWNER_REJECTED.
+- [ ] SP04-C004-004 Keep review IDs deterministic/idempotent and independent of cost/owner metadata.
+- [ ] SP04-C004-005 Add typed/sealed provider-capture evidence derived from accepted successful provider candidate/result objects.
+- [ ] SP04-C004-006 Require non-null exact returned provider model/engine, provider/version/workflow/request/result/raw identity in capture evidence.
+- [ ] SP04-C004-007 Require RAW_PROVIDER_CAPTURED to carry checked capture evidence.
+- [ ] SP04-C004-008 Cross-bind capture evidence to later SP03 raw import on candidate/result identity, request, provider/model/workflow, raw SHA and dimensions.
+- [ ] SP04-C004-009 Preserve C003 request/case binding, attempt seals, lifecycle monotonicity, summary validation and review-card attribution.
+- [ ] SP04-C004-010 Add adversarial arbitrary-review and capture-without-model/result tests.
+- [ ] SP04-C004-011 SP01-SP04 focused + full regression + compile/import/CLI/offline/security checks green.
+- [ ] SP04-C004-012 No provider execution, credits, live qualification, SP05/SP06/UI/M11.
+- [ ] SP04-C004-013 Create matching builder log before any C004 implementation edit.
 
-## Qualification gates blocked until C003 independent PASS
+## Qualification gates blocked until C004 independent PASS
 
 - [ ] SP04-Q01 Capture exact live Magnific raw bytes locally and compute immutable SHA-256.
 - [ ] SP04-Q02 Prove exact live Magnific raw file is accepted by SP03 decoder/import boundary.
@@ -196,6 +212,6 @@ No default production provider/model/workflow is selected yet.
 
 ## Current Stop Rule
 
-Execute **PAG-SP04-C003 only**.
+Execute **PAG-SP04-C004 only**.
 
-Do not call Magnific or PixelLab. Do not spend credits. Do not begin live SP04 qualification, SP05, SP06, Studio UI or M11. Codex must not edit `TASKS.md`, must create the matching C003 builder log before any implementation edit, commit/push `main`, verify final local HEAD == origin/main divergence `0 0`, then stop for independent ChatGPT audit.
+Do not call Magnific or PixelLab. Do not spend credits. Do not begin live SP04 qualification, SP05, SP06, Studio UI or M11. Codex must not edit `TASKS.md`, must create the matching C004 builder log before any implementation edit, commit/push `main`, verify final local HEAD == origin/main divergence `0 0`, then stop for independent ChatGPT audit.
