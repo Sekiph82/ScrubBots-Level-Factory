@@ -7,18 +7,18 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 ## Project Status
 
 - Current Milestone: **PAG-SP03 — Semantic Normalization Pipeline**
-- Current Sprint: **PAG-SP03-C001**
-- Current Task: **Raw Capture & Deterministic 24x24 Normalization Foundation**
+- Current Sprint: **PAG-SP03-C002**
+- Current Task: **Bounded Decode, Deep Immutability & Raw-to-Normalized Provenance Closure**
 - Current Task Status: **READY_FOR_IMPLEMENTATION**
 - Required Actor: **CODEX**
+- Previous Cycle: `PAG-SP03-C001` → **FAIL / BOUNDED REMEDIATION REQUIRED**
+- Previous Strict Audit: `.hiveai/audits/PAG-SP03-C001_RAW_CAPTURE_AND_DETERMINISTIC_24X24_NORMALIZATION_FOUNDATION_STRICT_AUDIT.md`
+- Current Prompt: `.hiveai/prompts/PAG-SP03-C002_BOUNDED_DECODE_DEEP_IMMUTABILITY_AND_RAW_TO_NORMALIZED_PROVENANCE_CLOSURE_PROMPT.md`
 - Previous Milestone: `PAG-SP02` → **PASS / CLOSED FOR CURRENT SCOPE**
-- Previous Code Cycle: `PAG-SP02-C003` → **PASS / CLOSED**
-- Previous Strict Audit: `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
 - Live Smoke Evidence: `review/sp02/SP02_MAGNIFIC_LIVE_SMOKE_2026-09-13.md`
-- Owner Decision: **Magnific wizard visual accepted; 24x24 px accepted as the first ASSET_ART baseline target**
-- Current Prompt: `.hiveai/prompts/PAG-SP03-C001_RAW_CAPTURE_AND_DETERMINISTIC_24X24_NORMALIZATION_FOUNDATION_PROMPT.md`
-- Next Task/Action: Execute SP03-C001 only, publish builder log/tests, commit/push `main`, then stop for independent ChatGPT audit.
-- Blockers/Waits: **SP04 and M11 remain blocked** until SP03 normalization receives technical acceptance. PixelLab live smoke remains optional/pending an authorized `PIXELLAB_SECRET`; it does not reopen accepted SP02 provider code.
+- Owner Decision: **Magnific wizard visual accepted; 24x24 px accepted as first ASSET_ART baseline target**
+- Next Task/Action: Execute SP03-C002 only, publish builder log/tests, commit/push `main`, then stop for independent ChatGPT audit.
+- Blockers/Waits: **SP04 and M11 remain blocked** until SP03 normalization receives technical acceptance.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
 - Provider Architecture: **provider-neutral; no silent provider/model fallback**
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
@@ -26,8 +26,6 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 - Canonical Local Repository: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
 
 ## Current Product Goal
-
-Convert the accepted deterministic Pixel Art Generator foundation into a PixelLab-like Semantic Pixel Studio:
 
 ```text
 TEXT / REFERENCE / STYLE
@@ -55,7 +53,7 @@ The previous M10 100-image owner pack remains **REJECTED 100/100** and is perman
 
 ### LEVEL_ART
 
-These remain unchanged:
+Unchanged:
 
 - EASY: width/height independently 20–29
 - MEDIUM: 30–39
@@ -75,10 +73,10 @@ These remain unchanged:
 ### ASSET_ART
 
 - Separate from LevelData/difficulty legality.
-- Existing architecture may represent sizes such as 16x16, 24x24, 32x32, 48x48, 64x64 and rectangles.
-- **24x24 px is now the first owner-approved baseline target.**
-- This does not mean 24x24 is the only future ASSET_ART size.
-- C01..C16 is not automatically forced on ASSET_ART unless an explicit later palette policy says so.
+- **24x24 px is the first owner-approved baseline target.**
+- 24x24 is not the only future ASSET_ART size.
+- C01..C16 is not automatically forced on ASSET_ART.
+- C001 baseline palette policy: `PRESERVE_SOURCE_RGBA`.
 
 ## Provider Decisions
 
@@ -87,30 +85,14 @@ These remain unchanged:
 - Approved while owner credits are available.
 - External owner-authorized orchestration only; Factory must not scrape/drive private endpoints.
 - Raw provider dimensions and logical target dimensions are separate provenance concepts.
-- Current pinned smoke model: `recraft-v4-1`.
-- Live smoke produced a 2048x2048 raw wizard and an exact 24x24 derivative.
-- Owner accepted both the visual direction and 24x24 dimensions.
-- Private creation identifiers/signed URLs are not committed to the repository.
+- Live `recraft-v4-1` wizard smoke generated successfully and owner accepted the visual direction and 24x24 derivative.
 
 ### PIXELLAB
 
-- Official SDK/API provider remains approved.
-- Provider id `PIXELLAB`.
-- Official Python package `pixellab`, baseline inspected version `1.0.8`.
-- Secret from `PIXELLAB_SECRET` only.
-- PixFlux exact-size generation and deterministic provider-seed mapping remain accepted SP02 contracts.
-- BitForge STYLE + style-strength mapping remains accepted.
-- Live PixelLab smoke is pending an authorized secret/environment and is not required to reopen SP02 code acceptance.
-
-## Authority Documents
-
-- `docs/PAG_SEMANTIC_PIXEL_STUDIO_CONVERSION_PLAN_V01.md`
-- `docs/SEMANTIC_PROVIDER_AUTHORITY_V02.md`
-- `docs/MAGNIFIC_PROVIDER_AUTHORITY_V01.md`
-- `docs/SEMANTIC_PIVOT_AUTHORITY_V01.md`
-- `review/m10/M10_OWNER_REVIEW_DECISION.md`
-- `review/sp02/SP02_MAGNIFIC_LIVE_SMOKE_2026-09-13.md`
-- `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
+- Official API/SDK provider remains approved.
+- Direct network execution is opt-in only.
+- `PIXELLAB_SECRET` remains runtime-only.
+- PixelLab live smoke is optional/pending authorized secret availability and does not reopen SP02.
 
 ---
 
@@ -118,161 +100,189 @@ These remain unchanged:
 
 ## Historical procedural foundation
 
-- [x] PAG-M00 — Repository Bootstrap & Governance
-- [x] PAG-M01 — Canonical SCRUBBOTS Contracts
-- [x] PAG-M02 — Deterministic Generation Core
-- [x] PAG-M03 — Mask / Sprite Generator
-- [x] PAG-M04 — Procedural Shape / Rule Generator technical closure
-- [x] PAG-M05 — Wave Function Collapse Generator
-- [x] PAG-M06 — Hybrid Generator Router
-- [x] PAG-M07 — Artwork Quality & Diversity Filters
-- [x] PAG-M08 — Output / Export Contract
-- [x] PAG-M09 — CLI & Local Batch Generation
-- [x] PAG-M10 — Technical validation/performance foundation
-- [!] PAG-M10 visual V1 acceptance — OWNER REJECTED 100/100
-- [!] PAG-M11 — Godot/Main-Level-Factory Handoff Gate blocked pending semantic replacement acceptance
-
-M10 technical performance decision remains accepted: RULES 59x59 offline-factory operational p95 budget approximately 15 s; `PAG-0441` technically closed.
+- [x] **PAG-M00 — Repository Bootstrap & Governance**
+- [x] **PAG-M01 — Canonical SCRUBBOTS Contracts**
+- [x] **PAG-M02 — Deterministic Generation Core**
+- [x] **PAG-M03 — Mask / Sprite Generator**
+- [x] **PAG-M04 — Procedural Shape / Rule Generator technical closure**
+- [x] **PAG-M05 — Wave Function Collapse Generator**
+- [x] **PAG-M06 — Hybrid Generator Router**
+- [x] **PAG-M07 — Artwork Quality & Diversity Filters**
+- [x] **PAG-M08 — Output / Export Contract**
+- [x] **PAG-M09 — CLI & Local Batch Generation**
+- [x] **PAG-M10 — Technical validation/performance foundation**
+- [!] **PAG-M10 visual V1 acceptance — OWNER REJECTED 100/100**
+- [!] **PAG-M11 — Godot/Main-Level-Factory Handoff Gate** blocked pending semantic replacement acceptance
 
 ## Semantic Pixel Studio roadmap
 
-- [x] PAG-SP00 — Owner Rejection & Semantic Pivot Record
-- [x] PAG-SP01 — Semantic Contracts & Provider Boundary
-- [x] PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
-- [~] PAG-SP03 — Semantic Normalization Pipeline
-- [ ] PAG-SP04 — Semantic Provider / Model / Workflow Qualification
-- [ ] PAG-SP05 — LEVEL_ART Semantic Integration
-- [ ] PAG-SP06 — Semantic Quality / Recognizability Gate
-- [ ] PAG-SP07 — Reference / Style Generation
-- [ ] PAG-SP08 — Edit / Inpaint
-- [ ] PAG-SP09 — Pixel Studio Create / Gallery UI
-- [ ] PAG-SP10 — Automated Weekly Semantic Batch
-- [ ] PAG-SP11 — ASSET_ART Production
-- [ ] PAG-SP12 — Direction / Rotation Variants
-- [ ] PAG-SP13 — Animation
-- [ ] PAG-SP14 — ScrubBots Level Factory Bridge
+- [x] **PAG-SP00 — Owner Rejection & Semantic Pivot Record**
+- [x] **PAG-SP01 — Semantic Contracts & Provider Boundary**
+- [x] **PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion** — technical PASS; live Magnific smoke/owner visual acceptance recorded
+- [~] **PAG-SP03 — Semantic Normalization Pipeline** — C002 remediation active
+- [ ] **PAG-SP04 — Semantic Provider / Model / Workflow Qualification**
+- [ ] **PAG-SP05 — LEVEL_ART Semantic Integration**
+- [ ] **PAG-SP06 — Semantic Quality / Recognizability Gate**
+- [ ] **PAG-SP07 — Reference / Style Generation**
+- [ ] **PAG-SP08 — Edit / Inpaint**
+- [ ] **PAG-SP09 — Pixel Studio Create / Gallery UI**
+- [ ] **PAG-SP10 — Automated Weekly Semantic Batch**
+- [ ] **PAG-SP11 — ASSET_ART Production**
+- [ ] **PAG-SP12 — Direction / Rotation Variants**
+- [ ] **PAG-SP13 — Animation**
+- [ ] **PAG-SP14 — ScrubBots Level Factory Bridge**
 
 ---
 
-# PAG-SP02 — Final Disposition
+# PAG-SP01 — Semantic Contracts & Provider Boundary
 
-State: **PASS / CLOSED FOR CURRENT SCOPE**
+Final state: `PASS / CLOSED`
 
-Technical closure cycle: `PAG-SP02-C003`.
+Closing audit: `.hiveai/audits/PAG-SP01-C003_NON_SUCCESS_PROVENANCE_ECHO_AND_MISMATCH_TEST_SENSITIVITY_CLOSURE_STRICT_AUDIT.md`
 
-Strict audit: `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`.
+Core accepted properties:
 
-Accepted facts:
+- [x] LEVEL_ART / ASSET_ART separation.
+- [x] Immutable/versioned semantic request and image descriptors.
+- [x] Provider-neutral boundary and typed raw candidates.
+- [x] Exact role/provenance binding.
+- [x] Raw semantic candidate cannot masquerade as M08 artwork.
 
-- [x] explicit provider selection and no silent fallback;
-- [x] Magnific pinned per-model capabilities and unknown-model fail-closed behavior;
-- [x] raw provider rasters up to versioned 8192 bound without relaxing logical request dimensions;
-- [x] exact Magnific request↔job↔manifest provenance binding;
-- [x] exact PixelLab request↔job↔candidate↔manifest provenance binding;
-- [x] mutable audit/cost/failure prose excluded from deterministic provider-result identity;
-- [x] PixelLab exact-size/seed/control/style-strength mappings preserved;
-- [x] no raw provider candidate can masquerade as normalized M08 artwork;
-- [x] live Magnific generation succeeded using `recraft-v4-1`;
-- [x] exact 24x24 derivative produced;
-- [x] owner accepted the visual direction;
-- [x] owner accepted 24x24 as first ASSET_ART baseline target;
-- [~] local Factory ingestion of the exact live private PNG bytes was not exercised during the connector smoke; SP03 owns immutable raw-byte capture/normalization verification;
-- [~] PixelLab live smoke pending secret/authorization, non-blocking for SP03.
+---
 
-Non-blocking documentation debt:
+# PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 
-- [~] align Magnific snapshot observation-date wording on next docs touch.
+Final state for current scope: `PASS / CLOSED`
+
+Closing code cycle: `PAG-SP02-C003`.
+
+Closing audit: `.hiveai/audits/PAG-SP02-C003_MODEL_CAPABILITY_SNAPSHOT_RAW_RASTER_CEILING_AND_CROSS_PROVENANCE_CLOSURE_STRICT_AUDIT.md`
+
+Live smoke evidence: `review/sp02/SP02_MAGNIFIC_LIVE_SMOKE_2026-09-13.md`.
+
+- [x] Explicit MAGNIFIC / PIXELLAB provider selection.
+- [x] Magnific pinned model capability snapshots and raw-raster/provenance bridge.
+- [x] PixelLab official SDK boundary with exact-size/seed mapping.
+- [x] Result identity excludes mutable audit/cost/failure prose.
+- [x] Exact cross-provenance binding.
+- [x] Magnific live provider generation PASS.
+- [x] Exact 24x24 derivative produced.
+- [x] Owner visual acceptance PASS.
+- [x] Owner 24x24 ASSET_ART baseline acceptance PASS.
+- [~] Real local Factory import of the live private Magnific bytes remains unverified and is carried as SP03 verification input, not an SP02 code blocker.
 
 ---
 
 # PAG-SP03 — Semantic Normalization Pipeline
 
-State: **ACTIVE / C001 READY_FOR_IMPLEMENTATION**
+State: `ACTIVE / C002_REMEDIATION`
 
-Current cycle:
+## Cycle PAG-SP03-C001 — Raw Capture & Deterministic 24x24 Normalization Foundation
 
-`PAG-SP03-C001 — Raw Capture & Deterministic 24x24 Normalization Foundation`
+State: **FAIL / BOUNDED C002 REQUIRED**
 
-Prompt:
+Builder evidence:
 
-`.hiveai/prompts/PAG-SP03-C001_RAW_CAPTURE_AND_DETERMINISTIC_24X24_NORMALIZATION_FOUNDATION_PROMPT.md`
+- 10 SP03 focused tests passed;
+- 74 SP01+SP02+SP03 focused tests passed;
+- 455 full repository tests passed according to builder log;
+- compile/import/CLI/offline checks passed;
+- independent audit runtime replay UNVERIFIED because audit container could not resolve `github.com`.
 
-C001 scope:
+Accepted implementation direction from C001:
 
-- [ ] SP03-C001-001 Define immutable raw semantic artifact with exact bytes/hash/provider/request provenance.
-- [ ] SP03-C001-002 Prove raw source bytes/hash are never mutated by normalization.
-- [ ] SP03-C001-003 Add deterministic local decode with explicit image-format/orientation/safety behavior.
-- [ ] SP03-C001-004 Define immutable/versioned normalization request/report/artifact contracts.
-- [ ] SP03-C001-005 Support owner-approved 24x24 ASSET_ART target as first-class baseline.
-- [ ] SP03-C001-006 Exact-size 24x24 source must take a no-resize/no-interpolation fast path.
-- [ ] SP03-C001-007 Add deterministic large-raster -> 24x24 baseline policy without claiming owner acceptance of the local resampler.
-- [ ] SP03-C001-008 Add explicit alpha/background policy; no heuristic background deletion.
-- [ ] SP03-C001-009 Add ASSET_ART `PRESERVE_SOURCE_RGBA` palette policy boundary without importing LEVEL_ART color-band rules.
-- [ ] SP03-C001-010 Keep LEVEL_ART final output fail-closed until required C01..C16 canonicalization policy is implemented.
-- [ ] SP03-C001-011 Preserve raw-to-normalized provenance/digests and exclude paths/secrets/private URLs from identity.
-- [ ] SP03-C001-012 Provide local-file ingestion/tooling path without external provider calls.
-- [ ] SP03-C001-013 Add deterministic/sensitivity/security tests including synthetic 24x24 and 2048x2048 fixtures.
-- [ ] SP03-C001-014 Preserve SP01/SP02 and M00-M10 regressions.
-- [ ] SP03-C001-015 No provider credit spend, no SP04, no M11.
+- [x] C001-A01 Separate `SemanticRawArtifact`, normalization request/report and normalized artifact lifecycle.
+- [x] C001-A02 Raw bytes/hash retained as immutable bytes.
+- [x] C001-A03 Exact 24x24 RGBA -> 24x24 fast path performs no resize/resample.
+- [x] C001-A04 Deterministic `AREA_AVERAGE_V1` + `FIT_CENTER_LETTERBOX_V1` baseline exists for large rasters.
+- [x] C001-A05 Explicit `PRESERVE_ALPHA` and `OPAQUE_AS_IS` policies.
+- [x] C001-A06 ASSET_ART baseline uses `PRESERVE_SOURCE_RGBA` and does not inherit LEVEL_ART color bands.
+- [x] C001-A07 Final LEVEL_ART emission remains blocked.
+- [x] C001-A08 Local CLI path is provider/network-free and protects the source path.
 
-Later SP03 scope after C001 audit:
+C001 strict-audit residuals:
 
-- [ ] final LEVEL_ART C01..C16 palette mapping;
-- [ ] LEVEL_ART difficulty color-band enforcement after semantic normalization;
-- [ ] ASSET_ART palette-policy refinement if owner/product needs it;
-- [ ] real owner-approved Magnific raw/24x24 file capture through the accepted ingestion path;
-- [ ] normalization visual review comparing local deterministic output with the accepted 24x24 provider derivative.
+- [!] `F-PAG-SP03-C001-001` **MAJOR** — zlib `flush()` is unbounded and can bypass decompression-bomb memory budget.
+- [!] `F-PAG-SP03-C001-002` **MAJOR** — report `crop_pad` mapping is mutable after construction, so report/artifact digest can change over object lifetime.
+- [!] `F-PAG-SP03-C001-003` **MAJOR** — duplicated provider/request provenance in normalized artifact is not cross-bound to the raw artifact source identity.
+- [!] `F-PAG-SP03-C001-004` **MINOR** — LEVEL_ART normalization request can represent arbitrary generic dimensions when future palette policy is supplied instead of preserving existing difficulty legality.
+
+Strict audit:
+
+`.hiveai/audits/PAG-SP03-C001_RAW_CAPTURE_AND_DETERMINISTIC_24X24_NORMALIZATION_FOUNDATION_STRICT_AUDIT.md`
+
+## Cycle PAG-SP03-C002 — Bounded Decode, Deep Immutability & Raw-to-Normalized Provenance Closure
+
+State: **READY_FOR_IMPLEMENTATION**
+
+Authoritative prompt:
+
+`.hiveai/prompts/PAG-SP03-C002_BOUNDED_DECODE_DEEP_IMMUTABILITY_AND_RAW_TO_NORMALIZED_PROVENANCE_CLOSURE_PROMPT.md`
+
+Required closure:
+
+- [ ] SP03-C002-001 Enforce hard decompressed-output budget through the entire zlib lifecycle; no unbounded flush.
+- [ ] SP03-C002-002 Add compact decompression-bomb, exact-bound, overflow, truncated-stream and trailing-data tests.
+- [ ] SP03-C002-003 Deep-freeze report `crop_pad` deterministic state.
+- [ ] SP03-C002-004 Prove caller dict mutation cannot change report/artifact digest.
+- [ ] SP03-C002-005 Cross-bind normalized provider/request provenance exactly to the source raw artifact.
+- [ ] SP03-C002-006 Reject coordinated raw/provenance/report/request tampering.
+- [ ] SP03-C002-007 Preserve LEVEL_ART request legality or fail all LEVEL_ART normalization-request construction until sufficient context exists.
+- [ ] SP03-C002-008 Preserve exact 24x24 fast path, 2048->24 baseline, alpha policies and ASSET palette boundary.
+- [ ] SP03-C002-009 Preserve offline/local CLI and no-source-overwrite behavior.
+- [ ] SP03-C002-010 Focused + SP01/SP02/SP03 + full regression green.
+- [ ] SP03-C002-011 No provider execution, no credits, no SP04/M11.
+
+### SP03 technical acceptance gate after C002
+
+- [ ] SP03-A01 Raw provider bytes/hash remain immutable before/after normalization.
+- [ ] SP03-A02 Malformed/compressed input cannot exceed the explicit decode memory budget.
+- [ ] SP03-A03 Exact-size source uses no hidden interpolation.
+- [ ] SP03-A04 Large raster downsample is byte-deterministic and fully reported.
+- [ ] SP03-A05 Deterministic report/artifact identity is deeply immutable.
+- [ ] SP03-A06 Normalized provenance is cryptographically bound to the exact raw source/request/provider chain.
+- [ ] SP03-A07 ASSET_ART does not inherit LEVEL_ART palette/color-band rules.
+- [ ] SP03-A08 LEVEL_ART cannot bypass canonical difficulty/palette contracts.
+- [ ] SP03-A09 No normalized ASSET_ART can masquerade as M08 LEVEL_ART.
+- [ ] SP03-A10 Independent audit marks C002/SP03 technical foundation PASS.
 
 ---
 
-# Future Milestones
+# PAG-SP04 — Semantic Provider / Model / Workflow Qualification
 
-## PAG-SP04 — Provider / Model / Workflow Qualification
+Blocked until SP03 technical PASS.
 
-Compare Magnific models and PixelLab PixFlux/BitForge using representative semantic subjects, provider cost/usage, exact-small-raster behavior and metadata-blind owner recognizability review.
+Planned:
 
-## PAG-SP05 — LEVEL_ART Semantic Integration
+- benchmark concrete recognizable subjects;
+- compare Magnific models/workflows within owner-approved credit budget;
+- compare PixelLab PixFlux/BitForge when API access is authorized;
+- measure costs separately from accepted results;
+- metadata-blind small-resolution visual review;
+- compare PixelLab exact-small output against Magnific + local normalization;
+- select default provider/model/workflow only from evidence and owner acceptance.
 
-Route owner-visible semantic art into existing MASK/RULES/WFC/HYBRID infrastructure while preserving exact LevelData contracts.
+---
 
-## PAG-SP06 — Semantic Quality / Recognizability Gate
+# Later Milestones
 
-Separate structural accept from semantic accept; owner acceptance remains authoritative.
+- SP05: LEVEL_ART semantic integration
+- SP06: semantic recognizability gate
+- SP07: reference/style generation
+- SP08: edit/inpaint
+- SP09: Pixel Studio UI
+- SP10: automated weekly semantic batch
+- SP11: ASSET_ART production
+- SP12: direction/rotation variants
+- SP13: animation
+- SP14: main ScrubBots Level Factory bridge
 
-## PAG-SP07 — Reference / Style Generation
-
-Provider-truthful reference/style/color/init workflows with content-hash provenance.
-
-## PAG-SP08 — Edit / Inpaint
-
-Versioned edit lineage and re-normalization.
-
-## PAG-SP09 — Pixel Studio Create / Gallery UI
-
-PixelLab-inspired provider-neutral Create/Gallery workspace.
-
-## PAG-SP10 — Automated Weekly Semantic Batch
-
-Budget-aware attempts, failures, normalization rejects and owner review queue.
-
-## PAG-SP11 — ASSET_ART Production
-
-Character/enemy/item/object/icon production using owner-approved asset policies. 24x24 is the first accepted baseline, not an exclusive size.
-
-## PAG-SP12 — Direction / Rotation Variants
-
-Audited provider-native or local direction/rotation lineage.
-
-## PAG-SP13 — Animation
-
-Optional animation-frame lineage, separate from level acceptance.
-
-## PAG-SP14 — ScrubBots Level Factory Bridge
-
-Export only owner-accepted normalized LEVEL_ART to main ScrubBots Level Factory. Re-open M11 only after semantic replacement acceptance.
+M11 remains blocked until owner-accepted semantic replacement artwork is technically normalized and accepted through downstream gates.
 
 ---
 
 ## Current Stop Rule
 
-Execute **PAG-SP03-C001 only**. Do not begin SP03-C002, SP04 or M11. Do not call Magnific or PixelLab or spend provider credits. Codex must publish the matching builder log, commit/push `main`, verify local HEAD == origin/main with divergence `0 0`, then stop for independent ChatGPT strict audit.
+Execute **PAG-SP03-C002 only**.
+
+Do not begin SP04, SP05, Studio UI or M11. Do not call Magnific/PixelLab or spend credits. Codex must not edit `TASKS.md`, must publish the matching builder log, commit/push `main`, verify local HEAD == origin/main divergence `0 0`, then stop for independent ChatGPT audit.
