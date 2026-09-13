@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 import json
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 import struct
 import zlib
@@ -16,11 +17,13 @@ from scrubbots_pixel_factory import (
     SemanticCandidateError,
     SemanticGenerationRequest,
     SemanticImageCandidate,
+    SemanticNormalizedArtifact,
     SemanticNormalizationError,
     SemanticNormalizationRequiredError,
     SemanticRawArtifact,
     SemanticDecodeError,
     SemanticNormalizationRequest,
+    SemanticSourceProvenance,
     normalize_semantic_artifact,
 )
 from scrubbots_pixel_factory.cli.main import main
@@ -192,15 +195,63 @@ def test_normalized_artifact_provenance_is_checked_against_the_raw_source_and_re
     raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((1, 2, 3, 255)) * (24 * 24)), 24, 24))
     request = SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 24, 24)
     normalized = normalize_semantic_artifact(raw, request)
-    with pytest.raises(SemanticNormalizationError, match="provenance"):
+    with pytest.raises(SemanticNormalizationError, match="checked construction|provenance"):
         replace(normalized, provider_id="forged-provider")
-    with pytest.raises(SemanticNormalizationError, match="provenance"):
+    with pytest.raises(SemanticNormalizationError, match="checked construction|provenance"):
         replace(normalized, request_digest=hashlib.sha256(b"other-request").hexdigest())
     foreign = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((4, 5, 6, 255)) * (24 * 24)), 24, 24, seed="foreign-seed"))
-    with pytest.raises(SemanticNormalizationError, match="provenance"):
+    with pytest.raises(SemanticNormalizationError, match="checked construction|provenance"):
         replace(normalized, source_provenance=normalized.source_provenance.__class__.from_raw_artifact(foreign))
-    with pytest.raises(SemanticNormalizationError, match="bound"):
+    with pytest.raises(SemanticNormalizationError, match="checked construction|bound"):
         replace(normalized, report=replace(normalized.report, input_raw_sha256=foreign.raw_sha256))
+
+
+def test_source_provenance_is_factory_sealed_and_retains_reference_identity() -> None:
+    descriptor = ImageInputDescriptor("STYLE", hashlib.sha256(b"style-input").hexdigest(), local_path="C:\\private\\style.png")
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((1, 2, 3, 255)) * (24 * 24)), 24, 24, style_image=descriptor))
+    source = SemanticSourceProvenance.from_raw_artifact(raw)
+    assert source.raw_artifact_digest == raw.digest()
+    assert source.canonical_dict()["style_image"] == descriptor.canonical_dict()
+    direct_values = {item.name: getattr(source, item.name) for item in fields(source) if item.init}
+    with pytest.raises(SemanticNormalizationError):
+        SemanticSourceProvenance(**direct_values)
+    for field_name, value in (("provider_id", "forged"), ("provider_version", "forged-v2"), ("workflow_version", "forged-workflow"), ("model_id", "forged-model"), ("request_digest", hashlib.sha256(b"forged-request").hexdigest())):
+        with pytest.raises(SemanticNormalizationError):
+            replace(source, **{field_name: value})
+
+
+def test_coordinated_provenance_replacement_and_seal_reset_fail_closed() -> None:
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((7, 8, 9, 255)) * (24 * 24)), 24, 24))
+    request = SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 24, 24)
+    normalized = normalize_semantic_artifact(raw, request)
+    source = normalized.source_provenance
+    forged = object.__new__(SemanticSourceProvenance)
+    for field_name in ("raw_artifact_digest", "raw_sha256", "provider_candidate_digest", "provider_id", "provider_version", "workflow_version", "model_id", "request_digest", "requested_width", "requested_height", "returned_width", "returned_height", "media_type", "source_status", "reference_images", "style_image", "init_image", "color_reference"):
+        object.__setattr__(forged, field_name, getattr(source, field_name))
+    object.__setattr__(forged, "provider_id", "forged-provider")
+    object.__setattr__(forged, "provider_version", "forged-version")
+    object.__setattr__(forged, "workflow_version", "forged-workflow")
+    object.__setattr__(forged, "model_id", "forged-model")
+    object.__setattr__(forged, "request_digest", hashlib.sha256(b"forged-request").hexdigest())
+    object.__setattr__(forged, "_construction_token", getattr(source, "_construction_token"))
+    object.__setattr__(forged, "_construction_fingerprint", None)
+    with pytest.raises(SemanticNormalizationError):
+        replace(normalized, source_provenance=forged, provider_id="forged-provider", provider_version="forged-version", workflow_version="forged-workflow", model_id="forged-model", request_digest=forged.request_digest)
+    with pytest.raises(ValueError):
+        replace(normalized, _construction_fingerprint=None)
+    with pytest.raises(ValueError):
+        replace(normalized, _construction_token=getattr(normalized, "_construction_token"))
+
+
+def test_valid_normalized_provenance_serialization_and_digest_are_stable() -> None:
+    raw = SemanticRawArtifact.from_candidate(candidate_for_png(rgba_png(24, 24, bytes((11, 12, 13, 255)) * (24 * 24)), 24, 24))
+    normalized = normalize_semantic_artifact(raw, SemanticNormalizationRequest(raw.digest(), "ASSET_ART", 24, 24))
+    assert "_construction_token" not in inspect.signature(SemanticNormalizedArtifact).parameters
+    assert "_construction_fingerprint" not in inspect.signature(SemanticNormalizedArtifact).parameters
+    canonical = normalized.canonical_bytes()
+    digest = normalized.digest()
+    assert normalized.canonical_bytes() == canonical
+    assert normalized.digest() == digest
 
 
 def test_local_normalization_cli_writes_manifest_without_overwriting_source(tmp_path: Path) -> None:

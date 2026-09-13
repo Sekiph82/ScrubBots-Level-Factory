@@ -46,6 +46,7 @@ ALPHA_POLICIES = frozenset({"PRESERVE_ALPHA", "OPAQUE_AS_IS"})
 ASSET_PALETTE_POLICY = "PRESERVE_SOURCE_RGBA"
 FUTURE_LEVEL_PALETTE_POLICY = "SCRUBBOTS_C01_C16"
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_SOURCE_PROVENANCE_CONSTRUCTION_TOKEN = object()
 _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN = object()
 
 
@@ -560,21 +561,36 @@ class SemanticSourceProvenance:
     style_image: ImageInputDescriptor | None = None
     init_image: ImageInputDescriptor | None = None
     color_reference: ImageInputDescriptor | None = None
+    _construction_token: object = field(init=False, repr=False, compare=False)
+    _construction_fingerprint: str = field(init=False, repr=False, compare=False)
 
     @classmethod
     def from_raw_artifact(cls, raw_artifact: SemanticRawArtifact) -> "SemanticSourceProvenance":
         if not isinstance(raw_artifact, SemanticRawArtifact):
             raise SemanticNormalizationError("source provenance requires a typed raw artifact")
-        return cls(
-            raw_artifact.digest(), raw_artifact.raw_sha256, raw_artifact.provider_candidate_digest,
-            raw_artifact.provider_id, raw_artifact.provider_version, raw_artifact.workflow_version,
-            raw_artifact.model_id, raw_artifact.request_digest, raw_artifact.requested_width,
-            raw_artifact.requested_height, raw_artifact.returned_width, raw_artifact.returned_height,
-            raw_artifact.media_type, raw_artifact.source_status, raw_artifact.reference_images,
-            raw_artifact.style_image, raw_artifact.init_image, raw_artifact.color_reference,
-        )
+        instance = object.__new__(cls)
+        values = {
+            "raw_artifact_digest": raw_artifact.digest(), "raw_sha256": raw_artifact.raw_sha256,
+            "provider_candidate_digest": raw_artifact.provider_candidate_digest, "provider_id": raw_artifact.provider_id,
+            "provider_version": raw_artifact.provider_version, "workflow_version": raw_artifact.workflow_version,
+            "model_id": raw_artifact.model_id, "request_digest": raw_artifact.request_digest,
+            "requested_width": raw_artifact.requested_width, "requested_height": raw_artifact.requested_height,
+            "returned_width": raw_artifact.returned_width, "returned_height": raw_artifact.returned_height,
+            "media_type": raw_artifact.media_type, "source_status": raw_artifact.source_status,
+            "reference_images": raw_artifact.reference_images, "style_image": raw_artifact.style_image,
+            "init_image": raw_artifact.init_image, "color_reference": raw_artifact.color_reference,
+        }
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        object.__setattr__(instance, "_construction_token", _SOURCE_PROVENANCE_CONSTRUCTION_TOKEN)
+        instance.__post_init__()
+        object.__setattr__(instance, "_construction_fingerprint", instance._compute_fingerprint())
+        instance._assert_integrity()
+        return instance
 
     def __post_init__(self) -> None:
+        if getattr(self, "_construction_token", None) is not _SOURCE_PROVENANCE_CONSTRUCTION_TOKEN:
+            raise SemanticNormalizationError("source provenance requires checked construction from a raw artifact")
         _sha256_text(self.raw_artifact_digest, "raw_artifact_digest")
         _sha256_text(self.raw_sha256, "raw_sha256")
         _sha256_text(self.provider_candidate_digest, "provider_candidate_digest")
@@ -593,7 +609,7 @@ class SemanticSourceProvenance:
             raise SemanticNormalizationError("source provenance reference images are invalid")
         object.__setattr__(self, "source_status", status)
 
-    def canonical_dict(self) -> dict[str, object]:
+    def _canonical_dict(self) -> dict[str, object]:
         return {
             "raw_artifact_digest": self.raw_artifact_digest,
             "raw_sha256": self.raw_sha256,
@@ -610,8 +626,22 @@ class SemanticSourceProvenance:
             "color_reference": self.color_reference.canonical_dict() if self.color_reference else None,
         }
 
+    def _compute_fingerprint(self) -> str:
+        return _digest(self._canonical_dict())
+
+    def _assert_integrity(self) -> None:
+        if getattr(self, "_construction_token", None) is not _SOURCE_PROVENANCE_CONSTRUCTION_TOKEN:
+            raise SemanticNormalizationError("source provenance construction seal is invalid")
+        if getattr(self, "_construction_fingerprint", None) != self._compute_fingerprint():
+            raise SemanticNormalizationError("source provenance construction fingerprint is invalid")
+
+    def canonical_dict(self) -> dict[str, object]:
+        self._assert_integrity()
+        return self._canonical_dict()
+
     def digest(self) -> str:
-        return _digest(self.canonical_dict())
+        self._assert_integrity()
+        return _digest(self._canonical_dict())
 
 
 @dataclass(frozen=True, slots=True)
@@ -636,11 +666,11 @@ class SemanticNormalizedArtifact:
     schema_version: int = NORMALIZATION_SCHEMA_VERSION
     source_provenance: SemanticSourceProvenance | None = field(default=None, repr=False, compare=False)
     normalization_request: SemanticNormalizationRequest | None = field(default=None, repr=False, compare=False)
-    _construction_token: object = field(default=None, repr=False, compare=False)
-    _construction_fingerprint: str | None = field(default=None, repr=False, compare=False)
+    _construction_token: object = field(init=False, repr=False, compare=False)
+    _construction_fingerprint: str = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if self._construction_token is not _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN:
+        if getattr(self, "_construction_token", None) is not _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN:
             raise SemanticNormalizationError("normalized artifacts require checked construction from a raw artifact")
         if not isinstance(self.source_provenance, SemanticSourceProvenance):
             raise SemanticNormalizationError("normalized artifact source provenance is missing")
@@ -670,11 +700,8 @@ class SemanticNormalizedArtifact:
         if not isinstance(self.report, SemanticNormalizationReport) or self.report.output_rgba_sha256 != self.normalized_rgba_sha256 or self.report.source_raw_artifact_digest != self.source_raw_artifact_digest or self.report.request_digest != self.normalization_request_digest or (self.report.target_width, self.report.target_height) != (self.target_width, self.target_height) or self.report.input_raw_sha256 != source.raw_sha256 or self.report.alpha_policy != request.alpha_policy or self.report.palette_policy != request.palette_policy:
             raise SemanticNormalizationError("normalized report is not bound to output pixels")
         object.__setattr__(self, "rgba8", bytes(self.rgba8))
-        fingerprint = _digest({"source_provenance": source.digest(), "normalization_request": request.digest(), "report": self.report.digest(), "output": self.normalized_rgba_sha256, "target": [self.target_width, self.target_height], "provider": [self.provider_id, self.provider_version, self.workflow_version, self.model_id], "request_digest": self.request_digest})
-        if self._construction_fingerprint is None:
-            object.__setattr__(self, "_construction_fingerprint", fingerprint)
-        elif self._construction_fingerprint != fingerprint:
-            raise SemanticNormalizationError("normalized artifact immutable provenance fingerprint is invalid")
+        if hasattr(self, "_construction_fingerprint"):
+            self._assert_integrity()
 
     @classmethod
     def from_raw_artifact(cls, raw_artifact: SemanticRawArtifact, request: SemanticNormalizationRequest, rgba8: bytes, report: SemanticNormalizationReport) -> "SemanticNormalizedArtifact":
@@ -687,12 +714,34 @@ class SemanticNormalizedArtifact:
         source = SemanticSourceProvenance.from_raw_artifact(raw_artifact)
         if report.source_raw_artifact_digest != source.raw_artifact_digest or report.request_digest != request.digest() or report.input_raw_sha256 != source.raw_sha256 or report.alpha_policy != request.alpha_policy or report.palette_policy != request.palette_policy or (report.target_width, report.target_height) != (request.target_width, request.target_height) or report.output_rgba_sha256 != _sha256(rgba8):
             raise SemanticNormalizationError("normalization report is not bound to the exact raw source and request")
-        return cls(
-            source.raw_artifact_digest, request.digest(), OutputClass.ASSET_ART, request.target_width, request.target_height,
-            bytes(rgba8), _sha256(rgba8), report, request.palette_policy, source.provider_id, source.provider_version,
-            source.workflow_version, source.model_id, source.request_digest, NORMALIZATION_SCHEMA, NORMALIZATION_SCHEMA_VERSION,
-            source, request, _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN, None,
-        )
+        instance = object.__new__(cls)
+        values = {
+            "source_raw_artifact_digest": source.raw_artifact_digest, "normalization_request_digest": request.digest(),
+            "output_class": OutputClass.ASSET_ART, "target_width": request.target_width, "target_height": request.target_height,
+            "rgba8": bytes(rgba8), "normalized_rgba_sha256": _sha256(rgba8), "report": report,
+            "palette_policy": request.palette_policy, "provider_id": source.provider_id,
+            "provider_version": source.provider_version, "workflow_version": source.workflow_version,
+            "model_id": source.model_id, "request_digest": source.request_digest, "schema": NORMALIZATION_SCHEMA,
+            "schema_version": NORMALIZATION_SCHEMA_VERSION, "source_provenance": source,
+            "normalization_request": request,
+        }
+        for name, value in values.items():
+            object.__setattr__(instance, name, value)
+        object.__setattr__(instance, "_construction_token", _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN)
+        instance.__post_init__()
+        object.__setattr__(instance, "_construction_fingerprint", instance._compute_fingerprint())
+        instance._assert_integrity()
+        return instance
+
+    def _compute_fingerprint(self) -> str:
+        return _digest({"source_provenance": self.source_provenance.digest(), "normalization_request": self.normalization_request.digest(), "report": self.report.digest(), "output": self.normalized_rgba_sha256, "target": [self.target_width, self.target_height], "provider": [self.provider_id, self.provider_version, self.workflow_version, self.model_id], "request_digest": self.request_digest})
+
+    def _assert_integrity(self) -> None:
+        if getattr(self, "_construction_token", None) is not _NORMALIZED_ARTIFACT_CONSTRUCTION_TOKEN:
+            raise SemanticNormalizationError("normalized artifact construction seal is invalid")
+        if getattr(self, "_construction_fingerprint", None) != self._compute_fingerprint():
+            raise SemanticNormalizationError("normalized artifact construction fingerprint is invalid")
+        self.source_provenance._assert_integrity()
 
     @property
     def normalized_pixel_sha256(self) -> str:
@@ -711,6 +760,7 @@ class SemanticNormalizedArtifact:
         return self.report.digest()
 
     def identity_dict(self) -> dict[str, object]:
+        self._assert_integrity()
         return {"schema": self.schema, "schema_version": self.schema_version, "source_raw_artifact_digest": self.source_raw_artifact_digest, "normalization_request_digest": self.normalization_request_digest, "output_class": self.output_class.value, "target_dimensions": {"width": self.target_width, "height": self.target_height}, "normalized_rgba_sha256": self.normalized_rgba_sha256, "report_digest": self.report_digest, "palette_policy": self.palette_policy, "provider": {"id": self.provider_id, "version": self.provider_version, "workflow_version": self.workflow_version, "model_id": self.model_id}, "request_digest": self.request_digest, "source_provenance_digest": self.source_provenance.digest()}
 
     def canonical_dict(self) -> dict[str, object]:
