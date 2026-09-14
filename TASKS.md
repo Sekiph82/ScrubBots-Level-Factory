@@ -7,20 +7,21 @@ Only ChatGPT, acting as independent auditor/tracker owner, may promote task stat
 ## Project Status
 
 - Current Milestone: PAG-SP07 — Reference / Style Generation
-- Current Sprint: PAG-SP07-C001 — Reference / Style Generation Contract & Deterministic Plan Foundation
-- Current Task: PAG-SP07-C001 — Reference / Style Generation Contract & Deterministic Plan Foundation
+- Current Sprint: PAG-SP07-C001-R01 — Required Identity-Mutation Evidence & Process Closure
+- Current Task: PAG-SP07-C001-R01 — Required Identity-Mutation Evidence & Process Closure
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only PAG-SP07-C001 from the published GitHub prompt, pushes implementation/tests/finalized builder log to `main`, then stops for ChatGPT strict audit.
+- Next Task/Action: Codex executes only PAG-SP07-C001-R01 from the published remediation prompt, pushes the test/evidence implementation and finalized R01 builder log to `main`, then stops for ChatGPT strict audit.
 - Required Actor: CODEX
-- Current Phase: REFERENCE_STYLE_PLANNING_FOUNDATION
-- Current Prompt: `.hiveai/prompts/PAG-SP07-C001_REFERENCE_STYLE_GENERATION_CONTRACT_AND_DETERMINISTIC_PLAN_FOUNDATION_PROMPT.md`
-- Previous Strict Audit: `.hiveai/audits/PAG-SP06-C002_DURABLE_REVIEW_EVIDENCE_AND_ACCEPTANCE_GATE_STRICT_AUDIT.md`
+- Current Phase: ACCEPTANCE_EVIDENCE_REMEDIATION
+- Current Prompt: `.hiveai/prompts/PAG-SP07-C001-R01_REQUIRED_IDENTITY_MUTATION_EVIDENCE_AND_PROCESS_CLOSURE_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/PAG-SP07-C001_REFERENCE_STYLE_GENERATION_CONTRACT_AND_DETERMINISTIC_PLAN_FOUNDATION_STRICT_AUDIT.md`
+- SP07-C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
+- SP07-C001 Implementation: `f55a1064fb8ccf24163cc8d3e815adb7e782674f`
+- SP07-C001 Builder Log Publication: `8f7552e24f859550bbf21d9aaeb4f19b1e081077`
+- SP07-C001 Audit Commit: `24f408d67253da740c4320cd562fe17d98c50173`
 - SP06 Final Disposition: PASS / CLOSED
-- SP06-C002 Implementation: `3c91bd93faf860b85f195ded421900a11be8dd7a`
-- SP06-C002 Builder Log Publication: `a2b9f4ef344a5346acf89f4a3f53abc206820ddf`
-- SP06-C002 Audit Commit: `fd50942bf155f9c00c1e7a7d5ca736efbfc6cd0f`
 - SP05 Final Disposition: PASS / CLOSED
-- Credit Policy: No Magnific or PixelLab call is authorized in SP07-C001. Spend zero provider credits.
+- Credit Policy: No Magnific or PixelLab call is authorized in SP07-C001-R01. Spend zero provider credits.
 - Blockers/Waits: Live provider execution, SP08+, Studio expansion, weekly batching, M08/LevelData bridge, solver integration and M11 remain blocked until their own explicitly authorized cycles.
 - Approved Semantic Providers: MAGNIFIC, PIXELLAB
 - Provider Architecture: provider-neutral; explicit provider/model/engine selection; no silent fallback
@@ -71,31 +72,37 @@ Accepted flow:
 Accepted rules:
 
 - structural diagnostics are objective grid facts, not semantic-recognition scores;
-- transition density, connected components, singleton counts and color-region structure never auto-accept recognizability;
 - diagnostics are recomputed from the exact trusted artifact when durable evidence is reloaded;
 - imported diagnostics/identity strings are comparison evidence only, never trusted directly;
-- durable evidence cross-binds artifact digest, final-grid digest, dimensions, used IDs/count, diagnostic policy, diagnostics identity, structural assessment identity, review identity and full assessment identity;
 - semantic-request digest remains intent identity only, not proof of semantic understanding;
 - only explicit `ACCEPT` passes the downstream gate;
 - `UNREVIEWED` and `REJECT` never pass;
 - no provider or external vision model is called by the SP06 gate.
 
-## SP07 Contract Direction
+## Retained SP07-C001 Planning Contract
 
-SP07 begins before provider execution.
+The current C001 product implementation is retained pending R01 acceptance-evidence closure.
 
-C001 must create a provider-neutral deterministic plan from one canonical `SemanticGenerationRequest` and its content-addressed REFERENCE / STYLE / INIT / COLOR_REFERENCE descriptors.
+Retained behavior:
 
-Planning rules:
-
-- request digest is source truth;
-- image content SHA/digest and role are canonical identity;
-- local filesystem paths are not canonical generation identity;
-- multiple inputs and variants have deterministic order/identity;
-- candidate identities/seeds are deterministic;
-- provider/model/workflow/config choice is bound explicitly with no silent fallback;
-- C001 performs no provider call and generates no image;
+- isolated `semantic/generation` provider-neutral planning boundary;
+- exact canonical `SemanticGenerationRequest` digest is source truth;
+- REFERENCE / STYLE / INIT / COLOR_REFERENCE inputs remain content-addressed and role-correct;
+- local filesystem paths are excluded from canonical image identity under the existing descriptor contract;
+- REFERENCE request order is preserved, followed by explicit STYLE / INIT / COLOR_REFERENCE ordering;
+- duplicate REFERENCE `(role, content_sha256)` is rejected explicitly;
+- candidate count, order and candidate IDs are deterministic;
+- variant seeds use the project `DeterministicRNG` convention;
+- provider/model/workflow/config identity is explicit and no fallback is introduced;
+- LEVEL_ART / ASSET_ART separation remains intact;
+- C001 performs no provider call, image upload or image generation;
 - accepted SP05 compilation and SP06 review/evidence gates remain unchanged downstream.
+
+Important dependency distinction:
+
+- candidate identity binds canonical request identity;
+- variant seed values are derived from canonical request seed + ordinal;
+- therefore changing reference content or init strength must change request/plan/candidate identity, but does not by itself require a seed-value change when the canonical seed is unchanged.
 
 ## Milestone Overview
 
@@ -103,10 +110,10 @@ Planning rules:
 - [x] PAG-SP01 — Semantic Contracts & Provider Boundary
 - [x] PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 - [x] PAG-SP03 — Semantic Normalization Pipeline technical foundation
-- [~] PAG-SP04 — Provider / Model / Workflow Qualification; Magnific live path qualified through accepted owner disposition, remaining comparative qualification deferred until useful/authorized
+- [~] PAG-SP04 — Provider / Model / Workflow Qualification; remaining comparative qualification deferred until useful/authorized
 - [x] PAG-SP05 — LEVEL_ART Semantic Integration — PASS / CLOSED
 - [x] PAG-SP06 — Semantic Quality / Recognizability Gate — PASS / CLOSED
-- [~] PAG-SP07 — Reference / Style Generation — C001 READY_FOR_IMPLEMENTATION
+- [~] PAG-SP07 — Reference / Style Generation — C001 CHANGES_REQUIRED / PRODUCT RETAINED; C001-R01 READY_FOR_IMPLEMENTATION
 - [ ] PAG-SP08 — Edit / Inpaint
 - [ ] PAG-SP09 — Pixel Studio Create / Gallery UI
 - [ ] PAG-SP10 — Automated Weekly Semantic Batch
@@ -119,103 +126,77 @@ M00–M10 remain historical accepted technical foundation except the M10 visual 
 
 ---
 
-# PAG-SP06 Closure Record
+# PAG-SP07-C001 — Reference / Style Generation Contract & Deterministic Plan Foundation
 
-## PAG-SP06-C001 — Semantic Recognizability Gate Contract & Offline Review Foundation
+State: **CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED**
 
-State: PASS / CLOSED
+Implementation commit:
 
-Implementation commit: `fe77b4a36c6fc7b3b60e608f6e8d6991f0c088ec`
+`f55a1064fb8ccf24163cc8d3e815adb7e782674f`
 
-Final builder-log commit: `0b27ba953aee45a2ca52a91d2a16645d50c23757`
+Builder-log publication commit:
 
-Strict audit:
-
-`.hiveai/audits/PAG-SP06-C001_SEMANTIC_RECOGNIZABILITY_GATE_CONTRACT_AND_OFFLINE_REVIEW_FOUNDATION_STRICT_AUDIT.md`
-
-Accepted closure:
-
-- [x] dedicated `semantic/quality` boundary outside SP05;
-- [x] deterministic transition/component/count diagnostics;
-- [x] diagnostics derived from trusted artifact cells;
-- [x] explicit UNREVIEWED / ACCEPT / REJECT review;
-- [x] ACCEPT/REJECT require reviewer + reason;
-- [x] structural diagnostics never auto-accept;
-- [x] stable structural identity and review-specific full identity;
-- [x] SP05 behavior preserved;
-- [x] zero provider calls / zero credits;
-- [x] ChatGPT strict audit PASS.
-
-## PAG-SP06-C002 — Durable Review Evidence & Acceptance Gate
-
-State: PASS / CLOSED
-
-Implementation commit: `3c91bd93faf860b85f195ded421900a11be8dd7a`
-
-Builder-log publication commit: `a2b9f4ef344a5346acf89f4a3f53abc206820ddf`
+`8f7552e24f859550bbf21d9aaeb4f19b1e081077`
 
 Strict audit:
 
-`.hiveai/audits/PAG-SP06-C002_DURABLE_REVIEW_EVIDENCE_AND_ACCEPTANCE_GATE_STRICT_AUDIT.md`
+`.hiveai/audits/PAG-SP07-C001_REFERENCE_STYLE_GENERATION_CONTRACT_AND_DETERMINISTIC_PLAN_FOUNDATION_STRICT_AUDIT.md`
 
-Accepted closure:
+Retained technical work:
 
-- [x] deterministic versioned durable evidence;
-- [x] export only from intact trusted C001 assessment;
-- [x] strict canonical JSON parser and fail-closed schema handling;
-- [x] reload validates exact trusted LEVEL_ART artifact;
-- [x] reload recomputes C001 diagnostics rather than trusting serialized facts;
-- [x] artifact/grid/dimensions/used IDs/policy/diagnostic/structural identities cross-bound;
-- [x] review identity reconstructed against recomputed structural identity;
-- [x] full assessment identity reverified;
-- [x] artifact-A evidence rejected against artifact-B;
-- [x] optional semantic-request identity preserved/checked;
-- [x] only explicit ACCEPT passes;
-- [x] UNREVIEWED and REJECT fail the gate;
-- [x] no heuristic recognizability threshold added;
-- [x] no unsafe deserialization path;
-- [x] SP05/SP06-C001 regressions retained green by builder evidence;
-- [x] zero provider calls / zero credits;
-- [x] no root `TASKS.md` builder edit;
-- [x] ChatGPT strict audit PASS.
+- [x] dedicated SP07 planning package outside SP05/SP06;
+- [x] canonical request digest binding;
+- [x] content-addressed role-correct input bindings;
+- [x] local paths excluded from canonical identity;
+- [x] deterministic input order and explicit duplicate-reference handling;
+- [x] deterministic candidate count/order/IDs and project-RNG seeds;
+- [x] provider/model/workflow/config identity without fallback;
+- [x] immutable/versioned/sealed plan values;
+- [x] public construction/replace cannot mint derived plan facts;
+- [x] LEVEL_ART / ASSET_ART separation retained;
+- [x] no provider execution / zero credits;
+- [x] accepted SP05/SP06 source untouched by C001 diff.
 
-SP06 final state: **PASS / CLOSED**.
+Open acceptance-evidence defects:
+
+- [ ] literal REFERENCE content-SHA mutation test must prove changed request + plan identity;
+- [ ] literal INIT-strength-only mutation test must prove changed request + plan identity;
+- [ ] R01 must create its builder log before any R01 edit, preserving the original C001 process-order incident as historical evidence.
 
 ---
 
-# PAG-SP07-C001 — Reference / Style Generation Contract & Deterministic Plan Foundation
+# PAG-SP07-C001-R01 — Required Identity-Mutation Evidence & Process Closure
 
-State: READY_FOR_IMPLEMENTATION
+State: **READY_FOR_IMPLEMENTATION**
 
 Prompt:
 
-`.hiveai/prompts/PAG-SP07-C001_REFERENCE_STYLE_GENERATION_CONTRACT_AND_DETERMINISTIC_PLAN_FOUNDATION_PROMPT.md`
+`.hiveai/prompts/PAG-SP07-C001-R01_REQUIRED_IDENTITY_MUTATION_EVIDENCE_AND_PROCESS_CLOSURE_PROMPT.md`
 
 Required closure:
 
-- [ ] add isolated SP07 reference/style planning boundary;
-- [ ] bind exact canonical `SemanticGenerationRequest` digest;
-- [ ] preserve content-addressed REFERENCE / STYLE / INIT / COLOR_REFERENCE identities;
-- [ ] keep local filesystem paths out of canonical plan identity;
-- [ ] deterministic input ordering and duplicate handling;
-- [ ] deterministic candidate count, variant order, IDs and seeds;
-- [ ] explicit provider/model/workflow/config identity with no fallback;
-- [ ] immutable versioned canonical plan;
-- [ ] caller assertions cannot mint trusted derived plan facts;
-- [ ] preserve LEVEL_ART / ASSET_ART separation;
-- [ ] no provider call or image generation;
-- [ ] accepted SP05 and SP06 tests remain green;
-- [ ] zero provider credits;
+- [ ] R01 builder log exists before R01 edits;
+- [ ] REFERENCE content-SHA mutation changes canonical request digest;
+- [ ] REFERENCE content-SHA mutation changes plan digest/canonical bytes;
+- [ ] changed REFERENCE binding identity is proven directly;
+- [ ] INIT-strength-only mutation changes canonical request digest;
+- [ ] INIT-strength-only mutation changes plan digest/canonical bytes;
+- [ ] changed INIT strength is preserved exactly in plan;
+- [ ] tests preserve the distinction between candidate identity and project-RNG seed derivation;
+- [ ] no production redesign unless a literal new test exposes a genuine defect;
+- [ ] focused/combined/full regressions green;
+- [ ] zero Magnific/PixelLab calls and zero credits;
 - [ ] no root `TASKS.md` builder edit;
 - [ ] no main-game writes;
+- [ ] finalized R01 log records implementation commit SHA and push result;
 - [ ] ChatGPT strict audit required before C001 closure.
 
 ---
 
 ## Current Stop / Action Rule
 
-Execute only `PAG-SP07-C001` from the published prompt.
+Execute only `PAG-SP07-C001-R01` from the published remediation prompt.
 
-Do not call Magnific or PixelLab. Do not execute provider generation. Do not reopen accepted SP05/SP06 architecture. Do not begin SP08+, Studio UI, weekly batching, M08/LevelData, solver or M11.
+Do not call Magnific or PixelLab. Do not execute provider generation. Do not redesign the retained SP07 planning architecture unless a literal remediation test proves a product defect. Do not reopen accepted SP05/SP06 architecture. Do not begin SP08+, Studio UI, weekly batching, M08/LevelData, solver or M11.
 
-After Codex pushes C001 implementation + finalized builder log, stop for ChatGPT strict audit.
+After Codex pushes C001-R01 test/evidence implementation + finalized builder log, stop for ChatGPT strict audit.
