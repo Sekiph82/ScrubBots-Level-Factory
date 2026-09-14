@@ -123,6 +123,8 @@ def _png_chunks(raw: bytes) -> list[tuple[bytes, bytes]]:
         raise SemanticDecodeError("raw image is not a PNG")
     position = len(PNG_SIGNATURE)
     chunks: list[tuple[bytes, bytes]] = []
+    idat_started = False
+    idat_run_closed = False
     while position < len(raw):
         if len(raw) - position < 12:
             raise SemanticDecodeError("PNG chunk header or CRC is truncated")
@@ -142,6 +144,12 @@ def _png_chunks(raw: bytes) -> list[tuple[bytes, bytes]]:
         position += 4
         if zlib.crc32(kind + chunk_data) & 0xFFFFFFFF != expected_crc:
             raise SemanticDecodeError("PNG chunk CRC is invalid")
+        if kind == b"IDAT":
+            if idat_run_closed:
+                raise SemanticDecodeError("PNG IDAT chunks must form one contiguous run")
+            idat_started = True
+        elif idat_started:
+            idat_run_closed = True
         chunks.append((kind, chunk_data))
     if not chunks or chunks[0][0] != b"IHDR" or chunks[-1][0] != b"IEND":
         raise SemanticDecodeError("PNG must begin with IHDR and end with IEND")
