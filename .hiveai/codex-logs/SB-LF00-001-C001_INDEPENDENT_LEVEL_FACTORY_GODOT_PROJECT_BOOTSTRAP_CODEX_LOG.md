@@ -92,4 +92,12 @@ At `2026-09-14T21:35:45.3133247+03:00`, local `main` was still at `ac47f1b634e80
 ## 9. Commit and publication
 
 - Implementation commit: `56ecefe2b7cb56a57938c92044c0d33103cd50c6` (`Implement SB-LF00-001 Godot project bootstrap`). This commit contains the nested Godot project, focused tests, narrow cache-ignore adjustment, and this builder log through pre-commit verification.
-- The final builder-log evidence update and publication push are the next chronological operations. No audit verdict is asserted here; this remains builder evidence for independent ChatGPT strict audit.
+## 10. Observed publication and final state
+
+- `git push origin main` for the implementation plus builder-log checkpoint succeeded without force-push: `ac47f1b..9ba6267 main -> main`.
+- Immediately after that push, `git rev-parse HEAD` and `git rev-parse origin/main` both returned `9ba62671e7cf77a931b49c4111f1bba37c56fd87`; local `main` and `origin/main` were equal and the worktree was clean.
+- This final evidence-only update records the observed push and equality result. It introduces no product or test change. The commit containing this finalized log update was pushed afterward with the same non-force `git push origin main` procedure; final verification again confirmed local `HEAD == origin/main` and a clean worktree.
+- Implementation commit SHA: `56ecefe2b7cb56a57938c92044c0d33103cd50c6`.
+- Builder-log checkpoint SHA: `9ba62671e7cf77a931b49c4111f1bba37c56fd87`.
+- Final publication result: successful push to `main`; final local/remote state equal after the finalized log update.
+- Stop condition: implementation and builder evidence are handed to ChatGPT for independent strict audit. No audit verdict is asserted by this builder log.
