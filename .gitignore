@@ -21,6 +21,10 @@ coverage.xml
 output/*
 !output/.gitkeep
 
+# Godot-facing generated/export staging: keep only the directory marker.
+level_factory/output/*
+!level_factory/output/.gitkeep
+
 # Runtime logs and temporary WFC/cache material
 logs/
 *.log
@@ -31,3 +35,12 @@ temp/
 
 # Godot editor/import cache for the independent Level Factory project
 level_factory/.godot/
+
+# Local-only secret locations; a root .env.example template remains allowed.
+.env
+.env.*
+!.env.example
+.secrets/
+secrets/
+level_factory/.secrets/
+level_factory/secrets/
