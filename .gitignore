@@ -28,3 +28,6 @@ logs/
 wfc-cache/
 tmp/
 temp/
+
+# Godot editor/import cache for the independent Level Factory project
+level_factory/.godot/
