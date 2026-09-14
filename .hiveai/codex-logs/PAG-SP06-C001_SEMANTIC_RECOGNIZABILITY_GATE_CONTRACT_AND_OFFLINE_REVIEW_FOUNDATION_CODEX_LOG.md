@@ -55,4 +55,8 @@ Implementation and test details, commands, failures/corrections, verification, f
 
 The final scoped diff contains only the SP06 quality package, its focused tests, semantic/root exports, this README section, and this builder log. Accepted SP05 production/compiler files are not modified. No access or write was made to `C:\Users\sekip\Desktop\ScrubBots`; only the canonical local mirror named above was used. Root `TASKS.md` and all ChatGPT-owned tracker/audit state were not edited. The pre-existing unrelated dirty files listed at start remain preserved.
 
-Commit SHA(s), push result, and the post-publication fetch/equality/divergence checkpoint will be recorded here after commit and push.
+## Publication
+
+- Implementation commit: `fe77b4a36c6fc7b3b60e608f6e8d6991f0c088ec` (`Implement SP06 semantic quality review foundation`).
+- Implementation push: `git push origin main` succeeded; `main` advanced from `9d1383384a973f7ecaa921dbd1a182f8670f4d93`.
+- The final log-publication commit is intentionally recorded in this log after it is created; no product/source changes are included in that publication commit.
