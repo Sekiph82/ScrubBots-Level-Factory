@@ -4,19 +4,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M09
-- Current Sprint: M09.03 — PAG-SP07-C001-R01 Required Identity-Mutation Evidence & Process Closure
-- Current Task: SB-LF09-003 — PAG-SP07-C001-R01 Required Identity-Mutation Evidence & Process Closure
+- Current Milestone: M00 — Repository, Governance & Canonical Factory Platform
+- Current Sprint: M00.01 — Canonical Factory platform
+- Current Task: SB-LF00-001 — Establish `level_factory/` as independently openable Godot project
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only the published PAG-SP07-C001-R01 remediation prompt, adds the required literal identity-mutation evidence/process closure without redesigning retained SP07 product behavior, publishes the R01 builder log, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Codex executes only `SB-LF00-001-C001` from the published GitHub prompt, creates the minimal independent `level_factory/` Godot project boundary plus focused structural evidence, pushes implementation/tests/finalized builder log to `main`, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- SP07-C001 Implementation Commit: `f55a1064fb8ccf24163cc8d3e815adb7e782674f`
-- SP07-C001 Builder Log Publication Commit: `8f7552e24f859550bbf21d9aaeb4f19b1e081077`
-- SP07-C001 Strict Audit Commit: `24f408d67253da740c4320cd562fe17d98c50173`
-- SP07-C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
-- Current Remediation Prompt: `.hiveai/prompts/PAG-SP07-C001-R01_REQUIRED_IDENTITY_MUTATION_EVIDENCE_AND_PROCESS_CLOSURE_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/PAG-SP07-C001-R01_REQUIRED_IDENTITY_MUTATION_EVIDENCE_AND_PROCESS_CLOSURE_STRICT_AUDIT.md`
+- SP07-C001-R01 Disposition: PASS / CLOSED
+- SP07-C001-R01 Test/Evidence Commit: `f53b47c873becd1d2d280908deccd4d10ebfbd63`
+- SP07-C001-R01 Terminal Checkpoint: `3a75b310960e6e21dfd1d585badaa58f5aa3b26d`
+- SP07-C001-R01 Strict Audit Commit: `aaa7f35e57bdd02c4a1b6dfa75c3d036ae747db4`
+- Current Prompt: `.hiveai/prompts/SB-LF00-001-C001_INDEPENDENT_LEVEL_FACTORY_GODOT_PROJECT_BOOTSTRAP_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -34,7 +35,7 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 
 ## Tasks
 
-- M00: Repository, Governance & Canonical Factory Platform — PLANNED / PARTIALLY EVIDENCED
+- M00: Repository, Governance & Canonical Factory Platform — ACTIVE / PARTIALLY EVIDENCED
 - M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
 - M03: Puzzle Intelligence: Simulation, Solver & State Search — PLANNED
@@ -43,7 +44,7 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M06: ScrubBots Factory Studio — PLANNED / PARTIALLY EVIDENCED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
-- M09: Advanced Generation Research & Semantic Provider Evolution — ACTIVE
+- M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
 - M12: .scrubpack Format & Packager — PLANNED / PARTIALLY EVIDENCED
@@ -95,14 +96,14 @@ Additional inline tags do not replace checkbox state:
 - Level Factory + unique extension surface: **115 tasks**; **26 / 115 = 22.61% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
-- `PAG-SP07-C001` product implementation is retained after strict audit; `PAG-SP07-C001-R01` is the active remediation cycle under `SB-LF09-003`.
+- `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
+- Active execution frontier is now M00 migration/governance closure beginning with `SB-LF00-001`.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
 
 - Width: 20..59 inclusive.
-- Height: 20..59 inclusive.
-- Width/height are independently validated; rectangular boards are legal.
+- Height: 20..59 independently validated; rectangular boards are legal.
 - One logical artwork pixel equals one gameplay cell.
 - Logical palette: C01..C16 only.
 - BG01 `#202533` is presentation/background only.
@@ -128,7 +129,7 @@ Capability source family: `SB-LF00-xxx` from the main Scrubbots master plan.
 
 ### M00.01 - Canonical Factory platform
 
-- [ ] [MIGRATION] SB-LF00-001 — Establish `level_factory/` as independently openable Godot project.
+- [~] [MIGRATION] SB-LF00-001 — Establish `level_factory/` as independently openable Godot project.
 - [ ] [MIGRATION] SB-LF00-002 — Maintain Factory-specific README/governance/docs/scenes/scripts/tests/output boundaries.
 - [x] SB-LF00-003 — Enforce one-way integration: Factory exports data; main game never preloads Factory scripts.
 - [x] SB-LF00-004 — Keep Factory logic headless-testable/data-oriented.
@@ -357,7 +358,7 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan.
 
 Capability source family: `SB-LF09-xxx` from the main Scrubbots master plan.
 
-Active legacy implementation/remediation chain: `PAG-SP07-C001` product implementation is retained; `PAG-SP07-C001-R01` is active for acceptance-evidence/process closure.
+Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implementation is retained and `PAG-SP07-C001-R01` is PASS/CLOSED; both remain evidence under `SB-LF09-003` and are not a second counted task family.
 
 ### M09.01 - Experimental evolutionary generation
 
@@ -366,12 +367,13 @@ Active legacy implementation/remediation chain: `PAG-SP07-C001` product implemen
 
 ### M09.02 - Semantic/procedural art helpers
 
-- [~] [PARTIAL] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction.
+- [ ] [PARTIAL] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction.
 
-### M09.03 - Reference / Style Generation active remediation cycle
+### M09.03 - Reference / Style Generation accepted evidence chain
 
 - `PAG-SP07-C001` remains retained product/evidence history under `SB-LF09-003`; it is not a second counted source requirement.
-- `PAG-SP07-C001-R01` is the current bounded remediation cycle and must close literal REFERENCE content-SHA mutation evidence, INIT-strength-only mutation evidence, and process-order/log evidence before SP07 closure.
+- `PAG-SP07-C001-R01` = PASS / CLOSED by `.hiveai/audits/PAG-SP07-C001-R01_REQUIRED_IDENTITY_MUTATION_EVIDENCE_AND_PROCESS_CLOSURE_STRICT_AUDIT.md`.
+- The accepted R01 closes the missing REFERENCE content-SHA mutation, INIT-strength-only mutation and remediation-process evidence, but does not by itself complete the broader `SB-LF09-003` capability.
 
 ### M09.04 - Telemetry calibration policy
 
@@ -684,7 +686,7 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 
 - PAG-M00..M10 accepted technical foundation remains immutable evidence; PAG-M10 visual pack remains OWNER REJECTED 100/100 negative evidence.
 - PAG-SP00..SP06 accepted/remediated history remains immutable evidence.
-- PAG-SP07-C001 strict audit = CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED; active R01 remediation is mapped to `SB-LF09-003`.
+- PAG-SP07-C001 strict audit = CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED; PAG-SP07-C001-R01 strict audit = PASS / CLOSED; both are mapped as accepted evidence under partial `SB-LF09-003` rather than counted as separate live tasks.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
 - PAG-SP11/PAG-SP12/PAG-SP13 are the three unique extension tasks retained under M09.06.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
@@ -701,17 +703,16 @@ Canonical migration/evidence documents:
 
 # EXECUTION ORDER
 
-1. Execute and independently audit `PAG-SP07-C001-R01` under active `SB-LF09-003`.
-2. Finish M00 migration/governance closure.
-3. M06 Factory Studio canonical-Core migration.
-4. M03 Puzzle Intelligence.
-5. M04 Difficulty Intelligence.
-6. M05 Unified QA.
-7. M07 mutation/difficulty targeting.
-8. M08 batch production.
-9. Continue M09 advanced generation only as justified.
-10. M10 Campaign Intelligence.
-11. M11-M14 Content Platform architecture/pack/manifest/publisher.
-12. M18-M20 storage/operations/security.
-13. M17 rollback/scheduling once manifest/publisher/storage are real.
-14. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots`.
+1. Finish M00 migration/governance closure, beginning with `SB-LF00-001`.
+2. M06 Factory Studio canonical-Core migration.
+3. M03 Puzzle Intelligence.
+4. M04 Difficulty Intelligence.
+5. M05 Unified QA.
+6. M07 mutation/difficulty targeting.
+7. M08 batch production.
+8. Continue M09 advanced generation only as justified.
+9. M10 Campaign Intelligence.
+10. M11-M14 Content Platform architecture/pack/manifest/publisher.
+11. M18-M20 storage/operations/security.
+12. M17 rollback/scheduling once manifest/publisher/storage are real.
+13. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots`.
