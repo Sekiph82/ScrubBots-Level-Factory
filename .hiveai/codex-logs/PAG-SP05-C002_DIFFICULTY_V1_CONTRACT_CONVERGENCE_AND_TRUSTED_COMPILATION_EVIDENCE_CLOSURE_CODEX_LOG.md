@@ -50,4 +50,5 @@ Implement only SP05-C002: converge the semantic LEVEL_ART compiler to current Di
 
 ## Publication checkpoint
 
-- The implementation and verification record is complete. The implementation commit and final publication/push details will be appended before publication. A commit cannot contain its own final SHA or post-push remote result; after the final push, terminal `HEAD`, `origin/main`, and divergence will be reported in the handoff without creating an endless log-only chain.
+- Implementation and verification record committed as `f9c0aaf` (`Converge SP05 LEVEL_ART to Difficulty V1`).
+- The completed log is being published in a final log-only commit and pushed with the implementation. A commit cannot contain its own final SHA or post-push remote result; after the final push, terminal `HEAD`, `origin/main`, and divergence will be reported in the handoff without creating an endless log-only chain.
