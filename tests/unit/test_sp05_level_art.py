@@ -28,6 +28,7 @@ from scrubbots_pixel_factory import (
     PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION,
     validate_production_dimensions,
 )
+from scrubbots_pixel_factory.semantic.normalization.level_art import _build_artifact, _build_report
 
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -135,7 +136,10 @@ def test_above_production_maximum_reduces_to_exact_global_maximum(difficulty: Di
 def test_every_over_envelope_color_count_reduces_deterministically_without_new_ids(color_count: int) -> None:
     cells = _cells_with_counts(tuple(f"C{index:02d}" for index in range(1, color_count + 1)))
     first, first_details = enforce_difficulty_color_budget(Difficulty.VERY_HARD, cells)
+    repeat, repeat_details = enforce_difficulty_color_budget(Difficulty.VERY_HARD, cells)
     second, second_details = enforce_difficulty_color_budget(Difficulty.EASY, cells)
+    assert first == repeat
+    assert first_details == repeat_details
     assert len(actual_used_palette_ids(first)) == len(actual_used_palette_ids(second)) == 12
     assert set(actual_used_palette_ids(first)) <= set(cells)
     assert first == second
@@ -318,6 +322,27 @@ def test_public_checked_constructor_recomputes_instead_of_sealing_assertions(tmp
         expected.report,
     )
     assert result.canonical_bytes() == expected.canonical_bytes()
+
+
+def test_fingerprint_valid_wrong_raw_sha_reaches_artifact_source_binding(tmp_path: Path) -> None:
+    raw = _raw(tmp_path, "binding.png", 20, 20, _rgb("C01") * 120 + _rgb("C02") * 120 + _rgb("C03") * 160)
+    request = _request(raw)
+    artifact = compile_semantic_level_art(raw, request)
+    report_values = {item.name: getattr(artifact.report, item.name) for item in fields(SemanticLevelArtReport) if item.init}
+    report_values["raw_sha256"] = "f" * 64
+    forged_report = _build_report(**report_values)
+    forged_report._assert_integrity()
+    assert forged_report.raw_sha256 != artifact.raw_sha256
+    with pytest.raises(SemanticLevelArtError) as error:
+        _build_artifact(
+            raw,
+            request,
+            artifact.logical_cells,
+            artifact.majority_rgba_sha256,
+            artifact.snapped_grid_digest,
+            forged_report,
+        )
+    assert error.value.code == "INVALID_ARTIFACT"
 
 
 def test_existing_asset_art_behavior_remains_separate(tmp_path: Path) -> None:
