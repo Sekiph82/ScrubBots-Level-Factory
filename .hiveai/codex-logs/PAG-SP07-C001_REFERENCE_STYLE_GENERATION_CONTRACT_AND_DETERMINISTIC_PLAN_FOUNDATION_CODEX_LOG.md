@@ -53,4 +53,9 @@ The implementation provides a dedicated sealed `semantic.generation` package. It
 
 The intended scoped diff contains only the SP07 planning package, focused tests, semantic/root exports, README section and this builder log. Accepted SP05/SP06 source and behavior are unchanged. No access or write was made to `C:\Users\sekip\Desktop\ScrubBots`; only the canonical local mirror was used. Root `TASKS.md` and ChatGPT-owned tracker/audit/task state were not edited. Pre-existing unrelated dirty files remain preserved.
 
-Implementation commit SHA, push result and terminal HEAD/origin equality/divergence will be appended after publication.
+## Publication
+
+- Implementation commit: `f55a1064fb8ccf24163cc8d3e815adb7e782674f` (`Implement SP07 deterministic generation planning`).
+- Implementation push: `git push origin main` succeeded; `main` advanced from `3efd0ae08a465294c218baddfae4c14945f41a08`.
+- A final log-only publication commit contains this completed chronology and no product/source changes.
+- After that publication push, `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main` verified local `HEAD == origin/main` with divergence `0 0`. The final log-only commit SHA is reported in the terminal handoff rather than self-embedded in its own commit.
