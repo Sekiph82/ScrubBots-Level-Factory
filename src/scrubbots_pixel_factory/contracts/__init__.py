@@ -32,6 +32,17 @@ from .palette import (
     PaletteContractError,
     load_palette,
 )
+from .production import (
+    PRODUCTION_COLOR_MAX,
+    PRODUCTION_COLOR_MIN,
+    PRODUCTION_DIMENSION_MAX,
+    PRODUCTION_DIMENSION_MIN,
+    ProductionContractError,
+    validate_production_dimensions,
+    validate_production_height,
+    validate_production_used_color_count,
+    validate_production_width,
+)
 
 __all__ = [
     "actual_used_palette_ids",
@@ -50,6 +61,11 @@ __all__ = [
     "PaletteColor",
     "PALETTE",
     "PaletteContractError",
+    "PRODUCTION_COLOR_MAX",
+    "PRODUCTION_COLOR_MIN",
+    "PRODUCTION_DIMENSION_MAX",
+    "PRODUCTION_DIMENSION_MIN",
+    "ProductionContractError",
     "parse_difficulty",
     "resolve_dimensions",
     "resolve_palette_subset",
@@ -58,6 +74,10 @@ __all__ = [
     "validate_dimensions",
     "validate_height",
     "validate_palette_subset",
+    "validate_production_dimensions",
+    "validate_production_height",
+    "validate_production_used_color_count",
+    "validate_production_width",
     "validate_used_color_count",
     "validate_width",
 ]

@@ -36,6 +36,7 @@ from .level_art import (
     LEVEL_ART_SCHEMA,
     LEVEL_ART_SCHEMA_VERSION,
     PALETTE_SNAP_POLICY_VERSION,
+    PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION,
     LevelArtStatus,
     SemanticLevelArtArtifact,
     SemanticLevelArtCompiler,
@@ -50,5 +51,5 @@ from .level_art import (
 )
 
 __all__ = [
-    "ALPHA_POLICIES", "ASSET_PALETTE_POLICY", "FUTURE_LEVEL_PALETTE_POLICY", "MAX_DECODE_PIXELS", "NORMALIZATION_POLICY_VERSION", "NORMALIZATION_REPORT_SCHEMA", "NORMALIZATION_REPORT_VERSION", "NORMALIZATION_SCHEMA", "NORMALIZATION_SCHEMA_VERSION", "RAW_ARTIFACT_MAX_BYTES", "RAW_ARTIFACT_SCHEMA", "RAW_ARTIFACT_SCHEMA_VERSION", "SUPPORTED_CROP_PAD_POLICY", "SUPPORTED_MEDIA_TYPE", "SUPPORTED_RESIZE_POLICY", "SemanticDecodeError", "SemanticNormalizedArtifact", "SemanticNormalizationError", "SemanticNormalizationReport", "SemanticNormalizationRequest", "SemanticNormalizer", "SemanticRawArtifact", "SemanticSourceProvenance", "normalize", "normalize_artifact", "normalize_semantic_artifact", "CELL_MAJORITY_POLICY_VERSION", "DIFFICULTY_BUDGET_POLICY_VERSION", "LEVEL_ART_REPORT_SCHEMA", "LEVEL_ART_REPORT_VERSION", "LEVEL_ART_SCHEMA", "LEVEL_ART_SCHEMA_VERSION", "PALETTE_SNAP_POLICY_VERSION", "LevelArtStatus", "SemanticLevelArtArtifact", "SemanticLevelArtCompiler", "SemanticLevelArtError", "SemanticLevelArtReport", "SemanticLevelArtRequest", "cell_majority_rgba_grid", "compile_level_art", "compile_semantic_level_art", "enforce_difficulty_color_budget", "palette_snap_grid",
+    "ALPHA_POLICIES", "ASSET_PALETTE_POLICY", "FUTURE_LEVEL_PALETTE_POLICY", "MAX_DECODE_PIXELS", "NORMALIZATION_POLICY_VERSION", "NORMALIZATION_REPORT_SCHEMA", "NORMALIZATION_REPORT_VERSION", "NORMALIZATION_SCHEMA", "NORMALIZATION_SCHEMA_VERSION", "RAW_ARTIFACT_MAX_BYTES", "RAW_ARTIFACT_SCHEMA", "RAW_ARTIFACT_SCHEMA_VERSION", "SUPPORTED_CROP_PAD_POLICY", "SUPPORTED_MEDIA_TYPE", "SUPPORTED_RESIZE_POLICY", "SemanticDecodeError", "SemanticNormalizedArtifact", "SemanticNormalizationError", "SemanticNormalizationReport", "SemanticNormalizationRequest", "SemanticNormalizer", "SemanticRawArtifact", "SemanticSourceProvenance", "normalize", "normalize_artifact", "normalize_semantic_artifact", "CELL_MAJORITY_POLICY_VERSION", "DIFFICULTY_BUDGET_POLICY_VERSION", "LEVEL_ART_REPORT_SCHEMA", "LEVEL_ART_REPORT_VERSION", "LEVEL_ART_SCHEMA", "LEVEL_ART_SCHEMA_VERSION", "PALETTE_SNAP_POLICY_VERSION", "PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION", "LevelArtStatus", "SemanticLevelArtArtifact", "SemanticLevelArtCompiler", "SemanticLevelArtError", "SemanticLevelArtReport", "SemanticLevelArtRequest", "cell_majority_rgba_grid", "compile_level_art", "compile_semantic_level_art", "enforce_difficulty_color_budget", "palette_snap_grid",
 ]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, replace
 from pathlib import Path
 import struct
 import zlib
@@ -14,6 +14,7 @@ from scrubbots_pixel_factory import (
     SemanticDecodeError,
     SemanticLevelArtArtifact,
     SemanticLevelArtError,
+    SemanticLevelArtReport,
     SemanticLevelArtRequest,
     SemanticNormalizedArtifact,
     SemanticRawArtifact,
@@ -24,6 +25,8 @@ from scrubbots_pixel_factory import (
     enforce_difficulty_color_budget,
     normalize_semantic_artifact,
     palette_snap_grid,
+    PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION,
+    validate_production_dimensions,
 )
 
 
@@ -120,15 +123,12 @@ def test_palette_snap_uses_canonical_exact_nearest_and_index_tie_rules() -> None
     assert all(value in CANONICAL_PALETTE.ids for value in palette_snap_grid([(1, 2, 3, 255), (254, 253, 252, 255)]))
 
 
-@pytest.mark.parametrize(
-    ("difficulty", "expected_max"),
-    [(Difficulty.EASY, 5), (Difficulty.MEDIUM, 7), (Difficulty.HARD, 9), (Difficulty.VERY_HARD, 12)],
-)
-def test_above_maximum_budget_reduces_to_exact_difficulty_maximum(difficulty: Difficulty, expected_max: int) -> None:
+@pytest.mark.parametrize("difficulty", list(Difficulty))
+def test_above_production_maximum_reduces_to_exact_global_maximum(difficulty: Difficulty) -> None:
     cells = _cells_with_counts(tuple(f"C{index:02d}" for index in range(1, 17)))
     final, details = enforce_difficulty_color_budget(difficulty, cells)
-    assert len(actual_used_palette_ids(final)) == expected_max
-    assert details["final_used_color_count"] == expected_max
+    assert len(actual_used_palette_ids(final)) == 12
+    assert details["final_used_color_count"] == 12
 
 
 def test_budget_preserves_in_band_and_rejects_below_minimum_without_fabrication() -> None:
@@ -140,18 +140,45 @@ def test_budget_preserves_in_band_and_rejects_below_minimum_without_fabrication(
     assert error.value.code == "INSUFFICIENT_USED_COLORS"
 
 
-def test_weighted_subset_optimization_retains_the_hand_computed_low_cost_subset() -> None:
-    ids = ("C01", "C02", "C03", "C04", "C05", "C06")
-    cells = _cells_with_counts(ids, (20, 20, 1, 20, 20, 20))
+def test_current_production_color_envelope_is_lane_independent() -> None:
+    for difficulty, count in ((Difficulty.EASY, 3), (Difficulty.EASY, 8), (Difficulty.VERY_HARD, 5), (Difficulty.HARD, 12)):
+        cells = _cells_with_counts(tuple(f"C{index:02d}" for index in range(1, count + 1)))
+        final, details = enforce_difficulty_color_budget(difficulty, cells)
+        assert final == cells
+        assert details["final_used_color_count"] == count
+
+
+def test_removed_colors_map_cell_by_cell_to_nearest_retained_palette_color() -> None:
+    ids = tuple(f"C{index:02d}" for index in range(1, 17))
+    cells = _cells_with_counts(ids)
     final, details = enforce_difficulty_color_budget(Difficulty.EASY, cells)
-    assert details["retained_palette_ids"] == ("C01", "C02", "C04", "C05", "C06")
-    assert len(actual_used_palette_ids(final)) == 5
+    retained = tuple(details["retained_palette_ids"])
+    assert len(retained) == 12
+    for source_id, final_id in zip(cells, final):
+        if source_id in retained:
+            assert final_id == source_id
+            continue
+        source_rgb = CANONICAL_PALETTE.rgb_for(source_id)
+        expected = min(
+            retained,
+            key=lambda candidate: (sum((left - right) ** 2 for left, right in zip(source_rgb, CANONICAL_PALETTE.rgb_for(candidate))), int(candidate[1:])),
+        )
+        assert final_id == expected
+    assert set(actual_used_palette_ids(final)) <= set(ids)
+
+
+def test_weighted_subset_optimization_retains_the_hand_computed_low_cost_subset() -> None:
+    ids = tuple(f"C{index:02d}" for index in range(1, 14))
+    cells = _cells_with_counts(ids, (20,) * 12 + (1,))
+    final, details = enforce_difficulty_color_budget(Difficulty.EASY, cells)
+    assert details["retained_palette_ids"] == tuple(f"C{index:02d}" for index in range(1, 13))
+    assert len(actual_used_palette_ids(final)) == 12
 
 
 def test_weighted_subset_ties_resolve_by_canonical_palette_tuple() -> None:
-    ids = ("C01", "C02", "C03", "C04", "C05", "C06")
+    ids = tuple(f"C{index:02d}" for index in range(1, 14))
     final, details = enforce_difficulty_color_budget(Difficulty.EASY, ids)
-    assert details["retained_palette_ids"] == ("C01", "C02", "C04", "C05", "C06")
+    assert details["retained_palette_ids"] == ("C01", "C02", "C04", "C05", "C06", "C07", "C08", "C09", "C10", "C11", "C12", "C13")
     assert "C03" not in actual_used_palette_ids(final)
 
 
@@ -167,6 +194,28 @@ def test_legal_rectangles_work_for_each_difficulty_and_24x24_is_not_special(tmp_
     bad = SemanticRawArtifact.from_local_file(tmp_path / "rectangle-0.png")
     with pytest.raises(SemanticLevelArtError):
         _request(bad, Difficulty.EASY, width=19)
+
+
+def test_current_production_dimensions_are_independent_of_lane(tmp_path: Path) -> None:
+    assert validate_production_dimensions(20, 20) == (20, 20)
+    assert validate_production_dimensions(20, 59) == (20, 59)
+    assert validate_production_dimensions(59, 20) == (59, 20)
+    assert validate_production_dimensions(59, 59) == (59, 59)
+    for invalid in (19, 60):
+        with pytest.raises(ValueError):
+            validate_production_dimensions(invalid, 20)
+        with pytest.raises(ValueError):
+            validate_production_dimensions(20, invalid)
+    pixels = b"".join(_rgb(f"C{index % 8 + 1:02d}") for index in range(38 * 38))
+    raw = _raw(tmp_path, "easy-38.png", 38, 38, pixels)
+    easy = compile_semantic_level_art(raw, _request(raw, Difficulty.EASY, 38, 38))
+    very_hard = compile_semantic_level_art(raw, _request(raw, Difficulty.VERY_HARD, 38, 38))
+    very_hard_24 = compile_semantic_level_art(raw, _request(raw, Difficulty.VERY_HARD, 24, 24))
+    assert easy.used_palette_ids == tuple(f"C{index:02d}" for index in range(1, 9))
+    assert very_hard.used_palette_ids == easy.used_palette_ids
+    assert very_hard.logical_cells == easy.logical_cells
+    assert very_hard_24.target_width == 24 and very_hard_24.target_height == 24
+    assert easy.report.difficulty_budget_policy_version == PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION
 
 
 def test_provenance_determinism_raw_change_and_request_identity(tmp_path: Path) -> None:
@@ -187,6 +236,11 @@ def test_level_art_artifact_is_sealed_and_cannot_be_minted_by_direct_or_replace_
     pixels = _rgb("C01") * 100 + _rgb("C02") * 100 + _rgb("C03") * 200
     raw = _raw(tmp_path, "sealed.png", 20, 20, pixels)
     artifact = compile_semantic_level_art(raw, _request(raw))
+    report_values = {item.name: getattr(artifact.report, item.name) for item in fields(SemanticLevelArtReport) if item.init}
+    with pytest.raises(SemanticLevelArtError):
+        SemanticLevelArtReport(**report_values)
+    with pytest.raises(SemanticLevelArtError):
+        replace(artifact.report, raw_sha256="e" * 64)
     with pytest.raises(SemanticLevelArtError):
         replace(artifact, raw_sha256="e" * 64)
     with pytest.raises(SemanticLevelArtError):
@@ -208,6 +262,21 @@ def test_level_art_artifact_is_sealed_and_cannot_be_minted_by_direct_or_replace_
     with pytest.raises(SemanticLevelArtError):
         object.__setattr__(artifact, "raw_sha256", "e" * 64)
         artifact.canonical_dict()
+
+
+def test_public_checked_constructor_recomputes_instead_of_sealing_assertions(tmp_path: Path) -> None:
+    raw = _raw(tmp_path, "compatibility.png", 20, 20, _rgb("C01") * 120 + _rgb("C02") * 120 + _rgb("C03") * 160)
+    request = _request(raw)
+    expected = compile_semantic_level_art(raw, request)
+    result = SemanticLevelArtArtifact.from_compilation(
+        raw,
+        request,
+        ("C01",) * 400,
+        "0" * 64,
+        "1" * 64,
+        expected.report,
+    )
+    assert result.canonical_bytes() == expected.canonical_bytes()
 
 
 def test_existing_asset_art_behavior_remains_separate(tmp_path: Path) -> None:

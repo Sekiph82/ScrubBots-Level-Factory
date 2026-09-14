@@ -16,10 +16,10 @@ from ...contracts import (
     Difficulty,
     actual_used_palette_ids,
     parse_difficulty,
-    validate_dimensions,
-    validate_used_color_count,
+    validate_production_dimensions,
+    validate_production_used_color_count,
 )
-from ...contracts.color_usage import _color_count_band
+from ...contracts import PRODUCTION_COLOR_MAX, PRODUCTION_COLOR_MIN
 from ..contracts import SEMANTIC_RAW_RASTER_MAX_DIMENSION, SemanticContractError
 from .core import (
     SemanticRawArtifact,
@@ -36,9 +36,14 @@ LEVEL_ART_REPORT_SCHEMA = "scrubbots-semantic-level-art-report"
 LEVEL_ART_REPORT_VERSION = 1
 CELL_MAJORITY_POLICY_VERSION = "CELL_MAJORITY_V1"
 PALETTE_SNAP_POLICY_VERSION = "PALETTE_SNAP_V1"
-DIFFICULTY_BUDGET_POLICY_VERSION = "DIFFICULTY_COLOR_BUDGET_V1"
+PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION = "PRODUCTION_COLOR_ENVELOPE_V1"
+
+# Kept as a source-compatibility name; new trusted artifacts use the explicit
+# current-production policy identity below rather than the historical class bands.
+DIFFICULTY_BUDGET_POLICY_VERSION = PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION
 
 _LEVEL_ART_ARTIFACT_TOKEN = object()
+_LEVEL_ART_REPORT_TOKEN = object()
 _SHA256_LENGTH = 64
 
 
@@ -66,14 +71,6 @@ def _canonical_digest(value: object) -> str:
 
 def _grid_digest(cells: Sequence[str]) -> str:
     return _canonical_digest({"schema": LEVEL_ART_SCHEMA, "row_major_cells": list(cells)})
-
-
-def _freeze(value: object) -> object:
-    if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
-    if isinstance(value, (list, tuple)):
-        return tuple(_freeze(item) for item in value)
-    return value
 
 
 def _palette_index(color_id: str) -> int:
@@ -152,10 +149,6 @@ def palette_snap_grid(majority_rgba: Iterable[bytes | Sequence[int]]) -> tuple[s
     return tuple(snapped)
 
 
-def _difficulty_band(difficulty: Difficulty) -> tuple[int, int]:
-    return _color_count_band(difficulty)
-
-
 def _weighted_subset_cost(source_ids: tuple[str, ...], frequencies: Mapping[str, int], retained: tuple[str, ...]) -> int:
     total = 0
     for source_id in source_ids:
@@ -184,7 +177,7 @@ def enforce_difficulty_color_budget(
         used = actual_used_palette_ids(snapped_cells)
     except Exception as exc:
         raise SemanticLevelArtError("INVALID_LOGICAL_GRID", "palette-snapped cells are not canonical C-ID values") from exc
-    minimum, maximum = _difficulty_band(selected)
+    minimum, maximum = PRODUCTION_COLOR_MIN, PRODUCTION_COLOR_MAX
     if len(used) < minimum:
         raise SemanticLevelArtError(
             "INSUFFICIENT_USED_COLORS",
@@ -204,7 +197,7 @@ def enforce_difficulty_color_budget(
         objective = _weighted_subset_cost(used, frequencies, retained)
         final_cells = tuple(value if value in retained else _nearest_retained(value, retained) for value in snapped_cells)
     try:
-        final_used = validate_used_color_count(selected, final_cells)
+        final_used = validate_production_used_color_count(final_cells)
     except Exception as exc:
         raise SemanticLevelArtError("INVALID_DIFFICULTY_BUDGET", "final logical grid failed the canonical color-count contract") from exc
     return final_cells, MappingProxyType(
@@ -227,7 +220,7 @@ class SemanticLevelArtRequest:
     target_height: int
     cell_majority_policy_version: str = CELL_MAJORITY_POLICY_VERSION
     palette_snap_policy_version: str = PALETTE_SNAP_POLICY_VERSION
-    difficulty_budget_policy_version: str = DIFFICULTY_BUDGET_POLICY_VERSION
+    difficulty_budget_policy_version: str = PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION
     schema: str = LEVEL_ART_SCHEMA
     schema_version: int = LEVEL_ART_SCHEMA_VERSION
 
@@ -235,7 +228,7 @@ class SemanticLevelArtRequest:
         _require_sha256(self.source_raw_artifact_digest, "source_raw_artifact_digest")
         try:
             selected = parse_difficulty(self.difficulty)
-            validate_dimensions(selected, self.target_width, self.target_height)
+            validate_production_dimensions(self.target_width, self.target_height)
         except Exception as exc:
             raise SemanticLevelArtError("INVALID_DIFFICULTY_OR_DIMENSIONS", "difficulty and target dimensions are not legal") from exc
         if self.schema != LEVEL_ART_SCHEMA or self.schema_version != LEVEL_ART_SCHEMA_VERSION:
@@ -244,7 +237,7 @@ class SemanticLevelArtRequest:
             raise SemanticLevelArtError("UNSUPPORTED_CELL_MAJORITY_POLICY", "unsupported CELL_MAJORITY policy version")
         if self.palette_snap_policy_version != PALETTE_SNAP_POLICY_VERSION:
             raise SemanticLevelArtError("UNSUPPORTED_PALETTE_SNAP_POLICY", "unsupported PALETTE_SNAP policy version")
-        if self.difficulty_budget_policy_version != DIFFICULTY_BUDGET_POLICY_VERSION:
+        if self.difficulty_budget_policy_version != PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION:
             raise SemanticLevelArtError("UNSUPPORTED_DIFFICULTY_BUDGET_POLICY", "unsupported difficulty-budget policy version")
         object.__setattr__(self, "difficulty", selected)
 
@@ -296,8 +289,12 @@ class SemanticLevelArtReport:
     status: LevelArtStatus | str = LevelArtStatus.SUCCESS
     schema: str = LEVEL_ART_REPORT_SCHEMA
     schema_version: int = LEVEL_ART_REPORT_VERSION
+    _construction_token: object = field(init=False, repr=False, compare=False)
+    _construction_fingerprint: str = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
+        if getattr(self, "_construction_token", None) is not _LEVEL_ART_REPORT_TOKEN:
+            raise SemanticLevelArtError("UNSEALED_REPORT", "LEVEL_ART reports require canonical compiler construction")
         _require_sha256(self.source_raw_artifact_digest, "source_raw_artifact_digest")
         _require_sha256(self.raw_sha256, "raw_sha256")
         _require_sha256(self.request_digest, "request_digest")
@@ -306,14 +303,14 @@ class SemanticLevelArtReport:
         _require_sha256(self.final_logical_grid_digest, "final_logical_grid_digest")
         try:
             selected = parse_difficulty(self.difficulty)
-            validate_dimensions(selected, self.target_width, self.target_height)
+            validate_production_dimensions(self.target_width, self.target_height)
             if type(self.raw_width) is not int or type(self.raw_height) is not int or not 1 <= self.raw_width <= SEMANTIC_RAW_RASTER_MAX_DIMENSION or not 1 <= self.raw_height <= SEMANTIC_RAW_RASTER_MAX_DIMENSION:
                 raise ValueError("raw dimensions are invalid")
         except Exception as exc:
             raise SemanticLevelArtError("INVALID_REPORT", "LEVEL_ART report difficulty or dimensions are invalid") from exc
         if self.schema != LEVEL_ART_REPORT_SCHEMA or self.schema_version != LEVEL_ART_REPORT_VERSION:
             raise SemanticLevelArtError("UNSUPPORTED_REPORT_SCHEMA", "unsupported LEVEL_ART report schema/version")
-        if (self.cell_majority_policy_version, self.palette_snap_policy_version, self.difficulty_budget_policy_version) != (CELL_MAJORITY_POLICY_VERSION, PALETTE_SNAP_POLICY_VERSION, DIFFICULTY_BUDGET_POLICY_VERSION):
+        if (self.cell_majority_policy_version, self.palette_snap_policy_version, self.difficulty_budget_policy_version) != (CELL_MAJORITY_POLICY_VERSION, PALETTE_SNAP_POLICY_VERSION, PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION):
             raise SemanticLevelArtError("UNSUPPORTED_POLICY", "LEVEL_ART report policy version is unsupported")
         for values in (self.original_used_palette_ids, self.retained_palette_ids, self.final_used_palette_ids):
             if not isinstance(values, tuple) or any(not isinstance(value, str) for value in values):
@@ -328,6 +325,17 @@ class SemanticLevelArtReport:
         status = self.status if isinstance(self.status, LevelArtStatus) else LevelArtStatus(self.status)
         object.__setattr__(self, "difficulty", selected)
         object.__setattr__(self, "status", status)
+        if hasattr(self, "_construction_fingerprint"):
+            self._assert_integrity()
+
+    def _compute_fingerprint(self) -> str:
+        return _canonical_digest({"report": self.canonical_dict()})
+
+    def _assert_integrity(self) -> None:
+        if getattr(self, "_construction_token", None) is not _LEVEL_ART_REPORT_TOKEN:
+            raise SemanticLevelArtError("UNSEALED_REPORT", "LEVEL_ART report construction seal is invalid")
+        if getattr(self, "_construction_fingerprint", None) != self._compute_fingerprint():
+            raise SemanticLevelArtError("TAMPERED_REPORT", "LEVEL_ART report construction fingerprint is invalid")
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -358,7 +366,22 @@ class SemanticLevelArtReport:
         return _canonical_bytes(self.canonical_dict())
 
     def digest(self) -> str:
+        self._assert_integrity()
         return _sha256(self.canonical_bytes())
+
+
+def _build_report(**values: object) -> SemanticLevelArtReport:
+    values.setdefault("status", LevelArtStatus.SUCCESS)
+    values.setdefault("schema", LEVEL_ART_REPORT_SCHEMA)
+    values.setdefault("schema_version", LEVEL_ART_REPORT_VERSION)
+    report = object.__new__(SemanticLevelArtReport)
+    for name, value in values.items():
+        object.__setattr__(report, name, value)
+    object.__setattr__(report, "_construction_token", _LEVEL_ART_REPORT_TOKEN)
+    report.__post_init__()
+    object.__setattr__(report, "_construction_fingerprint", report._compute_fingerprint())
+    report._assert_integrity()
+    return report
 
 
 @dataclass(frozen=True, slots=True)
@@ -390,9 +413,9 @@ class SemanticLevelArtArtifact:
             raise SemanticLevelArtError("UNSUPPORTED_SCHEMA", "unsupported LEVEL_ART artifact schema/version")
         try:
             selected = parse_difficulty(self.difficulty)
-            validate_dimensions(selected, self.target_width, self.target_height)
+            validate_production_dimensions(self.target_width, self.target_height)
             used = actual_used_palette_ids(self.logical_cells)
-            validate_used_color_count(selected, self.logical_cells)
+            validate_production_used_color_count(self.logical_cells)
         except Exception as exc:
             raise SemanticLevelArtError("INVALID_ARTIFACT", "LEVEL_ART logical cells are not legal") from exc
         if not isinstance(self.logical_cells, tuple) or len(self.logical_cells) != self.target_width * self.target_height:
@@ -407,6 +430,7 @@ class SemanticLevelArtArtifact:
         _require_sha256(self.final_logical_grid_digest, "final_logical_grid_digest")
         if not isinstance(self.report, SemanticLevelArtReport) or not isinstance(self.source_provenance, SemanticSourceProvenance):
             raise SemanticLevelArtError("INVALID_ARTIFACT", "LEVEL_ART report or source provenance is missing")
+        self.report._assert_integrity()
         if (
             self.source_raw_artifact_digest != self.source_provenance.raw_artifact_digest
             or self.raw_sha256 != self.source_provenance.raw_sha256
@@ -439,37 +463,11 @@ class SemanticLevelArtArtifact:
         snapped_grid_digest: str,
         report: SemanticLevelArtReport,
     ) -> "SemanticLevelArtArtifact":
-        if not isinstance(raw_artifact, SemanticRawArtifact) or not isinstance(request, SemanticLevelArtRequest):
-            raise SemanticLevelArtError("INVALID_INPUT", "LEVEL_ART compilation requires typed raw artifact and request")
-        if request.source_raw_artifact_digest != raw_artifact.digest():
-            raise SemanticLevelArtError("SOURCE_PROVENANCE_MISMATCH", "LEVEL_ART request is not bound to the raw artifact")
-        source = SemanticSourceProvenance.from_raw_artifact(raw_artifact)
-        final_digest = report.final_logical_grid_digest
-        instance = object.__new__(cls)
-        values = {
-            "source_raw_artifact_digest": source.raw_artifact_digest,
-            "raw_sha256": source.raw_sha256,
-            "request_digest": request.digest(),
-            "difficulty": request.difficulty,
-            "target_width": request.target_width,
-            "target_height": request.target_height,
-            "logical_cells": tuple(logical_cells),
-            "used_palette_ids": tuple(report.final_used_palette_ids),
-            "majority_rgba_sha256": majority_rgba_sha256,
-            "snapped_grid_digest": snapped_grid_digest,
-            "final_logical_grid_digest": final_digest,
-            "report": report,
-            "source_provenance": source,
-            "schema": LEVEL_ART_SCHEMA,
-            "schema_version": LEVEL_ART_SCHEMA_VERSION,
-        }
-        for name, value in values.items():
-            object.__setattr__(instance, name, value)
-        object.__setattr__(instance, "_construction_token", _LEVEL_ART_ARTIFACT_TOKEN)
-        instance.__post_init__()
-        object.__setattr__(instance, "_construction_fingerprint", instance._compute_fingerprint())
-        instance._assert_integrity()
-        return instance
+        # Retain the historical API name without retaining its assertion-based
+        # trust capability: all caller-supplied stage facts are ignored and the
+        # canonical compiler recomputes them from the typed source/request.
+        del logical_cells, majority_rgba_sha256, snapped_grid_digest, report
+        return compile_semantic_level_art(raw_artifact, request)
 
     def _compute_fingerprint(self) -> str:
         return _canonical_digest(
@@ -541,6 +539,48 @@ class SemanticLevelArtArtifact:
         return _sha256(_canonical_bytes(self.identity_dict()))
 
 
+def _build_artifact(
+    raw_artifact: SemanticRawArtifact,
+    request: SemanticLevelArtRequest,
+    logical_cells: tuple[str, ...],
+    majority_rgba_sha256: str,
+    snapped_grid_digest: str,
+    report: SemanticLevelArtReport,
+) -> SemanticLevelArtArtifact:
+    if not isinstance(raw_artifact, SemanticRawArtifact) or not isinstance(request, SemanticLevelArtRequest):
+        raise SemanticLevelArtError("INVALID_INPUT", "LEVEL_ART compilation requires typed raw artifact and request")
+    if request.source_raw_artifact_digest != raw_artifact.digest():
+        raise SemanticLevelArtError("SOURCE_PROVENANCE_MISMATCH", "LEVEL_ART request is not bound to the raw artifact")
+    if not isinstance(report, SemanticLevelArtReport):
+        raise SemanticLevelArtError("INVALID_REPORT", "LEVEL_ART compiler produced no trusted report")
+    source = SemanticSourceProvenance.from_raw_artifact(raw_artifact)
+    instance = object.__new__(SemanticLevelArtArtifact)
+    values = {
+        "source_raw_artifact_digest": source.raw_artifact_digest,
+        "raw_sha256": source.raw_sha256,
+        "request_digest": request.digest(),
+        "difficulty": request.difficulty,
+        "target_width": request.target_width,
+        "target_height": request.target_height,
+        "logical_cells": tuple(logical_cells),
+        "used_palette_ids": tuple(report.final_used_palette_ids),
+        "majority_rgba_sha256": majority_rgba_sha256,
+        "snapped_grid_digest": snapped_grid_digest,
+        "final_logical_grid_digest": report.final_logical_grid_digest,
+        "report": report,
+        "source_provenance": source,
+        "schema": LEVEL_ART_SCHEMA,
+        "schema_version": LEVEL_ART_SCHEMA_VERSION,
+    }
+    for name, value in values.items():
+        object.__setattr__(instance, name, value)
+    object.__setattr__(instance, "_construction_token", _LEVEL_ART_ARTIFACT_TOKEN)
+    instance.__post_init__()
+    object.__setattr__(instance, "_construction_fingerprint", instance._compute_fingerprint())
+    instance._assert_integrity()
+    return instance
+
+
 def compile_semantic_level_art(raw_artifact: SemanticRawArtifact, request: SemanticLevelArtRequest) -> SemanticLevelArtArtifact:
     """Compile one immutable raw semantic PNG into canonical logical LEVEL_ART."""
 
@@ -565,7 +605,7 @@ def compile_semantic_level_art(raw_artifact: SemanticRawArtifact, request: Seman
         raise
     except Exception as exc:
         raise SemanticLevelArtError("COMPILATION_FAILED", "LEVEL_ART compilation failed closed") from exc
-    report = SemanticLevelArtReport(
+    report = _build_report(
         source_raw_artifact_digest=raw_artifact.digest(),
         raw_sha256=raw_artifact.raw_sha256,
         request_digest=request.digest(),
@@ -587,7 +627,7 @@ def compile_semantic_level_art(raw_artifact: SemanticRawArtifact, request: Seman
         final_used_color_count=int(budget["final_used_color_count"]),
         final_logical_grid_digest=final_digest,
     )
-    return SemanticLevelArtArtifact.from_compilation(raw_artifact, request, logical_cells, _sha256(majority_bytes), snapped_digest, report)
+    return _build_artifact(raw_artifact, request, logical_cells, _sha256(majority_bytes), snapped_digest, report)
 
 
 compile_level_art = compile_semantic_level_art
