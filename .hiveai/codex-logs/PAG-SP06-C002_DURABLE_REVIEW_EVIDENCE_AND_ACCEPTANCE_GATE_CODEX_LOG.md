@@ -62,4 +62,9 @@ The C002 focused tests cover deterministic ACCEPT export/reload; REJECT and UNRE
 
 Only the C002 quality evidence module, focused tests, package exports, README C002 section, and this builder log are in scope. The accepted SP05 compiler and C001 quality architecture were not reopened or modified. No access or write was made to `C:\Users\sekip\Desktop\ScrubBots`; only the canonical local mirror was used. Root `TASKS.md` and all ChatGPT-owned tracker/audit/task state were not edited. Pre-existing unrelated dirty files remain preserved.
 
-Implementation commit SHA, push result, and final fetch/equality/divergence checkpoint will be appended after publication.
+## Publication
+
+- Implementation commit: `3c91bd93faf860b85f195ded421900a11be8dd7a` (`Implement SP06 durable review evidence gate`).
+- Implementation push: `git push origin main` succeeded; `main` advanced from `2736245d508f97d9a75993098e93e86975b3a3b3`.
+- The final log-publication commit contains only this completed builder-log checkpoint and no product/source changes.
+- After final log publication, `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main` verified local `HEAD == origin/main` with divergence `0 0`. The final log-only commit SHA is reported by the terminal handoff rather than self-embedded in its own commit.
