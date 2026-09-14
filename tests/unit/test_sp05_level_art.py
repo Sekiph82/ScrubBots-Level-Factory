@@ -131,6 +131,17 @@ def test_above_production_maximum_reduces_to_exact_global_maximum(difficulty: Di
     assert details["final_used_color_count"] == 12
 
 
+@pytest.mark.parametrize("color_count", [13, 14, 15, 16])
+def test_every_over_envelope_color_count_reduces_deterministically_without_new_ids(color_count: int) -> None:
+    cells = _cells_with_counts(tuple(f"C{index:02d}" for index in range(1, color_count + 1)))
+    first, first_details = enforce_difficulty_color_budget(Difficulty.VERY_HARD, cells)
+    second, second_details = enforce_difficulty_color_budget(Difficulty.EASY, cells)
+    assert len(actual_used_palette_ids(first)) == len(actual_used_palette_ids(second)) == 12
+    assert set(actual_used_palette_ids(first)) <= set(cells)
+    assert first == second
+    assert first_details == second_details
+
+
 def test_budget_preserves_in_band_and_rejects_below_minimum_without_fabrication() -> None:
     cells = _cells_with_counts(("C01", "C02", "C03"), (4, 3, 2))
     final, details = enforce_difficulty_color_budget(Difficulty.EASY, cells)
@@ -215,6 +226,15 @@ def test_current_production_dimensions_are_independent_of_lane(tmp_path: Path) -
     assert very_hard.used_palette_ids == easy.used_palette_ids
     assert very_hard.logical_cells == easy.logical_cells
     assert very_hard_24.target_width == 24 and very_hard_24.target_height == 24
+    assert very_hard.report.majority_rgba_sha256 == easy.report.majority_rgba_sha256
+    assert very_hard.report.snapped_grid_digest == easy.report.snapped_grid_digest
+    assert very_hard.report.final_logical_grid_digest == easy.report.final_logical_grid_digest
+    assert very_hard.report.original_used_palette_ids == easy.report.original_used_palette_ids
+    assert very_hard.report.original_used_color_count == easy.report.original_used_color_count
+    assert very_hard.report.retained_palette_ids == easy.report.retained_palette_ids
+    assert very_hard.report.weighted_subset_cost == easy.report.weighted_subset_cost
+    assert very_hard.report.final_used_palette_ids == easy.report.final_used_palette_ids
+    assert very_hard.report.final_used_color_count == easy.report.final_used_color_count
     assert easy.report.difficulty_budget_policy_version == PRODUCTION_COLOR_ENVELOPE_POLICY_VERSION
 
 
@@ -241,6 +261,27 @@ def test_level_art_artifact_is_sealed_and_cannot_be_minted_by_direct_or_replace_
         SemanticLevelArtReport(**report_values)
     with pytest.raises(SemanticLevelArtError):
         replace(artifact.report, raw_sha256="e" * 64)
+    tampered_report = artifact.report
+    report_tamper_values = {
+        "raw_sha256": "e" * 64,
+        "majority_rgba_sha256": "d" * 64,
+        "snapped_grid_digest": "c" * 64,
+        "original_used_palette_ids": ("C01",),
+        "original_used_color_count": 1,
+        "retained_palette_ids": ("C01",),
+        "weighted_subset_cost": 1,
+        "final_used_palette_ids": ("C01",),
+        "final_used_color_count": 1,
+        "final_logical_grid_digest": "b" * 64,
+    }
+    for field_name, replacement in report_tamper_values.items():
+        original = getattr(tampered_report, field_name)
+        object.__setattr__(tampered_report, field_name, replacement)
+        with pytest.raises(SemanticLevelArtError):
+            tampered_report.digest()
+        with pytest.raises(SemanticLevelArtError):
+            artifact.canonical_dict()
+        object.__setattr__(tampered_report, field_name, original)
     with pytest.raises(SemanticLevelArtError):
         replace(artifact, raw_sha256="e" * 64)
     with pytest.raises(SemanticLevelArtError):

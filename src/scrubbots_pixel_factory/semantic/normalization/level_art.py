@@ -434,6 +434,7 @@ class SemanticLevelArtArtifact:
         if (
             self.source_raw_artifact_digest != self.source_provenance.raw_artifact_digest
             or self.raw_sha256 != self.source_provenance.raw_sha256
+            or self.raw_sha256 != self.report.raw_sha256
             or self.request_digest != self.report.request_digest
             or self.source_raw_artifact_digest != self.report.source_raw_artifact_digest
             or self.difficulty is not self.report.difficulty
