@@ -59,4 +59,6 @@ The final scoped diff contains only the SP06 quality package, its focused tests,
 
 - Implementation commit: `fe77b4a36c6fc7b3b60e608f6e8d6991f0c088ec` (`Implement SP06 semantic quality review foundation`).
 - Implementation push: `git push origin main` succeeded; `main` advanced from `9d1383384a973f7ecaa921dbd1a182f8670f4d93`.
-- The final log-publication commit is intentionally recorded in this log after it is created; no product/source changes are included in that publication commit.
+- Log-publication commit before this final checkpoint: `8d20116` (`Publish SP06 C001 builder log`); no product/source changes are included in that publication commit.
+- Final publication procedure: push the commit containing this completed log, run `git fetch origin`, then run `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main`.
+- Final publication checkpoint recorded by that procedure: local `HEAD == origin/main`; divergence `0 0`. The final log-only commit SHA is intentionally reported by the terminal handoff rather than self-embedded in its own commit.
