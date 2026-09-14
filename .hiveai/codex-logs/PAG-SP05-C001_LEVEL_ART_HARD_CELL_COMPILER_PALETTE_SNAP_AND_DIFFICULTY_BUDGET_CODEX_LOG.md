@@ -55,4 +55,5 @@ Implement only the typed LEVEL_ART CELL_MAJORITY_V1 → PALETTE_SNAP_V1 → DIFF
 
 ## Publication checkpoint
 
-- The implementation and tests are ready for publication. The implementation commit SHA and publication/push checkpoint will be appended before the final publication push. Because a commit cannot contain its own SHA or the post-push remote result, the final terminal `HEAD`, `origin/main`, and divergence values will be reported in the final handoff and no further commit will be created after that checkpoint.
+- Implementation and tests were committed as `d7c405d` (`Implement SP05-C001 LEVEL_ART compiler`).
+- The builder-log publication commit and push checkpoint are being completed now. Because a commit cannot contain its own SHA or the post-push remote result, the final terminal `HEAD`, `origin/main`, and divergence values will be reported in the final handoff and no further commit will be created after that checkpoint.
