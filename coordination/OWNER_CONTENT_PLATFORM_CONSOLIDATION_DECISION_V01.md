@@ -1,101 +1,84 @@
-# OWNER CONTENT PLATFORM CONSOLIDATION DECISION V01
+# CONTENT PLATFORM CONSOLIDATION PLAN V01
 
-Status: **OWNER-LOCKED**
+Status: **DRAFT / NON-DESTRUCTIVE INTEGRATION PLAN — DOES NOT REPLACE CURRENT TASKS.MD**
 Date: 2026-09-14
-Owner: Şekip
+Owner direction: Şekip
 
-## Decision
+## Corrected interpretation
 
-`Sekiph82/ScrubBots-Level-Factory` is promoted from a standalone pixel-art/semantic generator project into the canonical **SCRUBBOTS Content Production Platform** repository.
+`Sekiph82/ScrubBots-Level-Factory` is intended to grow into the SCRUBBOTS development-time Content Production Platform while preserving the repository's existing roadmap, completed milestones, active cycles, audit history and task states.
 
-The platform owns program tracking, planning and implementation for the 224 sidecar tasks originally defined in `Sekiph82/Scrubbots` as:
+This document does **not** authorize replacing the current `TASKS.md`, resetting existing task completion, or superseding the active PAG/SP cycle.
 
-- `SB-LF00-*` through `SB-LF10-*`: 112 Level Factory / Campaign Intelligence tasks.
-- `SB-CP00-*` through `SB-CP09-*`: 112 Content Packaging / Publishing / Update Platform tasks.
+## Existing tracker preservation rule
 
-The mobile-game repository remains the canonical gameplay/client-runtime repository.
+The current Level Factory `TASKS.md` remains authoritative for the existing project and must be preserved byte/state-wise except through the normal audit-driven tracker workflow.
 
-## Product split
+Existing states such as `[x]`, `[~]`, `[ ]`, PASS/CLOSED milestones, active PAG-SP05 work and historical M00-M10 evidence remain valid unless an independent audit specifically changes an individual state.
+
+The 224 `SB-LF*` + `SB-CP*` tasks from the main Scrubbots roadmap are an **integration target**, not a replacement tracker.
+
+They must be introduced non-destructively through a migration/mapping layer that records for every task:
+
+- corresponding existing Level Factory milestone/cycle/evidence where any exists;
+- implementation repository (`ScrubBots-Level-Factory`, `Scrubbots`, or cross-repo);
+- whether existing evidence is sufficient, partial, absent, or incompatible;
+- whether a new task actually needs implementation;
+- status only after independent audit.
+
+No imported task starts as `[ ]` merely because it is newly mapped, and no imported task becomes `[x]` merely because similar code exists.
+
+## Intended product split
 
 ### `Sekiph82/ScrubBots-Level-Factory`
-Owns:
 
-- semantic and procedural level-art generation;
+Target development-time responsibilities include:
+
+- semantic/procedural level-art generation;
 - deterministic compilation and provenance;
-- puzzle simulation and solver tooling;
-- Difficulty V1 metrics and acceptance intelligence;
-- QA, review and campaign sequencing;
-- Factory Studio/operator UI;
-- `.scrubpack` packaging;
-- remote manifest generation;
-- staging/production publisher control plane;
-- storage/CDN adapters;
-- rollback, disable and scheduling control plane;
-- content operations and release evidence.
+- puzzle simulation/solver tooling;
+- Difficulty/QA intelligence;
+- campaign sequencing;
+- Factory Studio/operator workflow;
+- declarative content packaging;
+- manifest/publisher/staging/production tooling;
+- content operations.
 
 ### `Sekiph82/Scrubbots`
-Owns:
 
-- the shipping Godot game;
-- gameplay systems and presentation;
-- runtime LevelData/catalog consumption;
-- runtime `RemoteContentManager` implementation;
-- HTTPS download and integrity verification;
-- `user://` content registry/cache;
-- last-known-good activation and offline fallback;
-- store-facing application permissions and runtime compatibility.
+Remains the shipping game/client runtime and owns runtime content consumption such as:
 
-## Tracker authority
+- gameplay and presentation;
+- LevelData/catalog runtime;
+- RemoteContentManager when implemented;
+- HTTPS download/integrity verification;
+- `user://` cache/registry;
+- last-known-good/offline behavior.
 
-The canonical live tracker for the 224 LF/CP tasks is now:
+## Existing work must be reused
 
-`https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/TASKS.md`
+Accepted PAG M00-M10 and PAG-SP work is migration evidence, not disposable history. The Windows Level Factory application is also a source/evidence candidate, not permission to create a competing compiler.
 
-The corresponding LF/CP rows retained in the main-game repository are a historical/shadow roadmap only and must not be independently advanced. Cross-repo runtime tasks remain tracked in the Content Platform tracker but declare `implementation_repo: Sekiph82/Scrubbots`.
+Target direction remains:
 
-The main game keeps its own gameplay/UI tracker and progress denominator. Program-level reporting must show three values separately:
+`Studio UI -> canonical Factory Core -> declarative validated output -> publishing pipeline -> Scrubbots runtime`
 
-1. Game/client progress.
-2. Content Platform progress out of 224.
-3. Combined SCRUBBOTS program progress.
+## Migration procedure
 
-Moving tracker ownership does not itself count as task completion.
+Before changing any existing task state:
 
-## Contract precedence
-
-For gameplay, LevelData, palette, Difficulty V1, campaign and runtime semantics, current owner-locked contracts in `Sekiph82/Scrubbots` outrank stale legacy rules in this repository.
-
-In particular:
-
-- board dimensions are an engine/content envelope, not difficulty class identity;
-- production artwork uses canonical C01..C16 and current Difficulty V1 3..12 used-color envelope unless a newer audited rule narrows a content family;
-- old `EASY 20..29 / MEDIUM 30..39 / HARD 40..49 / VERY_HARD 50..59` and old class-specific used-color bands are historical compatibility rules, not current player-facing difficulty truth;
-- rectangular boards remain legal;
-- Challenge, Session Load and Frustration Risk remain separate axes;
-- CampaignBuilder sequences accepted levels but does not mutate accepted logical cell data.
-
-## Existing repository evidence
-
-Existing accepted PAG M00-M10 and PAG-SP evidence is preserved. It is not discarded and is not automatically relabeled as completion of new `SB-LF*` / `SB-CP*` tasks. A migration/evidence audit maps existing proofs onto the new canonical task IDs before new checkboxes close.
-
-## Factory Studio
-
-The owner-supplied `ScrubBots Level Factory v1.3.6` Windows application becomes a **Studio/operator-console source candidate**, not an independent second compiler.
-
-The target rule is:
-
-`Studio UI -> canonical Factory Core -> one canonical output contract`.
-
-Build environments, installer output and generated EXEs are not source authority and are not imported as canonical code.
-
-## Remote-content safety
-
-Remote content is declarative only. No remote scripts, native libraries, executable expressions, plugins or arbitrary code are permitted in content packages.
-
-Publishing is always versioned, integrity-checked, staging-first, reversible and auditable.
+1. Inventory the current Level Factory repository and current `TASKS.md`.
+2. Build a 224-row mapping against `SB-LF00..LF10` and `SB-CP00..CP09` without editing existing task states.
+3. Cross-audit existing code/tests/audits against that mapping.
+4. Identify overlap, genuine missing work and contract conflicts.
+5. Propose additive tracker sections or linked program documents.
+6. Obtain/record owner approval for tracker restructuring.
+7. Only then update task state through normal independent-audit rules.
 
 ## Parallel development
 
-Codex may advance Content Platform work in `ScrubBots-Level-Factory` while Claude advances game work in `Scrubbots`, provided each prompt states its repository and cross-repo write boundary explicitly.
+Codex may continue the existing Level Factory roadmap while Claude continues the main game. The integration work must not invalidate an active Codex prompt or silently redirect the current milestone.
 
-No agent may opportunistically modify the other repository outside a prompt-authorized cross-repo task.
+## Non-negotiable safety rule
+
+Migration must be **additive and evidence-preserving**. Never erase or reset existing completed/active Level Factory tasks merely to align numbering with the main Scrubbots roadmap.
