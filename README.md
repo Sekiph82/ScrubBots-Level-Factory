@@ -1,153 +1,94 @@
-# SCRUBBOTS Content Production Platform
+# SCRUBBOTS Pixel Art Generator V1
 
-`Sekiph82/ScrubBots-Level-Factory` is the canonical development-time platform that creates, validates, sequences, packages and publishes declarative content for the SCRUBBOTS mobile game.
+This repository is the standalone **SCRUBBOTS Procedural Pixel Art Generator
+V1** foundation. It is not the complete SCRUBBOTS Level Factory and does not
+contain gameplay, Godot integration, a GUI, or generator families yet.
 
-It now unifies three related development surfaces:
+The V1 core is local Python tooling and is explicitly offline-only. Runtime
+cloud image generation, HTTP/API calls, telemetry, and API keys are forbidden.
+One generated logical pixel will equal one SCRUBBOTS gameplay cell; later
+milestones must never resize, resample, interpolate, or antialias logical art
+to fit a board.
 
-1. **Level Factory / Art Intelligence** — semantic + procedural level artwork, deterministic logical compilation, provenance and batch production.
-2. **Puzzle / Campaign Intelligence** — simulation, solver, Difficulty V1 analysis, QA and campaign sequencing.
-3. **Content Publishing / Update Platform** — `.scrubpack`, manifests, staging/production promotion, storage adapters, rollback/disable/scheduling and release evidence.
+## Windows setup and tests
 
-The shipping game remains in `Sekiph82/Scrubbots` and never imports Factory/Publisher implementation code.
-
-## Canonical program tracker
-
-Root `TASKS.md` is the canonical live tracker for the 224 Content Platform tasks:
-
-- 112 `SB-LF00-* .. SB-LF10-*` Level Factory / Campaign tasks.
-- 112 `SB-CP00-* .. SB-CP09-*` Content / Update Platform tasks.
-
-Some CP tasks, especially `CP04` and `CP05`, are tracked here but implemented in the main Godot game repository because they are shipping-runtime responsibilities.
-
-ChatGPT owns task acceptance and tracker updates. Codex/Claude implement and test but do not self-close task rows.
-
-## Architecture authority
-
-Read in this order:
-
-- `coordination/OWNER_CONTENT_PLATFORM_CONSOLIDATION_DECISION_V01.md`
-- `TASKS.md`
-- `docs/CONTENT_PLATFORM_ARCHITECTURE_V01.md`
-- `docs/CROSS_REPO_CONTRACT_V01.md`
-- `docs/CONTENT_PLATFORM_MIGRATION_MATRIX_V01.md`
-- `docs/STUDIO_INTEGRATION_PLAN_V01.md`
-- `GOVERNANCE.md`
-
-Current owner-locked game contracts in `Sekiph82/Scrubbots` outrank stale historical Factory assumptions.
-
-## Current core
-
-The existing Python package remains valuable and is retained rather than rewritten. It already contains substantial audited foundations for:
-
-- deterministic generation requests and RNG;
-- seed/reproduce/batch workflows;
-- MASK / RULES / WFC / HYBRID / AUTO generation;
-- quality/diversity analysis;
-- deterministic logical export/provenance;
-- CLI batch/resume/reproduce;
-- semantic generation contracts;
-- Magnific and PixelLab provider bridges;
-- deterministic semantic normalization;
-- qualification/review evidence.
-
-Historical PAG M00-M10 and PAG-SP work remains evidence. It is mapped to the new 224-task program through strict migration audit rather than silently relabeled as completion.
-
-## Difficulty V1 convergence
-
-The main game has superseded the old player-facing assumptions that difficulty class is determined by board dimensions or class-specific color-count bands.
-
-Current platform target:
-
-- board engine/content envelope remains 20..59 per dimension, rectangular supported;
-- board size contributes to workload/session load rather than defining difficulty class;
-- production logical art uses canonical C01..C16;
-- current general production used-color envelope is 3..12;
-- Challenge, Session Load and Frustration Risk are separate;
-- campaign sequencing follows the owner-locked repeating cadence and retention system.
-
-Legacy validators/contracts are migrated through audited work, not edited silently.
-
-## LEVEL_ART semantic direction
-
-The owner-approved high-resolution LEVEL_ART direction remains:
-
-```text
-SEMANTIC IMAGE
-  -> CELL_MAJORITY
-  -> PALETTE SNAP
-  -> ONE LOGICAL PIXEL = ONE GAMEPLAY CELL
-  -> C01..C16
-  -> CURRENT DIFFICULTY / QA EVALUATION
-  -> VALIDATION / EXPORT
-```
-
-`AREA_AVERAGE_V1` remains historical evidence only for prior qualification and is not the canonical LEVEL_ART reduction policy.
-
-## Factory Studio
-
-The owner-supplied Windows `ScrubBots Level Factory v1.3.6` application is treated as a Studio/operator-console source candidate.
-
-Target dependency direction:
-
-```text
-Studio UI -> canonical Factory Core -> one canonical compiler/validator/exporter
-```
-
-The Studio may own provider orchestration, batch/resume, previews, review and operator UX. It must not remain an independent second compiler with duplicated difficulty/palette rules.
-
-See `docs/STUDIO_INTEGRATION_PLAN_V01.md`.
-
-## Content publishing boundary
-
-Factory output ultimately flows through:
-
-```text
-Accepted LevelData / Campaign
- -> .scrubpack
- -> versioned remote manifest
- -> STAGING
- -> remote verification
- -> explicit PRODUCTION promotion
- -> storage/CDN
- -> ScrubBots Godot runtime
-```
-
-Remote packages are declarative only. No executable scripts, native libraries, plugins or publishing credentials may ship as content.
-
-The game downloads verified content under `user://`, preserves last-known-good content and remains playable offline where cached/builtin content exists.
-
-## Development setup
-
-The current Python core targets Python 3.12 according to `pyproject.toml`.
-
-Typical local setup:
+From PowerShell at the repository root, use the process-scoped execution-policy
+form below. It applies the bypass only to the setup/test child processes and
+does not change the owner's global PowerShell policy:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\test.ps1
 ```
 
-Direct equivalent:
+The setup script prefers `py.exe -3.12`, validates any fallback `python.exe`
+before use, creates or refreshes only the repository-local `.venv`, reports the
+selected Python version and executable, and installs the package plus its test
+extra. It does not delete user data or modify `PATH`. The test script uses that
+environment when present, otherwise the active Python.
+
+Direct equivalents are:
 
 ```powershell
 python -m pip install -e ".[test]"
 python -m pytest
 ```
 
-Do not commit virtual environments, build trees, generated installer output, caches, provider credentials or publisher credentials.
+## Offline contract
 
-## Historical PAG CLI
+The package exposes a production-owned network guard in
+`scrubbots_pixel_factory.offline`. Any future generator path that attempts a
+network request must route through that boundary and receive an explicit
+`OfflinePolicyError`. Importing the package performs no network initialization.
 
-Existing local generator CLI remains available during migration:
-
-```powershell
-python -m scrubbots_pixel_factory.cli
-```
-
-Its `generate`, `reproduce` and `batch` foundations are retained and progressively adapted to the canonical Content Platform contracts.
+No third-party implementation or example artwork is copied in M00. Reference
+roles, license evidence, immutable revisions, and the future provenance-comment
+convention are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Governance
 
-GitHub `main` is repository truth. Root `TASKS.md` is the current 224-task Content Platform ledger. Historical `.hiveai` prompts/logs/audits remain immutable evidence, not a competing current tracker.
+`tasks.md` is the canonical task ledger. ChatGPT is the independent auditor
+and tracker owner; Codex is the implementation builder only. Passing builder
+tests are evidence for later independent review and do not close tasks.
 
-A builder's passing tests are evidence, not independent acceptance. ChatGPT performs final audits and tracker closure.
+## Offline CLI (M09)
+
+The standard-library CLI is available from PowerShell as either
+`python -m scrubbots_pixel_factory.cli` or, after an editable install, the
+`scrubbots-pixel` console command. It provides `generate`, `reproduce` and
+finite `batch` commands and never fetches network data.
+
+Explicit `--seed` values that are canonical decimal integers (for example
+`42` or `-7`) are integer seeds; every other token is a string seed. A single
+`generate` may omit `--seed`, in which case the locally selected entropy seed
+is printed and recorded. Batch generation requires an explicit `--seed`, a
+positive `--count` of accepted unique candidates and a positive
+`--max-attempts` bound.
+
+`generate` writes one accepted M08 bundle below `--output` (default
+`output`). `reproduce path\to\metadata.json` verifies the recorded request,
+logical grid, bundle bytes and rich provenance; WFC-bearing requests require
+the matching local `--exemplar-json`. `batch` writes a canonical
+`batch-manifest.json`, candidate bundles below `candidates/`, and deterministic
+review output below `review/`; resume uses `batch --resume path\to\batch-manifest.json`.
+For deliberate non-default M07 thresholds, `generate` and a new batch accept a
+canonical local `--quality-policy-json`; the policy is persisted and used
+exactly during reproduction and resume, while resume rejects policy overrides.
+Accepted batch IDs use the deterministic `<batch-id>-<zero-padded-attempt-index>`
+formula everywhere, including resume validation and bundle paths.
+
+Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
+invalid request/config, `4` generator failure, `5` quality rejection, `6`
+reproduction mismatch/unsupported metadata, `7` batch exhausted before its
+accepted target, and `8` filesystem/output failure.
+
+## M10 validation and owner review evidence
+
+The deterministic M10 evidence builder is `python tools/m10_prepare.py`. It
+records the versioned property corpus, actual-laptop generation measurements
+(including the explicit RULES 59x59 PAG-0441 row), and the self-contained
+review pack under `review/m10/`. The pack contains exactly 25 structurally
+accepted candidates per difficulty, but every candidate remains
+`PENDING_OWNER_REVIEW`; the gate matrix is not an acceptance declaration.
+Only local synthetic WFC fixtures are used for technical evidence, so the
+visual WFC pack is explicitly skipped until an owner-approved exemplar exists.
