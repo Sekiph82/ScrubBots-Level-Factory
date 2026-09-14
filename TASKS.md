@@ -13,7 +13,9 @@ Only ChatGPT, acting as independent auditor/tracker owner, may promote task stat
 - Required Actor: **CODEX BUILDER**
 - Current Prompt: `.hiveai/prompts/PAG-SP05-C003_TRUSTED_REPORT_BINDING_AND_ACCEPTANCE_EVIDENCE_CLOSURE_PROMPT.md`
 - Current Owner Decision Authority: `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V02.md`
+- C002 Builder Log: `.hiveai/codex-logs/PAG-SP05-C002_DIFFICULTY_V1_CONTRACT_CONVERGENCE_AND_TRUSTED_COMPILATION_EVIDENCE_CLOSURE_CODEX_LOG.md`
 - C002 Strict Audit: `.hiveai/audits/PAG-SP05-C002_DIFFICULTY_V1_CONTRACT_CONVERGENCE_AND_TRUSTED_COMPILATION_EVIDENCE_CLOSURE_STRICT_AUDIT.md`
+- C002 Revalidation: **2026-09-14 — FAIL verdict independently rechecked after builder-log receipt; verdict unchanged.**
 - C001 Strict Audit: `.hiveai/audits/PAG-SP05-C001_LEVEL_ART_HARD_CELL_COMPILER_PALETTE_SNAP_AND_DIFFICULTY_BUDGET_STRICT_AUDIT.md`
 - Previous Compatibility Cycle: `PAG-SP04-C006` → **PASS / CLOSED**
 - SP05-C001: **FAIL / SUPERSEDED BY C002 REMEDIATION**
@@ -25,7 +27,7 @@ Only ChatGPT, acting as independent auditor/tracker owner, may promote task stat
 - Provider Architecture: **provider-neutral; explicit provider/model/engine selection; no silent fallback**
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
 - Tracking Branch: `main`
-- Canonical Local Repository: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+- Canonical Local Repository: `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator`
 
 ## Current Owner-Locked LEVEL_ART Contract
 
@@ -187,9 +189,22 @@ Builder-log publication commit:
 
 `1a2c29bec920abdf7f90cc914b18ba1ac18ca166`
 
+Builder log:
+
+`.hiveai/codex-logs/PAG-SP05-C002_DIFFICULTY_V1_CONTRACT_CONVERGENCE_AND_TRUSTED_COMPILATION_EVIDENCE_CLOSURE_CODEX_LOG.md`
+
 Strict audit:
 
 `.hiveai/audits/PAG-SP05-C002_DIFFICULTY_V1_CONTRACT_CONVERGENCE_AND_TRUSTED_COMPILATION_EVIDENCE_CLOSURE_STRICT_AUDIT.md`
+
+Revalidation checkpoint — 2026-09-14:
+
+- [x] builder log re-read after publication;
+- [x] current `level_art.py` trust boundary re-inspected;
+- [x] C002 builder-reported focused/full regression results retained as builder evidence;
+- [x] independent audit verdict remains **FAIL**;
+- [x] missing explicit `report.raw_sha256 == artifact.raw_sha256 == source_provenance.raw_sha256` binding reconfirmed in current source;
+- [x] C003 remains the only authorized active implementation cycle.
 
 Accepted/retained C002 technical work:
 
