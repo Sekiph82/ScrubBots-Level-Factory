@@ -71,4 +71,5 @@ No provider execution, image generation, network upload, Magnific call, PixelLab
 
 - Test/evidence implementation commit: `f53b47c873becd1d2d280908deccd4d10ebfbd63` (`Add SP07 identity mutation evidence`).
 - Implementation push: `git push origin main` succeeded; `main` advanced from `3e2ce159df77c796b723a4387d5ce40e00b3ff50` to `f53b47c`.
-- Final log-only publication commit and terminal equality checkpoint are to be appended after the log-only commit and push.
+- Log-only publication commit: `ec9925809210db5a91dcc8b6420c27c49d25f47c`; `git push origin main` succeeded.
+- Post-publication fetch checkpoint before this final closure update: local HEAD `ec9925809210db5a91dcc8b6420c27c49d25f47c` equals `origin/main` `ec9925809210db5a91dcc8b6420c27c49d25f47c`; divergence `0 0`.
