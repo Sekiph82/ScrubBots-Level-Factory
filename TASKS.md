@@ -7,19 +7,20 @@ Only ChatGPT, acting as independent auditor/tracker owner, may promote task stat
 ## Project Status
 
 - Current Milestone: PAG-SP06 — Semantic Quality / Recognizability Gate
-- Current Sprint: PAG-SP06-C001 — Semantic Recognizability Gate Contract & Offline Review Foundation
-- Current Task: PAG-SP06-C001 — Semantic Recognizability Gate Contract & Offline Review Foundation
+- Current Sprint: PAG-SP06-C002 — Durable Review Evidence & Acceptance Gate
+- Current Task: PAG-SP06-C002 — Durable Review Evidence & Acceptance Gate
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only PAG-SP06-C001 from the published GitHub prompt, pushes implementation/tests/finalized builder log to `main`, then stops for ChatGPT strict audit.
+- Next Task/Action: Codex executes only PAG-SP06-C002 from the published GitHub prompt, pushes implementation/tests/finalized builder log to `main`, then stops for ChatGPT strict audit.
 - Required Actor: CODEX
-- Current Phase: CONTRACT_AND_OFFLINE_GATE_FOUNDATION
-- Current Prompt: `.hiveai/prompts/PAG-SP06-C001_SEMANTIC_RECOGNIZABILITY_GATE_CONTRACT_AND_OFFLINE_REVIEW_FOUNDATION_PROMPT.md`
-- Previous Strict Audit: `.hiveai/audits/PAG-SP05-C003-R01_DIRECT_BINDING_PROOF_AND_PUBLICATION_EVIDENCE_CLOSURE_STRICT_AUDIT.md`
+- Current Phase: DURABLE_REVIEW_EVIDENCE_AND_GATE
+- Current Prompt: `.hiveai/prompts/PAG-SP06-C002_DURABLE_REVIEW_EVIDENCE_AND_ACCEPTANCE_GATE_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/PAG-SP06-C001_SEMANTIC_RECOGNIZABILITY_GATE_CONTRACT_AND_OFFLINE_REVIEW_FOUNDATION_STRICT_AUDIT.md`
+- SP06-C001 Disposition: PASS / CLOSED
+- SP06-C001 Implementation: `fe77b4a36c6fc7b3b60e608f6e8d6991f0c088ec`
+- SP06-C001 Final Builder Log: `0b27ba953aee45a2ca52a91d2a16645d50c23757`
+- SP06-C001 Audit Commit: `57af8cafa83e20dd78317f6313f6a6db27e99b35`
 - SP05 Final Disposition: PASS / CLOSED
-- SP05 Closing Builder Implementation: `fc008dce7887a1eefbc314eab449c57355f2a942`
-- SP05 Closing Builder Log Publication: `009fb76ce9ced264212f6827fa16a66bc4b13083`
-- SP05 Closing Audit Commit: `5e789b7b753fca9156af8dd0081fa9d0a7f00b89`
-- Credit Policy: No Magnific or PixelLab call is authorized in SP06-C001. Spend zero provider credits.
+- Credit Policy: No Magnific or PixelLab call is authorized in SP06-C002. Spend zero provider credits.
 - Blockers/Waits: SP07+, Studio expansion, weekly batching, M08/LevelData bridge, solver integration and M11 remain blocked until their own authorized cycles.
 - Approved Semantic Providers: MAGNIFIC, PIXELLAB
 - Provider Architecture: provider-neutral; explicit provider/model/engine selection; no silent fallback
@@ -70,20 +71,27 @@ Trusted raw-SHA invariant:
 
 Historical class-specific dimension/color bands remain compatibility evidence only and must not become current production truth.
 
-## SP06 Contract Direction
+## Accepted SP06-C001 Contract
 
-SP06 begins only after accepted trusted LEVEL_ART output exists.
+SP06-C001 is independently accepted.
 
-C001 must distinguish two concepts that must not be blurred:
+Accepted flow:
 
-1. deterministic structural diagnostics computed from an accepted LEVEL_ART logical grid;
-2. semantic recognizability disposition.
+`trusted LEVEL_ART artifact → deterministic structural diagnostics → UNREVIEWED assessment → explicit auditable ACCEPT/REJECT review`
 
-Structural metrics such as transition density, connected-component counts, singleton counts or color-region sizes are objective diagnostics. They are not proof that the depicted subject is recognizable.
+Accepted rules:
 
-C001 therefore establishes an offline, auditable quality/review foundation. It must not silently auto-accept semantic recognizability from heuristic structure alone.
+- structural diagnostics are objective grid facts, not semantic-recognition scores;
+- transition density, component counts, singleton counts and color-region sizes never auto-accept recognizability;
+- diagnostics are derived from trusted row-major C-ID cells and are deterministic/canonical;
+- assessments bind trusted artifact digest, final-grid digest, dimensions, used IDs/count, diagnostics policy and diagnostic identity;
+- recognizability disposition is explicit `UNREVIEWED`, `ACCEPT`, or `REJECT`;
+- ACCEPT/REJECT require non-empty reviewer and reason evidence;
+- `passes`/`accepted` is true only for explicit ACCEPT bound to the same structural assessment identity;
+- changing review disposition changes full assessment identity while structural diagnostics identity remains unchanged;
+- no provider, vision model or external recognition service is called by this gate.
 
-No live provider call, downloaded vision model, CLIP/OCR service, or external semantic recognition API is authorized in C001.
+C002 must preserve this separation while adding durable/reloadable review evidence. Persisted evidence must be reverified against the exact trusted artifact rather than trusted as serialized assertions.
 
 ## Milestone Overview
 
@@ -93,7 +101,7 @@ No live provider call, downloaded vision model, CLIP/OCR service, or external se
 - [x] PAG-SP03 — Semantic Normalization Pipeline technical foundation
 - [~] PAG-SP04 — Provider / Model / Workflow Qualification; Magnific live path qualified through accepted owner disposition, remaining comparative qualification deferred until useful/authorized
 - [x] PAG-SP05 — LEVEL_ART Semantic Integration — PASS / CLOSED
-- [~] PAG-SP06 — Semantic Quality / Recognizability Gate — C001 READY_FOR_IMPLEMENTATION
+- [~] PAG-SP06 — Semantic Quality / Recognizability Gate — C001 PASS / CLOSED; C002 READY_FOR_IMPLEMENTATION
 - [ ] PAG-SP07 — Reference / Style Generation
 - [ ] PAG-SP08 — Edit / Inpaint
 - [ ] PAG-SP09 — Pixel Studio Create / Gallery UI
@@ -143,60 +151,35 @@ Retained technical direction:
 - [x] no new C-ID introduction;
 - [x] non-minting public `from_compilation()` behavior.
 
-## PAG-SP05-C003
+## PAG-SP05-C003 / C003-R01
 
-State: PASS / CLOSED THROUGH C003-R01 EVIDENCE CLOSURE
+State: PASS / CLOSED
 
 Product implementation commit:
 
 `e3605c263c495870766b6d841612b88194b35b66`
 
-Original strict audit:
-
-`.hiveai/audits/PAG-SP05-C003_TRUSTED_REPORT_BINDING_AND_ACCEPTANCE_EVIDENCE_CLOSURE_STRICT_AUDIT.md`
-
-Retained product fix:
-
-- [x] artifact/source raw SHA binding;
-- [x] artifact/report raw SHA binding;
-- [x] private report/artifact sealing model retained;
-- [x] lane-non-transformative evidence strengthened;
-- [x] explicit 13/14/15/16 over-envelope fixtures;
-- [x] broad report-field tamper probes.
-
-## PAG-SP05-C003-R01
-
-State: PASS / CLOSED
-
-Implementation/test-evidence commit:
+R01 implementation/test-evidence commit:
 
 `fc008dce7887a1eefbc314eab449c57355f2a942`
 
-Builder-log publication commit:
+R01 builder-log publication commit:
 
 `009fb76ce9ced264212f6827fa16a66bc4b13083`
 
-Strict audit:
+Final strict audit:
 
 `.hiveai/audits/PAG-SP05-C003-R01_DIRECT_BINDING_PROOF_AND_PUBLICATION_EVIDENCE_CLOSURE_STRICT_AUDIT.md`
 
 Accepted closure:
 
-- [x] fingerprint-valid wrong-raw-SHA report constructed through private test-only helper;
-- [x] forged report passes its own integrity check before artifact construction;
-- [x] artifact boundary rejects the report/source raw-SHA mismatch with `INVALID_ARTIFACT`;
-- [x] no public trust-minting API added;
-- [x] same-lane 13/14/15/16 repeat determinism explicitly proven;
-- [x] EASY/VERY_HARD lane-equivalence retained;
-- [x] every 13..16 case finishes at exactly 12 used colors;
-- [x] no new C-ID introduced in tested reductions;
-- [x] production source unchanged by R01;
-- [x] builder recorded focused/full green regressions;
-- [x] zero provider calls / zero credits;
-- [x] no main-game writes;
-- [x] builder did not edit root `TASKS.md`;
-- [x] publication evidence contains implementation SHA and push result;
-- [x] ChatGPT strict audit PASS.
+- [x] report/artifact/source raw SHA cross-binding;
+- [x] private report/artifact sealing retained;
+- [x] direct fingerprint-valid wrong-raw-SHA adversarial proof;
+- [x] lane-non-transformative evidence;
+- [x] deterministic 13/14/15/16 over-envelope reduction evidence;
+- [x] no public trust-minting API;
+- [x] zero provider calls / zero credits.
 
 SP05 final state: **PASS / CLOSED**.
 
@@ -204,39 +187,82 @@ SP05 final state: **PASS / CLOSED**.
 
 # PAG-SP06-C001 — Semantic Recognizability Gate Contract & Offline Review Foundation
 
+State: PASS / CLOSED
+
+Implementation commit:
+
+`fe77b4a36c6fc7b3b60e608f6e8d6991f0c088ec`
+
+Final builder-log commit:
+
+`0b27ba953aee45a2ca52a91d2a16645d50c23757`
+
+Strict audit:
+
+`.hiveai/audits/PAG-SP06-C001_SEMANTIC_RECOGNIZABILITY_GATE_CONTRACT_AND_OFFLINE_REVIEW_FOUNDATION_STRICT_AUDIT.md`
+
+Accepted closure:
+
+- [x] dedicated `semantic/quality` package outside SP05 compiler;
+- [x] exact trusted LEVEL_ART artifact integrity required;
+- [x] canonical deterministic structural diagnostics from logical cells;
+- [x] exact horizontal/vertical transitions and integer density evidence;
+- [x] four-neighbour components per C-ID;
+- [x] singleton components;
+- [x] per-color counts and largest component sizes/shares;
+- [x] unchecked public caller assertions cannot mint trusted diagnostics;
+- [x] explicit UNREVIEWED / ACCEPT / REJECT review contract;
+- [x] ACCEPT/REJECT require auditable reviewer + reason evidence;
+- [x] UNREVIEWED never passes;
+- [x] structural diagnostics remain distinct from semantic-recognition claims;
+- [x] structural identity stable across review disposition while full review identity changes;
+- [x] SP05 compiler files unchanged by C001 delta;
+- [x] builder-reported focused/combined/full regressions green;
+- [x] zero provider calls / zero credits;
+- [x] no root `TASKS.md` builder edit;
+- [x] ChatGPT strict audit PASS.
+
+---
+
+# PAG-SP06-C002 — Durable Review Evidence & Acceptance Gate
+
 State: READY_FOR_IMPLEMENTATION
 
 Prompt:
 
-`.hiveai/prompts/PAG-SP06-C001_SEMANTIC_RECOGNIZABILITY_GATE_CONTRACT_AND_OFFLINE_REVIEW_FOUNDATION_PROMPT.md`
+`.hiveai/prompts/PAG-SP06-C002_DURABLE_REVIEW_EVIDENCE_AND_ACCEPTANCE_GATE_PROMPT.md`
 
 Required closure:
 
-- [ ] add a dedicated SP06 semantic-quality package outside the SP05 compiler;
-- [ ] bind assessments to exact trusted LEVEL_ART artifact identity;
-- [ ] compute canonical deterministic structural diagnostics from logical cells;
-- [ ] cover horizontal/vertical transition counts and deterministic transition density;
-- [ ] cover 4-neighbour connected components per color;
-- [ ] cover singleton components;
-- [ ] cover per-color cell counts and largest component sizes/shares;
-- [ ] prevent unchecked caller assertions from minting trusted diagnostics;
-- [ ] provide explicit UNREVIEWED / ACCEPT / REJECT recognizability disposition;
-- [ ] require auditable review evidence for ACCEPT/REJECT;
-- [ ] ensure UNREVIEWED never silently passes;
-- [ ] keep structural diagnostics distinct from claims of semantic recognition;
-- [ ] preserve accepted SP05 compiler behavior unchanged;
-- [ ] keep provider execution offline and spend zero credits;
-- [ ] focused and full regressions green;
-- [ ] no root `TASKS.md` edit by builder;
+- [ ] add deterministic versioned durable SP06 review evidence;
+- [ ] export only from an intact trusted C001 assessment;
+- [ ] deterministic repeated export bytes/digest;
+- [ ] strict checked reload against the exact trusted LEVEL_ART artifact;
+- [ ] recompute C001 structural diagnostics during reload rather than trust serialized facts;
+- [ ] cross-bind artifact digest, final-grid digest, dimensions, used IDs/count and diagnostic policy;
+- [ ] cross-bind diagnostics facts/digest and structural assessment identity;
+- [ ] reconstruct and reverify review identity against the recomputed structural identity;
+- [ ] reverify full assessment identity;
+- [ ] reject malformed/unsupported schemas and tampered fields;
+- [ ] reject artifact A evidence against artifact B;
+- [ ] preserve/check optional canonical semantic-request identity when present;
+- [ ] add explicit acceptance gate where only ACCEPT succeeds;
+- [ ] UNREVIEWED and REJECT never pass the gate;
+- [ ] add no heuristic structural recognizability threshold;
+- [ ] add no public trust-minting or unsafe deserialization shortcut;
+- [ ] SP06-C001 focused tests remain green;
+- [ ] SP05 focused tests remain green;
+- [ ] zero Magnific/PixelLab calls and zero credits;
+- [ ] no root `TASKS.md` builder edit;
 - [ ] no main-game writes;
-- [ ] ChatGPT strict audit required before C001 closure.
+- [ ] ChatGPT strict audit required before C002 closure.
 
 ---
 
 ## Current Stop / Action Rule
 
-Execute only `PAG-SP06-C001` from the published prompt.
+Execute only `PAG-SP06-C002` from the published prompt.
 
-Do not reopen accepted SP05 architecture. Do not call Magnific or PixelLab. Do not download or invoke external recognition models. Do not begin SP07+, Studio UI, weekly batching, M08/LevelData, solver or M11.
+Do not reopen accepted SP05 or SP06-C001 architecture. Do not call Magnific or PixelLab. Do not download or invoke external recognition models. Do not add heuristic semantic-recognition thresholds. Do not begin SP07+, Studio UI, weekly batching, M08/LevelData, solver or M11.
 
-After Codex pushes C001 implementation + finalized evidence log, stop for ChatGPT strict audit.
+After Codex pushes C002 implementation + finalized evidence log, stop for ChatGPT strict audit.
