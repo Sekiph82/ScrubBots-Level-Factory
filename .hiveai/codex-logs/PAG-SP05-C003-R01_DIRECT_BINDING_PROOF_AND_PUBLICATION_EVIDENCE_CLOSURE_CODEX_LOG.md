@@ -45,4 +45,6 @@ Implement only the C003-R01 evidence closure: directly exercise the existing art
 
 ## Publication checkpoint
 
-- The focused evidence and regression record is complete. The implementation/test-evidence commit SHA and successful push result will be appended before the final publication push. The final log-publication commit cannot contain its own SHA or post-push remote result; those terminal values will be reported in the handoff after the final fetch, with no further commit created.
+- Implementation/test-evidence commit: `fc008dce7887a1eefbc314eab449c57355f2a942` (`Add SP05-C003-R01 binding evidence`).
+- Implementation/test-evidence push succeeded: `f50e11f..fc008dc main -> main`.
+- The completed log is now being published in a final log-only commit. That commit cannot contain its own SHA or post-push remote result; those terminal values will be reported in the handoff after the final fetch, with no further commit created.
