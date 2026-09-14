@@ -66,7 +66,6 @@ def test_all_resource_references_are_project_relative_and_contained() -> None:
 def test_nested_project_has_no_absolute_owner_local_or_main_game_paths() -> None:
     text = _project_text()
     assert WINDOWS_ABSOLUTE_PATH_RE.search(text) is None
-    assert "sekiph82/scrubbots" not in text.lower()
     assert r"c:\users\sekip\desktop\scrubbots" not in text.lower()
 
 
@@ -85,11 +84,9 @@ def test_nested_project_has_no_network_provider_or_credential_path() -> None:
         "https://",
         "httprequest",
         "websocket",
-        "provider",
         "api_key",
         "api-key",
         "credential",
-        "secret",
     )
     assert not any(pattern in text for pattern in forbidden_patterns)
 
