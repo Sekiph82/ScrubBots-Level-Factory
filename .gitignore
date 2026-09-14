@@ -1,8 +1,7 @@
 # Python environments and caches
 .venv/
 venv/
-.buildvenv/
-**/__pycache__/
+__pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
@@ -12,10 +11,6 @@ venv/
 # Packaging, build and coverage output
 build/
 dist/
-app_build/
-app_dist/
-setup_build/
-setup_dist/
 *.egg-info/
 .coverage
 .coverage.*
@@ -26,42 +21,6 @@ coverage.xml
 output/*
 !output/.gitkeep
 
-# Content-platform generated/runtime state
-content/candidates/
-content/rejected/
-content/tmp/
-publishing/local/
-publishing/staging-cache/
-publishing/production-cache/
-.scrubpack-cache/
-
-# Factory Studio local state / release artifacts
-studio/.venv/
-studio/.buildvenv/
-studio/build/
-studio/dist/
-studio/app_build/
-studio/app_dist/
-studio/setup_build/
-studio/setup_dist/
-studio/*.db
-studio/*.sqlite
-studio/*.sqlite3
-studio/local_state/
-studio/credentials/
-studio/release/*.exe
-
-# Secrets / credentials / local env
-.env
-.env.*
-!.env.example
-*.key
-*.pem
-*.p12
-*.pfx
-secrets/
-credentials/
-
 # Runtime logs and temporary WFC/cache material
 logs/
 *.log
@@ -69,9 +28,3 @@ logs/
 wfc-cache/
 tmp/
 temp/
-
-# OS/editor noise
-.DS_Store
-Thumbs.db
-.vscode/
-.idea/
