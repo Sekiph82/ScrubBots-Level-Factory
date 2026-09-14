@@ -1,6 +1,31 @@
-# SCRUBBOTS Content Production Platform — Canonical Task State
+# ScrubBots Level Factory — Canonical GitHub Task State
 
-This repository is the canonical program tracker for SCRUBBOTS Level Factory + Campaign Intelligence + Content Publishing / Update Platform work.
+This root `TASKS.md` is the only authoritative project-status tracker consumed by H!veAI for this repository. GitHub repository metadata and the latest commit are supporting project-truth inputs. Hidden `.hiveai` control-plane tracker files are historical evidence only and are not read for live project state.
+
+## Project Status
+
+- Current Milestone: LF02 — Semantic / Constraint Candidate Generator
+- Current Sprint: PAG-SP05-C002 — Difficulty V1 Contract Convergence & Trusted Compilation Evidence Closure
+- Current Task: SB-LF02-004 — Support ART_FIRST mode consuming owner/AI-approved pixel art, masks or semantic provider output
+- Current Task Status: AUDIT_REQUIRED
+- Next Task/Action: ChatGPT independently audits PAG-SP05-C002. On PASS, map only directly proven evidence into the canonical SB-LF/SB-CP task rows, update this root tracker, and issue the next implementation prompt. On FAIL, issue a bounded remediation cycle without granting canonical completion credit.
+- Required Actor: CHATGPT
+- Tracking Repository: Sekiph82/ScrubBots-Level-Factory
+- Tracking Branch: main
+- Progress: 0 / 224 = 0.00%
+
+## Program Scope
+
+- Program: SCRUBBOTS Content Production Platform
+- Canonical Task Count: 224
+- Level Factory / Campaign tasks: 112 (`SB-LF00-*` .. `SB-LF10-*`)
+- Content / Update Platform tasks: 112 (`SB-CP00-*` .. `SB-CP09-*`)
+- Accepted canonical tasks: 0 / 224
+- Active evidence cycle: PAG-SP05-C002
+- Last builder publication: `1a2c29bec920abdf7f90cc914b18ba1ac18ca166`
+- Current evidence mapping: LF02 semantic ART_FIRST candidate generation + LF05 validation/trust evidence candidate; canonical completion remains gated on independent audit.
+- Main Game Runtime Repository: `Sekiph82/Scrubbots`
+- Tracker Rule: ChatGPT is the sole writer of canonical task acceptance/checklist state. Codex/Claude read this file but do not edit it.
 
 Owner decision: `coordination/OWNER_CONTENT_PLATFORM_CONSOLIDATION_DECISION_V01.md`
 Architecture: `docs/CONTENT_PLATFORM_ARCHITECTURE_V01.md`
@@ -8,31 +33,14 @@ Cross-repo contract: `docs/CROSS_REPO_CONTRACT_V01.md`
 Migration matrix: `docs/CONTENT_PLATFORM_MIGRATION_MATRIX_V01.md`
 Studio migration: `docs/STUDIO_INTEGRATION_PLAN_V01.md`
 
-## Project Status
-
-- Program: **SCRUBBOTS Content Production Platform**
-- Canonical Repository: `Sekiph82/ScrubBots-Level-Factory`
-- Canonical Branch: `main`
-- Canonical Task Count: **224**
-- Level Factory / Campaign tasks: **112** (`SB-LF00-*` .. `SB-LF10-*`)
-- Content / Update Platform tasks: **112** (`SB-CP00-*` .. `SB-CP09-*`)
-- Accepted canonical tasks after migration: **0 / 224**
-- Existing PAG/SP evidence candidates: **preserved; strict mapping audit pending**
-- Migration Milestone: **CPMIG-01 — Contract Convergence + Existing-Evidence Mapping**
-- Active Builder Workstream: **PAG-SP05-C001 — LEVEL_ART Hard-Cell Compiler, Palette Snap & Difficulty Budget**
-- Active Workstream Mapping: **LF02 semantic candidate generation + LF05 validation evidence candidate; legacy difficulty-band semantics must be converged to current main-game Difficulty V1 before canonical task closure.**
-- Current Task Status: **READY_FOR_IMPLEMENTATION**
-- Required Actor: **CODEX BUILDER**, then **CHATGPT independent audit/tracker update**
-- Existing SP05 Prompt: `.hiveai/prompts/PAG-SP05-C001_LEVEL_ART_HARD_CELL_COMPILER_PALETTE_SNAP_AND_DIFFICULTY_BUDGET_PROMPT.md`
-- Main Game Runtime Repository: `Sekiph82/Scrubbots`
-- Tracker Rule: ChatGPT is the sole writer of task acceptance/checklist state. Codex/Claude read this file but do not edit it.
-
-> **Progress note:** tracker migration does not create completion credit. Historical PAG M00-M10 / PAG-SP evidence remains valuable and will be mapped onto the 224 canonical tasks through independent audit before checkboxes close. The already-published SP05-C001 prompt may complete as a grandfathered builder cycle; its output is audited against current Content Platform and main-game contracts rather than discarded.
+> Tracker normalization does not create completion credit. Historical PAG M00-M10 / PAG-SP evidence remains valuable and is mapped onto the 224 canonical tasks only after independent audit.
 
 ## Status / ownership vocabulary
 
 - `[x]` = independently audited and accepted against the current canonical task contract.
-- `[ ]` = open, not yet accepted under the current canonical task contract.
+- `[~]` = active / in progress / awaiting the next lifecycle gate; not completed.
+- `[ ]` = planned/open, not yet accepted under the current canonical task contract.
+- `[!]` = blocked.
 - `FACTORY` = implementation in this repository.
 - `GAME_RUNTIME` = implementation primarily in `Sekiph82/Scrubbots`, tracked here for end-to-end program completion.
 - `CROSS_REPO` = producer and consumer changes/tests required.
@@ -54,6 +62,8 @@ Studio migration: `docs/STUDIO_INTEGRATION_PLAN_V01.md`
 12. No secrets in Git.
 
 ---
+
+## Tasks
 
 # LF00 — Content Platform Bootstrap & Isolation
 
@@ -93,7 +103,7 @@ Migration state: substantial MASK/RULES/WFC/HYBRID/AUTO + PAG-SP semantic eviden
 - [ ] SB-LF02-001 Implement evaluator-guided candidate architecture rather than blind random filling.
 - [ ] SB-LF02-002 Support reverse construction when canonical gameplay mechanics permit.
 - [ ] SB-LF02-003 Support PUZZLE_FIRST mode.
-- [ ] SB-LF02-004 Support ART_FIRST mode consuming owner/AI-approved pixel art, masks or semantic provider output.
+- [~] SB-LF02-004 Support ART_FIRST mode consuming owner/AI-approved pixel art, masks or semantic provider output.
 - [ ] SB-LF02-005 Implement reusable shape/topology primitives without declaring them difficulty rules.
 - [ ] SB-LF02-006 Implement connected color-region representation/generation.
 - [ ] SB-LF02-007 Preserve one logical artwork square = one logical gameplay cell.
@@ -411,7 +421,7 @@ Migration state: release-gate work.
 
 ## Legacy PAG / Semantic Pixel Studio Evidence
 
-Historical accepted PAG M00-M10 and PAG-SP cycles remain authoritative evidence for what was actually implemented/tested at the time. They are **not deleted** and they are **not automatically converted into `[x]`** above.
+Historical accepted PAG M00-M10 and PAG-SP cycles remain authoritative evidence for what was actually implemented/tested at the time. They are not deleted and are not automatically converted into `[x]` above.
 
 Pre-consolidation tracker state is recoverable from Git history at commits before this migration, including `9f5fa4f7fabd8f7e5d12abbca5431af8b539c882` and the immediately preceding SP05 tracker update.
 
@@ -419,8 +429,10 @@ Current semantic direction retained from that program:
 
 `SEMANTIC IMAGE -> CELL_MAJORITY -> PALETTE SNAP -> ONE LOGICAL PIXEL = ONE GAMEPLAY CELL -> C01..C16 -> CURRENT DIFFICULTY/QA EVALUATION -> VALIDATION/EXPORT`
 
-The historical class-specific dimension/color bands are no longer current Difficulty V1 truth and must be migrated before canonical completion credit.
+The historical class-specific dimension/color bands are no longer current Difficulty V1 truth.
 
-## Next migration frontier
+PAG-SP05-C001 was independently audited FAIL because of the stale Difficulty V1 contract and trusted-construction boundary. PAG-SP05-C002 is the bounded remediation. Its builder implementation and log are published, but canonical task completion credit remains withheld until independent ChatGPT audit.
 
-The grandfathered SP05-C001 cycle may implement its hard-cell compiler foundation with zero provider credits. During independent audit, ChatGPT maps accepted evidence into LF02/LF05 only after reconciling obsolete difficulty-band semantics with current main-game Difficulty V1. Subsequent prompts use the 224-task Content Platform tracker directly.
+## Next Action
+
+Independently audit PAG-SP05-C002 against the current Content Platform and main-game Difficulty V1 contracts. Only after a PASS may accepted evidence close or partially advance the directly supported canonical SB-LF/SB-CP task rows.
