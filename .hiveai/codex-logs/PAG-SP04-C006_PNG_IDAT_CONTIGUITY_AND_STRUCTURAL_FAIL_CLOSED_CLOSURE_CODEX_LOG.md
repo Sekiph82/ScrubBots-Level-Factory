@@ -65,5 +65,5 @@ Files changed in this cycle:
 ## Publication checkpoint
 
 - Implementation commit: `e4a4155e6c022f1647b2010506f46693905c2de9` (`Enforce SP04-C006 PNG IDAT contiguity`).
-- Implementation push result: _to be recorded after the completed log publication push_.
+- Implementation and completed-log publication push result: succeeded with `git push origin main` (`862f801..307178d main -> main`).
 - Final terminal equality: _the final `git fetch origin`, `git rev-parse HEAD`, `git rev-parse origin/main`, and `git rev-list --left-right --count HEAD...origin/main` result will be recorded in the final handoff. Because recording a commit's own SHA inside that same commit is self-referential, this log will state any such publication limitation rather than claim a post-commit hash it cannot contain._
