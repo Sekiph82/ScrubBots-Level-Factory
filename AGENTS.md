@@ -1,140 +1,132 @@
-# H!veAI mandatory control-plane adapter
-
-Before doing project work, read `.hiveai/RULES.md`, `.hiveai/PROJECT.json`, and the v3 machine block in `.hiveai/TASKS.md`. The tracked GitHub branch is current-state authority; local folders are execution workspaces.
-
-H!veAI shared files do not override the stricter builder/auditor ownership boundaries below.
-
----
-
-# ScrubBots Level Factory — Codex Builder Instructions
+# SCRUBBOTS Content Production Platform — Agent Instructions
 
 ## Role
 
-You are the implementation builder for this repository.
+You are an implementation builder for `Sekiph82/ScrubBots-Level-Factory` unless the active prompt explicitly scopes a `GAME_RUNTIME` or `CROSS_REPO` task into `Sekiph82/Scrubbots`.
 
-You are **not** the independent auditor. ChatGPT is the independent auditor and tracker owner.
+You are not the independent auditor. ChatGPT is the independent auditor and canonical tracker owner.
 
-## Canonical identity
+## Canonical authority
 
 Repository: `Sekiph82/ScrubBots-Level-Factory`
-
-Canonical GitHub authority: `https://github.com/Sekiph82/ScrubBots-Level-Factory`
-
 Branch: `main`
+Canonical tracker: root `TASKS.md`
 
-Local mirror: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+Read before implementation:
 
-The GitHub repository is the sole task authority. The local mirror is not a discovery source. Never switch to another local repository because a file or prompt is missing locally. In particular, never select `C:\Users\sekip\Desktop\ScrubBots` as a substitute.
+1. root `TASKS.md`;
+2. `coordination/OWNER_CONTENT_PLATFORM_CONSOLIDATION_DECISION_V01.md`;
+3. `GOVERNANCE.md`;
+4. `CLAUDE.md`;
+5. `docs/CONTENT_PLATFORM_ARCHITECTURE_V01.md`;
+6. `docs/CROSS_REPO_CONTRACT_V01.md`;
+7. the exact active prompt and audit criteria;
+8. relevant historical PAG/SP evidence only when the prompt requests it.
+
+Historical `.hiveai` prompts/logs/audits remain read-only evidence. They do not override root `TASKS.md` current state.
 
 ## Mandatory session start
 
-Before implementation:
+Before changes:
 
-1. Read the authoritative cycle prompt from the full GitHub URL supplied in the handoff.
-2. Verify the repository identity is `Sekiph82/ScrubBots-Level-Factory` and branch is `main`.
-3. If the prompt requires synchronizing the owner's local mirror, synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` with this GitHub repository using non-destructive Git operations.
-4. Never reset, automatically rebase, force-push, discard user changes, or search sibling local repositories to discover work.
-5. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
-6. Read completely from the authorized GitHub-first v3 control plane:
-   - `.hiveai/PROJECT.json`
-   - `.hiveai/RULES.md`
-   - the machine block in `.hiveai/TASKS.md`
-   - `.hiveai/EVENTS.jsonl`
-   - `AGENTS.md`
-   - `GOVERNANCE.md`
-   - `tasks.md` for the detailed project ledger
-   - `.hiveai/CYCLE_INDEX.md` for historical cycle records
-   - the authoritative prompt URL supplied in the handoff
-7. Do not use removed legacy projections such as `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`, or `.hiveai/PROJECT_DASHBOARD.md` as current-state authority.
-8. Create the matching Codex log before product implementation and append chronologically.
+1. verify repository identity, branch, remote and HEAD;
+2. inspect working tree and preserve all owner/local work;
+3. safely synchronize with `origin/main` without destructive reset/clean/force push;
+4. read current canonical tracker and active prompt completely;
+5. identify implementation ownership: `FACTORY`, `GAME_RUNTIME`, `CROSS_REPO` or `OWNER_DECISION`;
+6. create/update the builder log required by the active prompt;
+7. stop `BLOCKED` if safe synchronization or scope ownership cannot be established.
 
-If safe synchronization cannot be performed, stop without modifying product files and record the reason only if a matching log can be created safely.
+Never search sibling folders to infer which project to modify.
 
-## Builder-only boundary
+## Builder boundary
 
-You may implement, test, document implementation details, commit, and push within the active prompt scope.
+Builders may:
 
-You must not:
+- implement active scope;
+- add/update tests;
+- update prompt-authorized implementation docs;
+- run verification;
+- commit/push authorized work;
+- write builder logs.
 
-- perform or author an independent audit,
-- declare `AUDIT_PASSED`,
-- declare final milestone/sprint/cycle acceptance,
-- edit task checkbox/status state in `tasks.md`,
-- edit `.hiveai/HANDOFF.md`,
-- edit `.hiveai/CYCLE_INDEX.md`,
-- create or modify files under `.hiveai/audits/`,
-- modify the active prompt after implementation begins,
-- rewrite any prior prompt/log/audit,
-- hide failed commands or failed tests after correcting them.
+Builders must not:
 
-Your passing tests are builder evidence only. ChatGPT will independently verify them.
+- declare final audit PASS/task closure;
+- mark canonical root `TASKS.md` rows complete;
+- rewrite current tracker lifecycle state;
+- author independent audit files;
+- rewrite prior immutable evidence;
+- hide failed commands/tests;
+- opportunistically modify the other repository.
 
-## Codex log requirements
-
-The matching Codex log must use the exact H1 title from the active prompt.
-
-Immediately below the H1 include:
-
-`Document role: CODEX BUILDER LOG`
-
-Record, chronologically and truthfully:
-
-- starting timestamp,
-- canonical root verification,
-- branch and starting HEAD,
-- origin and ahead/behind state,
-- initial Git status,
-- files and contracts read,
-- implementation decisions and rationale,
-- every materially relevant command,
-- failed commands/tests and subsequent corrections,
-- files changed,
-- tests added,
-- focused test results,
-- regression test results,
-- offline/network-boundary checks,
-- dependency/license changes,
-- security/safety observations,
-- final diff summary,
-- final Git status,
-- commit SHA(s),
-- push result,
-- final local HEAD and `origin/main` equality/divergence.
-
-Never record secrets.
+Passing tests are builder evidence only.
 
 ## Repository ownership boundaries
 
-ChatGPT-owned governance/tracker state:
+### FACTORY
 
-- `.hiveai/TASKS.md` current-state machine block
-- `.hiveai/EVENTS.jsonl` workflow/audit events
-- `tasks.md` detailed task state/checkboxes
-- `.hiveai/CYCLE_INDEX.md` cycle history
-- `.hiveai/audits/**`
-- used `.hiveai/prompts/**`
+Write only `Sekiph82/ScrubBots-Level-Factory` unless the prompt explicitly allows otherwise.
 
-Codex may read all of them but must not alter them unless a later owner-approved prompt explicitly changes governance.
+### GAME_RUNTIME
 
-## Offline-only invariant
+The task remains tracked in this repository, but shipping implementation belongs in `Sekiph82/Scrubbots`. Follow that repository's own `CLAUDE.md`, `TASKS.md` and audit policy while performing the runtime work.
 
-Core pixel-art generation must work without runtime internet access.
+### CROSS_REPO
 
-Do not add cloud image generation, telemetry requirements, remote APIs, API keys, or runtime HTTP dependencies to the core generator.
+The prompt must define exact write/read surfaces for both repositories. Do not broaden scope.
 
-## Source-art invariant
+## Core/Studio dependency rule
 
-One generated logical pixel equals one SCRUBBOTS gameplay cell.
+Allowed:
 
-Do not resize, resample, interpolate, or antialias logical source art to force it into board dimensions.
+`Studio -> canonical Factory Core`
 
-## Historical references
+Forbidden:
 
-`reference/audits/` contains read-only copies of relevant main SCRUBBOTS audit history. Use them as historical evidence only. Current owner-approved contracts and this repository's active task/prompt authority take precedence.
+`Factory Core -> Studio UI`
 
-## H!veAI GitHub tracking
+Do not create a second independent compiler/validator in Studio.
 
-- The repository root TASKS.md is the only current project-status tracker.
-- Keep the Project Status fields and task rows current when work changes state.
-- Commit and push TASKS.md with the implementation evidence that it describes.
-- Do not create or revive .hiveai PROJECT/RULES/TASKS/STATE/HANDOFF/EVENTS files as a competing tracker.
+## Difficulty and LevelData rule
+
+Current main-game owner contracts outrank stale Factory rules.
+
+Do not treat board size or fixed used-color bands as player-facing difficulty identity.
+
+Rectangular boards remain legal. C01..C16 remains canonical. Current general production used-color envelope is 3..12 unless a newer audited family rule narrows it.
+
+## LEVEL_ART rule
+
+Canonical high-resolution semantic reduction direction is CELL_MAJORITY followed by deterministic palette snap and current QA/difficulty evaluation.
+
+Never silently use AREA_AVERAGE as canonical LEVEL_ART reduction.
+
+## Network/security rule
+
+Core generation/validation must remain testable without mandatory network access.
+
+Provider/publisher networking may exist only behind explicit adapters and active user/prompt intent.
+
+Never commit provider keys, OAuth tokens, publishing credentials or user-local protected credential blobs.
+
+Remote content is declarative only. Never package executable runtime scripts/native code/plugins as content.
+
+## Builder log minimum
+
+Record truthfully:
+
+- starting HEAD/status;
+- contracts read;
+- implementation decisions;
+- commands/tests including failures;
+- files changed;
+- focused/regression results;
+- security/network observations;
+- dependency changes;
+- final diff/status;
+- commit/push result.
+
+## Handoff
+
+When the prompt requests it, return `AWAITING_AUDIT` plus the direct GitHub log URL. Do not modify root `TASKS.md` during handoff. ChatGPT audits and updates tracker state.
