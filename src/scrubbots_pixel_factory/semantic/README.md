@@ -57,3 +57,12 @@ review disposition bound to the exact assessment and trusted artifact. ACCEPT
 and REJECT require reviewer/reason evidence, and an unreviewed assessment never
 passes. The gate calls no provider or vision model and does not modify the
 accepted SP05 compiler output.
+
+SP06-C002 adds deterministic durable quality evidence. Export is available
+only from an intact C001 assessment. Reload validates the exact trusted
+LEVEL_ART artifact and recomputes structural diagnostics instead of trusting
+serialized claims, then reconstructs and cross-checks the review and all
+canonical identities. Only an explicit `ACCEPT` passes the narrow acceptance
+gate; `UNREVIEWED` and `REJECT` do not. This is an auditable evidence gate, not
+computer vision or an inference of recognizability, and it calls no provider or
+vision model.

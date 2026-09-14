@@ -15,6 +15,14 @@ from .core import (
     SemanticRecognizabilityReview,
     assess_semantic_quality,
 )
+from .evidence import (
+    SEMANTIC_QUALITY_EVIDENCE_SCHEMA,
+    SEMANTIC_QUALITY_EVIDENCE_SCHEMA_VERSION,
+    SemanticQualityEvidenceRecord,
+    export_semantic_quality_evidence,
+    load_semantic_quality_evidence,
+    require_semantic_recognizability_acceptance,
+)
 
 __all__ = [
     "SEMANTIC_QUALITY_ASSESSMENT_SCHEMA",
@@ -30,4 +38,10 @@ __all__ = [
     "SemanticQualityError",
     "SemanticRecognizabilityReview",
     "assess_semantic_quality",
+    "SEMANTIC_QUALITY_EVIDENCE_SCHEMA",
+    "SEMANTIC_QUALITY_EVIDENCE_SCHEMA_VERSION",
+    "SemanticQualityEvidenceRecord",
+    "export_semantic_quality_evidence",
+    "load_semantic_quality_evidence",
+    "require_semantic_recognizability_acceptance",
 ]
