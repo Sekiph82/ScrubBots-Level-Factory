@@ -7,19 +7,25 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 ## Project Status
 
 - Current Milestone: **PAG-SP04 — Semantic Provider / Model / Workflow Qualification**
-- Current Phase: **LIVE QUALIFICATION OWNER REVIEW**
-- Current Task: **SP04-Q04 — Owner review of official local 24x24 Magnific normalization**
-- Current Task Status: **AWAITING_OWNER_VISUAL_DISPOSITION**
-- Required Actor: **OWNER / CHATGPT**
+- Current Phase: **LIVE QUALIFICATION OWNER DECISION RECORDED**
+- Current Task: **Translate the owner-locked LEVEL_ART hard-cell normalization workflow into a bounded implementation cycle; do not re-open the workflow decision.**
+- Current Task Status: **OWNER_DECISION_RECORDED / IMPLEMENTATION_PENDING**
+- Required Actor: **CHATGPT TRACKER OWNER → CODEX BUILDER only after an explicit bounded prompt is published**
 - Closing Offline Foundation Cycle: `PAG-SP04-C004` → **PASS / CLOSED**
 - Compatibility Remediation: `PAG-SP04-C005` → FAIL / remediated by `PAG-SP04-C006`
 - Closing Compatibility Cycle: `PAG-SP04-C006` → **PASS / CLOSED**
 - C006 Strict Audit: `.hiveai/audits/PAG-SP04-C006_PNG_IDAT_CONTIGUITY_AND_STRUCTURAL_FAIL_CLOSED_CLOSURE_STRICT_AUDIT.md`
 - Official Q02/Q03 Evidence: `review/sp04/SP04_Q02_Q03_MAGNIFIC_OFFICIAL_LOCAL_NORMALIZATION_2026-09-14.md`
-- Owner Decision Already Locked: **Magnific semantic wizard direction accepted; 24x24 px accepted as first ASSET_ART baseline target.**
-- Next Action: **Owner reviews the official local `AREA_AVERAGE_V1` 24x24 wizard. Do not change resize policy until owner disposition is recorded.**
-- Credit Policy: **No additional provider spend is required for Q04. Any later paid Magnific/PixelLab generation requires owner authorization.**
-- Blockers/Waits: **SP05 and M11 remain blocked** until SP04 live qualification disposition is accepted. PixelLab live qualification remains pending later owner-authorized API conditions.
+- Owner Decision Document: `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`
+- Owner Decisions Locked:
+  - **Magnific semantic wizard direction accepted.**
+  - **24x24 accepted as a useful semantic qualification target.**
+  - **`AREA_AVERAGE_V1` is OWNER REJECTED for LEVEL_ART because it creates blended/intermediate edge colors.**
+  - **CELL_MAJORITY is OWNER ACCEPTED as the high-resolution semantic-image → logical-cell reduction direction for LEVEL_ART.**
+  - **Canonical LEVEL_ART workflow is: `SEMANTIC IMAGE → CELL_MAJORITY → PALETTE SNAP → ONE LOGICAL PIXEL = ONE GAMEPLAY CELL → C01..C16 → DIFFICULTY USED-COLOR BUDGET → VALIDATION/EXPORT`.**
+- Next Action: **Implement and strictly audit the owner-locked LEVEL_ART hard-cell workflow. Do not ask the owner to choose again between AREA_AVERAGE / NEAREST / CELL_MAJORITY unless new evidence shows CELL_MAJORITY itself violates a locked contract.**
+- Credit Policy: **No additional provider spend is required to implement the local deterministic LEVEL_ART compiler. Any later paid Magnific/PixelLab generation requires owner authorization.**
+- Blockers/Waits: **M11 remains blocked** until semantic LEVEL_ART output passes the owner-locked logical-grid/palette/difficulty contract and semantic review. PixelLab live qualification remains pending later owner-authorized API conditions.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
 - Provider Architecture: **provider-neutral; explicit provider/model/engine selection; no silent fallback**
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
@@ -44,16 +50,20 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 - BG01 `#202533` presentation/background only
 - no interpolation/antialiasing inside logical cells
 - deterministic provenance/export required
-- final LEVEL_ART semantic normalization remains blocked until SP05 integration.
+- **high-resolution semantic-image reduction policy: CELL_MAJORITY**
+- **palette stage: deterministic palette snap to C01..C16**
+- **difficulty color-budget stage: deterministic enforcement/rejection against the requested difficulty band**
+- `AREA_AVERAGE_V1` must not be used as the canonical LEVEL_ART logical-grid reduction policy.
+- Canonical workflow authority: `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`.
 
 ### ASSET_ART
 
 - Separate from LevelData/difficulty legality.
-- **24x24 px is the first owner-approved baseline target.**
+- **24x24 px is the first owner-approved ASSET_ART baseline target.**
 - 24x24 is not the only future ASSET_ART size.
 - C01..C16 is not automatically forced on ASSET_ART.
-- Current baseline palette policy: `PRESERVE_SOURCE_RGBA`.
-- Current accepted resize baseline remains `AREA_AVERAGE_V1` **until Q04 owner review decides whether its blended-edge behavior is visually acceptable.**
+- ASSET_ART may retain separate normalization/palette policies when explicitly specified.
+- ASSET_ART policy must never override the owner-locked LEVEL_ART workflow.
 
 ## Magnific Live Evidence
 
@@ -66,7 +76,10 @@ Accepted source facts:
 - source SHA-256: `58c667c848323727392ecbd663f1ebaa8f4b19471b1946f9325ab8d419eb63e9`;
 - source profile: 8-bit RGB, non-interlaced;
 - chunk sequence: `IHDR -> caBX -> fdEC -> IDAT -> IEND`;
-- metadata-vs-downloaded-file dimension mismatch remains visible and unresolved, not silently reconciled.
+- metadata-vs-downloaded-file dimension mismatch remains visible and unresolved, not silently reconciled;
+- Q03 `AREA_AVERAGE_V1` 24x24 result had 124 RGBA colors and was **OWNER REJECTED for LEVEL_ART visual behavior**;
+- nearest-neighbor diagnostic was not selected;
+- CELL_MAJORITY diagnostic was **OWNER ACCEPTED as the LEVEL_ART logical-cell reduction direction**.
 
 ## Milestone Overview
 
@@ -74,8 +87,8 @@ Accepted source facts:
 - [x] PAG-SP01 — Semantic Contracts & Provider Boundary
 - [x] PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 - [x] PAG-SP03 — Semantic Normalization Pipeline technical foundation
-- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — **Q04 owner review active**
-- [ ] PAG-SP05 — LEVEL_ART Semantic Integration
+- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — **live Magnific evidence captured; Q04 normalization disposition recorded**
+- [ ] PAG-SP05 — LEVEL_ART Semantic Integration — **must implement owner-locked CELL_MAJORITY → C01..C16 → difficulty-budget workflow**
 - [ ] PAG-SP06 — Semantic Quality / Recognizability Gate
 - [ ] PAG-SP07 — Reference / Style Generation
 - [ ] PAG-SP08 — Edit / Inpaint
@@ -108,7 +121,6 @@ M00–M10 remain historical accepted technical foundation except the M10 visual 
 - [x] valid ancillary before/after complete IDAT run supported;
 - [x] C005 CRC/type/reserved-bit/critical/decode bounds remain intact;
 - [x] raw identity/provenance unchanged;
-- [x] normalization policy unchanged;
 - [x] zero provider calls / zero credits;
 - [x] ChatGPT strict audit PASS.
 
@@ -120,18 +132,16 @@ No C007 decoder remediation is authorized.
 
 - [~] **SP04-Q01** Captured owner-supplied artifact: 1024x1024, 265479 bytes, exact SHA proven. **PARTIAL PASS** only because equivalence with provider metadata-reported 2048x2048 original remains unresolved.
 - [x] **SP04-Q02 — PASS.** Post-C006 strict decoder accepts the exact owner-supplied Magnific PNG without rewriting raw bytes; split-IDAT structural regression is closed.
-- [x] **SP04-Q03 — PASS.** Exact local artifact normalized through accepted deterministic policy to **24x24**.
-  - output class: `ASSET_ART`
+- [x] **SP04-Q03 — TECHNICAL PASS / VISUAL POLICY REJECTED FOR LEVEL_ART.** Exact local artifact normalized to 24x24 with historical `AREA_AVERAGE_V1`; deterministic execution succeeded, but the resulting blended/intermediate colors are not acceptable LEVEL_ART behavior.
+  - historical output class used during qualification: `ASSET_ART`
   - resize: `AREA_AVERAGE_V1`
   - alpha: `PRESERVE_ALPHA`
-  - crop/pad: `FIT_CENTER_LETTERBOX_V1`
   - palette: `PRESERVE_SOURCE_RGBA`
   - normalized RGBA SHA-256: `733503bd8e9a28443010d96e3c3b93668aaa3497526c15d673e1cc9c513a4c5e`
-  - normalized artifact digest: `b69312f889f41c7d78495c7e4433f5a186c0e3d30e5fe764b6034289c9430f7f`
   - distinct normalized RGBA colors: **124**
-- [~] **SP04-Q04 — OWNER REVIEW ACTIVE.** Determine whether the official local 24x24 `AREA_AVERAGE_V1` result is crisp/readable enough or whether blended edge tones justify a bounded pixel-art-specific resize-policy experiment.
+- [x] **SP04-Q04 — OWNER DISPOSITION RECORDED.** `AREA_AVERAGE_V1` rejected for LEVEL_ART; CELL_MAJORITY accepted as the hard-cell reduction direction. Canonical LEVEL_ART workflow is now explicitly locked in `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`.
 - [ ] **SP04-Q05** PixelLab exact-size 24x24 qualification only when owner authorizes live API use and `PIXELLAB_SECRET` is available.
-- [ ] **SP04-Q06** Compare eligible PIXFLUX / BITFORGE paths against Magnific using the same benchmark/review protocol.
+- [ ] **SP04-Q06** Compare eligible PIXFLUX / BITFORGE paths against Magnific using the same benchmark/review protocol when useful; this comparison must not reopen the local LEVEL_ART compiler contract.
 - [ ] **SP04-Q07** Select any default provider/model/workflow only from technical evidence plus owner visual acceptance.
 
 No default production provider/model/workflow is selected yet.
@@ -140,6 +150,10 @@ No default production provider/model/workflow is selected yet.
 
 ## Current Stop / Action Rule
 
-**Do not start another Codex cycle yet.**
+**Do not re-litigate the LEVEL_ART normalization workflow.**
 
-The next action is owner visual review of Q04. If the owner accepts the official local 24x24 output, record acceptance and continue SP04 qualification planning. If the owner rejects it specifically because `AREA_AVERAGE_V1` introduces blended edge tones, open one evidence-driven bounded resize-policy experiment rather than changing provider/palette/LEVEL_ART contracts broadly.
+The LEVEL_ART contract is now explicit and owner-locked:
+
+`SEMANTIC IMAGE → CELL_MAJORITY → PALETTE SNAP → ONE LOGICAL PIXEL = ONE GAMEPLAY CELL → C01..C16 → DIFFICULTY USED-COLOR BUDGET → VALIDATION/EXPORT`
+
+The next engineering cycle must implement that workflow deterministically and preserve provenance. Any future deviation requires concrete new evidence and explicit owner approval.
