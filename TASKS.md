@@ -6,26 +6,24 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 
 ## Project Status
 
-- Current Milestone: **PAG-SP04 — Semantic Provider / Model / Workflow Qualification**
-- Current Phase: **LIVE QUALIFICATION OWNER DECISION RECORDED**
-- Current Task: **Translate the owner-locked LEVEL_ART hard-cell normalization workflow into a bounded implementation cycle; do not re-open the workflow decision.**
-- Current Task Status: **OWNER_DECISION_RECORDED / IMPLEMENTATION_PENDING**
-- Required Actor: **CHATGPT TRACKER OWNER → CODEX BUILDER only after an explicit bounded prompt is published**
-- Closing Offline Foundation Cycle: `PAG-SP04-C004` → **PASS / CLOSED**
-- Compatibility Remediation: `PAG-SP04-C005` → FAIL / remediated by `PAG-SP04-C006`
-- Closing Compatibility Cycle: `PAG-SP04-C006` → **PASS / CLOSED**
+- Current Milestone: **PAG-SP05 — LEVEL_ART Semantic Integration**
+- Current Phase: **HARD-CELL COMPILER IMPLEMENTATION**
+- Current Task: **PAG-SP05-C001 — LEVEL_ART Hard-Cell Compiler, Palette Snap & Difficulty Budget**
+- Current Task Status: **READY_FOR_IMPLEMENTATION**
+- Required Actor: **CODEX BUILDER**
+- Current Prompt: `.hiveai/prompts/PAG-SP05-C001_LEVEL_ART_HARD_CELL_COMPILER_PALETTE_SNAP_AND_DIFFICULTY_BUDGET_PROMPT.md`
+- Owner Decision Authority: `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`
+- Previous Compatibility Cycle: `PAG-SP04-C006` → **PASS / CLOSED**
 - C006 Strict Audit: `.hiveai/audits/PAG-SP04-C006_PNG_IDAT_CONTIGUITY_AND_STRUCTURAL_FAIL_CLOSED_CLOSURE_STRICT_AUDIT.md`
-- Official Q02/Q03 Evidence: `review/sp04/SP04_Q02_Q03_MAGNIFIC_OFFICIAL_LOCAL_NORMALIZATION_2026-09-14.md`
-- Owner Decision Document: `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`
+- Official Magnific Q02/Q03 Evidence: `review/sp04/SP04_Q02_Q03_MAGNIFIC_OFFICIAL_LOCAL_NORMALIZATION_2026-09-14.md`
 - Owner Decisions Locked:
   - **Magnific semantic wizard direction accepted.**
-  - **24x24 accepted as a useful semantic qualification target.**
   - **`AREA_AVERAGE_V1` is OWNER REJECTED for LEVEL_ART because it creates blended/intermediate edge colors.**
   - **CELL_MAJORITY is OWNER ACCEPTED as the high-resolution semantic-image → logical-cell reduction direction for LEVEL_ART.**
-  - **Canonical LEVEL_ART workflow is: `SEMANTIC IMAGE → CELL_MAJORITY → PALETTE SNAP → ONE LOGICAL PIXEL = ONE GAMEPLAY CELL → C01..C16 → DIFFICULTY USED-COLOR BUDGET → VALIDATION/EXPORT`.**
-- Next Action: **Implement and strictly audit the owner-locked LEVEL_ART hard-cell workflow. Do not ask the owner to choose again between AREA_AVERAGE / NEAREST / CELL_MAJORITY unless new evidence shows CELL_MAJORITY itself violates a locked contract.**
-- Credit Policy: **No additional provider spend is required to implement the local deterministic LEVEL_ART compiler. Any later paid Magnific/PixelLab generation requires owner authorization.**
-- Blockers/Waits: **M11 remains blocked** until semantic LEVEL_ART output passes the owner-locked logical-grid/palette/difficulty contract and semantic review. PixelLab live qualification remains pending later owner-authorized API conditions.
+  - **Canonical LEVEL_ART workflow: `SEMANTIC IMAGE → CELL_MAJORITY → PALETTE SNAP → ONE LOGICAL PIXEL = ONE GAMEPLAY CELL → C01..C16 → DIFFICULTY USED-COLOR BUDGET → VALIDATION/EXPORT`.**
+- Next Action: **Codex implements SP05-C001 exactly from the published prompt, pushes `main`, then stops for ChatGPT strict audit.**
+- Credit Policy: **No Magnific or PixelLab call is authorized in SP05-C001. Spend zero provider credits.**
+- Blockers/Waits: **M11 remains blocked** until semantic LEVEL_ART passes the owner-locked logical-grid/palette/difficulty contract and semantic review. M08/LevelData bridge remains outside C001 and follows only after the hard-cell compiler passes strict audit.
 - Approved Semantic Providers: **MAGNIFIC**, **PIXELLAB**
 - Provider Architecture: **provider-neutral; explicit provider/model/engine selection; no silent fallback**
 - Tracking Repository: `Sekiph82/ScrubBots-Level-Factory`
@@ -65,6 +63,15 @@ Only ChatGPT, acting as independent auditor/tracker owner, may mark tasks or mil
 - ASSET_ART may retain separate normalization/palette policies when explicitly specified.
 - ASSET_ART policy must never override the owner-locked LEVEL_ART workflow.
 
+## Existing Canonical Authorities Reused by SP05-C001
+
+- `src/scrubbots_pixel_factory/contracts/palette.py` — immutable owner-locked C01..C16 palette; BG01 forbidden as logical color.
+- `src/scrubbots_pixel_factory/contracts/color_usage.py` — actual-used-color counting and difficulty-band validation.
+- `src/scrubbots_pixel_factory/contracts/difficulty.py` — independent width/height difficulty bands and rectangle legality.
+- accepted SP03/SP04 raw artifact, PNG decode and provenance foundation.
+
+SP05-C001 must consume these authorities; it must not duplicate or redefine them.
+
 ## Magnific Live Evidence
 
 Accepted source facts:
@@ -87,8 +94,8 @@ Accepted source facts:
 - [x] PAG-SP01 — Semantic Contracts & Provider Boundary
 - [x] PAG-SP02 — Magnific + PixelLab Provider Bridges & Result Ingestion
 - [x] PAG-SP03 — Semantic Normalization Pipeline technical foundation
-- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — **live Magnific evidence captured; Q04 normalization disposition recorded**
-- [ ] PAG-SP05 — LEVEL_ART Semantic Integration — **must implement owner-locked CELL_MAJORITY → C01..C16 → difficulty-budget workflow**
+- [~] PAG-SP04 — Semantic Provider / Model / Workflow Qualification — **Magnific live path technically qualified through Q04 owner disposition; PixelLab/comparative qualification deferred until useful/authorized**
+- [~] PAG-SP05 — LEVEL_ART Semantic Integration — **C001 READY: CELL_MAJORITY → C01..C16 → difficulty-budget compiler**
 - [ ] PAG-SP06 — Semantic Quality / Recognizability Gate
 - [ ] PAG-SP07 — Reference / Style Generation
 - [ ] PAG-SP08 — Edit / Inpaint
@@ -103,57 +110,52 @@ M00–M10 remain historical accepted technical foundation except the M10 visual 
 
 ---
 
-# PAG-SP04 — Cycle History
+# PAG-SP04 — Accepted Live Qualification State
 
-- C001 — FAIL / REMEDIATED
-- C002 — FAIL / REMEDIATED
-- C003 — FAIL / REMEDIATED IN C004
-- C004 — **PASS / CLOSED**
-- C005 — FAIL / positive ancillary compatibility retained / IDAT residual found
-- C006 — **PASS / CLOSED**
-
-## C006 Accepted Closure
-
-- [x] one IDAT accepted;
-- [x] multiple consecutive IDAT chunks accepted;
-- [x] any non-IDAT chunk splitting an IDAT run rejected fail-closed;
-- [x] live `IHDR -> caBX -> fdEC -> IDAT -> IEND` remains accepted;
-- [x] valid ancillary before/after complete IDAT run supported;
-- [x] C005 CRC/type/reserved-bit/critical/decode bounds remain intact;
-- [x] raw identity/provenance unchanged;
-- [x] zero provider calls / zero credits;
-- [x] ChatGPT strict audit PASS.
-
-No C007 decoder remediation is authorized.
+- C004 — **PASS / CLOSED** offline qualification foundation.
+- C005 — FAIL / remediated by C006.
+- C006 — **PASS / CLOSED** PNG ancillary + IDAT structural compatibility.
+- Q01 — local owner-supplied artifact byte identity captured; provider-metadata 2048 vs downloaded-file 1024 mismatch remains recorded.
+- Q02 — **PASS**, real owner-supplied Magnific PNG accepted by strict decoder without rewriting bytes.
+- Q03 — deterministic `AREA_AVERAGE_V1` execution technically passed but its blended LEVEL_ART visual policy was owner rejected.
+- Q04 — **OWNER DISPOSITION RECORDED:** CELL_MAJORITY selected; AREA_AVERAGE rejected for LEVEL_ART.
+- Q05/Q06/Q07 — PixelLab/comparative/default-provider selection remains deferred and must not reopen the local LEVEL_ART compiler contract.
 
 ---
 
-# PAG-SP04 — Live Qualification Gates
+# PAG-SP05-C001 — LEVEL_ART Hard-Cell Compiler, Palette Snap & Difficulty Budget
 
-- [~] **SP04-Q01** Captured owner-supplied artifact: 1024x1024, 265479 bytes, exact SHA proven. **PARTIAL PASS** only because equivalence with provider metadata-reported 2048x2048 original remains unresolved.
-- [x] **SP04-Q02 — PASS.** Post-C006 strict decoder accepts the exact owner-supplied Magnific PNG without rewriting raw bytes; split-IDAT structural regression is closed.
-- [x] **SP04-Q03 — TECHNICAL PASS / VISUAL POLICY REJECTED FOR LEVEL_ART.** Exact local artifact normalized to 24x24 with historical `AREA_AVERAGE_V1`; deterministic execution succeeded, but the resulting blended/intermediate colors are not acceptable LEVEL_ART behavior.
-  - historical output class used during qualification: `ASSET_ART`
-  - resize: `AREA_AVERAGE_V1`
-  - alpha: `PRESERVE_ALPHA`
-  - palette: `PRESERVE_SOURCE_RGBA`
-  - normalized RGBA SHA-256: `733503bd8e9a28443010d96e3c3b93668aaa3497526c15d673e1cc9c513a4c5e`
-  - distinct normalized RGBA colors: **124**
-- [x] **SP04-Q04 — OWNER DISPOSITION RECORDED.** `AREA_AVERAGE_V1` rejected for LEVEL_ART; CELL_MAJORITY accepted as the hard-cell reduction direction. Canonical LEVEL_ART workflow is now explicitly locked in `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V01.md`.
-- [ ] **SP04-Q05** PixelLab exact-size 24x24 qualification only when owner authorizes live API use and `PIXELLAB_SECRET` is available.
-- [ ] **SP04-Q06** Compare eligible PIXFLUX / BITFORGE paths against Magnific using the same benchmark/review protocol when useful; this comparison must not reopen the local LEVEL_ART compiler contract.
-- [ ] **SP04-Q07** Select any default provider/model/workflow only from technical evidence plus owner visual acceptance.
+State: **READY_FOR_IMPLEMENTATION**
 
-No default production provider/model/workflow is selected yet.
+Prompt:
+`.hiveai/prompts/PAG-SP05-C001_LEVEL_ART_HARD_CELL_COMPILER_PALETTE_SNAP_AND_DIFFICULTY_BUDGET_PROMPT.md`
+
+Required implementation closure:
+
+- [ ] separate typed LEVEL_ART semantic request/result/report boundary;
+- [ ] `CELL_MAJORITY_V1` with exact deterministic source footprints and no averaging/interpolation;
+- [ ] exact-size fast path;
+- [ ] source smaller than target fails closed in V1;
+- [ ] non-opaque majority winner fails closed;
+- [ ] deterministic `PALETTE_SNAP_V1` to owner-locked C01..C16 only;
+- [ ] BG01 never appears in logical cells;
+- [ ] palette snap uses deterministic squared-RGB distance and canonical-index tie-break;
+- [ ] in-band actual used-color count remains unchanged;
+- [ ] below-minimum actual used-color count fails closed without fabricated colors;
+- [ ] above-maximum actual used-color count reduces deterministically to the difficulty maximum using the prompt-defined weighted exact subset optimization;
+- [ ] final cells pass existing `validate_used_color_count`;
+- [ ] all difficulty dimension bands and rectangles remain legal through existing contracts;
+- [ ] raw artifact/request/intermediate/final provenance is immutable and exact;
+- [ ] accepted ASSET_ART behavior remains unchanged;
+- [ ] no provider calls / zero credits;
+- [ ] no M08/LevelData/solver/SP06/UI expansion in C001;
+- [ ] builder does not edit root `TASKS.md`;
+- [ ] ChatGPT strict audit required before closure.
 
 ---
 
 ## Current Stop / Action Rule
 
-**Do not re-litigate the LEVEL_ART normalization workflow.**
+**Execute only PAG-SP05-C001.**
 
-The LEVEL_ART contract is now explicit and owner-locked:
-
-`SEMANTIC IMAGE → CELL_MAJORITY → PALETTE SNAP → ONE LOGICAL PIXEL = ONE GAMEPLAY CELL → C01..C16 → DIFFICULTY USED-COLOR BUDGET → VALIDATION/EXPORT`
-
-The next engineering cycle must implement that workflow deterministically and preserve provenance. Any future deviation requires concrete new evidence and explicit owner approval.
+Do not re-litigate the LEVEL_ART workflow. Do not call Magnific or PixelLab. Do not spend credits. Do not begin M08/LevelData integration, solver integration, SP06, Studio UI, weekly batches or M11. After Codex pushes C001, stop for ChatGPT strict audit.
