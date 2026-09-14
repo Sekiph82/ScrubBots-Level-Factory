@@ -43,3 +43,17 @@ and normalized semantic art cannot masquerade as an M08 logical-artwork bundle.
 
 Existing MASK/RULES/WFC/HYBRID/AUTO engines remain retained downstream/control
 infrastructure.
+
+## SP06 semantic-quality foundation
+
+SP06-C001 adds an offline `semantic.quality` boundary. Structural diagnostics
+are deterministic facts computed from the sealed LEVEL_ART logical C-ID grid:
+transitions, adjacency density, connected components, singleton components,
+per-ID cell counts, and largest-component ratios. They are evidence about grid
+structure only; they do not claim to recognize the depicted subject.
+
+Recognizability is therefore an explicit `UNREVIEWED`, `ACCEPT`, or `REJECT`
+review disposition bound to the exact assessment and trusted artifact. ACCEPT
+and REJECT require reviewer/reason evidence, and an unreviewed assessment never
+passes. The gate calls no provider or vision model and does not modify the
+accepted SP05 compiler output.
