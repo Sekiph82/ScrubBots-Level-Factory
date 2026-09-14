@@ -103,6 +103,47 @@ def test_paths_are_not_identity_but_content_changes_are_identity_changes():
     assert plan_reference_style_generation(changed_style_request).digest() != first.digest()
 
 
+def test_reference_content_sha_mutation_changes_request_plan_binding_and_candidates():
+    base_request = _request()
+    base_plan = plan_reference_style_generation(base_request)
+    changed_reference = replace(
+        base_request.reference_images[0],
+        content_sha256=_sha("reference-b-mutated"),
+    )
+    changed_request = replace(
+        base_request,
+        reference_images=(changed_reference, *base_request.reference_images[1:]),
+    )
+    changed_plan = plan_reference_style_generation(changed_request)
+
+    assert changed_request.seed == base_request.seed
+    assert changed_request.desired_candidate_count == base_request.desired_candidate_count
+    assert changed_request.provider_id == base_request.provider_id
+    assert changed_request.digest() != base_request.digest()
+    assert changed_plan.digest() != base_plan.digest()
+    assert changed_plan.canonical_bytes() != base_plan.canonical_bytes()
+    assert changed_plan.input_bindings[0].content_sha256 != base_plan.input_bindings[0].content_sha256
+    assert changed_plan.input_bindings[0].digest() != base_plan.input_bindings[0].digest()
+    assert tuple(item.candidate_id for item in changed_plan.variants) != tuple(item.candidate_id for item in base_plan.variants)
+    assert tuple(item.seed for item in changed_plan.variants) == tuple(item.seed for item in base_plan.variants)
+
+
+def test_init_strength_only_mutation_changes_request_plan_and_preserves_binding():
+    base_request = _request()
+    base_plan = plan_reference_style_generation(base_request)
+    changed_request = replace(base_request, init_strength=0.66)
+    changed_plan = plan_reference_style_generation(changed_request)
+
+    assert changed_request.init_image == base_request.init_image
+    assert changed_request.digest() != base_request.digest()
+    assert changed_plan.digest() != base_plan.digest()
+    assert changed_plan.canonical_bytes() != base_plan.canonical_bytes()
+    assert changed_plan.init_strength == 0.66
+    assert changed_plan.input_bindings[3].content_sha256 == base_plan.input_bindings[3].content_sha256
+    assert changed_plan.input_bindings[3].digest() == base_plan.input_bindings[3].digest()
+    assert tuple(item.seed for item in changed_plan.variants) == tuple(item.seed for item in base_plan.variants)
+
+
 def test_strengths_and_request_seed_change_plan_and_variant_identity():
     base = _request()
     changed_strength = replace(base, style_strength=0.36)
