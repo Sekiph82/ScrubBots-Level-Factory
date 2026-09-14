@@ -106,4 +106,8 @@ At `2026-09-15T01:18:58.5810073+03:00`, local `main` remained at `8dd0dcf9bbefc6
 
 ## 10. Commit and publication
 
-Pending the required non-force commit and push. No audit verdict is asserted here; this is builder evidence for independent ChatGPT strict audit.
+- Implementation commit: `0f5ef0787b04fc86913ed495566fa03717574d48` (`Define SB-LF00-006 workspace exclusions`). It contains the canonical workspace policy, narrow `.gitignore` additions, focused ignore-policy tests, and this builder log through pre-commit verification.
+- `git push origin main` for the implementation commit succeeded without force-push: `8dd0dcf..0f5ef07 main -> main`.
+- Immediately after that push, `git rev-parse HEAD` and `git rev-parse origin/main` both returned `0f5ef0787b04fc86913ed495566fa03717574d48`; local `main` and `origin/main` were equal and the worktree was clean.
+- This final log update is evidence-only and introduces no product or test change. It is committed and pushed afterward with the same non-force procedure; final verification confirms local `HEAD == origin/main` and a clean worktree after finalized log publication.
+- No audit verdict is asserted here. Stop after final push for independent ChatGPT strict audit.
