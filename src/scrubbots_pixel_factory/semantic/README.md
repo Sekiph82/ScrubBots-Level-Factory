@@ -66,3 +66,15 @@ canonical identities. Only an explicit `ACCEPT` passes the narrow acceptance
 gate; `UNREVIEWED` and `REJECT` do not. This is an auditable evidence gate, not
 computer vision or an inference of recognizability, and it calls no provider or
 vision model.
+## SP07-C001 reference/style generation planning
+
+SP07-C001 adds an offline, provider-neutral planning boundary under
+`semantic.generation`. A plan is bound to the exact canonical
+`SemanticGenerationRequest`, preserves role-correct REFERENCE, STYLE, INIT and
+COLOR_REFERENCE descriptors by content identity, and derives deterministic
+candidate variants from the project RNG. Local filesystem paths are excluded
+by the existing descriptor identity contract. The plan is execution intent,
+not generated imagery; C001 calls no provider and performs no image
+generation. Later provider execution requires its own explicitly authorized
+and audited cycle. SP05 compilation and SP06 quality/evidence gates remain
+downstream and unchanged.

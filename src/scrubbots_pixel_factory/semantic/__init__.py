@@ -90,6 +90,18 @@ from .quality import (
     load_semantic_quality_evidence,
     require_semantic_recognizability_acceptance,
 )
+from .generation import (
+    SEMANTIC_GENERATION_INPUT_SCHEMA,
+    SEMANTIC_GENERATION_PLAN_SCHEMA,
+    SEMANTIC_GENERATION_PLAN_SCHEMA_VERSION,
+    SEMANTIC_GENERATION_POLICY_VERSION,
+    SEMANTIC_GENERATION_VARIANT_SCHEMA,
+    SemanticGenerationPlanError,
+    SemanticGenerationVariant,
+    SemanticInputBinding,
+    SemanticReferenceStylePlan,
+    plan_reference_style_generation,
+)
 
 
 def __getattr__(name: str) -> object:
@@ -117,4 +129,9 @@ __all__ = [
     "SEMANTIC_QUALITY_EVIDENCE_SCHEMA", "SEMANTIC_QUALITY_EVIDENCE_SCHEMA_VERSION",
     "SemanticQualityEvidenceRecord", "export_semantic_quality_evidence",
     "load_semantic_quality_evidence", "require_semantic_recognizability_acceptance",
+    "SEMANTIC_GENERATION_INPUT_SCHEMA", "SEMANTIC_GENERATION_PLAN_SCHEMA",
+    "SEMANTIC_GENERATION_PLAN_SCHEMA_VERSION", "SEMANTIC_GENERATION_POLICY_VERSION",
+    "SEMANTIC_GENERATION_VARIANT_SCHEMA", "SemanticGenerationPlanError",
+    "SemanticGenerationVariant", "SemanticInputBinding", "SemanticReferenceStylePlan",
+    "plan_reference_style_generation",
 ]
