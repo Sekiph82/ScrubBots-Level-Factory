@@ -5,336 +5,294 @@ Repository: https://github.com/Sekiph82/ScrubBots-Level-Factory
 Branch: `main`
 Canonical local mirror: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
 
-## Authority and current-state precedence
+## Authority and owner correction
+
+This prompt incorporates an owner correction made before builder execution.
+
+The current H!veAI architecture is **GitHub TASKS-only tracking**. The H!veAI implementation uses `GITHUB_TASKS_ONLY` and fetches the root `TASKS.md` directly from GitHub. No `.hiveai` tracker/control-plane file is required for project task state.
+
+Therefore, for this repository:
+
+- root uppercase `TASKS.md` is the **only project-management/tracker source of truth**;
+- H!veAI may additionally read ordinary GitHub repository metadata such as remote HEAD/latest commit, but no other repository file is a task-state source;
+- `.hiveai/prompts/`, `.hiveai/codex-logs/`, and `.hiveai/audits/` are historical/process evidence only and must never be parsed as tracker state;
+- `.hiveai/CYCLE_INDEX.md` is obsolete H!veAI tracker/control-plane residue and **must be removed** in this cycle;
+- lowercase root `tasks.md` must not exist or be recreated;
+- obsolete `.hiveai/PROJECT.json`, `.hiveai/RULES.md`, `.hiveai/TASKS.md`, `.hiveai/STATE.json`, `.hiveai/HANDOFF.md`, `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT_DASHBOARD.md`, `.hiveai/ACTIVE_CYCLES.md`, `.hiveai/ARTIFACT_MAP.md`, and `.hiveai/PROGRESS_SNAPSHOT.md` must not be recreated;
+- ChatGPT remains the repository-specific sole writer of live task/status state in root `TASKS.md` and the independent auditor;
+- Codex is builder only and must not edit root `TASKS.md` in this cycle.
+
+This owner correction supersedes any older repository wording that treats `CYCLE_INDEX`, lowercase `tasks.md`, or legacy `.hiveai` control-plane files as current tracking authority.
+
+## Required reads before edits
 
 Read completely from GitHub before any implementation/test/documentation edit:
 
 1. root `TASKS.md`;
 2. previous strict PASS audit:
    `https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audits/SB-LF00-008-C001_CLEAN_CHECKOUT_HEADLESS_BOOT_PROOF_STRICT_AUDIT.md`;
-3. `docs/migration/LEVEL_FACTORY_CONTENT_PLATFORM_UNIFICATION_V01.md`;
-4. `docs/migration/LF_CP_REQUIREMENT_MAPPING_V01.md`;
-5. `docs/migration/LF_CP_UNIFICATION_POST_CUTOVER_AUDIT_V01.md`;
-6. root `README.md`;
-7. root `GOVERNANCE.md`;
-8. root `AGENTS.md`;
-9. root `CLAUDE.md`;
-10. `.hiveai/CYCLE_INDEX.md`;
-11. `level_factory/GOVERNANCE.md`;
-12. `level_factory/README.md`;
-13. `docs/FACTORY_WORKSPACE_AND_EXCLUSIONS.md`;
-14. current repository tree under `.hiveai/`, especially `prompts/`, `codex-logs/`, and `audits/`.
+3. this complete prompt from its GitHub URL;
+4. `docs/migration/LEVEL_FACTORY_CONTENT_PLATFORM_UNIFICATION_V01.md`;
+5. `docs/migration/LF_CP_REQUIREMENT_MAPPING_V01.md`;
+6. `docs/migration/LF_CP_UNIFICATION_POST_CUTOVER_AUDIT_V01.md`;
+7. root `README.md`;
+8. root `GOVERNANCE.md`;
+9. root `AGENTS.md`;
+10. root `CLAUDE.md`;
+11. current `.hiveai/CYCLE_INDEX.md` only as **deletion input / obsolete state evidence**, never as authority;
+12. `level_factory/GOVERNANCE.md` and `level_factory/README.md`;
+13. current `.hiveai/` directory tree.
 
-GitHub `main` is authoritative.
-
-### Non-negotiable current-state rule
-
-The **root uppercase `TASKS.md` is the sole live task/status ledger** for the unified Level Factory + Content Platform program.
-
-ChatGPT is the sole owner/writer of root `TASKS.md` task-state promotion, current task, milestone/sprint/cycle status, and audit acceptance.
-
-Codex may read root `TASKS.md`, but **must not edit it in this cycle**.
-
-Historical prompts, builder logs, audits, and the historical cycle index are evidence. They are not a second current-state tracker.
-
-Do not use or modify `C:\Users\sekip\Desktop\ScrubBots` or `Sekiph82/Scrubbots`. The main-game repository is out of scope.
-
-Before any governance/test/documentation edit, create and verify this matching builder log:
+Before any governance/test/documentation edit, create and verify:
 
 `.hiveai/codex-logs/SB-LF00-007-C001_GOVERNANCE_AND_COORDINATION_AUTHORITY_NORMALIZATION_CODEX_LOG.md`
 
-The finalized builder log must be committed and pushed to GitHub `main`. At final handoff, give the user the **full GitHub URL** of the pushed log plus implementation/final publication commit SHA(s). Do not use a local Windows path as the primary handoff and do not paste the full log body unless explicitly asked.
-
----
-
 ## Mission
 
-Implement only canonical requirement:
+Implement only:
 
 `SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger.`
 
-Normalize the repository's builder/auditor/governance instructions after LF/CP unification so all current control documents agree on one authority model:
+Normalize the repository to the same simplified tracker model that H!veAI actually uses:
 
-- root `TASKS.md` = sole live task/status ledger;
-- ChatGPT = planner, tracker owner, independent auditor, task-state writer;
-- Codex = implementation builder only;
-- `.hiveai/prompts/`, `.hiveai/codex-logs/`, `.hiveai/audits/` = immutable evidence families after use;
-- `.hiveai/CYCLE_INDEX.md` = historical evidence/index only, **not current state**;
-- absent legacy v3 control-plane files must not be mandatory reads and must not be recreated;
-- lowercase `tasks.md` must not be referenced as a live ledger because it is absent and obsolete.
+```text
+GitHub repository metadata
+          +
+     root TASKS.md
+          |
+          v
+       H!veAI
+```
 
-This task is governance/documentation/test normalization only. Do not change Factory algorithms, provider code, generation behavior, Godot scenes, gameplay, Content Platform implementation, or main-game runtime.
+For project-management state, the only repository file in that model is root `TASKS.md`.
 
----
+The process/evidence workflow remains:
 
-## 1. Defects and drift this cycle must close
+```text
+root TASKS.md  (sole live tracker; ChatGPT-owned here)
+      |
+      v
+.hiveai/prompts/<cycle>.md  (implementation instruction/evidence, not tracker)
+      |
+      v
+Codex builder
+      |
+      v
+.hiveai/codex-logs/<cycle>.md  (builder evidence, not tracker)
+      |
+      v
+ChatGPT strict audit
+      |
+      v
+.hiveai/audits/<cycle>.md  (audit evidence, not tracker)
+      |
+      v
+ChatGPT updates root TASKS.md
+```
 
-The post-cutover repository currently contains contradictory/stale instructions. Correct them explicitly.
+No cycle index or second live-state file is part of this chain.
 
-### A. Root `README.md`
+## Required corrections
 
-Current stale behavior includes:
+### 1. Delete `.hiveai/CYCLE_INDEX.md`
 
-- calling lowercase `tasks.md` the canonical task ledger;
-- describing the repository only as the old standalone Pixel Art Generator foundation;
-- saying it does not contain Godot integration even though the accepted `level_factory/` Godot project now exists.
+Delete the tracked file `.hiveai/CYCLE_INDEX.md`.
 
-Normalize the README so it truthfully describes the repository as the canonical Level Factory + Content Platform program repository while distinguishing **implemented current foundation** from **planned/unimplemented capabilities**.
+Reason:
 
-At minimum state:
+- it is a superseded H!veAI-specific cycle/tracker index;
+- its active-cycle state is stale;
+- H!veAI does not need it to parse the project;
+- keeping a second state/index file invites authority drift;
+- historical prompts/logs/audits already preserve cycle evidence directly.
 
-- root `TASKS.md` is the sole live task ledger;
-- the repository currently includes the canonical Python Factory Core plus the independently openable `level_factory/` Godot shell;
-- Content Platform and other roadmap capabilities remain incomplete until their own audited tasks close;
-- main-game runtime remains in `Sekiph82/Scrubbots` when separately authorized;
-- builder tests do not self-accept work.
+Do **not** migrate its active/current-state block into another tracker file.
+Do **not** create a replacement cycle index, dashboard, manifest, event ledger, state JSON, handoff file, or task projection.
 
-Do not falsely claim unfinished roadmap capabilities are implemented.
+Deleting CYCLE_INDEX does not authorize deleting historical `.hiveai/prompts/`, `.hiveai/codex-logs/`, or `.hiveai/audits/` records.
 
-### B. Root `GOVERNANCE.md`
+### 2. Normalize root `README.md`
 
-Remove/replace obsolete live-authority references such as:
+Correct stale statements so README says:
 
-- lowercase `tasks.md` as task-state authority;
-- `.hiveai/TASKS.md` as current-state machine block;
-- `.hiveai/EVENTS.jsonl` as required live workflow state;
-- v3 task/event state as a second current control plane.
+- this is the canonical Level Factory + Content Platform repository;
+- root uppercase `TASKS.md` is the sole project-management tracker source;
+- H!veAI requires no other repository file for task-state parsing;
+- Python Factory Core and the accepted `level_factory/` Godot shell currently exist;
+- unfinished roadmap capabilities remain unfinished;
+- main-game runtime work belongs to `Sekiph82/Scrubbots` when separately authorized.
 
-Preserve the useful evidence-first builder/auditor separation and strict-audit model.
+Remove lowercase `tasks.md` as canonical authority and obsolete claims that the repository contains no Godot integration.
 
-Required normalized role model:
+### 3. Normalize root `GOVERNANCE.md`
 
-- ChatGPT owns root `TASKS.md` live status/checkbox/current-task changes;
-- ChatGPT owns strict audit verdicts and acceptance;
-- Codex implements/tests/logs/commits/pushes only within the active prompt;
-- Codex never edits root `TASKS.md` task state;
-- builder logs are evidence, not acceptance;
-- used prompts/logs/audits remain immutable historical evidence;
-- `.hiveai/CYCLE_INDEX.md` may remain as historical cycle evidence/index but is not live status authority.
+Remove obsolete current-authority references to:
 
-### C. Root `AGENTS.md`
+- lowercase `tasks.md`;
+- `.hiveai/TASKS.md`;
+- `.hiveai/EVENTS.jsonl`;
+- `.hiveai/PROJECT.json` / `.hiveai/RULES.md`;
+- `.hiveai/CYCLE_INDEX.md`;
+- any v3 control-plane state as a second tracker.
 
-Remove contradictory mandatory-session requirements that instruct builders to read nonexistent legacy v3 files as current authority, including:
+Required model:
+
+- root `TASKS.md` = sole live tracker;
+- ChatGPT = tracker owner + independent auditor;
+- Codex = builder only;
+- Codex must not change root `TASKS.md` task state in this repository workflow;
+- builder logs cannot self-accept work;
+- prompts/logs/audits are evidence, not task-state sources.
+
+### 4. Normalize root `AGENTS.md`
+
+Remove mandatory reads or current-state authority for obsolete legacy files, including:
 
 - `.hiveai/RULES.md`;
 - `.hiveai/PROJECT.json`;
 - `.hiveai/TASKS.md`;
-- `.hiveai/EVENTS.jsonl`.
+- `.hiveai/EVENTS.jsonl`;
+- `.hiveai/CYCLE_INDEX.md`;
+- lowercase `tasks.md`.
 
-Do not recreate those files.
+Builder startup should require only the relevant current sources:
 
-Remove lowercase `tasks.md` live-ledger references.
+1. repository/branch identity;
+2. safe sync of canonical local mirror when instructed;
+3. root `TASKS.md` as read-only live task state;
+4. supplied authoritative prompt URL;
+5. previous strict audit and specific contracts required by that prompt;
+6. branch/HEAD/status/stash/worktree checks as relevant;
+7. builder log before edits;
+8. no sibling-repository substitution;
+9. no self-audit or tracker-state mutation.
 
-Remove any instruction that tells Codex/builders to keep root `TASKS.md` current, commit it with implementation evidence, or otherwise mutate ChatGPT-owned task state.
+Preserve valid offline/core/source-art rules.
 
-The normalized builder startup contract should require, at minimum:
+### 5. Normalize root `CLAUDE.md`
 
-1. exact repository/branch identity;
-2. non-destructive sync of only the canonical local mirror when instructed;
-3. root `TASKS.md` read-only current-state read;
-4. authoritative active prompt read from the supplied GitHub URL;
-5. previous strict audit and specifically required contract documents from that prompt;
-6. branch/HEAD/origin/status/stash/worktree checks where relevant;
-7. matching builder log created before implementation;
-8. no sibling-repository discovery/substitution;
-9. no builder self-audit or tracker-state mutation.
+Make it agree with the same model:
 
-Preserve the accepted offline/core/source-art boundaries that remain valid.
+- root `TASKS.md` is the sole tracker source;
+- builders read it but do not mutate ChatGPT-owned task state;
+- no legacy `.hiveai` control-plane files are required;
+- no `CYCLE_INDEX` tracker exists after this cycle.
 
-### D. Root `CLAUDE.md`
+### 6. `level_factory/GOVERNANCE.md`
 
-Normalize it to the same authority model.
+Change only if required to make it cleanly defer live task status to root `TASKS.md` and root governance. Do not create a local tracker or second control plane.
 
-Remove contradictory instructions to:
+## H!veAI parser contract that must remain compatible
 
-- read nonexistent legacy v3 files as mandatory current state;
-- keep/update/commit root `TASKS.md` as part of implementation.
+Root `TASKS.md` already exposes the required literal project-status fields. Do not change the tracker in this builder cycle, but governance must protect this contract:
 
-It must state that root `TASKS.md` is read-only for builders and only ChatGPT changes live task status unless a future owner prompt explicitly changes the governance model.
+- `Current Milestone:`
+- `Current Sprint:`
+- `Current Task:`
+- `Current Task Status:`
+- `Next Task/Action:` (H!veAI also tolerates `Next Action:` / `Next Task:`, but this repository keeps the canonical field)
+- `Required Actor:`
 
-### E. `.hiveai/CYCLE_INDEX.md`
+Task rows are root `TASKS.md` Markdown checkbox rows using statuses such as:
 
-This file **exists** and is tracked. The previous SB-LF00-008 builder log incorrectly claimed it was absent; strict audit finding `F-SB-LF00-008-MINOR-001` records that evidence-quality error.
+- `[x]` complete;
+- `[~]` in progress;
+- `[!]` blocked;
+- `[ ]` backlog/open.
 
-Normalize this file without destroying history.
+Do not add another parser-facing tracker file.
 
-Required behavior:
+## Focused governance tests
 
-- clearly label it as a **historical cycle/evidence index**, not a live task/status ledger;
-- state root `TASKS.md` is the sole current-state authority;
-- preserve historical failed/remediated/closed cycle records;
-- do not rewrite historical outcomes to make old failures disappear;
-- remove or relabel the stale `## Active cycle` block so it can no longer be interpreted as the repository's current active task;
-- if preserving the old PAG-M10 active-cycle text for history, label it explicitly as a **pre-unification historical snapshot**, not current state;
-- do not turn CYCLE_INDEX into a second tracker for current SB-LF cycles.
-
-### F. `level_factory/GOVERNANCE.md`
-
-It is already largely correct. Change it only if a narrow wording adjustment is required so it cleanly defers to normalized root `GOVERNANCE.md` and root `TASKS.md`.
-
-Do not expand it into a second governance/control plane.
-
----
-
-## 2. Coordination structure after normalization
-
-The repository coordination model must be explicit and simple:
-
-```text
-root TASKS.md
-    |
-    | sole live task/status state
-    v
-ChatGPT planner / tracker owner / independent auditor
-    |
-    | publishes active implementation prompt
-    v
-.hiveai/prompts/<cycle>.md
-    |
-    v
-Codex builder
-    |
-    | implementation + tests + chronological evidence
-    v
-.hiveai/codex-logs/<cycle>.md
-    |
-    v
-ChatGPT strict audit
-    |
-    v
-.hiveai/audits/<cycle>.md
-    |
-    | only ChatGPT may then update root TASKS.md
-    v
-next cycle
-```
-
-`.hiveai/CYCLE_INDEX.md` may document historical cycles, but it must not participate as a second mutable live-state authority.
-
-No `.hiveai/TASKS.md`, `.hiveai/EVENTS.jsonl`, `.hiveai/PROJECT.json`, `.hiveai/RULES.md`, `tasks.md`, `STATE.json`, `HANDOFF.md`, or dashboard file should be created/revived as current-state authority in this task.
-
----
-
-## 3. Historical evidence preservation
-
-Do not delete, rewrite, squash, or rename historical prompt/log/audit evidence merely to make the repository look cleaner.
-
-Preserve:
-
-- `.hiveai/prompts/` history;
-- `.hiveai/codex-logs/` history;
-- `.hiveai/audits/` history;
-- historical cycle outcome records in `.hiveai/CYCLE_INDEX.md`;
-- migration documents;
-- `reference/audits/` historical evidence.
-
-A prior false statement in a historical builder log stays historical. Correct current governance rather than rewriting old evidence.
-
----
-
-## 4. Required focused governance tests
-
-Add a focused offline test file, preferably:
+Add:
 
 `tests/unit/test_sb_lf00_007_governance_authority.py`
 
 It must prove at minimum:
 
 1. root uppercase `TASKS.md` exists;
-2. root `README.md`, `GOVERNANCE.md`, `AGENTS.md`, and `CLAUDE.md` consistently identify root `TASKS.md` as the sole live/current task-status ledger;
-3. those current control documents do not identify lowercase `tasks.md` as canonical/current;
-4. those current control documents do not require absent `.hiveai/RULES.md`, `.hiveai/PROJECT.json`, `.hiveai/TASKS.md`, or `.hiveai/EVENTS.jsonl` as current-state mandatory reads;
-5. builders are explicitly prohibited from changing root `TASKS.md` task/status state;
-6. ChatGPT is explicitly identified as tracker owner and independent auditor;
-7. builder evidence cannot self-accept or self-close a task;
-8. `.hiveai/CYCLE_INDEX.md` identifies itself as historical/non-live and root `TASKS.md` as current authority;
-9. `.hiveai/CYCLE_INDEX.md` no longer exposes the old PAG-M10 block as an unlabeled current `## Active cycle`;
-10. representative historical cycle IDs/outcomes remain present in CYCLE_INDEX after normalization;
-11. no legacy current-state files are created/revived:
-    - `.hiveai/RULES.md`
-    - `.hiveai/PROJECT.json`
-    - `.hiveai/TASKS.md`
-    - `.hiveai/EVENTS.jsonl`
-    - `.hiveai/STATE.json`
-    - `.hiveai/HANDOFF.md`
-    - root `tasks.md`;
-12. `level_factory/GOVERNANCE.md` continues to defer live task status and audit acceptance to root governance/root `TASKS.md`;
-13. no product Python/GDScript implementation is added or modified by this governance cycle;
-14. previous LF00-001/LF00-002/LF00-006/LF00-008 focused suites remain green.
+2. lowercase root `tasks.md` does not exist;
+3. `.hiveai/CYCLE_INDEX.md` does not exist after implementation;
+4. no legacy tracker/control-plane file exists:
+   - `.hiveai/PROJECT.json`
+   - `.hiveai/RULES.md`
+   - `.hiveai/TASKS.md`
+   - `.hiveai/STATE.json`
+   - `.hiveai/HANDOFF.md`
+   - `.hiveai/EVENTS.jsonl`
+   - `.hiveai/PROJECT_DASHBOARD.md`
+   - `.hiveai/ACTIVE_CYCLES.md`
+   - `.hiveai/ARTIFACT_MAP.md`
+   - `.hiveai/PROGRESS_SNAPSHOT.md`;
+5. `.hiveai/` contains no current-state tracker file outside evidence families;
+6. root README/GOVERNANCE/AGENTS/CLAUDE identify root `TASKS.md` as the sole live/current project tracker source;
+7. those control documents do not require `CYCLE_INDEX`, lowercase `tasks.md`, or legacy v3 files;
+8. ChatGPT is identified as tracker owner / independent auditor for this repo workflow;
+9. builders are prohibited from editing root `TASKS.md` task state;
+10. prompts/logs/audits are explicitly non-tracker evidence;
+11. root `TASKS.md` contains the six required H!veAI Project Status labels;
+12. representative canonical task rows remain parseable in root `TASKS.md`;
+13. `level_factory/GOVERNANCE.md` does not create another tracker;
+14. previous LF00-001/LF00-002/LF00-006/LF00-008 tests remain green;
+15. no product Python/GDScript implementation changes occur.
 
-Prefer structural/read-only tests. Do not create fake tracker/control-plane files as fixtures inside the repository.
+## Allowed scope
 
----
+Expected changes are limited to:
 
-## 5. Allowed file scope
-
-Expected governance/documentation changes may include only what is necessary among:
-
+- delete `.hiveai/CYCLE_INDEX.md`;
 - `README.md`;
 - `GOVERNANCE.md`;
 - `AGENTS.md`;
 - `CLAUDE.md`;
-- `.hiveai/CYCLE_INDEX.md`;
 - `level_factory/GOVERNANCE.md` only if needed;
 - `tests/unit/test_sb_lf00_007_governance_authority.py`;
-- the required builder log.
+- required builder log.
 
 Do not edit root `TASKS.md`.
+Do not modify Factory algorithms, `src/` product code, Godot scenes/project source, provider code, dependencies, Content Platform implementation, or main-game repository files.
 
-Do not modify Python Factory Core source, Godot scene/project files, provider code, packaging dependencies, or main-game files.
+## Explicitly out of scope
 
-If another current governance-facing document contains the exact same contradictory live-authority defect, you may make the smallest necessary correction and must justify it in the log. Do not expand scope into general documentation cleanup.
+Do not begin:
 
----
-
-## 6. Explicit out of scope
-
-Do not begin or complete:
-
-- M01 migration work;
-- M03 puzzle solver work;
-- M06 Factory Studio migration;
-- Perchance/Magnific/PixelLab/provider integration;
+- M01+ implementation/migration;
+- M03 solver;
+- M06 Factory Studio implementation;
+- Perchance/Magnific/PixelLab integration;
 - Content Platform implementation;
 - main-game runtime implementation;
-- secret-manager implementation;
-- CI redesign;
-- mass historical-file renaming;
-- historical audit/log rewriting;
-- task-state edits in root `TASKS.md`.
+- secret-management implementation;
+- CI redesign.
 
-Do not call Magnific, PixelLab, Perchance, or any provider/network service.
+Do not call providers or external generation services.
 
----
+## Required verification
 
-## 7. Required verification
+Run and record:
 
-Run and record at minimum:
-
-1. focused `SB-LF00-007` governance-authority tests;
-2. prior `SB-LF00-001` focused suite;
-3. prior `SB-LF00-002` focused suite;
-4. prior `SB-LF00-006` focused suite;
-5. prior `SB-LF00-008` focused suite;
+1. focused `SB-LF00-007` governance tests;
+2. prior LF00-001 suite;
+3. prior LF00-002 suite;
+4. prior LF00-006 suite;
+5. prior LF00-008 suite;
 6. full `python -m pytest -q`;
 7. `python -m compileall -q src tests`;
 8. package import smoke;
-9. module CLI help and installed CLI help if installed;
-10. Godot headless/editor smoke against `level_factory/` to prove governance edits did not disturb the accepted project shell;
+9. module CLI help and installed CLI help if available;
+10. Godot headless/editor smoke against `level_factory/`;
 11. `git diff --check`;
 12. `git diff -- TASKS.md` must be empty;
-13. repository search proving no current governance document still names lowercase `tasks.md` as canonical/current;
-14. repository search proving current governance documents do not require absent legacy v3 files as current-state authority;
-15. repository check proving no forbidden legacy state files were created;
-16. diff check proving no product Python/GDScript file changed;
+13. prove `.hiveai/CYCLE_INDEX.md` is deleted;
+14. prove none of the legacy H!veAI tracker/control-plane files exist;
+15. prove current governance docs contain no live-authority references to those files;
+16. prove no product Python/GDScript files changed;
 17. main-game no-access/no-write statement;
 18. provider/network/credential no-use statement.
 
-Record failed commands/tests and corrections truthfully.
+Record any failed command/test and its correction truthfully.
 
----
-
-## 8. Builder log requirements
+## Builder log requirements
 
 H1 exactly:
 
@@ -347,70 +305,59 @@ Immediately below:
 Record chronologically:
 
 - exact starting timestamp;
-- canonical repository/local root/branch/remote;
-- starting HEAD and `origin/main`;
-- divergence and initial worktree/stash/worktree state;
+- canonical repo/local root/branch/remote;
+- starting HEAD / `origin/main` and divergence;
+- initial status/stash/worktree state;
 - authorities read;
-- explicit confirmation that `.hiveai/CYCLE_INDEX.md` **exists** at cycle start;
-- explicit confirmation that lowercase root `tasks.md` is absent;
-- stale/contradictory governance statements identified before edits;
-- exact files changed and rationale;
-- README identity/current-state corrections;
-- GOVERNANCE role/authority corrections;
-- AGENTS builder-start/current-authority corrections;
-- CLAUDE authority corrections;
-- CYCLE_INDEX historical-only normalization and preservation checks;
-- any level_factory governance adjustment;
-- focused governance tests added;
-- failed tests/commands and corrections;
-- prior LF00 regression results;
-- full regression result;
-- compile/import/CLI/Godot/diff checks;
-- proof root `TASKS.md` was not edited;
-- proof no legacy v3 control files were recreated;
-- proof no product Python/GDScript file changed;
+- confirmation that `.hiveai/CYCLE_INDEX.md` existed at start and is being removed as obsolete tracker residue;
+- confirmation lowercase root `tasks.md` is absent;
+- inventory of stale legacy H!veAI authority references;
+- exact files changed/deleted and rationale;
+- focused governance tests;
+- prior LF00 regression tests;
+- full regression;
+- compile/import/CLI/Godot checks;
+- proof `TASKS.md` was not edited;
+- proof no replacement tracker/control-plane file was created;
+- proof no product Python/GDScript changed;
 - dependency/license changes, expected none;
-- main-game no-access/no-write statement;
-- provider/network/credential no-use statement;
-- implementation commit SHA and push result;
-- final log publication commit SHA and push result;
-- final local HEAD / `origin/main` equality/divergence.
+- main-game no-access/no-write;
+- provider/network/credential no-use;
+- implementation commit SHA/push;
+- final builder-log publication SHA/push;
+- final HEAD / `origin/main` equality.
 
-### GitHub log delivery requirement
+## GitHub handoff requirement
 
-The finalized builder log counts as handoff evidence only after it is committed and pushed to GitHub `main`.
+The finalized builder log must be committed and pushed to `main`.
 
-At final Codex handoff to the user:
+At final handoff provide:
 
-- provide the full GitHub URL to the finalized builder log;
-- provide implementation/final publication commit SHA(s);
-- do not paste the log body unless explicitly asked;
-- do not provide a local Windows path as the primary handoff;
-- stop for independent ChatGPT audit.
+1. full GitHub URL to the finalized builder log;
+2. implementation commit SHA;
+3. final publication commit SHA.
 
----
+Do not use a local Windows path as the primary handoff.
+Do not paste the full log body unless asked.
+Stop for independent ChatGPT strict audit.
 
 ## Acceptance criteria
 
-`SB-LF00-007-C001` is eligible for PASS only if all are true:
+Eligible for PASS only if all are true:
 
-- [ ] root `TASKS.md` is consistently documented as the sole live task/status ledger;
-- [ ] ChatGPT is consistently documented as tracker owner and independent auditor;
-- [ ] Codex/builders are consistently read-only with respect to root `TASKS.md` task state;
-- [ ] lowercase `tasks.md` is no longer referenced as live/canonical authority;
-- [ ] absent legacy `.hiveai/RULES.md`, `PROJECT.json`, `TASKS.md`, and `EVENTS.jsonl` are not mandatory current-state reads;
-- [ ] no legacy v3 control-plane files are recreated;
-- [ ] `.hiveai/CYCLE_INDEX.md` is historical/non-live and no stale PAG cycle is presented as current active task;
-- [ ] historical cycle outcomes remain preserved;
-- [ ] README accurately reflects the current repository identity without claiming unfinished capabilities complete;
-- [ ] level_factory local governance still defers to root authority;
+- [ ] root `TASKS.md` remains the only project-management tracker source;
+- [ ] `.hiveai/CYCLE_INDEX.md` is deleted;
+- [ ] no lowercase root `tasks.md` exists;
+- [ ] no legacy `.hiveai` control-plane tracker files exist or are recreated;
+- [ ] README/GOVERNANCE/AGENTS/CLAUDE consistently use the TASKS-only model;
+- [ ] ChatGPT/Codex ownership is unambiguous;
+- [ ] prompts/logs/audits remain evidence and are not tracker sources;
+- [ ] root `TASKS.md` parser labels remain present and builder-untouched;
 - [ ] focused governance tests pass;
-- [ ] LF00-001/LF00-002/LF00-006/LF00-008 focused regressions pass;
+- [ ] prior LF00 focused suites pass;
 - [ ] full regression passes by builder evidence;
-- [ ] accepted Godot project still boots headlessly;
-- [ ] no product Python/GDScript implementation changes occur;
-- [ ] root `TASKS.md` remains builder-untouched;
-- [ ] no main-game write occurs;
-- [ ] no provider/network/credential call occurs;
-- [ ] finalized builder log is pushed to GitHub and handed to the user by full GitHub URL;
-- [ ] Codex stops after final push for independent ChatGPT strict audit.
+- [ ] Godot smoke still passes;
+- [ ] no product Python/GDScript implementation changed;
+- [ ] no main-game write/provider call/credential use occurred;
+- [ ] finalized builder log is pushed and handed off by full GitHub URL;
+- [ ] Codex stops for independent audit.
