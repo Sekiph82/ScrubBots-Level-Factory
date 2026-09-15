@@ -11,6 +11,7 @@ NAVIGATION = FACTORY / "scripts" / "factory_studio_navigation.gd"
 SHELL = FACTORY / "scripts" / "factory_studio_shell.gd"
 WORKSPACE = FACTORY / "scripts" / "factory_studio_workspace_page.gd"
 GATEWAY = FACTORY / "scripts" / "factory_core_gateway.gd"
+RUNTIME_CONTRACT = ROOT / "tests" / "support" / "factory_studio_runtime_contract.gd"
 
 
 def _runtime_sources() -> list[Path]:
@@ -32,7 +33,26 @@ def test_shell_is_split_into_navigation_page_and_gateway_contracts() -> None:
     assert 'factory_studio_navigation.gd' in SCENE.read_text(encoding="utf-8")
     assert 'factory_studio_workspace_page.gd' in SCENE.read_text(encoding="utf-8")
     assert SHELL.exists() and WORKSPACE.exists() and GATEWAY.exists()
-    assert "FactoryCoreGateway.new()" in SHELL.read_text(encoding="utf-8")
+    shell = SHELL.read_text(encoding="utf-8")
+    assert "FactoryCoreGateway.new()" in shell
+    assert 'NodePath("Frame/Layout/Body/NavigationPanel/Navigation")' in shell
+    assert 'NodePath("Frame/Layout/Body/Workspace")' in shell
+    assert "_resolve_navigation()" in shell
+    assert "_resolve_workspace()" in shell
+
+
+def test_executable_runtime_contract_is_committed_and_binds_scene_hierarchy() -> None:
+    scene = SCENE.read_text(encoding="utf-8")
+    runtime = RUNTIME_CONTRACT.read_text(encoding="utf-8")
+    assert RUNTIME_CONTRACT.exists()
+    assert '[node name="NavigationPanel" type="PanelContainer" parent="Frame/Layout/Body"]' in scene
+    assert '[node name="Navigation" type="VBoxContainer" parent="Frame/Layout/Body/NavigationPanel"]' in scene
+    assert 'NodePath("Frame/Layout/Body/NavigationPanel/Navigation")' in runtime
+    assert 'NodePath("Frame/Layout/Body/Workspace")' in runtime
+    assert 'MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"' in runtime
+    assert "surface_selected.is_connected" in runtime
+    assert "quit(1)" in runtime
+    assert runtime.startswith("extends SceneTree")
 
 
 def test_navigation_is_single_deterministic_future_surface_list() -> None:

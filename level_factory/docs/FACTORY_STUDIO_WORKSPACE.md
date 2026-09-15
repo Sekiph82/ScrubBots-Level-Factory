@@ -51,6 +51,17 @@ The headless project/editor load contract is:
 godot --headless --path level_factory --editor --quit
 ```
 
+The executable Studio scene-instantiation regression is:
+
+```text
+cd <repo-root>\level_factory
+godot --headless --script <repo-root>\tests\support\factory_studio_runtime_contract.gd
+```
+
+This regression loads the committed main scene, enters it into the scene tree,
+exercises the shell's initial Dashboard and one inert navigation selection,
+and exits non-zero on contract assertion failure.
+
 The root Python Factory Core and its root test suite remain the canonical
 implementation and regression surface. This Factory-local shell does not
 replace those tests with Godot-local truth.
