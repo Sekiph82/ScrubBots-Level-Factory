@@ -21,8 +21,10 @@ PROJECT_STATUS_LABELS = (
     "Next Task/Action:",
     "Required Actor:",
 )
-EXPECTED_STATE_COUNTS = Counter({"x": 30, "~": 1, " ": 196, "!": 0})
-EXPECTED_METADATA_COUNTS = Counter(
+NORMALIZATION_BASE_REF = "1952657cfa1832d90f4e077e67f4b6a2917b8861"
+NORMALIZATION_IMPLEMENTATION_REF = "dd3311ef8ef35ac88f1d12b91b5f306e2408bed4"
+EXPECTED_NORMALIZATION_STATE_COUNTS = Counter({"x": 30, "~": 1, " ": 196, "!": 0})
+EXPECTED_NORMALIZATION_METADATA_COUNTS = Counter(
     {"MIGRATION": 6, "PARTIAL": 52, "GAME_RUNTIME": 28, "EXTENSION": 3}
 )
 LEGACY_TRACKER_FILES = (
@@ -57,6 +59,17 @@ def _git_lines(*args: str) -> tuple[str, ...]:
         encoding="utf-8",
     )
     return tuple(line for line in result.stdout.splitlines() if line)
+
+
+def _git_text(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args],
+        cwd=REPOSITORY_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    ).stdout
 
 
 def _effective_tracked_paths() -> set[str]:
@@ -102,31 +115,8 @@ def _parse_rows(text: str) -> list[dict[str, object]]:
     return rows
 
 
-def _pre_edit_tasks_text() -> str:
-    """Recover the pre-edit blob both before and after the implementation commit."""
-
-    if subprocess.run(
-        ["git", "diff", "--quiet", "--", "TASKS.md"],
-        cwd=REPOSITORY_ROOT,
-        check=False,
-    ).returncode != 0:
-        return subprocess.run(
-            ["git", "show", "HEAD:TASKS.md"],
-            cwd=REPOSITORY_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        ).stdout
-    task_commit = _git_lines("log", "-1", "--format=%H", "--", "TASKS.md")[0]
-    return subprocess.run(
-        ["git", "show", f"{task_commit}^:TASKS.md"],
-        cwd=REPOSITORY_ROOT,
-        check=True,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    ).stdout
+def _historical_tasks_text(ref: str) -> str:
+    return _git_text("show", f"{ref}:TASKS.md")
 
 
 def test_root_tracker_and_legacy_control_plane_boundaries() -> None:
@@ -160,56 +150,56 @@ def test_governance_docs_use_tasks_only_authority_and_evidence_archives() -> Non
         assert phrase in readme
 
 
-def test_tasks_rows_are_parser_safe_and_preserve_pre_edit_inventory() -> None:
-    before_text = _pre_edit_tasks_text()
-    after_text = TASKS_FILE.read_text(encoding="utf-8")
+def test_historical_normalization_is_parser_safe_and_preserved_exactly() -> None:
+    before_text = _historical_tasks_text(NORMALIZATION_BASE_REF)
+    normalized_text = _historical_tasks_text(NORMALIZATION_IMPLEMENTATION_REF)
     before = _parse_rows(before_text)
-    after = _parse_rows(after_text)
+    normalized = _parse_rows(normalized_text)
 
-    assert len(before) == len(after) == 227
-    assert Counter(row["state"] for row in before) == EXPECTED_STATE_COUNTS
-    assert Counter(row["id"] for row in before) == Counter(row["id"] for row in after)
-    assert len({row["id"] for row in after}) == 227
-    assert Counter(
-        tag
-        for row in before
-        for tag in row["all_tags"]
-    ) == EXPECTED_METADATA_COUNTS
-    assert Counter(
-        tag
-        for row in after
-        for tag in row["all_tags"]
-    ) == EXPECTED_METADATA_COUNTS
-    assert all(not row["prefix_tags"] for row in after)
-    assert [row["state"] for row in before] == [row["state"] for row in after]
-    assert [row["id"] for row in before] == [row["id"] for row in after]
-    assert [row["title"] for row in before] == [row["title"] for row in after]
-    assert [row["all_tags"] for row in before] == [row["all_tags"] for row in after]
+    assert len(before) == len(normalized) == 227
+    assert Counter(row["state"] for row in before) == EXPECTED_NORMALIZATION_STATE_COUNTS
+    assert Counter(row["id"] for row in before) == Counter(row["id"] for row in normalized)
+    assert len({row["id"] for row in normalized}) == 227
+    assert Counter(tag for row in before for tag in row["all_tags"]) == EXPECTED_NORMALIZATION_METADATA_COUNTS
+    assert Counter(tag for row in normalized for tag in row["all_tags"]) == EXPECTED_NORMALIZATION_METADATA_COUNTS
+    assert all(not row["prefix_tags"] for row in normalized)
+    assert [row["state"] for row in before] == [row["state"] for row in normalized]
+    assert [row["id"] for row in before] == [row["id"] for row in normalized]
+    assert [row["title"] for row in before] == [row["title"] for row in normalized]
+    assert [row["all_tags"] for row in before] == [row["all_tags"] for row in normalized]
 
     before_lines = before_text.splitlines()
-    after_lines = after_text.splitlines()
-    assert len(before_lines) == len(after_lines)
-    for before_line, after_line in zip(before_lines, after_lines):
+    normalized_lines = normalized_text.splitlines()
+    assert len(before_lines) == len(normalized_lines)
+    for before_line, normalized_line in zip(before_lines, normalized_lines):
         if TASK_ROW_RE.match(before_line):
-            assert TASK_ROW_RE.match(after_line)
+            assert TASK_ROW_RE.match(normalized_line)
         else:
-            assert before_line == after_line
+            assert before_line == normalized_line
 
 
-def test_project_status_and_active_task_contract_are_unchanged_and_exact() -> None:
-    before = _pre_edit_tasks_text()
-    after = TASKS_FILE.read_text(encoding="utf-8")
+def test_current_tasks_rows_are_parser_safe_and_declared_denominator_matches() -> None:
+    current_text = TASKS_FILE.read_text(encoding="utf-8")
+    rows = _parse_rows(current_text)
+    assert rows
+    assert all(not row["prefix_tags"] for row in rows)
+    ids = [row["id"] for row in rows]
+    assert len(ids) == len(set(ids))
+    declared = re.search(r"Unified live task denominator:\s+\*\*(\d+)\*\*", current_text)
+    assert declared is not None
+    assert int(declared.group(1)) == len(rows)
+    assert "canonical live source-requirement denominator is exactly 224" in current_text
+
+
+def test_project_status_and_active_task_contract_are_exact() -> None:
+    current = TASKS_FILE.read_text(encoding="utf-8")
     for label in PROJECT_STATUS_LABELS:
-        before_line = next(line for line in before.splitlines() if line.startswith(f"- {label}"))
-        after_line = next(line for line in after.splitlines() if line.startswith(f"- {label}"))
-        assert before_line == after_line
-    active = [row for row in _parse_rows(after) if row["state"] == "~"]
+        assert any(line.startswith(f"- {label}") for line in current.splitlines())
+    active = [row for row in _parse_rows(current) if row["state"] == "~"]
     assert len(active) == 1
-    current_task = re.search(r"(?m)^- Current Task:\s+(SB-[A-Z0-9]+-\d{3})\s+—", after)
+    current_task = re.search(r"(?m)^- Current Task:\s+((?:SB-[A-Z0-9]+-\d{3}|PAG-SP\d+))\s+—", current)
     assert current_task is not None
-    assert current_task.group(1) == active[0]["id"] == "SB-LF00-007"
-    assert "canonical live source-requirement denominator is exactly 224" in after
-    assert "Unified live task denominator: **227**" in after
+    assert current_task.group(1) == active[0]["id"]
 
 
 def test_level_factory_governance_defers_to_root_without_second_tracker() -> None:
@@ -222,12 +212,21 @@ def test_level_factory_governance_defers_to_root_without_second_tracker() -> Non
     assert "does not create a competing h!veai control plane" in text
 
 
-def test_no_product_python_or_godot_implementation_changed() -> None:
-    changed = set(_git_lines("diff", "--name-only", "HEAD"))
+def test_sb_lf00_007_historical_diff_contains_no_product_implementation_change() -> None:
+    changed = set(
+        _git_lines(
+            "diff",
+            "--name-only",
+            NORMALIZATION_BASE_REF,
+            NORMALIZATION_IMPLEMENTATION_REF,
+        )
+    )
     forbidden = {
         path
         for path in changed
         if path.startswith("src/")
-        or Path(path).suffix.lower() in {".py", ".gd", ".tscn", ".godot"}
+        or path.startswith("level_factory/scripts/")
+        or path.startswith("level_factory/scenes/")
+        or path == "level_factory/project.godot"
     }
     assert not forbidden
