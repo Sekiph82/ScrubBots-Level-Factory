@@ -10,6 +10,7 @@ from scrubbots_pixel_factory.contracts import PRODUCTION_DIMENSION_ENVELOPE
 ROOT = Path(__file__).resolve().parents[2]
 TARGET_CONTROLS = ROOT / "level_factory" / "scripts" / "factory_studio_target_controls.gd"
 TARGET_RUNTIME_CONTRACT = ROOT / "tests" / "support" / "factory_studio_target_controls_contract.gd"
+RUNTIME_RUNNER = ROOT / "level_factory" / "tests" / "factory_studio_runtime_suite.gd"
 
 
 def _constant_strings(source: str, name: str) -> list[str]:
@@ -66,3 +67,15 @@ def test_target_controls_have_an_executable_scene_instantiation_contract() -> No
     assert runtime.startswith("extends Node")
     assert 'load(MAIN_SCENE_PATH) as PackedScene' in runtime
     assert 'get_tree().root.add_child(instance)' in runtime
+
+
+def test_committed_project_local_runtime_runner_is_clean_checkout_safe() -> None:
+    source = RUNTIME_RUNNER.read_text(encoding="utf-8")
+    assert RUNTIME_RUNNER.exists()
+    assert RUNTIME_RUNNER.is_relative_to(ROOT / "level_factory")
+    assert source.startswith("extends SceneTree")
+    assert 'MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"' in source
+    assert "res://../" not in source
+    assert "quit(1)" in source and "quit(0)" in source
+    assert 'emit_signal("surface_selected", "Generate")' in source
+    assert 'target.call("draft_snapshot")' in source
