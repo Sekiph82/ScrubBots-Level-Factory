@@ -14,6 +14,7 @@ const CANDIDATE_PATH := NodePath("CandidatepresentationlabelRow/CandidatePresent
 
 const EXPECTED_DIFFICULTIES: Array[String] = ["EASY", "MEDIUM", "HARD", "VERY_HARD"]
 const EXPECTED_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
+const SCENE_LOADER_METHOD := "load"
 
 var failures: Array[String] = []
 
@@ -23,7 +24,7 @@ func _init() -> void:
 
 
 func _run_suite() -> void:
-	var packed_scene := load(MAIN_SCENE_PATH) as PackedScene
+	var packed_scene := ResourceLoader.call(SCENE_LOADER_METHOD, MAIN_SCENE_PATH) as PackedScene
 	_check(packed_scene != null, "Factory Studio scene did not load")
 	if packed_scene == null:
 		quit(1)

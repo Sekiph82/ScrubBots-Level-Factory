@@ -75,6 +75,7 @@ def test_committed_project_local_runtime_runner_is_clean_checkout_safe() -> None
     assert RUNTIME_RUNNER.is_relative_to(ROOT / "level_factory")
     assert source.startswith("extends SceneTree")
     assert 'MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"' in source
+    assert 'ResourceLoader.call(SCENE_LOADER_METHOD, MAIN_SCENE_PATH)' in source
     assert "res://../" not in source
     assert "quit(1)" in source and "quit(0)" in source
     assert 'emit_signal("surface_selected", "Generate")' in source
