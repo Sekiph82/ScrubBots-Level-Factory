@@ -5,19 +5,19 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M00 — Repository, Governance & Canonical Factory Platform
-- Current Sprint: M00.02 — Workspace hygiene and exclusions
-- Current Task: SB-LF00-008 — Prove clean checkout boots nested Factory headlessly
+- Current Sprint: M00.03 — Tracker and coordination governance
+- Current Task: SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF00-008-C001` from the published GitHub prompt, proves the committed tracked-only Factory snapshot boots headlessly without ignored/local dependencies, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Codex executes only `SB-LF00-007-C001` from the published GitHub prompt, normalizes README/governance/agent/cycle-index authority so root `TASKS.md` is the sole live ledger, pushes governance/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF00-006-C001_FACTORY_WORKSPACE_EXCLUSIONS_AND_SECRET_BOUNDARY_STRICT_AUDIT.md`
-- SB-LF00-006 Disposition: PASS / CLOSED
-- SB-LF00-006 Implementation Commit: `0f5ef0787b04fc86913ed495566fa03717574d48`
-- SB-LF00-006 Final Builder Publication: `b4b7ffc3da12248f4635ccf3207c4ca2ca0c59d1`
-- SB-LF00-006 Strict Audit Commit: `fea0e91fa214f15328d94a664511dfeed31a8ab3`
-- Current Prompt: `.hiveai/prompts/SB-LF00-008-C001_CLEAN_CHECKOUT_HEADLESS_BOOT_PROOF_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF00-008-C001_CLEAN_CHECKOUT_HEADLESS_BOOT_PROOF_STRICT_AUDIT.md`
+- SB-LF00-008 Disposition: PASS / CLOSED
+- SB-LF00-008 Implementation Commit: `c78293309f6cf2f05f8441a44935416d865b8c10`
+- SB-LF00-008 Final Builder Publication: `e93f6d9c429e18391c63c6731f875d20f3eb3518`
+- SB-LF00-008 Strict Audit Commit: `82b995e23f8eaff0b2496ca469dca5001a50fbbb`
+- Current Prompt: `.hiveai/prompts/SB-LF00-007-C001_GOVERNANCE_AND_COORDINATION_AUTHORITY_NORMALIZATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -85,22 +85,23 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 29 VERIFIED, 52 PARTIAL, 7 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **29 / 224 = 12.95%**.
+- Canonical LF/CP source-requirement classification: 30 VERIFIED, 52 PARTIAL, 6 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **30 / 224 = 13.39%**.
 - Canonical LF/CP engineering/migration coverage: **88 / 224 = 39.29%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Three genuinely unmapped Semantic Pixel Studio extension tasks are retained live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Unified live task denominator: **227** = 224 LF/CP source requirements + 3 unique extension tasks.
-- Unified verified completion: **29 / 227 = 12.78%**.
+- Unified verified completion: **30 / 227 = 13.22%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **199 live tasks**.
-- Conservative verified local completion: **29 / 199 = 14.57%**.
-- Level Factory + unique extension surface: **115 tasks**; **29 / 115 = 25.22% verified**.
+- Conservative verified local completion: **30 / 199 = 15.08%**.
+- Level Factory + unique extension surface: **115 tasks**; **30 / 115 = 26.09% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
 - `SB-LF00-001` is PASS/CLOSED and establishes the independently openable `level_factory/` Godot project shell.
 - `SB-LF00-002` is PASS/CLOSED and establishes the Factory-local README/governance/docs/scenes/scripts/tests/output ownership boundaries.
 - `SB-LF00-006` is PASS/CLOSED and establishes the repository-wide generated/candidate/cache/log/secret workspace boundary without hiding durable evidence.
-- Active execution frontier remains M00 migration/governance closure and advances to `SB-LF00-008`.
+- `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
+- Active execution frontier remains M00 migration/governance closure and advances to `SB-LF00-007`.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -141,11 +142,11 @@ Capability source family: `SB-LF00-xxx` from the main Scrubbots master plan.
 ### M00.02 - Workspace hygiene and exclusions
 
 - [x] SB-LF00-006 — Define generated/candidate/cache/secret folders and exclusions.
-- [~] [MIGRATION] SB-LF00-008 — Prove clean checkout boots nested Factory headlessly.
+- [x] SB-LF00-008 — Prove clean checkout boots nested Factory headlessly.
 
 ### M00.03 - Tracker and coordination governance
 
-- [ ] [MIGRATION] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger.
+- [~] [MIGRATION] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger.
 
 ---
 
@@ -706,7 +707,7 @@ Canonical migration/evidence documents:
 
 # EXECUTION ORDER
 
-1. Finish M00 migration/governance closure, continuing with `SB-LF00-008`.
+1. Finish M00 migration/governance closure, continuing with `SB-LF00-007`.
 2. M06 Factory Studio canonical-Core migration.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
