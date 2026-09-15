@@ -11,11 +11,12 @@ NAVIGATION = FACTORY / "scripts" / "factory_studio_navigation.gd"
 SHELL = FACTORY / "scripts" / "factory_studio_shell.gd"
 WORKSPACE = FACTORY / "scripts" / "factory_studio_workspace_page.gd"
 GATEWAY = FACTORY / "scripts" / "factory_core_gateway.gd"
+TARGET_CONTROLS = FACTORY / "scripts" / "factory_studio_target_controls.gd"
 RUNTIME_CONTRACT = ROOT / "tests" / "support" / "factory_studio_runtime_contract.gd"
 
 
 def _runtime_sources() -> list[Path]:
-    return [SCENE, NAVIGATION, SHELL, WORKSPACE, GATEWAY]
+    return [SCENE, NAVIGATION, SHELL, WORKSPACE, GATEWAY, TARGET_CONTROLS]
 
 
 def test_factory_project_points_to_real_studio_shell() -> None:
@@ -33,6 +34,7 @@ def test_shell_is_split_into_navigation_page_and_gateway_contracts() -> None:
     assert 'factory_studio_navigation.gd' in SCENE.read_text(encoding="utf-8")
     assert 'factory_studio_workspace_page.gd' in SCENE.read_text(encoding="utf-8")
     assert SHELL.exists() and WORKSPACE.exists() and GATEWAY.exists()
+    assert TARGET_CONTROLS.exists()
     shell = SHELL.read_text(encoding="utf-8")
     assert "FactoryCoreGateway.new()" in shell
     assert 'NodePath("Frame/Layout/Body/NavigationPanel/Navigation")' in shell
@@ -52,7 +54,7 @@ def test_executable_runtime_contract_is_committed_and_binds_scene_hierarchy() ->
     assert 'MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"' in runtime
     assert "surface_selected.is_connected" in runtime
     assert "quit(1)" in runtime
-    assert runtime.startswith("extends SceneTree")
+    assert runtime.startswith("extends Node")
 
 
 def test_navigation_is_single_deterministic_future_surface_list() -> None:

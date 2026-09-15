@@ -1,4 +1,4 @@
-extends SceneTree
+extends Node
 
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Navigation")
@@ -16,17 +16,17 @@ func _run_contract() -> void:
 	var packed_scene := load(MAIN_SCENE_PATH) as PackedScene
 	_check(packed_scene != null, "main Factory Studio scene did not load")
 	if packed_scene == null:
-		quit(1)
+		get_tree().quit(1)
 		return
 
 	var instance := packed_scene.instantiate()
 	_check(instance != null, "main Factory Studio scene did not instantiate")
 	if instance == null:
-		quit(1)
+		get_tree().quit(1)
 		return
 
-	root.add_child(instance)
-	await process_frame
+	get_tree().root.add_child(instance)
+	await get_tree().process_frame
 
 	var navigation := instance.get_node_or_null(NAVIGATION_NODE_PATH)
 	_check(navigation is FactoryStudioNavigation, "Navigation did not resolve at the committed scene path")
@@ -46,12 +46,17 @@ func _run_contract() -> void:
 		_check("generated data" not in state.text.to_lower(), "initial Dashboard exposes fabricated/generated operational state")
 
 		navigation_control.surface_selected.emit("Generate")
-		await process_frame
+		await get_tree().process_frame
 		_check(title.text == "Factory Studio — Generate", "deterministic navigation selection did not reach the workspace")
-		_check("NOT IMPLEMENTED" in state.text, "navigation selection did not remain an inert placeholder")
+		_check("DRAFT" in state.text, "Generate did not expose the presentation draft state")
+		_check("UNAVAILABLE" in state.text, "Generate did not preserve truthful Core unavailability")
+		var target_controls := workspace_page.get_node_or_null("Padding/Content/TargetControls")
+		_check(target_controls != null, "Generate target controls did not resolve at the committed scene path")
+		if target_controls != null:
+			_check(target_controls.visible, "Generate target controls are not visible on the Generate surface")
 
 		navigation_control.surface_selected.emit("Dashboard")
-		await process_frame
+		await get_tree().process_frame
 		_check(title.text == "Factory Studio — Dashboard", "Dashboard could not be restored deterministically")
 
 	var footer_status := instance.get_node_or_null(FOOTER_STATUS_PATH) as Label
@@ -62,12 +67,12 @@ func _run_contract() -> void:
 	instance.queue_free()
 	if failures.is_empty():
 		print("SB-LF06-001-C001-R01 runtime contract PASS")
-		quit(0)
+		get_tree().quit(0)
 		return
 
 	for failure in failures:
 		push_error(failure)
-	quit(1)
+	get_tree().quit(1)
 
 
 func _check(condition: bool, message: String) -> void:

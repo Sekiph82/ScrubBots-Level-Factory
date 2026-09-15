@@ -141,6 +141,7 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_navigation.gd",
             "factory_studio_shell.gd",
             "factory_studio_workspace_page.gd",
+            "factory_studio_target_controls.gd",
         }
         for path in _project_files()
         if path.suffix == ".gd"

@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/factory_studio_shell.gd" id="1_shell"]
 [ext_resource type="Script" path="res://scripts/factory_studio_navigation.gd" id="2_navigation"]
 [ext_resource type="Script" path="res://scripts/factory_studio_workspace_page.gd" id="3_workspace"]
+[ext_resource type="Script" path="res://scripts/factory_studio_target_controls.gd" id="4_target_controls"]
 
 [node name="FactoryStudio" type="Control"]
 layout_mode = 3
@@ -101,6 +102,12 @@ autowrap_mode = 2
 layout_mode = 2
 text = "This workspace shell is ready for a later audited presentation integration. No generated data is loaded."
 autowrap_mode = 2
+
+[node name="TargetControls" type="VBoxContainer" parent="Frame/Layout/Body/Workspace/Padding/Content"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+script = ExtResource("4_target_controls")
 
 [node name="Footer" type="PanelContainer" parent="Frame/Layout"]
 custom_minimum_size = Vector2(0, 42)
