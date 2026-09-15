@@ -7,17 +7,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M01 — Deterministic Factory Core
 - Current Sprint: M01.02 — Production dimensions and workload envelope
 - Current Task: SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF01-005-C001` from the published GitHub prompt, migrates canonical production dimensions to independent width/height 20..59 without difficulty-size coupling while preserving deterministic/versioned historical reproduction, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Task Status: FIX_REQUIRED
+- Next Task/Action: Codex executes only `SB-LF01-005-C001-R01` from the published GitHub remediation prompt, hardens the batch-manifest version gate, adds non-binding workload guidance, preserves the accepted independent-dimension/schema-v1 replay architecture, pushes remediation/tests/finalized R01 builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-001-C001-R01_FACTORY_STUDIO_RUNTIME_NODE_CONTRACT_REMEDIATION_STRICT_AUDIT.md`
-- SB-LF06-001 Disposition: PASS / CLOSED
-- SB-LF06-001 Remediation Implementation Commit: `bef6a974317e06792e882f5a645e3f6a8416c233`
-- SB-LF06-001 Final Builder Publication: `0b2408fabb190271016e71a67f4034e82b3bdc85`
-- SB-LF06-001 Closing Strict Audit Commit: `5321d0ac2205ed40149eb8ea38149c1993f77557`
-- Current Prompt: `.hiveai/prompts/SB-LF01-005-C001_INDEPENDENT_DIMENSION_ENVELOPE_MIGRATION_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF01-005-C001_INDEPENDENT_DIMENSION_ENVELOPE_MIGRATION_STRICT_AUDIT.md`
+- SB-LF01-005 C001 Disposition: CHANGES_REQUIRED / PRODUCT MIGRATION RETAINED
+- SB-LF01-005 C001 Implementation Commit: `739e100c4a5a188f6aa3d311e87069924c8ef3c8`
+- SB-LF01-005 C001 Observed Terminal Builder Commit: `acf4b46e6b603254b221f4335bb57ba321815850`
+- SB-LF01-005 C001 Strict Audit Commit: `618d0ff406e8b5cc5c501127f3d4bd859c4e5521`
+- Current Prompt: `.hiveai/prompts/SB-LF01-005-C001-R01_MANIFEST_VERSION_GATE_AND_WORKLOAD_GUIDANCE_REMEDIATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -106,7 +106,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
 - `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
 - `SB-LF06-001` is PASS/CLOSED through `SB-LF06-001-C001-R01`; the real Factory Studio workspace shell and executable runtime node contract are accepted.
-- Active execution frontier temporarily returns to `SB-LF01-005` because canonical Core still difficulty-bands legal/automatic dimensions; M06 resumes at `SB-LF06-002` after this dependency independently passes.
+- `SB-LF01-005-C001` correctly migrates current production dimensions to independent `20..59` and retains historical request-schema-v1 replay, but strict audit found a non-strict batch-manifest version gate and missing advisory workload guidance; bounded R01 remediation is active.
+- Active execution frontier remains `SB-LF01-005`; M06 resumes at `SB-LF06-002` only after R01 independently passes.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
