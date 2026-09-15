@@ -105,3 +105,10 @@ Corrections and remaining implementation are recorded chronologically below.
 - Final implementation diff summary: 22 tracked files changed, 464 insertions, 98 deletions. Root `TASKS.md` has no diff. The working tree is otherwise clean except the four preserved owner-local UID files.
 - No provider, network, credential, sibling-repository, Factory Studio product, or root-tracker files were modified.
 - The next publication commit will contain only this finalized builder-log closure; after publication, `main` must be verified equal to `origin/main`.
+
+### 2026-09-15T13:44:00+03:00 — publication result and equality checkpoint
+
+- `git push origin main` succeeded, publishing implementation commit `739e100c4a5a188f6aa3d311e87069924c8ef3c8` and builder-log publication commit `a919adcea378debf1bed96e4875b8b9689503a4f` to GitHub `main`.
+- After `git fetch origin main`, local `HEAD` and `origin/main` were both `a919adcea378debf1bed96e4875b8b9689503a4f`; there was no tracked divergence.
+- The only remaining status entries are the four pre-existing untracked owner-local Godot UID files, preserved and not part of this task.
+- Final builder-log closure is now ready for independent strict audit. No audit verdict or tracker-state change was authored.
