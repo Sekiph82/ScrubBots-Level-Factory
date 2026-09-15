@@ -68,3 +68,15 @@ The implementation will be checked with focused LF06-002 tests, LF06-001 regress
 - Final tracked diff summary before commit: 9 files, 450 insertions, 13 deletions.
 - Final local tracked worktree status before commit: only the intended staged files above; the four pre-existing untracked UID files remain untouched.
 - Commit and push/equality results will be appended chronologically after the implementation commit and final publication checkpoint are observed. No final SHA is claimed in this pre-commit entry.
+
+## Implementation publication checkpoint
+
+- Implementation commit created: `d8623ab4ccc4c62c408fb8841ebfca6b7ac29b42` (`Implement Factory Studio target controls`).
+- Implementation commit contains the nine intended files listed above; root `TASKS.md` is not changed.
+- Push command: `git push origin main` — succeeded; remote advanced from `ad7805a88ca6bcd860a0e9fb06101515c9d7f43a` to `d8623ab4ccc4c62c408fb8841ebfca6b7ac29b42`.
+- Immediately after the implementation push, local HEAD and `origin/main` both resolved to `d8623ab4ccc4c62c408fb8841ebfca6b7ac29b42`.
+- The pre-existing four untracked owner-local UID files remained untracked and were not included.
+
+## Final publication checkpoint
+
+- This log update is the final publication content. The final publication commit is created from this exact staged log and pushed to `main`; its resulting SHA is handed off externally rather than self-referenced inside the commit content.
