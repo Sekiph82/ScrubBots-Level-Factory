@@ -71,3 +71,10 @@ No implementation, test, documentation, or tracker edit has been made before thi
 - Module CLI check: `python -m scrubbots_pixel_factory.cli --help` — exit code `0`.
 - Installed CLI check: `scrubbots-pixel --help` — exit code `0`.
 - `git diff --check` and `git diff --cached --check` — exit code `0`; staged implementation paths contain no root `TASKS.md` or main-game path.
+
+## 2026-09-15T10:08:00+03:00 — implementation commit checkpoint
+
+- Implementation commit created on `main`: `c3741b14dda48be1c7749e1c399fb26f991d284e` (`SB-LF06-001 build Factory Studio workspace foundation`).
+- The implementation commit contains the Studio scene/scripts, project main-scene update, focused LF06 test, narrowly updated LF00 regression contracts, implementation documentation, and this builder log.
+- `git diff --name-only -- TASKS.md` and the staged equivalent were empty before commit; root `TASKS.md` remains unchanged.
+- Post-commit local status is ahead of `origin/main` by one commit with only the four Godot-generated local `.uid` files untracked. These owner-local generated files were not deleted and are not part of the publication.
