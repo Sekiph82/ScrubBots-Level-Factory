@@ -115,7 +115,7 @@ func _run_contract() -> void:
 		_check(width.min_value == 20.0 and width.max_value == 59.0, "Difficulty changed the width envelope")
 		_check(height.min_value == 20.0 and height.max_value == 59.0, "Difficulty changed the height envelope")
 
-	_check(_contains_no_action_button(target), "Target controls introduced an operational action button")
+	_check(_contains_action_buttons(target), "Factory Studio action controls are missing")
 
 	var dashboard_button := _find_navigation_button(navigation, "Dashboard")
 	_check(dashboard_button != null, "Dashboard navigation control is missing")
@@ -152,11 +152,9 @@ func _option_values(control: OptionButton) -> Array[String]:
 	return values
 
 
-func _contains_no_action_button(node: Node) -> bool:
-	for child in node.get_children():
-		if child is Button and not child is OptionButton:
-			return false
-		if not _contains_no_action_button(child):
+func _contains_action_buttons(node: Node) -> bool:
+	for action in ["Generate", "Solve", "Validate", "Analyze", "Reproduce"]:
+		if node.get_node_or_null("ActionArea/" + action + "Action") == null:
 			return false
 	return true
 

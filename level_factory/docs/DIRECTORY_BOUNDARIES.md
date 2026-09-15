@@ -4,8 +4,10 @@ These roles describe the `level_factory/` project shell and are not tracker
 truth.
 
 - `scenes/` — Godot scenes owned by the Factory project.
-- `scripts/` — future Godot-side adapter, presentation, or editor scripts,
-  only when explicitly authorized.
+- `scripts/` — authorized Godot-side adapter/presentation scripts and the
+  narrow `factory_core_launcher.py` transport entrypoint. The launcher only
+  delegates to the canonical repository Python CLI and is not a duplicated
+  implementation.
 - `tests/` — future Godot-local tests and fixtures; the root Python tests remain
   the canonical Factory implementation test suite.
 - `output/` — Factory-produced or export staging boundary. Its existence does

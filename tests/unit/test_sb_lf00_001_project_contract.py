@@ -99,5 +99,9 @@ def test_factory_python_source_layout_remains_outside_nested_project() -> None:
     assert (REPOSITORY_ROOT / "src" / "scrubbots_pixel_factory").is_dir()
     assert (REPOSITORY_ROOT / "tests").is_dir()
     assert not (PROJECT_ROOT / "src").exists()
-    assert not any(path.suffix == ".py" for path in _project_files())
+    assert all(
+        path.relative_to(PROJECT_ROOT).as_posix() == "scripts/factory_core_launcher.py"
+        for path in _project_files()
+        if path.suffix == ".py"
+    )
     assert not (PROJECT_ROOT / "src").exists()

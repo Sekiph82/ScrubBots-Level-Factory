@@ -5,6 +5,11 @@ extends PanelContainer
 @onready var target_controls: Node = $Padding/Content/TargetControls
 
 
+func configure_gateway(gateway: RefCounted) -> void:
+	if target_controls != null and target_controls.has_method("configure_gateway"):
+		target_controls.call("configure_gateway", gateway)
+
+
 func show_surface(surface_name: String) -> void:
 	var title: Label = $Padding/Content/Title
 	var state: Label = $Padding/Content/State

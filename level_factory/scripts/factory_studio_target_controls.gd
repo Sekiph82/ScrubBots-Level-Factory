@@ -2,11 +2,12 @@
 class_name FactoryStudioTargetControls
 extends VBoxContainer
 
-## Presentation-only Generate target controls.
-## Python Factory Core remains the authority for request interpretation.
+## Generate target draft and action presentation for Factory Studio.
+## Python Factory Core remains the authority for request interpretation and artifacts.
 
 const CANONICAL_DIFFICULTIES: Array[String] = ["EASY", "MEDIUM", "HARD", "VERY_HARD"]
 const CANONICAL_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
+const ACTIONS: Array[String] = ["Generate", "Solve", "Validate", "Analyze", "Reproduce"]
 const MIN_DIMENSION := 20
 const MAX_DIMENSION := 59
 const MAX_CANDIDATE_LABEL_LENGTH := 64
@@ -18,12 +19,23 @@ var seed_control: LineEdit
 var mode_control: OptionButton
 var candidate_label_control: LineEdit
 var draft_readout: Label
+var action_result_readout: Label
+var _action_buttons: Dictionary = {}
+var _core_gateway: RefCounted
+var _last_action_result: Dictionary = {}
+var _action_running := false
 
 
 func _ready() -> void:
 	if get_child_count() == 0:
 		_build_controls()
 	_refresh_draft_readout()
+	_refresh_action_controls()
+
+
+func configure_gateway(gateway: RefCounted) -> void:
+	_core_gateway = gateway
+	_refresh_action_controls()
 
 
 func _build_controls() -> void:
@@ -33,7 +45,7 @@ func _build_controls() -> void:
 	add_child(heading)
 
 	var explanation := Label.new()
-	explanation.text = "Edit target values locally. No generation, solving, validation, file, or provider operation is performed."
+	explanation.text = "Edit target values locally. Generate and Reproduce use the canonical Python Core; other actions remain unavailable until their governing capability exists."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(explanation)
 
@@ -76,6 +88,29 @@ func _build_controls() -> void:
 	draft_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(draft_readout)
 
+	var action_heading := Label.new()
+	action_heading.name = "ActionHeading"
+	action_heading.text = "Action controls"
+	action_heading.add_theme_font_size_override("font_size", 16)
+	add_child(action_heading)
+
+	var action_area := VBoxContainer.new()
+	action_area.name = "ActionArea"
+	add_child(action_area)
+	for action in ACTIONS:
+		var button := Button.new()
+		button.name = action + "Action"
+		button.text = action
+		button.pressed.connect(_on_action_pressed.bind(action))
+		_action_buttons[action] = button
+		action_area.add_child(button)
+
+	action_result_readout = Label.new()
+	action_result_readout.name = "ActionResult"
+	action_result_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	action_result_readout.text = "Action result: IDLE"
+	action_area.add_child(action_result_readout)
+
 
 func _make_dimension_control(control_name: String) -> SpinBox:
 	var control := SpinBox.new()
@@ -104,6 +139,7 @@ func _make_row(label_text: String, control: Control) -> HBoxContainer:
 
 func _on_control_changed(_value: Variant = null) -> void:
 	_refresh_draft_readout()
+	_refresh_action_controls()
 
 
 func draft_snapshot() -> Dictionary:
@@ -118,6 +154,10 @@ func draft_snapshot() -> Dictionary:
 		"mode": _selected_option(mode_control, CANONICAL_MODES[0]),
 		"candidate_presentation": candidate_label_control.text if candidate_label_control != null else "",
 	}
+
+
+func action_result_snapshot() -> Dictionary:
+	return _last_action_result.duplicate(true)
 
 
 func _selected_option(control: OptionButton, fallback: String) -> String:
@@ -141,3 +181,54 @@ func _refresh_draft_readout() -> void:
 		snapshot["seed"],
 		snapshot["candidate_presentation"],
 	]
+
+
+func _refresh_action_controls() -> void:
+	if _action_buttons.is_empty():
+		return
+	var matrix: Dictionary = {}
+	if _core_gateway != null and _core_gateway.has_method("capability_matrix"):
+		matrix = _core_gateway.call("capability_matrix")
+	var seed_present := not str(draft_snapshot().get("seed", "")).strip_edges().is_empty()
+	for action in ACTIONS:
+		var button: Button = _action_buttons[action]
+		var capability: Dictionary = matrix.get(action, {"available": false, "reason": "UNAVAILABLE — canonical action capability is not connected."})
+		var available := bool(capability.get("available", false))
+		var reason := str(capability.get("reason", "UNAVAILABLE"))
+		if action == "Generate" and available and not seed_present:
+			available = false
+			reason = "UNAVAILABLE — enter a seed for a deterministic canonical Generate request."
+		button.disabled = _action_running or not available
+		button.tooltip_text = "" if available else reason
+
+
+func _on_action_pressed(action: String) -> void:
+	if _action_running or _core_gateway == null or not _core_gateway.has_method("run_action"):
+		return
+	_action_running = true
+	_refresh_action_controls()
+	var result: Variant = _core_gateway.call("run_action", action, draft_snapshot())
+	_last_action_result = result if result is Dictionary else {"action": action, "state": "FAILED", "reason": "FAILED — action bridge returned no structured result."}
+	_action_running = false
+	_render_action_result()
+	_refresh_action_controls()
+
+
+func _render_action_result() -> void:
+	if action_result_readout == null:
+		return
+	var state := str(_last_action_result.get("state", "IDLE"))
+	var action := str(_last_action_result.get("action", ""))
+	var disposition := str(_last_action_result.get("disposition", state))
+	var message := str(_last_action_result.get("reason", ""))
+	if state == "SUCCESS":
+		message = "Core evidence: candidate=%s | seed=%s | mode=%s | dimensions=%s | grid_hash=%s | output=%s | metadata=%s" % [
+			_last_action_result.get("candidate_id", ""),
+			_last_action_result.get("selected_seed", ""),
+			_last_action_result.get("mode", ""),
+			_last_action_result.get("dimensions", ""),
+			_last_action_result.get("grid_hash", ""),
+			_last_action_result.get("output_path", ""),
+			_last_action_result.get("metadata_path", ""),
+		]
+	action_result_readout.text = "Action result: %s / %s / exit=%s\n%s" % [action, disposition, _last_action_result.get("exit_code", ""), message]

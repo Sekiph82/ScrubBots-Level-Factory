@@ -87,17 +87,19 @@ def test_unimplemented_surfaces_are_truthful_placeholders() -> None:
     assert "metrics" not in source.lower() or "not connected" in source.lower()
 
 
-def test_gateway_is_truthful_status_only_and_offline() -> None:
+def test_gateway_is_a_truthful_local_canonical_core_bridge() -> None:
     source = GATEWAY.read_text(encoding="utf-8")
     assert "AVAILABLE" in source
     assert "UNAVAILABLE" in source
     assert "ERROR" in source
-    assert "CURRENT_STATUS: ConnectionStatus = ConnectionStatus.UNAVAILABLE" in source
+    assert 'LAUNCHER_PATH := "res://scripts/factory_core_launcher.py"' in source
+    assert "OS.execute" in source
+    assert "func run_action" in source
+    assert '"Generate"' in source and '"Reproduce"' in source
     forbidden = (
         "HTTPRequest",
         "HTTPClient",
         "WebSocket",
-        "OS.execute",
         "FileAccess",
         "DirAccess",
         "api_key",

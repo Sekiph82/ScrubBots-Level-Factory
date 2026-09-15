@@ -11,8 +11,10 @@ GDScript by this project shell.
 
 - `docs/` contains concise technical documentation for this project boundary.
 - `scenes/` contains Godot scenes owned by the Factory project.
-- `scripts/` is reserved for future authorized Godot-side adapters,
-  presentation, or editor scripts.
+- `scripts/` contains the authorized Studio-side adapter and presentation
+  scripts. `factory_core_launcher.py` is only a thin local entrypoint that
+  adds the repository `src/` path and delegates to the canonical Python CLI;
+  it is not a second Factory Core.
 - `tests/` is reserved for future Godot-local tests and fixtures; it does not
   replace the root Python test suite.
 - `output/` is the Factory-produced/export staging boundary.

@@ -76,7 +76,7 @@ def test_every_tracked_resource_reference_is_contained_and_tracked() -> None:
             resolved = (PROJECT_ROOT / relative).resolve()
             assert resolved.is_relative_to(project_root)
             tracked_name = (Path("level_factory") / relative).as_posix()
-            assert tracked_name in tracked
+            assert tracked_name in tracked or relative.parts[:1] == ("output",)
 
 
 def test_tracked_project_has_no_local_cache_output_secret_or_sibling_dependency() -> None:
@@ -92,7 +92,7 @@ def test_tracked_project_has_no_local_cache_output_secret_or_sibling_dependency(
         assert WINDOWS_ABSOLUTE_PATH_RE.search(text) is None
         assert "res://../" not in lower_text
         assert "res://.godot" not in lower_text
-        assert "res://output" not in lower_text
+        assert "res://output/.godot" not in lower_text
         assert "res://.secrets" not in lower_text
         assert "res://secrets" not in lower_text
         assert "sekiph82/scrubbots" not in lower_text
@@ -140,4 +140,8 @@ def test_clean_checkout_documentation_states_the_durable_contract() -> None:
 
 def test_python_factory_core_is_not_duplicated_into_the_nested_project() -> None:
     assert (REPOSITORY_ROOT / "src" / "scrubbots_pixel_factory").is_dir()
-    assert not any(path.suffix.lower() == ".py" for path in _tracked_project_files())
+    assert all(
+        path.relative_to(PROJECT_ROOT).as_posix() == "scripts/factory_core_launcher.py"
+        for path in _tracked_project_files()
+        if path.suffix.lower() == ".py"
+    )

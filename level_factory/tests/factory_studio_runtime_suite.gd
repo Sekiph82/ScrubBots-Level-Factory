@@ -136,7 +136,7 @@ func _run_suite() -> void:
 		difficulty.item_selected.emit(difficulty_index)
 		_check(width.min_value == 20.0 and width.max_value == 59.0, "Difficulty changed width bounds")
 		_check(height.min_value == 20.0 and height.max_value == 59.0, "Difficulty changed height bounds")
-	_check(_contains_no_action_button(target), "Target controls introduced an operational action button")
+	_check(_contains_action_buttons(target), "Factory Studio action controls are missing")
 
 	navigation.emit_signal("surface_selected", "Import")
 	await process_frame
@@ -172,11 +172,9 @@ func _option_values(control: OptionButton) -> Array[String]:
 	return values
 
 
-func _contains_no_action_button(node: Node) -> bool:
-	for child in node.get_children():
-		if child is Button and not child is OptionButton:
-			return false
-		if not _contains_no_action_button(child):
+func _contains_action_buttons(node: Node) -> bool:
+	for action in ["Generate", "Solve", "Validate", "Analyze", "Reproduce"]:
+		if node.get_node_or_null("ActionArea/" + action + "Action") == null:
 			return false
 	return true
 

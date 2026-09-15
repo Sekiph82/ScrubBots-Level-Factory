@@ -17,9 +17,10 @@ func _ready() -> void:
 	if workspace == null:
 		push_error("Factory Studio Workspace node is missing at %s." % WORKSPACE_NODE_PATH)
 		return
+	workspace.configure_gateway(core_gateway)
 	navigation.surface_selected.connect(workspace.show_surface)
 	workspace.show_surface("Dashboard")
-	$Frame/Layout/Footer/Status.text = "Canonical Core: %s — %s" % [core_gateway.status_name(), core_gateway.status_message()]
+	$Frame/Layout/Footer/Status.text = "Canonical Core: %s — %s | %s" % [core_gateway.status_name(), core_gateway.status_message(), core_gateway.capability_summary()]
 
 
 func _get_configuration_warnings() -> PackedStringArray:
