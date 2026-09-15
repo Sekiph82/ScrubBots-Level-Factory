@@ -7,18 +7,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M06 — ScrubBots Factory Studio
 - Current Sprint: M06.01 — Studio architecture and operator controls
 - Current Task: SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-002-C001` from the published GitHub prompt, implements presentation-only Generate target controls bound by regression to canonical Python Difficulty/GeneratorMode/dimension truth, preserves truthful Core-unavailable behavior, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Task Status: FIX_REQUIRED
+- Next Task/Action: Codex executes only `SB-LF06-002-C001-R01` from the published GitHub remediation prompt, preserves the accepted target-control implementation, commits a clean-checkout executable Godot runtime regression entrypoint for LF06-001/LF06-002, pushes remediation/tests/finalized R01 builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF01-005-C001-R01_MANIFEST_VERSION_GATE_AND_WORKLOAD_GUIDANCE_REMEDIATION_STRICT_AUDIT.md`
-- SB-LF01-005 Disposition: PASS / CLOSED
-- SB-LF01-005 C001 Implementation Commit: `739e100c4a5a188f6aa3d311e87069924c8ef3c8`
-- SB-LF01-005 R01 Remediation Commit: `c84f182ac07813dda6095ff6db5ad58dd210627d`
-- SB-LF01-005 R01 Final Builder Publication: `9c0aedf2283b0e20aa825897505c2067d1d14b7d`
-- SB-LF01-005 Closing Strict Audit Commit: `272d8f1baf4fb1f9b8742cb93345d674010ce454`
-- Current Prompt: `.hiveai/prompts/SB-LF06-002-C001_FACTORY_STUDIO_TARGET_CONTROLS_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-002-C001_FACTORY_STUDIO_TARGET_CONTROLS_STRICT_AUDIT.md`
+- SB-LF06-002 C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
+- SB-LF06-002 C001 Implementation Commit: `d8623ab4ccc4c62c408fb8841ebfca6b7ac29b42`
+- SB-LF06-002 C001 Final Builder Publication: `d5d731cdac0ae5fa8e0273deb0be6b2d5d613ecd`
+- SB-LF06-002 C001 Strict Audit Commit: `e8e9b2103164234ef7e5e4cb1a4ff33178c69e90`
+- Current Prompt: `.hiveai/prompts/SB-LF06-002-C001-R01_COMMITTED_GODOT_RUNTIME_REGRESSION_REMEDIATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -108,7 +107,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
 - `SB-LF06-001` is PASS/CLOSED through `SB-LF06-001-C001-R01`; the real Factory Studio workspace shell and executable runtime node contract are accepted.
 - `SB-LF01-005` is PASS/CLOSED through `SB-LF01-005-C001-R01`; current production dimensions are independently `20..59`, historical request-schema-v1 replay remains intact, manifest version parsing is strict, and workload guidance is advisory only.
-- Active execution frontier has returned to M06 at `SB-LF06-002`; Studio target controls must remain presentation-only and regression-bound to canonical Python Core truth while the Core gateway is unavailable.
+- `SB-LF06-002-C001` product implementation is retained: the real Generate target form is presentation-only, cross-language guarded, independent-dimension safe, and Core-unavailable truthful; strict audit found that its passing Godot interaction path depended on a deleted disposable runner, so bounded R01 committed-runtime remediation is active before closure.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
