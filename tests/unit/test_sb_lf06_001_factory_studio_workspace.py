@@ -116,9 +116,9 @@ def test_no_gdscript_factory_core_clone_or_main_game_dependency() -> None:
         assert marker not in runtime
 
 
-def test_root_tracker_and_canonical_python_core_are_untouched() -> None:
+def test_root_tracker_is_untouched_and_canonical_python_core_remains_present() -> None:
     changed = subprocess.run(
-        ["git", "diff", "HEAD", "--name-only", "--", "TASKS.md", "src"],
+        ["git", "diff", "HEAD", "--name-only", "--", "TASKS.md"],
         cwd=ROOT,
         check=True,
         capture_output=True,

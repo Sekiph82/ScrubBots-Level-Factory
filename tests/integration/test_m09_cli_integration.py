@@ -14,6 +14,7 @@ import pytest
 from scrubbots_pixel_factory import DeterministicRNG, GenerationRequest, GeneratorOptions, GenerationResult, GeneratorMode, QualityPolicy, RNG_ALGORITHM, evaluate_grid, offline_runtime
 from scrubbots_pixel_factory.cli import main as cli_main
 from scrubbots_pixel_factory.generators.router import GeneratorRouter
+from scrubbots_pixel_factory.generators.wfc import ExemplarRegistry
 from scrubbots_pixel_factory.output import canonical_json_bytes, read_bundle
 
 cli_module = importlib.import_module("scrubbots_pixel_factory.cli.main")
@@ -310,7 +311,52 @@ def test_single_auto_dimensions_record_exact_legal_resolution(tmp_path: Path) ->
     resolved = bundle.metadata["generation"]["result"]["resolved_dimensions"]
     assert request["width"] is None and request["height"] is None
     assert resolved == {"width": bundle.artwork.width, "height": bundle.artwork.height}
-    assert 20 <= bundle.artwork.width <= 29 and 20 <= bundle.artwork.height <= 29
+    assert 20 <= bundle.artwork.width <= 59 and 20 <= bundle.artwork.height <= 59
+    assert request["schema_version"] == 2
+
+
+def test_historical_v1_omitted_request_reproduces_without_current_dimension_re_resolution(tmp_path: Path) -> None:
+    request = GenerationRequest("EASY", "historical-v1-bundle", "MASK", schema_version=1)
+    candidate = cli_module._router(ExemplarRegistry()).generate_candidate(request)
+    result = candidate.result if hasattr(candidate, "result") else candidate
+    assert result.is_success
+    report = evaluate_grid(result.width, result.height, result.logical_grid, policy=QualityPolicy(difficulty="EASY"))
+    assert report.accepted
+    cli_module.export_candidate(candidate, "historical-v1", tmp_path, quality_report=report)
+    metadata = next(tmp_path.rglob("metadata.json"))
+    value = json.loads(metadata.read_text(encoding="utf-8"))
+    assert value["generation"]["request"]["schema_version"] == 1
+    reproduced = _run("reproduce", str(metadata))
+    assert reproduced.returncode == 0 and "MATCH" in reproduced.stdout
+
+
+def test_version1_batch_manifest_replays_legacy_omitted_dimension_semantics(tmp_path: Path) -> None:
+    root = tmp_path / "legacy-batch"
+    policy = QualityPolicy(difficulty="EASY").as_dict()
+    seed = "historical-v1-batch"
+    template = {
+        "difficulty": "EASY", "width": None, "height": None, "generator_mode": "MASK",
+        "style": None, "theme": None, "palette_subset": None,
+        "generator_options": {"namespace": "mask", "version": 1, "values": {}},
+    }
+    batch_id = cli_module._batch_id(template, seed, 1, 2, [], policy)
+    manifest = {
+        "schema": "scrubbots-batch-manifest", "version": 1, "batch_id": batch_id,
+        "requested_count": 1, "max_attempts": 2, "root_seed": cli_module._typed_seed(seed),
+        "request_template": template, "exemplar_identities": [], "quality_policy": policy,
+        "next_attempt_index": 0, "attempts": [], "accepted": [], "accepted_count": 0,
+        "terminal_state": "IN_PROGRESS",
+    }
+    manifest_path = root / "batch-manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_bytes(cli_module._manifest_bytes(manifest))
+    assert cli_module.main(["batch", "--resume", str(manifest_path)]) == 0
+    generated = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert generated["version"] == 1
+    accepted = generated["accepted"][0]
+    bundle = read_bundle(root / accepted["relative_path"])
+    assert bundle.metadata["generation"]["request"]["schema_version"] == 1
+    assert cli_module.main(["batch", "--resume", str(manifest_path)]) == 0
 
 
 @pytest.mark.parametrize("kind", ("invalid-mode", "malformed-options", "unsupported-options"))

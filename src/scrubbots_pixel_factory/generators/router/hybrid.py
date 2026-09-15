@@ -105,6 +105,7 @@ def _child_request(
         theme=theme,
         palette_subset=palette,
         generator_options=options,
+        schema_version=outer.schema_version,
     )
 
 
@@ -423,7 +424,7 @@ class HybridGenerator:
             canvas = _canvas_from_occupied(width, height, occupied, "MASK_FOREGROUND")
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(_stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")))
             stage_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")
-            synthetic = GenerationRequest(request.difficulty, stage_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options)
+            synthetic = GenerationRequest(request.difficulty, stage_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options, schema_version=request.schema_version)
             stages.append(HybridStageMetadata(1, "RULE_COLOR_REGIONS", "COMPOSITION", stage_seed, synthetic.digest(), synthetic.canonical_dict(), "rule-colorize", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"canvas_digest": canvas.geometry_digest()}))
             return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": occupied, "after": occupied, "final": occupied}
         if strategy == HybridStrategy.RULE_GEOMETRY_MASK_SYMMETRY:
@@ -443,7 +444,7 @@ class HybridGenerator:
             canvas = _canvas_from_occupied(width, height, occupied, "MASK_SYMMETRY")
             color_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/MASK_SYMMETRY_COLOR_REGIONS")
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(color_seed))
-            synthetic = GenerationRequest(request.difficulty, color_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options)
+            synthetic = GenerationRequest(request.difficulty, color_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options, schema_version=request.schema_version)
             stages.append(HybridStageMetadata(1, "MASK_SYMMETRY_COLOR_REGIONS", "COMPOSITION", color_seed, synthetic.digest(), synthetic.canonical_dict(), "mask-symmetry-compose", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"symmetry": symmetry.value, "before_topology_digest": _topology_digest(raw, width, height), "after_topology_digest": _topology_digest(occupied, width, height)}))
             return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": raw, "after": occupied, "final": occupied}
         base_mode = GeneratorMode.RULES.value if strategy == HybridStrategy.RULE_BASE_WFC_DETAIL else GeneratorMode.MASK.value

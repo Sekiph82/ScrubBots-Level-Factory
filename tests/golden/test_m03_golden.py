@@ -20,6 +20,7 @@ def test_m03_family_goldens_are_byte_stable() -> None:
             style=fixture["family"],
             width=fixture["dimensions"][0],
             height=fixture["dimensions"][1],
+            schema_version=1,
         )
         candidate = generator.generate_candidate(request)
         assert isinstance(candidate, MaskCandidate)

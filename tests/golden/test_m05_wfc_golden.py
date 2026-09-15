@@ -19,7 +19,7 @@ def test_m05_golden_outputs_and_pattern_tables_are_stable() -> None:
     golden = json.loads((Path(__file__).with_name("m05_wfc_goldens.json")).read_text(encoding="utf-8"))
     for entry in golden["entries"]:
         exemplar = _exemplar(entry["exemplar_id"])
-        request = GenerationRequest(entry["difficulty"], entry["seed"], "WFC", width=entry["dimensions"][0], height=entry["dimensions"][1], style=exemplar.exemplar_id, palette_subset=tuple(pair[1] for pair in entry["palette_mapping"]), generator_options=GeneratorOptions("wfc", 1, entry["options"]))
+        request = GenerationRequest(entry["difficulty"], entry["seed"], "WFC", width=entry["dimensions"][0], height=entry["dimensions"][1], style=exemplar.exemplar_id, palette_subset=tuple(pair[1] for pair in entry["palette_mapping"]), generator_options=GeneratorOptions("wfc", 1, entry["options"]), schema_version=1)
         candidate = WFCGenerator(ExemplarRegistry((exemplar,))).generate_candidate(request)
         assert isinstance(candidate, WFCCandidate)
         assert candidate.exemplar.digest == entry["exemplar_digest"]

@@ -56,7 +56,7 @@ def test_generator_options_reject_non_canonical_values(bad) -> None:
     {"width": 19},
     {"height": 60},
     {"palette_subset": ["C01", "C02"]},
-    {"schema_version": 2},
+    {"schema_version": 3},
     {"style": "   "},
 ])
 def test_request_validation_is_strict(kwargs) -> None:
@@ -67,4 +67,21 @@ def test_request_validation_is_strict(kwargs) -> None:
 def test_partial_dimensions_resolve_without_clamping() -> None:
     request = make_request(difficulty="HARD", width=48)
     width, height = request.resolve_dimensions()
-    assert width == 48 and 40 <= height <= 49
+    assert width == 48 and 20 <= height <= 59
+
+
+def test_current_request_schema_is_v2_and_legacy_v1_replays_old_omitted_axis_semantics() -> None:
+    current = make_request(difficulty="EASY", seed="migration")
+    legacy = make_request(difficulty="EASY", seed="migration", schema_version=1)
+    assert current.schema_version == 2
+    assert current.canonical_dict()["schema_version"] == 2
+    assert legacy.canonical_dict()["schema_version"] == 1
+    assert current.resolve_dimensions() != legacy.resolve_dimensions()
+    assert all(20 <= value <= 59 for value in current.resolve_dimensions())
+    assert all(20 <= value <= 29 for value in legacy.resolve_dimensions())
+
+
+def test_current_request_allows_cross_band_rectangles_for_every_difficulty() -> None:
+    for difficulty in ("EASY", "MEDIUM", "HARD", "VERY_HARD"):
+        request = make_request(difficulty=difficulty, width=20, height=59)
+        assert request.resolve_dimensions() == (20, 59)

@@ -13,7 +13,7 @@ def test_all_m04_recipe_goldens_are_byte_stable() -> None:
     generator = RuleShapeGenerator()
     for fixture in FIXTURES:
         width, height = fixture["dimensions"]
-        request = GenerationRequest(difficulty=fixture["difficulty"], seed=fixture["seed"], generator_mode="RULES", style=fixture["recipe"], width=width, height=height)
+        request = GenerationRequest(difficulty=fixture["difficulty"], seed=fixture["seed"], generator_mode="RULES", style=fixture["recipe"], width=width, height=height, schema_version=1)
         candidate = generator.generate_candidate(request)
         assert isinstance(candidate, RuleCandidate)
         assert candidate.recipe.version == fixture["version"]

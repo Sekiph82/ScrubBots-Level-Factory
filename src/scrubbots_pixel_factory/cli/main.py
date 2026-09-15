@@ -65,9 +65,10 @@ class ExitCode(IntEnum):
     FILESYSTEM = 8
 
 
-_SEED_TOKEN = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
+_SEED_VALUE_PATTERN = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _MANIFEST_SCHEMA = "scrubbots-batch-manifest"
-_MANIFEST_VERSION = 1
+_MANIFEST_VERSION = 2
+_SUPPORTED_MANIFEST_VERSIONS = {1, _MANIFEST_VERSION}
 _BATCH_MODES = {mode.value for mode in GeneratorMode}
 _CANDIDATE_TYPES = (MaskCandidate, RuleCandidate, WFCCandidate, HybridCandidate, AutoCandidate)
 _ATTEMPT_FIELDS = {
@@ -106,7 +107,7 @@ def _is_local_path(path: Path) -> bool:
 
 
 def _canonical_seed(token: str) -> int | str:
-    return int(token) if _SEED_TOKEN.fullmatch(token) else token
+    return int(token) if _SEED_VALUE_PATTERN.fullmatch(token) else token
 
 
 def _typed_seed(seed: int | str) -> dict[str, int | str]:
@@ -248,7 +249,7 @@ def _request_from_canonical(value: object, path: str = "request") -> GenerationR
     if not isinstance(value, Mapping):
         raise CLIError(f"{path} must be an object")
     required = {"schema", "schema_version", "difficulty", "width", "height", "seed", "generator_mode", "style", "theme", "palette_subset", "generator_options"}
-    if set(value) != required or value.get("schema") != "scrubbots-generation-request" or value.get("schema_version") != 1:
+    if set(value) != required or value.get("schema") != "scrubbots-generation-request" or type(value.get("schema_version")) is not int or value.get("schema_version") not in {1, 2}:
         raise CLIError(f"{path} schema/version or fields are unsupported")
     seed = _parse_typed_seed(value.get("seed"), f"{path}.seed")
     options = value.get("generator_options")
@@ -259,6 +260,7 @@ def _request_from_canonical(value: object, path: str = "request") -> GenerationR
             value["difficulty"], seed, value["generator_mode"],
             width=value["width"], height=value["height"], style=value["style"], theme=value["theme"],
             palette_subset=value["palette_subset"], generator_options=GeneratorOptions(options["namespace"], options["version"], options["values"]),
+            schema_version=value["schema_version"],
         )  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:
         raise CLIError(f"{path} violates the request contract: {exc}") from exc
@@ -421,7 +423,7 @@ def _batch_config(args: argparse.Namespace, seed: int | str, registry: ExemplarR
     return request, _request_template(request)
 
 
-def _request_template(request: GenerationRequest) -> dict[str, object]:
+def _request_template(request: GenerationRequest, *, include_schema_version: bool = True) -> dict[str, object]:
     config = {
         "difficulty": request.difficulty.value,
         "width": request.width,
@@ -432,6 +434,8 @@ def _request_template(request: GenerationRequest) -> dict[str, object]:
         "palette_subset": list(request.palette_subset) if request.palette_subset is not None else None,
         "generator_options": request.options.canonical_dict(),
     }
+    if include_schema_version:
+        config["schema_version"] = request.schema_version
     return config
 
 
@@ -475,7 +479,7 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise CLIError("batch manifest root must be an object")
     required = {"schema", "version", "batch_id", "requested_count", "max_attempts", "root_seed", "request_template", "exemplar_identities", "quality_policy", "next_attempt_index", "attempts", "accepted", "accepted_count", "terminal_state"}
-    if set(value) != required or value.get("schema") != _MANIFEST_SCHEMA or value.get("version") != _MANIFEST_VERSION:
+    if set(value) != required or value.get("schema") != _MANIFEST_SCHEMA or value.get("version") not in _SUPPORTED_MANIFEST_VERSIONS:
         raise CLIError("unsupported or incomplete batch manifest")
     if path.name != "batch-manifest.json":
         raise CLIError("resume input must be named batch-manifest.json")
@@ -490,14 +494,19 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
     if not isinstance(value["attempts"], list) or not isinstance(value["accepted"], list) or not isinstance(value["exemplar_identities"], list):
         raise CLIError("batch manifest ordered sections are malformed")
     template = value["request_template"]
-    if not isinstance(template, Mapping) or set(template) != {"difficulty", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options"}:
+    expected_template_fields = {"difficulty", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options"}
+    if value["version"] == _MANIFEST_VERSION:
+        expected_template_fields.add("schema_version")
+    if not isinstance(template, Mapping) or set(template) != expected_template_fields:
         raise CLIError("batch manifest request template is malformed")
+    if value["version"] == _MANIFEST_VERSION and template.get("schema_version") != 2:
+        raise CLIError("batch manifest request template schema version is unsupported")
     if not isinstance(template["generator_options"], Mapping) or set(template["generator_options"]) != {"namespace", "version", "values"}:
         raise CLIError("batch manifest generator options are malformed")
     root_seed = _parse_typed_seed(value["root_seed"], "manifest.root_seed")
     try:
         first_request = _request_from_manifest(dict(value), DeterministicRNG(root_seed).retry_seed(0))
-        if template != _request_template(first_request):
+        if template != _request_template(first_request, include_schema_version=value["version"] == _MANIFEST_VERSION):
             raise CLIError("batch manifest request template is not canonical")
         policy_data = value["quality_policy"]
         if not isinstance(policy_data, Mapping):
@@ -639,6 +648,7 @@ def _request_from_manifest(manifest: Mapping[str, object], attempt_seed: int | s
             template["difficulty"], attempt_seed, template["generator_mode"], width=template["width"], height=template["height"],
             style=template["style"], theme=template["theme"], palette_subset=template["palette_subset"],
             generator_options=GeneratorOptions(**template["generator_options"]),  # type: ignore[arg-type]
+            schema_version=template.get("schema_version", 1),
         )
     except (KeyError, TypeError, ValueError) as exc:
         raise CLIError(f"manifest request template violates the request contract: {exc}") from exc

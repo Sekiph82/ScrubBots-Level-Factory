@@ -29,7 +29,7 @@ def test_m10_corpus_is_versioned_and_has_required_valid_cases() -> None:
 def test_m10_successful_samples_preserve_logical_contracts(difficulty: str, mode: str) -> None:
     palette = select_palette_subset(difficulty, f"m10-property-sample-{difficulty}-{mode}")
     strategy = ROBUST_HYBRIDS[1] if mode == "HYBRID" else None
-    request = _request(difficulty, f"m10-property-sample-{difficulty}-{mode}", mode, 1, dimensions=(dimension_band(difficulty).minimum, dimension_band(difficulty).minimum + 1), palette=palette, strategy=strategy)
+    request = _request(difficulty, f"m10-property-sample-{difficulty}-{mode}", mode, 1, dimensions=(40, 41), palette=palette, strategy=strategy)
     first = GeneratorRouter().generate_candidate(request)
     second = GeneratorRouter().generate_candidate(request)
     result = first.result if hasattr(first, "result") else first

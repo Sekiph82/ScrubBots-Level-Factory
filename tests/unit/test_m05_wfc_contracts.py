@@ -53,7 +53,7 @@ def _production(width: int, height: int, difficulty: str) -> Exemplar:
 def test_production_exemplar_dimensions_reuse_m01_contract() -> None:
     for width, height, difficulty in ((20, 20, "EASY"), (29, 23, "EASY"), (30, 39, "MEDIUM"), (48, 41, "HARD"), (59, 50, "VERY_HARD")):
         assert _production(width, height, difficulty).production_difficulty == difficulty
-    for width, height in ((19, 20), (20, 30)):
+    for width, height in ((19, 20), (20, 60)):
         with pytest.raises(WFCContractError):
             _production(width, height, "EASY")
     with pytest.raises(WFCContractError):

@@ -10,7 +10,9 @@ from types import MappingProxyType
 from typing import Any
 
 from ..contracts import (
+    CURRENT_DIMENSION_SCHEMA_VERSION,
     Difficulty,
+    LEGACY_DIMENSION_SCHEMA_VERSION,
     resolve_dimensions,
     resolve_palette_subset,
     validate_palette_subset,
@@ -19,7 +21,11 @@ from ..contracts import (
 
 
 GENERATION_REQUEST_SCHEMA = "scrubbots-generation-request"
-GENERATION_REQUEST_SCHEMA_VERSION = 1
+GENERATION_REQUEST_SCHEMA_VERSION = CURRENT_DIMENSION_SCHEMA_VERSION
+SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS = (
+    LEGACY_DIMENSION_SCHEMA_VERSION,
+    GENERATION_REQUEST_SCHEMA_VERSION,
+)
 
 
 class RequestContractError(ValueError):
@@ -155,18 +161,18 @@ class GenerationRequest:
         if isinstance(self.seed, bool) or not isinstance(self.seed, (int, str)):
             raise RequestContractError("seed must be an integer or string, excluding bool")
         mode = GeneratorMode.parse(self.generator_mode)
-        if isinstance(self.schema_version, bool) or self.schema_version != GENERATION_REQUEST_SCHEMA_VERSION:
+        if type(self.schema_version) is not int or self.schema_version not in SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS:
             raise RequestContractError("unsupported generation request schema version")
         for label, value in (("style", self.style), ("theme", self.theme)):
             if value is not None:
                 _require_nonblank_string(value, label)
         try:
             if self.width is not None and self.height is not None:
-                resolve_dimensions(difficulty, self.width, self.height)
+                resolve_dimensions(difficulty, self.width, self.height, schema_version=self.schema_version)
             elif self.width is not None:
-                resolve_dimensions(difficulty, self.width, None, seed=self.seed)
+                resolve_dimensions(difficulty, self.width, None, seed=self.seed, schema_version=self.schema_version)
             elif self.height is not None:
-                resolve_dimensions(difficulty, None, self.height, seed=self.seed)
+                resolve_dimensions(difficulty, None, self.height, seed=self.seed, schema_version=self.schema_version)
             normalized_subset = (
                 None
                 if self.palette_subset is None
@@ -198,6 +204,7 @@ class GenerationRequest:
             self.width,
             self.height,
             seed=self.stage_seed("dimension"),
+            schema_version=self.schema_version,
         )
 
     def resolve_palette_subset(self) -> tuple[str, ...]:

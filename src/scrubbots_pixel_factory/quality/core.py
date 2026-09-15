@@ -17,7 +17,7 @@ import math
 from types import MappingProxyType
 from typing import Any
 
-from ..contracts import CANONICAL_PALETTE, Difficulty, dimension_band, parse_difficulty, validate_used_color_count
+from ..contracts import CANONICAL_PALETTE, Difficulty, parse_difficulty, validate_dimensions, validate_used_color_count
 from ..contracts.color_usage import ColorUsageContractError
 from ..contracts.palette import PaletteContractError
 
@@ -521,12 +521,12 @@ def _quality_codes(analysis: QualityAnalysis, policy: QualityPolicy) -> tuple[st
     if len(analysis.used_colors) == 2 and metrics.checkerboard_score >= policy.max_checkerboard_score:
         codes.append(QualityCode.CHECKERBOARD_NOISE.value)
     if policy.difficulty is not None:
-        band = dimension_band(policy.difficulty)
         try:
+            validate_dimensions(policy.difficulty, analysis.width, analysis.height)
             validate_used_color_count(policy.difficulty, analysis.cells)
         except ColorUsageContractError:
             codes.append(QualityCode.DIFFICULTY_COLOR_COUNT.value)
-        if not band.contains(analysis.width) or not band.contains(analysis.height):
+        except (TypeError, ValueError):
             codes.append(QualityCode.DIMENSION_MISMATCH.value)
     code_order = {code.value: index for index, code in enumerate(QualityCode)}
     return tuple(sorted(codes, key=lambda code: code_order[code]))

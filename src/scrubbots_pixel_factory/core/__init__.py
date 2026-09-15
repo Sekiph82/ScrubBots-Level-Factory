@@ -4,6 +4,7 @@ from .generator import PixelGenerator
 from .request import (
     GENERATION_REQUEST_SCHEMA,
     GENERATION_REQUEST_SCHEMA_VERSION,
+    SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS,
     GenerationRequest,
     GeneratorMode,
     GeneratorOptions,
@@ -33,6 +34,7 @@ __all__ = [
     "GenerationResult",
     "GENERATION_REQUEST_SCHEMA",
     "GENERATION_REQUEST_SCHEMA_VERSION",
+    "SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS",
     "GENERATION_RESULT_SCHEMA",
     "GENERATION_RESULT_SCHEMA_VERSION",
     "GeneratorMode",

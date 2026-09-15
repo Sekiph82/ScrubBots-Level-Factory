@@ -17,6 +17,7 @@ def test_four_difficulty_golden_fixtures_are_byte_stable() -> None:
             seed=fixture["seed"],
             generator_mode=fixture["generator_mode"],
             generator_options={"namespace": "probe", "version": 1, "values": {"fixture": fixture["name"]}},
+            schema_version=1,
         )
         result = generator.generate(request)
         assert (result.width, result.height) == tuple(fixture["dimensions"])

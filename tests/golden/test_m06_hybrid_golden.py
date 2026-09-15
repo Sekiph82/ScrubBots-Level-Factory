@@ -51,6 +51,7 @@ def test_m06_hybrid_goldens() -> None:
             raw["difficulty"], raw["seed"], "HYBRID", width=raw["width"], height=raw["height"],
             palette_subset=palette_subset,
             generator_options=GeneratorOptions(generator_options["namespace"], generator_options["version"], generator_options["values"]),
+            schema_version=1,
         )
         candidate = generator.generate_candidate(request)
         assert isinstance(candidate, HybridCandidate)
@@ -98,6 +99,7 @@ def test_m06_wfc_golden_strategy_corruption_is_rejected() -> None:
         raw["difficulty"], raw["seed"], raw["generator_mode"], width=raw["width"], height=raw["height"],
         palette_subset=tuple(raw["palette_subset"]),
         generator_options=GeneratorOptions(raw["generator_options"]["namespace"], raw["generator_options"]["version"], raw["generator_options"]["values"]),
+        schema_version=1,
     )
     candidate = generator.generate_candidate(request)
     assert isinstance(candidate, HybridCandidate)
