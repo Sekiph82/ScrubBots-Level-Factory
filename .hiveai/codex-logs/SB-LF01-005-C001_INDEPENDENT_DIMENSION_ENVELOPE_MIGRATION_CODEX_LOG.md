@@ -96,3 +96,12 @@ Corrections and remaining implementation are recorded chronologically below.
 - Offline CLI smoke passed for an explicit `23x47` MASK request; reproduce returned `MATCH`. Two independent omitted-axis CLI runs with the same seed both resolved to `52x32`, proving deterministic current automatic resolution. Disposable output was created outside the repository under the system temporary directory; an exact-path cleanup attempt was rejected by the local command safety guard and therefore did not alter repository state.
 - A direct offline router smoke passed for a `23x47` MASK request with a successful result and `1081` logical cells.
 - `git diff --check` passed; Git only emitted standard line-ending normalization warnings for edited files.
+
+### 2026-09-15T13:42:00+03:00 — implementation checkpoint and publication preparation
+
+- The implementation and test changes were staged explicitly with `git add -- src tests .hiveai/codex-logs/SB-LF01-005-C001_INDEPENDENT_DIMENSION_ENVELOPE_MIGRATION_CODEX_LOG.md`; the four pre-existing owner-local Godot UID files remained untracked and unstaged.
+- Staged `git diff --cached --check` passed.
+- Implementation commit created: `739e100c4a5a188f6aa3d311e87069924c8ef3c8` (`Implement independent production dimension envelope`).
+- Final implementation diff summary: 22 tracked files changed, 464 insertions, 98 deletions. Root `TASKS.md` has no diff. The working tree is otherwise clean except the four preserved owner-local UID files.
+- No provider, network, credential, sibling-repository, Factory Studio product, or root-tracker files were modified.
+- The next publication commit will contain only this finalized builder-log closure; after publication, `main` must be verified equal to `origin/main`.
