@@ -81,6 +81,14 @@ exactly during reproduction and resume, while resume rejects policy overrides.
 Accepted batch IDs use the deterministic `<batch-id>-<zero-padded-attempt-index>`
 formula everywhere, including resume validation and bundle paths.
 
+### Dimension and workload guidance
+
+Production width and height are independently legal from `20..59` inclusive.
+Every rectangle inside this envelope remains legal regardless of difficulty
+label. Larger board area may require more processing/resources than smaller
+board area. This guidance is advisory only: it never changes legality and is
+not difficulty; do not use it to infer or assign difficulty.
+
 Stable domain exit codes are: `0` success, `2` argparse usage error, `3`
 invalid request/config, `4` generator failure, `5` quality rejection, `6`
 reproduction mismatch/unsupported metadata, `7` batch exhausted before its

@@ -86,6 +86,32 @@ def test_batch_manifest_and_completed_resume_are_byte_stable(tmp_path: Path) -> 
     assert first_manifest.read_bytes() == before
 
 
+def test_current_v2_batch_manifest_is_explicit_and_replayable(tmp_path: Path) -> None:
+    root = tmp_path / "current-v2"
+    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "1001", "--max-attempts", "2", "--width", "20", "--height", "59", "--output", str(root))
+    assert generated.returncode == 0, generated.stderr
+    manifest_path = root / "batch-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert manifest["version"] == 2
+    assert manifest["request_template"]["schema_version"] == 2
+    resumed = _run("batch", "--resume", str(manifest_path))
+    assert resumed.returncode == 0 and "COMPLETE" in resumed.stdout
+
+
+@pytest.mark.parametrize("version", (True, False, 1.0, "1", None, 3, 99))
+def test_resume_rejects_non_strict_or_unsupported_manifest_versions(tmp_path: Path, version: object) -> None:
+    root = tmp_path / f"version-{str(version).lower().replace('.', '-')}"
+    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "1002", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    assert generated.returncode == 0, generated.stderr
+    manifest_path = root / "batch-manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["version"] = version
+    manifest_path.write_bytes(canonical_json_bytes(manifest))
+    resumed = _run("batch", "--resume", str(manifest_path))
+    assert resumed.returncode != 0
+    assert "Traceback" not in resumed.stderr
+
+
 def test_interrupted_batch_resume_converges_to_uninterrupted_bytes(tmp_path: Path, monkeypatch) -> None:
     interrupted_root = tmp_path / "interrupted"
     clean_root = tmp_path / "clean"

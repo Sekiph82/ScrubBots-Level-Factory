@@ -479,7 +479,8 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
     if not isinstance(value, Mapping):
         raise CLIError("batch manifest root must be an object")
     required = {"schema", "version", "batch_id", "requested_count", "max_attempts", "root_seed", "request_template", "exemplar_identities", "quality_policy", "next_attempt_index", "attempts", "accepted", "accepted_count", "terminal_state"}
-    if set(value) != required or value.get("schema") != _MANIFEST_SCHEMA or value.get("version") not in _SUPPORTED_MANIFEST_VERSIONS:
+    manifest_version = value.get("version")
+    if set(value) != required or value.get("schema") != _MANIFEST_SCHEMA or type(manifest_version) is not int or manifest_version not in _SUPPORTED_MANIFEST_VERSIONS:
         raise CLIError("unsupported or incomplete batch manifest")
     if path.name != "batch-manifest.json":
         raise CLIError("resume input must be named batch-manifest.json")
@@ -495,18 +496,18 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
         raise CLIError("batch manifest ordered sections are malformed")
     template = value["request_template"]
     expected_template_fields = {"difficulty", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options"}
-    if value["version"] == _MANIFEST_VERSION:
+    if manifest_version == _MANIFEST_VERSION:
         expected_template_fields.add("schema_version")
     if not isinstance(template, Mapping) or set(template) != expected_template_fields:
         raise CLIError("batch manifest request template is malformed")
-    if value["version"] == _MANIFEST_VERSION and template.get("schema_version") != 2:
+    if manifest_version == _MANIFEST_VERSION and template.get("schema_version") != 2:
         raise CLIError("batch manifest request template schema version is unsupported")
     if not isinstance(template["generator_options"], Mapping) or set(template["generator_options"]) != {"namespace", "version", "values"}:
         raise CLIError("batch manifest generator options are malformed")
     root_seed = _parse_typed_seed(value["root_seed"], "manifest.root_seed")
     try:
         first_request = _request_from_manifest(dict(value), DeterministicRNG(root_seed).retry_seed(0))
-        if template != _request_template(first_request, include_schema_version=value["version"] == _MANIFEST_VERSION):
+        if template != _request_template(first_request, include_schema_version=manifest_version == _MANIFEST_VERSION):
             raise CLIError("batch manifest request template is not canonical")
         policy_data = value["quality_policy"]
         if not isinstance(policy_data, Mapping):

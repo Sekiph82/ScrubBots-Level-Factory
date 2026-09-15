@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 
 from scrubbots_pixel_factory import (
@@ -9,6 +11,7 @@ from scrubbots_pixel_factory import (
     select_dimensions,
     validate_dimensions,
 )
+from scrubbots_pixel_factory.contracts import PRODUCTION_DIMENSION_ENVELOPE
 from scrubbots_pixel_factory.core import RequestContractError
 from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
 
@@ -75,3 +78,16 @@ def test_rectangular_generation_preserves_width_height_identity() -> None:
     assert first.is_success and second.is_success
     assert first.canonical_bytes() == second.canonical_bytes()
     assert (first.width, first.height) == (23, 47)
+
+
+def test_workload_guidance_is_advisory_and_uses_canonical_envelope() -> None:
+    readme = (Path(__file__).parents[2] / "README.md").read_text(encoding="utf-8")
+    guidance = " ".join(readme.split("### Dimension and workload guidance", 1)[1].split("Stable domain exit codes are:", 1)[0].split())
+    envelope = f"`{PRODUCTION_DIMENSION_ENVELOPE.minimum}..{PRODUCTION_DIMENSION_ENVELOPE.maximum}`"
+    assert f"width and height are independently legal from {envelope} inclusive" in guidance
+    assert "Every rectangle inside this envelope remains legal regardless of difficulty label." in guidance
+    assert "Larger board area may require more processing/resources than smaller board area." in guidance
+    assert "advisory only" in guidance
+    assert "never changes legality" in guidance
+    assert "not difficulty" in guidance
+    assert "infer or assign difficulty" in guidance
