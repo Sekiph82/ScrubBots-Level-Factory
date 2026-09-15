@@ -1,0 +1,112 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scripts/factory_studio_shell.gd" id="1_shell"]
+[ext_resource type="Script" path="res://scripts/factory_studio_navigation.gd" id="2_navigation"]
+[ext_resource type="Script" path="res://scripts/factory_studio_workspace_page.gd" id="3_workspace"]
+
+[node name="FactoryStudio" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_shell")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.055, 0.071, 0.11, 1)
+mouse_filter = 2
+
+[node name="Frame" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = -20.0
+offset_bottom = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Layout" type="VBoxContainer" parent="Frame"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Header" type="PanelContainer" parent="Frame/Layout"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+
+[node name="Identity" type="VBoxContainer" parent="Frame/Layout/Header"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="Title" type="Label" parent="Frame/Layout/Header/Identity"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "SCRUBBOTS LEVEL FACTORY"
+
+[node name="Subtitle" type="Label" parent="Frame/Layout/Header/Identity"]
+layout_mode = 2
+text = "Factory Studio — canonical-Core workspace"
+
+[node name="Body" type="HBoxContainer" parent="Frame/Layout"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="NavigationPanel" type="PanelContainer" parent="Frame/Layout/Body"]
+custom_minimum_size = Vector2(160, 0)
+layout_mode = 2
+
+[node name="Navigation" type="VBoxContainer" parent="Frame/Layout/Body/NavigationPanel"]
+layout_mode = 2
+theme_override_constants/separation = 4
+script = ExtResource("2_navigation")
+
+[node name="Workspace" type="PanelContainer" parent="Frame/Layout/Body"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("3_workspace")
+
+[node name="Padding" type="MarginContainer" parent="Frame/Layout/Body/Workspace"]
+layout_mode = 2
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 24
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 24
+
+[node name="Content" type="VBoxContainer" parent="Frame/Layout/Body/Workspace/Padding"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Frame/Layout/Body/Workspace/Padding/Content"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Factory Studio — Dashboard"
+
+[node name="State" type="Label" parent="Frame/Layout/Body/Workspace/Padding/Content"]
+layout_mode = 2
+text = "NOT AVAILABLE: canonical records and derived metrics are not connected in this foundation."
+autowrap_mode = 2
+
+[node name="Detail" type="Label" parent="Frame/Layout/Body/Workspace/Padding/Content"]
+layout_mode = 2
+text = "This workspace shell is ready for a later audited presentation integration. No generated data is loaded."
+autowrap_mode = 2
+
+[node name="Footer" type="PanelContainer" parent="Frame/Layout"]
+custom_minimum_size = Vector2(0, 42)
+layout_mode = 2
+
+[node name="Status" type="Label" parent="Frame/Layout/Footer"]
+layout_mode = 2
+text = "Canonical Core: UNAVAILABLE — status boundary initializing."
+autowrap_mode = 2

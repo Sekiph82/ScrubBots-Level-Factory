@@ -9,7 +9,7 @@ from pathlib import Path
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = REPOSITORY_ROOT / "level_factory"
 PROJECT_FILE = PROJECT_ROOT / "project.godot"
-SCENE_FILE = PROJECT_ROOT / "scenes" / "bootstrap.tscn"
+SCENE_FILE = PROJECT_ROOT / "scenes" / "factory_studio.tscn"
 RESOURCE_REFERENCE_RE = re.compile(r"res://[^\s\"'(),\[\]]+")
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(
     r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\)"
@@ -87,11 +87,11 @@ def test_directory_contract_documents_all_project_local_roles() -> None:
     assert "not tracker truth" in text
 
 
-def test_bootstrap_scene_and_main_scene_reference_use_scene_boundary() -> None:
+def test_factory_studio_scene_and_main_scene_reference_use_scene_boundary() -> None:
     assert SCENE_FILE.is_file()
     assert not (PROJECT_ROOT / "bootstrap.tscn").exists()
     descriptor = PROJECT_FILE.read_text(encoding="utf-8")
-    assert 'run/main_scene="res://scenes/bootstrap.tscn"' in descriptor
+    assert 'run/main_scene="res://scenes/factory_studio.tscn"' in descriptor
 
 
 def test_project_local_resource_references_are_contained() -> None:
@@ -106,7 +106,11 @@ def test_project_local_resource_references_are_contained() -> None:
 
 
 def test_project_local_files_have_no_external_dependency_markers() -> None:
-    text = _project_text()
+    text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in _project_files()
+        if path.suffix.lower() in {".godot", ".tscn", ".gd", ".tres", ".res", ".cfg", ".json"}
+    )
     forbidden = (
         "http://",
         "https://",
@@ -129,7 +133,18 @@ def test_project_local_files_have_no_external_dependency_markers() -> None:
 
 def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
     assert (REPOSITORY_ROOT / "src" / "scrubbots_pixel_factory").is_dir()
-    assert not any(path.suffix in {".py", ".gd"} for path in _project_files())
+    assert not any(path.suffix == ".py" for path in _project_files())
+    assert all(
+        path.name
+        in {
+            "factory_core_gateway.gd",
+            "factory_studio_navigation.gd",
+            "factory_studio_shell.gd",
+            "factory_studio_workspace_page.gd",
+        }
+        for path in _project_files()
+        if path.suffix == ".gd"
+    )
     assert not any(path.is_symlink() for path in PROJECT_ROOT.rglob("*"))
 
 

@@ -59,7 +59,7 @@ def test_boot_descriptor_and_scene_are_tracked_by_git() -> None:
     descriptor = PROJECT_FILE.read_text(encoding="utf-8")
     match = MAIN_SCENE_RE.search(descriptor)
     assert match is not None
-    assert match.group(1) == "res://scenes/bootstrap.tscn"
+    assert match.group(1) == "res://scenes/factory_studio.tscn"
     assert BOOT_SCENE.is_file()
 
 
@@ -140,4 +140,4 @@ def test_clean_checkout_documentation_states_the_durable_contract() -> None:
 
 def test_python_factory_core_is_not_duplicated_into_the_nested_project() -> None:
     assert (REPOSITORY_ROOT / "src" / "scrubbots_pixel_factory").is_dir()
-    assert not any(path.suffix.lower() in {".py", ".gd"} for path in _tracked_project_files())
+    assert not any(path.suffix.lower() == ".py" for path in _tracked_project_files())

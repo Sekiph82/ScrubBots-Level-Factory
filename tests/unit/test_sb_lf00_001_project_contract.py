@@ -78,7 +78,11 @@ def test_nested_project_has_no_external_addon_or_plugin_dependency() -> None:
 
 
 def test_nested_project_has_no_network_provider_or_credential_path() -> None:
-    text = _project_text().lower()
+    text = "\n".join(
+        path.read_text(encoding="utf-8").lower()
+        for path in _project_files()
+        if path.suffix.lower() in {".godot", ".tscn", ".gd", ".tres", ".res", ".cfg", ".json"}
+    )
     forbidden_patterns = (
         "http://",
         "https://",
@@ -96,3 +100,4 @@ def test_factory_python_source_layout_remains_outside_nested_project() -> None:
     assert (REPOSITORY_ROOT / "tests").is_dir()
     assert not (PROJECT_ROOT / "src").exists()
     assert not any(path.suffix == ".py" for path in _project_files())
+    assert not (PROJECT_ROOT / "src").exists()

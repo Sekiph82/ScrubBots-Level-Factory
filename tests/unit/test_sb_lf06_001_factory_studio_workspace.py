@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[2]
+FACTORY = ROOT / "level_factory"
+SCENE = FACTORY / "scenes" / "factory_studio.tscn"
+NAVIGATION = FACTORY / "scripts" / "factory_studio_navigation.gd"
+SHELL = FACTORY / "scripts" / "factory_studio_shell.gd"
+WORKSPACE = FACTORY / "scripts" / "factory_studio_workspace_page.gd"
+GATEWAY = FACTORY / "scripts" / "factory_core_gateway.gd"
+
+
+def _runtime_sources() -> list[Path]:
+    return [SCENE, NAVIGATION, SHELL, WORKSPACE, GATEWAY]
+
+
+def test_factory_project_points_to_real_studio_shell() -> None:
+    project = (FACTORY / "project.godot").read_text(encoding="utf-8")
+    scene = SCENE.read_text(encoding="utf-8")
+
+    assert 'run/main_scene="res://scenes/factory_studio.tscn"' in project
+    assert SCENE.exists()
+    assert SCENE.stat().st_size > 69
+    assert '[node name="FactoryStudio" type="Control"]' in scene
+    assert 'res://scenes/bootstrap.tscn' not in project
+
+
+def test_shell_is_split_into_navigation_page_and_gateway_contracts() -> None:
+    assert 'factory_studio_navigation.gd' in SCENE.read_text(encoding="utf-8")
+    assert 'factory_studio_workspace_page.gd' in SCENE.read_text(encoding="utf-8")
+    assert SHELL.exists() and WORKSPACE.exists() and GATEWAY.exists()
+    assert "FactoryCoreGateway.new()" in SHELL.read_text(encoding="utf-8")
+
+
+def test_navigation_is_single_deterministic_future_surface_list() -> None:
+    expected = [
+        "Dashboard",
+        "Generate",
+        "Import",
+        "Library",
+        "Batches",
+        "Candidates",
+        "Review",
+        "QA",
+        "Providers",
+        "Outputs",
+        "Settings",
+    ]
+    source = NAVIGATION.read_text(encoding="utf-8")
+    assert "const NAVIGATION_SURFACES" in source
+    assert source.count('"Dashboard"') == 1
+    for surface in expected:
+        assert source.count(f'"{surface}"') == 1
+    assert source.index('"Dashboard"') < source.index('"Settings"')
+
+
+def test_unimplemented_surfaces_are_truthful_placeholders() -> None:
+    source = WORKSPACE.read_text(encoding="utf-8")
+    assert "NOT AVAILABLE" in source
+    assert "NOT IMPLEMENTED" in source
+    assert "No generated data is loaded" in source
+    assert "metrics" not in source.lower() or "not connected" in source.lower()
+
+
+def test_gateway_is_truthful_status_only_and_offline() -> None:
+    source = GATEWAY.read_text(encoding="utf-8")
+    assert "AVAILABLE" in source
+    assert "UNAVAILABLE" in source
+    assert "ERROR" in source
+    assert "CURRENT_STATUS: ConnectionStatus = ConnectionStatus.UNAVAILABLE" in source
+    forbidden = (
+        "HTTPRequest",
+        "HTTPClient",
+        "WebSocket",
+        "OS.execute",
+        "FileAccess",
+        "DirAccess",
+        "api_key",
+        "credential",
+        "http://",
+        "https://",
+        "Magnific",
+        "PixelLab",
+        "Perchance",
+    )
+    for marker in forbidden:
+        assert marker.lower() not in source.lower()
+
+
+def test_no_gdscript_factory_core_clone_or_main_game_dependency() -> None:
+    runtime = "\n".join(path.read_text(encoding="utf-8") for path in _runtime_sources()).lower()
+    for marker in ("scrubbots/", "scrubbots\\", "subprocess", "import ", "generate(", "solve(", "validate("):
+        assert marker not in runtime
+
+
+def test_root_tracker_and_canonical_python_core_are_untouched() -> None:
+    changed = subprocess.run(
+        ["git", "diff", "HEAD", "--name-only", "--", "TASKS.md", "src"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    assert changed == []
+    assert (ROOT / "src").exists()
+
+
+def test_factory_cache_is_not_tracked() -> None:
+    tracked = subprocess.run(
+        ["git", "ls-files", "level_factory/.godot"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    assert tracked == ""
