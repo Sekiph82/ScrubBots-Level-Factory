@@ -81,3 +81,10 @@ Document role: CODEX BUILDER LOG
 - Godot editor/headless check: `godot --headless --path level_factory --editor --quit` — exit code `0`, Godot `4.7.2.stable.official.ed1daf0bf`, no parse or missing-resource error.
 - Corrected executable runtime command from the nested project directory: `godot --headless --script ..\tests\support\factory_studio_runtime_contract.gd --log-file %TEMP%\scrubbots-r01-runtime.log`.
 - Runtime stdout/stderr capture: engine banner, `SB-LF06-001-C001-R01 runtime contract PASS`, and `GODOT_EXIT=0`; no `SCRIPT ERROR` or `ERROR:` marker.
+
+## 2026-09-15T12:30:37+03:00 — remediation implementation checkpoint
+
+- Remediation implementation commit: `bef6a974317e06792e882f5a645e3f6a8416c233` (`SB-LF06-001-R01 repair Studio runtime node contract`).
+- The commit contains only the bounded shell path repair, executable runtime evidence, focused static-test strengthening, narrow runtime-command documentation, and this R01 log.
+- Post-commit status is one commit ahead of `origin/main`; only the four pre-existing/generated local `.uid` files remain untracked and were not deleted or staged.
+- Root `TASKS.md`, root `src/`, the main-game repository, and provider/network surfaces remain unchanged.
