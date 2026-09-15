@@ -68,6 +68,7 @@ Additional inline tags do not replace checkbox state:
 - `[GAME_RUNTIME]` — implementation belongs in `Sekiph82/Scrubbots`; this tracker retains program-level requirement truth.
 - `[DESIGN_GATE]` — owner/product semantics must not be invented.
 - `[OWNER_GATE]` — technical work may exist but owner product/visual acceptance remains required.
+- `[EXTENSION]` — owner-approved post-cutover product capability outside the fixed 224 LF/CP source-requirement denominator.
 
 ## Canonical tracking rules
 
@@ -78,6 +79,7 @@ Additional inline tags do not replace checkbox state:
 - Historical PAG-M00..M10 and PAG-SP00..SP14 prompt/log/audit chains remain immutable evidence.
 - Historical work is mapped to the 224 canonical source requirements rather than counted as a second live task set.
 - The canonical live source-requirement denominator is exactly 224: 112 Level Factory + 112 Content Pipeline.
+- Owner-approved post-cutover extension tasks are counted only in the unified denominator and do not rewrite the historical 224-source mapping.
 - Main-game runtime requirements remain visible here as `[GAME_RUNTIME]` but implementation lives in `Sekiph82/Scrubbots`.
 - No accepted SP05/SP06 architecture is reopened without a new independently audited defect.
 - No provider credits are spent merely for tracker migration, evidence migration, or offline planning.
@@ -88,12 +90,13 @@ Additional inline tags do not replace checkbox state:
 - Canonical LF/CP source-requirement classification: 30 VERIFIED, 52 PARTIAL, 6 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
 - Canonical LF/CP source-requirement completion: **30 / 224 = 13.39%**.
 - Canonical LF/CP engineering/migration coverage: **88 / 224 = 39.29%** (`VERIFIED + PARTIAL + MIGRATION`).
-- Three genuinely unmapped Semantic Pixel Studio extension tasks are retained live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
-- Unified live task denominator: **227** = 224 LF/CP source requirements + 3 unique extension tasks.
-- Unified verified completion: **30 / 227 = 13.22%**.
-- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **199 live tasks**.
-- Conservative verified local completion: **30 / 199 = 15.08%**.
-- Level Factory + unique extension surface: **115 tasks**; **30 / 115 = 26.09% verified**.
+- Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
+- Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
+- Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
+- Unified verified completion: **30 / 244 = 12.30%**.
+- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
+- Conservative verified local completion: **30 / 216 = 13.89%**.
+- Level Factory + unique extension surface: **132 tasks**; **30 / 132 = 22.73% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -123,6 +126,9 @@ Additional inline tags do not replace checkbox state:
 - SP06 structural diagnostics never auto-accept recognizability; explicit ACCEPT is required.
 - WFC constraint solving is not the ScrubBots gameplay solver.
 - Factory Studio must consume canonical Factory Core rather than maintain a second compiler.
+- Factory Operations Dashboard and smart collections are derived views over canonical records, never second tracker/truth stores.
+- Owner-uploaded source art is preserved byte-for-byte; transformations produce separately identified derived artifacts.
+- Imported artwork is provenance-bearing content, not model-training data.
 - Remote content is declarative only; executable payloads are forbidden.
 
 ---
@@ -286,7 +292,7 @@ Capability source family: `SB-LF05-xxx` from the main Scrubbots master plan.
 
 # M06 - ScrubBots Factory Studio
 
-Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan.
+Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus owner-approved post-cutover `SB-LFX-xxx` Studio extensions.
 
 ### M06.01 - Studio architecture and operator controls
 
@@ -308,6 +314,27 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan.
 - [ ] SB-LF06-010 — Keep editor presentation separate from truth. [PARTIAL]
 - [ ] SB-LF06-011 — Reproduce candidate by seed/config. [PARTIAL]
 - [ ] SB-LF06-012 — Editor smoke + headless core tests. [PARTIAL]
+
+### M06.04 - Owner-approved operations dashboard, import and library extensions
+
+- [ ] SB-LFX-001 — Build Factory Operations Dashboard from canonical job/artifact/evidence truth without creating a second tracker or production truth store. [EXTENSION]
+- [ ] SB-LFX-002 — Support manual Pixel Art import with explicit `OWNER_UPLOAD` provenance and immutable original bytes. [EXTENSION]
+- [ ] SB-LFX-003 — Build searchable Source Art Library/index with immutable source identity, provenance, tags, review state and usage references. [EXTENSION]
+- [ ] SB-LFX-004 — Add Import Validation Wizard for format/dimensions/C01..C16/foreign colors/semi-alpha/used-color and canonical structural checks. [EXTENSION]
+
+### M06.05 - Unified operator workflow extensions
+
+- [ ] SB-LFX-005 — Build bounded one-click pipeline orchestration across applicable Import/Generate→Normalize→Validate→Candidate→Solve→Difficulty→QA→Review stages. [EXTENSION]
+- [ ] SB-LFX-006 — Build unified Candidate Inbox and owner Review Queue across provider, procedural, owner-upload and library-derived candidates. [EXTENSION]
+- [ ] SB-LFX-007 — Provide side-by-side candidate/variant comparison using canonical preview, QA, solver/difficulty, provenance and cost evidence where available. [EXTENSION]
+- [ ] SB-LFX-008 — Add reusable Presets / Production Recipes while always persisting the fully expanded canonical request/config. [EXTENSION]
+
+### M06.06 - Discovery, readiness, reproduction and edit lineage extensions
+
+- [ ] SB-LFX-009 — Add scalable search/filter/smart collections as derived views over canonical source/candidate/level records. [EXTENSION]
+- [ ] SB-LFX-010 — Add Production Readiness Card exposing truthful SOURCE/PALETTE/STRUCTURE/SOLVER/DIFFICULTY/QA/OWNER/EXPORT dispositions. [EXTENSION]
+- [ ] SB-LFX-011 — Expose Exact Reproduce action only where recorded canonical identities and the underlying path support truthful reproducibility. [EXTENSION]
+- [ ] SB-LFX-012 — Add immutable manual-edit revision history with compare/undo/restore-source behavior and no silent source overwrite. [EXTENSION]
 
 ---
 
@@ -335,7 +362,7 @@ Capability source family: `SB-LF07-xxx` from the main Scrubbots master plan.
 
 # M08 - Batch Factory & Weekly Production
 
-Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan.
+Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan plus owner-approved batch-operations extensions.
 
 ### M08.01 - Batch counts, rejection statistics and resumability
 
@@ -356,11 +383,17 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan.
 - [ ] SB-LF08-009 — Stress high rejection rates safely. [PARTIAL]
 - [x] SB-LF08-010 — Reruns create no meaningless diffs.
 
+### M08.04 - Owner-approved failure, batch-import and recovery extensions
+
+- [ ] SB-LFX-013 — Build Failure Inbox / Retry Center that retries only eligible failed/rejected/inconclusive work while preserving failure evidence and lineage. [EXTENSION]
+- [ ] SB-LFX-014 — Support drag-and-drop multi-file Pixel Art batch import with independent immutable provenance per file. [EXTENSION]
+- [ ] SB-LFX-015 — Add Factory Studio session recovery/autosave that resumes eligible durable jobs without redoing successful stages. [EXTENSION]
+
 ---
 
 # M09 - Advanced Generation Research & Semantic Provider Evolution
 
-Capability source family: `SB-LF09-xxx` from the main Scrubbots master plan.
+Capability source family: `SB-LF09-xxx` from the main Scrubbots master plan plus owner-approved provider/analysis extensions.
 
 Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implementation is retained and `PAG-SP07-C001-R01` is PASS/CLOSED; both remain evidence under `SB-LF09-003` and are not a second counted task family.
 
@@ -395,6 +428,11 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 - [ ] PAG-SP11 — ASSET_ART Production. [EXTENSION]
 - [ ] PAG-SP12 — Direction / Rotation Variants. [EXTENSION]
 - [ ] PAG-SP13 — Animation. [EXTENSION]
+
+### M09.07 - Owner-approved similarity and provider-accounting extensions
+
+- [ ] SB-LFX-016 — Add advisory visual-similarity guard for near-duplicate artwork/candidates while retaining exact identity checks and avoiding silent auto-reject policy. [EXTENSION]
+- [ ] SB-LFX-017 — Build Provider Cost / Credit Center for truthful jobs/success/failure/consumed/remaining/cost-per-accepted accounting where reliable provider data exists. [EXTENSION]
 
 ---
 
@@ -692,7 +730,8 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 - PAG-SP00..SP06 accepted/remediated history remains immutable evidence.
 - PAG-SP07-C001 strict audit = CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED; PAG-SP07-C001-R01 strict audit = PASS / CLOSED; both are mapped as accepted evidence under partial `SB-LF09-003` rather than counted as separate live tasks.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
-- PAG-SP11/PAG-SP12/PAG-SP13 are the three unique extension tasks retained under M09.06.
+- PAG-SP11/PAG-SP12/PAG-SP13 are the three legacy unique extension tasks retained under M09.06.
+- `SB-LFX-001..017` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
 - Windows Factory Studio v1.3.6 is retained as M06 migration evidence; its operator/provider/job/accounting layers are reusable, while its legacy compiler is not canonical.
 
@@ -701,6 +740,9 @@ Canonical migration/evidence documents:
 - `docs/migration/LEVEL_FACTORY_CONTENT_PLATFORM_UNIFICATION_V01.md`
 - `docs/migration/LF_CP_REQUIREMENT_MAPPING_V01.md`
 
+Owner-approved post-cutover product specification:
+- `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`
+
 # CROSS-REPOSITORY RUNTIME REGISTER
 
 `SB-CP04-001..014`, `SB-CP05-001..012`, `SB-CP06-004`, and `SB-CP06-010` are `[GAME_RUNTIME]` requirements. Implementation occurs in `Sekiph82/Scrubbots`; closure here requires exact main-game audit evidence.
@@ -708,13 +750,13 @@ Canonical migration/evidence documents:
 # EXECUTION ORDER
 
 1. Finish M00 migration/governance closure, continuing with `SB-LF00-007`.
-2. M06 Factory Studio canonical-Core migration.
+2. M06 Factory Studio canonical-Core migration, then the owner-approved `SB-LFX-001..012` Studio/operator extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
 6. M07 mutation/difficulty targeting.
-7. M08 batch production.
-8. Continue M09 advanced generation only as justified.
+7. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions.
+8. Continue M09 advanced generation only as justified, including `SB-LFX-016..017` similarity/provider-accounting extensions when their dependencies are real.
 9. M10 Campaign Intelligence.
 10. M11-M14 Content Platform architecture/pack/manifest/publisher.
 11. M18-M20 storage/operations/security.
