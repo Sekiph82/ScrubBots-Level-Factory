@@ -1,6 +1,9 @@
-# H!veAI mandatory control-plane adapter
+# H!veAI TASKS-only control-plane adapter
 
-Before doing project work, read `.hiveai/RULES.md`, `.hiveai/PROJECT.json`, and the v3 machine block in `.hiveai/TASKS.md`. The tracked GitHub branch is current-state authority; local folders are execution workspaces.
+Before doing project work, read the root `TASKS.md` as the sole current
+task-state authority and read the authoritative prompt URL supplied in the
+handoff. The tracked GitHub branch is current-state authority; local folders
+are execution workspaces.
 
 H!veAI shared files do not override the stricter builder/auditor ownership boundaries below.
 
@@ -35,18 +38,14 @@ Before implementation:
 3. If the prompt requires synchronizing the owner's local mirror, synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` with this GitHub repository using non-destructive Git operations.
 4. Never reset, automatically rebase, force-push, discard user changes, or search sibling local repositories to discover work.
 5. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
-6. Read completely from the authorized GitHub-first v3 control plane:
-   - `.hiveai/PROJECT.json`
-   - `.hiveai/RULES.md`
-   - the machine block in `.hiveai/TASKS.md`
-   - `.hiveai/EVENTS.jsonl`
+6. Read completely from the authorized GitHub-first source set:
+   - root `TASKS.md`
    - `AGENTS.md`
    - `GOVERNANCE.md`
-   - `tasks.md` for the detailed project ledger
-   - `.hiveai/CYCLE_INDEX.md` for historical cycle records
+   - the previous audit and specific contracts required by the authoritative prompt
    - the authoritative prompt URL supplied in the handoff
-7. Do not use removed legacy projections such as `.hiveai/HANDOFF.md`, `.hiveai/STATE.json`, or `.hiveai/PROJECT_DASHBOARD.md` as current-state authority.
-8. Create the matching Codex log before product implementation and append chronologically.
+7. Treat `.hiveai/prompts/`, `.hiveai/codex-logs/`, and `.hiveai/audits/` as process/evidence archives only, not task-state sources. Do not recreate legacy tracker/control-plane files.
+8. Create the matching Codex log before implementation, tests, documentation, or governance edits and append chronologically.
 
 If safe synchronization cannot be performed, stop without modifying product files and record the reason only if a matching log can be created safely.
 
@@ -59,9 +58,9 @@ You must not:
 - perform or author an independent audit,
 - declare `AUDIT_PASSED`,
 - declare final milestone/sprint/cycle acceptance,
-- edit task checkbox/status state in `tasks.md`,
+- edit root `TASKS.md` task state except when the active authoritative prompt explicitly grants a one-time mechanical format-only exception,
 - edit `.hiveai/HANDOFF.md`,
-- edit `.hiveai/CYCLE_INDEX.md`,
+- create or modify legacy tracker/control-plane files,
 - create or modify files under `.hiveai/audits/`,
 - modify the active prompt after implementation begins,
 - rewrite any prior prompt/log/audit,
@@ -107,12 +106,12 @@ Never record secrets.
 
 ChatGPT-owned governance/tracker state:
 
-- `.hiveai/TASKS.md` current-state machine block
-- `.hiveai/EVENTS.jsonl` workflow/audit events
-- `tasks.md` detailed task state/checkboxes
-- `.hiveai/CYCLE_INDEX.md` cycle history
+- root `TASKS.md` current task-state ledger and Project Status fields
 - `.hiveai/audits/**`
 - used `.hiveai/prompts/**`
+
+`.hiveai/codex-logs/**` are builder evidence archives. There is no second live
+tracker, cycle index, event ledger, or machine-state file.
 
 Codex may read all of them but must not alter them unless a later owner-approved prompt explicitly changes governance.
 
@@ -134,7 +133,6 @@ Do not resize, resample, interpolate, or antialias logical source art to force i
 
 ## H!veAI GitHub tracking
 
-- The repository root TASKS.md is the only current project-status tracker.
-- Keep the Project Status fields and task rows current when work changes state.
-- Commit and push TASKS.md with the implementation evidence that it describes.
-- Do not create or revive .hiveai PROJECT/RULES/TASKS/STATE/HANDOFF/EVENTS files as a competing tracker.
+- The repository root `TASKS.md` is the only current project-management/task-state tracker.
+- Do not create or revive legacy `.hiveai` tracker/control-plane files or a lowercase root `tasks.md`.
+- Prompts, builder logs, audits, README, AGENTS, CLAUDE, and other documents are not tracker inputs.

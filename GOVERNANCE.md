@@ -19,9 +19,8 @@ ChatGPT owns:
 - implementation and remediation prompt authoring,
 - independent strict audits,
 - acceptance and rejection decisions,
-- task checkbox state in `tasks.md`,
+- task checkbox/status state in root `TASKS.md`,
 - milestone, sprint, and cycle closure state,
-- GitHub-first v3 H!veAI task/event state and cycle-index history,
 - bounded remediation prompt creation,
 - final determination of whether work may advance.
 
@@ -41,10 +40,9 @@ Codex must not:
 
 - declare `AUDIT_PASSED`,
 - declare a milestone, sprint, or cycle finally accepted,
-- mark tasks complete in `tasks.md`,
-- edit `.hiveai/TASKS.md` acceptance/current-state fields,
-- edit `.hiveai/EVENTS.jsonl` workflow/audit events,
-- edit `.hiveai/CYCLE_INDEX.md`,
+- mutate root `TASKS.md` task state except for the one-time format-only
+  normalization explicitly authorized by `SB-LF00-007-C001`,
+- create or revive legacy H!veAI tracker/control-plane files,
 - author or edit files under `.hiveai/audits/`,
 - rewrite historical prompt/log/audit files,
 - author a strict audit,
@@ -167,11 +165,16 @@ Matching filenames:
 
 ## Tracker ownership
 
-`tasks.md` is the canonical task ledger.
+Root `TASKS.md` is the sole project-management/task-state ledger. H!veAI
+determines current task state from GitHub repository metadata plus that file;
+prompts, builder logs, audits, and other documents are process/evidence
+archives, not tracker inputs.
 
-Only ChatGPT may promote task states or mark sprint/milestone closure.
+Only ChatGPT may promote task states or mark sprint/milestone closure after the
+one-time parser-format normalization authorized by `SB-LF00-007-C001`.
 
-Codex may describe proposed completion in its log but must not edit task state.
+Codex may describe proposed completion in its log but must not edit task state
+outside that explicit format-only exception.
 
 ## SCRUBBOTS contract precedence
 

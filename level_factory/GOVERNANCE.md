@@ -16,6 +16,6 @@ authorized game repository boundary.
 
 This project-local document does not create a competing H!veAI control plane,
 tracker, event ledger, prompt index, task denominator, or acceptance state.
-Broader coordination and governance normalization remains the separately
-authorized `SB-LF00-007` scope. Unrelated root governance drift is not repaired
-here.
+Broader coordination and governance normalization is owned by the root
+`TASKS.md` and root `GOVERNANCE.md`; this project-local document remains
+subordinate and does not repair or recreate any tracker/control-plane state.

@@ -146,7 +146,7 @@ Capability source family: `SB-LF00-xxx` from the main Scrubbots master plan.
 
 ### M00.03 - Tracker and coordination governance
 
-- [~] [MIGRATION] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger.
+- [~] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger. [MIGRATION]
 
 ---
 
@@ -163,15 +163,15 @@ Capability source family: `SB-LF01-xxx` from the main Scrubbots master plan.
 
 ### M01.02 - Production dimensions and workload envelope
 
-- [ ] [MIGRATION] SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance.
+- [ ] SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance. [MIGRATION]
 - [x] SB-LF01-006 — Support rectangular boards.
 - [x] SB-LF01-007 — Exercise 59×59 where cost scales.
 
 ### M01.03 - Provenance and production classification
 
 - [x] SB-LF01-008 — Record seed/config/generator-version provenance.
-- [ ] [PARTIAL] SB-LF01-009 — Separate TEST/development candidates from production.
-- [ ] [MIGRATION] SB-LF01-010 — Reject obsolete semantic assumptions.
+- [ ] SB-LF01-009 — Separate TEST/development candidates from production. [PARTIAL]
+- [ ] SB-LF01-010 — Reject obsolete semantic assumptions. [MIGRATION]
 
 ---
 
@@ -181,17 +181,17 @@ Capability source family: `SB-LF02-xxx` from the main Scrubbots master plan.
 
 ### M02.01 - Candidate modes and evaluator guidance
 
-- [ ] [PARTIAL] SB-LF02-001 — Implement evaluator-guided candidate architecture rather than blind random filling.
+- [ ] SB-LF02-001 — Implement evaluator-guided candidate architecture rather than blind random filling. [PARTIAL]
 - [ ] SB-LF02-002 — Support reverse construction when canonical mechanics permit.
 - [ ] SB-LF02-003 — Support PUZZLE_FIRST mode.
-- [ ] [PARTIAL] SB-LF02-004 — Support ART_FIRST mode consuming owner/AI-approved pixel art/masks.
+- [ ] SB-LF02-004 — Support ART_FIRST mode consuming owner/AI-approved pixel art/masks. [PARTIAL]
 
 ### M02.02 - Shape, regions and artwork provenance
 
 - [x] SB-LF02-005 — Implement reusable shape/topology primitives without declaring them difficulty rules.
 - [x] SB-LF02-006 — Implement connected color-region representation/generation.
 - [x] SB-LF02-007 — Preserve one logical artwork square = one logical board cell.
-- [ ] [PARTIAL] SB-LF02-008 — Never fabricate missing owner artwork or label AI output owner-original.
+- [ ] SB-LF02-008 — Never fabricate missing owner artwork or label AI output owner-original. [PARTIAL]
 
 ### M02.03 - Design gates, provenance and deterministic tests
 
@@ -235,7 +235,7 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 
 ### M04.01 - Versioned solver-derived metrics
 
-- [ ] [PARTIAL] SB-LF04-001 — Define versioned LevelMetrics.
+- [ ] SB-LF04-001 — Define versioned LevelMetrics. [PARTIAL]
 - [ ] SB-LF04-002 — Record solution depth/move count where meaningful.
 - [ ] SB-LF04-003 — Record states/dead ends/branching/forced moves.
 
@@ -250,9 +250,9 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 
 - [ ] SB-LF04-008 — Implement/version Difficulty V1 Challenge Score components/coefficients.
 - [ ] SB-LF04-009 — Map predicted score to current lane/class rhythm without equating class to board size.
-- [ ] [PARTIAL] SB-LF04-010 — Keep metric provenance/versioning.
+- [ ] SB-LF04-010 — Keep metric provenance/versioning. [PARTIAL]
 - [ ] SB-LF04-011 — Design future calibration against player data under approved analytics policy.
-- [ ] [PARTIAL] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source.
+- [ ] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
 
 ---
 
@@ -262,9 +262,9 @@ Capability source family: `SB-LF05-xxx` from the main Scrubbots master plan.
 
 ### M05.01 - Structural and production validation
 
-- [ ] [PARTIAL] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation.
-- [ ] [PARTIAL] SB-LF05-002 — Reuse audited M09 round-trip contract for art-first exports.
-- [ ] [PARTIAL] SB-LF05-003 — Validate dimensions/envelope/C01..C16/3..12 used colors/cells/opacity/transparency/provenance/duplicate IDs.
+- [ ] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation. [PARTIAL]
+- [ ] SB-LF05-002 — Reuse audited M09 round-trip contract for art-first exports. [PARTIAL]
+- [ ] SB-LF05-003 — Validate dimensions/envelope/C01..C16/3..12 used colors/cells/opacity/transparency/provenance/duplicate IDs. [PARTIAL]
 
 ### M05.02 - Solver disposition
 
@@ -274,8 +274,8 @@ Capability source family: `SB-LF05-xxx` from the main Scrubbots master plan.
 ### M05.03 - QA reports, source preservation and semantic readability
 
 - [x] SB-LF05-006 — Actionable rejection reasons.
-- [ ] [PARTIAL] SB-LF05-007 — Machine-readable QA report.
-- [ ] [PARTIAL] SB-LF05-008 — Preserve owner source images byte-for-byte.
+- [ ] SB-LF05-007 — Machine-readable QA report. [PARTIAL]
+- [ ] SB-LF05-008 — Preserve owner source images byte-for-byte. [PARTIAL]
 - [x] SB-LF05-009 — Visual recognizability/readability gates, not structural-only false positives.
 
 ### M05.04 - Main-game acceptance handoff
@@ -290,9 +290,9 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan.
 
 ### M06.01 - Studio architecture and operator controls
 
-- [ ] [MIGRATION] SB-LF06-001 — Build @tool/editor-facing workspace.
-- [ ] [PARTIAL] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls.
-- [ ] [PARTIAL] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions.
+- [ ] SB-LF06-001 — Build @tool/editor-facing workspace. [MIGRATION]
+- [ ] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls. [PARTIAL]
+- [ ] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions. [PARTIAL]
 
 ### M06.02 - Preview, metrics and controlled editing
 
@@ -303,11 +303,11 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan.
 
 ### M06.03 - Revalidation, truth separation, reproduction and tests
 
-- [ ] [PARTIAL] SB-LF06-008 — Revalidate after manual changes.
+- [ ] SB-LF06-008 — Revalidate after manual changes. [PARTIAL]
 - [x] SB-LF06-009 — Never auto-promote generated candidate.
-- [ ] [PARTIAL] SB-LF06-010 — Keep editor presentation separate from truth.
-- [ ] [PARTIAL] SB-LF06-011 — Reproduce candidate by seed/config.
-- [ ] [PARTIAL] SB-LF06-012 — Editor smoke + headless core tests.
+- [ ] SB-LF06-010 — Keep editor presentation separate from truth. [PARTIAL]
+- [ ] SB-LF06-011 — Reproduce candidate by seed/config. [PARTIAL]
+- [ ] SB-LF06-012 — Editor smoke + headless core tests. [PARTIAL]
 
 ---
 
@@ -339,7 +339,7 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan.
 
 ### M08.01 - Batch counts, rejection statistics and resumability
 
-- [ ] [PARTIAL] SB-LF08-001 — Generate requested accepted counts by lane/class cadence.
+- [ ] SB-LF08-001 — Generate requested accepted counts by lane/class cadence. [PARTIAL]
 - [x] SB-LF08-002 — Separate generated from accepted count.
 - [x] SB-LF08-003 — Rejection statistics.
 - [x] SB-LF08-004 — Deterministic/resumable batch jobs.
@@ -347,13 +347,13 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan.
 
 ### M08.02 - Accepted outputs, owner review and pipeline handoff
 
-- [ ] [PARTIAL] SB-LF08-006 — Accepted LevelData/previews/metadata/QA reports as batch result.
-- [ ] [PARTIAL] SB-LF08-007 — Owner review/approval queue before publication.
+- [ ] SB-LF08-006 — Accepted LevelData/previews/metadata/QA reports as batch result. [PARTIAL]
+- [ ] SB-LF08-007 — Owner review/approval queue before publication. [PARTIAL]
 - [ ] SB-LF08-008 — Production-ready handoff to Content Pipeline.
 
 ### M08.03 - Stress and idempotence
 
-- [ ] [PARTIAL] SB-LF08-009 — Stress high rejection rates safely.
+- [ ] SB-LF08-009 — Stress high rejection rates safely. [PARTIAL]
 - [x] SB-LF08-010 — Reruns create no meaningless diffs.
 
 ---
@@ -367,11 +367,11 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 ### M09.01 - Experimental evolutionary generation
 
 - [ ] SB-LF09-001 — Prototype evolutionary selection behind experimental flag.
-- [ ] [PARTIAL] SB-LF09-002 — Versioned fitness metrics.
+- [ ] SB-LF09-002 — Versioned fitness metrics. [PARTIAL]
 
 ### M09.02 - Semantic/procedural art helpers
 
-- [ ] [PARTIAL] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction.
+- [ ] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction. [PARTIAL]
 
 ### M09.03 - Reference / Style Generation accepted evidence chain
 
@@ -387,7 +387,7 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 - [x] SB-LF09-005 — Keep live/runtime level generation disabled unless explicitly approved.
 - [x] SB-LF09-006 — Preserve reproducibility/lineage.
-- [ ] [PARTIAL] SB-LF09-007 — Compare advanced generation quality/compute cost.
+- [ ] SB-LF09-007 — Compare advanced generation quality/compute cost. [PARTIAL]
 - [x] SB-LF09-008 — No production promotion without separate audit decision.
 
 ### M09.06 - Semantic asset extensions not represented by the 224 LF/CP source requirements
@@ -427,21 +427,21 @@ Capability source family: `SB-CP00-xxx` from the main Scrubbots master plan.
 
 ### M11.01 - App/content and declarative-content boundary
 
-- [ ] [MIGRATION] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project.
-- [ ] [PARTIAL] SB-CP00-002 — Define app code vs remote content boundary.
-- [ ] [PARTIAL] SB-CP00-003 — Remote content declarative only; forbid executable payloads.
+- [ ] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project. [MIGRATION]
+- [ ] SB-CP00-002 — Define app code vs remote content boundary. [PARTIAL]
+- [ ] SB-CP00-003 — Remote content declarative only; forbid executable payloads. [PARTIAL]
 
 ### M11.02 - Staging, audit state, secrets and dry-run
 
 - [ ] SB-CP00-004 — Separate staging/production.
 - [ ] SB-CP00-005 — Versioned/auditable publish/promotion/rollback state.
-- [ ] [PARTIAL] SB-CP00-006 — Secret handling; no credentials in Git.
+- [ ] SB-CP00-006 — Secret handling; no credentials in Git. [PARTIAL]
 - [ ] SB-CP00-007 — Publisher dry-run/validation-only before remote mutation.
 
 ### M11.03 - Provider abstraction, tracker ownership and store-policy gate
 
-- [ ] [PARTIAL] SB-CP00-008 — Provider abstraction.
-- [ ] [MIGRATION] SB-CP00-009 — Content Pipeline GitHub coordination under ChatGPT-owned root tracker.
+- [ ] SB-CP00-008 — Provider abstraction. [PARTIAL]
+- [ ] SB-CP00-009 — Content Pipeline GitHub coordination under ChatGPT-owned root tracker. [MIGRATION]
 - [ ] SB-CP00-010 — Re-verify mobile/store-policy boundary before release.
 
 ---
@@ -453,21 +453,21 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 ### M12.01 - Pack spec, declarative payload and metadata
 
 - [ ] SB-CP01-001 — Define versioned .scrubpack spec.
-- [ ] [PARTIAL] SB-CP01-002 — Package declarative levels only.
-- [ ] [PARTIAL] SB-CP01-003 — Record pack ID/version/time/levels.
+- [ ] SB-CP01-002 — Package declarative levels only. [PARTIAL]
+- [ ] SB-CP01-003 — Record pack ID/version/time/levels. [PARTIAL]
 
 ### M12.02 - Integrity, deterministic serialization and duplicate prevention
 
-- [ ] [PARTIAL] SB-CP01-004 — Per-pack SHA-256.
-- [ ] [PARTIAL] SB-CP01-005 — Deterministic pack serialization/order.
-- [ ] [PARTIAL] SB-CP01-006 — Prevent duplicate level IDs.
+- [ ] SB-CP01-004 — Per-pack SHA-256. [PARTIAL]
+- [ ] SB-CP01-005 — Deterministic pack serialization/order. [PARTIAL]
+- [ ] SB-CP01-006 — Prevent duplicate level IDs. [PARTIAL]
 
 ### M12.03 - Validation, inspection and compatibility
 
-- [ ] [PARTIAL] SB-CP01-007 — Validate every level before pack.
+- [ ] SB-CP01-007 — Validate every level before pack. [PARTIAL]
 - [ ] SB-CP01-008 — Unpack/inspect tooling.
-- [ ] [PARTIAL] SB-CP01-009 — Deterministic bytes where container permits.
-- [ ] [PARTIAL] SB-CP01-010 — Reject unsupported versions safely.
+- [ ] SB-CP01-009 — Deterministic bytes where container permits. [PARTIAL]
+- [ ] SB-CP01-010 — Reject unsupported versions safely. [PARTIAL]
 
 ---
 
@@ -505,8 +505,8 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 ### M14.01 - Validation-only packaging and candidate manifest
 
 - [ ] SB-CP03-001 — Publisher validation-only mode.
-- [ ] [PARTIAL] SB-CP03-002 — Serialize accepted Factory output into packs.
-- [ ] [PARTIAL] SB-CP03-003 — Hashes + candidate manifest.
+- [ ] SB-CP03-002 — Serialize accepted Factory output into packs. [PARTIAL]
+- [ ] SB-CP03-003 — Hashes + candidate manifest. [PARTIAL]
 
 ### M14.02 - Upload integrity and staging verification
 
@@ -531,29 +531,29 @@ Capability source family: `SB-CP04-xxx` from the main Scrubbots master plan.
 
 ### M15.01 - Remote manager, manifest fetch and version comparison
 
-- [ ] [GAME_RUNTIME] SB-CP04-001 — Implement RemoteContentManager only when runtime integration milestone opens.
-- [ ] [GAME_RUNTIME] SB-CP04-002 — Fetch production manifest over HTTPS.
-- [ ] [GAME_RUNTIME] SB-CP04-003 — Compare remote/local content versions.
-- [ ] [GAME_RUNTIME] SB-CP04-004 — Determine missing packs without redundant downloads.
+- [ ] SB-CP04-001 — Implement RemoteContentManager only when runtime integration milestone opens. [GAME_RUNTIME]
+- [ ] SB-CP04-002 — Fetch production manifest over HTTPS. [GAME_RUNTIME]
+- [ ] SB-CP04-003 — Compare remote/local content versions. [GAME_RUNTIME]
+- [ ] SB-CP04-004 — Determine missing packs without redundant downloads. [GAME_RUNTIME]
 
 ### M15.02 - Download, integrity validation and activation
 
-- [ ] [GAME_RUNTIME] SB-CP04-005 — Download to `user://content/`, never `res://`.
-- [ ] [GAME_RUNTIME] SB-CP04-006 — Verify SHA-256.
-- [ ] [GAME_RUNTIME] SB-CP04-007 — Validate pack/schema/level before activation.
-- [ ] [GAME_RUNTIME] SB-CP04-008 — Activate verified content preserving last-known-good.
+- [ ] SB-CP04-005 — Download to `user://content/`, never `res://`. [GAME_RUNTIME]
+- [ ] SB-CP04-006 — Verify SHA-256. [GAME_RUNTIME]
+- [ ] SB-CP04-007 — Validate pack/schema/level before activation. [GAME_RUNTIME]
+- [ ] SB-CP04-008 — Activate verified content preserving last-known-good. [GAME_RUNTIME]
 
 ### M15.03 - Catalog bridge, runtime isolation and failure handling
 
-- [ ] [GAME_RUNTIME] SB-CP04-009 — Expose remote levels to catalog/loader through narrow data interface.
-- [ ] [GAME_RUNTIME] SB-CP04-010 — Keep generator/publisher code out of runtime.
-- [ ] [GAME_RUNTIME] SB-CP04-011 — Add INTERNET permission only when runtime enabled.
-- [ ] [GAME_RUNTIME] SB-CP04-012 — Handle network/server/parse/hash failures without blocking offline play.
+- [ ] SB-CP04-009 — Expose remote levels to catalog/loader through narrow data interface. [GAME_RUNTIME]
+- [ ] SB-CP04-010 — Keep generator/publisher code out of runtime. [GAME_RUNTIME]
+- [ ] SB-CP04-011 — Add INTERNET permission only when runtime enabled. [GAME_RUNTIME]
+- [ ] SB-CP04-012 — Handle network/server/parse/hash failures without blocking offline play. [GAME_RUNTIME]
 
 ### M15.04 - Compatibility and executable-payload rejection
 
-- [ ] [GAME_RUNTIME] SB-CP04-013 — App/content version compatibility tests.
-- [ ] [GAME_RUNTIME] SB-CP04-014 — Reject executable remote artifacts.
+- [ ] SB-CP04-013 — App/content version compatibility tests. [GAME_RUNTIME]
+- [ ] SB-CP04-014 — Reject executable remote artifacts. [GAME_RUNTIME]
 
 ---
 
@@ -563,24 +563,24 @@ Capability source family: `SB-CP05-xxx` from the main Scrubbots master plan.
 
 ### M16.01 - Local registry, last-known-good and offline boot
 
-- [ ] [GAME_RUNTIME] SB-CP05-001 — Define local content registry under `user://`.
-- [ ] [GAME_RUNTIME] SB-CP05-002 — Preserve last-known-good manifest/packs.
-- [ ] [GAME_RUNTIME] SB-CP05-003 — Boot/play cached content offline.
-- [ ] [GAME_RUNTIME] SB-CP05-004 — Safe fallback on manifest fetch failure.
+- [ ] SB-CP05-001 — Define local content registry under `user://`. [GAME_RUNTIME]
+- [ ] SB-CP05-002 — Preserve last-known-good manifest/packs. [GAME_RUNTIME]
+- [ ] SB-CP05-003 — Boot/play cached content offline. [GAME_RUNTIME]
+- [ ] SB-CP05-004 — Safe fallback on manifest fetch failure. [GAME_RUNTIME]
 
 ### M16.02 - Corruption, interruption, retention and builtin levels
 
-- [ ] [GAME_RUNTIME] SB-CP05-005 — Reject corrupt/incomplete downloads without replacing good cache.
-- [ ] [GAME_RUNTIME] SB-CP05-006 — Interrupted-download recovery/cleanup.
-- [ ] [GAME_RUNTIME] SB-CP05-007 — Cache size/retention policy.
-- [ ] [GAME_RUNTIME] SB-CP05-008 — Builtin app levels playable independently.
+- [ ] SB-CP05-005 — Reject corrupt/incomplete downloads without replacing good cache. [GAME_RUNTIME]
+- [ ] SB-CP05-006 — Interrupted-download recovery/cleanup. [GAME_RUNTIME]
+- [ ] SB-CP05-007 — Cache size/retention policy. [GAME_RUNTIME]
+- [ ] SB-CP05-008 — Builtin app levels playable independently. [GAME_RUNTIME]
 
 ### M16.03 - Cold launch, upgrade/downgrade and replacement safety
 
-- [ ] [GAME_RUNTIME] SB-CP05-009 — First launch no-network test.
-- [ ] [GAME_RUNTIME] SB-CP05-010 — Upgrade with partial/corrupt cache.
-- [ ] [GAME_RUNTIME] SB-CP05-011 — Downgrade/compatibility behavior.
-- [ ] [GAME_RUNTIME] SB-CP05-012 — Never delete only known-good set before replacement validates.
+- [ ] SB-CP05-009 — First launch no-network test. [GAME_RUNTIME]
+- [ ] SB-CP05-010 — Upgrade with partial/corrupt cache. [GAME_RUNTIME]
+- [ ] SB-CP05-011 — Downgrade/compatibility behavior. [GAME_RUNTIME]
+- [ ] SB-CP05-012 — Never delete only known-good set before replacement validates. [GAME_RUNTIME]
 
 ---
 
@@ -593,19 +593,19 @@ Capability source family: `SB-CP06-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP06-001 — Rollback as new auditable content version.
 - [ ] SB-CP06-002 — Roll back to known-good manifest/pack set.
 - [ ] SB-CP06-003 — Disable individual level IDs.
-- [ ] [GAME_RUNTIME] SB-CP06-004 — Disabled levels skipped safely.
+- [ ] SB-CP06-004 — Disabled levels skipped safely. [GAME_RUNTIME]
 
 ### M17.02 - Scheduling, time semantics and edit history
 
 - [ ] SB-CP06-005 — Scheduled future activation.
-- [ ] [PARTIAL] SB-CP06-006 — Timezone/time-source behavior.
-- [ ] [PARTIAL] SB-CP06-007 — No schedule activates incompatible/unverified content.
+- [ ] SB-CP06-006 — Timezone/time-source behavior. [PARTIAL]
+- [ ] SB-CP06-007 — No schedule activates incompatible/unverified content. [PARTIAL]
 - [ ] SB-CP06-008 — Cancel/edit future schedules with audit history.
 
 ### M17.03 - Rollback/disable tests and reproducible reports
 
-- [ ] [PARTIAL] SB-CP06-009 — Rollback after bad live release test.
-- [ ] [GAME_RUNTIME] SB-CP06-010 — Single-level disable test.
+- [ ] SB-CP06-009 — Rollback after bad live release test. [PARTIAL]
+- [ ] SB-CP06-010 — Single-level disable test. [GAME_RUNTIME]
 - [ ] SB-CP06-011 — Multiple weekly packs prepared together.
 - [ ] SB-CP06-012 — Reproducible publish/rollback reports.
 
@@ -619,7 +619,7 @@ Capability source family: `SB-CP07-xxx` from the main Scrubbots master plan.
 
 - [ ] SB-CP07-001 — Evaluate provider candidates.
 - [ ] SB-CP07-002 — Select provider with owner approval.
-- [ ] [PARTIAL] SB-CP07-003 — Provider adapter; no credentials in project data.
+- [ ] SB-CP07-003 — Provider adapter; no credentials in project data. [PARTIAL]
 
 ### M18.02 - Storage separation, naming and integrity round trip
 
@@ -632,7 +632,7 @@ Capability source family: `SB-CP07-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP07-007 — Cache-control/CDN strategy.
 - [ ] SB-CP07-008 — Backup/export/migration path.
 - [ ] SB-CP07-009 — Least-privilege publishing credentials.
-- [ ] [PARTIAL] SB-CP07-010 — Keep provider-specific code outside gameplay/content schemas.
+- [ ] SB-CP07-010 — Keep provider-specific code outside gameplay/content schemas. [PARTIAL]
 
 ---
 
@@ -642,22 +642,22 @@ Capability source family: `SB-CP08-xxx` from the main Scrubbots master plan.
 
 ### M19.01 - Batch/version/hash/change records
 
-- [ ] [PARTIAL] SB-CP08-001 — Weekly batch summary.
+- [ ] SB-CP08-001 — Weekly batch summary. [PARTIAL]
 - [ ] SB-CP08-002 — Record staging/production versions.
-- [ ] [PARTIAL] SB-CP08-003 — Record hashes/remote verification.
+- [ ] SB-CP08-003 — Record hashes/remote verification. [PARTIAL]
 - [ ] SB-CP08-004 — Record disabled/scheduled/rollback changes.
 
 ### M19.02 - Health checks, safe errors and incident response
 
 - [ ] SB-CP08-005 — Content-health check.
-- [ ] [PARTIAL] SB-CP08-006 — Safe operational errors/alerts without unnecessary player data.
+- [ ] SB-CP08-006 — Safe operational errors/alerts without unnecessary player data. [PARTIAL]
 - [ ] SB-CP08-007 — Content incident runbook.
 
 ### M19.03 - Clean-machine dry run, disaster recovery and secret-free logs
 
-- [ ] [PARTIAL] SB-CP08-008 — Clean-machine publish dry run.
+- [ ] SB-CP08-008 — Clean-machine publish dry run. [PARTIAL]
 - [ ] SB-CP08-009 — Disaster recovery from backups.
-- [ ] [PARTIAL] SB-CP08-010 — Logs free of secrets.
+- [ ] SB-CP08-010 — Logs free of secrets. [PARTIAL]
 
 ---
 
@@ -672,15 +672,15 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 
 ### M20.02 - Declarative-only payload and transport security
 
-- [ ] [PARTIAL] SB-CP09-003 — Prove remote payloads declarative only.
-- [ ] [PARTIAL] SB-CP09-004 — Prevent content data from embedding/evaluating executable expressions/scripts.
+- [ ] SB-CP09-003 — Prove remote payloads declarative only. [PARTIAL]
+- [ ] SB-CP09-004 — Prevent content data from embedding/evaluating executable expressions/scripts. [PARTIAL]
 - [ ] SB-CP09-005 — HTTPS-only endpoints.
 
 ### M20.03 - Threat model, authenticity, secret/privacy and final audit
 
 - [ ] SB-CP09-006 — Threat-model tampering/rollback attacks.
 - [ ] SB-CP09-007 — Define authenticity upgrade if hash-only insufficient.
-- [ ] [PARTIAL] SB-CP09-008 — No publishing secret ships in app.
+- [ ] SB-CP09-008 — No publishing secret ships in app. [PARTIAL]
 - [ ] SB-CP09-009 — Privacy impact if telemetry enabled.
 - [ ] SB-CP09-010 — Independent audit before production remote-content delivery.
 

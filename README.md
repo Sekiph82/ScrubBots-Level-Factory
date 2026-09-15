@@ -1,8 +1,9 @@
-# SCRUBBOTS Pixel Art Generator V1
+# SCRUBBOTS Level Factory + Content Platform
 
-This repository is the standalone **SCRUBBOTS Procedural Pixel Art Generator
-V1** foundation. It is not the complete SCRUBBOTS Level Factory and does not
-contain gameplay, Godot integration, a GUI, or generator families yet.
+This repository is the canonical SCRUBBOTS Level Factory + Content Platform
+repository. It contains the offline Python Factory Core and the accepted,
+independently openable `level_factory/` Godot shell. Roadmap capabilities that
+are not implemented remain unfinished and are tracked in the root ledger.
 
 The V1 core is local Python tooling and is explicitly offline-only. Runtime
 cloud image generation, HTTP/API calls, telemetry, and API keys are forbidden.
@@ -47,9 +48,12 @@ convention are recorded in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Governance
 
-`tasks.md` is the canonical task ledger. ChatGPT is the independent auditor
+The root `TASKS.md` is the sole project-management tracker. H!veAI task
+tracking requires no other repository file. ChatGPT is the independent auditor
 and tracker owner; Codex is the implementation builder only. Passing builder
 tests are evidence for later independent review and do not close tasks.
+Main-game runtime belongs in `Sekiph82/Scrubbots` only when separately
+authorized; it is not implemented in this repository.
 
 ## Offline CLI (M09)
 
