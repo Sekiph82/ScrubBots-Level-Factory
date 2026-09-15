@@ -4,20 +4,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M00 — Repository, Governance & Canonical Factory Platform
-- Current Sprint: M00.03 — Tracker and coordination governance
-- Current Task: SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger
+- Current Milestone: M06 — ScrubBots Factory Studio
+- Current Sprint: M06.01 — Studio architecture and operator controls
+- Current Task: SB-LF06-001 — Build @tool/editor-facing workspace
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF00-007-C001` from the published GitHub prompt, normalizes README/governance/agent/cycle-index authority so root `TASKS.md` is the sole live ledger, pushes governance/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Codex executes only `SB-LF06-001-C001` from the published GitHub prompt, builds the real Godot Factory Studio workspace shell and explicit canonical-Core gateway boundary without implementing later Dashboard/Import/Library/provider functionality, pushes tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF00-008-C001_CLEAN_CHECKOUT_HEADLESS_BOOT_PROOF_STRICT_AUDIT.md`
-- SB-LF00-008 Disposition: PASS / CLOSED
-- SB-LF00-008 Implementation Commit: `c78293309f6cf2f05f8441a44935416d865b8c10`
-- SB-LF00-008 Final Builder Publication: `e93f6d9c429e18391c63c6731f875d20f3eb3518`
-- SB-LF00-008 Strict Audit Commit: `82b995e23f8eaff0b2496ca469dca5001a50fbbb`
-- Current Prompt: `.hiveai/prompts/SB-LF00-007-C001_GOVERNANCE_AND_COORDINATION_AUTHORITY_NORMALIZATION_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF00-007-C001_GOVERNANCE_AND_COORDINATION_AUTHORITY_NORMALIZATION_STRICT_AUDIT.md`
+- SB-LF00-007 Disposition: PASS / CLOSED
+- SB-LF00-007 Implementation Commit: `dd3311ef8ef35ac88f1d12b91b5f306e2408bed4`
+- SB-LF00-007 Final Builder Publication: `f5cacafdb9c94dc524f7a260681eff2ebe6a50a9`
+- SB-LF00-007 Strict Audit Commit: `dc3675b6d4f9ffc33e723aa84d6a063023b0e4f3`
+- Current Prompt: `.hiveai/prompts/SB-LF06-001-C001_FACTORY_STUDIO_CANONICAL_CORE_WORKSPACE_MIGRATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -35,13 +35,13 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 
 ## Tasks
 
-- M00: Repository, Governance & Canonical Factory Platform — ACTIVE / PARTIALLY EVIDENCED
+- M00: Repository, Governance & Canonical Factory Platform — COMPLETE / VERIFIED
 - M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
 - M03: Puzzle Intelligence: Simulation, Solver & State Search — PLANNED
 - M04: Difficulty Intelligence & Metrics — PLANNED / PARTIALLY EVIDENCED
 - M05: Unified Factory Validation & Level QA — PLANNED / PARTIALLY EVIDENCED
-- M06: ScrubBots Factory Studio — PLANNED / PARTIALLY EVIDENCED
+- M06: ScrubBots Factory Studio — ACTIVE / PARTIALLY EVIDENCED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
 - M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
@@ -87,16 +87,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 30 VERIFIED, 52 PARTIAL, 6 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **30 / 224 = 13.39%**.
+- Canonical LF/CP source-requirement classification: 31 VERIFIED, 52 PARTIAL, 5 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **31 / 224 = 13.84%**.
 - Canonical LF/CP engineering/migration coverage: **88 / 224 = 39.29%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **30 / 244 = 12.30%**.
+- Unified verified completion: **31 / 244 = 12.70%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **30 / 216 = 13.89%**.
-- Level Factory + unique extension surface: **132 tasks**; **30 / 132 = 22.73% verified**.
+- Conservative verified local completion: **31 / 216 = 14.35%**.
+- Level Factory + unique extension surface: **132 tasks**; **31 / 132 = 23.48% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -104,7 +104,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF00-002` is PASS/CLOSED and establishes the Factory-local README/governance/docs/scenes/scripts/tests/output ownership boundaries.
 - `SB-LF00-006` is PASS/CLOSED and establishes the repository-wide generated/candidate/cache/log/secret workspace boundary without hiding durable evidence.
 - `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
-- Active execution frontier remains M00 migration/governance closure and advances to `SB-LF00-007`.
+- `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
+- Active execution frontier is now M06 Factory Studio canonical-Core migration, beginning with `SB-LF06-001`.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -152,7 +153,7 @@ Capability source family: `SB-LF00-xxx` from the main Scrubbots master plan.
 
 ### M00.03 - Tracker and coordination governance
 
-- [~] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger. [MIGRATION]
+- [x] SB-LF00-007 — Establish Factory coordination structure while root TASKS remains sole ledger.
 
 ---
 
@@ -296,7 +297,7 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 
 ### M06.01 - Studio architecture and operator controls
 
-- [ ] SB-LF06-001 — Build @tool/editor-facing workspace. [MIGRATION]
+- [~] SB-LF06-001 — Build @tool/editor-facing workspace. [MIGRATION]
 - [ ] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls. [PARTIAL]
 - [ ] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions. [PARTIAL]
 
@@ -749,8 +750,8 @@ Owner-approved post-cutover product specification:
 
 # EXECUTION ORDER
 
-1. Finish M00 migration/governance closure, continuing with `SB-LF00-007`.
-2. M06 Factory Studio canonical-Core migration, then the owner-approved `SB-LFX-001..012` Studio/operator extensions in dependency-safe slices.
+1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
+2. Execute M06 Factory Studio canonical-Core migration beginning with `SB-LF06-001`, then the owner-approved `SB-LFX-001..012` Studio/operator extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
