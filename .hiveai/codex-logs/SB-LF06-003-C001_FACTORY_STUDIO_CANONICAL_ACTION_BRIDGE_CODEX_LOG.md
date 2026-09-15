@@ -67,3 +67,12 @@ The required implementation, regression tests, offline checks, commit/push evide
 - No canonical Python Factory Core source or semantics were moved, copied, or reimplemented. No WFC gameplay solver, validation, difficulty policy, Dashboard operation, Import, Library, Content Platform, main-game, M03, or M04 behavior was added.
 - Root `TASKS.md` was not modified. The only pre-existing owner-local UID files remain untracked and untouched.
 - Dependency and license files were not changed.
+
+## Implementation publication checkpoint
+
+- Implementation commit: `a34107864d44118762bcde3a35f7c04a5633a4a4` (`Implement Factory Studio canonical action bridge`).
+- Implementation commit was pushed to `origin/main` successfully.
+- Immediately after that push, local `HEAD` and `origin/main` were both `a34107864d44118762bcde3a35f7c04a5633a4a4`; no tracked ahead/behind divergence remained.
+- Final local status retained only the five pre-existing owner-local UID files as untracked; no generated output, cache, secret, sibling-repository, or tracker file was added.
+
+The final publication commit below is intentionally log-only and will be pushed after this checkpoint so the URL identifies this finalized builder log without any post-publication edits.
