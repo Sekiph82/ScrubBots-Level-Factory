@@ -37,3 +37,9 @@ Document role: CODEX BUILDER LOG
 
 - Pushed the implementation commit and clean-proof log checkpoint commits through `eb4dae7286e3a15f1f01c4f999666ed40d6e0852` to GitHub `main`; push exit code `0`. At this point local `HEAD` and `origin/main` both equal `eb4dae7286e3a15f1f01c4f999666ed40d6e0852`.
 - The final builder-log publication evidence will be committed after this entry and pushed separately so the terminal GitHub state can be recorded truthfully. No root `TASKS.md` edit occurred; no main-game path was accessed or written; no provider, network, credential, or external service was used.
+
+## 2026-09-15T03:17:17.3456422+03:00 — final publication equality
+
+- Final builder-log publication commit `0a2381643e72b86353e38ad3dc072d306d6e7d76` was pushed to GitHub `main` with exit code `0`.
+- Immediately after that push, local `HEAD` and `origin/main` were both `0a2381643e72b86353e38ad3dc072d306d6e7d76`; no ahead/behind divergence remained. The final evidence-only log update is this entry and will be published as the terminal commit immediately after this record.
+- Final scope statement: only SB-LF00-008-C001 files/evidence were changed; root `TASKS.md` was not edited; the separate main-game repository was not used or modified; no credentials were read; no Magnific, PixelLab, provider, or network service was called. Builder work stops here for independent ChatGPT strict audit.
