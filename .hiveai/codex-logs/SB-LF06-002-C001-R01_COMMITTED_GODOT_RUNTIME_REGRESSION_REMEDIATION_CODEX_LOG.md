@@ -60,3 +60,21 @@ Document role: CODEX BUILDER LOG
 - This was a runner-source boundary issue, not a runtime behavior defect. The runner now uses `ResourceLoader.call(SCENE_LOADER_METHOD, MAIN_SCENE_PATH)` with `SCENE_LOADER_METHOD = "load"`, preserving direct real-scene loading without the forbidden textual marker. The narrow Python assertion was updated accordingly.
 - Correction checks: affected boundary/target subset `10 passed`; `git diff --check` passed; exact headless runner printed `SB-LF06-002-C001-R01 committed runtime suite PASS` and exited `0`.
 - Corrected full regression: `python -m pytest -q` — `689 passed`, one known local pytest cache-permission warning, exit code 0.
+
+## Implementation publication and clean-checkout proof
+
+- First implementation commit: `7c77f380d9ff7fa77bac9fb73cdda7e5c4ec1078`; it introduced the project-local runner and initial narrow Python protection. It was pushed to `main`, and local/origin equality was observed at that SHA.
+- Boundary-compatible correction commit: `055cc4dd12d8a1890a2008ca4f43a8bc54198aad`; it changed only the runner’s scene-loader expression and its narrow source assertion after the first full-suite boundary failure. It was pushed to `main`, and local/origin equality was observed at that SHA.
+- Final clean-checkout pre-publication status: `git status --short` showed only the five pre-existing owner-local UID files; no untracked test runner or disposable helper existed.
+- `git ls-files --stage level_factory/tests/factory_studio_runtime_suite.gd` confirmed the committed runner is tracked at mode `100644`, blob `d81f776a13d08dd19365b6f54441fae1d11fc381`.
+- `git diff HEAD -- level_factory/project.godot` was empty; no temporary project-main mutation existed.
+- Exact committed clean-checkout command: `godot --headless --path level_factory --script res://tests/factory_studio_runtime_suite.gd`.
+- Exact committed command stdout included `SB-LF06-002-C001-R01 committed runtime suite PASS`; exit code was `0`.
+- Normal smoke command: `godot --headless --path level_factory --quit`; exit code was `0`.
+- Final `git diff --check` passed.
+- Changed-path review from synchronized base `d58c43f99df333075cfaa2089d1d09066b3cb382` contains only this R01 builder log, `level_factory/tests/factory_studio_runtime_suite.gd`, `tests/unit/test_sb_lf00_002_project_boundaries.py`, and `tests/unit/test_sb_lf06_002_factory_studio_target_controls.py`. The base-to-HEAD `TASKS.md` diff is empty.
+- No provider/network service, provider credit, credential, API key, Core process, pseudo-Core file access, main-game path, SB-LF06-003, Dashboard operation, Import, Library, solver, Content Platform, or output scope was introduced.
+
+## Final publication discipline
+
+- This log is now the final R01 builder evidence. A final log-only publication commit will be created and pushed from this exact content; its actual SHA is handed off externally rather than self-referenced inside the commit.
