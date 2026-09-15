@@ -7,17 +7,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M06 — ScrubBots Factory Studio
 - Current Sprint: M06.01 — Studio architecture and operator controls
 - Current Task: SB-LF06-001 — Build @tool/editor-facing workspace
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-001-C001` from the published GitHub prompt, builds the real Godot Factory Studio workspace shell and explicit canonical-Core gateway boundary without implementing later Dashboard/Import/Library/provider functionality, pushes tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Task Status: FIX_REQUIRED
+- Next Task/Action: Codex executes only `SB-LF06-001-C001-R01` from the published GitHub remediation prompt, repairs the Factory Studio runtime Navigation node contract and adds executable Godot scene-instantiation regression evidence, pushes remediation/tests/finalized R01 builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF00-007-C001_GOVERNANCE_AND_COORDINATION_AUTHORITY_NORMALIZATION_STRICT_AUDIT.md`
-- SB-LF00-007 Disposition: PASS / CLOSED
-- SB-LF00-007 Implementation Commit: `dd3311ef8ef35ac88f1d12b91b5f306e2408bed4`
-- SB-LF00-007 Final Builder Publication: `f5cacafdb9c94dc524f7a260681eff2ebe6a50a9`
-- SB-LF00-007 Strict Audit Commit: `dc3675b6d4f9ffc33e723aa84d6a063023b0e4f3`
-- Current Prompt: `.hiveai/prompts/SB-LF06-001-C001_FACTORY_STUDIO_CANONICAL_CORE_WORKSPACE_MIGRATION_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-001-C001_FACTORY_STUDIO_CANONICAL_CORE_WORKSPACE_MIGRATION_STRICT_AUDIT.md`
+- SB-LF06-001 C001 Disposition: FAIL / CHANGES_REQUIRED
+- SB-LF06-001 C001 Implementation Commit: `c3741b14dda48be1c7749e1c399fb26f991d284e`
+- SB-LF06-001 C001 Observed Terminal Builder Commit: `c4f8233f5a20a1b2f839b6b992b200ef352d30f9`
+- SB-LF06-001 C001 Strict Audit Commit: `a212893c352bc24c0205820f32aaa90d8e99788e`
+- Current Prompt: `.hiveai/prompts/SB-LF06-001-C001-R01_FACTORY_STUDIO_RUNTIME_NODE_CONTRACT_REMEDIATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -105,7 +105,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF00-006` is PASS/CLOSED and establishes the repository-wide generated/candidate/cache/log/secret workspace boundary without hiding durable evidence.
 - `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
 - `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
-- Active execution frontier is now M06 Factory Studio canonical-Core migration, beginning with `SB-LF06-001`.
+- `SB-LF06-001-C001` is FAIL / CHANGES_REQUIRED because the committed shell resolves Navigation through a path that does not exist in the committed scene; bounded R01 remediation is active.
+- Active execution frontier remains `SB-LF06-001`; M06 must not advance until R01 independently passes.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -751,7 +752,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. Execute M06 Factory Studio canonical-Core migration beginning with `SB-LF06-001`, then the owner-approved `SB-LFX-001..012` Studio/operator extensions in dependency-safe slices.
+2. Finish `SB-LF06-001` runtime remediation and strict audit before advancing M06; then continue M06 Factory Studio canonical-Core migration and the owner-approved `SB-LFX-001..012` Studio/operator extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
