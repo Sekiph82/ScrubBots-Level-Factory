@@ -88,3 +88,13 @@ Document role: CODEX BUILDER LOG
 - The commit contains only the bounded shell path repair, executable runtime evidence, focused static-test strengthening, narrow runtime-command documentation, and this R01 log.
 - Post-commit status is one commit ahead of `origin/main`; only the four pre-existing/generated local `.uid` files remain untracked and were not deleted or staged.
 - Root `TASKS.md`, root `src/`, the main-game repository, and provider/network surfaces remain unchanged.
+
+## 2026-09-15T12:31:15+03:00 — observed publication/equality checkpoint
+
+- Pushed remediation implementation plus builder-evidence checkpoint successfully: `c799b44..d1b7c04` on `main -> main`.
+- Observed local HEAD and `origin/main` equality after that push: `d1b7c04044e2b7e1fd3e6c39df8d07b7d3568583`; ahead/behind `0 0`.
+- This is the last pushed equality checkpoint before the final log-only publication record below; no earlier commit is called terminal while another builder commit remains planned.
+
+## Terminal log publication note
+
+- The final log-only commit will publish this record and will be verified against `origin/main` after push. The preceding observed equality checkpoint is recorded above rather than making a self-referential SHA claim.
