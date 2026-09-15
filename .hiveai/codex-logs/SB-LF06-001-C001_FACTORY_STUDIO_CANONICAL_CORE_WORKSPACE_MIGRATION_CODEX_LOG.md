@@ -84,3 +84,9 @@ No implementation, test, documentation, or tracker edit has been made before thi
 - Pushed `main` to `origin` successfully with implementation and builder-evidence checkpoint commits: `8532d39..c8c9ef2`.
 - After that push, local HEAD and `origin/main` were both `c8c9ef26211e9dc7e5ac127cecd2634496493384`; ahead/behind was `0 0`.
 - Final publication will add only this truthful push/equality record to the same builder log. The four generated local `.uid` files remain untracked owner-local files and are excluded from publication.
+
+## 2026-09-15T10:00:00+03:00 — terminal publication record
+
+- Final publication commit created and pushed: `13eb7098e7c465f93aa20216f7c6efe738b8a090`.
+- Push result: `c8c9ef2..13eb709` on `main -> main`.
+- The finalized builder log is therefore published at the repository `main` path. The implementation SHA is `c3741b14dda48be1c7749e1c399fb26f991d284e`; the evidence checkpoint SHA is `c8c9ef26211e9dc7e5ac127cecd2634496493384`.
