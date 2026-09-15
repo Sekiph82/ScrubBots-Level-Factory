@@ -4,20 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M01 — Deterministic Factory Core
-- Current Sprint: M01.02 — Production dimensions and workload envelope
-- Current Task: SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance
-- Current Task Status: FIX_REQUIRED
-- Next Task/Action: Codex executes only `SB-LF01-005-C001-R01` from the published GitHub remediation prompt, hardens the batch-manifest version gate, adds non-binding workload guidance, preserves the accepted independent-dimension/schema-v1 replay architecture, pushes remediation/tests/finalized R01 builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Milestone: M06 — ScrubBots Factory Studio
+- Current Sprint: M06.01 — Studio architecture and operator controls
+- Current Task: SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls
+- Current Task Status: READY_FOR_IMPLEMENTATION
+- Next Task/Action: Codex executes only `SB-LF06-002-C001` from the published GitHub prompt, implements presentation-only Generate target controls bound by regression to canonical Python Difficulty/GeneratorMode/dimension truth, preserves truthful Core-unavailable behavior, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF01-005-C001_INDEPENDENT_DIMENSION_ENVELOPE_MIGRATION_STRICT_AUDIT.md`
-- SB-LF01-005 C001 Disposition: CHANGES_REQUIRED / PRODUCT MIGRATION RETAINED
+- Previous Strict Audit: `.hiveai/audits/SB-LF01-005-C001-R01_MANIFEST_VERSION_GATE_AND_WORKLOAD_GUIDANCE_REMEDIATION_STRICT_AUDIT.md`
+- SB-LF01-005 Disposition: PASS / CLOSED
 - SB-LF01-005 C001 Implementation Commit: `739e100c4a5a188f6aa3d311e87069924c8ef3c8`
-- SB-LF01-005 C001 Observed Terminal Builder Commit: `acf4b46e6b603254b221f4335bb57ba321815850`
-- SB-LF01-005 C001 Strict Audit Commit: `618d0ff406e8b5cc5c501127f3d4bd859c4e5521`
-- Current Prompt: `.hiveai/prompts/SB-LF01-005-C001-R01_MANIFEST_VERSION_GATE_AND_WORKLOAD_GUIDANCE_REMEDIATION_PROMPT.md`
+- SB-LF01-005 R01 Remediation Commit: `c84f182ac07813dda6095ff6db5ad58dd210627d`
+- SB-LF01-005 R01 Final Builder Publication: `9c0aedf2283b0e20aa825897505c2067d1d14b7d`
+- SB-LF01-005 Closing Strict Audit Commit: `272d8f1baf4fb1f9b8742cb93345d674010ce454`
+- Current Prompt: `.hiveai/prompts/SB-LF06-002-C001_FACTORY_STUDIO_TARGET_CONTROLS_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -36,12 +37,12 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 ## Tasks
 
 - M00: Repository, Governance & Canonical Factory Platform — COMPLETE / VERIFIED
-- M01: Deterministic Factory Core — ACTIVE / PARTIALLY EVIDENCED
+- M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
 - M03: Puzzle Intelligence: Simulation, Solver & State Search — PLANNED
 - M04: Difficulty Intelligence & Metrics — PLANNED / PARTIALLY EVIDENCED
 - M05: Unified Factory Validation & Level QA — PLANNED / PARTIALLY EVIDENCED
-- M06: ScrubBots Factory Studio — PAUSED / PARTIALLY EVIDENCED — waiting on `SB-LF01-005` canonical-Core dependency
+- M06: ScrubBots Factory Studio — ACTIVE / PARTIALLY EVIDENCED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
 - M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
@@ -87,16 +88,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 32 VERIFIED, 52 PARTIAL, 4 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **32 / 224 = 14.29%**.
+- Canonical LF/CP source-requirement classification: 33 VERIFIED, 52 PARTIAL, 3 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **33 / 224 = 14.73%**.
 - Canonical LF/CP engineering/migration coverage: **88 / 224 = 39.29%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **32 / 244 = 13.11%**.
+- Unified verified completion: **33 / 244 = 13.52%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **32 / 216 = 14.81%**.
-- Level Factory + unique extension surface: **132 tasks**; **32 / 132 = 24.24% verified**.
+- Conservative verified local completion: **33 / 216 = 15.28%**.
+- Level Factory + unique extension surface: **132 tasks**; **33 / 132 = 25.00% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -106,8 +107,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
 - `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
 - `SB-LF06-001` is PASS/CLOSED through `SB-LF06-001-C001-R01`; the real Factory Studio workspace shell and executable runtime node contract are accepted.
-- `SB-LF01-005-C001` correctly migrates current production dimensions to independent `20..59` and retains historical request-schema-v1 replay, but strict audit found a non-strict batch-manifest version gate and missing advisory workload guidance; bounded R01 remediation is active.
-- Active execution frontier remains `SB-LF01-005`; M06 resumes at `SB-LF06-002` only after R01 independently passes.
+- `SB-LF01-005` is PASS/CLOSED through `SB-LF01-005-C001-R01`; current production dimensions are independently `20..59`, historical request-schema-v1 replay remains intact, manifest version parsing is strict, and workload guidance is advisory only.
+- Active execution frontier has returned to M06 at `SB-LF06-002`; Studio target controls must remain presentation-only and regression-bound to canonical Python Core truth while the Core gateway is unavailable.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -172,7 +173,7 @@ Capability source family: `SB-LF01-xxx` from the main Scrubbots master plan.
 
 ### M01.02 - Production dimensions and workload envelope
 
-- [~] SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance. [MIGRATION]
+- [x] SB-LF01-005 — Support width/height selection within current engine/content envelope and workload guidance.
 - [x] SB-LF01-006 — Support rectangular boards.
 - [x] SB-LF01-007 — Exercise 59×59 where cost scales.
 
@@ -300,7 +301,7 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 ### M06.01 - Studio architecture and operator controls
 
 - [x] SB-LF06-001 — Build @tool/editor-facing workspace.
-- [ ] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls. [PARTIAL]
+- [~] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls. [PARTIAL]
 - [ ] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions. [PARTIAL]
 
 ### M06.02 - Preview, metrics and controlled editing
@@ -752,7 +753,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. Close the canonical-Core dimension dependency `SB-LF01-005`, then return to M06 at `SB-LF06-002`; continue Factory Studio canonical-Core migration and owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
+2. `SB-LF01-005` canonical-Core dimension dependency is PASS/CLOSED; M06 resumes at `SB-LF06-002` and then continues Factory Studio canonical-Core migration plus owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
