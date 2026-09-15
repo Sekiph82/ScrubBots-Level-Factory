@@ -23,5 +23,13 @@ implementation belongs to `Sekiph82/Scrubbots` only when separately
 authorized. Generated or provider-backed features are not implied by this
 project shell.
 
+Owner-approved future Studio/operator workflows, including the Factory
+Operations Dashboard, manual Pixel Art import, Source Art Library, one-click
+pipeline, unified review workflow, retry/recovery tools, comparison/search
+surfaces, and provider accounting, are specified in
+`../docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`. That
+product plan does not imply those capabilities are already implemented and it
+must remain an orchestration/presentation layer over canonical Factory truth.
+
 The broader generated, candidate, cache, and secret-folder policy remains
 owned by `SB-LF00-006`; this document does not claim that policy is complete.
