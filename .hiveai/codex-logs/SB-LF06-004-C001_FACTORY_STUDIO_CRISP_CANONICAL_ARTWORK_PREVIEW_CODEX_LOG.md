@@ -64,3 +64,31 @@ Implementation notes will be appended chronologically after the committed previe
 ## Publication checkpoints
 
 Implementation commit and push details will be appended after the implementation commit. The final log-only publication commit will be the terminal commit and will contain no product or test changes.
+
+## Implementation checkpoint
+
+- Implementation commit: `7f201c4735ee72bc6e352ff26ea5fdcafc4e3f18` (`Implement crisp canonical artwork preview`).
+- `git push origin main`: succeeded.
+- Post-push implementation equality: local `HEAD` and `origin/main` both equal `7f201c4735ee72bc6e352ff26ea5fdcafc4e3f18`.
+- Product/test tree is frozen at the implementation checkpoint; the remaining untracked files are the five pre-existing owner-local Godot UID files and were not added or modified.
+
+## Final security, offline, and scope review
+
+- No provider, network, HTTP, credential, API-key, sibling-repository, or temporary-runner dependency was added.
+- The preview reads only local governed Factory output, derives only `artwork.png` beneath the successful action `output_path`, and keeps presentation scaling in memory.
+- Nearest-neighbor interpolation and the nearest texture filter are both applied; no canonical bundle is rewritten and no generated preview file is committed.
+- No second Core, compiler, solver, validator, difficulty policy, metrics system, editor, importer, library, Dashboard operation, Content Platform, or main-game implementation was introduced.
+- Candidate presentation labels remain UI-only and are not forwarded or used as preview identity.
+- No dependency or license files changed.
+
+## Final diff and status before log-only publication
+
+- `git diff --check`: passed at the implementation checkpoint.
+- Implementation commit changed only the dedicated preview component, existing target-controls presentation handoff, committed Studio integration evidence, the narrow LF00 boundary allow-list update for that authorized script, the focused LF06-004 Python evidence, and this builder log.
+- Root `TASKS.md` and all prior prompts, audits, and logs remain unchanged.
+- Final status before the terminal log-only commit: branch `main` equal to `origin/main` at `7f201c4735ee72bc6e352ff26ea5fdcafc4e3f18`, plus only the five preserved pre-existing untracked UID files.
+
+## Terminal publication
+
+- This final append is the sole post-implementation change. The next commit must be log-only and must not contain product or test edits.
+- The terminal log-only publication commit SHA is intentionally handed off externally because recording its own SHA inside the commit would require a post-final self-referential log edit. After this commit is pushed, local `HEAD` and `origin/main` must be equal; no post-final equality-log commit will be made.
