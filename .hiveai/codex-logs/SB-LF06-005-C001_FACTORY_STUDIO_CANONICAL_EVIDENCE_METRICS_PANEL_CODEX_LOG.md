@@ -65,3 +65,31 @@ Implementation notes will be appended chronologically after the read-only canoni
 ## Publication checkpoints
 
 Implementation commit and push details will be appended after the implementation commit. The final log-only publication commit will be the terminal commit and will contain no product or test changes.
+
+## Implementation checkpoint
+
+- Implementation commit: `5ea045acf4ef0bae0a26055f5d26b8e3c2b4b03d` (`Add canonical evidence metrics panel`).
+- `git push origin main`: succeeded.
+- Post-push implementation equality: local `HEAD` and `origin/main` both equal `5ea045acf4ef0bae0a26055f5d26b8e3c2b4b03d`.
+- Product/test tree is frozen at the implementation checkpoint; the remaining untracked files are the five pre-existing owner-local Godot UID files and were not added or modified.
+
+## Final security, offline, and scope review
+
+- No provider, network, HTTP, credential, API-key, sibling-repository, or temporary-helper dependency was added.
+- The panel reads only local governed Factory output metadata after a successful canonical action, keeps metadata read-only, and stores only in-memory presentation snapshots.
+- Structural quality values are copied from canonical metadata; no quality formula, solver, measured difficulty, load, risk, or owner-acceptance computation was introduced.
+- Request difficulty is labeled target/request context only. Solution, Difficulty analysis, and Load/risk remain explicitly unavailable under their governing M03/M04/M05 gates.
+- `Structural QA ACCEPT != OWNER ACCEPT` remains explicit. Preview, action result, and evidence-panel states remain separate.
+- No dependency or license files changed.
+
+## Final diff and status before log-only publication
+
+- `git diff --check`: passed at the implementation checkpoint.
+- Implementation commit changed only the dedicated LF06-005 evidence panel, existing target-controls presentation handoff, committed Studio integration evidence, the narrow LF00 boundary allow-list update for that authorized script, focused LF06-005 Python evidence, and this builder log.
+- Root `TASKS.md` and all prior prompts, audits, and logs remain unchanged.
+- Final status before the terminal log-only commit: branch `main` equal to `origin/main` at `5ea045acf4ef0bae0a26055f5d26b8e3c2b4b03d`, plus only the five preserved pre-existing untracked UID files.
+
+## Terminal publication
+
+- This final append is the sole post-implementation change. The next commit must be log-only and must not contain product or test edits.
+- The terminal log-only publication commit SHA is intentionally handed off externally because recording its own SHA inside the commit would require a post-final self-referential log edit. After this commit is pushed, local `HEAD` and `origin/main` must be equal; no post-final equality-log commit will be made.
