@@ -200,9 +200,9 @@ func _run_suite() -> void:
 	_check(not source_bytes_before.is_empty() and not source_sha_before.is_empty(), "Editor did not capture real source artwork bytes/hash before editing")
 	var edited_x := 0
 	var edited_y := 0
-	var selected_color := "C16"
-	if editor_source_image != null and editor_source_image.get_pixel(edited_x, edited_y) == Color8(0, 0, 0, 255):
-		selected_color = "C01"
+	var original_color_id := str(editor.call("canonical_color_id_for_pixel", editor_source_image.get_pixel(edited_x, edited_y))) if editor_source_image != null else ""
+	_check(not original_color_id.is_empty(), "Editor could not map the source cell RGB to a canonical palette ID")
+	var selected_color := _different_canonical_color(original_color_id, "C16")
 	_check(bool(editor.call("select_color", selected_color)), "Editor rejected a canonical C01..C16 paint color")
 	_check(bool(editor.call("paint_cell", edited_x, edited_y, selected_color)), "Editor did not paint one valid logical cell")
 	var editor_dirty: Dictionary = editor.call("snapshot")
@@ -223,6 +223,32 @@ func _run_suite() -> void:
 	_check(str(editor_dirty.get("source_artwork_sha256", "")) == source_sha_before, "Editing changed captured canonical source artwork hash")
 	_check(preview.call("snapshot").get("artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Dirty edit relabeled canonical preview source")
 	_check(evidence.call("snapshot").get("metadata_path") == str(generated.get("output_path")).path_join("metadata.json"), "Dirty edit relabeled canonical evidence source")
+	_check(bool(editor.call("select_color", original_color_id)), "Editor rejected the original canonical source color ID")
+	_check(bool(editor.call("paint_cell", edited_x, edited_y, original_color_id)), "Editor could not restore the last differing cell to its source color")
+	var editor_clean_after_reversal: Dictionary = editor.call("snapshot")
+	_check(editor_clean_after_reversal.get("state") == "CLEAN", "Restoring the last differing cell did not automatically return the editor to CLEAN")
+	_check(editor_clean_after_reversal.get("dirty_cell_count") == 0 and editor_clean_after_reversal.get("working_buffer_differs") == false, "Single-cell reversal left stale dirty evidence")
+	var restored_after_reversal: Image = editor.call("working_image_snapshot")
+	_check(restored_after_reversal != null and editor_source_image != null and _images_equal(restored_after_reversal, editor_source_image), "Single-cell reversal did not restore exact source pixels")
+	_check(FileAccess.get_file_as_bytes(source_artwork_path) == source_bytes_before, "Single-cell reversal changed canonical source artwork bytes")
+	_check(preview.call("snapshot").get("artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Single-cell reversal changed canonical preview identity")
+	_check(evidence.call("snapshot").get("metadata_path") == str(generated.get("output_path")).path_join("metadata.json"), "Single-cell reversal changed canonical evidence identity")
+	var multi_first_x := 0
+	var multi_second_x := 1
+	var multi_first_source_id := str(editor.call("canonical_color_id_for_pixel", editor_source_image.get_pixel(multi_first_x, edited_y))) if editor_source_image != null else ""
+	var multi_second_source_id := str(editor.call("canonical_color_id_for_pixel", editor_source_image.get_pixel(multi_second_x, edited_y))) if editor_source_image != null else ""
+	var multi_first_color := _different_canonical_color(multi_first_source_id, "C16")
+	var multi_second_color := _different_canonical_color(multi_second_source_id, "C15")
+	_check(bool(editor.call("paint_cell", multi_first_x, edited_y, multi_first_color)), "First multi-dirty cell could not be painted")
+	_check(bool(editor.call("paint_cell", multi_second_x, edited_y, multi_second_color)), "Second multi-dirty cell could not be painted")
+	var editor_multi_dirty: Dictionary = editor.call("snapshot")
+	_check(editor_multi_dirty.get("state") == "DIRTY" and editor_multi_dirty.get("dirty_cell_count") == 2, "Two differing cells did not produce exact DIRTY count 2")
+	_check(bool(editor.call("paint_cell", multi_first_x, edited_y, multi_first_source_id)), "First multi-dirty cell could not be restored to its source color")
+	var editor_partial_restore: Dictionary = editor.call("snapshot")
+	_check(editor_partial_restore.get("state") == "DIRTY" and editor_partial_restore.get("dirty_cell_count") == 1, "Partial multi-cell restoration did not remain DIRTY with exact count 1")
+	_check(editor_partial_restore.get("working_buffer_differs") == true, "Partial multi-cell restoration falsely reported equal source/work buffer")
+	edited_x = multi_second_x
+	selected_color = multi_second_color
 	var dirty_before_invalid_attempts: Image = editor.call("working_image_snapshot")
 	_check(editor.call("paint_cell", -1, 0, selected_color) == false, "Out-of-bounds negative coordinate was accepted")
 	_check(editor.call("paint_cell", 20, 21, selected_color) == false, "Out-of-bounds upper coordinate was accepted")
@@ -448,6 +474,14 @@ func _write_text(path: String, contents: String) -> void:
 	if file != null:
 		file.store_string(contents)
 		file.close()
+
+
+func _different_canonical_color(source_id: String, preferred: String) -> String:
+	var candidates := [preferred, "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10", "C11", "C12", "C13", "C14", "C15", "C16"]
+	for candidate in candidates:
+		if candidate != source_id:
+			return candidate
+	return ""
 
 
 func _images_equal(left: Image, right: Image) -> bool:

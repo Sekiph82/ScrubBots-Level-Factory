@@ -151,7 +151,7 @@ func latest_successful_action_snapshot() -> Dictionary:
 
 
 func snapshot() -> Dictionary:
-	var dirty_count := _dirty_cell_count()
+	var dirty_count := _reconcile_state()
 	return {
 		"state": _state,
 		"source_action": _source_action,
@@ -207,10 +207,11 @@ func paint_cell(x: int, y: int, color_id: String = "") -> bool:
 		return false
 	var target_color := _canonical_color(chosen_color)
 	if _working_image.get_pixel(x, y) == target_color:
+		_reconcile_state()
 		_refresh_editor()
 		return true
 	_working_image.set_pixel(x, y, target_color)
-	_state = DIRTY
+	_reconcile_state()
 	_refresh_editor()
 	return true
 
@@ -270,6 +271,13 @@ func reset_to_source() -> bool:
 	return true
 
 
+func canonical_color_id_for_pixel(pixel: Color) -> String:
+	for color_id in LOGICAL_PALETTE_IDS:
+		if _canonical_color(color_id) == pixel:
+			return color_id
+	return ""
+
+
 func _on_load_pressed() -> void:
 	# The button itself is the explicit operator approval to replace a DIRTY buffer.
 	load_current_canonical_artwork(true)
@@ -308,7 +316,7 @@ func _set_load_error(message: String) -> bool:
 func _refresh_editor() -> void:
 	if _state_label == null:
 		return
-	var dirty_count := _dirty_cell_count()
+	var dirty_count := _reconcile_state()
 	var suffix := ""
 	if _state == DIRTY:
 		suffix = " — DIRTY EDIT != CANONICAL SOURCE"
@@ -370,6 +378,13 @@ func _dirty_cell_count() -> int:
 			if _source_image.get_pixel(x, y) != _working_image.get_pixel(x, y):
 				count += 1
 	return count
+
+
+func _reconcile_state() -> int:
+	var dirty_count := _dirty_cell_count()
+	if _source_image != null and _working_image != null and _state in [CLEAN, DIRTY]:
+		_state = DIRTY if dirty_count > 0 else CLEAN
+	return dirty_count
 
 
 func _canonical_color(color_id: String) -> Color:
