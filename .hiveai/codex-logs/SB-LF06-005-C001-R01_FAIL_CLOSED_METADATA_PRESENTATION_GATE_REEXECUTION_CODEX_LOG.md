@@ -57,3 +57,8 @@ The existing R01 implementation already contains the required candidate identity
 ## Publication checkpoints
 
 Verification, implementation commit, push/equality checkpoint, and the terminal log-only publication commit will be appended chronologically. No prior process record will be rewritten.
+
+- Remediation implementation commit: `68080eb451fbaaed2dfb4ff685e1cac390b91560`.
+- The implementation commit was pushed successfully to `origin/main`; local `HEAD` and `origin/main` were equal at `68080eb451fbaaed2dfb4ff685e1cac390b91560` immediately after publication.
+- The final status before this append contains only the ten preserved untracked owner-local Godot UID files. They were not staged or deleted.
+- This is the final evidence append. The next commit is intentionally log-only and terminal; no product or test edit will follow it.
