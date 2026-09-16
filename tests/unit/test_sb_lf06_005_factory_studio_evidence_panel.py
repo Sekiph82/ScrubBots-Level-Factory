@@ -30,7 +30,7 @@ def test_evidence_panel_is_project_local_and_reads_canonical_metadata_only() -> 
     assert "JSON.parse_string" in source
     assert "quality" in lowered and "report" in lowered and "metrics" in lowered
     assert "evaluate_grid" not in source
-    assert "GenerationRequest" not in source
+    assert "class GenerationRequest" not in source
     assert "GenerationResult" not in source
     assert "candidate_presentation" not in lowered
     for marker in (

@@ -14,6 +14,8 @@ const QUALITY_BINDING_SCHEMA := "scrubbots-output-quality-binding"
 const QUALITY_BINDING_VERSION := 1
 const QUALITY_SCHEMA := "scrubbots-quality"
 const QUALITY_VERSION := 1
+const GENERATION_REQUEST_SCHEMA := "scrubbots-generation-request"
+const SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS: Array[int] = [1, 2]
 
 var _state := EMPTY
 var _source_action := ""
@@ -162,6 +164,8 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	var root: Dictionary = metadata
 	if root.get("schema") != METADATA_SCHEMA or root.get("schema_version") != METADATA_SCHEMA_VERSION:
 		return "unsupported metadata schema/version"
+	if typeof(root.get("candidate_id")) != TYPE_STRING or str(root.get("candidate_id")).is_empty():
+		return "root metadata candidate_id is missing or not a string"
 	var artwork: Variant = root.get("artwork")
 	var generation: Variant = root.get("generation")
 	var quality: Variant = root.get("quality")
@@ -172,12 +176,18 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	var quality_data: Dictionary = quality
 	var action_candidate := str(result.get("candidate_id", ""))
 	var action_grid_hash := str(result.get("grid_hash", ""))
-	if artwork_data.get("candidate_id") != action_candidate:
+	if root.get("candidate_id") != action_candidate or artwork_data.get("candidate_id") != action_candidate or root.get("candidate_id") != artwork_data.get("candidate_id"):
 		return "metadata candidate identity does not match successful action evidence"
 	if artwork_data.get("grid_hash") != action_grid_hash:
 		return "metadata grid identity does not match successful action evidence"
 	var action_dimensions := _parse_dimensions(str(result.get("dimensions", "")))
-	if action_dimensions.is_empty() or artwork_data.get("width") != action_dimensions[0] or artwork_data.get("height") != action_dimensions[1]:
+	var artwork_width_value: Variant = artwork_data.get("width")
+	var artwork_height_value: Variant = artwork_data.get("height")
+	if typeof(artwork_width_value) not in [TYPE_INT, TYPE_FLOAT] or typeof(artwork_height_value) not in [TYPE_INT, TYPE_FLOAT]:
+		return "metadata artwork dimensions are not numeric"
+	if float(artwork_width_value) != floor(float(artwork_width_value)) or float(artwork_height_value) != floor(float(artwork_height_value)):
+		return "metadata artwork dimensions are not exact integers"
+	if action_dimensions.is_empty() or int(artwork_width_value) != action_dimensions[0] or int(artwork_height_value) != action_dimensions[1]:
 		return "metadata dimensions do not match successful action evidence"
 	if quality_data.get("schema") != QUALITY_BINDING_SCHEMA or quality_data.get("version") != QUALITY_BINDING_VERSION:
 		return "unsupported canonical quality binding schema/version"
@@ -204,6 +214,14 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	if not request is Dictionary or generator_mode.is_empty() or generator_id.is_empty() or generator_version.is_empty():
 		return "canonical generation provenance is missing"
 	var request_data: Dictionary = request
+	if typeof(request_data.get("schema")) != TYPE_STRING or request_data.get("schema") != GENERATION_REQUEST_SCHEMA:
+		return "unsupported canonical GenerationRequest schema"
+	var request_version_value: Variant = request_data.get("schema_version")
+	if typeof(request_version_value) not in [TYPE_INT, TYPE_FLOAT] or float(request_version_value) != floor(float(request_version_value)):
+		return "canonical GenerationRequest schema version is not an exact integer"
+	var request_version := int(request_version_value)
+	if not SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS.has(request_version):
+		return "unsupported canonical GenerationRequest schema version"
 	var selected_metrics: Dictionary = {}
 	for key in [
 		"occupied_count",
@@ -221,9 +239,17 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 		"negative_space_ratio",
 	]:
 		if metrics.has(key):
+			if typeof(metrics[key]) not in [TYPE_INT, TYPE_FLOAT]:
+				return "canonical structural metric has an invalid type: " + key
 			selected_metrics[key] = metrics[key]
 	if selected_metrics.is_empty():
 		return "canonical structural metric subset is empty"
+	var rejection_codes_value: Variant = quality_data.get("rejection_codes")
+	if typeof(rejection_codes_value) != TYPE_ARRAY:
+		return "canonical quality rejection_codes is not an array"
+	for rejection_code in rejection_codes_value:
+		if typeof(rejection_code) != TYPE_STRING:
+			return "canonical quality rejection_codes contains a non-string value"
 	_source_action = str(result.get("action", ""))
 	_source_bundle_path = str(result.get("output_path", ""))
 	_metadata_path = path
@@ -241,7 +267,7 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	_quality_schema_version = int(report_data.get("version", 0))
 	_quality_policy_version = str(policy.get("version", ""))
 	_quality_decision = str(quality_data.get("decision", report_data.get("accepted", "")))
-	_quality_rejection_codes = quality_data.get("rejection_codes", report_data.get("rejection_codes", [])).duplicate()
+	_quality_rejection_codes = rejection_codes_value.duplicate()
 	_structural_metrics = selected_metrics
 	_canonical_quality_evidence = quality_data.duplicate(true)
 	return ""

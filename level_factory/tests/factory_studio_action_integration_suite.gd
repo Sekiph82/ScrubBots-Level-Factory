@@ -201,6 +201,41 @@ func _run_suite() -> void:
 	var original_metadata := metadata_file.get_as_text() if metadata_file != null else ""
 	if metadata_file != null:
 		metadata_file.close()
+	var canonical_metadata_value: Variant = JSON.parse_string(original_metadata)
+	_check(canonical_metadata_value is Dictionary, "Canonical Generate metadata could not be parsed for fail-closed gate mutations")
+	if canonical_metadata_value is Dictionary:
+		var root_candidate_mutation: Dictionary = canonical_metadata_value.duplicate(true)
+		root_candidate_mutation["candidate_id"] = "root-mismatched-candidate"
+		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, root_candidate_mutation, "root candidate mismatch")
+		var request_schema_mutation: Dictionary = canonical_metadata_value.duplicate(true)
+		var request_schema_generation: Dictionary = request_schema_mutation.get("generation", {})
+		var request_schema_request: Dictionary = request_schema_generation.get("request", {})
+		request_schema_request["schema"] = "unsupported-generation-request"
+		request_schema_generation["request"] = request_schema_request
+		request_schema_mutation["generation"] = request_schema_generation
+		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, request_schema_mutation, "request schema")
+		var request_version_mutation: Dictionary = canonical_metadata_value.duplicate(true)
+		var request_version_generation: Dictionary = request_version_mutation.get("generation", {})
+		var request_version_request: Dictionary = request_version_generation.get("request", {})
+		request_version_request["schema_version"] = 999
+		request_version_generation["request"] = request_version_request
+		request_version_mutation["generation"] = request_version_generation
+		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, request_version_mutation, "unsupported request version")
+		var request_type_mutation: Dictionary = canonical_metadata_value.duplicate(true)
+		var request_type_generation: Dictionary = request_type_mutation.get("generation", {})
+		var request_type_request: Dictionary = request_type_generation.get("request", {})
+		request_type_request["schema_version"] = "2"
+		request_type_generation["request"] = request_type_request
+		request_type_mutation["generation"] = request_type_generation
+		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, request_type_mutation, "request version type")
+		var rejection_type_mutation: Dictionary = canonical_metadata_value.duplicate(true)
+		var rejection_type_quality: Dictionary = rejection_type_mutation.get("quality", {})
+		rejection_type_quality["rejection_codes"] = "not-an-array"
+		rejection_type_mutation["quality"] = rejection_type_quality
+		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, rejection_type_mutation, "rejection_codes type")
+		evidence.call("consume_action_result", generated)
+		var restored_generate_evidence: Dictionary = evidence.call("snapshot")
+		_check(restored_generate_evidence.get("state") == "READY" and restored_generate_evidence.get("retained_after_failure") == false, "Restored canonical Generate metadata did not return evidence panel to READY")
 	_write_text(metadata_path, "{\"corrupted\":true}")
 	reproduce_button.pressed.emit()
 	await process_frame
@@ -289,6 +324,16 @@ func _under_output_area(path: String) -> bool:
 	var output_root := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
 	var normalized := path.simplify_path().replace(char(92), "/").to_lower()
 	return normalized.begins_with(output_root + "/")
+
+
+func _assert_evidence_error_after_metadata_mutation(evidence: Node, result: Dictionary, metadata_path: String, original_metadata: String, mutation: Dictionary, label: String) -> void:
+	_write_text(metadata_path, JSON.stringify(mutation))
+	evidence.call("consume_action_result", result)
+	var mutated_evidence: Dictionary = evidence.call("snapshot")
+	_check(mutated_evidence.get("state") == "ERROR", "" + label + " did not produce truthful evidence ERROR")
+	_check(mutated_evidence.get("retained_after_failure") == true, "" + label + " did not retain prior successful evidence")
+	_check(not str(mutated_evidence.get("error", "")).is_empty(), "" + label + " did not expose a bounded evidence diagnostic")
+	_write_text(metadata_path, original_metadata)
 
 
 func _write_text(path: String, contents: String) -> void:
