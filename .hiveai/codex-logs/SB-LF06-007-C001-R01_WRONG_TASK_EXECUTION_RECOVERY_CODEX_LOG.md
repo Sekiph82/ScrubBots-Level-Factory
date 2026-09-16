@@ -61,3 +61,14 @@ This recovery log was created and verified before restoring the wrong-task produ
 ## Publication checkpoints
 
 Verification, implementation commit, push/equality checkpoint, and the terminal log-only publication commit will be appended chronologically. No root `TASKS.md`, audit, prompt, prior builder log, or wrong-task evidence will be rewritten.
+
+## Implementation checkpoint
+
+- Implementation/recovery commit: `1918e9158872ef450629758ca181bc8e4a262b6c` (`Recover LF06-007 puzzle-config edit gate`).
+- The implementation commit was pushed successfully to `origin/main`.
+- Immediately after push, local `HEAD` and `origin/main` were both `1918e9158872ef450629758ca181bc8e4a262b6c`.
+- The ten pre-existing owner-local Godot UID files remain untracked and were not staged, deleted, or modified by this task.
+
+## Final publication checkpoint
+
+- This append is the final evidence update before the terminal log-only publication commit. No product, test, tracker, prompt, audit, or prior-log content will be changed afterward.
