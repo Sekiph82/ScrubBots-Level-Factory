@@ -7,18 +7,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M06 — ScrubBots Factory Studio
 - Current Sprint: M06.01 — Studio architecture and operator controls
 - Current Task: SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-003-C001` from the published GitHub prompt, builds the truth-gated Factory Studio action layer over canonical Python Core, makes only real Generate/Reproduce capabilities operational when the Core bridge is available, keeps Solve/Validate/Analyze dependency-gated where canonical capability is absent, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Task Status: FIX_REQUIRED
+- Next Task/Action: Codex executes only `SB-LF06-003-C001-R01` from the published GitHub remediation prompt, preserves the accepted canonical Generate/Reproduce action bridge and dependency gates, fixes real Core availability probing, stderr/error truth, post-success workspace wording and last-success evidence retention, publishes the finalized R01 builder log to `main`, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-002-C001-R01_COMMITTED_GODOT_RUNTIME_REGRESSION_REMEDIATION_STRICT_AUDIT.md`
-- SB-LF06-002 Disposition: PASS / CLOSED
-- SB-LF06-002 C001 Implementation Commit: `d8623ab4ccc4c62c408fb8841ebfca6b7ac29b42`
-- SB-LF06-002 R01 Final Implementation Commit: `055cc4dd12d8a1890a2008ca4f43a8bc54198aad`
-- SB-LF06-002 R01 Final Builder Publication: `9350ae7c8f71ec7f15c76746a2f66616ef944d17`
-- SB-LF06-002 Closing Strict Audit Commit: `6273a266abc74e0eb672c44461349ce4376c048f`
-- Current Prompt: `.hiveai/prompts/SB-LF06-003-C001_FACTORY_STUDIO_CANONICAL_ACTION_BRIDGE_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-003-C001_FACTORY_STUDIO_CANONICAL_ACTION_BRIDGE_STRICT_AUDIT.md`
+- SB-LF06-003 C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
+- SB-LF06-003 C001 Implementation Commit: `a34107864d44118762bcde3a35f7c04a5633a4a4`
+- SB-LF06-003 C001 Final Builder Publication: `9cc87b4edb493f0d3848aeaec2947b718a5c2127`
+- SB-LF06-003 C001 Strict Audit Commit: `cafafa2e096ec2f5ad949da3985a106f53995c73`
+- Current Prompt: `.hiveai/prompts/SB-LF06-003-C001-R01_CORE_AVAILABILITY_ERROR_AND_RESULT_TRUTH_REMEDIATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -109,7 +108,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF06-001` is PASS/CLOSED through `SB-LF06-001-C001-R01`; the real Factory Studio workspace shell and executable runtime node contract are accepted.
 - `SB-LF01-005` is PASS/CLOSED through `SB-LF01-005-C001-R01`; current production dimensions are independently `20..59`, historical request-schema-v1 replay remains intact, manifest version parsing is strict, and workload guidance is advisory only.
 - `SB-LF06-002` is PASS/CLOSED through `SB-LF06-002-C001-R01`; the Generate target form is presentation-only, cross-language guarded, independent-dimension safe, Core-unavailable truthful, and protected by a committed project-local clean-checkout Godot runtime suite.
-- Active execution frontier is `SB-LF06-003`; the action layer must expose Generate/Solve/Validate/Analyze/Reproduce while operationalizing only capabilities backed by real canonical Python Core and truth-gating missing solver/validation/analysis dependencies.
+- `SB-LF06-003-C001` product implementation is retained: real canonical Generate/Reproduce, dependency-gated Solve/Validate/Analyze, identity isolation and governed output are present; strict audit found false-positive Core availability probing, lost stderr diagnostics, stale post-success workspace wording, and last-success evidence retention gaps, so bounded R01 truth remediation is active before closure.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
