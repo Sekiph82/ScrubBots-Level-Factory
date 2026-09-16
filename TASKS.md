@@ -6,18 +6,18 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: M06 — ScrubBots Factory Studio
 - Current Sprint: M06.02 — Preview, metrics and controlled editing
-- Current Task: SB-LF06-006 — Owner/designer paint/edit where appropriate
+- Current Task: SB-LF06-007 — Approved puzzle-config edits only
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-006-C001` from the published GitHub prompt, adds a bounded memory-only owner/designer pixel edit buffer over immutable successful-bundle artwork, preserves canonical source bytes and truth separation, marks edits UNVALIDATED pending later revalidation, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Codex executes only `SB-LF06-007-C001` from the published GitHub prompt, discovers the current authoritative puzzle/config edit contract, enables only explicitly approved canonical fields or truthfully reports UNAVAILABLE when no such fields exist, preserves immutable source truth and UNVALIDATED edit separation, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-005-C001-R01_FAIL_CLOSED_METADATA_PRESENTATION_GATE_REMEDIATION_STRICT_AUDIT.md`
-- SB-LF06-005 Disposition: PASS / CLOSED through C001-R01
-- SB-LF06-005 R01 Implementation Commit: `b257d09764507f24fad840314e8afce6add4914b`
-- SB-LF06-005 R01 Final Builder Publication: `1d8f0d47b4419134f26600313775d9d4e3cbf130`
-- SB-LF06-005 Closing Strict Audit Commit: `7f495a0410d581a4cde76f6b5bd1c85250fa241c`
-- Current Prompt: `.hiveai/prompts/SB-LF06-006-C001_FACTORY_STUDIO_BOUNDED_MEMORY_PIXEL_EDIT_BUFFER_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-006-C001-R01_EDITOR_STATE_RECONCILIATION_REMEDIATION_STRICT_AUDIT.md`
+- SB-LF06-006 Disposition: PASS / CLOSED through C001-R01
+- SB-LF06-006 R01 Implementation Commit: `f3c3c69f99ff1f556fd910b258f9aadde13616eb`
+- SB-LF06-006 R01 Final Builder Publication: `d1635878c11d5159aaf39837d9915a87d8b8b7db`
+- SB-LF06-006 Closing Strict Audit Commit: `4413d610c5610ff12b4d5ce4f6047f05ae82ec21`
+- Current Prompt: `.hiveai/prompts/SB-LF06-007-C001_FACTORY_STUDIO_APPROVED_PUZZLE_CONFIG_EDIT_GATE_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -87,16 +87,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 37 VERIFIED, 50 PARTIAL, 3 MIGRATION, 106 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **37 / 224 = 16.52%**.
-- Canonical LF/CP engineering/migration coverage: **90 / 224 = 40.18%** (`VERIFIED + PARTIAL + MIGRATION`).
+- Canonical LF/CP source-requirement classification: 38 VERIFIED, 50 PARTIAL, 3 MIGRATION, 105 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **38 / 224 = 16.96%**.
+- Canonical LF/CP engineering/migration coverage: **91 / 224 = 40.63%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **37 / 244 = 15.16%**.
+- Unified verified completion: **38 / 244 = 15.57%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **37 / 216 = 17.13%**.
-- Level Factory + unique extension surface: **132 tasks**; **37 / 132 = 28.03% verified**.
+- Conservative verified local completion: **38 / 216 = 17.59%**.
+- Level Factory + unique extension surface: **132 tasks**; **38 / 132 = 28.79% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -111,7 +111,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF06-003` is PASS/CLOSED through `SB-LF06-003-C001-R01`; real canonical Generate/Reproduce, dependency-gated Solve/Validate/Analyze, launcher-backed availability, bounded stderr/error truth, identity isolation, governed output and retained last-success action evidence are accepted.
 - `SB-LF06-004` is PASS/CLOSED; Studio displays only real canonical successful-bundle `artwork.png` through deterministic integer nearest-neighbor presentation, with pixel-level runtime evidence, truthful failure retention and Reproduce-source switching.
 - `SB-LF06-005` is PASS/CLOSED through `SB-LF06-005-C001-R01`; the read-only canonical evidence panel exposes real structural/art QA and provenance, keeps solution/measured difficulty/load/risk truthfully unavailable, and now fails closed on root candidate identity, canonical request schema/version and malformed consumed-field types while retaining prior successful evidence.
-- Active execution frontier is `SB-LF06-006`; manual owner/designer pixel edits must remain separate from immutable canonical source truth, memory-only and explicitly UNVALIDATED in this cycle, with no persistence/promotion or implied QA acceptance before later revalidation/revision-lineage work.
+- `SB-LF06-006` is PASS/CLOSED through `SB-LF06-006-C001-R01`; the non-destructive C01..C16 logical-pixel editor remains memory-only and UNVALIDATED, preserves immutable canonical source bytes, and reconciles CLEAN/DIRTY state exactly from source-vs-working pixels including automatic CLEAN recovery when the final differing cell is restored.
+- Active execution frontier is `SB-LF06-007`; only authoritative explicitly approved puzzle-config fields may become editable. GenerationRequest fields must not be relabeled as puzzle config, and absence of an approved canonical edit contract must be reported truthfully as UNAVAILABLE rather than fabricated.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -311,8 +312,8 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 
 - [x] SB-LF06-004 — Crisp board/art preview.
 - [x] SB-LF06-005 — Display solution/difficulty/load/risk/art QA metrics/provenance.
-- [~] SB-LF06-006 — Owner/designer paint/edit where appropriate.
-- [ ] SB-LF06-007 — Approved puzzle-config edits only.
+- [x] SB-LF06-006 — Owner/designer paint/edit where appropriate.
+- [~] SB-LF06-007 — Approved puzzle-config edits only.
 
 ### M06.03 - Revalidation, truth separation, reproduction and tests
 
@@ -755,7 +756,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005` canonical-Core dimension dependency and `SB-LF06-001..005` Studio foundation/evidence chain are PASS/CLOSED; M06 continues at `SB-LF06-006` controlled editing, then proceeds through remaining Factory Studio canonical-Core migration plus owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
+2. `SB-LF01-005` canonical-Core dimension dependency and `SB-LF06-001..006` Studio foundation/evidence/editing chain are PASS/CLOSED; M06 continues at `SB-LF06-007` approved-config edit gating, then proceeds through remaining Factory Studio canonical-Core migration plus owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
