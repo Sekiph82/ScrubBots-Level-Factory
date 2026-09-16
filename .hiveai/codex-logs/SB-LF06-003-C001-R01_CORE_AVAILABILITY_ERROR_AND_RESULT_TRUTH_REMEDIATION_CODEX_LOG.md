@@ -63,3 +63,12 @@ No implementation, test, documentation, governance, or tracker file was edited b
 - No provider, network, HTTP, credential, API-key, secret, Magnific, PixelLab, or Perchance operation was used. No environment value is displayed or written to this log; only the bounded optional local executable setting is consulted.
 - Generate/Reproduce remain the only operational actions. Solve remains pending M03, Validate remains unavailable pending standalone canonical validation, and Analyze remains pending M04. WFC is not used as gameplay Solve.
 - No dependency, license, virtualenv, binary, output bundle, cache, or tracker file was added.
+
+## Implementation publication checkpoint
+
+- Remediation implementation commit: `c640fe95a17ea2943b4a09f7e9aa1310fba396a9` (`Remediate Factory Studio action truth`).
+- The remediation implementation commit was pushed successfully to `origin/main`.
+- Immediately after that push, local `HEAD` and `origin/main` were both `c640fe95a17ea2943b4a09f7e9aa1310fba396a9`; no tracked ahead/behind divergence remained.
+- Final pre-publication status retained only the five pre-existing owner-local Godot UID files as untracked; no generated output, project cache, secret, sibling-repository, or root tracker file was present in the change.
+
+The final publication commit below is intentionally log-only and will be pushed after this equality checkpoint. No post-final log edit will follow it.
