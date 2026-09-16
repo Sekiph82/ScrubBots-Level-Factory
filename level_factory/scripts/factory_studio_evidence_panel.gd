@@ -176,6 +176,10 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	var quality_data: Dictionary = quality
 	var action_candidate := str(result.get("candidate_id", ""))
 	var action_grid_hash := str(result.get("grid_hash", ""))
+	if typeof(artwork_data.get("candidate_id")) != TYPE_STRING or str(artwork_data.get("candidate_id")).is_empty():
+		return "artwork candidate_id is missing or not a string"
+	if typeof(artwork_data.get("grid_hash")) != TYPE_STRING or str(artwork_data.get("grid_hash")).is_empty():
+		return "artwork grid_hash is missing or not a string"
 	if root.get("candidate_id") != action_candidate or artwork_data.get("candidate_id") != action_candidate or root.get("candidate_id") != artwork_data.get("candidate_id"):
 		return "metadata candidate identity does not match successful action evidence"
 	if artwork_data.get("grid_hash") != action_grid_hash:

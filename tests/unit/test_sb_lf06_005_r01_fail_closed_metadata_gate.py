@@ -50,6 +50,7 @@ def test_real_godot_regression_covers_r01_metadata_error_mutations() -> None:
     source = INTEGRATION.read_text(encoding="utf-8")
     for marker in (
         "root_candidate_mutation",
+        "artwork_type_mutation",
         "request_schema_mutation",
         "request_version_mutation",
         "request_type_mutation",
