@@ -14,6 +14,7 @@ const MAX_CANDIDATE_LABEL_LENGTH := 64
 const PREVIEW_SCRIPT_PATH := "res://scripts/factory_studio_art_preview.gd"
 const EVIDENCE_PANEL_SCRIPT_PATH := "res://scripts/factory_studio_evidence_panel.gd"
 const ART_EDITOR_SCRIPT_PATH := "res://scripts/factory_studio_art_editor.gd"
+const PUZZLE_CONFIG_GATE_SCRIPT_PATH := "res://scripts/factory_studio_puzzle_config_gate.gd"
 
 var difficulty_control: OptionButton
 var width_control: SpinBox
@@ -55,6 +56,12 @@ func _build_controls() -> void:
 	explanation.text = "Edit target values locally. Generate and Reproduce use the canonical Python Core; other actions remain unavailable until their governing capability exists."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(explanation)
+
+	var puzzle_config_gate_script := ResourceLoader.call("load", PUZZLE_CONFIG_GATE_SCRIPT_PATH) as Script
+	if puzzle_config_gate_script != null:
+		var puzzle_config_gate := puzzle_config_gate_script.new() as Node
+		puzzle_config_gate.name = "ApprovedPuzzleConfigGate"
+		add_child(puzzle_config_gate)
 
 	difficulty_control = OptionButton.new()
 	difficulty_control.name = "Difficulty"

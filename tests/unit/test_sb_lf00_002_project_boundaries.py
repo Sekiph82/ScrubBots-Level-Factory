@@ -149,8 +149,10 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_art_preview.gd",
             "factory_studio_evidence_panel.gd",
             "factory_studio_art_editor.gd",
+            "factory_studio_puzzle_config_gate.gd",
             "factory_studio_runtime_suite.gd",
             "factory_studio_action_integration_suite.gd",
+            "factory_studio_puzzle_config_gate_integration_suite.gd",
         }
         for path in _project_files()
         if path.suffix == ".gd"

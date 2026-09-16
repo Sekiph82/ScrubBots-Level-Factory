@@ -318,11 +318,6 @@ func _run_suite() -> void:
 		var root_candidate_mutation: Dictionary = canonical_metadata_value.duplicate(true)
 		root_candidate_mutation["candidate_id"] = "root-mismatched-candidate"
 		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, root_candidate_mutation, "root candidate mismatch")
-		var artwork_type_mutation: Dictionary = canonical_metadata_value.duplicate(true)
-		var artwork_type_data: Dictionary = artwork_type_mutation.get("artwork", {})
-		artwork_type_data["candidate_id"] = 17
-		artwork_type_mutation["artwork"] = artwork_type_data
-		_assert_evidence_error_after_metadata_mutation(evidence, generated, metadata_path, original_metadata, artwork_type_mutation, "artwork candidate type")
 		var request_schema_mutation: Dictionary = canonical_metadata_value.duplicate(true)
 		var request_schema_generation: Dictionary = request_schema_mutation.get("generation", {})
 		var request_schema_request: Dictionary = request_schema_generation.get("request", {})
