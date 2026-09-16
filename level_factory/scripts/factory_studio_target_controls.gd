@@ -11,6 +11,7 @@ const ACTIONS: Array[String] = ["Generate", "Solve", "Validate", "Analyze", "Rep
 const MIN_DIMENSION := 20
 const MAX_DIMENSION := 59
 const MAX_CANDIDATE_LABEL_LENGTH := 64
+const PREVIEW_SCRIPT_PATH := "res://scripts/factory_studio_art_preview.gd"
 
 var difficulty_control: OptionButton
 var width_control: SpinBox
@@ -24,6 +25,7 @@ var _action_buttons: Dictionary = {}
 var _core_gateway: RefCounted
 var _last_action_result: Dictionary = {}
 var _last_successful_core_evidence: Dictionary = {}
+var _art_preview: Node
 var _action_running := false
 
 
@@ -111,6 +113,12 @@ func _build_controls() -> void:
 	action_result_readout.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	action_result_readout.text = "Action result: IDLE"
 	action_area.add_child(action_result_readout)
+
+	var preview_script := ResourceLoader.call("load", PREVIEW_SCRIPT_PATH) as Script
+	if preview_script != null:
+		_art_preview = preview_script.new() as Node
+		_art_preview.name = "CanonicalArtworkPreview"
+		action_area.add_child(_art_preview)
 
 
 func _make_dimension_control(control_name: String) -> SpinBox:
@@ -216,6 +224,8 @@ func _on_action_pressed(action: String) -> void:
 	_last_action_result = result if result is Dictionary else {"action": action, "state": "FAILED", "reason": "FAILED — action bridge returned no structured result."}
 	if _last_action_result.get("state") == "SUCCESS":
 		_last_successful_core_evidence = _last_action_result.duplicate(true)
+	if _art_preview != null:
+		_art_preview.call("consume_action_result", _last_action_result)
 	_action_running = false
 	_render_action_result()
 	_refresh_action_controls()

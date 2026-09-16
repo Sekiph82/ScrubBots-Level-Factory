@@ -108,6 +108,12 @@ func _run_suite() -> void:
 		instance.queue_free()
 		_finish()
 		return
+	var preview_before_action := target.get_node_or_null("ActionArea/CanonicalArtworkPreview")
+	_check(preview_before_action != null, "Canonical artwork preview component is missing before execution")
+	if preview_before_action != null:
+		var empty_preview: Dictionary = preview_before_action.call("snapshot")
+		_check(empty_preview.get("state") == "EMPTY", "Preview was not EMPTY before a successful canonical action")
+		_check(preview_before_action.get_node_or_null("ArtworkImage").texture == null, "Preview fabricated a texture before canonical success")
 
 	generate_button.pressed.emit()
 	await process_frame
@@ -123,6 +129,36 @@ func _run_suite() -> void:
 	_check(not reproduce_button.disabled, "Reproduce was not enabled after a successful Generate")
 	var last_success_after_generate: Dictionary = target.call("last_successful_core_evidence_snapshot")
 	_check(last_success_after_generate == generated, "Successful Generate evidence was not retained separately")
+	var preview := target.get_node_or_null("ActionArea/CanonicalArtworkPreview")
+	_check(preview != null, "Canonical artwork preview component is missing")
+	if preview == null:
+		instance.queue_free()
+		_finish()
+		return
+	var preview_before_success: Dictionary = preview.call("snapshot")
+	_check(preview_before_success.get("state") == "READY", "Successful Generate did not produce a READY canonical preview")
+	_check(preview_before_success.get("source_action") == "Generate", "Preview source action was not Generate")
+	_check(preview_before_success.get("candidate_id") == generated.get("candidate_id"), "Preview candidate identity was not taken from canonical Core evidence")
+	_check(preview_before_success.get("candidate_id") != PRESENTATION_LABEL, "Preview used the candidate presentation label as identity")
+	_check(preview_before_success.get("artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Preview did not derive artwork.png from Generate output_path")
+	_check(preview_before_success.get("logical_width") == 20 and preview_before_success.get("logical_height") == 21, "Preview did not inspect the real 20x21 rectangular artwork dimensions")
+	var expected_scale := maxi(1, mini(16, floori(512.0 / 21.0)))
+	_check(preview_before_success.get("presentation_scale") == expected_scale, "Preview presentation scale was not the deterministic bounded integer scale")
+	_check(preview_before_success.get("displayed_width") == 20 * expected_scale and preview_before_success.get("displayed_height") == 21 * expected_scale, "Preview display dimensions do not equal logical dimensions multiplied by scale")
+	var source_image := Image.load_from_file(str(preview_before_success.get("artwork_path")))
+	_check(source_image != null, "Canonical Generate artwork.png could not be loaded by the integration test")
+	var displayed_texture := preview.get_node_or_null("ArtworkImage").texture as ImageTexture
+	_check(displayed_texture != null, "Canonical preview did not create an ImageTexture")
+	var displayed_image := displayed_texture.get_image() if displayed_texture != null else null
+	_check(displayed_image != null, "Canonical preview texture did not expose a displayed image")
+	if displayed_image != null:
+		for y in range(21):
+			for x in range(20):
+				var expected_color := source_image.get_pixel(x, y)
+				for dy in range(expected_scale):
+					for dx in range(expected_scale):
+						_check(displayed_image.get_pixel(x * expected_scale + dx, y * expected_scale + dy) == expected_color, "Preview introduced a blended or foreign pixel at logical block %s,%s" % [x, y])
+		_check(displayed_image.get_width() == 20 * expected_scale and displayed_image.get_height() == 21 * expected_scale, "Displayed texture dimensions are not deterministic")
 
 	var metadata_path := str(generated.get("metadata_path", ""))
 	var metadata_file := FileAccess.open(metadata_path, FileAccess.READ)
@@ -141,6 +177,11 @@ func _run_suite() -> void:
 	_check(last_success_after_failure == last_success_after_generate, "Failed Reproduce erased last-success Core evidence")
 	var result_readout := target.get_node_or_null("ActionArea/ActionResult") as Label
 	_check(result_readout != null and "Last successful Core evidence retained" in result_readout.text, "Last-success evidence was not visibly retained after failure")
+	var preview_after_failure: Dictionary = preview.call("snapshot")
+	_check(preview_after_failure.get("state") == "READY" and preview_after_failure.get("retained_after_failure") == true, "Failed action did not retain and label the last successful preview")
+	_check(preview_after_failure.get("artwork_path") == preview_before_success.get("artwork_path"), "Failed action silently changed the retained preview source")
+	var preview_state_label := preview.get_node_or_null("PreviewState") as Label
+	_check(preview_state_label != null and "RETAINED LAST SUCCESS" in preview_state_label.text, "Retained preview was not visibly labeled")
 	_write_text(metadata_path, original_metadata)
 
 	reproduce_button.pressed.emit()
@@ -152,6 +193,29 @@ func _run_suite() -> void:
 	_check(reproduced.get("grid_hash") == generated.get("grid_hash"), "Reproduce grid hash did not match Generate")
 	_check(str(reproduced.get("output_path", "")) != str(generated.get("output_path", "")), "Reproduce targeted the original Generate bundle")
 	_check(_under_output_area(str(reproduced.get("output_path", ""))), "Reproduce output escaped the approved Factory output area")
+	var preview_after_reproduce: Dictionary = preview.call("snapshot")
+	_check(preview_after_reproduce.get("state") == "READY", "Reproduce MATCH did not produce a READY preview")
+	_check(preview_after_reproduce.get("source_action") == "Reproduce", "Reproduce preview retained the Generate source action")
+	_check(preview_after_reproduce.get("artwork_path") == str(reproduced.get("output_path")).path_join("artwork.png"), "Reproduce preview did not point at the reproduction bundle artwork.png")
+	var reproduced_image := Image.load_from_file(str(preview_after_reproduce.get("artwork_path")))
+	_check(reproduced_image != null, "Reproduce artwork.png could not be loaded")
+	_check(source_image != null and reproduced_image != null and source_image.get_width() == reproduced_image.get_width() and source_image.get_height() == reproduced_image.get_height(), "Reproduce preview dimensions changed")
+	if source_image != null and reproduced_image != null and source_image.get_width() == reproduced_image.get_width() and source_image.get_height() == reproduced_image.get_height():
+		for y in range(source_image.get_height()):
+			for x in range(source_image.get_width()):
+				_check(source_image.get_pixel(x, y) == reproduced_image.get_pixel(x, y), "Reproduce MATCH preview pixels differ from Generate artwork")
+	var reproduced_artwork_path := str(preview_after_reproduce.get("artwork_path"))
+	var reproduced_artwork_bytes := FileAccess.get_file_as_bytes(reproduced_artwork_path)
+	DirAccess.remove_absolute(reproduced_artwork_path)
+	preview.call("consume_action_result", reproduced)
+	var corrupt_preview: Dictionary = preview.call("snapshot")
+	_check(corrupt_preview.get("state") == "ERROR", "Missing canonical artwork did not produce truthful preview ERROR")
+	_check(corrupt_preview.get("retained_after_failure") == true, "Missing canonical artwork did not label prior preview as retained/stale")
+	_check("no draft preview" in str(corrupt_preview.get("error", "")).to_lower(), "Preview failure did not state that no draft artwork was fabricated")
+	var restored_artwork := FileAccess.open(reproduced_artwork_path, FileAccess.WRITE)
+	if restored_artwork != null:
+		restored_artwork.store_buffer(reproduced_artwork_bytes)
+		restored_artwork.close()
 
 	instance.queue_free()
 	_finish()
@@ -192,6 +256,7 @@ func _finish() -> void:
 	_remove_tree(test_output_absolute)
 	if failures.is_empty():
 		print("SB-LF06-003-C001 Studio/Core action integration PASS")
+		print("SB-LF06-004-C001 crisp preview integration PASS")
 		quit(0)
 		return
 	for failure in failures:

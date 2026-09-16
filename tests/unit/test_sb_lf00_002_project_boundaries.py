@@ -144,9 +144,10 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_core_gateway.gd",
             "factory_studio_navigation.gd",
             "factory_studio_shell.gd",
-            "factory_studio_workspace_page.gd",
-            "factory_studio_target_controls.gd",
-            "factory_studio_runtime_suite.gd",
+                "factory_studio_workspace_page.gd",
+                "factory_studio_target_controls.gd",
+                "factory_studio_art_preview.gd",
+                "factory_studio_runtime_suite.gd",
             "factory_studio_action_integration_suite.gd",
         }
         for path in _project_files()
