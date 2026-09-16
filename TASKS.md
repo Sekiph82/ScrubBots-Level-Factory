@@ -5,19 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M06 — ScrubBots Factory Studio
-- Current Sprint: M06.01 — Studio architecture and operator controls
-- Current Task: SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions
-- Current Task Status: FIX_REQUIRED
-- Next Task/Action: Codex executes only `SB-LF06-003-C001-R01` from the published GitHub remediation prompt, preserves the accepted canonical Generate/Reproduce action bridge and dependency gates, fixes real Core availability probing, stderr/error truth, post-success workspace wording and last-success evidence retention, publishes the finalized R01 builder log to `main`, then stops for independent ChatGPT strict audit.
+- Current Sprint: M06.02 — Preview, metrics and controlled editing
+- Current Task: SB-LF06-004 — Crisp board/art preview
+- Current Task Status: READY_FOR_IMPLEMENTATION
+- Next Task/Action: Codex executes only `SB-LF06-004-C001` from the published GitHub prompt, adds a presentation-only crisp preview sourced exclusively from real canonical successful-bundle `artwork.png`, proves deterministic integer nearest-neighbor pixel integrity and truthful failure/retention behavior, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-003-C001_FACTORY_STUDIO_CANONICAL_ACTION_BRIDGE_STRICT_AUDIT.md`
-- SB-LF06-003 C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-003-C001-R01_CORE_AVAILABILITY_ERROR_AND_RESULT_TRUTH_REMEDIATION_STRICT_AUDIT.md`
+- SB-LF06-003 Disposition: PASS / CLOSED
 - SB-LF06-003 C001 Implementation Commit: `a34107864d44118762bcde3a35f7c04a5633a4a4`
-- SB-LF06-003 C001 Final Builder Publication: `9cc87b4edb493f0d3848aeaec2947b718a5c2127`
-- SB-LF06-003 C001 Strict Audit Commit: `cafafa2e096ec2f5ad949da3985a106f53995c73`
-- Current Prompt: `.hiveai/prompts/SB-LF06-003-C001-R01_CORE_AVAILABILITY_ERROR_AND_RESULT_TRUTH_REMEDIATION_PROMPT.md`
+- SB-LF06-003 R01 Remediation Commit: `c640fe95a17ea2943b4a09f7e9aa1310fba396a9`
+- SB-LF06-003 R01 Final Builder Publication: `adab438dfe00084f7f40a34437708d5edb8a00ea`
+- SB-LF06-003 Closing Strict Audit Commit: `064f6c6b3721053b18e8d619c2a205926e630fde`
+- Current Prompt: `.hiveai/prompts/SB-LF06-004-C001_FACTORY_STUDIO_CRISP_CANONICAL_ARTWORK_PREVIEW_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -87,28 +88,29 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 34 VERIFIED, 51 PARTIAL, 3 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **34 / 224 = 15.18%**.
+- Canonical LF/CP source-requirement classification: 35 VERIFIED, 50 PARTIAL, 3 MIGRATION, 108 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **35 / 224 = 15.63%**.
 - Canonical LF/CP engineering/migration coverage: **88 / 224 = 39.29%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **34 / 244 = 13.93%**.
+- Unified verified completion: **35 / 244 = 14.34%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **34 / 216 = 15.74%**.
-- Level Factory + unique extension surface: **132 tasks**; **34 / 132 = 25.76% verified**.
+- Conservative verified local completion: **35 / 216 = 16.20%**.
+- Level Factory + unique extension surface: **132 tasks**; **35 / 132 = 26.52% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
 - `SB-LF00-001` is PASS/CLOSED and establishes the independently openable `level_factory/` Godot project shell.
 - `SB-LF00-002` is PASS/CLOSED and establishes the Factory-local README/governance/docs/scenes/scripts/tests/output ownership boundaries.
-- `SB-LF00-006` is PASS/CLOSED and establishes the repository-wide generated/candidate/cache/log/secret workspace boundary without hiding durable evidence.
+- `SB-LF00-006` is PASS/CLOSED and establishes the repository-wide generated/candidate/cache/secret workspace boundary without hiding durable evidence.
 - `SB-LF00-008` is PASS/CLOSED and proves the committed tracked-only `level_factory/` snapshot boots headlessly without ignored/local dependencies.
 - `SB-LF00-007` is PASS/CLOSED and establishes TASKS-only H!veAI governance with obsolete `CYCLE_INDEX` removed and parser-safe task rows.
 - `SB-LF06-001` is PASS/CLOSED through `SB-LF06-001-C001-R01`; the real Factory Studio workspace shell and executable runtime node contract are accepted.
 - `SB-LF01-005` is PASS/CLOSED through `SB-LF01-005-C001-R01`; current production dimensions are independently `20..59`, historical request-schema-v1 replay remains intact, manifest version parsing is strict, and workload guidance is advisory only.
 - `SB-LF06-002` is PASS/CLOSED through `SB-LF06-002-C001-R01`; the Generate target form is presentation-only, cross-language guarded, independent-dimension safe, Core-unavailable truthful, and protected by a committed project-local clean-checkout Godot runtime suite.
-- `SB-LF06-003-C001` product implementation is retained: real canonical Generate/Reproduce, dependency-gated Solve/Validate/Analyze, identity isolation and governed output are present; strict audit found false-positive Core availability probing, lost stderr diagnostics, stale post-success workspace wording, and last-success evidence retention gaps, so bounded R01 truth remediation is active before closure.
+- `SB-LF06-003` is PASS/CLOSED through `SB-LF06-003-C001-R01`; real canonical Generate/Reproduce, dependency-gated Solve/Validate/Analyze, launcher-backed availability, bounded stderr/error truth, identity isolation, governed output and retained last-success action evidence are accepted.
+- Active execution frontier is `SB-LF06-004`; Studio must display only real canonical successful-bundle `artwork.png` using deterministic crisp integer nearest-neighbor presentation without creating a second artwork truth store.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -302,11 +304,11 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 
 - [x] SB-LF06-001 — Build @tool/editor-facing workspace.
 - [x] SB-LF06-002 — Target difficulty/dimensions/seed/mode/candidate controls.
-- [~] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions. [PARTIAL]
+- [x] SB-LF06-003 — Generate/Solve/Validate/Analyze/Reproduce actions.
 
 ### M06.02 - Preview, metrics and controlled editing
 
-- [ ] SB-LF06-004 — Crisp board/art preview.
+- [~] SB-LF06-004 — Crisp board/art preview.
 - [ ] SB-LF06-005 — Display solution/difficulty/load/risk/art QA metrics/provenance.
 - [ ] SB-LF06-006 — Owner/designer paint/edit where appropriate.
 - [ ] SB-LF06-007 — Approved puzzle-config edits only.
@@ -753,7 +755,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005` canonical-Core dimension dependency and `SB-LF06-002` target-control/runtime foundation are PASS/CLOSED; M06 continues at `SB-LF06-003` and then proceeds through Factory Studio canonical-Core migration plus owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
+2. `SB-LF01-005` canonical-Core dimension dependency, `SB-LF06-002` target-control/runtime foundation and `SB-LF06-003` canonical action bridge are PASS/CLOSED; M06 continues at `SB-LF06-004` and then proceeds through Factory Studio canonical-Core migration plus owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
