@@ -59,3 +59,8 @@ This log was created and verified before any R01 product, test, documentation, o
 ## Publication checkpoints
 
 Implementation and verification details are complete before the remediation implementation commit. The final log-only publication commit will be terminal and will contain no product or test changes.
+
+- Remediation implementation commit: `f3c3c69f99ff1f556fd910b258f9aadde13616eb`.
+- The implementation commit was pushed successfully to `origin/main`; local `HEAD` and `origin/main` were equal at `f3c3c69f99ff1f556fd910b258f9aadde13616eb` immediately after publication.
+- Final pre-publication status contains only the ten pre-existing/generated owner-local Godot UID files; they remain untracked and were not staged or deleted.
+- This append is the final evidence update. The next commit is intentionally log-only and is the terminal publication checkpoint; no product or test edit may follow it.
