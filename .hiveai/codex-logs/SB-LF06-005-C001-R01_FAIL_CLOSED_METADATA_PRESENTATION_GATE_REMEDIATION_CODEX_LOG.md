@@ -62,4 +62,28 @@ Remediation notes will be appended chronologically after the bounded fail-closed
 
 ## Publication checkpoints
 
-Implementation commit and push details will be appended after the remediation implementation commit. The final log-only publication commit will be the terminal commit and will contain no product or test changes.
+### Implementation checkpoint
+
+- Remediation implementation commit: `b257d09764507f24fad840314e8afce6add4914b` (`Remediate fail-closed evidence metadata gates`).
+- `git push origin main` succeeded, advancing GitHub `main` from `4de700e` to the implementation commit.
+- Local `HEAD` and `origin/main` are equal at `b257d09764507f24fad840314e8afce6add4914b`.
+- The five pre-existing untracked Godot UID files remain preserved and are not part of the implementation commit.
+
+### Final security, offline, and scope review
+
+- No API key, token, credential, DPAPI store, or environment-secret value was read or recorded.
+- No Magnific, PixelLab, Perchance, provider, telemetry, or runtime network service was called. GitHub was used only for the required repository synchronization and publication.
+- No canonical Python Factory Core semantics were modified, no second validator/compiler was added, and no solver, Difficulty V1, load/risk scoring, editing, Dashboard, Import, Library, Content Platform, main-game, or SB-LF06-006+ work was started.
+- Root `TASKS.md`, prior prompts, audits, and prior builder logs were not edited. Tracked review/data/exemplars/docs/.hiveai evidence was preserved.
+- No dependency or license changes were made.
+
+### Final pre-publication state
+
+- The product/test tree is frozen at the implementation checkpoint. Only this builder-log append remains to publish.
+- The final publication commit will contain only this builder log; no product or test files will be included.
+- `git diff --check` and the staged-name verification will be run before the terminal commit.
+
+### Terminal publication
+
+- This section and the preceding evidence are the sole post-implementation log update.
+- The next commit is the terminal log-only publication commit. No files will be edited after it, and no later commit will be created.
