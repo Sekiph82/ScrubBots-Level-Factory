@@ -23,6 +23,7 @@ var action_result_readout: Label
 var _action_buttons: Dictionary = {}
 var _core_gateway: RefCounted
 var _last_action_result: Dictionary = {}
+var _last_successful_core_evidence: Dictionary = {}
 var _action_running := false
 
 
@@ -160,6 +161,10 @@ func action_result_snapshot() -> Dictionary:
 	return _last_action_result.duplicate(true)
 
 
+func last_successful_core_evidence_snapshot() -> Dictionary:
+	return _last_successful_core_evidence.duplicate(true)
+
+
 func _selected_option(control: OptionButton, fallback: String) -> String:
 	if control == null or control.selected < 0:
 		return fallback
@@ -209,6 +214,8 @@ func _on_action_pressed(action: String) -> void:
 	_refresh_action_controls()
 	var result: Variant = _core_gateway.call("run_action", action, draft_snapshot())
 	_last_action_result = result if result is Dictionary else {"action": action, "state": "FAILED", "reason": "FAILED — action bridge returned no structured result."}
+	if _last_action_result.get("state") == "SUCCESS":
+		_last_successful_core_evidence = _last_action_result.duplicate(true)
 	_action_running = false
 	_render_action_result()
 	_refresh_action_controls()
@@ -230,5 +237,12 @@ func _render_action_result() -> void:
 			_last_action_result.get("grid_hash", ""),
 			_last_action_result.get("output_path", ""),
 			_last_action_result.get("metadata_path", ""),
+		]
+	elif not _last_successful_core_evidence.is_empty():
+		message += "\nLast successful Core evidence retained: candidate=%s | grid_hash=%s | output=%s | metadata=%s" % [
+			_last_successful_core_evidence.get("candidate_id", ""),
+			_last_successful_core_evidence.get("grid_hash", ""),
+			_last_successful_core_evidence.get("output_path", ""),
+			_last_successful_core_evidence.get("metadata_path", ""),
 		]
 	action_result_readout.text = "Action result: %s / %s / exit=%s\n%s" % [action, disposition, _last_action_result.get("exit_code", ""), message]

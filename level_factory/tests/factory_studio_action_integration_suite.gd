@@ -66,8 +66,15 @@ func _run_suite() -> void:
 	_check(not bool(capability_matrix["Solve"]["available"]), "Solve became available without M03")
 	_check(not bool(capability_matrix["Validate"]["available"]), "Validate became available without standalone canonical validation")
 	_check(not bool(capability_matrix["Analyze"]["available"]), "Analyze became available without M04")
+	var incompatible_core := FactoryCoreGateway.new(str(gateway.get("python_executable")), "res://tests/factory_studio_action_integration_suite.gd")
+	_check(incompatible_core.status_name() == "UNAVAILABLE", "Executable-present but incompatible launcher path was reported available")
+	var incompatible_matrix: Dictionary = incompatible_core.call("capability_matrix")
+	_check(not bool(incompatible_matrix["Generate"]["available"]), "Generate was enabled for an incompatible launcher/Core path")
 	var invalid_request: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "NOT_A_DIFFICULTY", "width": 20, "height": 21, "seed": "77", "mode": "RULES"}, TEST_OUTPUT_PATH)
 	_check(invalid_request.get("state") == "FAILED" and int(invalid_request.get("exit_code", 0)) != 0, "Canonical nonzero action failure was not mapped to FAILED")
+	var invalid_reason := str(invalid_request.get("reason", "")).to_lower()
+	_check("invalid choice" in invalid_reason or "invalid generation request" in invalid_reason, "Canonical stderr diagnostic was not preserved in the failed action reason")
+	_check("success candidate_id=" not in str(invalid_request.get("captured_output", "")).to_lower(), "Unrelated output was allowed to promote a failed action")
 
 	var difficulty := target.get_node_or_null("DifficultyRow/Difficulty") as OptionButton
 	var width := target.get_node_or_null("WidthRow/Width") as SpinBox
@@ -111,7 +118,30 @@ func _run_suite() -> void:
 	_check(str(generated.get("captured_output", "")).contains("SUCCESS candidate_id="), "Generate did not capture the canonical CLI summary")
 	_check(str(generated.get("metadata_path", "")).ends_with("metadata.json"), "Generate did not expose metadata.json evidence")
 	_check(_under_output_area(str(generated.get("output_path", ""))), "Generate output escaped the approved Factory output area")
+	var generate_detail := workspace.get_node_or_null("Padding/Content/Detail") as Label
+	_check(generate_detail != null and "No generation has occurred" not in generate_detail.text, "Generate workspace retained a false post-success no-generation statement")
 	_check(not reproduce_button.disabled, "Reproduce was not enabled after a successful Generate")
+	var last_success_after_generate: Dictionary = target.call("last_successful_core_evidence_snapshot")
+	_check(last_success_after_generate == generated, "Successful Generate evidence was not retained separately")
+
+	var metadata_path := str(generated.get("metadata_path", ""))
+	var metadata_file := FileAccess.open(metadata_path, FileAccess.READ)
+	_check(metadata_file != null, "Generated metadata.json could not be opened for failure-retention regression")
+	var original_metadata := metadata_file.get_as_text() if metadata_file != null else ""
+	if metadata_file != null:
+		metadata_file.close()
+	_write_text(metadata_path, "{\"corrupted\":true}")
+	reproduce_button.pressed.emit()
+	await process_frame
+	var failed_reproduce: Dictionary = target.call("action_result_snapshot")
+	_check(failed_reproduce.get("action") == "Reproduce" and failed_reproduce.get("state") == "FAILED", "Corrupt metadata did not produce a failed Reproduce action")
+	_check(int(failed_reproduce.get("exit_code", 0)) != 0, "Failed Reproduce did not preserve its nonzero Core exit")
+	_check("metadata" in str(failed_reproduce.get("reason", "")).to_lower() or "mismatch" in str(failed_reproduce.get("reason", "")).to_lower(), "Failed Reproduce did not expose its canonical diagnostic")
+	var last_success_after_failure: Dictionary = target.call("last_successful_core_evidence_snapshot")
+	_check(last_success_after_failure == last_success_after_generate, "Failed Reproduce erased last-success Core evidence")
+	var result_readout := target.get_node_or_null("ActionArea/ActionResult") as Label
+	_check(result_readout != null and "Last successful Core evidence retained" in result_readout.text, "Last-success evidence was not visibly retained after failure")
+	_write_text(metadata_path, original_metadata)
 
 	reproduce_button.pressed.emit()
 	await process_frame
@@ -131,6 +161,13 @@ func _under_output_area(path: String) -> bool:
 	var output_root := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
 	var normalized := path.simplify_path().replace(char(92), "/").to_lower()
 	return normalized.begins_with(output_root + "/")
+
+
+func _write_text(path: String, contents: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file != null:
+		file.store_string(contents)
+		file.close()
 
 
 func _remove_tree(path: String) -> void:

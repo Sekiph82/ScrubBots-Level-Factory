@@ -17,6 +17,8 @@ const PYTHON_ENVIRONMENT_NAME := "SCRUBBOTS_FACTORY_PYTHON"
 const LAUNCHER_PATH := "res://scripts/factory_core_launcher.py"
 const GENERATE_OUTPUT_PATH := "res://output/studio-runs"
 const REPRODUCE_OUTPUT_PATH := "res://output/studio-reproductions"
+const READ_STDERR := true
+const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
 	"Solve": "UNAVAILABLE — gameplay solver is pending M03; WFC is not used as the gameplay solver.",
 	"Validate": "UNAVAILABLE — no standalone canonical validation capability is connected.",
@@ -29,9 +31,11 @@ var _connection_detail := ""
 var _last_successful_metadata_path := ""
 var _last_result: Dictionary = {}
 var _default_output_root := ""
+var _probe_launcher_path := LAUNCHER_PATH
 
 
-func _init(configured_executable: String = "") -> void:
+func _init(configured_executable: String = "", probe_launcher_path: String = LAUNCHER_PATH) -> void:
+	_probe_launcher_path = probe_launcher_path if _safe_probe_launcher(probe_launcher_path) else LAUNCHER_PATH
 	python_executable = configured_executable.strip_edges()
 	if python_executable.is_empty():
 		var configured_from_environment := OS.get_environment(PYTHON_ENVIRONMENT_NAME).strip_edges()
@@ -113,10 +117,10 @@ func _refresh_connection() -> void:
 		return
 	if _probe_executable(python_executable):
 		_connection_status = ConnectionStatus.AVAILABLE
-		_connection_detail = "AVAILABLE — canonical Python Factory Core local launcher is executable."
+		_connection_detail = "AVAILABLE — committed canonical Python Factory Core launcher probe passed."
 	else:
 		_connection_status = ConnectionStatus.UNAVAILABLE
-		_connection_detail = "UNAVAILABLE — canonical Python Factory Core local launcher could not be executed."
+		_connection_detail = "UNAVAILABLE — committed canonical Python Factory Core launcher/Core probe failed."
 
 
 func _discover_executable() -> String:
@@ -139,7 +143,20 @@ func _probe_executable(executable: String) -> bool:
 	if not _safe_executable(executable):
 		return false
 	var captured: Array[String] = []
-	return OS.execute(executable, PackedStringArray(["--version"]), captured, true, false) == 0
+	var exit_code := _execute_process(executable, PackedStringArray([
+		ProjectSettings.globalize_path(_probe_launcher_path),
+		"--help",
+	]), captured)
+	var identity := "\n".join(captured).to_lower()
+	return exit_code == 0 and "usage: scrubbots-pixel" in identity and "reproduce" in identity
+
+
+func _safe_probe_launcher(path: String) -> bool:
+	return path == LAUNCHER_PATH or path.begins_with("res://" + "tests/")
+
+
+func _execute_process(executable: String, arguments: PackedStringArray, captured: Array[String]) -> int:
+	return OS.execute(executable, arguments, captured, READ_STDERR, OPEN_CONSOLE)
 
 
 func _generate_arguments(draft: Dictionary, output_root: String) -> PackedStringArray:
@@ -166,23 +183,24 @@ func _reproduce_arguments(metadata_path: String, output_root: String) -> PackedS
 
 func _execute_core(action: String, arguments: PackedStringArray) -> Dictionary:
 	var captured: Array[String] = []
-	var exit_code := OS.execute(python_executable, arguments, captured, true, false)
+	var exit_code := _execute_process(python_executable, arguments, captured)
 	var process_output := "\n".join(captured)
+	var bounded_process_output := process_output.left(4096)
 	if exit_code != 0:
 		var failure := _failed_result(action, exit_code, _safe_process_message(process_output))
-		failure["captured_output"] = process_output
+		failure["captured_output"] = bounded_process_output
 		_last_result = failure
 		return failure
 	var summary_line := _find_summary_line(captured, "MATCH" if action == "Reproduce" else "SUCCESS")
 	if summary_line.is_empty():
 		var malformed := _failed_result(action, exit_code, "FAILED — canonical Core returned no recognized action summary.")
-		malformed["captured_output"] = process_output
+		malformed["captured_output"] = bounded_process_output
 		_last_result = malformed
 		return malformed
 	var output_path := _field_value(summary_line, "output=")
 	if output_path.is_empty():
 		var missing_output := _failed_result(action, exit_code, "FAILED — canonical Core summary did not provide an output path.")
-		missing_output["captured_output"] = process_output
+		missing_output["captured_output"] = bounded_process_output
 		_last_result = missing_output
 		return missing_output
 	var result := {
@@ -197,7 +215,7 @@ func _execute_core(action: String, arguments: PackedStringArray) -> Dictionary:
 		"grid_hash": _field_value(summary_line, "grid_hash="),
 		"output_path": output_path,
 		"metadata_path": output_path.path_join("metadata.json"),
-		"captured_output": process_output,
+		"captured_output": bounded_process_output,
 	}
 	if action == "Generate":
 		_last_successful_metadata_path = str(result["metadata_path"])
@@ -255,7 +273,11 @@ func _safe_process_message(process_output: String) -> String:
 	var message := process_output.strip_edges()
 	if message.is_empty():
 		return "FAILED — canonical Python Factory Core returned a nonzero exit code without a diagnostic."
-	return "FAILED — canonical Python Factory Core: " + message.left(512)
+	var lines := message.replace("\r\n", "\n").split("\n", false)
+	var diagnostic := lines[lines.size() - 1].strip_edges() if not lines.is_empty() else message
+	if diagnostic.is_empty():
+		diagnostic = message
+	return "FAILED — canonical Python Factory Core: " + diagnostic.left(512)
 
 
 func _unavailable_result(action: String, reason: String) -> Dictionary:

@@ -21,7 +21,7 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "This workspace shell is ready for a later audited presentation integration. No generated data is loaded."
 	elif surface_name == "Generate":
 		state.text = "DRAFT — CORE VALIDATION: UNAVAILABLE"
-		detail.text = "Editable presentation draft only. No generation has occurred."
+		detail.text = "Editable presentation draft; canonical execution evidence is shown separately in Action result."
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
