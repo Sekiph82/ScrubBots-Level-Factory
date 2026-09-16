@@ -7,17 +7,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M06 — ScrubBots Factory Studio
 - Current Sprint: M06.02 — Preview, metrics and controlled editing
 - Current Task: SB-LF06-005 — Display solution/difficulty/load/risk/art QA metrics/provenance
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-005-C001` from the published GitHub prompt, adds a read-only canonical evidence/metrics panel over real successful-bundle `metadata.json`, displays only real structural QA/provenance evidence, keeps solution/difficulty/load/risk explicitly unavailable where canonical capabilities do not yet exist, pushes implementation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
+- Current Task Status: FIX_REQUIRED
+- Next Task/Action: Codex executes only `SB-LF06-005-C001-R01` from the published GitHub remediation prompt, retains the accepted read-only canonical evidence panel, adds fail-closed root candidate/request-schema/type presentation checks plus real malformed-evidence runtime regressions, pushes remediation/tests/finalized builder log to `main`, hands the log to the user by full GitHub URL, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-004-C001_FACTORY_STUDIO_CRISP_CANONICAL_ARTWORK_PREVIEW_STRICT_AUDIT.md`
-- SB-LF06-004 Disposition: PASS / CLOSED
-- SB-LF06-004 C001 Implementation Commit: `7f201c4735ee72bc6e352ff26ea5fdcafc4e3f18`
-- SB-LF06-004 C001 Final Builder Publication: `bb2acb4a721ea79229d87cb7d6aae5b9ca417fba`
-- SB-LF06-004 Closing Strict Audit Commit: `fb877a2e376392a365c814ffc508c85d57665f07`
-- Current Prompt: `.hiveai/prompts/SB-LF06-005-C001_FACTORY_STUDIO_CANONICAL_EVIDENCE_METRICS_PANEL_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-005-C001_FACTORY_STUDIO_CANONICAL_EVIDENCE_METRICS_PANEL_STRICT_AUDIT.md`
+- SB-LF06-005 C001 Disposition: CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED
+- SB-LF06-005 C001 Implementation Commit: `5ea045acf4ef0bae0a26055f5d26b8e3c2b4b03d`
+- SB-LF06-005 C001 Final Builder Publication: `226bf06d0fc881a23660e313d23f2f33d8428aea`
+- SB-LF06-005 C001 Strict Audit Commit: `be2361da5a81f33541c113ed687b23ab68d9be96`
+- Current Prompt: `.hiveai/prompts/SB-LF06-005-C001-R01_FAIL_CLOSED_METADATA_PRESENTATION_GATE_REMEDIATION_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -110,7 +110,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF06-002` is PASS/CLOSED through `SB-LF06-002-C001-R01`; the Generate target form is presentation-only, cross-language guarded, independent-dimension safe, Core-unavailable truthful, and protected by a committed project-local clean-checkout Godot runtime suite.
 - `SB-LF06-003` is PASS/CLOSED through `SB-LF06-003-C001-R01`; real canonical Generate/Reproduce, dependency-gated Solve/Validate/Analyze, launcher-backed availability, bounded stderr/error truth, identity isolation, governed output and retained last-success action evidence are accepted.
 - `SB-LF06-004` is PASS/CLOSED; Studio displays only real canonical successful-bundle `artwork.png` through deterministic integer nearest-neighbor presentation, with pixel-level runtime evidence, truthful failure retention and Reproduce-source switching.
-- Active execution frontier is `SB-LF06-005`; Studio must present real canonical structural/art QA and provenance evidence while keeping solution, measured difficulty, load and risk explicitly unavailable until their canonical M03/M04/M05 capabilities exist.
+- `SB-LF06-005-C001` product implementation is retained: the read-only Studio evidence panel correctly exposes real structural/art QA and provenance while keeping solution, measured difficulty, load and risk unavailable; strict audit found an incomplete fail-closed metadata presentation gate for root candidate identity, canonical request schema/version and malformed consumed-field types, so bounded R01 remediation is active before closure.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
