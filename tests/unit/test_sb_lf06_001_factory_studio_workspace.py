@@ -36,7 +36,8 @@ def test_shell_is_split_into_navigation_page_and_gateway_contracts() -> None:
     assert SHELL.exists() and WORKSPACE.exists() and GATEWAY.exists()
     assert TARGET_CONTROLS.exists()
     shell = SHELL.read_text(encoding="utf-8")
-    assert "FactoryCoreGateway.new()" in shell
+    assert 'ResourceLoader.call("load", "res://scripts/factory_core_gateway.gd")' in shell
+    assert "core_gateway = gateway_script.new()" in shell
     assert 'NodePath("Frame/Layout/Body/NavigationPanel/Navigation")' in shell
     assert 'NodePath("Frame/Layout/Body/Workspace")' in shell
     assert "_resolve_navigation()" in shell

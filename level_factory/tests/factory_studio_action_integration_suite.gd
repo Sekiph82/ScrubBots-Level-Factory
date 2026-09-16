@@ -5,6 +5,7 @@ const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Naviga
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
 const TEST_OUTPUT_PATH := "res://output/.lf06-003-action-test"
+const CORE_GATEWAY_SCRIPT_PATH := "res://scripts/factory_core_gateway.gd"
 const SEED_VALUE := "77"
 const PRESENTATION_LABEL := "presentation-only-label"
 const SCENE_LOADER_METHOD := "load"
@@ -20,7 +21,22 @@ func _init() -> void:
 func _run_suite() -> void:
 	test_output_absolute = ProjectSettings.globalize_path(TEST_OUTPUT_PATH)
 	_remove_tree(test_output_absolute)
-	var missing_core := FactoryCoreGateway.new("definitely;missing-scrubbots-python")
+	for script_path in [
+		"res://scripts/factory_core_gateway.gd",
+		"res://scripts/factory_studio_navigation.gd",
+		"res://scripts/factory_studio_workspace_page.gd",
+		"res://scripts/factory_studio_target_controls.gd",
+		"res://scripts/factory_studio_art_preview.gd",
+		"res://scripts/factory_studio_evidence_panel.gd",
+		"res://scripts/factory_studio_art_editor.gd",
+	]:
+		_check(ResourceLoader.call(SCENE_LOADER_METHOD, script_path) as Script != null, "Studio script contract did not load: %s" % script_path)
+	var gateway_script := ResourceLoader.call(SCENE_LOADER_METHOD, CORE_GATEWAY_SCRIPT_PATH) as Script
+	_check(gateway_script != null, "Canonical Core gateway script did not load")
+	if gateway_script == null:
+		_finish()
+		return
+	var missing_core: RefCounted = gateway_script.new("definitely;missing-scrubbots-python")
 	_check(missing_core.status_name() == "UNAVAILABLE", "Invalid canonical Core executable was not reported unavailable")
 	var missing_result: Dictionary = missing_core.call("run_action", "Generate", {"seed": "77"})
 	_check(missing_result.get("state") == "UNAVAILABLE", "Missing canonical Core did not keep Generate unavailable")
@@ -66,7 +82,7 @@ func _run_suite() -> void:
 	_check(not bool(capability_matrix["Solve"]["available"]), "Solve became available without M03")
 	_check(not bool(capability_matrix["Validate"]["available"]), "Validate became available without standalone canonical validation")
 	_check(not bool(capability_matrix["Analyze"]["available"]), "Analyze became available without M04")
-	var incompatible_core := FactoryCoreGateway.new(str(gateway.get("python_executable")), "res://tests/factory_studio_action_integration_suite.gd")
+	var incompatible_core: RefCounted = gateway_script.new(str(gateway.get("python_executable")), "res://tests/factory_studio_action_integration_suite.gd")
 	_check(incompatible_core.status_name() == "UNAVAILABLE", "Executable-present but incompatible launcher path was reported available")
 	var incompatible_matrix: Dictionary = incompatible_core.call("capability_matrix")
 	_check(not bool(incompatible_matrix["Generate"]["available"]), "Generate was enabled for an incompatible launcher/Core path")
@@ -120,6 +136,13 @@ func _run_suite() -> void:
 		var empty_evidence: Dictionary = evidence_before_action.call("snapshot")
 		_check(empty_evidence.get("state") == "EMPTY", "Evidence panel was not EMPTY before a successful canonical action")
 		_check(str(empty_evidence.get("candidate_id", "")).is_empty() and str(empty_evidence.get("quality_decision", "")).is_empty(), "Evidence panel fabricated identity or quality before canonical success")
+	var editor_before_action := target.get_node_or_null("ActionArea/CanonicalArtEditor")
+	_check(editor_before_action != null, "Non-destructive logical-pixel editor is missing before execution")
+	if editor_before_action != null:
+		var empty_editor: Dictionary = editor_before_action.call("snapshot")
+		_check(empty_editor.get("state") == "EMPTY", "Editor was not EMPTY before a real canonical source was loaded")
+		_check(editor_before_action.call("paint_cell", 0, 0, "C01") == false, "Editor fabricated an editable buffer before source load")
+		_check(editor_before_action.call("working_image_snapshot") == null, "Editor exposed a working image before source load")
 
 	generate_button.pressed.emit()
 	await process_frame
@@ -136,11 +159,81 @@ func _run_suite() -> void:
 	var last_success_after_generate: Dictionary = target.call("last_successful_core_evidence_snapshot")
 	_check(last_success_after_generate == generated, "Successful Generate evidence was not retained separately")
 	var preview := target.get_node_or_null("ActionArea/CanonicalArtworkPreview")
+	var evidence := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
+	var source_image := Image.load_from_file(str(generated.get("output_path", "")).path_join("artwork.png"))
 	_check(preview != null, "Canonical artwork preview component is missing")
-	if preview == null:
+	_check(evidence != null, "Canonical evidence panel is missing after Generate")
+	_check(source_image != null, "Canonical Generate artwork.png could not be loaded by the integration test")
+	if preview == null or evidence == null or source_image == null:
 		instance.queue_free()
 		_finish()
 		return
+	var editor := target.get_node_or_null("ActionArea/CanonicalArtEditor")
+	_check(editor != null, "Non-destructive logical-pixel editor is missing after Generate")
+	if editor == null:
+		instance.queue_free()
+		_finish()
+		return
+	var editor_empty_after_generate: Dictionary = editor.call("snapshot")
+	_check(editor_empty_after_generate.get("state") == "EMPTY", "Editor silently loaded or fabricated a source before explicit operator load")
+	_check(bool(editor.call("load_current_canonical_artwork")), "Editor could not explicitly load the successful canonical artwork")
+	var editor_clean: Dictionary = editor.call("snapshot")
+	_check(editor_clean.get("state") == "CLEAN", "Explicit canonical artwork load did not produce a CLEAN editor")
+	_check(editor_clean.get("source_action") == "Generate", "Editor source action was not bound to the real Generate result")
+	_check(editor_clean.get("source_candidate_id") == generated.get("candidate_id"), "Editor source candidate was not bound to canonical Generate identity")
+	_check(editor_clean.get("source_bundle_path") == generated.get("output_path"), "Editor source bundle path was not bound to canonical Generate output")
+	_check(editor_clean.get("source_artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Editor source artwork path was not derived from canonical output")
+	_check(editor_clean.get("logical_width") == 20 and editor_clean.get("logical_height") == 21, "Editor did not preserve the real rectangular artwork dimensions")
+	_check(editor_clean.get("validation_disposition") == "UNVALIDATED — revalidation pending SB-LF06-008", "Editor did not expose the required UNVALIDATED disposition")
+	var editor_source_image: Image = editor.call("source_image_snapshot")
+	var editor_working_image: Image = editor.call("working_image_snapshot")
+	_check(editor_source_image != null and editor_working_image != null, "Editor did not create source and working image buffers")
+	_check(editor_source_image != null and editor_source_image.get_width() == 20 and editor_source_image.get_height() == 21, "Editor source image dimensions are not canonical")
+	if source_image != null and editor_source_image != null and editor_working_image != null:
+		for y in range(source_image.get_height()):
+			for x in range(source_image.get_width()):
+				_check(editor_source_image.get_pixel(x, y) == source_image.get_pixel(x, y), "Editor source pixels differ from real canonical artwork at %s,%s" % [x, y])
+				_check(editor_working_image.get_pixel(x, y) == source_image.get_pixel(x, y), "Editor working pixels differ before any edit at %s,%s" % [x, y])
+	var source_artwork_path := str(editor_clean.get("source_artwork_path", ""))
+	var source_bytes_before := FileAccess.get_file_as_bytes(source_artwork_path)
+	var source_sha_before := str(editor_clean.get("source_artwork_sha256", ""))
+	_check(not source_bytes_before.is_empty() and not source_sha_before.is_empty(), "Editor did not capture real source artwork bytes/hash before editing")
+	var edited_x := 0
+	var edited_y := 0
+	var selected_color := "C16"
+	if editor_source_image != null and editor_source_image.get_pixel(edited_x, edited_y) == Color8(0, 0, 0, 255):
+		selected_color = "C01"
+	_check(bool(editor.call("select_color", selected_color)), "Editor rejected a canonical C01..C16 paint color")
+	_check(bool(editor.call("paint_cell", edited_x, edited_y, selected_color)), "Editor did not paint one valid logical cell")
+	var editor_dirty: Dictionary = editor.call("snapshot")
+	_check(editor_dirty.get("state") == "DIRTY", "One-cell edit did not produce DIRTY state")
+	_check(editor_dirty.get("dirty_cell_count") == 1, "One-cell edit did not produce exactly one dirty cell")
+	_check(editor_dirty.get("working_buffer_differs") == true, "Dirty editor did not expose working-buffer difference")
+	_check(editor_dirty.get("validation_disposition") == "UNVALIDATED — revalidation pending SB-LF06-008", "Dirty editor did not remain explicitly UNVALIDATED")
+	var editor_working_after_edit: Image = editor.call("working_image_snapshot")
+	_check(editor_working_after_edit != null, "Dirty editor did not expose a working image")
+	if editor_source_image != null and editor_working_after_edit != null:
+		for y in range(editor_source_image.get_height()):
+			for x in range(editor_source_image.get_width()):
+				if x == edited_x and y == edited_y:
+					continue
+				_check(editor_working_after_edit.get_pixel(x, y) == editor_source_image.get_pixel(x, y), "Edit changed an untouched logical cell at %s,%s" % [x, y])
+		_check(editor_working_after_edit.get_pixel(edited_x, edited_y) == (Color8(0, 0, 0, 255) if selected_color == "C16" else Color8(233, 75, 75, 255)), "Edited cell RGB does not equal selected canonical palette RGB")
+	_check(FileAccess.get_file_as_bytes(source_artwork_path) == source_bytes_before, "Editing changed canonical source artwork bytes")
+	_check(str(editor_dirty.get("source_artwork_sha256", "")) == source_sha_before, "Editing changed captured canonical source artwork hash")
+	_check(preview.call("snapshot").get("artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Dirty edit relabeled canonical preview source")
+	_check(evidence.call("snapshot").get("metadata_path") == str(generated.get("output_path")).path_join("metadata.json"), "Dirty edit relabeled canonical evidence source")
+	var dirty_before_invalid_attempts: Image = editor.call("working_image_snapshot")
+	_check(editor.call("paint_cell", -1, 0, selected_color) == false, "Out-of-bounds negative coordinate was accepted")
+	_check(editor.call("paint_cell", 20, 21, selected_color) == false, "Out-of-bounds upper coordinate was accepted")
+	_check(editor.call("paint_cell", edited_x, edited_y, "BG01") == false, "BG01 was accepted as a logical paint color")
+	_check(editor.call("paint_cell", edited_x, edited_y, "RGB_NOT_CANONICAL") == false, "Unknown color was accepted as a logical paint color")
+	var after_invalid_attempts: Image = editor.call("working_image_snapshot")
+	_check(after_invalid_attempts != null and dirty_before_invalid_attempts != null, "Invalid paint regression could not inspect working images")
+	if after_invalid_attempts != null and dirty_before_invalid_attempts != null:
+		_check(_images_equal(after_invalid_attempts, dirty_before_invalid_attempts), "Invalid paint attempt mutated the working buffer")
+	_check(bool(editor.call("paint_cell", edited_x, edited_y, selected_color)), "No-op paint was not accepted as a stable operation")
+	_check(editor.call("snapshot").get("dirty_cell_count") == 1, "No-op paint created false dirty evidence")
 	var preview_before_success: Dictionary = preview.call("snapshot")
 	_check(preview_before_success.get("state") == "READY", "Successful Generate did not produce a READY canonical preview")
 	_check(preview_before_success.get("source_action") == "Generate", "Preview source action was not Generate")
@@ -151,8 +244,6 @@ func _run_suite() -> void:
 	var expected_scale := maxi(1, mini(16, floori(512.0 / 21.0)))
 	_check(preview_before_success.get("presentation_scale") == expected_scale, "Preview presentation scale was not the deterministic bounded integer scale")
 	_check(preview_before_success.get("displayed_width") == 20 * expected_scale and preview_before_success.get("displayed_height") == 21 * expected_scale, "Preview display dimensions do not equal logical dimensions multiplied by scale")
-	var source_image := Image.load_from_file(str(preview_before_success.get("artwork_path")))
-	_check(source_image != null, "Canonical Generate artwork.png could not be loaded by the integration test")
 	var displayed_texture := preview.get_node_or_null("ArtworkImage").texture as ImageTexture
 	_check(displayed_texture != null, "Canonical preview did not create an ImageTexture")
 	var displayed_image := displayed_texture.get_image() if displayed_texture != null else null
@@ -165,12 +256,6 @@ func _run_suite() -> void:
 					for dx in range(expected_scale):
 						_check(displayed_image.get_pixel(x * expected_scale + dx, y * expected_scale + dy) == expected_color, "Preview introduced a blended or foreign pixel at logical block %s,%s" % [x, y])
 		_check(displayed_image.get_width() == 20 * expected_scale and displayed_image.get_height() == 21 * expected_scale, "Displayed texture dimensions are not deterministic")
-	var evidence := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
-	_check(evidence != null, "Canonical evidence panel is missing after Generate")
-	if evidence == null:
-		instance.queue_free()
-		_finish()
-		return
 	var evidence_after_generate: Dictionary = evidence.call("snapshot")
 	_check(evidence_after_generate.get("state") == "READY", "Generate did not produce a READY canonical evidence panel")
 	_check(evidence_after_generate.get("source_action") == "Generate", "Evidence panel source action was not Generate")
@@ -236,6 +321,7 @@ func _run_suite() -> void:
 		evidence.call("consume_action_result", generated)
 		var restored_generate_evidence: Dictionary = evidence.call("snapshot")
 		_check(restored_generate_evidence.get("state") == "READY" and restored_generate_evidence.get("retained_after_failure") == false, "Restored canonical Generate metadata did not return evidence panel to READY")
+	var editor_before_failed_action: Dictionary = editor.call("snapshot")
 	_write_text(metadata_path, "{\"corrupted\":true}")
 	reproduce_button.pressed.emit()
 	await process_frame
@@ -245,6 +331,10 @@ func _run_suite() -> void:
 	_check("metadata" in str(failed_reproduce.get("reason", "")).to_lower() or "mismatch" in str(failed_reproduce.get("reason", "")).to_lower(), "Failed Reproduce did not expose its canonical diagnostic")
 	var last_success_after_failure: Dictionary = target.call("last_successful_core_evidence_snapshot")
 	_check(last_success_after_failure == last_success_after_generate, "Failed Reproduce erased last-success Core evidence")
+	var editor_after_failed_action: Dictionary = editor.call("snapshot")
+	_check(editor_after_failed_action.get("state") == "DIRTY", "Failed action erased the DIRTY editor state")
+	_check(editor_after_failed_action.get("source_action") == editor_before_failed_action.get("source_action") and editor_after_failed_action.get("source_bundle_path") == editor_before_failed_action.get("source_bundle_path"), "Failed action changed the dirty editor source identity")
+	_check(editor_after_failed_action.get("dirty_cell_count") == editor_before_failed_action.get("dirty_cell_count"), "Failed action changed dirty-cell evidence")
 	var result_readout := target.get_node_or_null("ActionArea/ActionResult") as Label
 	_check(result_readout != null and "Last successful Core evidence retained" in result_readout.text, "Last-success evidence was not visibly retained after failure")
 	var preview_after_failure: Dictionary = preview.call("snapshot")
@@ -267,6 +357,10 @@ func _run_suite() -> void:
 	_check(reproduced.get("grid_hash") == generated.get("grid_hash"), "Reproduce grid hash did not match Generate")
 	_check(str(reproduced.get("output_path", "")) != str(generated.get("output_path", "")), "Reproduce targeted the original Generate bundle")
 	_check(_under_output_area(str(reproduced.get("output_path", ""))), "Reproduce output escaped the approved Factory output area")
+	var editor_after_reproduce: Dictionary = editor.call("snapshot")
+	_check(editor_after_reproduce.get("state") == "DIRTY", "Successful Reproduce silently replaced the DIRTY editor")
+	_check(editor_after_reproduce.get("source_action") == "Generate" and editor_after_reproduce.get("source_bundle_path") == generated.get("output_path"), "Successful Reproduce silently changed the dirty editor source identity")
+	_check(editor_after_reproduce.get("latest_successful_output_path") == reproduced.get("output_path"), "Editor did not retain the newer successful Reproduce as a separately observable latest action")
 	var preview_after_reproduce: Dictionary = preview.call("snapshot")
 	_check(preview_after_reproduce.get("state") == "READY", "Reproduce MATCH did not produce a READY preview")
 	_check(preview_after_reproduce.get("source_action") == "Reproduce", "Reproduce preview retained the Generate source action")
@@ -315,6 +409,19 @@ func _run_suite() -> void:
 	if restored_artwork != null:
 		restored_artwork.store_buffer(reproduced_artwork_bytes)
 		restored_artwork.close()
+	_check(bool(editor.call("reset_to_source")), "Reset to source did not restore the immutable Generate source")
+	var editor_after_reset: Dictionary = editor.call("snapshot")
+	_check(editor_after_reset.get("state") == "CLEAN" and editor_after_reset.get("dirty_cell_count") == 0, "Reset to source did not return the editor to CLEAN")
+	var reset_image: Image = editor.call("working_image_snapshot")
+	_check(reset_image != null and editor_source_image != null and _images_equal(reset_image, editor_source_image), "Reset to source did not restore exact original source pixels")
+	_check(bool(editor.call("load_current_canonical_artwork")), "Explicit clean load of the current Reproduce artwork failed")
+	var editor_after_reproduce_load: Dictionary = editor.call("snapshot")
+	_check(editor_after_reproduce_load.get("state") == "CLEAN", "Explicit Reproduce source load did not produce CLEAN state")
+	_check(editor_after_reproduce_load.get("source_action") == "Reproduce", "Explicit current-source load did not switch editor source action")
+	_check(editor_after_reproduce_load.get("source_bundle_path") == reproduced.get("output_path"), "Explicit current-source load did not switch editor bundle path")
+	_check(editor_after_reproduce_load.get("source_candidate_id") == reproduced.get("candidate_id"), "Explicit current-source load did not preserve canonical Reproduce candidate identity")
+	var reproduce_editor_image: Image = editor.call("working_image_snapshot")
+	_check(reproduce_editor_image != null and reproduced_image != null and _images_equal(reproduce_editor_image, reproduced_image), "Explicit Reproduce source load changed canonical source pixels")
 
 	instance.queue_free()
 	_finish()
@@ -343,6 +450,18 @@ func _write_text(path: String, contents: String) -> void:
 		file.close()
 
 
+func _images_equal(left: Image, right: Image) -> bool:
+	if left == null or right == null:
+		return false
+	if left.get_width() != right.get_width() or left.get_height() != right.get_height():
+		return false
+	for y in range(left.get_height()):
+		for x in range(left.get_width()):
+			if left.get_pixel(x, y) != right.get_pixel(x, y):
+				return false
+	return true
+
+
 func _remove_tree(path: String) -> void:
 	var directory := DirAccess.open(path)
 	if directory == null:
@@ -367,6 +486,7 @@ func _finish() -> void:
 		print("SB-LF06-003-C001 Studio/Core action integration PASS")
 		print("SB-LF06-004-C001 crisp preview integration PASS")
 		print("SB-LF06-005-C001 canonical evidence integration PASS")
+		print("SB-LF06-006-C001 non-destructive pixel editor integration PASS")
 		quit(0)
 		return
 	for failure in failures:

@@ -72,7 +72,7 @@ def test_studio_exposes_exact_action_set_and_does_not_forward_presentation_id() 
 def test_committed_integration_runner_covers_unavailable_and_real_core_paths() -> None:
     source = INTEGRATION.read_text(encoding="utf-8")
     assert source.startswith("extends SceneTree")
-    assert 'FactoryCoreGateway.new(str(gateway.get("python_executable")), "res://tests/factory_studio_action_integration_suite.gd")' in source
+    assert 'gateway_script.new(str(gateway.get("python_executable")), "res://tests/factory_studio_action_integration_suite.gd")' in source
     assert '"state") == "FAILED"' in source
     assert '"disposition") == "MATCH"' in source
     assert "PRESENTATION_LABEL" in source

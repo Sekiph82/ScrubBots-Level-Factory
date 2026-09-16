@@ -13,6 +13,7 @@ const MAX_DIMENSION := 59
 const MAX_CANDIDATE_LABEL_LENGTH := 64
 const PREVIEW_SCRIPT_PATH := "res://scripts/factory_studio_art_preview.gd"
 const EVIDENCE_PANEL_SCRIPT_PATH := "res://scripts/factory_studio_evidence_panel.gd"
+const ART_EDITOR_SCRIPT_PATH := "res://scripts/factory_studio_art_editor.gd"
 
 var difficulty_control: OptionButton
 var width_control: SpinBox
@@ -28,6 +29,7 @@ var _last_action_result: Dictionary = {}
 var _last_successful_core_evidence: Dictionary = {}
 var _art_preview: Node
 var _evidence_panel: Node
+var _art_editor: Node
 var _action_running := false
 
 
@@ -126,6 +128,11 @@ func _build_controls() -> void:
 		_evidence_panel = evidence_script.new() as Node
 		_evidence_panel.name = "CanonicalEvidencePanel"
 		action_area.add_child(_evidence_panel)
+	var editor_script := ResourceLoader.call("load", ART_EDITOR_SCRIPT_PATH) as Script
+	if editor_script != null:
+		_art_editor = editor_script.new() as Node
+		_art_editor.name = "CanonicalArtEditor"
+		action_area.add_child(_art_editor)
 
 
 func _make_dimension_control(control_name: String) -> SpinBox:
@@ -235,6 +242,8 @@ func _on_action_pressed(action: String) -> void:
 		_art_preview.call("consume_action_result", _last_action_result)
 	if _evidence_panel != null:
 		_evidence_panel.call("consume_action_result", _last_action_result)
+	if _art_editor != null:
+		_art_editor.call("observe_action_result", _last_action_result)
 	_action_running = false
 	_render_action_result()
 	_refresh_action_controls()
