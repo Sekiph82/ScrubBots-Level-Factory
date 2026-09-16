@@ -114,6 +114,12 @@ func _run_suite() -> void:
 		var empty_preview: Dictionary = preview_before_action.call("snapshot")
 		_check(empty_preview.get("state") == "EMPTY", "Preview was not EMPTY before a successful canonical action")
 		_check(preview_before_action.get_node_or_null("ArtworkImage").texture == null, "Preview fabricated a texture before canonical success")
+	var evidence_before_action := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
+	_check(evidence_before_action != null, "Canonical evidence panel is missing before execution")
+	if evidence_before_action != null:
+		var empty_evidence: Dictionary = evidence_before_action.call("snapshot")
+		_check(empty_evidence.get("state") == "EMPTY", "Evidence panel was not EMPTY before a successful canonical action")
+		_check(str(empty_evidence.get("candidate_id", "")).is_empty() and str(empty_evidence.get("quality_decision", "")).is_empty(), "Evidence panel fabricated identity or quality before canonical success")
 
 	generate_button.pressed.emit()
 	await process_frame
@@ -159,6 +165,35 @@ func _run_suite() -> void:
 					for dx in range(expected_scale):
 						_check(displayed_image.get_pixel(x * expected_scale + dx, y * expected_scale + dy) == expected_color, "Preview introduced a blended or foreign pixel at logical block %s,%s" % [x, y])
 		_check(displayed_image.get_width() == 20 * expected_scale and displayed_image.get_height() == 21 * expected_scale, "Displayed texture dimensions are not deterministic")
+	var evidence := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
+	_check(evidence != null, "Canonical evidence panel is missing after Generate")
+	if evidence == null:
+		instance.queue_free()
+		_finish()
+		return
+	var evidence_after_generate: Dictionary = evidence.call("snapshot")
+	_check(evidence_after_generate.get("state") == "READY", "Generate did not produce a READY canonical evidence panel")
+	_check(evidence_after_generate.get("source_action") == "Generate", "Evidence panel source action was not Generate")
+	_check(evidence_after_generate.get("metadata_path") == str(generated.get("output_path")).path_join("metadata.json"), "Evidence panel did not derive metadata.json from Generate output_path")
+	_check(evidence_after_generate.get("candidate_id") == generated.get("candidate_id"), "Evidence candidate identity disagrees with Generate action evidence")
+	_check(evidence_after_generate.get("grid_hash") == generated.get("grid_hash"), "Evidence grid hash disagrees with Generate action evidence")
+	_check(evidence_after_generate.get("logical_width") == 20 and evidence_after_generate.get("logical_height") == 21, "Evidence dimensions were not read from canonical metadata")
+	_check(evidence_after_generate.get("quality_schema") == "scrubbots-quality" and evidence_after_generate.get("quality_schema_version") == 1, "Evidence quality schema/version is not canonical")
+	_check(evidence_after_generate.get("quality_decision") in ["ACCEPT", "REJECT"], "Evidence quality decision is not a canonical structural decision")
+	_check(not str(evidence_after_generate.get("solution", "")).is_empty() and "UNAVAILABLE" in str(evidence_after_generate.get("solution", "")), "Solution did not remain unavailable pending M03")
+	_check("UNAVAILABLE" in str(evidence_after_generate.get("difficulty_analysis", "")), "Difficulty analysis did not remain unavailable pending M04")
+	_check("UNAVAILABLE" in str(evidence_after_generate.get("load_risk", "")), "Load/risk did not remain unavailable without canonical models")
+	_check("Structural QA ACCEPT != OWNER ACCEPT" in str(evidence.get_node_or_null("StructuralArtQA").text), "Evidence panel did not preserve QA versus owner acceptance truth")
+	var metadata_value: Variant = JSON.parse_string(FileAccess.get_file_as_string(str(generated.get("metadata_path", ""))))
+	_check(metadata_value is Dictionary, "Canonical Generate metadata could not be parsed for evidence comparison")
+	if metadata_value is Dictionary:
+		var metadata_quality: Dictionary = metadata_value.get("quality", {})
+		var metadata_report: Dictionary = metadata_quality.get("report", {})
+		var metadata_analysis: Dictionary = metadata_report.get("analysis", {})
+		var metadata_metrics: Dictionary = metadata_analysis.get("metrics", {})
+		var displayed_metrics: Dictionary = evidence_after_generate.get("structural_metrics", {})
+		for metric_name in displayed_metrics:
+			_check(displayed_metrics[metric_name] == metadata_metrics.get(metric_name), "Evidence metric %s was not read from canonical metadata" % metric_name)
 
 	var metadata_path := str(generated.get("metadata_path", ""))
 	var metadata_file := FileAccess.open(metadata_path, FileAccess.READ)
@@ -182,6 +217,10 @@ func _run_suite() -> void:
 	_check(preview_after_failure.get("artwork_path") == preview_before_success.get("artwork_path"), "Failed action silently changed the retained preview source")
 	var preview_state_label := preview.get_node_or_null("PreviewState") as Label
 	_check(preview_state_label != null and "RETAINED LAST SUCCESS" in preview_state_label.text, "Retained preview was not visibly labeled")
+	var evidence_after_failure: Dictionary = evidence.call("snapshot")
+	_check(evidence_after_failure.get("state") == "READY" and evidence_after_failure.get("retained_after_failure") == true, "Failed action did not retain the last successful evidence panel")
+	_check(evidence_after_failure.get("metadata_path") == evidence_after_generate.get("metadata_path"), "Failed action silently changed retained evidence metadata source")
+	_check("RETAINED LAST SUCCESS" in str(evidence.get_node_or_null("EvidenceState").text), "Retained evidence was not visibly labeled")
 	_write_text(metadata_path, original_metadata)
 
 	reproduce_button.pressed.emit()
@@ -204,6 +243,31 @@ func _run_suite() -> void:
 		for y in range(source_image.get_height()):
 			for x in range(source_image.get_width()):
 				_check(source_image.get_pixel(x, y) == reproduced_image.get_pixel(x, y), "Reproduce MATCH preview pixels differ from Generate artwork")
+	var evidence_after_reproduce: Dictionary = evidence.call("snapshot")
+	_check(evidence_after_reproduce.get("state") == "READY", "Reproduce MATCH did not produce a READY evidence panel")
+	_check(evidence_after_reproduce.get("source_action") == "Reproduce", "Reproduce evidence retained the Generate source action")
+	_check(evidence_after_reproduce.get("metadata_path") == str(reproduced.get("output_path")).path_join("metadata.json"), "Reproduce evidence did not switch to the reproduction metadata.json")
+	_check(evidence_after_reproduce.get("candidate_id") == generated.get("candidate_id") and evidence_after_reproduce.get("grid_hash") == generated.get("grid_hash"), "Reproduce evidence identity was not MATCH-consistent")
+	var reproduction_metadata_path := str(evidence_after_reproduce.get("metadata_path"))
+	var original_reproduction_metadata := FileAccess.get_file_as_string(reproduction_metadata_path)
+	_write_text(reproduction_metadata_path, "{\"schema\":\"corrupt\"}")
+	evidence.call("consume_action_result", reproduced)
+	var corrupt_evidence: Dictionary = evidence.call("snapshot")
+	_check(corrupt_evidence.get("state") == "ERROR", "Corrupt successful metadata did not produce truthful evidence ERROR")
+	_check(corrupt_evidence.get("retained_after_failure") == true, "Corrupt metadata did not retain prior evidence separately")
+	_check("metadata" in str(corrupt_evidence.get("error", "")).to_lower(), "Evidence metadata failure did not expose a truthful diagnostic")
+	_write_text(reproduction_metadata_path, original_reproduction_metadata)
+	var mismatched_metadata: Variant = JSON.parse_string(original_reproduction_metadata)
+	if mismatched_metadata is Dictionary:
+		var mismatched_artwork: Dictionary = mismatched_metadata.get("artwork", {})
+		mismatched_artwork["candidate_id"] = "mismatched-candidate"
+		mismatched_metadata["artwork"] = mismatched_artwork
+		_write_text(reproduction_metadata_path, JSON.stringify(mismatched_metadata))
+		evidence.call("consume_action_result", reproduced)
+		var mismatch_evidence: Dictionary = evidence.call("snapshot")
+		_check(mismatch_evidence.get("state") == "ERROR", "Mismatched canonical metadata did not produce truthful evidence ERROR")
+		_check(mismatch_evidence.get("retained_after_failure") == true, "Mismatched metadata did not retain prior evidence separately")
+	_write_text(reproduction_metadata_path, original_reproduction_metadata)
 	var reproduced_artwork_path := str(preview_after_reproduce.get("artwork_path"))
 	var reproduced_artwork_bytes := FileAccess.get_file_as_bytes(reproduced_artwork_path)
 	DirAccess.remove_absolute(reproduced_artwork_path)
@@ -257,6 +321,7 @@ func _finish() -> void:
 	if failures.is_empty():
 		print("SB-LF06-003-C001 Studio/Core action integration PASS")
 		print("SB-LF06-004-C001 crisp preview integration PASS")
+		print("SB-LF06-005-C001 canonical evidence integration PASS")
 		quit(0)
 		return
 	for failure in failures:
