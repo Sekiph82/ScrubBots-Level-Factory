@@ -47,3 +47,7 @@ Implementation decisions, commands, failures/corrections, changed files, tests, 
 - No canonical Python Core semantics, Studio product script, source bundle, metadata, artwork, TASKS tracker, prompt, audit, prior log, provider, network, credential, dependency, license, persistent truth store, persistence, revision history, save/export, owner acceptance, promotion, solver, Difficulty V1, M05 validator, SB-LF06-011+, SB-LFX, Content Platform, or main-game file was changed.
 - Offline/network boundary check: the added runner and tests invoke only the local committed Godot scene and canonical local Python launcher; no HTTP, provider, API key, credential, telemetry, or runtime network dependency was introduced.
 - Security/safety: test output is bounded under `level_factory/output/` and removed on suite completion; canonical A bundle bytes are compared before/after divergence, revalidation, failure, reproduction, and explicit replacement; pre-existing owner-local UID files remain untracked and untouched.
+- Implementation commit: `6972a7b6d360b7d73380ff9f04b1cef42e07360e` (`Prove LF06-010 Studio truth separation`).
+- Implementation push: `git push origin main` succeeded; local `HEAD` equals `origin/main` at `6972a7b6d360b7d73380ff9f04b1cef42e07360e`.
+- The ten pre-existing owner-local `.uid` files remain untracked and were not included in the implementation commit.
+- The final action is exactly one log-only publication commit containing this finalized builder log; after that push, local `HEAD` and `origin/main` will be rechecked for equality.
