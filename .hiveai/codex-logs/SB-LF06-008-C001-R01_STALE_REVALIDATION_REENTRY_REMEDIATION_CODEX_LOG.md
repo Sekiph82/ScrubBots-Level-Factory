@@ -51,4 +51,7 @@ This builder log was created and verified before any R01 implementation or test 
 - `git diff -- TASKS.md`: empty; the root tracker was not modified.
 - Staged implementation scope before commit is exactly this R01 log, the stale lifecycle component, the committed Godot re-entry integration suite, and its focused static regression test. The ten pre-existing owner-local `.uid` files remain untracked and preserved.
 - No Python Factory Core, launcher, bridge, provider, network, credential, dependency, persistence, promotion, M03/M04/M05, LF06-009+, or SB-LFX work was performed.
-- The implementation commit, push/equality checkpoint, and exactly one terminal log-only publication commit remain to be recorded chronologically below. Root `TASKS.md`, prompts, audits, prior logs, and accepted LF06-008 product semantics will not be rewritten.
+- Implementation commit: `ae1dcfcd6841e966f82b88eb568310ed74b25423` (`Fix LF06-008 stale revalidation re-entry`).
+- Implementation push: `git push origin main` succeeded; local `HEAD` equals `origin/main` at `ae1dcfcd6841e966f82b88eb568310ed74b25423`.
+- The ten pre-existing owner-local `.uid` files remain untracked and were not included in the implementation commit.
+- The final action is exactly one log-only publication commit containing this finalized builder log; after that push, local `HEAD` and `origin/main` will be rechecked for equality.
