@@ -130,6 +130,7 @@ func _run_suite() -> void:
 	_check(evidence.call("snapshot").get("metadata_path") == evidence_before.get("metadata_path"), "Revalidation changed canonical evidence identity")
 	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")), "Transient revalidation request directory was not removed")
 	_check(str(first_result.get("disposition", "")) == "ACCEPT" or not first_result.get("rejection_codes", []).is_empty(), "Structural REJECT did not carry canonical rejection codes")
+	var first_working_hash := str(first_result.get("working_grid_hash", ""))
 
 	var second_original := str(editor.call("canonical_color_id_for_pixel", source_image.get_pixel(1, 0))) if source_image != null else ""
 	var second_color := _different_color(second_original)
@@ -138,6 +139,31 @@ func _run_suite() -> void:
 	var stale: Dictionary = revalidation.call("snapshot")
 	_check(stale.get("state") == "STALE", "Editing after a structural result did not make the result STALE")
 	_check(not bool(stale.get("result_current", true)), "STALE result remained current")
+	_check(revalidate_button != null and not revalidate_button.disabled, "STALE DIRTY working grid did not re-enable revalidation")
+	_check("Stale evidence:" in str(revalidation.get_node_or_null("RevalidationResult").text), "STALE result was not visibly separated as stale evidence")
+	revalidate_button.pressed.emit()
+	await process_frame
+	var second_result: Dictionary = revalidation.call("snapshot")
+	_check(second_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"] and bool(second_result.get("result_current", false)), "Second real canonical revalidation did not replace stale evidence with a current result")
+	_check(str(second_result.get("working_grid_hash", "")) != first_working_hash, "Second revalidation did not bind a different working-grid hash")
+	_check(editor.call("snapshot").get("state") == "DIRTY", "Second revalidation cleared the editor DIRTY state")
+	_check(second_result.get("source_bytes_unchanged") == true and _source_files(source_bundle_path) == source_files_before, "Second revalidation changed canonical source bytes")
+	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")), "Transient second revalidation request directory was not removed")
+
+	var third_original := str(editor.call("canonical_color_id_for_pixel", source_image.get_pixel(2, 0))) if source_image != null else ""
+	editor.call("paint_cell", 2, 0, _different_color(third_original))
+	await process_frame
+	var second_stale: Dictionary = revalidation.call("snapshot")
+	_check(second_stale.get("state") == "STALE" and not bool(second_stale.get("result_current", true)), "Third edit did not stale the second result")
+	_check(revalidate_button != null and not revalidate_button.disabled, "Second STALE DIRTY grid did not re-enable revalidation")
+	revalidate_button.pressed.emit()
+	await process_frame
+	var third_result: Dictionary = revalidation.call("snapshot")
+	_check(third_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"] and bool(third_result.get("result_current", false)), "Third real canonical revalidation did not re-enter from STALE")
+	_check(str(third_result.get("working_grid_hash", "")) != str(second_result.get("working_grid_hash", "")), "Third revalidation did not bind the latest working-grid hash")
+	_check(editor.call("snapshot").get("state") == "DIRTY", "Third revalidation cleared the editor DIRTY state")
+	_check(third_result.get("source_bytes_unchanged") == true and _source_files(source_bundle_path) == source_files_before, "Third revalidation changed canonical source bytes")
+
 	_check(bool(editor.call("reset_to_source")), "LF06-008 could not reset the working copy to source")
 	await process_frame
 	var reset: Dictionary = revalidation.call("snapshot")

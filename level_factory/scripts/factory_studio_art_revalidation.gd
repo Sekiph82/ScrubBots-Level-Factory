@@ -230,8 +230,9 @@ func _refresh_lifecycle() -> void:
 	elif editor_state == "DIRTY":
 		if _result_current and cells != _last_evaluated_cells:
 			_state = STALE
+			_result_current = false
 			_error_message = "STALE — working artwork changed after the recorded structural result; revalidate again."
-		elif not _result_current and _state != RUNNING:
+		elif not _result_current and _state not in [RUNNING, STALE]:
 			_state = AVAILABLE if _gateway != null and _gateway.has_method("run_manual_art_revalidation") else UNAVAILABLE
 	_refresh_presentation()
 
@@ -244,7 +245,9 @@ func _refresh_presentation() -> void:
 		if _last_result.is_empty():
 			_result_label.text = "No current structural result."
 		else:
-			_result_label.text = "Result: %s | source candidate=%s | source grid=%s | working grid=%s | dirty cells=%s | policy=%s | rejection_codes=%s" % [
+			var result_prefix := "Stale evidence: " if _state == STALE else "Result: "
+			_result_label.text = "%s%s | source candidate=%s | source grid=%s | working grid=%s | dirty cells=%s | policy=%s | rejection_codes=%s" % [
+				result_prefix,
 				_last_result.get("disposition", _last_result.get("state", "")),
 				_last_result.get("source_candidate_id", ""),
 				_last_result.get("source_grid_hash", ""),
@@ -254,7 +257,7 @@ func _refresh_presentation() -> void:
 				_last_result.get("rejection_codes", []),
 			]
 	if _revalidate_button != null:
-		_revalidate_button.disabled = _state != AVAILABLE
+		_revalidate_button.disabled = _state not in [AVAILABLE, STALE]
 
 
 func _editor_snapshot() -> Dictionary:

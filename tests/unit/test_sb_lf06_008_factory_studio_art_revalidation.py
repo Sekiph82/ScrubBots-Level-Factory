@@ -75,6 +75,9 @@ def test_revalidation_component_is_bounded_and_scope_qualified() -> None:
     assert 'func _process' in lowered
     assert 'stale' in lowered
     assert 'revalidate manual artwork' in lowered
+    assert '_result_current = false' in lowered
+    assert '_state not in [running, stale]' in lowered
+    assert '_state not in [available, stale]' in lowered
     assert 'evaluate_grid' not in lowered
     assert 'qualitypolicy' not in lowered
     assert 'store_buffer' not in lowered
@@ -163,6 +166,16 @@ def test_python_bridge_rejects_clean_malformed_and_corrupt_inputs() -> None:
 
 
 def test_committed_real_godot_revalidation_integration_passes() -> None:
+    source = INTEGRATION.read_text(encoding="utf-8")
+    for marker in (
+        'second_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"]',
+        'second_result.get("working_grid_hash", "")) != first_working_hash',
+        'second_stale.get("state") == "STALE"',
+        'third_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"]',
+        'revalidate_button != null and not revalidate_button.disabled',
+        'reset.get("state") == "NOT_REQUIRED"',
+    ):
+        assert marker in source
     result = subprocess.run(
         ["godot", "--headless", "--path", "level_factory", "--script", "res://tests/factory_studio_art_revalidation_integration_suite.gd"],
         cwd=ROOT,
