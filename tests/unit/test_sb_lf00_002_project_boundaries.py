@@ -156,6 +156,7 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_art_revalidation.gd",
             "factory_studio_art_revalidation_integration_suite.gd",
             "factory_studio_truth_separation_integration_suite.gd",
+            "factory_studio_exact_reproduce_integration_suite.gd",
         }
         for path in _project_files()
         if path.suffix == ".gd"

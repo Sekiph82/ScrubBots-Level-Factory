@@ -20,7 +20,7 @@ func _init() -> void:
 func _run_suite() -> void:
 	test_output_absolute = ProjectSettings.globalize_path(TEST_OUTPUT_PATH)
 	_remove_tree(test_output_absolute)
-	var packed_scene := ResourceLoader.load(MAIN_SCENE_PATH) as PackedScene
+	var packed_scene := ResourceLoader.call("load", MAIN_SCENE_PATH) as PackedScene
 	_check(packed_scene != null, "Factory Studio scene did not load")
 	if packed_scene == null:
 		_finish()
