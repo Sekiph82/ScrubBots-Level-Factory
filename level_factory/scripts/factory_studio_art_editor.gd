@@ -180,6 +180,14 @@ func working_image_snapshot() -> Image:
 	return _working_image.duplicate() if _working_image != null else null
 
 
+func source_logical_cells_snapshot() -> Array[String]:
+	return _logical_cells_snapshot(_source_image)
+
+
+func working_logical_cells_snapshot() -> Array[String]:
+	return _logical_cells_snapshot(_working_image)
+
+
 func select_color(color_id: String) -> bool:
 	if not LOGICAL_PALETTE_IDS.has(color_id) or color_id == "BG01" or not CANONICAL_PALETTE_RGB.has(color_id):
 		_last_operation_rejection = "REJECTED — only canonical C01..C16 logical colors are paintable."
@@ -385,6 +393,19 @@ func _reconcile_state() -> int:
 	if _source_image != null and _working_image != null and _state in [CLEAN, DIRTY]:
 		_state = DIRTY if dirty_count > 0 else CLEAN
 	return dirty_count
+
+
+func _logical_cells_snapshot(image: Image) -> Array[String]:
+	var cells: Array[String] = []
+	if image == null or image.is_empty() or image.get_width() != _logical_width or image.get_height() != _logical_height:
+		return cells
+	for y in range(_logical_height):
+		for x in range(_logical_width):
+			var color_id := canonical_color_id_for_pixel(image.get_pixel(x, y))
+			if color_id.is_empty():
+				return []
+			cells.append(color_id)
+	return cells
 
 
 func _canonical_color(color_id: String) -> Color:

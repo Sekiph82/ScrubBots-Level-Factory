@@ -126,7 +126,7 @@ def test_root_tracker_and_legacy_control_plane_boundaries() -> None:
     assert "tasks.md" not in effective
     assert all(path not in effective and not _exact_relative_exists(path) for path in LEGACY_TRACKER_FILES)
     hiveai_entries = {path.name for path in (REPOSITORY_ROOT / ".hiveai").iterdir()}
-    assert hiveai_entries <= {"audits", "codex-logs", "prompts"}
+    assert hiveai_entries <= {"audit-criteria", "audits", "codex-logs", "prompts"}
 
 
 def test_governance_docs_use_tasks_only_authority_and_evidence_archives() -> None:

@@ -15,6 +15,7 @@ const PREVIEW_SCRIPT_PATH := "res://scripts/factory_studio_art_preview.gd"
 const EVIDENCE_PANEL_SCRIPT_PATH := "res://scripts/factory_studio_evidence_panel.gd"
 const ART_EDITOR_SCRIPT_PATH := "res://scripts/factory_studio_art_editor.gd"
 const PUZZLE_CONFIG_GATE_SCRIPT_PATH := "res://scripts/factory_studio_puzzle_config_gate.gd"
+const ART_REVALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_art_revalidation.gd"
 
 var difficulty_control: OptionButton
 var width_control: SpinBox
@@ -31,6 +32,7 @@ var _last_successful_core_evidence: Dictionary = {}
 var _art_preview: Node
 var _evidence_panel: Node
 var _art_editor: Node
+var _art_revalidation: Node
 var _action_running := false
 
 
@@ -43,6 +45,8 @@ func _ready() -> void:
 
 func configure_gateway(gateway: RefCounted) -> void:
 	_core_gateway = gateway
+	if _art_revalidation != null:
+		_art_revalidation.call("configure_gateway", gateway)
 	_refresh_action_controls()
 
 
@@ -140,6 +144,14 @@ func _build_controls() -> void:
 		_art_editor = editor_script.new() as Node
 		_art_editor.name = "CanonicalArtEditor"
 		action_area.add_child(_art_editor)
+	var revalidation_script := ResourceLoader.call("load", ART_REVALIDATION_SCRIPT_PATH) as Script
+	if revalidation_script != null:
+		_art_revalidation = revalidation_script.new() as Node
+		_art_revalidation.name = "ManualArtStructuralRevalidation"
+		action_area.add_child(_art_revalidation)
+		_art_revalidation.call("configure_editor", _art_editor)
+		if _core_gateway != null:
+			_art_revalidation.call("configure_gateway", _core_gateway)
 
 
 func _make_dimension_control(control_name: String) -> SpinBox:
@@ -251,6 +263,8 @@ func _on_action_pressed(action: String) -> void:
 		_evidence_panel.call("consume_action_result", _last_action_result)
 	if _art_editor != null:
 		_art_editor.call("observe_action_result", _last_action_result)
+	if _art_revalidation != null:
+		_art_revalidation.call("refresh_from_editor")
 	_action_running = false
 	_render_action_result()
 	_refresh_action_controls()

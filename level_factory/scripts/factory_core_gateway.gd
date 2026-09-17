@@ -17,6 +17,8 @@ const PYTHON_ENVIRONMENT_NAME := "SCRUBBOTS_FACTORY_PYTHON"
 const LAUNCHER_PATH := "res://scripts/factory_core_launcher.py"
 const GENERATE_OUTPUT_PATH := "res://output/studio-runs"
 const REPRODUCE_OUTPUT_PATH := "res://output/studio-reproductions"
+const STUDIO_REVALIDATION_TRANSPORT_PATH := "res://output/.lf06-008-revalidation/request.json"
+const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
@@ -108,6 +110,48 @@ func run_action(action: String, draft: Dictionary, requested_output_root: String
 	else:
 		arguments = _reproduce_arguments(_last_successful_metadata_path, output_root)
 	return _execute_core(normalized_action, arguments)
+
+
+func run_manual_art_revalidation(request_path: String) -> Dictionary:
+	if _connection_status != ConnectionStatus.AVAILABLE:
+		return {
+			"operation": STUDIO_REVALIDATION_OPERATION,
+			"scope": "STRUCTURAL_ART_QA_ONLY",
+			"state": "UNAVAILABLE",
+			"disposition": "UNAVAILABLE",
+			"exit_code": -1,
+			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
+		}
+	if request_path.strip_edges() != STUDIO_REVALIDATION_TRANSPORT_PATH:
+		return {
+			"operation": STUDIO_REVALIDATION_OPERATION,
+			"scope": "STRUCTURAL_ART_QA_ONLY",
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"exit_code": -1,
+			"error": "ERROR — manual artwork structural revalidation transport path is outside the fixed operation boundary.",
+		}
+	var captured: Array[String] = []
+	var exit_code := _execute_process(python_executable, PackedStringArray([
+		ProjectSettings.globalize_path(LAUNCHER_PATH),
+		"studio-revalidate-art",
+		"--request-file", ProjectSettings.globalize_path(request_path),
+	]), captured)
+	var process_output := "\n".join(captured)
+	var payload := _find_studio_result(captured)
+	if payload.is_empty():
+		return {
+			"operation": STUDIO_REVALIDATION_OPERATION,
+			"scope": "STRUCTURAL_ART_QA_ONLY",
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"exit_code": exit_code,
+			"error": "ERROR — manual artwork structural revalidation returned no structured result.",
+			"captured_output": process_output.left(4096),
+		}
+	payload["exit_code"] = exit_code
+	payload["captured_output"] = process_output.left(4096)
+	return payload
 
 
 func _refresh_connection() -> void:
@@ -256,6 +300,19 @@ func _find_summary_line(lines: Array[String], prefix: String) -> String:
 		if line.begins_with(prefix + " "):
 			return line
 	return ""
+
+
+func _find_studio_result(lines: Array[String]) -> Dictionary:
+	var combined := "\n".join(lines).replace("\r\n", "\n")
+	var output_lines := combined.split("\n")
+	for index in range(output_lines.size() - 1, -1, -1):
+		var candidate_line := output_lines[index].strip_edges()
+		if not candidate_line.begins_with("{") or not candidate_line.ends_with("}"):
+			continue
+		var parsed: Variant = JSON.parse_string(candidate_line)
+		if parsed is Dictionary and str(parsed.get("operation", "")) == STUDIO_REVALIDATION_OPERATION:
+			return parsed
+	return {}
 
 
 func _field_value(line: String, field: String) -> String:
