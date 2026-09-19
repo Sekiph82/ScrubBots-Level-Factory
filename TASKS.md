@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M06 — ScrubBots Factory Studio
-- Current Sprint: M06.03 — Revalidation, truth separation, reproduction and tests
-- Current Task: SB-LF06-012 — Editor smoke + headless core tests
+- Current Sprint: M06.04 — Owner-approved operations dashboard, import and library extensions
+- Current Task: SB-LFX-001 — Factory Operations Dashboard
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF06-012-C001` from the published GitHub prompt and audit criteria, closes the final canonical M06 test gate by reusing the committed real Studio headless smoke, directly exercising canonical Python Generate/Reproduce headlessly/offline, correcting stale verification documentation, pushing implementation/tests/finalized builder log to `main`, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Codex executes only `SB-LFX-001-C001` from the published GitHub prompt and audit criteria, replaces the inert Dashboard placeholder with a read-only fail-closed derived view over canonical batch manifests plus separately labeled Studio action evidence, keeps unavailable domains truthful, pushes implementation/tests/finalized builder log to `main`, then stops for independent ChatGPT strict audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF06-011-C001_FACTORY_STUDIO_EXACT_REPRODUCE_BY_RECORDED_SEED_CONFIG_STRICT_AUDIT.md`
-- SB-LF06-011 Disposition: PASS / CLOSED through C001
-- SB-LF06-011 Implementation Commit: `fa0046fd69d2166e4e6d124cd1eec4d06f698f9a`
-- SB-LF06-011 Final Builder Publication: `fc7e187fc12e594556c36a28edb66172ad187a78`
-- SB-LF06-011 Closing Strict Audit Commit: `cae4064662109cd9dfb20eada8d1c8ecac8379dc`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF06-012-C001_EDITOR_SMOKE_AND_HEADLESS_CORE_TEST_GATE_AUDIT_CRITERIA.md`
-- Current Prompt: `.hiveai/prompts/SB-LF06-012-C001_FACTORY_STUDIO_EDITOR_SMOKE_AND_HEADLESS_CORE_TEST_GATE_PROMPT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF06-012-C001_FACTORY_STUDIO_EDITOR_SMOKE_AND_HEADLESS_CORE_TEST_GATE_STRICT_AUDIT.md`
+- SB-LF06-012 Disposition: PASS / CLOSED through C001
+- SB-LF06-012 Implementation Commit: `79ad82b484804ca3a439a031f578a1064cd71d92`
+- SB-LF06-012 Final Builder Publication: `d71585e26219e328cdb850d950e2764be1adf791`
+- SB-LF06-012 Closing Strict Audit Commit: `4ff1e47b6dd229e6a19db4f2132b4aa4a082a008`
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-001-C001_FACTORY_OPERATIONS_DASHBOARD_CANONICAL_DERIVED_VIEW_AUDIT_CRITERIA.md`
+- Current Prompt: `.hiveai/prompts/SB-LFX-001-C001_FACTORY_OPERATIONS_DASHBOARD_CANONICAL_DERIVED_VIEW_PROMPT.md`
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -88,16 +88,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 42 VERIFIED, 47 PARTIAL, 3 MIGRATION, 104 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **42 / 224 = 18.75%**.
+- Canonical LF/CP source-requirement classification: 43 VERIFIED, 46 PARTIAL, 3 MIGRATION, 104 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **43 / 224 = 19.20%**.
 - Canonical LF/CP engineering/migration coverage: **92 / 224 = 41.07%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **42 / 244 = 17.21%**.
+- Unified verified completion: **43 / 244 = 17.62%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **42 / 216 = 19.44%**.
-- Level Factory + unique extension surface: **132 tasks**; **42 / 132 = 31.82% verified**.
+- Conservative verified local completion: **43 / 216 = 19.91%**.
+- Level Factory + unique extension surface: **132 tasks**; **43 / 132 = 32.58% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -117,7 +117,8 @@ Additional inline tags do not replace checkbox state:
 - `SB-LF06-008` is PASS/CLOSED through `SB-LF06-008-C001-R01`; manual DIRTY artwork now receives real canonical Python structural/art QA with exact source-policy reuse, immutable source bytes and canonical grid-hash binding, and STALE results can repeatedly re-enter fresh revalidation without Reset while stale evidence remains non-current.
 - `SB-LF06-010` is PASS/CLOSED through `SB-LF06-010-C001`; real A/B runtime divergence proves draft, action attempt, retained Core success, canonical preview/evidence, manual editor source/working copy and manual revalidation remain separate truth domains, with explicit replacement as the only DIRTY editor source transition.
 - `SB-LF06-011` is PASS/CLOSED through `SB-LF06-011-C001`; real Studio runtime proves Reproduce is driven only by retained canonical recorded metadata seed/config, survives draft divergence and unavailable-action attempts, follows Generate source transitions, and returns canonical byte-level MATCH without source mutation.
-- Active execution frontier is `SB-LF06-012`; close the final canonical M06 smoke/headless test requirement by reusing committed Studio smoke evidence, adding a bounded direct canonical Python Core Generate/Reproduce headless gate, and documenting truthful verification commands.
+- `SB-LF06-012` is PASS/CLOSED through `SB-LF06-012-C001`; one focused offline/headless gate now executes the real committed Studio smoke plus direct canonical Python Generate/Reproduce MATCH with byte-identical bundle evidence and current verification documentation.
+- All canonical `SB-LF06-001..012` Studio requirements are PASS/CLOSED. Active M06 work moves to owner-approved post-cutover extension `SB-LFX-001`, which is outside the fixed 224 LF/CP source denominator.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -326,11 +327,11 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 - [x] SB-LF06-009 — Never auto-promote generated candidate.
 - [x] SB-LF06-010 — Keep editor presentation separate from truth.
 - [x] SB-LF06-011 — Reproduce candidate by seed/config.
-- [~] SB-LF06-012 — Editor smoke + headless core tests. [PARTIAL]
+- [x] SB-LF06-012 — Editor smoke + headless core tests.
 
 ### M06.04 - Owner-approved operations dashboard, import and library extensions
 
-- [ ] SB-LFX-001 — Build Factory Operations Dashboard from canonical job/artifact/evidence truth without creating a second tracker or production truth store. [EXTENSION]
+- [~] SB-LFX-001 — Build Factory Operations Dashboard from canonical job/artifact/evidence truth without creating a second tracker or production truth store. [EXTENSION]
 - [ ] SB-LFX-002 — Support manual Pixel Art import with explicit `OWNER_UPLOAD` provenance and immutable original bytes. [EXTENSION]
 - [ ] SB-LFX-003 — Build searchable Source Art Library/index with immutable source identity, provenance, tags, review state and usage references. [EXTENSION]
 - [ ] SB-LFX-004 — Add Import Validation Wizard for format/dimensions/C01..C16/foreign colors/semi-alpha/used-color and canonical structural checks. [EXTENSION]
@@ -761,7 +762,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005` canonical-Core dimension dependency and `SB-LF06-001..011` Studio foundation/evidence/editing/config/revalidation/truth-separation/reproduction chain are PASS/CLOSED; M06 continues at `SB-LF06-012` final editor-smoke/headless-Core test closure, then proceeds through owner-approved `SB-LFX-001..012` extensions in dependency-safe slices.
+2. `SB-LF01-005` canonical-Core dimension dependency and all `SB-LF06-001..012` canonical Studio requirements are PASS/CLOSED; M06 continues with owner-approved post-cutover extension `SB-LFX-001` Factory Operations Dashboard, then proceeds through `SB-LFX-002..012` in dependency-safe slices.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
