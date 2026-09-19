@@ -54,3 +54,7 @@ Implementation decisions, commands, failures/corrections, changed files, tests, 
 - Focused and direct smoke artifacts were cleaned; `level_factory/output/` contains only tracked `.gitkeep`.
 - `git diff --check`: passed. `git diff -- TASKS.md`: empty. The ten pre-existing owner-local UID files remain untracked and unstaged.
 - No network/provider calls, credentials, API keys, runtime HTTP, cloud image generation, solver, validation, dashboard, library, import, content-platform, main-game, or later LF/LFX work was used or added. No dependency/license changes.
+- Final implementation diff contained exactly: `.hiveai/codex-logs/SB-LF06-012-C001_FACTORY_STUDIO_EDITOR_SMOKE_AND_HEADLESS_CORE_TEST_GATE_CODEX_LOG.md`, `level_factory/README.md`, and `tests/unit/test_sb_lf06_012_factory_studio_editor_smoke_and_headless_core_test_gate.py`. No `TASKS.md` or owner-local UID file was staged.
+- Implementation commit: `79ad82b484804ca3a439a031f578a1064cd71d92` (`Add LF06-012 Studio and Core smoke gate`).
+- Pushed implementation commit to `origin/main`; verified local `HEAD` and `origin/main` both equal `79ad82b484804ca3a439a031f578a1064cd71d92` before terminal log publication.
+- Terminal log publication remains a separate log-only commit and will be recorded after this checkpoint.
