@@ -15,8 +15,8 @@ GDScript by this project shell.
   scripts. `factory_core_launcher.py` is only a thin local entrypoint that
   adds the repository `src/` path and delegates to the canonical Python CLI;
   it is not a second Factory Core.
-- `tests/` is reserved for future Godot-local tests and fixtures; it does not
-  replace the root Python test suite.
+- `tests/` contains committed Godot-local smoke and integration tests; the
+  root Python test suite remains canonical for Factory Core semantics.
 - `output/` is the Factory-produced/export staging boundary.
 
 The root `TASKS.md` is the sole live task ledger. Project-local documentation
@@ -35,3 +35,27 @@ must remain an orchestration/presentation layer over canonical Factory truth.
 
 The broader generated, candidate, cache, and secret-folder policy remains
 owned by `SB-LF00-006`; this document does not claim that policy is complete.
+
+## Verification
+
+The focused editor-smoke and headless-Core gate is runnable with:
+
+```text
+python -m pytest -q tests/unit/test_sb_lf06_012_factory_studio_editor_smoke_and_headless_core_test_gate.py
+```
+
+The project boot check is:
+
+```text
+godot --headless --path level_factory --quit
+```
+
+Run the complete Python regression suite with:
+
+```text
+python -m pytest -q
+```
+
+The smoke gate executes without GUI interaction, provider/network access, or
+credentials. It directly exercises the canonical Python Factory Core and
+cleans its bounded temporary output.
