@@ -43,3 +43,6 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 ## Finalization before log-only commit
 
 - Implementation commit and push SHAs will be recorded below; the ten pre-existing untracked `.uid` files remain preserved and unstaged.
+
+- Implementation commit: `3aaaa71dd997b6e019d9f0e6d178b8ea62971504`; push succeeded and local `main` equaled `origin/main`.
+- This entry completes the task evidence before the required log-only terminal commit.
