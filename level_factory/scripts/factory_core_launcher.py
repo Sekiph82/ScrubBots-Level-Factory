@@ -219,6 +219,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.candidate_inbox()
         elif operation == "owner-review":
             payload = extensions.record_owner_review(str(request["candidate_id"]), str(request["disposition"]), str(request.get("reason", "")), str(request.get("note", "")))
+        elif operation == "preset-save":
+            payload = extensions.save_preset(str(request["preset_id"]), str(request["name"]), str(request["operation"]), request.get("settings", {}), str(request.get("description", "")))
+        elif operation == "preset-load":
+            payload = extensions.load_preset(str(request["preset_id"]))
+        elif operation == "preset-expand":
+            payload = extensions.expand_preset(str(request["preset_id"]), request.get("overrides", {}))
+        elif operation == "preset-delete":
+            extensions.delete_preset(str(request["preset_id"]))
+            payload = {"state": "DELETED", "preset_id": request["preset_id"]}
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":

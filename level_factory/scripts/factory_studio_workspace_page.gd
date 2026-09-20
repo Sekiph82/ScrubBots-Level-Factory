@@ -12,6 +12,7 @@ const VALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_import_validation.
 const PIPELINE_SCRIPT_PATH := "res://scripts/factory_studio_pipeline.gd"
 const CANDIDATES_SCRIPT_PATH := "res://scripts/factory_studio_candidates.gd"
 const COMPARISON_SCRIPT_PATH := "res://scripts/factory_studio_comparison.gd"
+const PRESETS_SCRIPT_PATH := "res://scripts/factory_studio_presets.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -19,6 +20,7 @@ var validation_surface: Node
 var pipeline_surface: Node
 var candidates_surface: Node
 var comparison_surface: Node
+var presets_surface: Node
 
 
 func _ready() -> void:
@@ -29,6 +31,7 @@ func _ready() -> void:
 	_ensure_pipeline()
 	_ensure_candidates()
 	_ensure_comparison()
+	_ensure_presets()
 
 
 func _ensure_dashboard() -> void:
@@ -109,6 +112,16 @@ func _ensure_comparison() -> void:
 	content.add_child(comparison_surface)
 
 
+func _ensure_presets() -> void:
+	if presets_surface != null: return
+	var presets_script := ResourceLoader.call("load", PRESETS_SCRIPT_PATH) as Script
+	if presets_script == null: return
+	presets_surface = presets_script.new() as Node
+	presets_surface.name = "ProductionPresets"
+	presets_surface.visible = false
+	content.add_child(presets_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -128,6 +141,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		candidates_surface.call("configure_gateway", gateway)
 	if comparison_surface != null and comparison_surface.has_method("configure_gateway"):
 		comparison_surface.call("configure_gateway", gateway)
+	if presets_surface != null and presets_surface.has_method("configure_gateway"):
+		presets_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -149,6 +164,8 @@ func show_surface(surface_name: String) -> void:
 		candidates_surface.visible = surface_name in ["Candidates", "Review"]
 	if comparison_surface != null:
 		comparison_surface.visible = surface_name == "Comparison"
+	if presets_surface != null:
+		presets_surface.visible = surface_name == "Presets"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -188,6 +205,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Evidence is shown only when bound to the selected candidate/artwork identity; missing solver, difficulty, and cost evidence stays unavailable."
 		if comparison_surface != null and comparison_surface.has_method("show_comparison"):
 			comparison_surface.call("show_comparison")
+	elif surface_name == "Presets":
+		state.text = "VERSIONED OPERATOR PRESETS — EXPANDED CANONICAL REQUESTS"
+		detail.text = "Presets are convenience records; execution history binds full resolved controls and does not depend on preset survival."
+		if presets_surface != null and presets_surface.has_method("show_presets"):
+			presets_surface.call("show_presets")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
