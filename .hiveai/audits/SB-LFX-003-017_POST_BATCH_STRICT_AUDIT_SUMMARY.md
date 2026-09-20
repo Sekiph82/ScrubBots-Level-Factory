@@ -1,0 +1,32 @@
+# SB-LFX-003..017 — Post-Batch Strict Audit Summary
+
+Audit mode: IMPLEMENT_ALL_THEN_AUDIT
+Result date: 2026-09-20
+
+| Task | Verdict | Saved strict audit |
+|---|---|---|
+| SB-LFX-003 | PASS / CLOSED | `.hiveai/audits/SB-LFX-003-C001_SOURCE_ART_LIBRARY_CANONICAL_CATALOG_STRICT_AUDIT.md` |
+| SB-LFX-004 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-004-C001_IMPORT_VALIDATION_WIZARD_STRICT_AUDIT.md` |
+| SB-LFX-005 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-005-C001_ONE_CLICK_PIPELINE_STRICT_AUDIT.md` |
+| SB-LFX-006 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-006-C001_CANDIDATE_INBOX_OWNER_REVIEW_QUEUE_STRICT_AUDIT.md` |
+| SB-LFX-007 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-007-C001_SIDE_BY_SIDE_COMPARISON_STRICT_AUDIT.md` |
+| SB-LFX-008 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-008-C001_PRESETS_PRODUCTION_RECIPES_STRICT_AUDIT.md` |
+| SB-LFX-009 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-009-C001_SEARCH_FILTER_SMART_COLLECTIONS_STRICT_AUDIT.md` |
+| SB-LFX-010 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-010-C001_PRODUCTION_READINESS_CARD_STRICT_AUDIT.md` |
+| SB-LFX-011 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-011-C001_EXACT_REPRODUCE_ACTION_STRICT_AUDIT.md` |
+| SB-LFX-012 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-012-C001_MANUAL_EDIT_REVISION_HISTORY_STRICT_AUDIT.md` |
+| SB-LFX-013 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-013-C001_FAILURE_INBOX_RETRY_CENTER_STRICT_AUDIT.md` |
+| SB-LFX-014 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-014-C001_MULTI_FILE_BATCH_IMPORT_STRICT_AUDIT.md` |
+| SB-LFX-015 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-015-C001_SESSION_RECOVERY_AUTOSAVE_STRICT_AUDIT.md` |
+| SB-LFX-016 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-016-C001_ADVISORY_VISUAL_SIMILARITY_GUARD_STRICT_AUDIT.md` |
+| SB-LFX-017 | CHANGES_REQUIRED | `.hiveai/audits/SB-LFX-017-C001_PROVIDER_COST_CREDIT_CENTER_STRICT_AUDIT.md` |
+
+## Remediation disposition
+
+- SB-LFX-003 requires no remediation.
+- SB-LFX-004..017 each have a separate C001-R01 remediation prompt.
+- Remediation index: `.hiveai/prompts/SB-LFX-004-017-C001-R01_REMEDIATION_INDEX.md`.
+- Master remediation prompt: `.hiveai/prompts/SB-LFX-004-017-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
+- After the complete R01 builder batch, ChatGPT re-audits SB-LFX-004..017 one-by-one and saves a separate R01 strict audit for every task.
+
+Root `TASKS.md` remains ChatGPT-owned. Builder implementation or remediation does not advance acceptance state.
