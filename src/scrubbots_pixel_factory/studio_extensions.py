@@ -770,20 +770,44 @@ def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
     return payload
 
 
+def _scrub_session_value(value: Any, depth: int = 0) -> Any:
+    if depth > 8:
+        raise StudioExtensionError("session state nesting exceeds the recovery boundary")
+    if isinstance(value, Mapping):
+        return {str(key): _scrub_session_value(item, depth + 1) for key, item in value.items() if not any(secret in str(key).lower() for secret in ("secret", "token", "password", "api_key", "credential"))}
+    if isinstance(value, list):
+        return [_scrub_session_value(item, depth + 1) for item in value]
+    if value is None or type(value) in {str, int, float, bool}:
+        return value
+    raise StudioExtensionError("session state contains a non-serializable value")
+
+
+def _session_reference_checks(state: Mapping[str, Any]) -> list[dict[str, Any]]:
+    checks = []
+    for key, value in state.items():
+        if str(key).endswith("_id") and value is not None:
+            valid = type(value) is str and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value))
+            checks.append({"field": str(key), "value": value if valid else None, "disposition": "VALID" if valid else "NEEDS_OPERATOR_ACTION"})
+    return checks
+
+
 def save_session(session_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
     if not _ID.fullmatch(session_id): raise StudioExtensionError("session ID is invalid")
-    scrubbed = {key: value for key, value in dict(state).items() if not any(secret in key.lower() for secret in ("secret", "token", "password", "api_key"))}
-    payload = {"schema": SESSION_SCHEMA, "version": 1, "session_id": session_id, "state": json.loads(json.dumps(scrubbed, sort_keys=True, separators=(",", ":"))), "autosave_generation": int(state.get("autosave_generation", 0)) + 1}
+    scrubbed = _scrub_session_value(dict(state))
+    references = _session_reference_checks(scrubbed)
+    payload = {"schema": SESSION_SCHEMA, "version": 1, "session_id": session_id, "state": json.loads(json.dumps(scrubbed, sort_keys=True, separators=(",", ":"))), "reference_validation": references, "autosave_generation": int(state.get("autosave_generation", 0)) + 1}
     _write_json(extensions_root() / "sessions" / f"{session_id}.json", payload)
     return payload
 
 
 def restore_session(session_id: str) -> dict[str, Any]:
     value = _read_json(extensions_root() / "sessions" / f"{session_id}.json")
-    if value.get("schema") != SESSION_SCHEMA: raise StudioExtensionError("session schema is invalid")
+    if value.get("schema") != SESSION_SCHEMA or value.get("version") != 1 or value.get("session_id") != session_id: raise StudioExtensionError("session schema or identity is invalid")
     state = value.get("state", {})
     if not isinstance(state, Mapping): raise StudioExtensionError("session state is invalid")
-    return {**value, "recovery": "RESUMED", "validated_references": True}
+    checks = _session_reference_checks(state)
+    valid = all(check["disposition"] == "VALID" for check in checks)
+    return {**value, "reference_validation": checks, "recovery": "RESUMED" if valid else "NEEDS_OPERATOR_ACTION", "validated_references": valid}
 
 
 def similarity(left: Mapping[str, Any], right: Mapping[str, Any], threshold: float = 0.92) -> dict[str, Any]:
