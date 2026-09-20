@@ -20,6 +20,7 @@ const REVISIONS_SCRIPT_PATH := "res://scripts/factory_studio_revisions.gd"
 const FAILURES_SCRIPT_PATH := "res://scripts/factory_studio_failures.gd"
 const BATCH_IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_batch_import.gd"
 const SESSION_SCRIPT_PATH := "res://scripts/factory_studio_session.gd"
+const SIMILARITY_SCRIPT_PATH := "res://scripts/factory_studio_similarity.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -35,6 +36,7 @@ var revisions_surface: Node
 var failures_surface: Node
 var batch_import_surface: Node
 var session_surface: Node
+var similarity_surface: Node
 
 
 func _ready() -> void:
@@ -53,6 +55,7 @@ func _ready() -> void:
 	_ensure_failures()
 	_ensure_batch_import()
 	_ensure_session()
+	_ensure_similarity()
 
 
 func _ensure_dashboard() -> void:
@@ -213,6 +216,16 @@ func _ensure_session() -> void:
 	content.add_child(session_surface)
 
 
+func _ensure_similarity() -> void:
+	if similarity_surface != null: return
+	var similarity_script := ResourceLoader.call("load", SIMILARITY_SCRIPT_PATH) as Script
+	if similarity_script == null: return
+	similarity_surface = similarity_script.new() as Node
+	similarity_surface.name = "VisualSimilarity"
+	similarity_surface.visible = false
+	content.add_child(similarity_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -248,6 +261,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		batch_import_surface.call("configure_gateway", gateway)
 	if session_surface != null and session_surface.has_method("configure_gateway"):
 		session_surface.call("configure_gateway", gateway)
+	if similarity_surface != null and similarity_surface.has_method("configure_gateway"):
+		similarity_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -285,6 +300,8 @@ func show_surface(surface_name: String) -> void:
 		batch_import_surface.visible = surface_name == "Batch Import"
 	if session_surface != null:
 		session_surface.visible = surface_name == "Session Recovery"
+	if similarity_surface != null:
+		similarity_surface.visible = surface_name == "Similarity"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -364,6 +381,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Restore revalidates canonical references and does not rerun successful durable stages or persist secrets."
 		if session_surface != null and session_surface.has_method("show_session"):
 			session_surface.call("show_session")
+	elif surface_name == "Similarity":
+		state.text = "ADVISORY OFFLINE VISUAL SIMILARITY"
+		detail.text = "Similarity evidence is identity-bound and advisory; exact SHA/grid duplicate identity remains authoritative."
+		if similarity_surface != null and similarity_surface.has_method("show_similarity"):
+			similarity_surface.call("show_similarity")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."

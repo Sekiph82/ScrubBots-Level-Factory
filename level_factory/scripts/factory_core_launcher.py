@@ -242,6 +242,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":
             payload = extensions.restore_session(str(request["session_id"]))
+        elif operation == "similarity":
+            payload = extensions.similarity(request.get("left", {}), request.get("right", {}), float(request.get("threshold", 0.92)))
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":
