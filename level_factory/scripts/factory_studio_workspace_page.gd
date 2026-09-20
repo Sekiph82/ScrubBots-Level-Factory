@@ -14,6 +14,7 @@ const CANDIDATES_SCRIPT_PATH := "res://scripts/factory_studio_candidates.gd"
 const COMPARISON_SCRIPT_PATH := "res://scripts/factory_studio_comparison.gd"
 const PRESETS_SCRIPT_PATH := "res://scripts/factory_studio_presets.gd"
 const SEARCH_SCRIPT_PATH := "res://scripts/factory_studio_search.gd"
+const READINESS_SCRIPT_PATH := "res://scripts/factory_studio_readiness.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -23,6 +24,7 @@ var candidates_surface: Node
 var comparison_surface: Node
 var presets_surface: Node
 var search_surface: Node
+var readiness_surface: Node
 
 
 func _ready() -> void:
@@ -35,6 +37,7 @@ func _ready() -> void:
 	_ensure_comparison()
 	_ensure_presets()
 	_ensure_search()
+	_ensure_readiness()
 
 
 func _ensure_dashboard() -> void:
@@ -135,6 +138,16 @@ func _ensure_search() -> void:
 	content.add_child(search_surface)
 
 
+func _ensure_readiness() -> void:
+	if readiness_surface != null: return
+	var readiness_script := ResourceLoader.call("load", READINESS_SCRIPT_PATH) as Script
+	if readiness_script == null: return
+	readiness_surface = readiness_script.new() as Node
+	readiness_surface.name = "ProductionReadinessCard"
+	readiness_surface.visible = false
+	content.add_child(readiness_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -158,6 +171,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		presets_surface.call("configure_gateway", gateway)
 	if search_surface != null and search_surface.has_method("configure_gateway"):
 		search_surface.call("configure_gateway", gateway)
+	if readiness_surface != null and readiness_surface.has_method("configure_gateway"):
+		readiness_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -183,6 +198,8 @@ func show_surface(surface_name: String) -> void:
 		presets_surface.visible = surface_name == "Presets"
 	if search_surface != null:
 		search_surface.visible = surface_name == "Search"
+	if readiness_surface != null:
+		readiness_surface.visible = surface_name == "Readiness"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -232,6 +249,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Queries are deterministic views over canonical records. Unavailable domains remain unavailable and no membership list is persisted."
 		if search_surface != null and search_surface.has_method("show_search"):
 			search_surface.call("show_search")
+	elif surface_name == "Readiness":
+		state.text = "IDENTITY-BOUND PRODUCTION READINESS GATES"
+		detail.text = "Overall READY is impossible while solver, difficulty, QA, owner, or export authority is missing."
+		if readiness_surface != null and readiness_surface.has_method("show_readiness"):
+			readiness_surface.call("show_readiness")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
