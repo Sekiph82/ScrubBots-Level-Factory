@@ -8,15 +8,18 @@ extends PanelContainer
 const DASHBOARD_SCRIPT_PATH := "res://scripts/factory_studio_dashboard.gd"
 const IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_import.gd"
 const LIBRARY_SCRIPT_PATH := "res://scripts/factory_studio_library.gd"
+const VALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_import_validation.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
+var validation_surface: Node
 
 
 func _ready() -> void:
 	_ensure_dashboard()
 	_ensure_import()
 	_ensure_library()
+	_ensure_validation()
 
 
 func _ensure_dashboard() -> void:
@@ -55,6 +58,18 @@ func _ensure_library() -> void:
 	content.add_child(library_surface)
 
 
+func _ensure_validation() -> void:
+	if validation_surface != null:
+		return
+	var validation_script := ResourceLoader.call("load", VALIDATION_SCRIPT_PATH) as Script
+	if validation_script == null:
+		return
+	validation_surface = validation_script.new() as Node
+	validation_surface.name = "ImportValidationWizard"
+	validation_surface.visible = false
+	content.add_child(validation_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -66,6 +81,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		import_surface.call("configure_gateway", gateway)
 	if library_surface != null and library_surface.has_method("configure_gateway"):
 		library_surface.call("configure_gateway", gateway)
+	if validation_surface != null and validation_surface.has_method("configure_gateway"):
+		validation_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -79,6 +96,8 @@ func show_surface(surface_name: String) -> void:
 		import_surface.visible = surface_name == "Import"
 	if library_surface != null:
 		library_surface.visible = surface_name == "Library"
+	if validation_surface != null:
+		validation_surface.visible = surface_name == "Import Validation"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -98,6 +117,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Refresh re-verifies source.json and source.png. Only bounded label/tag sidecar metadata is editable."
 		if library_surface != null and library_surface.has_method("show_library"):
 			library_surface.call("show_library")
+	elif surface_name == "Import Validation":
+		state.text = "CANONICAL IMPORT ANALYSIS — IMMUTABLE SOURCE"
+		detail.text = "Run/re-run validation for an OWNER_UPLOAD source. Derived-artifact requirements are explicit; no source bytes are changed."
+		if validation_surface != null and validation_surface.has_method("show_validation"):
+			validation_surface.call("show_validation")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
