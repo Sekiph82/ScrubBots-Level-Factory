@@ -353,35 +353,70 @@ def _pipeline_path(run_id: str) -> Path:
     return extensions_root() / "pipelines" / f"{run_id}.json"
 
 
+def _pipeline_stage(
+    stage: str,
+    disposition: str,
+    *,
+    inputs: Iterable[str] = (),
+    outputs: Iterable[str] = (),
+    evidence: str | None = None,
+    reason: str,
+) -> dict[str, Any]:
+    """Build the one durable stage lineage shape used by every pipeline run."""
+
+    input_identities = [str(value) for value in inputs if str(value)]
+    output_identities = [str(value) for value in outputs if str(value)]
+    return {
+        "schema": "scrubbots-studio-pipeline-stage",
+        "version": 1,
+        "stage": stage,
+        "disposition": disposition,
+        "input_identities": input_identities,
+        "output_identities": output_identities,
+        "evidence_reference": evidence,
+        "reason": reason[:512],
+    }
+
+
 def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = None, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if (source_id is None) == (candidate_id is None):
         raise StudioExtensionError("pipeline requires exactly one source or candidate identity")
     stages: list[dict[str, Any]] = []
+    known_inputs: list[str] = [source_id or candidate_id or ""]
     if source_id is not None:
         validation = validate_owner_source(source_id)
-        stages.append({"stage": "SOURCE", "disposition": "PASS", "input_identity": source_id, "output_identity": source_id})
-        stages.append({"stage": "NORMALIZE/DERIVE", "disposition": "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", "reason": "Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."})
-        stages.append({"stage": "PALETTE/STRUCTURE VALIDATION", "disposition": validation["structural"]["disposition"], "evidence": validation.get("evidence_path"), "reason": validation["structural"].get("reason", "canonical validation evidence")})
+        source_evidence = str(validation.get("record_path", ""))
+        stages.append(_pipeline_stage("SOURCE", "PASS", inputs=[source_id], outputs=[source_id], evidence=source_evidence, reason="Verified immutable OWNER_UPLOAD source identity."))
+        stages.append(_pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason="Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."))
+        stages.append(_pipeline_stage("PALETTE/STRUCTURE VALIDATION", validation["structural"]["disposition"], inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason=validation["structural"].get("reason", "Canonical validation evidence.")))
         if validation["exact_logical_source"] and validation["structural"]["disposition"] == "PASS":
-            stages.append({"stage": "CANDIDATE", "disposition": "NOT_AVAILABLE", "reason": "OWNER_UPLOAD source is not automatically a candidate."})
+            stages.append(_pipeline_stage("CANDIDATE", "NOT_AVAILABLE", inputs=[source_id], evidence=validation.get("evidence_path"), reason="OWNER_UPLOAD source is not automatically a candidate."))
         else:
-            stages.append({"stage": "CANDIDATE", "disposition": "BLOCKED", "reason": "Pipeline stopped at source validation."})
+            stages.append(_pipeline_stage("CANDIDATE", "BLOCKED", inputs=[source_id], evidence=validation.get("evidence_path"), reason="Pipeline stopped at source validation."))
     else:
         candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
         if candidate is None: raise StudioExtensionError("candidate is unavailable")
-        stages.extend([{"stage": "SOURCE", "disposition": "PASS", "input_identity": candidate_id}, {"stage": "NORMALIZE/DERIVE", "disposition": "NOT_APPLICABLE"}, {"stage": "PALETTE/STRUCTURE VALIDATION", "disposition": "PASS" if candidate["quality"].get("decision") in {"ACCEPT", "PASS"} else "NOT AVAILABLE", "input_identity": candidate["artwork_sha256"]}, {"stage": "CANDIDATE", "disposition": "PASS", "output_identity": candidate_id}])
+        quality_disposition = "PASS" if candidate["quality"].get("decision") in {"ACCEPT", "PASS"} else "NOT_AVAILABLE"
+        quality_reason = "Canonical structural evidence is present." if quality_disposition == "PASS" else "Canonical structural evidence is unavailable for this candidate."
+        stages.extend([
+            _pipeline_stage("SOURCE", "PASS", inputs=[candidate_id], outputs=[candidate["artwork_sha256"]], evidence=candidate["source_path"], reason="Verified canonical candidate bundle source."),
+            _pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE", inputs=[candidate["artwork_sha256"]], outputs=[candidate["artwork_sha256"]], evidence=candidate["source_path"], reason="Canonical candidate is already in logical representation."),
+            _pipeline_stage("PALETTE/STRUCTURE VALIDATION", quality_disposition, inputs=[candidate["artwork_sha256"]], outputs=[candidate["artwork_sha256"]] if quality_disposition == "PASS" else (), evidence=candidate["source_path"], reason=quality_reason),
+            _pipeline_stage("CANDIDATE", "PASS", inputs=[candidate["artwork_sha256"]], outputs=[candidate_id], evidence=candidate["source_path"], reason="Canonical candidate identity is retained."),
+        ])
     hard_stop = next((stage for stage in stages if stage["disposition"] in {"FAIL", "BLOCKED", "NOT_AVAILABLE", "NOT AVAILABLE"}), None)
+    current_identity = source_id or candidate_id or ""
     for name in ("SOLVE", "DIFFICULTY", "QA", "REVIEW"):
         if hard_stop is not None:
-            stages.append({"stage": name, "disposition": "NOT_AVAILABLE", "reason": f"Stopped after {hard_stop['stage']}: {hard_stop.get('reason', hard_stop['disposition'])}"})
+            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], evidence=hard_stop.get("evidence_reference"), reason=f"Stopped after {hard_stop['stage']}: {hard_stop.get('reason', hard_stop['disposition'])}"))
         elif name == "SOLVE":
-            stages.append({"stage": name, "disposition": "NOT_AVAILABLE", "reason": "Gameplay solver pending M03."})
+            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Gameplay solver pending M03."))
             hard_stop = stages[-1]
         elif name == "DIFFICULTY":
-            stages.append({"stage": name, "disposition": "NOT_AVAILABLE", "reason": "Measured difficulty pending M04."})
+            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Measured difficulty pending M04."))
             hard_stop = stages[-1]
         else:
-            stages.append({"stage": name, "disposition": "NOT_AVAILABLE", "reason": "Canonical downstream dependency is unavailable."})
+            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Canonical downstream dependency is unavailable."))
     run_id = f"pipeline-{_digest({'source_id': source_id, 'candidate_id': candidate_id, 'request': dict(request or {}), 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
     payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": "PARTIAL / STOPPED" if hard_stop else "COMPLETE", "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(_pipeline_path(run_id), payload, immutable=True)
