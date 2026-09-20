@@ -51,3 +51,12 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 ## Publication
 
 - Implementation commit and final tracked diff checks will be recorded before the task-final log-only commit. The implementation commit must contain only the scoped product/test changes and this builder log; the subsequent commit will contain only this finalized log.
+
+## Finalization before log-only commit
+
+- Implementation commit: `4e11fbe034f154944c4c27a122b4958145ad1a83`.
+- Push result: `main -> origin/main` succeeded.
+- Post-push implementation equality: local `4e11fbe034f154944c4c27a122b4958145ad1a83`; `origin/main` `4e11fbe034f154944c4c27a122b4958145ad1a83`.
+- `TASKS.md` diff check: unchanged.
+- Tracked worktree: clean. Preserved owner `.uid` files remain untracked and unstaged.
+- Final task log commit is intentionally log-only and will be published separately after this entry.
