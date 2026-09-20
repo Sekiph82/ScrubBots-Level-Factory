@@ -18,6 +18,7 @@ const READINESS_SCRIPT_PATH := "res://scripts/factory_studio_readiness.gd"
 const REPRODUCE_SCRIPT_PATH := "res://scripts/factory_studio_reproduce.gd"
 const REVISIONS_SCRIPT_PATH := "res://scripts/factory_studio_revisions.gd"
 const FAILURES_SCRIPT_PATH := "res://scripts/factory_studio_failures.gd"
+const BATCH_IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_batch_import.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -31,6 +32,7 @@ var readiness_surface: Node
 var reproduce_surface: Node
 var revisions_surface: Node
 var failures_surface: Node
+var batch_import_surface: Node
 
 
 func _ready() -> void:
@@ -47,6 +49,7 @@ func _ready() -> void:
 	_ensure_reproduce()
 	_ensure_revisions()
 	_ensure_failures()
+	_ensure_batch_import()
 
 
 func _ensure_dashboard() -> void:
@@ -187,6 +190,16 @@ func _ensure_failures() -> void:
 	content.add_child(failures_surface)
 
 
+func _ensure_batch_import() -> void:
+	if batch_import_surface != null: return
+	var batch_script := ResourceLoader.call("load", BATCH_IMPORT_SCRIPT_PATH) as Script
+	if batch_script == null: return
+	batch_import_surface = batch_script.new() as Node
+	batch_import_surface.name = "BatchImport"
+	batch_import_surface.visible = false
+	content.add_child(batch_import_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -218,6 +231,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		revisions_surface.call("configure_gateway", gateway)
 	if failures_surface != null and failures_surface.has_method("configure_gateway"):
 		failures_surface.call("configure_gateway", gateway)
+	if batch_import_surface != null and batch_import_surface.has_method("configure_gateway"):
+		batch_import_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -251,6 +266,8 @@ func show_surface(surface_name: String) -> void:
 		revisions_surface.visible = surface_name == "Revisions"
 	if failures_surface != null:
 		failures_surface.visible = surface_name == "Failures"
+	if batch_import_surface != null:
+		batch_import_surface.visible = surface_name == "Batch Import"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -320,6 +337,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Original failure evidence remains immutable. Successful or unavailable stages are not retried."
 		if failures_surface != null and failures_surface.has_method("show_failures"):
 			failures_surface.call("show_failures")
+	elif surface_name == "Batch Import":
+		state.text = "PER-FILE IMMUTABLE OWNER_UPLOAD BATCH IMPORT"
+		detail.text = "Partial success is truthful; same-name files retain independent SHA-derived identities and corrupt items fail independently."
+		if batch_import_surface != null and batch_import_surface.has_method("show_batch_import"):
+			batch_import_surface.call("show_batch_import")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."

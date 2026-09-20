@@ -22,6 +22,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Reproduce",
 	"Revisions",
 	"Failures",
+	"Batch Import",
 	"QA",
 	"Providers",
 	"Outputs",
