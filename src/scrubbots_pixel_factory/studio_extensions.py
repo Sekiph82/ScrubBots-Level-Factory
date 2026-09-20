@@ -13,6 +13,8 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import subprocess
+import sys
 from typing import Any
 
 from .contracts import CANONICAL_PALETTE
@@ -248,7 +250,7 @@ def _candidate_roots() -> Iterable[Path]:
     output = (_repository_root() / "level_factory" / "output").resolve()
     if not output.exists():
         return ()
-    return (path.parent for path in output.rglob("metadata.json") if path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
+    return (path.parent for path in output.rglob("metadata.json") if "studio-reproductions" not in path.parent.parts and path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
 
 
 def list_candidates() -> list[dict[str, Any]]:
@@ -578,14 +580,74 @@ def readiness_card(candidate_id: str) -> dict[str, Any]:
     return {"schema": "scrubbots-production-readiness-card", "version": 1, "candidate_id": candidate_id, "gates": gates, "overall": "READY" if ready else "NOT READY", "reason": "Every required gate must be authoritative PASS." if not ready else "All required gates pass."}
 
 
+def _reproduction_contract(candidate: Mapping[str, Any]) -> tuple[Path, Any]:
+    """Validate the complete recorded Generate contract before claiming replay."""
+
+    source = (_repository_root() / str(candidate["source_path"])).resolve()
+    if _repository_root().resolve() not in source.parents:
+        raise StudioExtensionError("recorded candidate path escaped the repository")
+    bundle = read_bundle(source)
+    metadata = bundle.metadata
+    generation = metadata.get("generation")
+    if not isinstance(generation, Mapping) or not isinstance(generation.get("request"), Mapping):
+        raise StudioExtensionError("recorded generation request is missing")
+    if metadata.get("candidate_id") != candidate["candidate_id"] or bundle.artwork.candidate_id != candidate["candidate_id"]:
+        raise StudioExtensionError("recorded candidate identity is inconsistent")
+    if hashlib.sha256(bundle.artwork_png).hexdigest() != candidate["artwork_sha256"] or bundle.artwork.grid_hash != candidate["grid_hash"]:
+        raise StudioExtensionError("recorded artwork identity is inconsistent")
+    request = generation["request"]
+    required_request = {"schema", "schema_version", "difficulty", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options", "seed"}
+    if set(request) != required_request or request.get("schema") != "scrubbots-generation-request":
+        raise StudioExtensionError("recorded generation request schema is invalid")
+    if type(request.get("schema_version")) is not int or type(request.get("width")) is not int or type(request.get("height")) is not int:
+        raise StudioExtensionError("recorded generation request types are invalid")
+    if not isinstance(generation.get("seed"), Mapping) or set(generation["seed"]) != {"type", "value"}:
+        raise StudioExtensionError("recorded generation seed is not typed")
+    if generation.get("generator_mode") != request.get("generator_mode") or not generation.get("generator_id") or not generation.get("generator_version"):
+        raise StudioExtensionError("recorded generator identity is incomplete")
+    return source / "metadata.json", bundle
+
+
 def reproduce_capability(candidate_id: str) -> dict[str, Any]:
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
-    if candidate is None: return {"disposition": "STALE/INVALID", "reason": "Candidate is not a verified canonical bundle."}
-    origin = str(candidate["origin"]).upper()
-    if origin in {"MASK", "RULES", "HYBRID", "AUTO", "WFC", "PROCEDURAL"}:
-        return {"disposition": "EXACT_REPRODUCIBLE", "candidate_id": candidate_id, "recorded_metadata": candidate["source_path"], "reason": "Canonical recorded Generate metadata is available."}
-    if origin == "OWNER_UPLOAD": return {"disposition": "SOURCE_RETRIEVABLE_ONLY", "candidate_id": candidate_id, "reason": "Owner-upload retrieval is not regeneration."}
-    return {"disposition": "NOT_REPRODUCIBLE", "candidate_id": candidate_id, "reason": "No deterministic replay path is recorded."}
+    if candidate is None:
+        if candidate_id.startswith("owner-upload-"):
+            return {"disposition": "SOURCE_RETRIEVABLE_ONLY", "candidate_id": candidate_id, "reason": "OWNER_UPLOAD source retrieval is not deterministic regeneration."}
+        return {"disposition": "STALE/INVALID", "candidate_id": candidate_id, "reason": "Candidate is not a verified canonical bundle."}
+    try:
+        metadata_path, bundle = _reproduction_contract(candidate)
+    except StudioExtensionError as exc:
+        return {"disposition": "STALE/INVALID", "candidate_id": candidate_id, "reason": f"Recorded replay contract is invalid: {exc}"}
+    if str(candidate["origin"]).upper() == "OWNER_UPLOAD":
+        return {"disposition": "SOURCE_RETRIEVABLE_ONLY", "candidate_id": candidate_id, "reason": "OWNER_UPLOAD source retrieval is not deterministic regeneration."}
+    return {"disposition": "EXACT_REPRODUCIBLE", "candidate_id": candidate_id, "recorded_metadata": _relative(metadata_path), "request_identity": _digest(bundle.metadata["generation"]["request"]), "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"], "reason": "Canonical recorded Generate request, seed, generator identity, and bundle evidence are valid."}
+
+
+def reproduce_exact(candidate_id: str) -> dict[str, Any]:
+    """Run the canonical offline Reproduce command and verify byte identity."""
+
+    candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
+    if candidate is None:
+        raise StudioExtensionError("candidate is unavailable")
+    capability = reproduce_capability(candidate_id)
+    if capability.get("disposition") != "EXACT_REPRODUCIBLE":
+        raise StudioExtensionError(f"exact reproduction is not available: {capability.get('reason', 'capability rejected')}")
+    metadata_path, original = _reproduction_contract(candidate)
+    run_root = (_repository_root() / "level_factory" / "output" / "studio-reproductions" / f"{candidate_id}-{candidate['artwork_sha256'][:16]}").resolve()
+    destination = run_root / candidate_id
+    launcher = _repository_root() / "level_factory" / "scripts" / "factory_core_launcher.py"
+    process = subprocess.run([sys.executable, str(launcher), "reproduce", str(metadata_path), "--output", str(run_root)], cwd=_repository_root(), capture_output=True, text=True, check=False)
+    if process.returncode != 0 or "MATCH" not in process.stdout:
+        raise StudioExtensionError(f"canonical Reproduce failed: {(process.stderr or process.stdout).strip()[:512]}")
+    reproduced = read_bundle(destination)
+    files = {name: hashlib.sha256(data).hexdigest() for name, data in reproduced.files.items()}
+    original_files = {name: hashlib.sha256(data).hexdigest() for name, data in original.files.items()}
+    if reproduced.files != original.files:
+        raise StudioExtensionError("canonical Reproduce did not preserve exact bundle bytes")
+    evidence = {"schema": "scrubbots-studio-exact-reproduction", "version": 1, "reproduction_id": f"reproduction-{candidate_id}-{candidate['artwork_sha256'][:24]}", "candidate_id": candidate_id, "source_metadata_path": _relative(metadata_path), "reproduced_output_path": _relative(destination), "disposition": "MATCH", "match": True, "original_file_sha256": original_files, "reproduced_file_sha256": files, "canonical_stdout": process.stdout.strip()[:2048]}
+    evidence_path = extensions_root() / "reproductions" / f"{evidence['reproduction_id']}.json"
+    _write_json(evidence_path, evidence, immutable=True)
+    return {"state": "SUCCESS", "disposition": "MATCH", "capability": capability, "candidate_id": candidate_id, "output_path": _relative(destination), "evidence": evidence, "evidence_path": _relative(evidence_path)}
 
 
 def create_revision(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "") -> dict[str, Any]:
@@ -700,5 +762,5 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "create_revision", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
 ]
