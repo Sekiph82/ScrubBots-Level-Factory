@@ -25,7 +25,7 @@ func save_generate_preset() -> void:
 
 func apply_preset() -> void:
 	if _gateway == null: return
-	_projection = _gateway.call("run_studio_extension", "preset-expand", {"preset_id": _id.text.strip_edges()})
+	_projection = _gateway.call("run_studio_extension", "preset-apply", {"preset_id": _id.text.strip_edges()})
 	_render()
 
 

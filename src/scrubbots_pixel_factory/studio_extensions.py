@@ -488,11 +488,9 @@ def _preset_root() -> Path: return extensions_root() / "presets"
 def save_preset(preset_id: str, name: str, operation: str, settings: Mapping[str, Any], description: str = "") -> dict[str, Any]:
     if not _ID.fullmatch(preset_id) or type(name) is not str or not 1 <= len(name.strip()) <= 80 or type(description) is not str or len(description) > 240:
         raise StudioExtensionError("preset identity/name/description is invalid")
-    if operation not in {"Generate", "ImportValidation", "Pipeline"}:
-        raise StudioExtensionError("preset operation is unsupported")
-    expanded = json.loads(json.dumps(dict(settings), sort_keys=True, separators=(",", ":")))
-    if any(key in expanded for key in ("provider_secret", "api_key", "solver_result", "difficulty_result")):
-        raise StudioExtensionError("preset contains unsupported secret or fabricated truth")
+    if operation != "Generate":
+        raise StudioExtensionError("only the canonical Generate preset operation is currently supported")
+    expanded = _validate_generate_preset_settings(settings)
     payload = {"schema": PRESET_SCHEMA, "version": 1, "preset_id": preset_id, "name": name.strip(), "description": description.strip(), "operation": operation, "settings": expanded}
     _write_json(_preset_root() / f"{preset_id}.json", payload)
     return payload
@@ -513,7 +511,48 @@ def expand_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) ->
     preset = load_preset(preset_id)
     expanded = dict(preset["settings"])
     expanded.update(dict(overrides or {}))
-    return {"operation": preset["operation"], "request_schema": "scrubbots-studio-expanded-request", "request_version": 1, "preset_id": preset_id, "settings": json.loads(json.dumps(expanded, sort_keys=True, separators=(",", ":")))}
+    return {"operation": preset["operation"], "request_schema": "scrubbots-studio-expanded-request", "request_version": 1, "preset_id": preset_id, "settings": _validate_generate_preset_settings(expanded)}
+
+
+def _validate_generate_preset_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
+    allowed = {"difficulty", "width", "height", "seed", "mode"}
+    if not isinstance(settings, Mapping) or set(settings) != allowed:
+        raise StudioExtensionError("Generate preset must contain exactly difficulty, width, height, seed and mode")
+    normalized = json.loads(json.dumps(dict(settings), sort_keys=True, separators=(",", ":")))
+    if type(normalized["difficulty"]) is not str or normalized["difficulty"] not in {"EASY", "MEDIUM", "HARD"}:
+        raise StudioExtensionError("preset difficulty is invalid")
+    if type(normalized["width"]) is not int or type(normalized["height"]) is not int or not 20 <= normalized["width"] <= 59 or not 20 <= normalized["height"] <= 59:
+        raise StudioExtensionError("preset dimensions must be integers from 20 through 59")
+    if type(normalized["seed"]) not in {int, str} or (type(normalized["seed"]) is str and not normalized["seed"].strip()):
+        raise StudioExtensionError("preset seed must be a typed integer or non-empty string")
+    if type(normalized["mode"]) is not str or normalized["mode"] not in {"MASK", "RULES", "WFC", "HYBRID", "AUTO"}:
+        raise StudioExtensionError("preset generator mode is invalid")
+    return normalized
+
+
+def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Execute canonical Generate from a fully expanded request, never preset identity."""
+
+    expanded = expand_preset(preset_id, overrides)
+    settings = expanded["settings"]
+    from .core.request import GenerationRequest
+    from .generators.router import GeneratorRouter
+    from .output.bundle import export_candidate
+
+    try:
+        request = GenerationRequest(settings["difficulty"], settings["seed"], settings["mode"], width=settings["width"], height=settings["height"])
+        candidate = GeneratorRouter().generate_candidate(request)
+        if not hasattr(candidate, "result") and not hasattr(candidate, "canonical_dict"):
+            raise StudioExtensionError("canonical Generate did not return a candidate")
+        candidate_id = f"preset-{preset_id}-{_digest(settings)[:16]}"
+        destination = (_repository_root() / "level_factory" / "output" / "studio-preset-runs").resolve()
+        bundle_path = export_candidate(candidate, candidate_id, destination)
+    except Exception as exc:
+        raise StudioExtensionError(f"canonical preset Generate failed: {exc}") from exc
+    execution = {"schema": "scrubbots-preset-execution", "version": 1, "execution_id": f"preset-execution-{_digest(settings)[:24]}", "preset_id_at_launch": preset_id, "operation": "Generate", "expanded_request": settings, "candidate_id": candidate_id, "source_bundle_path": _relative(bundle_path)}
+    execution_path = extensions_root() / "preset-executions" / f"{execution['execution_id']}.json"
+    _write_json(execution_path, execution, immutable=True)
+    return {"state": "SUCCESS", "disposition": "SUCCESS", "operation": "Generate", "execution": execution, "expanded_request": expanded}
 
 
 def readiness_card(candidate_id: str) -> dict[str, Any]:

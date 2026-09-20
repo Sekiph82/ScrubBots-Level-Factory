@@ -232,6 +232,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.load_preset(str(request["preset_id"]))
         elif operation == "preset-expand":
             payload = extensions.expand_preset(str(request["preset_id"]), request.get("overrides", {}))
+        elif operation == "preset-apply":
+            payload = extensions.apply_preset(str(request["preset_id"]), request.get("overrides", {}))
         elif operation == "preset-delete":
             extensions.delete_preset(str(request["preset_id"]))
             payload = {"state": "DELETED", "preset_id": request["preset_id"]}
