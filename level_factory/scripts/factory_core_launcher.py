@@ -270,7 +270,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "readiness":
             payload = extensions.readiness_card(str(request["candidate_id"]))
         elif operation == "cost-center":
-            payload = extensions.cost_center(request.get("records", []))
+            payload = extensions.canonical_cost_center(request.get("scope"), request.get("provider"))
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

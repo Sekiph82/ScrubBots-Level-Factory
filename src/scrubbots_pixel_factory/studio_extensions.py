@@ -53,6 +53,10 @@ def extensions_root() -> Path:
     return (_repository_root() / "level_factory" / "output" / "studio-extensions").resolve()
 
 
+def _accounting_root() -> Path:
+    return extensions_root() / "accounting"
+
+
 def _canonical_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
@@ -868,8 +872,57 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     return {"schema": "scrubbots-provider-cost-center-view", "version": 1, "groups": sorted(groups.values(), key=lambda item: (item["provider"], item["unit"])), "read_only": True}
 
 
+def _validated_accounting_records(scope: str | None = None, provider: str | None = None) -> list[dict[str, Any]]:
+    required = {"schema", "version", "record_id", "provider", "unit", "scope", "status", "consumed", "remaining", "candidate_id", "owner_review_id", "recorded_at", "evidence_reference"}
+    records: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for path in sorted(_accounting_root().glob("*.json")) if _accounting_root().exists() else []:
+        value = _read_json(path)
+        if set(value) != required or value.get("schema") != ACCOUNTING_SCHEMA or value.get("version") != 1 or value.get("record_id") != path.stem or value["record_id"] in seen:
+            continue
+        if type(value.get("provider")) is not str or not value["provider"] or type(value.get("unit")) is not str or not value["unit"] or type(value.get("scope")) is not str or not value["scope"]:
+            continue
+        if scope is not None and value["scope"] != scope or provider is not None and value["provider"] != provider:
+            continue
+        if value.get("status") not in {"SUCCESS", "FAILED"} or (value.get("consumed") is not None and (type(value["consumed"]) not in {int, float} or value["consumed"] < 0)) or (value.get("remaining") is not None and (type(value["remaining"]) not in {int, float} or value["remaining"] < 0)):
+            continue
+        try:
+            datetime.fromisoformat(str(value["recorded_at"]).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        seen.add(value["record_id"])
+        records.append(value)
+    return records
+
+
+def canonical_cost_center(scope: str | None = None, provider: str | None = None) -> dict[str, Any]:
+    records = _validated_accounting_records(scope, provider)
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    for record in records:
+        key = (record["provider"], record["unit"])
+        group = groups.setdefault(key, {"provider": key[0], "unit": key[1], "scope": record["scope"], "jobs": 0, "success": 0, "failure": 0, "consumed": None, "remaining": None, "accepted": 0, "evidence_record_ids": [], "as_of": None, "unknown": []})
+        group["jobs"] += 1
+        group["success"] += record["status"] == "SUCCESS"
+        group["failure"] += record["status"] == "FAILED"
+        group["evidence_record_ids"].append(record["record_id"])
+        if record["consumed"] is not None:
+            group["consumed"] = (group["consumed"] or 0) + record["consumed"]
+        review = _latest_review(str(record["candidate_id"])) if record.get("candidate_id") and record.get("owner_review_id") else None
+        if record.get("status") == "SUCCESS" and review is not None and review.get("review_id") == record.get("owner_review_id") and review.get("disposition") == "ACCEPT":
+            group["accepted"] += 1
+        timestamp = datetime.fromisoformat(str(record["recorded_at"]).replace("Z", "+00:00"))
+        if group["as_of"] is None or timestamp > datetime.fromisoformat(str(group["as_of"]).replace("Z", "+00:00")):
+            group["as_of"] = record["recorded_at"]
+            group["remaining"] = record["remaining"]
+    for group in groups.values():
+        group["cost_per_success"] = group["consumed"] / group["success"] if group["consumed"] is not None and group["success"] else None
+        group["cost_per_owner_accepted"] = group["consumed"] / group["accepted"] if group["consumed"] is not None and group["accepted"] else None
+        group["unknown"] = [key for key in ("consumed", "remaining", "cost_per_success", "cost_per_owner_accepted") if group[key] is None]
+    return {"schema": "scrubbots-provider-cost-center-view", "version": 2, "scope": scope, "provider_filter": provider, "groups": sorted(groups.values(), key=lambda item: (item["provider"], item["unit"])), "read_only": True, "source": "validated-local-accounting-evidence", "network_calls": 0}
+
+
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
 ]
