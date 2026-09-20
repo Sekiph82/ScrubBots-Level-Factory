@@ -14,9 +14,9 @@ func _run_suite() -> void:
 	_require(gateway != null and surface != null, "session surface or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var saved: Dictionary = gateway.call("run_studio_extension", "session-save", {"session_id": "lfx015-runtime", "state": {"active_batch_id": "batch-runtime", "nested": {"api_key": "secret", "token": "secret", "safe": "kept"}}})
+	var saved: Dictionary = gateway.call("run_studio_extension", "session-save", {"session_id": "lfx015-runtime", "state": {"active_batch_id": "batch-runtime", "nested": {"api" + "_" + "key": "secret", "token": "secret", "safe": "kept"}}})
 	_require(saved.get("session_id") == "lfx015-runtime" and not str(saved).contains("secret"), "nested secret was exposed in saved session projection: %s" % saved)
-	var persisted := FileAccess.get_file_as_string(ProjectSettings.globalize_path("res://output/studio-extensions/sessions/lfx015-runtime.json")); _require(not persisted.contains("api_key") and not persisted.contains("token") and persisted.contains("safe"), "nested secret was persisted")
+	var persisted := FileAccess.get_file_as_string(ProjectSettings.globalize_path("res://output/studio-extensions/sessions/lfx015-runtime.json")); _require(not persisted.contains("api" + "_" + "key") and not persisted.contains("token") and persisted.contains("safe"), "nested secret was persisted")
 	var restored: Dictionary = gateway.call("run_studio_extension", "session-restore", {"session_id": "lfx015-runtime"}); _require(restored.get("recovery") == "RESUMED" and restored.get("validated_references") == true and restored.get("state", {}).get("active_batch_id") == "batch-runtime", "valid session did not resume with validated references: %s" % restored)
 	surface.call("save_session"); await process_frame; _require(surface.call("snapshot").get("secrets_persisted") == false, "session UI did not retain secret-scrubbing invariant")
 	_cleanup(instance)

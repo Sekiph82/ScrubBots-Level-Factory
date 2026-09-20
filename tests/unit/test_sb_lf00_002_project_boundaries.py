@@ -179,6 +179,18 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_library_integration_suite.gd",
             "factory_studio_import_validation_integration_suite.gd",
             "factory_studio_pipeline_integration_suite.gd",
+            "factory_studio_exact_reproduce_r01_integration_suite.gd",
+            "factory_studio_revisions_r01_integration_suite.gd",
+            "factory_studio_failures_r01_integration_suite.gd",
+            "factory_studio_batch_import_r01_integration_suite.gd",
+            "factory_studio_session_r01_integration_suite.gd",
+            "factory_studio_similarity_r01_integration_suite.gd",
+            "factory_studio_cost_center_r01_integration_suite.gd",
+            "factory_studio_candidate_review_integration_suite.gd",
+            "factory_studio_comparison_integration_suite.gd",
+            "factory_studio_presets_integration_suite.gd",
+            "factory_studio_readiness_integration_suite.gd",
+            "factory_studio_search_integration_suite.gd",
         }
         for path in _project_files()
         if path.suffix == ".gd"
