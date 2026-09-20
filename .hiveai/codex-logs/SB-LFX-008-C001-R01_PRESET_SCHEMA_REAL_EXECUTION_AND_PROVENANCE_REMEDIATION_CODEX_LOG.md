@@ -34,3 +34,11 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 - Real runtime command: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_presets_integration_suite.gd` — `SB-LFX-008-C001 PRESETS integration PASS`.
 - Corrections during implementation: canonical generated wrappers expose `result` rather than `cells`, so Apply now accepts the wrapper contract; Godot JSON parses numbers as floats, so integration request comparison handles integer/float equivalence without weakening Python schema validation. Rerun passed.
 - `git diff --check` and empty `TASKS.md` diff will be recorded before publication.
+
+## Final publication
+
+- Final R01 implementation SHA: `d89ac52888090ff8f9958a340896e4826659c935`.
+- Implementation push: successful; local HEAD equals `origin/main`.
+- The log-creation ordering omission is explicitly retained above; no history was rewritten.
+- Focused/runtime, compileall, headless boot, diff-check and TASKS read-only checks passed.
+- This file is finalized for exactly one log-only terminal commit; builder evidence remains subject to independent re-audit.
