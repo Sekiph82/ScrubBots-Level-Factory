@@ -236,12 +236,13 @@ func run_studio_extension(operation: String, request: Dictionary = {}) -> Dictio
 			"disposition": "UNAVAILABLE",
 			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
 		}
+	var request_base64 := Marshalls.raw_to_base64(JSON.stringify(request).to_utf8_buffer())
 	var captured: Array[String] = []
 	var exit_code := _execute_process(python_executable, PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"studio-extension",
 		"--operation", operation,
-		"--request-json", JSON.stringify(request),
+		"--request-base64", request_base64,
 	]), captured)
 	var process_output := "\n".join(captured)
 	var payload := _find_extension_result(captured)

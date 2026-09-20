@@ -7,6 +7,8 @@ const PASS_MARKER := "SB-LFX-004-C001 IMPORT VALIDATION integration PASS"
 var _errors: Array[String] = []
 var _fixture_root := ""
 var _source_ids: Array[String] = []
+var _source_backups: Dictionary = {}
+var _evidence_path := ""
 
 
 func _init() -> void:
@@ -30,9 +32,11 @@ func _run_suite() -> void:
 	DirAccess.make_dir_recursive_absolute(_fixture_root)
 	var valid_path := _fixture_root.path_join("valid.png")
 	var nonlogical_path := _fixture_root.path_join("nonlogical.png")
+	var alpha_path := _fixture_root.path_join("semi-alpha.png")
 	_write_valid(valid_path)
 	_write_nonlogical(nonlogical_path)
-	for path in [valid_path, nonlogical_path]:
+	_write_alpha(alpha_path)
+	for path in [valid_path, nonlogical_path, alpha_path]:
 		import_surface.call("set_source_path", path)
 		import_surface.call("import_selected")
 		await process_frame
@@ -45,13 +49,53 @@ func _run_suite() -> void:
 	wizard.call("run_validation")
 	await process_frame
 	var valid_report: Dictionary = wizard.call("snapshot")
-	_require(valid_report.get("exact_logical_source") == true, "valid logical source was not recognized")
+	_require(valid_report.get("exact_logical_source") == true, "valid logical source was not recognized: %s" % valid_report)
 	wizard.call("set_source_id", _source_ids[1])
 	wizard.call("run_validation")
 	await process_frame
 	var derived_report: Dictionary = wizard.call("snapshot")
-	_require(derived_report.get("logical_dimension_status") == "DERIVED_ARTIFACT_REQUIRED", "nonlogical source did not require a derived artifact")
-	_require(derived_report.get("palette", {}).get("foreign_color_count", 0) > 0, "foreign color fact was not reported")
+	_require(derived_report.get("logical_dimension_status") == "DERIVED_ARTIFACT_REQUIRED", "nonlogical source did not require a derived artifact: %s" % derived_report)
+	_require(derived_report.get("palette", {}).get("foreign_color_count", 0) > 0, "foreign color fact was not reported: %s" % derived_report)
+	wizard.call("set_source_id", _source_ids[2])
+	wizard.call("run_validation")
+	await process_frame
+	var alpha_report: Dictionary = wizard.call("snapshot")
+	_require(alpha_report.get("logical_dimension_status") == "DERIVED_ARTIFACT_REQUIRED", "semi-alpha source did not require a derived artifact: %s" % alpha_report)
+	_require(alpha_report.get("alpha", {}).get("semi_alpha_count", 0) > 0, "semi-alpha fact was not reported: %s" % alpha_report)
+	_require("ALPHA_CONTRACT" in alpha_report.get("structural", {}).get("rejection_codes", []), "alpha contract rejection was not reported: %s" % alpha_report)
+	var alpha_root := ProjectSettings.globalize_path("res://output/owner-uploads").path_join(_source_ids[2])
+	var source_path := alpha_root.path_join("source.png")
+	var record_path := alpha_root.path_join("source.json")
+	var source_before := FileAccess.get_file_as_bytes(source_path)
+	var record_before := FileAccess.get_file_as_bytes(record_path)
+	var tampered_source := FileAccess.open(source_path, FileAccess.WRITE)
+	tampered_source.store_buffer(source_before + PackedByteArray([1]))
+	tampered_source.close()
+	wizard.call("run_validation")
+	await process_frame
+	var source_tamper_report: Dictionary = wizard.call("snapshot")
+	_require(source_tamper_report.get("state") == "ERROR" or source_tamper_report.get("disposition") == "ERROR", "tampered source did not fail closed")
+	var restore_source := FileAccess.open(source_path, FileAccess.WRITE)
+	restore_source.store_buffer(source_before)
+	restore_source.close()
+	wizard.call("run_validation")
+	await process_frame
+	var evidence_report: Dictionary = wizard.call("snapshot")
+	_evidence_path = ProjectSettings.globalize_path("res://output/studio-extensions/validation").path_join("%s-%s.json" % [_source_ids[2], evidence_report.get("source_sha256", "")])
+	if FileAccess.file_exists(_evidence_path):
+		var evidence_before := FileAccess.get_file_as_bytes(_evidence_path)
+		var evidence_file := FileAccess.open(_evidence_path, FileAccess.WRITE)
+		evidence_file.store_buffer(evidence_before + PackedByteArray([2]))
+		evidence_file.close()
+		wizard.call("run_validation")
+		await process_frame
+		var evidence_tamper_report: Dictionary = wizard.call("snapshot")
+		_require(evidence_tamper_report.get("state") == "ERROR" or evidence_tamper_report.get("disposition") == "ERROR", "tampered validation evidence did not fail closed")
+		var restore_evidence := FileAccess.open(_evidence_path, FileAccess.WRITE)
+		restore_evidence.store_buffer(evidence_before)
+		restore_evidence.close()
+	_require(FileAccess.get_file_as_bytes(source_path) == source_before, "source bytes changed across tamper paths")
+	_require(FileAccess.get_file_as_bytes(record_path) == record_before, "source record changed across tamper paths")
 	_cleanup(instance)
 
 
@@ -66,6 +110,12 @@ func _write_valid(path: String) -> void:
 func _write_nonlogical(path: String) -> void:
 	var image := Image.create(19, 20, false, Image.FORMAT_RGB8)
 	image.fill(Color8(255, 0, 255))
+	image.save_png(path)
+
+
+func _write_alpha(path: String) -> void:
+	var image := Image.create(20, 20, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0.91, 0.29, 0.29, 0.5))
 	image.save_png(path)
 
 

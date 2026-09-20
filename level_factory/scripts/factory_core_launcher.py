@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 from pathlib import Path
@@ -202,9 +203,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
     parser.add_argument("--operation", required=True)
     parser.add_argument("--request-json", default="{}")
     parser.add_argument("--request-file")
+    parser.add_argument("--request-base64")
     args = parser.parse_args(list(arguments))
     try:
-        request = json.loads(Path(args.request_file).read_text(encoding="utf-8")) if args.request_file else json.loads(args.request_json)
+        if args.request_file:
+            request = json.loads(Path(args.request_file).read_text(encoding="utf-8"))
+        elif args.request_base64:
+            request = json.loads(base64.b64decode(args.request_base64).decode("utf-8"))
+        else:
+            request = json.loads(args.request_json)
         if not isinstance(request, dict):
             raise ValueError("request-json must be an object")
         from scrubbots_pixel_factory import studio_extensions as extensions
