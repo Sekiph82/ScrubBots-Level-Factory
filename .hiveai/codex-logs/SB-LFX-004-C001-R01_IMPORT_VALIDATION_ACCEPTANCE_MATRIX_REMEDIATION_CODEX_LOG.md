@@ -54,3 +54,12 @@ Further commands, implementation decisions, tests, changed files, commit/push SH
 - Root `TASKS.md` diff: empty.
 - No audit, audit-criteria, prompt, product-specification, or sibling-repository files were modified.
 - The ten pre-existing untracked `.uid` files remain unmodified and unstaged.
+
+## Final publication
+
+- Final R01 implementation SHA: `5d515b598aa9032f5a1ad291061a2e873d9ee8fd`.
+- Implementation push: successful to `origin/main`.
+- Post-implementation local HEAD and `origin/main`: both `5d515b598aa9032f5a1ad291061a2e873d9ee8fd`.
+- Final task status before log-only publication: implementation is published; builder evidence is not an independent audit or acceptance decision.
+- Known limitations: full repository gate retained four failures described above; two are pre-existing governance/BitForge failures and the two gateway static failures were corrected. The focused and real SB-LFX-004 acceptance matrix passes.
+- Next publication action: this file is finalized in exactly one log-only terminal commit.
