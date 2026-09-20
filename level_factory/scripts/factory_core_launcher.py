@@ -243,6 +243,12 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.reproduce_capability(str(request["candidate_id"]))
         elif operation == "reproduce-exact":
             payload = extensions.reproduce_exact(str(request["candidate_id"]))
+        elif operation == "revision-create":
+            payload = extensions.revision_create(str(request["candidate_id"]), int(request["width"]), int(request["height"]), request["cells"], request.get("parent_revision_id"), str(request.get("change_summary", "")), request.get("edit_operations", []))
+        elif operation == "revision-list":
+            payload = extensions.revision_list(str(request["candidate_id"]))
+        elif operation == "revision-compare":
+            payload = extensions.revision_compare(str(request["candidate_id"]), str(request["left_revision_id"]), str(request["right_revision_id"]))
         elif operation == "record-failure":
             payload = extensions.record_failure(str(request["operation"]), str(request["stage"]), str(request["disposition"]), str(request["reason"]), request.get("inputs", {}))
         elif operation == "retry-failure":

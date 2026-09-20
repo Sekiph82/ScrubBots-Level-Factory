@@ -650,17 +650,43 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "MATCH", "capability": capability, "candidate_id": candidate_id, "output_path": _relative(destination), "evidence": evidence, "evidence_path": _relative(evidence_path)}
 
 
-def create_revision(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "") -> dict[str, Any]:
+def create_revision(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "", edit_operations: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
     if len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells): raise StudioExtensionError("revision logical grid is invalid")
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None: raise StudioExtensionError("revision source candidate is unavailable")
     root = extensions_root() / "revisions" / candidate_id
     existing = sorted(root.glob("revision-*.json")) if root.exists() else []
     sequence = len(existing)
+    parent = None
+    if sequence and parent_revision_id is None:
+        raise StudioExtensionError("every revision after the root must name its explicit parent revision")
+    if parent_revision_id is not None:
+        parent = load_revision(candidate_id, parent_revision_id)
+        if parent.get("width") != width or parent.get("height") != height or not isinstance(parent.get("cells"), list) or len(parent["cells"]) != len(cells):
+            raise StudioExtensionError("revision parent dimensions or logical grid are invalid")
     grid_hash = logical_grid_hash(width, height, cells)
-    payload = {"schema": REVISION_SCHEMA, "version": 1, "revision_id": f"revision-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "source_artwork_sha256": candidate["artwork_sha256"], "parent_revision_id": parent_revision_id, "width": width, "height": height, "cells": list(cells), "working_grid_hash": grid_hash, "change_summary": change_summary[:240], "change_count": 0 if parent_revision_id is None else None, "sequence": sequence, "validation": {"disposition": "STALE / NOT CURRENT"}, "created_at": datetime.now(timezone.utc).isoformat()}
+    changed_indices = [index for index, (before, after) in enumerate(zip(parent["cells"], cells)) if before != after] if parent else []
+    operations = json.loads(json.dumps(list(edit_operations or []), sort_keys=True, separators=(",", ":")))
+    if any(not isinstance(operation, Mapping) or set(operation) - {"operation", "indices", "summary"} or not isinstance(operation.get("operation"), str) or not isinstance(operation.get("indices", []), list) for operation in operations):
+        raise StudioExtensionError("revision edit operations are malformed")
+    if parent and not operations:
+        operations = [{"operation": "GRID_EDIT", "indices": changed_indices, "summary": change_summary[:240]}]
+    payload = {"schema": REVISION_SCHEMA, "version": 1, "revision_id": f"revision-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "source_artwork_sha256": candidate["artwork_sha256"], "parent_revision_id": parent_revision_id, "width": width, "height": height, "cells": list(cells), "working_grid_hash": grid_hash, "change_summary": change_summary[:240], "change_count": len(changed_indices), "edit_operations": operations, "sequence": sequence, "validation": {"disposition": "STALE / NOT CURRENT", "reason": "Manual revisions are not authoritative production validation."}, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(root / f"revision-{sequence:04d}.json", payload, immutable=True)
     return payload
+
+
+def revision_create(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "", edit_operations: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
+    return {"state": "SUCCESS", "disposition": "CREATED", "revision": create_revision(candidate_id, width, height, cells, parent_revision_id, change_summary, edit_operations)}
+
+
+def revision_list(candidate_id: str) -> dict[str, Any]:
+    return {"state": "SUCCESS", "disposition": "READY", "candidate_id": candidate_id, "revisions": list_revisions(candidate_id)}
+
+
+def revision_compare(candidate_id: str, left_revision_id: str, right_revision_id: str) -> dict[str, Any]:
+    left, right = load_revision(candidate_id, left_revision_id), load_revision(candidate_id, right_revision_id)
+    return {"state": "SUCCESS", "disposition": "READY", "comparison": compare_revisions(left, right)}
 
 
 def compare_revisions(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
@@ -762,5 +788,5 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
 ]
