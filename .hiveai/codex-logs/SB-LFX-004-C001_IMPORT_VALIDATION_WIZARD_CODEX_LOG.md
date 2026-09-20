@@ -20,7 +20,25 @@ Implement only SB-LFX-004 C001. Root `TASKS.md` remains read-only. Read the owne
 
 ## Implementation
 
-Pending.
+- Added canonical `validate_owner_source` analysis bound to exact OWNER_UPLOAD source hash and source-record identity. It reports strict format, independent dimensions, C-ID/foreign-color facts, alpha facts, logical status, structural policy/rejection codes, and explicit solver/difficulty/owner-unavailable claims.
+- Added the real Import Validation Wizard surface and navigation entry. It supports Run/Re-run, exact facts, derived-artifact-required wording, immutable-source messaging, and no transformation or promotion controls.
+- Added focused Python coverage and real Godot integration for exact logical input, foreign/non-logical input, source immutability, and cleanup.
+- No source bytes/records, `TASKS.md`, prompts, criteria, provider/network code, or downstream task surfaces were modified.
+
+## Verification
+
+- Focused retained/new Python: `PYTHONPATH=src python -m pytest -q tests/unit/test_sb_lfx_004_import_validation.py tests/unit/test_sb_lfx_003_source_library.py` — **3 passed, 1 warning**.
+- Real Godot validation integration: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_import_validation_integration_suite.gd` — **PASS** (`SB-LFX-004-C001 IMPORT VALIDATION integration PASS`).
+- `git diff --check` — **PASS**; `git diff -- TASKS.md` — **empty**.
+
+## Changed files
+
+`level_factory/scripts/factory_studio_import_validation.gd`, `level_factory/tests/factory_studio_import_validation_integration_suite.gd`, `tests/unit/test_sb_lfx_004_import_validation.py`, and the previously committed workspace/navigation integration.
+
+## Publication
+
+- Final implementation SHA: `ef115dcd09e992ca00a934c952b2bdb765558355`.
+- Push/equality checkpoint and final log-only SHA are pending.
 
 ## Verification and publication
 
