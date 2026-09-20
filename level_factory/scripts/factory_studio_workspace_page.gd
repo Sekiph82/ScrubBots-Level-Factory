@@ -7,13 +7,16 @@ extends PanelContainer
 
 const DASHBOARD_SCRIPT_PATH := "res://scripts/factory_studio_dashboard.gd"
 const IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_import.gd"
+const LIBRARY_SCRIPT_PATH := "res://scripts/factory_studio_library.gd"
 var dashboard: Node
 var import_surface: Node
+var library_surface: Node
 
 
 func _ready() -> void:
 	_ensure_dashboard()
 	_ensure_import()
+	_ensure_library()
 
 
 func _ensure_dashboard() -> void:
@@ -40,6 +43,18 @@ func _ensure_import() -> void:
 	content.add_child(import_surface)
 
 
+func _ensure_library() -> void:
+	if library_surface != null:
+		return
+	var library_script := ResourceLoader.call("load", LIBRARY_SCRIPT_PATH) as Script
+	if library_script == null:
+		return
+	library_surface = library_script.new() as Node
+	library_surface.name = "SourceArtLibrary"
+	library_surface.visible = false
+	content.add_child(library_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -49,6 +64,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		dashboard.call("configure_action_source", target_controls)
 	if import_surface != null and import_surface.has_method("configure_gateway"):
 		import_surface.call("configure_gateway", gateway)
+	if library_surface != null and library_surface.has_method("configure_gateway"):
+		library_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -60,6 +77,8 @@ func show_surface(surface_name: String) -> void:
 		dashboard.visible = surface_name == "Dashboard"
 	if import_surface != null:
 		import_surface.visible = surface_name == "Import"
+	if library_surface != null:
+		library_surface.visible = surface_name == "Library"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -74,6 +93,11 @@ func show_surface(surface_name: String) -> void:
 	elif surface_name == "Generate":
 		state.text = "DRAFT — CORE VALIDATION: UNAVAILABLE"
 		detail.text = "Editable presentation draft; canonical execution evidence is shown separately in Action result."
+	elif surface_name == "Library":
+		state.text = "DERIVED ASSET CATALOG — VERIFIED OWNER_UPLOAD SOURCES ONLY"
+		detail.text = "Refresh re-verifies source.json and source.png. Only bounded label/tag sidecar metadata is editable."
+		if library_surface != null and library_surface.has_method("show_library"):
+			library_surface.call("show_library")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."

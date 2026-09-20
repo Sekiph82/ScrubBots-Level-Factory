@@ -21,6 +21,7 @@ const STUDIO_REVALIDATION_TRANSPORT_PATH := "res://output/.lf06-008-revalidation
 const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
 const OWNER_UPLOAD_OPERATION := "owner-upload-import"
+const STUDIO_EXTENSION_OPERATION := "studio-extension"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
@@ -227,6 +228,44 @@ func run_owner_import(source_path: String) -> Dictionary:
 	return payload
 
 
+func run_studio_extension(operation: String, request: Dictionary = {}) -> Dictionary:
+	if _connection_status != ConnectionStatus.AVAILABLE:
+		return {
+			"operation": STUDIO_EXTENSION_OPERATION,
+			"state": "UNAVAILABLE",
+			"disposition": "UNAVAILABLE",
+			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
+		}
+	var request_path := ProjectSettings.globalize_path("res://output/.studio-extension-request.json")
+	var request_file := FileAccess.open(request_path, FileAccess.WRITE)
+	if request_file == null:
+		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": "ERROR — could not create bounded Studio extension request transport."}
+	request_file.store_string(JSON.stringify(request))
+	request_file.close()
+	var captured: Array[String] = []
+	var exit_code := _execute_process(python_executable, PackedStringArray([
+		ProjectSettings.globalize_path(LAUNCHER_PATH),
+		"studio-extension",
+		"--operation", operation,
+		"--request-file", request_path,
+	]), captured)
+	DirAccess.remove_absolute(request_path)
+	var process_output := "\n".join(captured)
+	var payload := _find_extension_result(captured)
+	if payload.is_empty():
+		return {
+			"operation": STUDIO_EXTENSION_OPERATION,
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"exit_code": exit_code,
+			"error": "ERROR — Studio extension returned no structured result.",
+			"captured_output": process_output.left(4096),
+		}
+	payload["exit_code"] = exit_code
+	payload["captured_output"] = process_output.left(4096)
+	return payload
+
+
 func _refresh_connection() -> void:
 	if not _safe_executable(python_executable):
 		_connection_status = ConnectionStatus.UNAVAILABLE
@@ -410,6 +449,18 @@ func _find_owner_upload_result(lines: Array[String]) -> Dictionary:
 			continue
 		var parsed: Variant = JSON.parse_string(candidate_line)
 		if parsed is Dictionary and str(parsed.get("operation", "")) == OWNER_UPLOAD_OPERATION:
+			return parsed
+	return {}
+
+
+func _find_extension_result(lines: Array[String]) -> Dictionary:
+	var combined := "\n".join(lines).replace("\r\n", "\n")
+	for line in combined.split("\n"):
+		var candidate_line := line.strip_edges()
+		if not candidate_line.begins_with("{") or not candidate_line.ends_with("}"):
+			continue
+		var parsed: Variant = JSON.parse_string(candidate_line)
+		if parsed is Dictionary:
 			return parsed
 	return {}
 

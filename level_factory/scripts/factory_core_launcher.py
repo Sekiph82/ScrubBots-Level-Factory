@@ -31,6 +31,7 @@ STUDIO_REQUEST_KEYS = {
 }
 DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"
 OWNER_UPLOAD_OPERATION = "owner-upload-import"
+STUDIO_EXTENSION_OPERATION = "studio-extension"
 
 
 def _repository_root() -> Path:
@@ -196,6 +197,44 @@ def _owner_upload_main(arguments: Sequence[str]) -> int:
     return 0 if payload.get("state") in {"IMPORTED", "ALREADY_IMPORTED"} else 2
 
 
+def _studio_extension_main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scrubbots-pixel-factory studio-extension")
+    parser.add_argument("--operation", required=True)
+    parser.add_argument("--request-json", default="{}")
+    parser.add_argument("--request-file")
+    args = parser.parse_args(list(arguments))
+    try:
+        request = json.loads(Path(args.request_file).read_text(encoding="utf-8")) if args.request_file else json.loads(args.request_json)
+        if not isinstance(request, dict):
+            raise ValueError("request-json must be an object")
+        from scrubbots_pixel_factory import studio_extensions as extensions
+        operation = args.operation
+        if operation == "library-refresh":
+            payload = extensions.library_refresh()
+        elif operation == "library-save":
+            payload = extensions.save_library_metadata(str(request["source_id"]), str(request.get("label", "")), request.get("tags", []))
+        elif operation == "validate-source":
+            payload = extensions.validate_owner_source(str(request["source_id"]))
+        elif operation == "candidate-inbox":
+            payload = extensions.candidate_inbox()
+        elif operation == "pipeline":
+            payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
+        elif operation == "comparison":
+            payload = extensions.compare_candidates(request.get("candidate_ids", []))
+        elif operation == "readiness":
+            payload = extensions.readiness_card(str(request["candidate_id"]))
+        elif operation == "cost-center":
+            payload = extensions.cost_center(request.get("records", []))
+        else:
+            raise ValueError(f"unsupported Studio extension operation: {operation}")
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        return 0
+    except Exception as exc:
+        payload = {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": f"ERROR — Studio extension: {str(exc)[:512]}"}
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        return 2
+
+
 def _validate_studio_request(raw: object) -> dict[str, object]:
     request = dict(_mapping(raw, "request"))
     if set(request) != STUDIO_REQUEST_KEYS:
@@ -331,6 +370,8 @@ def _main() -> int:
         return _studio_revalidate_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "owner-upload":
         return _owner_upload_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "studio-extension":
+        return _studio_extension_main(sys.argv[2:])
     from scrubbots_pixel_factory.cli.main import main as canonical_main
 
     return canonical_main()
