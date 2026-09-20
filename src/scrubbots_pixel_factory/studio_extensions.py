@@ -374,6 +374,9 @@ def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, 
     """Return a deterministic, non-persisted discovery view over canonical records."""
 
     wanted = dict(filters or {})
+    allowed_filters = {"record_type", "origin", "width", "height", "review", "qa", "used_color_count"}
+    if set(wanted) - allowed_filters:
+        raise StudioExtensionError("discovery filter is not a grounded canonical field")
     if collection in {"Ready for Production", "Unused in Campaign"}:
         return {"schema": "scrubbots-discovery-view", "version": 1, "state": "NOT AVAILABLE", "disposition": "NOT AVAILABLE", "reason": "Required canonical export/campaign evidence is not connected.", "records": []}
     records: list[dict[str, Any]] = []
@@ -382,7 +385,7 @@ def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, 
     for candidate in candidate_inbox()["candidates"]:
         records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"]})
     if collection == "Imported Sources": records = [record for record in records if record["record_type"] == "SOURCE"]
-    elif collection == "Needs Review": records = [record for record in records if record["review"] in {"NEEDS_REVIEW", "NOT AVAILABLE"}]
+    elif collection == "Needs Review": records = [record for record in records if record["review"] == "NEEDS_REVIEW"]
     elif collection == "Owner Accepted": records = [record for record in records if record["review"] == "ACCEPT"]
     elif collection == "Owner Rejected": records = [record for record in records if record["review"] == "REJECT"]
     needle = query.strip().casefold()
