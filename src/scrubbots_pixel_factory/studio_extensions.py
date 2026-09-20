@@ -266,7 +266,7 @@ def list_candidates() -> list[dict[str, Any]]:
             candidates.append({
                 "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
                 "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
-                "used_colors": list(bundle.artwork.used_palette), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
+                "used_colors": list(bundle.artwork.palette), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
                 "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
                 "quality": dict(quality), "metadata": metadata,
             })

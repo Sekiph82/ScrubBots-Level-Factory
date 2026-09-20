@@ -217,6 +217,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.validate_owner_source(str(request["source_id"]))
         elif operation == "candidate-inbox":
             payload = extensions.candidate_inbox()
+        elif operation == "owner-review":
+            payload = extensions.record_owner_review(str(request["candidate_id"]), str(request["disposition"]), str(request.get("reason", "")), str(request.get("note", "")))
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":

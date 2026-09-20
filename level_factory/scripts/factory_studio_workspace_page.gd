@@ -10,11 +10,13 @@ const IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_import.gd"
 const LIBRARY_SCRIPT_PATH := "res://scripts/factory_studio_library.gd"
 const VALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_import_validation.gd"
 const PIPELINE_SCRIPT_PATH := "res://scripts/factory_studio_pipeline.gd"
+const CANDIDATES_SCRIPT_PATH := "res://scripts/factory_studio_candidates.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
 var validation_surface: Node
 var pipeline_surface: Node
+var candidates_surface: Node
 
 
 func _ready() -> void:
@@ -23,6 +25,7 @@ func _ready() -> void:
 	_ensure_library()
 	_ensure_validation()
 	_ensure_pipeline()
+	_ensure_candidates()
 
 
 func _ensure_dashboard() -> void:
@@ -83,6 +86,16 @@ func _ensure_pipeline() -> void:
 	content.add_child(pipeline_surface)
 
 
+func _ensure_candidates() -> void:
+	if candidates_surface != null: return
+	var candidates_script := ResourceLoader.call("load", CANDIDATES_SCRIPT_PATH) as Script
+	if candidates_script == null: return
+	candidates_surface = candidates_script.new() as Node
+	candidates_surface.name = "CandidateInbox"
+	candidates_surface.visible = false
+	content.add_child(candidates_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -98,6 +111,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		validation_surface.call("configure_gateway", gateway)
 	if pipeline_surface != null and pipeline_surface.has_method("configure_gateway"):
 		pipeline_surface.call("configure_gateway", gateway)
+	if candidates_surface != null and candidates_surface.has_method("configure_gateway"):
+		candidates_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -115,6 +130,8 @@ func show_surface(surface_name: String) -> void:
 		validation_surface.visible = surface_name == "Import Validation"
 	if pipeline_surface != null:
 		pipeline_surface.visible = surface_name == "Pipeline"
+	if candidates_surface != null:
+		candidates_surface.visible = surface_name in ["Candidates", "Review"]
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -144,6 +161,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Pipeline records stage lineage and never fabricates solver, difficulty, QA, or owner-review truth."
 		if pipeline_surface != null and pipeline_surface.has_method("show_pipeline"):
 			pipeline_surface.call("show_pipeline")
+	elif surface_name in ["Candidates", "Review"]:
+		state.text = "DERIVED CANDIDATE INBOX — EXPLICIT OWNER REVIEW"
+		detail.text = "ACCEPT and REJECT append identity-bound evidence. Review history is retained and independent from QA."
+		if candidates_surface != null and candidates_surface.has_method("show_candidates"):
+			candidates_surface.call("show_candidates")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
