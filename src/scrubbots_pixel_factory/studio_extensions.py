@@ -35,6 +35,7 @@ REVISION_SCHEMA = "scrubbots-manual-art-revision"
 BATCH_SCHEMA = "scrubbots-owner-upload-batch"
 SESSION_SCHEMA = "scrubbots-studio-session"
 SIMILARITY_SCHEMA = "scrubbots-art-similarity-evidence"
+SIMILARITY_POLICY = "SIMILARITY_POLICY_V1"
 ACCOUNTING_SCHEMA = "scrubbots-provider-accounting-record"
 _ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _TAG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.-]{0,31}$")
@@ -820,6 +821,35 @@ def similarity(left: Mapping[str, Any], right: Mapping[str, Any], threshold: flo
     return {"schema": SIMILARITY_SCHEMA, "version": 1, "algorithm": "LOGICAL_CELL_HAMMING_V1", "left_identity": left.get("candidate_id"), "right_identity": right.get("candidate_id"), "left_grid_hash": left.get("grid_hash"), "right_grid_hash": right.get("grid_hash"), "distance": distance, "score": round(score, 8), "threshold": threshold, "disposition": disposition, "advisory": True}
 
 
+def _similarity_artifact(identity: str) -> dict[str, Any]:
+    if not isinstance(identity, str) or not _ID.fullmatch(identity):
+        raise StudioExtensionError("similarity identity is not a canonical artifact ID")
+    candidate = next((item for item in list_candidates() if item["candidate_id"] == identity), None)
+    if candidate is not None:
+        bundle = read_bundle((_repository_root() / candidate["source_path"]).resolve())
+        if bundle.artwork.grid_hash != candidate["grid_hash"] or hashlib.sha256(bundle.artwork_png).hexdigest() != candidate["artwork_sha256"]:
+            raise StudioExtensionError("candidate representation identity is stale")
+        return {"identity": identity, "candidate_id": identity, "width": bundle.artwork.width, "height": bundle.artwork.height, "cells": list(bundle.artwork.cells), "grid_hash": bundle.artwork.grid_hash, "evidence_reference": candidate["source_path"]}
+    for candidate in list_candidates():
+        try:
+            revision = load_revision(candidate["candidate_id"], identity)
+        except StudioExtensionError:
+            continue
+        cells = revision.get("cells")
+        if not isinstance(cells, list) or revision.get("working_grid_hash") != logical_grid_hash(int(revision.get("width", 0)), int(revision.get("height", 0)), cells):
+            raise StudioExtensionError("revision representation identity is stale")
+        return {"identity": identity, "candidate_id": candidate["candidate_id"], "width": revision["width"], "height": revision["height"], "cells": cells, "grid_hash": revision["working_grid_hash"], "evidence_reference": f"studio-extensions/revisions/{candidate['candidate_id']}/{identity}.json"}
+    raise StudioExtensionError("similarity artifact identity is unavailable")
+
+
+def similarity_canonical(left_id: str, right_id: str, threshold: float = 0.92) -> dict[str, Any]:
+    if type(threshold) not in {int, float} or not 0.0 <= float(threshold) <= 1.0:
+        raise StudioExtensionError("similarity threshold must be between 0 and 1")
+    left, right = _similarity_artifact(left_id), _similarity_artifact(right_id)
+    result = similarity(left, right, float(threshold))
+    return {**result, "policy": SIMILARITY_POLICY, "left_identity": left["identity"], "right_identity": right["identity"], "left_grid_hash": left["grid_hash"], "right_grid_hash": right["grid_hash"], "evidence_references": {"left": left["evidence_reference"], "right": right["evidence_reference"]}, "advisory_note": "Advisory similarity only; it does not change review, readiness, or production disposition."}
+
+
 def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     groups: dict[tuple[str, str], dict[str, Any]] = {}
     for record in records:
@@ -841,5 +871,5 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center",
 ]
