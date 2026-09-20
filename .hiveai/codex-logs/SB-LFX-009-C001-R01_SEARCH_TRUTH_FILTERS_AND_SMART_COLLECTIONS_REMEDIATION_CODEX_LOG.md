@@ -33,3 +33,10 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 - Real runtime command: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_search_integration_suite.gd` — `SB-LFX-009-C001 SEARCH integration PASS`.
 - Initial runtime fixture used a MASK seed that legitimately returned canonical `RETRY_EXHAUSTED`; corrected the fixture to use a deterministic RULES path, then reran successfully. Product behavior was unchanged.
 - `git diff --check` and empty `TASKS.md` diff will be recorded before publication.
+
+## Final publication
+
+- Final R01 implementation SHA: `ad697899e86767cb487861f40553991f9adbcdcb`.
+- Implementation push: successful; local HEAD equals `origin/main`.
+- Focused/runtime, compileall, headless boot, diff-check and TASKS read-only checks passed.
+- This file is finalized for exactly one log-only terminal commit; builder evidence remains subject to independent re-audit.
