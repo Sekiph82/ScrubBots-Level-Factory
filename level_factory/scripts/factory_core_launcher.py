@@ -30,6 +30,7 @@ STUDIO_REQUEST_KEYS = {
     "dirty_cell_count",
 }
 DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"
+OWNER_UPLOAD_OPERATION = "owner-upload-import"
 
 
 def _repository_root() -> Path:
@@ -184,6 +185,17 @@ def _dashboard_inspect_main(arguments: Sequence[str]) -> int:
         return 2
 
 
+def _owner_upload_main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scrubbots-pixel-factory owner-upload")
+    parser.add_argument("--source", required=True)
+    args = parser.parse_args(list(arguments))
+    from scrubbots_pixel_factory.owner_upload import import_owner_upload
+
+    payload = import_owner_upload(args.source)
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return 0 if payload.get("state") in {"IMPORTED", "ALREADY_IMPORTED"} else 2
+
+
 def _validate_studio_request(raw: object) -> dict[str, object]:
     request = dict(_mapping(raw, "request"))
     if set(request) != STUDIO_REQUEST_KEYS:
@@ -317,6 +329,8 @@ def _main() -> int:
         return _dashboard_inspect_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "studio-revalidate-art":
         return _studio_revalidate_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "owner-upload":
+        return _owner_upload_main(sys.argv[2:])
     from scrubbots_pixel_factory.cli.main import main as canonical_main
 
     return canonical_main()

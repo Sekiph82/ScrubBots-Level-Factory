@@ -20,6 +20,7 @@ const REPRODUCE_OUTPUT_PATH := "res://output/studio-reproductions"
 const STUDIO_REVALIDATION_TRANSPORT_PATH := "res://output/.lf06-008-revalidation/request.json"
 const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
+const OWNER_UPLOAD_OPERATION := "owner-upload-import"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
@@ -189,6 +190,36 @@ func run_dashboard_inspection(manifest_path: String) -> Dictionary:
 			"disposition": "ERROR",
 			"exit_code": exit_code,
 			"error": "ERROR — canonical dashboard inspection returned no structured result.",
+			"captured_output": process_output.left(4096),
+		}
+	payload["exit_code"] = exit_code
+	payload["captured_output"] = process_output.left(4096)
+	return payload
+
+
+func run_owner_import(source_path: String) -> Dictionary:
+	if _connection_status != ConnectionStatus.AVAILABLE:
+		return {
+			"operation": OWNER_UPLOAD_OPERATION,
+			"state": "UNAVAILABLE",
+			"disposition": "UNAVAILABLE",
+			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
+		}
+	var captured: Array[String] = []
+	var exit_code := _execute_process(python_executable, PackedStringArray([
+		ProjectSettings.globalize_path(LAUNCHER_PATH),
+		"owner-upload",
+		"--source", source_path,
+	]), captured)
+	var process_output := "\n".join(captured)
+	var payload := _find_owner_upload_result(captured)
+	if payload.is_empty():
+		return {
+			"operation": OWNER_UPLOAD_OPERATION,
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"exit_code": exit_code,
+			"error": "ERROR — canonical OWNER_UPLOAD operation returned no structured result.",
 			"captured_output": process_output.left(4096),
 		}
 	payload["exit_code"] = exit_code
@@ -366,6 +397,19 @@ func _find_dashboard_result(lines: Array[String]) -> Dictionary:
 			continue
 		var parsed: Variant = JSON.parse_string(candidate_line)
 		if parsed is Dictionary and str(parsed.get("operation", "")) == DASHBOARD_INSPECTION_OPERATION:
+			return parsed
+	return {}
+
+
+func _find_owner_upload_result(lines: Array[String]) -> Dictionary:
+	var combined := "\n".join(lines).replace("\r\n", "\n")
+	var output_lines := combined.split("\n")
+	for index in range(output_lines.size() - 1, -1, -1):
+		var candidate_line := output_lines[index].strip_edges()
+		if not candidate_line.begins_with("{") or not candidate_line.ends_with("}"):
+			continue
+		var parsed: Variant = JSON.parse_string(candidate_line)
+		if parsed is Dictionary and str(parsed.get("operation", "")) == OWNER_UPLOAD_OPERATION:
 			return parsed
 	return {}
 
