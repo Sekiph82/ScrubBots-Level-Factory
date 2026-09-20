@@ -714,9 +714,14 @@ def load_revision(candidate_id: str, revision_id: str) -> dict[str, Any]:
 
 def record_failure(operation: str, stage: str, disposition: str, reason: str, inputs: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if disposition not in {"FAILED", "REJECTED", "INCONCLUSIVE"}: raise StudioExtensionError("failure disposition is not retryable evidence")
+    if operation not in {"import-validation", "pipeline"} or stage not in {"VALIDATE", "SOURCE", "NORMALIZE/DERIVE", "CANDIDATE", "SOLVE", "DIFFICULTY"}:
+        raise StudioExtensionError("failure operation/stage is outside the canonical retry contract")
     inputs_data = json.loads(json.dumps(dict(inputs or {}), sort_keys=True, separators=(",", ":")))
+    if any(any(secret in str(key).lower() for secret in ("secret", "token", "password", "api_key")) for key in inputs_data):
+        raise StudioExtensionError("failure inputs contain prohibited secret-like fields")
     failure_id = f"failure-{_digest({'operation': operation, 'stage': stage, 'reason': reason, 'inputs': inputs_data, 'time': datetime.now(timezone.utc).isoformat()})[:24]}"
-    payload = {"schema": "scrubbots-failure-evidence", "version": 1, "failure_id": failure_id, "operation": operation, "stage": stage, "disposition": disposition, "reason": reason[:512], "inputs": inputs_data, "retryable": stage not in {"SOLVE", "DIFFICULTY"}, "created_at": datetime.now(timezone.utc).isoformat()}
+    eligible = operation == "import-validation" and stage == "VALIDATE" and isinstance(inputs_data.get("source_id"), str) or operation == "pipeline" and stage in {"SOURCE", "VALIDATE", "NORMALIZE/DERIVE", "CANDIDATE"} and bool(inputs_data.get("source_id") or inputs_data.get("candidate_id"))
+    payload = {"schema": "scrubbots-failure-evidence", "version": 1, "failure_id": failure_id, "operation": operation, "stage": stage, "disposition": disposition, "reason": reason[:512], "inputs": inputs_data, "retryable": eligible, "retry_contract": "CANONICAL_LOCAL_RETRY_V1" if eligible else "NOT_AVAILABLE", "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(extensions_root() / "failures" / f"{failure_id}.json", payload, immutable=True)
     return payload
 
@@ -724,10 +729,34 @@ def record_failure(operation: str, stage: str, disposition: str, reason: str, in
 def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> dict[str, Any]:
     failure = _read_json(extensions_root() / "failures" / f"{failure_id}.json")
     if not failure.get("retryable"): return {"disposition": "NOT_AVAILABLE", "reason": "This stage has no safe retry capability.", "parent_failure_id": failure_id}
+    requested_changes = dict(changes or {})
+    if set(requested_changes) - {"operator_note"} or type(requested_changes.get("operator_note", "")) is not str or len(str(requested_changes.get("operator_note", ""))) > 512:
+        raise StudioExtensionError("retry changes are restricted to a bounded operator_note")
     attempt_id = f"retry-{_digest({'parent': failure_id, 'changes': dict(changes or {})})[:24]}"
-    payload = {"schema": "scrubbots-retry-attempt", "version": 1, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": dict(changes or {}), "disposition": "PENDING", "created_at": datetime.now(timezone.utc).isoformat()}
+    execution: dict[str, Any]
+    try:
+        if failure["operation"] == "import-validation":
+            execution = validate_owner_source(str(failure["inputs"]["source_id"]))
+        else:
+            execution = run_pipeline(source_id=failure["inputs"].get("source_id"), candidate_id=failure["inputs"].get("candidate_id"))
+        disposition = "RETRY_EXECUTED" if execution.get("state") not in {"ERROR", "UNAVAILABLE"} else "RETRY_FAILED"
+    except Exception as exc:
+        execution = {"state": "ERROR", "disposition": "ERROR", "error": str(exc)[:512]}
+        disposition = "RETRY_FAILED"
+    payload = {"schema": "scrubbots-retry-attempt", "version": 1, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": requested_changes, "disposition": disposition, "execution": execution, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(extensions_root() / "retries" / f"{attempt_id}.json", payload, immutable=True)
     return payload
+
+
+def list_failures() -> dict[str, Any]:
+    records = []
+    root = extensions_root() / "failures"
+    for path in sorted(root.glob("failure-*.json")) if root.exists() else []:
+        value = _read_json(path)
+        if value.get("schema") != "scrubbots-failure-evidence" or value.get("version") != 1 or value.get("failure_id") != path.stem:
+            continue
+        records.append(value)
+    return {"state": "SUCCESS", "disposition": "READY", "failures": records}
 
 
 def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
@@ -788,5 +817,5 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
 ]
