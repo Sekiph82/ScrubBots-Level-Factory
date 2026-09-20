@@ -24,6 +24,12 @@ func compare_selected() -> void:
 	_render()
 
 
+func compare_ids(left_id: String, right_id: String) -> void:
+	if _left != null: _left.text = left_id
+	if _right != null: _right.text = right_id
+	compare_selected()
+
+
 func snapshot() -> Dictionary: return _projection.duplicate(true)
 func show_comparison() -> void: _render()
 
@@ -39,5 +45,5 @@ func _render() -> void:
 	if _state == null: return
 	_state.text = "Comparison: %s | winner=%s" % [_projection.get("state", "EMPTY"), _projection.get("winner", {}).get("disposition", "NOT AVAILABLE")]
 	var entries: Array[String] = []
-	for candidate in _projection.get("candidates", []): entries.append("%s preview=%s dims=%sx%s colors=%s review=%s solver=%s difficulty=%s cost=%s" % [candidate.get("candidate_id", ""), candidate.get("artwork_sha256", ""), candidate.get("width", ""), candidate.get("height", ""), candidate.get("used_colors", []), candidate.get("owner_review", {}).get("disposition", "NOT AVAILABLE"), candidate.get("solver", {}).get("disposition", "NOT AVAILABLE"), candidate.get("difficulty", {}).get("disposition", "NOT AVAILABLE"), candidate.get("provider_cost", {}).get("disposition", "NOT AVAILABLE")])
+	for candidate in _projection.get("candidates", []): entries.append("%s preview=%s grid=%s dims=%sx%s colors=%s provenance=%s structural/QA=%s review=%s solver=%s difficulty=%s cost=%s evidence=%s" % [candidate.get("candidate_id", ""), candidate.get("artwork_sha256", ""), candidate.get("grid_hash", ""), candidate.get("width", ""), candidate.get("height", ""), candidate.get("used_colors", []), candidate.get("provenance", {}), candidate.get("structural", {}).get("decision", candidate.get("structural", {}).get("disposition", "NOT AVAILABLE")), candidate.get("owner_review", {}).get("disposition", "NOT AVAILABLE"), candidate.get("solver", {}).get("disposition", "NOT AVAILABLE"), candidate.get("difficulty", {}).get("disposition", "NOT AVAILABLE"), candidate.get("provider_cost", {}).get("disposition", "NOT AVAILABLE"), candidate.get("evidence_references", [])])
 	_details.text = "\n".join(entries) if not entries.is_empty() else "No comparison loaded."

@@ -402,7 +402,9 @@ def compare_candidates(candidate_ids: Sequence[str]) -> dict[str, Any]:
         if candidate is None:
             raise StudioExtensionError("comparison candidate is unavailable")
         review = _latest_review(candidate_id, candidate["artwork_sha256"])
-        selected.append({k: candidate[k] for k in ("candidate_id", "artwork_sha256", "grid_hash", "width", "height", "used_colors", "origin", "source_path", "artwork_path", "quality") } | {"owner_review": review or {"disposition": "NOT AVAILABLE", "reason": "No review evidence."}, "solver": {"disposition": "NOT AVAILABLE"}, "difficulty": {"disposition": "NOT AVAILABLE"}, "provider_cost": {"disposition": "NOT AVAILABLE"}})
+        _history, invalid_reviews = _validated_review_chain(candidate)
+        current_review: dict[str, Any] = review or ({"disposition": "STALE", "reason": "Mismatched or corrupt review evidence is excluded."} if invalid_reviews else {"disposition": "NOT AVAILABLE", "reason": "No review evidence."})
+        selected.append({k: candidate[k] for k in ("candidate_id", "artwork_sha256", "grid_hash", "width", "height", "used_colors", "origin", "source_path", "artwork_path", "quality") } | {"provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "owner_review": current_review, "owner_review_invalid": invalid_reviews, "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}, "provider_cost": {"disposition": "NOT AVAILABLE", "reason": "Pending reliable provider evidence."}})
     return {"schema": "scrubbots-candidate-comparison-view", "version": 1, "read_only": True, "candidates": selected, "winner": {"disposition": "NOT AVAILABLE", "reason": "Comparison never computes a winner."}}
 
 
