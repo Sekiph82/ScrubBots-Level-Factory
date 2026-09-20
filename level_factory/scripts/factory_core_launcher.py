@@ -232,6 +232,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.discover_records(str(request.get("query", "")), request.get("filters", {}), request.get("collection"))
         elif operation == "reproduce-capability":
             payload = extensions.reproduce_capability(str(request["candidate_id"]))
+        elif operation == "record-failure":
+            payload = extensions.record_failure(str(request["operation"]), str(request["stage"]), str(request["disposition"]), str(request["reason"]), request.get("inputs", {}))
+        elif operation == "retry-failure":
+            payload = extensions.retry_failure(str(request["failure_id"]), request.get("changes", {}))
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":

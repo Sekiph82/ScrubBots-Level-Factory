@@ -21,6 +21,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Readiness",
 	"Reproduce",
 	"Revisions",
+	"Failures",
 	"QA",
 	"Providers",
 	"Outputs",

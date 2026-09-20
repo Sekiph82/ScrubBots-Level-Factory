@@ -17,6 +17,7 @@ const SEARCH_SCRIPT_PATH := "res://scripts/factory_studio_search.gd"
 const READINESS_SCRIPT_PATH := "res://scripts/factory_studio_readiness.gd"
 const REPRODUCE_SCRIPT_PATH := "res://scripts/factory_studio_reproduce.gd"
 const REVISIONS_SCRIPT_PATH := "res://scripts/factory_studio_revisions.gd"
+const FAILURES_SCRIPT_PATH := "res://scripts/factory_studio_failures.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -29,6 +30,7 @@ var search_surface: Node
 var readiness_surface: Node
 var reproduce_surface: Node
 var revisions_surface: Node
+var failures_surface: Node
 
 
 func _ready() -> void:
@@ -44,6 +46,7 @@ func _ready() -> void:
 	_ensure_readiness()
 	_ensure_reproduce()
 	_ensure_revisions()
+	_ensure_failures()
 
 
 func _ensure_dashboard() -> void:
@@ -174,6 +177,16 @@ func _ensure_revisions() -> void:
 	content.add_child(revisions_surface)
 
 
+func _ensure_failures() -> void:
+	if failures_surface != null: return
+	var failures_script := ResourceLoader.call("load", FAILURES_SCRIPT_PATH) as Script
+	if failures_script == null: return
+	failures_surface = failures_script.new() as Node
+	failures_surface.name = "FailureInbox"
+	failures_surface.visible = false
+	content.add_child(failures_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -203,6 +216,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		reproduce_surface.call("configure_gateway", gateway)
 	if revisions_surface != null and revisions_surface.has_method("configure_gateway"):
 		revisions_surface.call("configure_gateway", gateway)
+	if failures_surface != null and failures_surface.has_method("configure_gateway"):
+		failures_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -234,6 +249,8 @@ func show_surface(surface_name: String) -> void:
 		reproduce_surface.visible = surface_name == "Reproduce"
 	if revisions_surface != null:
 		revisions_surface.visible = surface_name == "Revisions"
+	if failures_surface != null:
+		failures_surface.visible = surface_name == "Failures"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -298,6 +315,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Revision identities bind exact logical working grids and canonical source identity; restore and undo preserve later lineage."
 		if revisions_surface != null and revisions_surface.has_method("show_revisions"):
 			revisions_surface.call("show_revisions")
+	elif surface_name == "Failures":
+		state.text = "DERIVED FAILURE INBOX — SELECTIVE RETRY WITH LINEAGE"
+		detail.text = "Original failure evidence remains immutable. Successful or unavailable stages are not retried."
+		if failures_surface != null and failures_surface.has_method("show_failures"):
+			failures_surface.call("show_failures")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
