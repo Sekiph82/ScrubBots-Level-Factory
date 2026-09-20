@@ -35,7 +35,7 @@ Implement only SB-LFX-016 C001. Root `TASKS.md` is read-only. Read product contr
 
 ## Publication
 
-- Final implementation SHA: pending commit.
+- Final implementation SHA: `5061c14096eacc0d73d3bc687fee6402f32a4b8b`.
 - Push/equality checkpoint and final log-only SHA are pending.
 
 ## Verification and publication
