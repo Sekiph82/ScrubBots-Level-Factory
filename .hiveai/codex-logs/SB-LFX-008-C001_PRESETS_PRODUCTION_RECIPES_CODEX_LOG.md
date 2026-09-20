@@ -36,7 +36,7 @@ Implement only SB-LFX-008 C001. Read root `TASKS.md`, owner-operations spec, SB-
 
 ## Publication
 
-- Final implementation SHA: pending commit.
+- Final implementation SHA: `4b01e116526800d0fc0133834f0843df1fef1814`.
 - Push/equality checkpoint and final log-only SHA are pending.
 
 ## Verification and publication
