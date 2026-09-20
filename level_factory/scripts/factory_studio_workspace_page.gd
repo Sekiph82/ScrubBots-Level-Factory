@@ -21,6 +21,7 @@ const FAILURES_SCRIPT_PATH := "res://scripts/factory_studio_failures.gd"
 const BATCH_IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_batch_import.gd"
 const SESSION_SCRIPT_PATH := "res://scripts/factory_studio_session.gd"
 const SIMILARITY_SCRIPT_PATH := "res://scripts/factory_studio_similarity.gd"
+const COST_SCRIPT_PATH := "res://scripts/factory_studio_cost.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -37,6 +38,7 @@ var failures_surface: Node
 var batch_import_surface: Node
 var session_surface: Node
 var similarity_surface: Node
+var cost_surface: Node
 
 
 func _ready() -> void:
@@ -56,6 +58,7 @@ func _ready() -> void:
 	_ensure_batch_import()
 	_ensure_session()
 	_ensure_similarity()
+	_ensure_cost()
 
 
 func _ensure_dashboard() -> void:
@@ -226,6 +229,16 @@ func _ensure_similarity() -> void:
 	content.add_child(similarity_surface)
 
 
+func _ensure_cost() -> void:
+	if cost_surface != null: return
+	var cost_script := ResourceLoader.call("load", COST_SCRIPT_PATH) as Script
+	if cost_script == null: return
+	cost_surface = cost_script.new() as Node
+	cost_surface.name = "ProviderCostCenter"
+	cost_surface.visible = false
+	content.add_child(cost_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -263,6 +276,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		session_surface.call("configure_gateway", gateway)
 	if similarity_surface != null and similarity_surface.has_method("configure_gateway"):
 		similarity_surface.call("configure_gateway", gateway)
+	if cost_surface != null and cost_surface.has_method("configure_gateway"):
+		cost_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -302,6 +317,8 @@ func show_surface(surface_name: String) -> void:
 		session_surface.visible = surface_name == "Session Recovery"
 	if similarity_surface != null:
 		similarity_surface.visible = surface_name == "Similarity"
+	if cost_surface != null:
+		cost_surface.visible = surface_name == "Cost Center"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -386,6 +403,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Similarity evidence is identity-bound and advisory; exact SHA/grid duplicate identity remains authoritative."
 		if similarity_surface != null and similarity_surface.has_method("show_similarity"):
 			similarity_surface.call("show_similarity")
+	elif surface_name == "Cost Center":
+		state.text = "READ-ONLY PROVIDER COST / CREDIT ACCOUNTING"
+		detail.text = "Provider, currency, credit units, balance, and owner-accepted denominators remain separated; unknown values are not estimated."
+		if cost_surface != null and cost_surface.has_method("show_cost"):
+			cost_surface.call("show_cost")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."

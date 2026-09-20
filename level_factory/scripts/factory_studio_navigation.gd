@@ -25,6 +25,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Batch Import",
 	"Session Recovery",
 	"Similarity",
+	"Cost Center",
 	"QA",
 	"Providers",
 	"Outputs",
