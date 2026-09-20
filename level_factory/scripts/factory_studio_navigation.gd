@@ -10,6 +10,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Generate",
 	"Import",
 	"Import Validation",
+	"Pipeline",
 	"Library",
 	"Batches",
 	"Candidates",
