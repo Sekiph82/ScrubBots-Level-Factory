@@ -20,8 +20,16 @@ Implement only SB-LFX-017 C001. Root `TASKS.md` is read-only. Read product contr
 
 ## Implementation
 
-Pending.
+- Added the local-only `factory_studio_cost.gd` surface and wired it into the Studio workspace/navigation.
+- Added provider-cost accounting through the existing offline `studio-extension` transport, with explicit provider, model, operation, unit, credit, and total-cost fields.
+- Added focused regression coverage for deterministic credit/cost totals and zero-cost local operations.
+- No provider, network, telemetry, API-key, or runtime HTTP dependency was introduced.
 
 ## Verification and publication
 
-Pending.
+- Focused tests: `PYTHONPATH=src python -m pytest -q tests/unit/test_sb_lfx_017_cost_center.py tests/unit/test_sb_lfx_016_similarity.py` — 2 passed, 1 warning.
+- Headless Godot boot: `godot_console.exe --headless --path level_factory --quit` — exit 0.
+- Python bytecode check: `PYTHONPATH=src python -m compileall -q src tests` — exit 0.
+- `git diff --check` passed; root `TASKS.md` remained unchanged.
+- Implementation commit: `2999d941098140fd068b0f8df96e777b80a238a6`.
+- Task-final log-only commit and final equality checkpoint follow after this log update.
