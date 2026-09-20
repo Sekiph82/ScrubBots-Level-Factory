@@ -16,6 +16,7 @@ const PRESETS_SCRIPT_PATH := "res://scripts/factory_studio_presets.gd"
 const SEARCH_SCRIPT_PATH := "res://scripts/factory_studio_search.gd"
 const READINESS_SCRIPT_PATH := "res://scripts/factory_studio_readiness.gd"
 const REPRODUCE_SCRIPT_PATH := "res://scripts/factory_studio_reproduce.gd"
+const REVISIONS_SCRIPT_PATH := "res://scripts/factory_studio_revisions.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -27,6 +28,7 @@ var presets_surface: Node
 var search_surface: Node
 var readiness_surface: Node
 var reproduce_surface: Node
+var revisions_surface: Node
 
 
 func _ready() -> void:
@@ -41,6 +43,7 @@ func _ready() -> void:
 	_ensure_search()
 	_ensure_readiness()
 	_ensure_reproduce()
+	_ensure_revisions()
 
 
 func _ensure_dashboard() -> void:
@@ -161,6 +164,16 @@ func _ensure_reproduce() -> void:
 	content.add_child(reproduce_surface)
 
 
+func _ensure_revisions() -> void:
+	if revisions_surface != null: return
+	var revisions_script := ResourceLoader.call("load", REVISIONS_SCRIPT_PATH) as Script
+	if revisions_script == null: return
+	revisions_surface = revisions_script.new() as Node
+	revisions_surface.name = "ManualEditRevisions"
+	revisions_surface.visible = false
+	content.add_child(revisions_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -188,6 +201,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		readiness_surface.call("configure_gateway", gateway)
 	if reproduce_surface != null and reproduce_surface.has_method("configure_gateway"):
 		reproduce_surface.call("configure_gateway", gateway)
+	if revisions_surface != null and revisions_surface.has_method("configure_gateway"):
+		revisions_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -217,6 +232,8 @@ func show_surface(surface_name: String) -> void:
 		readiness_surface.visible = surface_name == "Readiness"
 	if reproduce_surface != null:
 		reproduce_surface.visible = surface_name == "Reproduce"
+	if revisions_surface != null:
+		revisions_surface.visible = surface_name == "Revisions"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -276,6 +293,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Recorded canonical Generate metadata is required. OWNER_UPLOAD retrieval is never mislabeled as regeneration."
 		if reproduce_surface != null and reproduce_surface.has_method("show_reproduce"):
 			reproduce_surface.call("show_reproduce")
+	elif surface_name == "Revisions":
+		state.text = "IMMUTABLE MANUAL EDIT REVISION HISTORY"
+		detail.text = "Revision identities bind exact logical working grids and canonical source identity; restore and undo preserve later lineage."
+		if revisions_surface != null and revisions_surface.has_method("show_revisions"):
+			revisions_surface.call("show_revisions")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."

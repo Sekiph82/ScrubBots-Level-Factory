@@ -105,8 +105,10 @@ from .studio_extensions import (
     delete_preset,
     expand_preset,
     library_refresh,
+    list_revisions,
     list_candidates,
     load_preset,
+    load_revision,
     readiness_card,
     record_failure,
     record_owner_review,
@@ -371,7 +373,7 @@ __all__ = [
     "default_benchmark_corpus", "default_evidence_references", "default_provider_workflow_matrix",
     "summarize_qualification",
     "UnsupportedCapabilityError",
-    "StudioExtensionError", "batch_import", "candidate_inbox", "compare_candidates", "compare_revisions", "cost_center", "create_revision", "delete_preset", "discover_records", "expand_preset", "library_refresh", "list_candidates", "load_preset", "readiness_card", "record_failure", "record_owner_review", "reproduce_capability", "restore_session", "retry_failure", "run_pipeline", "save_library_metadata", "save_preset", "save_session", "similarity", "validate_owner_source", "verify_owner_source",
+    "StudioExtensionError", "batch_import", "candidate_inbox", "compare_candidates", "compare_revisions", "cost_center", "create_revision", "delete_preset", "discover_records", "expand_preset", "library_refresh", "list_candidates", "list_revisions", "load_preset", "load_revision", "readiness_card", "record_failure", "record_owner_review", "reproduce_capability", "restore_session", "retry_failure", "run_pipeline", "save_library_metadata", "save_preset", "save_session", "similarity", "validate_owner_source", "verify_owner_source",
 ]
 
 __version__ = "0.1.0"

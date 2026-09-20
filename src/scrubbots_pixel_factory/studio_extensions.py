@@ -470,6 +470,23 @@ def compare_revisions(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict
     return {"left_revision_id": left.get("revision_id"), "right_revision_id": right.get("revision_id"), "changed_cell_count": len(changed), "changed_indices": changed}
 
 
+def list_revisions(candidate_id: str) -> list[dict[str, Any]]:
+    root = extensions_root() / "revisions" / candidate_id
+    values = []
+    for path in sorted(root.glob("revision-*.json")) if root.exists() else []:
+        value = _read_json(path)
+        if value.get("schema") != REVISION_SCHEMA or value.get("candidate_id") != candidate_id:
+            raise StudioExtensionError("revision lineage is malformed")
+        values.append(value)
+    return values
+
+
+def load_revision(candidate_id: str, revision_id: str) -> dict[str, Any]:
+    for value in list_revisions(candidate_id):
+        if value.get("revision_id") == revision_id: return value
+    raise StudioExtensionError("revision is unavailable")
+
+
 def record_failure(operation: str, stage: str, disposition: str, reason: str, inputs: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if disposition not in {"FAILED", "REJECTED", "INCONCLUSIVE"}: raise StudioExtensionError("failure disposition is not retryable evidence")
     inputs_data = json.loads(json.dumps(dict(inputs or {}), sort_keys=True, separators=(",", ":")))
@@ -546,5 +563,5 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "create_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
+    "readiness_card", "reproduce_capability", "create_revision", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
 ]
