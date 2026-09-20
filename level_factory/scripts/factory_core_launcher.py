@@ -230,6 +230,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = {"state": "DELETED", "preset_id": request["preset_id"]}
         elif operation == "discover":
             payload = extensions.discover_records(str(request.get("query", "")), request.get("filters", {}), request.get("collection"))
+        elif operation == "reproduce-capability":
+            payload = extensions.reproduce_capability(str(request["candidate_id"]))
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":
