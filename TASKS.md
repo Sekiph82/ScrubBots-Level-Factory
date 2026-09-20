@@ -8,7 +8,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Sprint: M06.04 — Owner-approved operations dashboard, import and library extensions
 - Current Task: SB-LFX-003 — Source Art Library
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LFX-003-C001` from the published GitHub prompt and audit criteria, creates the builder log before edits, builds a real searchable Library over re-verified canonical OWNER_UPLOAD source truth, permits only bounded label/tag catalog metadata, keeps review/palette/usage truth unavailable unless canonical evidence exists, pushes implementation/tests/finalized builder log to `main`, then stops for independent ChatGPT strict audit.
+- Next Task/Action: Owner-authorized batch mode: Codex executes `SB-LFX-003-C001` through `SB-LFX-017-C001` sequentially from `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`, using each task's separate audit criteria/prompt and builder log, without intermediate ChatGPT audit; Codex never edits `TASKS.md`; after the complete batch ChatGPT independently audits 003..017 one-by-one and only then advances task truth or creates remediation.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -19,6 +19,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-003-C001_SOURCE_ART_LIBRARY_CANONICAL_CATALOG_AUDIT_CRITERIA.md`
 - Current Prompt: `.hiveai/prompts/SB-LFX-003-C001_FACTORY_STUDIO_SOURCE_ART_LIBRARY_CANONICAL_CATALOG_PROMPT.md`
+- SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
+- SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
+- SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
+- SB-LFX Post-Batch Audit Protocol: `.hiveai/audit-criteria/SB-LFX-003-017_POST_BATCH_STRICT_AUDIT_PROTOCOL.md`
+- SB-LFX Batch Tracker Policy: task checkboxes remain ChatGPT-owned and are not advanced from builder implementation alone; 003..017 are audited after the complete coding batch.
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -121,7 +126,7 @@ Additional inline tags do not replace checkbox state:
 - All canonical `SB-LF06-001..012` Studio requirements are PASS/CLOSED.
 - `SB-LFX-001` is PASS/CLOSED through `SB-LFX-001-C001`; the Factory Operations Dashboard is a real read-only fail-closed derived view over canonical batch/action evidence with no second truth store or tracker.
 - `SB-LFX-002` is PASS/CLOSED through `SB-LFX-002-C001`; manual Pixel Art import now creates explicit content-addressed immutable OWNER_UPLOAD source records while preserving original PNG bytes exactly and making no validation/candidate claims.
-- Active M06 work is `SB-LFX-003`, the searchable Source Art Library canonical catalog; it is outside the fixed 224 LF/CP source denominator.
+- Active M06 implementation batch begins at `SB-LFX-003` and is owner-authorized to continue sequentially through `SB-LFX-017` before intermediate audit; all 003..017 builder outputs remain unaccepted until the post-batch task-by-task ChatGPT strict-audit phase. These extensions are outside the fixed 224 LF/CP source denominator.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
