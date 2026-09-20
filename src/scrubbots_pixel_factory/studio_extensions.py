@@ -562,6 +562,7 @@ def readiness_card(candidate_id: str) -> dict[str, Any]:
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None: raise StudioExtensionError("candidate is unavailable")
     review = _latest_review(candidate_id, candidate["artwork_sha256"])
+    _review_history, invalid_reviews = _validated_review_chain(candidate)
     quality = candidate["quality"]
     gates = {
         "SOURCE": {"disposition": "PASS", "reason": "Verified canonical candidate bundle.", "evidence": candidate["artwork_sha256"]},
@@ -569,9 +570,9 @@ def readiness_card(candidate_id: str) -> dict[str, Any]:
         "STRUCTURE": {"disposition": "PASS" if quality.get("decision") in {"ACCEPT", "PASS"} else "FAIL", "reason": "Canonical quality evidence.", "evidence": quality.get("grid_hash")},
         "SOLVER": {"disposition": "NOT_AVAILABLE", "reason": "Gameplay solver pending M03.", "evidence": None},
         "DIFFICULTY": {"disposition": "NOT_AVAILABLE", "reason": "Measured difficulty pending M04.", "evidence": None},
-        "QA": {"disposition": "PASS" if quality.get("decision") in {"ACCEPT", "PASS"} else "FAIL", "reason": "Structural QA only; not solver or acceptance.", "evidence": quality.get("grid_hash")},
-        "OWNER": {"disposition": review["disposition"] if review else "PENDING", "reason": "Latest append-only owner review evidence." if review else "No owner review exists.", "evidence": review.get("review_id") if review else None},
-        "EXPORT": {"disposition": "PASS", "reason": "Canonical artwork bundle is present.", "evidence": candidate["source_path"]},
+        "QA": {"disposition": "NOT_AVAILABLE", "reason": "Authoritative M05 QA evidence is not connected; structural evidence is not QA.", "evidence": None},
+        "OWNER": {"disposition": "PASS" if review and review["disposition"] == "ACCEPT" else "FAIL" if review and review["disposition"] == "REJECT" else "STALE" if invalid_reviews else "PENDING", "reason": "Latest validated append-only owner review evidence." if review else "Mismatched/corrupt review evidence is excluded." if invalid_reviews else "No valid owner review exists.", "evidence": review.get("review_id") if review else None, "invalid_evidence": invalid_reviews},
+        "EXPORT": {"disposition": "NOT_AVAILABLE", "reason": "Authoritative export/promotion evidence is not connected; bundle presence is not export authority.", "evidence": None},
     }
     ready = all(gate["disposition"] == "PASS" for gate in gates.values())
     return {"schema": "scrubbots-production-readiness-card", "version": 1, "candidate_id": candidate_id, "gates": gates, "overall": "READY" if ready else "NOT READY", "reason": "Every required gate must be authoritative PASS." if not ready else "All required gates pass."}

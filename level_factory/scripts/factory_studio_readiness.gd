@@ -18,6 +18,9 @@ func _ready() -> void:
 
 func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 func refresh_card() -> void: _projection = _gateway.call("run_studio_extension", "readiness", {"candidate_id": _candidate.text.strip_edges()}) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
+func refresh_candidate(candidate_id: String) -> void:
+	if _candidate != null: _candidate.text = candidate_id
+	refresh_card()
 func snapshot() -> Dictionary: return _projection.duplicate(true)
 func show_readiness() -> void: _render()
 
