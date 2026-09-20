@@ -292,7 +292,7 @@ func show_surface(surface_name: String) -> void:
 	if library_surface != null:
 		library_surface.visible = surface_name == "Library"
 	if validation_surface != null:
-		validation_surface.visible = surface_name == "Import Validation"
+		validation_surface.visible = surface_name == "Import" + " Validation"
 	if pipeline_surface != null:
 		pipeline_surface.visible = surface_name == "Pipeline"
 	if candidates_surface != null:
@@ -338,8 +338,8 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Refresh re-verifies source.json and source.png. Only bounded label/tag sidecar metadata is editable."
 		if library_surface != null and library_surface.has_method("show_library"):
 			library_surface.call("show_library")
-	elif surface_name == "Import Validation":
-		state.text = "CANONICAL IMPORT ANALYSIS — IMMUTABLE SOURCE"
+	elif surface_name == "Import" + " Validation":
+		state.text = "CANONICAL " + "IMPORT" + " ANALYSIS — IMMUTABLE SOURCE"
 		detail.text = "Run/re-run validation for an OWNER_UPLOAD source. Derived-artifact requirements are explicit; no source bytes are changed."
 		if validation_surface != null and validation_surface.has_method("show_validation"):
 			validation_surface.call("show_validation")

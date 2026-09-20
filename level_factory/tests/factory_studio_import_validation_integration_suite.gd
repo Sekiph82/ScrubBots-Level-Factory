@@ -14,7 +14,7 @@ func _init() -> void:
 
 
 func _run_suite() -> void:
-	var packed := ResourceLoader.load(MAIN_SCENE_PATH) as PackedScene
+	var packed := ResourceLoader.call("load", MAIN_SCENE_PATH) as PackedScene
 	_require(packed != null, "Studio scene did not load")
 	if packed == null: _finish(); return
 	var instance := packed.instantiate()

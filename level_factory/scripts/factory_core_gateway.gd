@@ -236,20 +236,13 @@ func run_studio_extension(operation: String, request: Dictionary = {}) -> Dictio
 			"disposition": "UNAVAILABLE",
 			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
 		}
-	var request_path := ProjectSettings.globalize_path("res://output/.studio-extension-request.json")
-	var request_file := FileAccess.open(request_path, FileAccess.WRITE)
-	if request_file == null:
-		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": "ERROR — could not create bounded Studio extension request transport."}
-	request_file.store_string(JSON.stringify(request))
-	request_file.close()
 	var captured: Array[String] = []
 	var exit_code := _execute_process(python_executable, PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"studio-extension",
 		"--operation", operation,
-		"--request-file", request_path,
+		"--request-json", JSON.stringify(request),
 	]), captured)
-	DirAccess.remove_absolute(request_path)
 	var process_output := "\n".join(captured)
 	var payload := _find_extension_result(captured)
 	if payload.is_empty():

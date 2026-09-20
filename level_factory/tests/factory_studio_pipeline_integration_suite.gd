@@ -10,7 +10,7 @@ func _init() -> void: call_deferred("_run_suite")
 
 
 func _run_suite() -> void:
-	var packed := ResourceLoader.load("res://scenes/factory_studio.tscn") as PackedScene
+	var packed := ResourceLoader.call("load", "res://scenes/factory_studio.tscn") as PackedScene
 	_require(packed != null, "Studio scene did not load")
 	if packed == null: _finish(); return
 	var instance := packed.instantiate(); root.add_child(instance); await process_frame

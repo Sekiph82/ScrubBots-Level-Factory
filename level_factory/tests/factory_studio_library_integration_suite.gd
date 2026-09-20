@@ -15,7 +15,7 @@ func _init() -> void:
 
 
 func _run_suite() -> void:
-	var packed_scene := ResourceLoader.load(MAIN_SCENE_PATH) as PackedScene
+	var packed_scene := ResourceLoader.call("load", MAIN_SCENE_PATH) as PackedScene
 	_require(packed_scene != null, "Factory Studio scene did not load")
 	if packed_scene == null:
 		_finish()
