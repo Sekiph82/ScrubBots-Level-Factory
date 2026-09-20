@@ -33,3 +33,10 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 - Real runtime command: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_comparison_integration_suite.gd` — `SB-LFX-007-C001 COMPARISON integration PASS`.
 - One initial integration run used the wrong lazy surface node name; corrected to the canonical runtime node `CandidateComparison` and reran successfully.
 - `git diff --check` and empty `TASKS.md` diff will be recorded before publication.
+
+## Final publication
+
+- Final R01 implementation SHA: `7ffe37dd6ddcab64e8295a77b6be442cd19752dc`.
+- Implementation push: successful; local HEAD equals `origin/main`.
+- Focused/runtime, compileall, headless boot, diff-check and TASKS read-only checks passed.
+- This file is finalized for exactly one log-only terminal commit; builder evidence remains subject to ChatGPT re-audit.
