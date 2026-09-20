@@ -29,6 +29,7 @@ STUDIO_REQUEST_KEYS = {
     "working_cells",
     "dirty_cell_count",
 }
+DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"
 
 
 def _repository_root() -> Path:
@@ -83,6 +84,104 @@ def _source_file_hashes(bundle: object) -> dict[str, str]:
         "artwork.json": hashlib.sha256(bundle.artwork_json).hexdigest(),  # type: ignore[attr-defined]
         "metadata.json": hashlib.sha256(bundle.metadata_json).hexdigest(),  # type: ignore[attr-defined]
     }
+
+
+def _dashboard_error(message: str) -> dict[str, object]:
+    return {
+        "operation": DASHBOARD_OPERATION,
+        "state": "ERROR",
+        "disposition": "ERROR",
+        "error": f"ERROR — canonical batch dashboard inspection: {message[:512]}",
+    }
+
+
+def _dashboard_manifest_path(raw_path: object) -> Path:
+    if type(raw_path) is not str or not raw_path.strip():
+        raise ValueError("manifest path must be a non-empty local path")
+    manifest_path = Path(raw_path).resolve()
+    output_root = (_repository_root() / "level_factory" / "output").resolve()
+    if manifest_path.name != "batch-manifest.json" or not _inside_output(manifest_path, output_root):
+        raise ValueError("manifest path must be batch-manifest.json inside the approved Factory output area")
+    if not manifest_path.is_file():
+        raise ValueError("canonical batch manifest does not exist")
+    return manifest_path
+
+
+def _dashboard_projection(manifest_path: Path) -> dict[str, object]:
+    from scrubbots_pixel_factory.cli.main import (
+        _accepted_grids,
+        _resume_registry,
+        _validate_attempt_history,
+        _validate_manifest,
+    )
+
+    raw_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = _validate_manifest(raw_manifest, manifest_path)
+    registry = _resume_registry(manifest, None)
+    accepted = _accepted_grids(manifest_path.parent, manifest)
+    _validate_attempt_history(manifest, registry, accepted)
+
+    attempts = list(manifest["attempts"])
+    disposition_counts = {
+        "ACCEPTED": 0,
+        "QUALITY_REJECTED": 0,
+        "GENERATOR_FAILURE": 0,
+        "DUPLICATE": 0,
+    }
+    rejection_code_counts: dict[str, int] = {}
+    for attempt in attempts:
+        status = str(attempt["status"])
+        disposition_counts[status] = disposition_counts.get(status, 0) + 1
+        for code in attempt["rejection_codes"]:
+            rejection_code_counts[str(code)] = rejection_code_counts.get(str(code), 0) + 1
+
+    request_template = dict(manifest["request_template"])
+    latest_attempt = dict(attempts[-1]) if attempts else {}
+    return {
+        "operation": DASHBOARD_OPERATION,
+        "state": "READY",
+        "disposition": "READY",
+        "source_manifest_path": str(manifest_path),
+        "batch_id": manifest["batch_id"],
+        "terminal_state": manifest["terminal_state"],
+        "requested_count": manifest["requested_count"],
+        "max_attempts": manifest["max_attempts"],
+        "attempt_count": len(attempts),
+        "next_attempt_index": manifest["next_attempt_index"],
+        "accepted_count": manifest["accepted_count"],
+        "request_context": {
+            "difficulty": request_template["difficulty"],
+            "width": request_template["width"],
+            "height": request_template["height"],
+            "generator_mode": request_template["generator_mode"],
+        },
+        "source_classification": "CANONICAL_BATCH / PROCEDURAL",
+        "disposition_counts": disposition_counts,
+        "rejection_code_counts": dict(sorted(rejection_code_counts.items())),
+        "latest_attempt": latest_attempt,
+        "unavailable": {
+            "owner_review": "NOT AVAILABLE — no canonical owner-review queue is connected.",
+            "solver": "NOT AVAILABLE — gameplay solver evidence is pending M03.",
+            "difficulty_v1": "NOT AVAILABLE — measured Difficulty V1 is pending M04.",
+            "timing": "NOT AVAILABLE — canonical batch timing evidence is not recorded.",
+            "provider_cost": "NOT AVAILABLE — provider accounting is not connected.",
+        },
+    }
+
+
+def _dashboard_inspect_main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scrubbots-pixel-factory dashboard-inspect")
+    parser.add_argument("--manifest", required=True)
+    args = parser.parse_args(list(arguments))
+    try:
+        manifest_path = _dashboard_manifest_path(args.manifest)
+        payload = _dashboard_projection(manifest_path)
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        return 0
+    except Exception as exc:  # fail closed at the process boundary
+        payload = _dashboard_error(str(exc))
+        print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+        return 2
 
 
 def _validate_studio_request(raw: object) -> dict[str, object]:
@@ -214,6 +313,8 @@ def _studio_revalidate_main(arguments: Sequence[str]) -> int:
 def _main() -> int:
     repository_root = _repository_root()
     sys.path.insert(0, str(repository_root / "src"))
+    if len(sys.argv) > 1 and sys.argv[1] == "dashboard-inspect":
+        return _dashboard_inspect_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "studio-revalidate-art":
         return _studio_revalidate_main(sys.argv[2:])
     from scrubbots_pixel_factory.cli.main import main as canonical_main

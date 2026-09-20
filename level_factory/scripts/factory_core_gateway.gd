@@ -19,6 +19,7 @@ const GENERATE_OUTPUT_PATH := "res://output/studio-runs"
 const REPRODUCE_OUTPUT_PATH := "res://output/studio-reproductions"
 const STUDIO_REVALIDATION_TRANSPORT_PATH := "res://output/.lf06-008-revalidation/request.json"
 const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
+const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
@@ -147,6 +148,47 @@ func run_manual_art_revalidation(request_path: String) -> Dictionary:
 			"disposition": "ERROR",
 			"exit_code": exit_code,
 			"error": "ERROR — manual artwork structural revalidation returned no structured result.",
+			"captured_output": process_output.left(4096),
+		}
+	payload["exit_code"] = exit_code
+	payload["captured_output"] = process_output.left(4096)
+	return payload
+
+
+func run_dashboard_inspection(manifest_path: String) -> Dictionary:
+	if _connection_status != ConnectionStatus.AVAILABLE:
+		return {
+			"operation": DASHBOARD_INSPECTION_OPERATION,
+			"state": "UNAVAILABLE",
+			"disposition": "UNAVAILABLE",
+			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
+		}
+	var raw_path := manifest_path.strip_edges()
+	var normalized := raw_path.replace(char(92), "/")
+	var path_parts := normalized.split("/", false)
+	var relative_suffix := normalized.trim_prefix("res://output/")
+	if normalized.is_empty() or raw_path.contains(char(92)) or not normalized.begins_with("res://output/") or relative_suffix.contains(":") or normalized.contains("..") or not normalized.ends_with("/batch-manifest.json") or path_parts.has("."):
+		return {
+			"operation": DASHBOARD_INSPECTION_OPERATION,
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"error": "ERROR — Dashboard manifest path is outside the approved res://output boundary.",
+		}
+	var captured: Array[String] = []
+	var exit_code := _execute_process(python_executable, PackedStringArray([
+		ProjectSettings.globalize_path(LAUNCHER_PATH),
+		"dashboard-inspect",
+		"--manifest", ProjectSettings.globalize_path(normalized),
+	]), captured)
+	var process_output := "\n".join(captured)
+	var payload := _find_dashboard_result(captured)
+	if payload.is_empty():
+		return {
+			"operation": DASHBOARD_INSPECTION_OPERATION,
+			"state": "ERROR",
+			"disposition": "ERROR",
+			"exit_code": exit_code,
+			"error": "ERROR — canonical dashboard inspection returned no structured result.",
 			"captured_output": process_output.left(4096),
 		}
 	payload["exit_code"] = exit_code
@@ -311,6 +353,19 @@ func _find_studio_result(lines: Array[String]) -> Dictionary:
 			continue
 		var parsed: Variant = JSON.parse_string(candidate_line)
 		if parsed is Dictionary and str(parsed.get("operation", "")) == STUDIO_REVALIDATION_OPERATION:
+			return parsed
+	return {}
+
+
+func _find_dashboard_result(lines: Array[String]) -> Dictionary:
+	var combined := "\n".join(lines).replace("\r\n", "\n")
+	var output_lines := combined.split("\n")
+	for index in range(output_lines.size() - 1, -1, -1):
+		var candidate_line := output_lines[index].strip_edges()
+		if not candidate_line.begins_with("{") or not candidate_line.ends_with("}"):
+			continue
+		var parsed: Variant = JSON.parse_string(candidate_line)
+		if parsed is Dictionary and str(parsed.get("operation", "")) == DASHBOARD_INSPECTION_OPERATION:
 			return parsed
 	return {}
 
