@@ -78,3 +78,12 @@ Implementation, tests, regressions, offline/security checks, final diff, commits
 - No dependency or license files changed. Existing Python Factory Core remains authoritative; the nested Godot project contains only the launcher bridge, not a second compiler or Core implementation.
 - Source bytes are written only to the content-addressed owner-upload destination; external selected files are read-only from this feature's perspective. Existing destination identity/bytes are verified before idempotent reuse; corruption and malformed input fail closed.
 - No `TASKS.md`, prompt, audit, sibling repository, or owner-local UID file was modified.
+
+## Implementation publication and terminal log checkpoint
+
+- Final implementation diff was limited to the nine staged files listed in the implementation commit; `git diff --cached --check` passed and staged `TASKS.md` diff was empty.
+- Implementation commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d` (`Implement OWNER_UPLOAD immutable source import`).
+- Ran `git push origin main`; GitHub accepted `main` from `ccf4536700c9c62c1717ace05f543962e7d955f2` to `7e6ad79a5436b013e787509e9b2ab374ed90c78d`.
+- Ran `git fetch origin main --prune`; local `HEAD` and `origin/main` both equal `7e6ad79a5436b013e787509e9b2ab374ed90c78d`.
+- Final working-tree state after implementation publication contains only the ten pre-existing owner-local Godot UID files as untracked; they were preserved and are not part of this task.
+- The remaining publication step is a separate terminal commit containing only this finalized builder log; no product or test file will be included in that checkpoint.
