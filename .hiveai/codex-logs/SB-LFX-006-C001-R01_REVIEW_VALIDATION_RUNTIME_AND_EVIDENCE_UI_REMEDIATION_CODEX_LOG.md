@@ -33,3 +33,10 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 - Real runtime command: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_candidate_review_integration_suite.gd` — `SB-LFX-006-C001 CANDIDATE REVIEW integration PASS`.
 - One integration compile warning-as-error required an explicit `Dictionary` annotation for a Variant-returning evidence lookup; corrected and rerun successfully.
 - `git diff --check` PASS; `git diff --exit-code -- TASKS.md` PASS.
+
+## Final publication
+
+- Final R01 implementation SHA: `4a02aec1fe5d3c77b4a70218baea21044038ce2b`.
+- Implementation push: successful; local HEAD equals `origin/main`.
+- Known limitation: builder evidence remains subject to ChatGPT independent re-audit; no audit or acceptance declaration was made.
+- This file is finalized for exactly one log-only terminal commit.
