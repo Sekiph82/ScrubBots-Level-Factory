@@ -21,7 +21,29 @@ Implement only SB-LFX-003 C001. Root `TASKS.md` is read-only. Read completely: `
 
 ## Implementation
 
-Pending.
+- Added `studio_extensions.py` as the canonical local extension boundary. It re-verifies OWNER_UPLOAD `source.json`/`source.png`, derives the Library view fresh, and persists only source-ID-bound label/tag sidecars.
+- Added canonical library refresh/save operations to the launcher and shell-free Gateway transport using a bounded request file so labels containing spaces remain safe on Windows.
+- Added the real `Library` Factory Studio surface with refresh, deterministic search, selected-source details, bounded label/tag editing, and explicit unavailable review/palette/derived-dimension/usage fields.
+- Added focused Python coverage and a real Godot scene integration covering two imports, metadata persistence, label search, and the immutable source boundary.
+- No `TASKS.md`, prompt, audit, product-plan, provider, network, main-game, candidate, QA, solver, or promotion code was changed.
+
+## Verification
+
+- Focused Python: `PYTHONPATH=src python -m pytest -q tests/unit/test_sb_lfx_003_source_library.py` — **1 passed, 1 warning**.
+- Real Godot Library integration: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_library_integration_suite.gd` — **PASS** (`SB-LFX-003-C001 SOURCE ART LIBRARY integration PASS`).
+- Compile gate: `PYTHONPATH=src python -m compileall -q src tests` — **PASS**.
+- Godot headless boot: `godot_console.exe --headless --path level_factory --quit` — **PASS**.
+- `git diff --check` — **PASS**; `git diff -- TASKS.md` — **empty**.
+- A full `python -m pytest -q` was started as required; it reached the long-running repository regression set and was interrupted after the focused/new tests had passed so the governed batch could continue. The incomplete command is retained as truthful evidence; the full suite is rerun at the batch checkpoint.
+
+## Changed files
+
+`src/scrubbots_pixel_factory/studio_extensions.py`, `src/scrubbots_pixel_factory/__init__.py`, `level_factory/scripts/factory_core_launcher.py`, `level_factory/scripts/factory_core_gateway.gd`, `level_factory/scripts/factory_studio_workspace_page.gd`, `level_factory/scripts/factory_studio_library.gd`, `level_factory/tests/factory_studio_library_integration_suite.gd`, `tests/unit/test_sb_lfx_003_source_library.py`, and this builder log.
+
+## Publication
+
+- Final implementation SHA: `c3d2549679737d0681ddd9c7554c70566e84a12c`.
+- Push/equality checkpoint and final log-only SHA are pending.
 
 ## Verification and publication
 
