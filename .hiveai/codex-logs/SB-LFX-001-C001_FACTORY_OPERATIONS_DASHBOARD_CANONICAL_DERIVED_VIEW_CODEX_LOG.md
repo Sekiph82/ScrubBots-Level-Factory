@@ -72,3 +72,14 @@ Final review, staged diff, commit, push, and remote-equality records will be app
 - Final intended file set is limited to the canonical launcher, gateway, workspace page, new dashboard node, new real-scene dashboard integration suite, focused dashboard regression test, the existing project-boundary allowlist addition, and this matching builder log.
 - `git diff --check` passed. No `TASKS.md`, prompt, audit, sibling repository, credential, provider, or network file is staged. No Python Factory Core semantic source file was changed.
 - The staged implementation is read-only at the dashboard boundary: no manifest writes, persistence, owner-acceptance mutation, solver, measured Difficulty V1, timing, or provider accounting is introduced.
+
+## Implementation commit checkpoint
+
+- Implementation commit: `21ea9f9c41667497488d8bd9e1fe3f53a3c29459` (`Implement Factory Operations Dashboard derived view`).
+- Pushed implementation commit to `origin/main` successfully.
+- Post-push fetch verification: local `HEAD` and `origin/main` both equal `21ea9f9c41667497488d8bd9e1fe3f53a3c29459`.
+- The only remaining worktree entries are the ten pre-existing owner-local `.gd.uid` files listed above; none is staged or modified by this task.
+
+## Terminal publication checkpoint
+
+This final append is the sole content change after the implementation commit. The following terminal commit is intentionally log-only and will be pushed separately after verifying its diff contains only this builder log. The final local `HEAD` and `origin/main` equality after that push will be recorded in the terminal commit's resulting log state and reported to the user as the terminal publication SHA.
