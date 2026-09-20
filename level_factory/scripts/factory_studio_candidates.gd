@@ -8,6 +8,7 @@ var _candidate_control: LineEdit
 var _reason_control: LineEdit
 var _state_label: Label
 var _list_label: Label
+var _details_label: Label
 
 
 func _ready() -> void:
@@ -45,11 +46,20 @@ func _build_controls() -> void:
 	var refresh := Button.new(); refresh.text = "Refresh"; refresh.pressed.connect(refresh_inbox); row.add_child(refresh); add_child(row)
 	_state_label = Label.new(); _state_label.name = "CandidateInboxState"; _state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_state_label)
 	_list_label = Label.new(); _list_label.name = "CandidateInboxItems"; _list_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_list_label)
+	_details_label = Label.new(); _details_label.name = "CandidateEvidenceDetails"; _details_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_details_label)
 
 
 func _render() -> void:
 	if _state_label == null: return
 	_state_label.text = "Candidate Inbox: %s | owner review is append-only" % _projection.get("state", "EMPTY")
 	var rows: Array[String] = []
-	for candidate in _projection.get("candidates", []): rows.append("%s=%s" % [candidate.get("candidate_id", ""), candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW")])
+	var selected: Dictionary = {}
+	for candidate in _projection.get("candidates", []):
+		rows.append("%s=%s" % [candidate.get("candidate_id", ""), candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW")])
+		if str(candidate.get("candidate_id", "")) == _candidate_control.text.strip_edges(): selected = candidate
 	_list_label.text = "Queue: %s" % ", ".join(rows) if not rows.is_empty() else "Queue: no trusted canonical candidates; unsupported origins remain unavailable."
+	if _details_label != null:
+		if selected.is_empty():
+			_details_label.text = "Selected candidate evidence: enter a candidate ID and refresh."
+		else:
+			_details_label.text = "Selected candidate evidence: id=%s | artwork=%s | grid=%s | dimensions=%sx%s | provenance=%s | structural/QA=%s | owner-review=%s | solver=%s | difficulty=%s | immutable references=%s | invalid review=%s" % [selected.get("candidate_id", ""), selected.get("artwork_sha256", ""), selected.get("grid_hash", ""), selected.get("width", ""), selected.get("height", ""), selected.get("provenance", {}), selected.get("structural", {}).get("decision", selected.get("structural", {}).get("disposition", "NOT AVAILABLE")), selected.get("owner_review", {}).get("disposition", "NEEDS_REVIEW"), selected.get("solver", {}).get("disposition", "NOT AVAILABLE"), selected.get("difficulty", {}).get("disposition", "NOT AVAILABLE"), selected.get("evidence_references", []), selected.get("owner_review_invalid", [])]

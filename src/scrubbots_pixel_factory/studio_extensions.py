@@ -279,17 +279,73 @@ def _review_root() -> Path:
     return extensions_root() / "owner-review"
 
 
-def _latest_review(candidate_id: str, artwork_sha256: str | None = None) -> dict[str, Any] | None:
-    records: list[dict[str, Any]] = []
+def _validate_review_record(candidate: Mapping[str, Any], value: Mapping[str, Any], expected_sequence: int, previous_review_id: str | None) -> dict[str, Any]:
+    """Validate one immutable owner-review record against its live candidate."""
+
+    required = {"schema", "version", "review_id", "candidate_id", "candidate_identity_hash", "artwork_sha256", "grid_hash", "disposition", "reason", "note", "sequence", "created_at", "previous_review_id"}
+    if set(value) != required:
+        raise StudioExtensionError("review evidence schema is incomplete")
+    candidate_id = str(candidate["candidate_id"])
+    sequence = value.get("sequence")
+    expected_id = f"review-{candidate_id}-{expected_sequence:04d}"
+    expected_identity = _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]})
+    if value.get("schema") != REVIEW_SCHEMA or value.get("version") != 1 or value.get("review_id") != expected_id:
+        raise StudioExtensionError("review schema or deterministic identity is invalid")
+    if value.get("candidate_id") != candidate_id or value.get("candidate_identity_hash") != expected_identity or value.get("artwork_sha256") != candidate["artwork_sha256"] or value.get("grid_hash") != candidate["grid_hash"]:
+        raise StudioExtensionError("review evidence is bound to a different candidate/artwork/grid identity")
+    if value.get("disposition") not in {"ACCEPT", "REJECT"} or type(sequence) is not int or sequence != expected_sequence:
+        raise StudioExtensionError("review disposition or sequence is invalid")
+    if value.get("previous_review_id") != previous_review_id:
+        raise StudioExtensionError("review chain predecessor is invalid")
+    if any(type(value.get(key)) is not str or len(str(value.get(key))) > 512 for key in ("reason", "note", "created_at")):
+        raise StudioExtensionError("review text or timestamp is invalid")
+    return dict(value)
+
+
+def _validated_review_chain(candidate: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Return only the contiguous valid review chain; malformed records are excluded."""
+
+    candidate_id = str(candidate["candidate_id"])
+    artwork_sha256 = str(candidate["artwork_sha256"])
+    raw_records: list[dict[str, Any]] = []
+    invalid: list[str] = []
     if _review_root().exists():
         for path in sorted(_review_root().glob("*.json")):
             try:
                 value = _read_json(path)
-                if value.get("candidate_id") == candidate_id and (artwork_sha256 is None or value.get("artwork_sha256") == artwork_sha256):
-                    records.append(value)
             except StudioExtensionError:
+                invalid.append(path.name)
                 continue
-    return records[-1] if records else None
+            if value.get("candidate_id") == candidate_id and value.get("artwork_sha256") == artwork_sha256:
+                raw_records.append(value)
+    by_sequence: dict[int, dict[str, Any]] = {}
+    for value in raw_records:
+        sequence = value.get("sequence")
+        if type(sequence) is not int or sequence in by_sequence:
+            invalid.append(str(value.get("review_id", "unknown")))
+        else:
+            by_sequence[sequence] = value
+    chain: list[dict[str, Any]] = []
+    previous_id: str | None = None
+    sequence = 1
+    while sequence in by_sequence:
+        try:
+            checked = _validate_review_record(candidate, by_sequence[sequence], sequence, previous_id)
+        except StudioExtensionError:
+            invalid.append(str(by_sequence[sequence].get("review_id", "unknown")))
+            break
+        chain.append(checked)
+        previous_id = str(checked["review_id"])
+        sequence += 1
+    return chain, invalid
+
+
+def _latest_review(candidate_id: str, artwork_sha256: str | None = None) -> dict[str, Any] | None:
+    candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id and (artwork_sha256 is None or item["artwork_sha256"] == artwork_sha256)), None)
+    if candidate is None:
+        return None
+    chain, _invalid = _validated_review_chain(candidate)
+    return chain[-1] if chain else None
 
 
 def record_owner_review(candidate_id: str, disposition: str, reason: str = "", note: str = "") -> dict[str, Any]:
@@ -300,7 +356,7 @@ def record_owner_review(candidate_id: str, disposition: str, reason: str = "", n
         raise StudioExtensionError("review reason/note is bounded text")
     previous = _latest_review(candidate_id, candidate["artwork_sha256"])
     sequence = 1 if previous is None else int(previous["sequence"]) + 1
-    payload = {"schema": REVIEW_SCHEMA, "version": 1, "review_id": f"review-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "candidate_identity_hash": _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]}), "artwork_sha256": candidate["artwork_sha256"], "disposition": disposition, "reason": reason.strip(), "note": note.strip(), "sequence": sequence, "created_at": datetime.now(timezone.utc).isoformat(), "previous_review_id": previous.get("review_id") if previous else None}
+    payload = {"schema": REVIEW_SCHEMA, "version": 1, "review_id": f"review-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "candidate_identity_hash": _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]}), "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"], "disposition": disposition, "reason": reason.strip(), "note": note.strip(), "sequence": sequence, "created_at": datetime.now(timezone.utc).isoformat(), "previous_review_id": previous.get("review_id") if previous else None}
     _write_json(_review_root() / f"{payload['review_id']}.json", payload, immutable=True)
     return payload
 
@@ -309,7 +365,8 @@ def candidate_inbox() -> dict[str, Any]:
     items = []
     for candidate in list_candidates():
         review = _latest_review(candidate["candidate_id"], candidate["artwork_sha256"])
-        items.append({**candidate, "owner_review": review or {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}, "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}})
+        chain, invalid = _validated_review_chain(candidate)
+        items.append({**candidate, "owner_review": review or {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}, "owner_review_history": chain, "owner_review_invalid": invalid, "provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}})
     return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "candidates": items}
 
 
