@@ -313,6 +313,29 @@ def candidate_inbox() -> dict[str, Any]:
     return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "candidates": items}
 
 
+def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, collection: str | None = None) -> dict[str, Any]:
+    """Return a deterministic, non-persisted discovery view over canonical records."""
+
+    wanted = dict(filters or {})
+    if collection in {"Ready for Production", "Unused in Campaign"}:
+        return {"schema": "scrubbots-discovery-view", "version": 1, "state": "NOT AVAILABLE", "disposition": "NOT AVAILABLE", "reason": "Required canonical export/campaign evidence is not connected.", "records": []}
+    records: list[dict[str, Any]] = []
+    for source in library_refresh()["sources"]:
+        records.append({"record_type": "SOURCE", "record_id": source["source_id"], "origin": source["origin"], "filename": source["original_filename"], "width": source["original_width"], "height": source["original_height"], "label": source["catalog"]["label"], "tags": source["catalog"]["tags"], "review": source["owner_review"]["disposition"], "qa": "NOT AVAILABLE"})
+    for candidate in candidate_inbox()["candidates"]:
+        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"]})
+    if collection == "Imported Sources": records = [record for record in records if record["record_type"] == "SOURCE"]
+    elif collection == "Needs Review": records = [record for record in records if record["review"] in {"NEEDS_REVIEW", "NOT AVAILABLE"}]
+    elif collection == "Owner Accepted": records = [record for record in records if record["review"] == "ACCEPT"]
+    elif collection == "Owner Rejected": records = [record for record in records if record["review"] == "REJECT"]
+    needle = query.strip().casefold()
+    if needle: records = [record for record in records if needle in json.dumps(record, ensure_ascii=False, sort_keys=True).casefold()]
+    for key, value in wanted.items():
+        records = [record for record in records if record.get(key) == value]
+    records.sort(key=lambda record: (str(record["record_type"]), str(record["record_id"])))
+    return {"schema": "scrubbots-discovery-view", "version": 1, "state": "READY", "disposition": "DERIVED_VIEW", "collection": collection or "ALL", "records": records, "mutated": False}
+
+
 def compare_candidates(candidate_ids: Sequence[str]) -> dict[str, Any]:
     if len(candidate_ids) < 2 or len(set(candidate_ids)) != len(candidate_ids):
         raise StudioExtensionError("comparison requires at least two distinct candidate IDs")
@@ -522,6 +545,6 @@ def cost_center(records: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
-    "list_candidates", "record_owner_review", "candidate_inbox", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
+    "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
     "readiness_card", "reproduce_capability", "create_revision", "compare_revisions", "record_failure", "retry_failure", "batch_import", "save_session", "restore_session", "similarity", "cost_center",
 ]

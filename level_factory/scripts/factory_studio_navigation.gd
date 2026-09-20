@@ -17,6 +17,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Review",
 	"Comparison",
 	"Presets",
+	"Search",
 	"QA",
 	"Providers",
 	"Outputs",

@@ -13,6 +13,7 @@ const PIPELINE_SCRIPT_PATH := "res://scripts/factory_studio_pipeline.gd"
 const CANDIDATES_SCRIPT_PATH := "res://scripts/factory_studio_candidates.gd"
 const COMPARISON_SCRIPT_PATH := "res://scripts/factory_studio_comparison.gd"
 const PRESETS_SCRIPT_PATH := "res://scripts/factory_studio_presets.gd"
+const SEARCH_SCRIPT_PATH := "res://scripts/factory_studio_search.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -21,6 +22,7 @@ var pipeline_surface: Node
 var candidates_surface: Node
 var comparison_surface: Node
 var presets_surface: Node
+var search_surface: Node
 
 
 func _ready() -> void:
@@ -32,6 +34,7 @@ func _ready() -> void:
 	_ensure_candidates()
 	_ensure_comparison()
 	_ensure_presets()
+	_ensure_search()
 
 
 func _ensure_dashboard() -> void:
@@ -122,6 +125,16 @@ func _ensure_presets() -> void:
 	content.add_child(presets_surface)
 
 
+func _ensure_search() -> void:
+	if search_surface != null: return
+	var search_script := ResourceLoader.call("load", SEARCH_SCRIPT_PATH) as Script
+	if search_script == null: return
+	search_surface = search_script.new() as Node
+	search_surface.name = "DiscoverySearch"
+	search_surface.visible = false
+	content.add_child(search_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -143,6 +156,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		comparison_surface.call("configure_gateway", gateway)
 	if presets_surface != null and presets_surface.has_method("configure_gateway"):
 		presets_surface.call("configure_gateway", gateway)
+	if search_surface != null and search_surface.has_method("configure_gateway"):
+		search_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -166,6 +181,8 @@ func show_surface(surface_name: String) -> void:
 		comparison_surface.visible = surface_name == "Comparison"
 	if presets_surface != null:
 		presets_surface.visible = surface_name == "Presets"
+	if search_surface != null:
+		search_surface.visible = surface_name == "Search"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -210,6 +227,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Presets are convenience records; execution history binds full resolved controls and does not depend on preset survival."
 		if presets_surface != null and presets_surface.has_method("show_presets"):
 			presets_surface.call("show_presets")
+	elif surface_name == "Search":
+		state.text = "DERIVED SEARCH / FILTER / SMART COLLECTIONS"
+		detail.text = "Queries are deterministic views over canonical records. Unavailable domains remain unavailable and no membership list is persisted."
+		if search_surface != null and search_surface.has_method("show_search"):
+			search_surface.call("show_search")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
