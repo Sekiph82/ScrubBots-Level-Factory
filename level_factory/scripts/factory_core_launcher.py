@@ -238,6 +238,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.retry_failure(str(request["failure_id"]), request.get("changes", {}))
         elif operation == "batch-import":
             payload = extensions.batch_import(request.get("paths", []))
+        elif operation == "session-save":
+            payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
+        elif operation == "session-restore":
+            payload = extensions.restore_session(str(request["session_id"]))
         elif operation == "pipeline":
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
         elif operation == "comparison":

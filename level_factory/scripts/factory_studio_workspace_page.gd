@@ -19,6 +19,7 @@ const REPRODUCE_SCRIPT_PATH := "res://scripts/factory_studio_reproduce.gd"
 const REVISIONS_SCRIPT_PATH := "res://scripts/factory_studio_revisions.gd"
 const FAILURES_SCRIPT_PATH := "res://scripts/factory_studio_failures.gd"
 const BATCH_IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_batch_import.gd"
+const SESSION_SCRIPT_PATH := "res://scripts/factory_studio_session.gd"
 var dashboard: Node
 var import_surface: Node
 var library_surface: Node
@@ -33,6 +34,7 @@ var reproduce_surface: Node
 var revisions_surface: Node
 var failures_surface: Node
 var batch_import_surface: Node
+var session_surface: Node
 
 
 func _ready() -> void:
@@ -50,6 +52,7 @@ func _ready() -> void:
 	_ensure_revisions()
 	_ensure_failures()
 	_ensure_batch_import()
+	_ensure_session()
 
 
 func _ensure_dashboard() -> void:
@@ -200,6 +203,16 @@ func _ensure_batch_import() -> void:
 	content.add_child(batch_import_surface)
 
 
+func _ensure_session() -> void:
+	if session_surface != null: return
+	var session_script := ResourceLoader.call("load", SESSION_SCRIPT_PATH) as Script
+	if session_script == null: return
+	session_surface = session_script.new() as Node
+	session_surface.name = "SessionRecovery"
+	session_surface.visible = false
+	content.add_child(session_surface)
+
+
 func configure_gateway(gateway: RefCounted) -> void:
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
@@ -233,6 +246,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		failures_surface.call("configure_gateway", gateway)
 	if batch_import_surface != null and batch_import_surface.has_method("configure_gateway"):
 		batch_import_surface.call("configure_gateway", gateway)
+	if session_surface != null and session_surface.has_method("configure_gateway"):
+		session_surface.call("configure_gateway", gateway)
 
 
 func show_surface(surface_name: String) -> void:
@@ -268,6 +283,8 @@ func show_surface(surface_name: String) -> void:
 		failures_surface.visible = surface_name == "Failures"
 	if batch_import_surface != null:
 		batch_import_surface.visible = surface_name == "Batch Import"
+	if session_surface != null:
+		session_surface.visible = surface_name == "Session Recovery"
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
@@ -342,6 +359,11 @@ func show_surface(surface_name: String) -> void:
 		detail.text = "Partial success is truthful; same-name files retain independent SHA-derived identities and corrupt items fail independently."
 		if batch_import_surface != null and batch_import_surface.has_method("show_batch_import"):
 			batch_import_surface.call("show_batch_import")
+	elif surface_name == "Session Recovery":
+		state.text = "SESSION RECOVERY — DURABLE REFERENCES, NO SHADOW TRUTH"
+		detail.text = "Restore revalidates canonical references and does not rerun successful durable stages or persist secrets."
+		if session_surface != null and session_surface.has_method("show_session"):
+			session_surface.call("show_session")
 	else:
 		state.text = "NOT IMPLEMENTED: " + surface_name + " is an inert migration placeholder."
 		detail.text = "No provider, import, library, solver, QA, review, batch, or output operation is performed here."
