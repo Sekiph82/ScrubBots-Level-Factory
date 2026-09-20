@@ -31,3 +31,10 @@ Further commands, implementation, tests, failures/corrections, publication SHAs 
 - Focused command: `.venv\Scripts\python.exe -m pytest -q tests/unit/test_sb_lfx_010_readiness.py` — `1 passed, 1 warning`.
 - Real runtime command: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_readiness_integration_suite.gd` — `SB-LFX-010-C001 READINESS integration PASS`.
 - `git diff --check` and empty `TASKS.md` diff will be recorded before publication.
+
+## Final publication
+
+- Final R01 implementation SHA: `fa2bd1c825cbc562679e47774045c72534334357`.
+- Implementation push: successful; local HEAD equals `origin/main`.
+- Focused/runtime, compileall, headless boot, diff-check and TASKS read-only checks passed.
+- This file is finalized for exactly one log-only terminal commit; builder evidence remains subject to independent re-audit.
