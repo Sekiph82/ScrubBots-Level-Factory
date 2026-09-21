@@ -259,6 +259,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.list_failures()
         elif operation == "batch-import":
             payload = extensions.batch_import(request.get("paths", []))
+        elif operation == "batch-load":
+            payload = extensions.batch_load(str(request["batch_id"]))
         elif operation == "session-save":
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":

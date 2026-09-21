@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import uuid
 from typing import Any
 
 from .contracts import CANONICAL_PALETTE
@@ -850,10 +851,18 @@ def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
     for index, path in enumerate(paths):
         result = import_owner_upload(path)
         items.append({"index": index, "display_path": Path(path).name, "source_id": result.get("source_id"), "disposition": result.get("state", "ERROR"), "error": result.get("error")})
-    batch_id = f"batch-import-{_digest(items)[:24]}"
+    batch_id = f"batch-import-{_digest(items)[:24]}-{uuid.uuid4().hex[:12]}"
     payload = {"schema": BATCH_SCHEMA, "version": 1, "batch_id": batch_id, "items": items, "counts": {"success": sum(item["disposition"] in {"IMPORTED", "ALREADY_IMPORTED"} for item in items), "failed": sum(item["disposition"] not in {"IMPORTED", "ALREADY_IMPORTED"} for item in items)}, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(extensions_root() / "batches" / f"{batch_id}.json", payload, immutable=True)
     return payload
+
+
+def batch_load(batch_id: str) -> dict[str, Any]:
+    if not _ID.fullmatch(batch_id): raise StudioExtensionError("batch ID is invalid")
+    value = _read_json(extensions_root() / "batches" / f"{batch_id}.json")
+    if value.get("schema") != BATCH_SCHEMA or value.get("version") != 1 or value.get("batch_id") != batch_id or not isinstance(value.get("items"), list) or not isinstance(value.get("counts"), Mapping):
+        raise StudioExtensionError("batch evidence schema or identity is invalid")
+    return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
 
 
 def _scrub_session_value(value: Any, depth: int = 0) -> Any:
@@ -1005,5 +1014,5 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
 ]
