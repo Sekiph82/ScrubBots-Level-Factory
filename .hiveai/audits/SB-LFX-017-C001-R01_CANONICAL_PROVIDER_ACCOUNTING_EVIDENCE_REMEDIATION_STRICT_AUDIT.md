@@ -5,8 +5,8 @@
 **CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED**
 
 Severity:
-- BLOCKER: 0
-- MAJOR: 4
+- BLOCKER: 1
+- MAJOR: 2
 - MINOR: 0
 - NOTE: 1
 
@@ -18,141 +18,114 @@ Severity:
 
 ## Material improvements
 
-R01 closes the original direct-request financial injection path:
-- Studio/launcher Cost Center now accepts only `scope` and `provider` filters;
-- caller-supplied `records` are ignored by the authoritative launcher path;
-- local accounting files require an exact versioned schema;
-- provider/unit/scope/status and nonnegative consumed/remaining types are checked;
-- timestamps are parsed;
-- provider+unit are kept separate;
-- latest timestamp drives remaining/as-of inside a group;
-- owner-accepted count is bound to the current validated owner-review ID and ACCEPT disposition;
-- absent consumed/remaining values remain unknown/None;
-- no network/provider call or credit spend is introduced.
+R01 materially improves the original implementation:
+- Studio launcher no longer accepts caller-supplied provider/financial facts;
+- product path accepts only scope/provider filters;
+- records are discovered from a bounded local accounting directory;
+- schema/key/type/nonnegative/timestamp validation is applied;
+- provider/unit groups remain separated;
+- remaining balance uses latest validated timestamp;
+- owner-accepted denominator requires matching validated owner review ID/disposition;
+- UI has scope/provider filters and Refresh;
+- no network/provider calls are made.
 
-These are substantial and retained.
+These improvements are retained.
 
-## MAJOR-001 — “validated accounting evidence” is not bound to originating provider/job evidence
+## BLOCKER-001 — the new “accounting evidence” has no authoritative producer/binding to real provider execution
 
-The canonical reader validates the accounting record's own JSON shape, but `evidence_reference` is not resolved or verified.
+The original blocker was that arbitrary caller records could masquerade as financial truth.
 
-A well-formed file placed under:
+R01 moves those records from the request body into:
 
-`studio-extensions/accounting/*.json`
+`level_factory/output/studio-extensions/accounting/*.json`
 
-can assert arbitrary:
+but no canonical provider/job subsystem produces or signs/binds those records.
+
+The real integration itself writes the accounting JSON files directly with a test helper:
+
+`_write_record({... provider, consumed, remaining ...})`
+
+Then `canonical_cost_center()` trusts any local file that matches the schema.
+
+This means arbitrary local JSON can still fabricate:
+- provider identity;
+- status;
+- consumed credits/cost;
+- remaining balance;
+- candidate association;
+- evidence reference.
+
+The transport changed, but financial authority is still self-asserted rather than bound to real provider execution/accounting evidence.
+
+### Required remediation
+
+One of the following must be true before a metric is authoritative:
+
+1. **Existing provider execution records** already contain reliable cost/credit facts:
+   - define a canonical adapter that derives accounting rows directly from those immutable job records; or
+
+2. **No reliable provider accounting source exists yet**:
+   - Cost Center must report NOT AVAILABLE for consumed/remaining/cost metrics instead of inventing a new free-standing accounting source.
+
+If a new accounting-evidence schema is retained, its records must be produced only by an authoritative provider/job execution path and bind:
+- provider job/run ID;
+- immutable execution evidence identity/hash;
+- metric source;
+- unit/currency;
+- recorded timestamp/as-of;
+- candidate linkage where applicable.
+
+A manually dropped JSON file must never establish financial truth.
+
+## MAJOR-001 — Studio UI does not render the required accounting facts/evidence
+
+The actual `FactoryStudioCost` result text shows only:
+
+`Groups: N`
+
+It does not present:
 - provider;
-- unit;
+- unit/currency;
 - scope;
-- SUCCESS/FAILED status;
-- consumed;
-- remaining;
-- candidate/review IDs;
-- recorded_at;
-
-and be counted as trusted accounting evidence as long as its shape is valid.
-
-The real integration itself writes those accounting JSON files directly with `FileAccess`; it does not derive them from a verified provider/job execution record.
-
-This improves over request injection, but it still does not establish why the financial facts are reliable provider evidence.
-
-### Required follow-up
-
-Define one trusted accounting-record creation/ingestion boundary that binds each record to real local provider/job evidence when such evidence exists.
-
-At minimum:
-- validate `evidence_reference` through a known provider/job record schema or trusted adapter evidence;
-- derive provider/status/consumed/remaining from that record rather than duplicate unchecked facts where possible;
-- if a provider has no reliable accounting evidence, return NOT AVAILABLE instead of accepting manually asserted financial values.
-
-Deterministic test fixtures may use a dedicated test-only canonical evidence writer, but product runtime must not treat arbitrary dropped JSON as provider truth.
-
-## MAJOR-002 — different scopes can be silently merged
-
-`canonical_cost_center()` groups by:
-
-`(provider, unit)`
-
-but each accounting record also has a `scope`.
-
-When the user leaves the scope filter blank, two records with:
-- same provider;
-- same unit;
-- different scopes
-
-are combined into one group while `group["scope"]` remains whichever scope was seen first.
-
-That produces a misleading mixed-scope aggregate.
-
-### Required follow-up
-
-Either:
-- include scope in the grouping key; or
-- require an explicit scope before aggregating.
-
-Never merge different accounting scopes while labeling the result as a single scope.
-
-Add a mixed-scope runtime test.
-
-## MAJOR-003 — real Cost Center UI still does not expose the required accounting facts
-
-The R01 Studio surface now has scope/provider filters and Refresh, but its rendered output is only:
-
-`Groups: <count>`
-`Validated local evidence only; read-only.`
-
-It does not display per-provider/group:
-- jobs;
-- success/failure;
+- jobs/success/failure;
 - consumed;
 - remaining;
 - cost per success;
 - cost per owner accepted;
-- UNKNOWN/NOT AVAILABLE fields;
-- unit/currency;
-- scope;
-- as-of timestamp;
-- evidence record IDs/references.
+- UNKNOWN / NOT AVAILABLE fields;
+- evidence record IDs;
+- as-of timestamp.
 
-This leaves the original operator-surface finding only partially remediated.
+The criteria explicitly require those operator-visible summaries and evidence metadata.
 
-### Required follow-up
+### Required remediation
 
-Render a bounded per-group summary/detail view directly from the canonical projection, including explicit UNKNOWN/NOT AVAILABLE values and evidence/as-of information. Do not recompute accounting in GDScript.
+Render real read-only group rows/details with explicit UNKNOWN/NOT AVAILABLE values and evidence references.
 
-## MAJOR-004 — runtime acceptance matrix remains incomplete
+## MAJOR-002 — required runtime evidence remains incomplete
 
-The real R01 integration proves:
-- mixed provider/unit separation;
-- success/failure counts;
+The real integration proves:
+- two providers/units separated;
+- success/failure arithmetic;
 - consumed aggregation;
+- latest remaining;
 - owner-accepted denominator;
-- latest remaining within one group;
-- unknown values;
-- forged request records ignored;
-- real Studio refresh invokes the canonical projection.
+- one unknown provider group;
+- caller-forged request records ignored;
+- UI invocation.
 
 It does not prove:
-- refresh reflects a **new accounting record added after the first refresh**;
-- mixed scopes are not merged;
-- malformed/unbound accounting evidence is rejected;
-- candidate bundle and owner-review evidence remain byte-identical before/after Cost Center refresh;
-- secret-bearing/extra-field accounting records are excluded.
+- refresh after adding a new authoritative accounting record;
+- malformed/secret-bearing accounting record is rejected;
+- candidate/review bytes remain unchanged across Cost Center refresh;
+- evidence-reference/as-of values are rendered in Studio.
 
-### Required follow-up
-
-Extend the existing real integration with those cases.
-
-## Publication / regression
-
-Task-final publication is log-only.
-
-Builder reports focused unit PASS and real accounting-evidence integration PASS. The remediation-batch global suite retains the unrelated protected tracker-contract failure.
+These are required by the original criteria/remediation prompt.
 
 ## NOTE
 
-The old pure `cost_center(records)` helper remains for a standalone unit contract, but the authoritative Studio launcher no longer uses it. This is acceptable provided product runtime continues to use only `canonical_cost_center()`.
+The remediation-batch global suite retains the unrelated protected tracker-contract failure.
 
 ## Disposition
 
-`SB-LFX-017` remains open pending trusted accounting-source binding, scope-safe aggregation, full UI rendering and runtime evidence.
+`SB-LFX-017` remains open pending R02.
