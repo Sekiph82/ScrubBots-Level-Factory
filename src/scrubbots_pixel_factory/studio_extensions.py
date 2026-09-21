@@ -476,21 +476,28 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             _pipeline_stage("PALETTE/STRUCTURE VALIDATION", quality_disposition, inputs=[candidate["artwork_sha256"]], outputs=[candidate["artwork_sha256"]] if quality_disposition == "PASS" else (), evidence=candidate["source_path"], reason=quality_reason),
             _pipeline_stage("CANDIDATE", "PASS", inputs=[candidate["artwork_sha256"]], outputs=[candidate_id], evidence=candidate["source_path"], reason="Canonical candidate identity is retained."),
         ])
+    requested_interrupt = request.get("interrupt_after") if isinstance(request, Mapping) else None
+    if requested_interrupt is not None and requested_interrupt not in {"SOURCE", "NORMALIZE/DERIVE", "PALETTE/STRUCTURE VALIDATION", "CANDIDATE"}:
+        raise StudioExtensionError("pipeline interrupt boundary is unsupported")
+    interrupted = bool(requested_interrupt and any(stage["stage"] == requested_interrupt for stage in stages))
     hard_stop = next((stage for stage in stages if stage["disposition"] in {"FAIL", "BLOCKED", "NOT_AVAILABLE", "NOT AVAILABLE"}), None)
     current_identity = source_id or candidate_id or ""
-    for name in ("SOLVE", "DIFFICULTY", "QA", "REVIEW"):
-        if hard_stop is not None:
-            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], evidence=hard_stop.get("evidence_reference"), reason=f"Stopped after {hard_stop['stage']}: {hard_stop.get('reason', hard_stop['disposition'])}"))
-        elif name == "SOLVE":
-            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Gameplay solver pending M03."))
-            hard_stop = stages[-1]
-        elif name == "DIFFICULTY":
-            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Measured difficulty pending M04."))
-            hard_stop = stages[-1]
-        else:
-            stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Canonical downstream dependency is unavailable."))
+    if interrupted:
+        stages.append(_pipeline_stage("RECOVERY_BOUNDARY", "INTERRUPTED", inputs=[current_identity], evidence=stages[-1].get("evidence_reference"), reason=f"Durable supported interruption boundary after {requested_interrupt}; safe continuation is limited to canonical local re-entry."))
+    else:
+        for name in ("SOLVE", "DIFFICULTY", "QA", "REVIEW"):
+            if hard_stop is not None:
+                stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], evidence=hard_stop.get("evidence_reference"), reason=f"Stopped after {hard_stop['stage']}: {hard_stop.get('reason', hard_stop['disposition'])}"))
+            elif name == "SOLVE":
+                stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Gameplay solver pending M03."))
+                hard_stop = stages[-1]
+            elif name == "DIFFICULTY":
+                stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Measured difficulty pending M04."))
+                hard_stop = stages[-1]
+            else:
+                stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Canonical downstream dependency is unavailable."))
     run_id = f"pipeline-{_digest({'source_id': source_id, 'candidate_id': candidate_id, 'request': dict(request or {}), 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
-    payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": "PARTIAL / STOPPED" if hard_stop else "COMPLETE", "created_at": datetime.now(timezone.utc).isoformat()}
+    payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": "INTERRUPTED" if interrupted else "PARTIAL / STOPPED" if hard_stop else "COMPLETE", "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(_pipeline_path(run_id), payload, immutable=True)
     return payload
 
@@ -933,6 +940,38 @@ def _session_reference_checks(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     return checks
 
 
+def _pipeline_recovery_path(run_id: str) -> Path:
+    return extensions_root() / "recoveries" / f"{run_id}.json"
+
+
+def resume_pipeline(run_id: str) -> dict[str, Any]:
+    """Resume only the supported local pipeline interruption boundary."""
+
+    pipeline = _read_json(_pipeline_path(run_id))
+    if pipeline.get("schema") != PIPELINE_SCHEMA or pipeline.get("run_id") != run_id:
+        raise StudioExtensionError("pipeline evidence is invalid")
+    recovery_path = _pipeline_recovery_path(run_id)
+    if recovery_path.exists():
+        return _read_json(recovery_path)
+    if pipeline.get("disposition") != "INTERRUPTED":
+        return {"state": "SUCCESS", "disposition": "NOT_RESUMABLE", "run_id": run_id, "reason": "Pipeline has no supported interrupted recovery boundary."}
+    boundary = next((stage for stage in pipeline.get("stages", []) if stage.get("stage") == "RECOVERY_BOUNDARY" and stage.get("disposition") == "INTERRUPTED"), None)
+    if boundary is None or not pipeline.get("candidate_id"):
+        return {"state": "SUCCESS", "disposition": "NOT_RESUMABLE", "run_id": run_id, "reason": "Only candidate-bound local pipeline recovery is supported."}
+    candidate_id = str(pipeline["candidate_id"])
+    candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
+    if candidate is None:
+        return {"state": "SUCCESS", "disposition": "NEEDS_OPERATOR_ACTION", "run_id": run_id, "reason": "Canonical candidate is unavailable for recovery."}
+    bundle = read_bundle((_repository_root() / candidate["source_path"]).resolve())
+    if bundle.artwork.grid_hash != candidate["grid_hash"] or hashlib.sha256(bundle.artwork_png).hexdigest() != candidate["artwork_sha256"]:
+        return {"state": "SUCCESS", "disposition": "NEEDS_OPERATOR_ACTION", "run_id": run_id, "reason": "Canonical candidate evidence is stale or corrupt."}
+    reused = [{"stage": stage["stage"], "output_identities": stage.get("output_identities", []), "evidence_reference": stage.get("evidence_reference"), "stage_digest": _digest(stage)} for stage in pipeline.get("stages", []) if stage.get("disposition") in {"PASS", "NOT_APPLICABLE"}]
+    continued = _pipeline_stage("CANDIDATE_REENTRY", "PASS", inputs=[candidate_id], outputs=[candidate_id], evidence=candidate["source_path"], reason="Canonical candidate bundle was re-entered without creating a new candidate or job.")
+    payload = {"state": "SUCCESS", "disposition": "RESUMED", "run_id": run_id, "operation": "pipeline", "reused_successful_stage_evidence": reused, "continued_stage_evidence": continued, "duplicate_source_candidate_job_count": 0, "reason": "Supported interrupted pipeline boundary resumed through canonical candidate evidence."}
+    _write_json(recovery_path, payload, immutable=True)
+    return payload
+
+
 def save_session(session_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
     if not _ID.fullmatch(session_id): raise StudioExtensionError("session ID is invalid")
     normalized = _validate_session_state(state)
@@ -953,9 +992,12 @@ def restore_session(session_id: str) -> dict[str, Any]:
     if not checks: recovery = "NEW"
     elif not valid: recovery = "NEEDS_OPERATOR_ACTION"
     elif state.get("active_retry_id"): recovery = "RETRIED"
-    elif state.get("active_pipeline_run_id") or state.get("active_batch_id"): recovery = "RESUMED"
+    elif state.get("active_pipeline_run_id"):
+        execution = resume_pipeline(str(state["active_pipeline_run_id"]))
+        recovery = "RESUMED" if execution.get("disposition") == "RESUMED" else execution.get("disposition", "NOT_RESUMABLE")
+    elif state.get("active_batch_id"): recovery = "NOT_RESUMABLE"
     else: recovery = "NOT_RESUMABLE"
-    return {**value, "state": state, "reference_validation": checks, "recovery": recovery, "validated_references": valid}
+    return {**value, "state": state, "reference_validation": checks, "recovery": recovery, "validated_references": valid, "recovery_execution": execution if state.get("active_pipeline_run_id") and 'execution' in locals() else None}
 
 
 def similarity(left: Mapping[str, Any], right: Mapping[str, Any], threshold: float = 0.92) -> dict[str, Any]:
@@ -1061,5 +1103,5 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
 ]

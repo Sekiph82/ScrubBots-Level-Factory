@@ -14,6 +14,8 @@ func _ready() -> void:
 
 func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 var _projection: Dictionary = {}
+func set_session_id(session_id: String) -> void:
+	if _session != null: _session.text = session_id
 func save_session() -> void:
 	_projection = _gateway.call("run_studio_extension", "session-save", {"session_id": _session.text.strip_edges(), "state": {"surface": "Session", "autosave_generation": 0}}) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
 func restore_session() -> void:
