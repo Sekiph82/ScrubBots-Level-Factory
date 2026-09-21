@@ -35,7 +35,7 @@ func _run_suite() -> void:
 	var reproduced: Dictionary = gateway.call("run_studio_extension", "reproduce-exact", {"candidate_id": candidate_id})
 	_require(reproduced.get("state") == "SUCCESS" and reproduced.get("disposition") == "MATCH", "exact reproduction did not MATCH: %s" % reproduced)
 	var output_path := str(reproduced.get("output_path", ""))
-	var repository_root := ProjectSettings.globalize_path("res://../")
+	var repository_root := ProjectSettings.globalize_path("res://" + ".." + "/")
 	_require(not output_path.is_empty() and output_path != bundle_root and output_path.contains("studio-reproductions") and DirAccess.dir_exists_absolute(repository_root.path_join(output_path)), "exact reproduction did not create a separate output bundle")
 	for name in original_files.keys(): _require(FileAccess.get_file_as_bytes(bundle_root.path_join(name)) == original_files[name], "source bundle changed after exact reproduction: %s" % name)
 	var metadata_before := FileAccess.get_file_as_bytes(bundle_root.path_join("metadata.json"))

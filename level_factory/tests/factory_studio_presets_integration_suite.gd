@@ -21,7 +21,7 @@ func _run_suite() -> void:
 	var applied: Dictionary = gateway.call("run_studio_extension", "preset-apply", {"preset_id": "lfx008-runtime"})
 	_require(applied.get("state") == "SUCCESS", "Apply Preset did not execute canonical Generate: %s" % applied)
 	var execution_a: Dictionary = applied.get("execution", {})
-	var metadata_path_a := ProjectSettings.globalize_path("res://../" + str(execution_a.get("source_bundle_path", "")).trim_prefix("res://")).path_join("metadata.json")
+	var metadata_path_a := ProjectSettings.globalize_path("res://" + ".." + "/" + str(execution_a.get("source_bundle_path", "")).trim_prefix("res://")).path_join("metadata.json")
 	var metadata_a: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(metadata_path_a))
 	_require(metadata_a.get("generation", {}).get("request", {}) == execution_a.get("expanded_request", {}), "execution expanded request does not exactly equal bundle metadata request: %s" % execution_a)
 	_require(execution_a.get("expanded_request", {}).get("seed", {}).get("type") == "int", "expanded request did not persist typed seed")
