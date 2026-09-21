@@ -494,7 +494,7 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
     hard_stop = next((stage for stage in stages if stage["disposition"] in {"FAIL", "BLOCKED", "NOT_AVAILABLE", "NOT AVAILABLE"}), None)
     current_identity = source_id or candidate_id or ""
     if interrupted:
-        stages.append(_pipeline_stage("RECOVERY_BOUNDARY", "INTERRUPTED", inputs=[current_identity], evidence=stages[-1].get("evidence_reference"), reason=f"Durable supported interruption boundary after {requested_interrupt}; safe continuation is limited to canonical local re-entry."))
+        stages.append(_pipeline_stage("RECOVERY_BOUNDARY", "INTERRUPTED", inputs=[current_identity], evidence=stages[-1].get("evidence_reference"), reason=f"Durable supported interruption boundary after {requested_interrupt}; recovery evaluates the next canonical stage without fabricating continuation."))
     else:
         for name in ("SOLVE", "DIFFICULTY", "QA", "REVIEW"):
             if hard_stop is not None:
@@ -1007,7 +1007,7 @@ def _pipeline_recovery_path(run_id: str) -> Path:
 
 
 def resume_pipeline(run_id: str) -> dict[str, Any]:
-    """Resume only the supported local pipeline interruption boundary."""
+    """Resolve a durable interruption without overstating unavailable continuation."""
 
     pipeline = _read_json(_pipeline_path(run_id))
     if pipeline.get("schema") != PIPELINE_SCHEMA or pipeline.get("run_id") != run_id:
@@ -1028,8 +1028,7 @@ def resume_pipeline(run_id: str) -> dict[str, Any]:
     if bundle.artwork.grid_hash != candidate["grid_hash"] or hashlib.sha256(bundle.artwork_png).hexdigest() != candidate["artwork_sha256"]:
         return {"state": "SUCCESS", "disposition": "NEEDS_OPERATOR_ACTION", "run_id": run_id, "reason": "Canonical candidate evidence is stale or corrupt."}
     reused = [{"stage": stage["stage"], "output_identities": stage.get("output_identities", []), "evidence_reference": stage.get("evidence_reference"), "stage_digest": _digest(stage)} for stage in pipeline.get("stages", []) if stage.get("disposition") in {"PASS", "NOT_APPLICABLE"}]
-    continued = _pipeline_stage("CANDIDATE_REENTRY", "PASS", inputs=[candidate_id], outputs=[candidate_id], evidence=candidate["source_path"], reason="Canonical candidate bundle was re-entered without creating a new candidate or job.")
-    payload = {"state": "SUCCESS", "disposition": "RESUMED", "run_id": run_id, "operation": "pipeline", "reused_successful_stage_evidence": reused, "continued_stage_evidence": continued, "duplicate_source_candidate_job_count": 0, "reason": "Supported interrupted pipeline boundary resumed through canonical candidate evidence."}
+    payload = {"state": "SUCCESS", "disposition": "NOT_RESUMABLE", "run_id": run_id, "operation": "pipeline", "reused_successful_stage_evidence": reused, "continued_stage_evidence": None, "next_stage": "SOLVE", "next_stage_disposition": "NOT_AVAILABLE", "duplicate_source_candidate_job_count": 0, "reason": "Canonical candidate evidence is valid, but no executable stage remains after the interruption boundary; SOLVE is unavailable pending M03. Operator action is required for a new supported attempt."}
     _write_json(recovery_path, payload, immutable=True)
     return payload
 
