@@ -1,0 +1,22 @@
+# SB-LFX R04 Remediation Index
+
+PASS/CLOSED before R04:
+- SB-LFX-001..012
+- SB-LFX-014
+- SB-LFX-016
+- SB-LFX-017
+
+R04 tasks:
+- SB-LFX-013
+- SB-LFX-015
+
+| Task | R03 audit | R04 prompt | R04 builder log |
+|---|---|---|---|
+| SB-LFX-013 | `.hiveai/audits/SB-LFX-013-C001-R03_CANONICAL_ONLY_FAILURE_TRUTH_AND_RETRY_EVIDENCE_REMEDIATION_STRICT_AUDIT.md` | `.hiveai/prompts/SB-LFX-013-C001-R04_STAGE_AWARE_RETRY_CONTINUATION_PROMPT.md` | `.hiveai/codex-logs/SB-LFX-013-C001-R04_STAGE_AWARE_RETRY_CONTINUATION_CODEX_LOG.md` |
+| SB-LFX-015 | `.hiveai/audits/SB-LFX-015-C001-R03_REAL_RECOVERY_RESUME_COORDINATOR_REMEDIATION_STRICT_AUDIT.md` | `.hiveai/prompts/SB-LFX-015-C001-R04_TRUTHFUL_DURABLE_RESUME_SEMANTICS_PROMPT.md` | `.hiveai/codex-logs/SB-LFX-015-C001-R04_TRUTHFUL_DURABLE_RESUME_SEMANTICS_CODEX_LOG.md` |
+
+Execution order:
+
+SB-LFX-013 → SB-LFX-015
+
+After the complete R04 builder batch, ChatGPT independently re-audits only these two tasks.
