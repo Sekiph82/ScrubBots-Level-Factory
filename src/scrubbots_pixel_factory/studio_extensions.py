@@ -621,7 +621,11 @@ def reproduce_capability(candidate_id: str) -> dict[str, Any]:
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None:
         if candidate_id.startswith("owner-upload-"):
-            return {"disposition": "SOURCE_RETRIEVABLE_ONLY", "candidate_id": candidate_id, "reason": "OWNER_UPLOAD source retrieval is not deterministic regeneration."}
+            try:
+                source = verify_owner_source(candidate_id)
+            except (StudioExtensionError, OSError) as exc:
+                return {"disposition": "STALE/INVALID", "candidate_id": candidate_id, "reason": f"OWNER_UPLOAD source verification failed: {exc}"}
+            return {"disposition": "SOURCE_RETRIEVABLE_ONLY", "candidate_id": candidate_id, "source_record": source["record_path"], "reason": "Verified OWNER_UPLOAD source retrieval is not deterministic regeneration."}
         return {"disposition": "STALE/INVALID", "candidate_id": candidate_id, "reason": "Candidate is not a verified canonical bundle."}
     try:
         metadata_path, bundle = _reproduction_contract(candidate)

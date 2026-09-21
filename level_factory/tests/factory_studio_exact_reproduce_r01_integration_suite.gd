@@ -25,10 +25,17 @@ func _run_suite() -> void:
 	var capability: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": candidate_id})
 	_require(capability.get("disposition") == "EXACT_REPRODUCIBLE", "valid recorded Generate was not exact-reproducible: %s" % capability)
 	_require(str(capability.get("recorded_metadata", "")).ends_with("metadata.json"), "capability did not expose the recorded metadata evidence")
+	reproduce_surface.call("set_selected_identity", candidate_id); await process_frame
+	_require(not reproduce_surface.call("capability_button_enabled"), "Exact Reproduce was enabled before a fresh capability check")
+	reproduce_surface.call("check_capability"); await process_frame
+	_require(reproduce_surface.call("capability_button_enabled"), "Exact Reproduce did not enable for a fresh EXACT_REPRODUCIBLE capability")
+	reproduce_surface.call("set_selected_identity", "tampered-selection"); await process_frame
+	_require(not reproduce_surface.call("capability_button_enabled"), "candidate identity edit did not invalidate capability")
+	reproduce_surface.call("set_selected_identity", candidate_id); reproduce_surface.call("check_capability"); await process_frame
 	var reproduced: Dictionary = gateway.call("run_studio_extension", "reproduce-exact", {"candidate_id": candidate_id})
 	_require(reproduced.get("state") == "SUCCESS" and reproduced.get("disposition") == "MATCH", "exact reproduction did not MATCH: %s" % reproduced)
 	var output_path := str(reproduced.get("output_path", ""))
-	var repository_root := ProjectSettings.globalize_path("res://").get_base_dir()
+	var repository_root := ProjectSettings.globalize_path("res://../")
 	_require(not output_path.is_empty() and output_path != bundle_root and output_path.contains("studio-reproductions") and DirAccess.dir_exists_absolute(repository_root.path_join(output_path)), "exact reproduction did not create a separate output bundle")
 	for name in original_files.keys(): _require(FileAccess.get_file_as_bytes(bundle_root.path_join(name)) == original_files[name], "source bundle changed after exact reproduction: %s" % name)
 	var metadata_before := FileAccess.get_file_as_bytes(bundle_root.path_join("metadata.json"))
@@ -36,9 +43,20 @@ func _run_suite() -> void:
 	var stale: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": candidate_id})
 	_require(stale.get("disposition") == "STALE/INVALID", "tampered metadata was not rejected fail-closed: %s" % stale)
 	var restore := FileAccess.open(bundle_root.path_join("metadata.json"), FileAccess.WRITE); restore.store_buffer(metadata_before); restore.close()
-	var owner_only: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": "owner-upload-missing"})
-	_require(owner_only.get("disposition") == "SOURCE_RETRIEVABLE_ONLY", "OWNER_UPLOAD did not remain source-retrievable-only: %s" % owner_only)
+	var owner_fixture := _fixture_owner_upload(gateway)
+	var owner_only: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": owner_fixture})
+	_require(owner_only.get("disposition") == "SOURCE_RETRIEVABLE_ONLY", "verified OWNER_UPLOAD was not source-retrievable-only: %s" % owner_only)
+	var missing_owner: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": "owner-upload-missing"})
+	_require(missing_owner.get("disposition") in ["STALE/INVALID", "NOT_REPRODUCIBLE"], "nonexistent OWNER_UPLOAD was falsely source-retrievable: %s" % missing_owner)
+	var unsupported: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": "unsupported-provider-record"})
+	_require(unsupported.get("disposition") != "EXACT_REPRODUCIBLE", "unsupported record was enabled for exact reproduction")
 	_cleanup(instance)
+
+func _fixture_owner_upload(gateway: RefCounted) -> String:
+	var root := OS.get_temp_dir().path_join("scrubbots_lfx_011_owner_fixture"); _remove_tree(root); DirAccess.make_dir_recursive_absolute(root)
+	var image := Image.create(20, 20, false, Image.FORMAT_RGB8); image.fill(Color8(233, 75, 75)); var path := root.path_join("owner-source.png"); image.save_png(path)
+	var imported: Dictionary = gateway.call("run_owner_import", path)
+	return str(imported.get("source_id", ""))
 
 func _cleanup(instance: Node) -> void:
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx011-reproduce")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-reproductions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
