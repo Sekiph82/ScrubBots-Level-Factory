@@ -559,10 +559,14 @@ def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> 
         bundle_path = export_candidate(candidate, candidate_id, destination)
     except Exception as exc:
         raise StudioExtensionError(f"canonical preset Generate failed: {exc}") from exc
-    execution = {"schema": "scrubbots-preset-execution", "version": 1, "execution_id": f"preset-execution-{_digest(settings)[:24]}", "preset_id_at_launch": preset_id, "operation": "Generate", "expanded_request": settings, "candidate_id": candidate_id, "source_bundle_path": _relative(bundle_path)}
+    canonical_request = request.canonical_dict()
+    bundle = read_bundle(bundle_path)
+    if bundle.metadata.get("generation", {}).get("request") != canonical_request:
+        raise StudioExtensionError("preset expanded request does not match canonical bundle metadata")
+    execution = {"schema": "scrubbots-preset-execution", "version": 2, "execution_id": f"preset-execution-{_digest(canonical_request)[:24]}", "preset_id_at_launch": preset_id, "operation": "Generate", "operator_settings": settings, "expanded_request": canonical_request, "expanded_request_digest": _digest(canonical_request), "candidate_id": candidate_id, "source_bundle_path": _relative(bundle_path)}
     execution_path = extensions_root() / "preset-executions" / f"{execution['execution_id']}.json"
     _write_json(execution_path, execution, immutable=True)
-    return {"state": "SUCCESS", "disposition": "SUCCESS", "operation": "Generate", "execution": execution, "expanded_request": expanded}
+    return {"state": "SUCCESS", "disposition": "SUCCESS", "operation": "Generate", "execution": execution, "expanded_request": {**expanded, "canonical_request": canonical_request, "canonical_request_digest": _digest(canonical_request)}}
 
 
 def readiness_card(candidate_id: str) -> dict[str, Any]:
