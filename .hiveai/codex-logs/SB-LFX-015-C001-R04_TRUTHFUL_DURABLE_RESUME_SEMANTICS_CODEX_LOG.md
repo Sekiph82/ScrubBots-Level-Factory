@@ -54,3 +54,16 @@ Implementation decisions, commands, tests, failures/corrections, changed files, 
 - Corrected the retained SB-LFX-005 integration to use its own bounded `.lfx005-studio-runs` fixture path and clean it before and after execution, preserving owner output paths.
 - Retained correction checks: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_pipeline_integration_suite.gd` — PASS; `python -m pytest tests/unit/test_sb_lf00_001_project_contract.py tests/unit/test_sb_lf00_002_project_boundaries.py -q` — `16 passed, 1 warning`.
 - The required full suite will be rerun after this correction and recorded with its final publication evidence.
+
+## Final publication evidence
+
+- Implementation commit: `0863b9f99e3c64acceb99c050d49bf02729abf2f` (`Remediate SB-LFX-015 truthful recovery semantics`), pushed successfully to `origin/main`.
+- Required in-scope regression correction commit: `2b1eba23f06001c839f7772a4779eecb7510b90d` (`Harden SB-LFX regression fixture cleanup`), pushed successfully to `origin/main`; it isolates the retained SB-LFX-005 generated fixture so the full repository scanners remain text-safe.
+- SB-LFX-013 terminal log-only publication preceded this entry at `ea4399bed9947a6b5514fe8ebc6524d95acc81c4`; no product files were changed by that publication.
+- Final full-suite result: `python -m pytest -q` — `761 passed, 1 warning`.
+- Final compile gate: `python -m compileall -q src tests` — PASS.
+- Final Godot editor boot: `godot_console.exe --headless --path level_factory --editor --quit` — exit `0`.
+- Final `git diff --check` — PASS.
+- Final `git diff --exit-code -- TASKS.md` — zero diff.
+- Final status before this terminal log-only publication: tracked worktree clean, pre-existing untracked `.uid` files preserved; local `HEAD` and `origin/main` both `ea4399bed9947a6b5514fe8ebc6524d95acc81c4`.
+- Terminal log-only commit and push are the next publication action; its SHA is recorded in the R04 master log.
