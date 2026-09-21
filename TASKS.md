@@ -138,7 +138,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LFX-001` is PASS/CLOSED through `SB-LFX-001-C001`; the Factory Operations Dashboard is a real read-only fail-closed derived view over canonical batch/action evidence with no second truth store or tracker.
 - `SB-LFX-002` is PASS/CLOSED through `SB-LFX-002-C001`; manual Pixel Art import now creates explicit content-addressed immutable OWNER_UPLOAD source records while preserving original PNG bytes exactly and making no validation/candidate claims.
 - `SB-LFX-003` is PASS/CLOSED through `SB-LFX-003-C001`; the Source Art Library re-verifies canonical OWNER_UPLOAD source truth, persists only bounded label/tag catalog metadata, and keeps unavailable review/palette/usage domains truthful.
-- Post-batch strict audits for `SB-LFX-004..017` are saved individually and all fourteen are CHANGES_REQUIRED. The active owner-authorized execution is the sequential R01 remediation batch `SB-LFX-004..017-C001-R01`; these extensions remain outside the fixed 224 LF/CP source denominator.
+- Post-batch strict audits for `SB-LFX-004..017` were followed by the complete R01 remediation and independent R01 re-audit. `PASS/CLOSED = 004, 006, 007, 010`; `CHANGES_REQUIRED = 005, 008, 009, 011..017`. The active owner-authorized execution is the ten-task sequential R02 remediation batch indexed by `.hiveai/prompts/SB-LFX-005-017-C001-R02_REMEDIATION_INDEX.md`; these extensions remain outside the fixed 224 LF/CP source denominator.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -782,7 +782,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005` canonical-Core dimension dependency and all `SB-LF06-001..012` canonical Studio requirements are PASS/CLOSED; `SB-LFX-001` Dashboard and `SB-LFX-002` manual OWNER_UPLOAD import are PASS/CLOSED; M06 continues with `SB-LFX-003` Source Art Library, then proceeds through `SB-LFX-004..012` in dependency-safe slices.
+2. `SB-LF01-005` and all `SB-LF06-001..012` are PASS/CLOSED. `SB-LFX-001..004`, `006`, `007`, and `010` are PASS/CLOSED; the active M06 frontier is the R02 remediation batch `SB-LFX-005`, `008`, `009`, `011`, `012`, followed by the dependency-linked `SB-LFX-013..017` R02 tasks in the saved master order.
 3. M03 Puzzle Intelligence.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
