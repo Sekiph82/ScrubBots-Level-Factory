@@ -25,14 +25,22 @@ func _run_suite() -> void:
 	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "13013", "mode": "MASK"}, "res://output/.lfx013-success"); _require(generated.get("state") == "SUCCESS", "successful control candidate failed"); gateway.call("run_studio_extension", "pipeline", {"candidate_id": generated.get("candidate_id", "")})
 	var listed: Dictionary = gateway.call("run_studio_extension", "failures-list", {}); var failures: Array = listed.get("failures", []); _require(listed.get("state") == "SUCCESS" and failures.any(func(item): return item.get("originating_evidence_id", "").begins_with(invalid_id)), "Failure Inbox did not derive the real validation evidence")
 	_require(not failures.any(func(item): return bool(item.get("retryable", false)) and item.get("inputs", {}).get("candidate_id", "") == generated.get("candidate_id", "")), "successful control work appeared as retryable failure truth")
-	var retryable_candidates: Array = failures.filter(func(item): return bool(item.get("retryable", false)) and item.get("operation") == "pipeline")
-	var retryable: Dictionary = retryable_candidates[0] if not retryable_candidates.is_empty() else (failures.filter(func(item): return bool(item.get("retryable", false)))[0] if failures.any(func(item): return bool(item.get("retryable", false))) else {})
+	var pipeline_entry: Dictionary = failures.filter(func(item): return item.get("operation") == "pipeline" and item.get("inputs", {}).get("source_id", "") == invalid_id)[0] if failures.any(func(item): return item.get("operation") == "pipeline" and item.get("inputs", {}).get("source_id", "") == invalid_id) else {}
+	_require(not pipeline_entry.is_empty(), "canonical failed pipeline evidence was not indexed")
+	_require(not bool(pipeline_entry.get("retryable", true)) and str(pipeline_entry.get("non_retryable_reason", "")).contains("safely retryable"), "unsupported pipeline failure remained retryable")
+	var pipeline_evidence_path := _repo_path(str(pipeline_entry.get("evidence_reference", ""))); var pipeline_evidence_before := FileAccess.get_file_as_bytes(pipeline_evidence_path); var pipeline_count_before := _json_files(ProjectSettings.globalize_path("res://output/studio-extensions/pipelines"))
+	var retry: Dictionary = gateway.call("run_studio_extension", "retry-failure", {"failure_id": pipeline_entry.get("failure_id", ""), "changes": {"operator_note": "runtime retry"}}); _require(retry.get("parent_failure_id") == pipeline_entry.get("failure_id") and retry.get("disposition") == "NOT_AVAILABLE", "unsupported pipeline retry was not reported as NOT_AVAILABLE")
+	_require(retry.get("originating_pipeline_run_id") == pipeline_failure.get("run_id", ""), "retry did not bind the originating pipeline run")
+	_require((retry.get("reused_successful_stage_evidence", []) as Array).size() >= 1 and (retry.get("reused_prior_stage_ids", []) as Array).size() >= 1, "retry did not record immutable prior-stage references")
+	_require((retry.get("newly_attempted_stages", []) as Array).is_empty(), "unsupported pipeline retry attempted a stage")
+	_require(FileAccess.get_file_as_bytes(pipeline_evidence_path) == pipeline_evidence_before, "originating canonical pipeline evidence changed during retry")
+	_require(_json_files(ProjectSettings.globalize_path("res://output/studio-extensions/pipelines")) == pipeline_count_before, "unsupported retry created a duplicate pipeline run")
+	var retryable: Dictionary = failures.filter(func(item): return bool(item.get("retryable", false)) and item.get("operation") == "import-validation" and item.get("inputs", {}).get("source_id", "") == invalid_id)[0] if failures.any(func(item): return bool(item.get("retryable", false)) and item.get("operation") == "import-validation" and item.get("inputs", {}).get("source_id", "") == invalid_id) else {}
 	_require(not retryable.is_empty(), "real eligible validation failure was not retryable")
 	var evidence_path := _repo_path(str(retryable.get("evidence_reference", ""))); var evidence_before := FileAccess.get_file_as_bytes(evidence_path)
-	var retry: Dictionary = gateway.call("run_studio_extension", "retry-failure", {"failure_id": retryable.get("failure_id", ""), "changes": {"operator_note": "runtime retry"}}); _require(retry.get("parent_failure_id") == retryable.get("failure_id") and retry.get("disposition") in ["RETRY_FAILED", "RETRY_EXECUTED"], "canonical retry did not preserve originating failure")
-	_require(FileAccess.get_file_as_bytes(evidence_path) == evidence_before, "originating canonical failure evidence changed during retry")
-	_require(retry.get("originating_evidence_sha256_before") == retry.get("originating_evidence_sha256_after") and retry.get("originating_evidence_sha256_before") == retryable.get("evidence_sha256", ""), "retry did not preserve originating evidence identity")
-	_require((retry.get("reused_successful_stage_evidence", []) as Array).size() >= 1 or retryable.get("operation") != "pipeline", "retry did not report reuse of successful pipeline stage evidence")
+	var validation_retry: Dictionary = gateway.call("run_studio_extension", "retry-failure", {"failure_id": retryable.get("failure_id", ""), "changes": {"operator_note": "runtime validation retry"}}); _require(validation_retry.get("parent_failure_id") == retryable.get("failure_id") and validation_retry.get("disposition") in ["RETRY_FAILED", "RETRY_EXECUTED"], "canonical validation retry did not preserve originating failure")
+	_require(FileAccess.get_file_as_bytes(evidence_path) == evidence_before, "originating canonical validation evidence changed during retry")
+	_require(validation_retry.get("originating_evidence_sha256_before") == validation_retry.get("originating_evidence_sha256_after") and validation_retry.get("originating_evidence_sha256_before") == retryable.get("evidence_sha256", ""), "validation retry did not preserve originating evidence identity")
 	var unavailable := failures.filter(func(item): return item.get("stage") in ["SOLVE", "DIFFICULTY"]); _require(unavailable.any(func(item): return not bool(item.get("retryable", true))), "unavailable SOLVE/DIFFICULTY evidence was retryable")
 	surface.call("refresh"); await process_frame; _require(surface.call("snapshot").get("projection", {}).get("state") == "SUCCESS", "failure UI did not invoke canonical inbox list")
 	if not retryable.is_empty(): surface.call("select_failure", str(retryable.get("failure_id", ""))); _require(not surface.call("snapshot").get("projection", {}).get("failures", []).is_empty(), "failure UI did not render selectable canonical rows")
@@ -43,6 +51,17 @@ func _cleanup(instance: Node) -> void:
 
 func _repo_path(relative_path: String) -> String:
 	return ProjectSettings.globalize_path("res://" + "../" + relative_path)
+
+func _json_files(path: String) -> int:
+	if not DirAccess.dir_exists_absolute(path): return 0
+	var directory := DirAccess.open(path); if directory == null: return 0
+	var count := 0
+	directory.list_dir_begin()
+	while true:
+		var entry := directory.get_next(); if entry.is_empty(): break
+		if not directory.current_is_dir() and entry.ends_with(".json"): count += 1
+	directory.list_dir_end()
+	return count
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

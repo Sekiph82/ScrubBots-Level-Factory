@@ -795,11 +795,56 @@ def record_failure(operation: str, stage: str, disposition: str, reason: str, in
     return payload
 
 
+_PIPELINE_STAGE_RETRY_CAPABILITIES: frozenset[str] = frozenset()
+
+
+def _pipeline_stage_reference(run_id: str, ordinal: int, stage: Mapping[str, Any]) -> dict[str, Any]:
+    stage_name = str(stage.get("stage", ""))
+    return {
+        "stage_id": f"{run_id}:{ordinal}:{stage_name}",
+        "stage": stage_name,
+        "evidence_reference": stage.get("evidence_reference"),
+        "output_identities": list(stage.get("output_identities", [])),
+        "stage_digest": _digest(stage),
+    }
+
+
+def _pipeline_retry_plan(parent_pipeline: Mapping[str, Any], failed_stage: str) -> dict[str, Any]:
+    """Describe a pipeline retry without executing a complete pipeline restart."""
+
+    run_id = str(parent_pipeline.get("run_id", ""))
+    stages = parent_pipeline.get("stages", [])
+    if not run_id or not isinstance(stages, list):
+        raise StudioExtensionError("originating pipeline evidence has no valid stage plan")
+    failed_index = next(
+        (index for index, stage in enumerate(stages) if stage.get("stage") == failed_stage and stage.get("disposition") not in {"PASS", "NOT_APPLICABLE"}),
+        None,
+    )
+    if failed_index is None:
+        raise StudioExtensionError("originating pipeline evidence has no matching failed stage")
+    reused = [
+        _pipeline_stage_reference(run_id, index, stage)
+        for index, stage in enumerate(stages[:failed_index])
+        if stage.get("disposition") in {"PASS", "NOT_APPLICABLE"}
+    ]
+    supported = failed_stage in _PIPELINE_STAGE_RETRY_CAPABILITIES
+    return {
+        "originating_pipeline_run_id": run_id,
+        "failed_stage": failed_stage,
+        "reused_successful_stage_evidence": reused,
+        "reused_prior_stage_ids": [item["stage_id"] for item in reused],
+        "reused_prior_stage_digests": [item["stage_digest"] for item in reused],
+        "newly_attempted_stages": [],
+        "output_identity": None,
+        "disposition": "READY" if supported else "NOT_AVAILABLE",
+        "reason": "A stage-specific canonical retry executor is not available for this pipeline stage." if not supported else "Stage-specific continuation is available.",
+    }
+
+
 def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> dict[str, Any]:
     failure = next((item for item in _canonical_failure_records() if item.get("failure_id") == failure_id), None)
     if failure is None:
         raise StudioExtensionError("failure evidence is unavailable from the canonical scanner")
-    if not failure.get("retryable"): return {"disposition": "NOT_AVAILABLE", "reason": "This stage has no safe retry capability.", "parent_failure_id": failure_id}
     requested_changes = dict(changes or {})
     if set(requested_changes) - {"operator_note"} or type(requested_changes.get("operator_note", "")) is not str or len(str(requested_changes.get("operator_note", ""))) > 512:
         raise StudioExtensionError("retry changes are restricted to a bounded operator_note")
@@ -808,28 +853,34 @@ def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> 
     if _repository_root().resolve() not in evidence_path.parents or not evidence_path.is_file():
         raise StudioExtensionError("originating failure evidence is unavailable")
     originating_bytes = evidence_path.read_bytes()
-    reused_successful_stage_evidence: list[dict[str, Any]] = []
+    pipeline_plan: dict[str, Any] | None = None
     if failure["operation"] == "pipeline":
         try:
             parent_pipeline = _read_json(evidence_path)
         except (OSError, StudioExtensionError) as exc:
             raise StudioExtensionError(f"originating pipeline evidence is invalid: {exc}") from exc
-        for stage in parent_pipeline.get("stages", []):
-            if stage.get("disposition") in {"PASS", "NOT_APPLICABLE"}:
-                reused_successful_stage_evidence.append({"stage": stage.get("stage"), "evidence_reference": stage.get("evidence_reference"), "identity": stage.get("output_identities", []), "stage_digest": _digest(stage)})
+        pipeline_plan = _pipeline_retry_plan(parent_pipeline, str(failure["stage"]))
     execution: dict[str, Any]
     try:
-        if failure["operation"] == "import-validation":
+        if pipeline_plan is not None:
+            execution = {"state": "UNAVAILABLE", "disposition": "NOT_AVAILABLE", "reason": pipeline_plan["reason"], "stage_plan": pipeline_plan}
+            disposition = "NOT_AVAILABLE"
+        elif not failure.get("retryable"):
+            execution = {"state": "UNAVAILABLE", "disposition": "NOT_AVAILABLE", "reason": "This stage has no safe retry capability."}
+            disposition = "NOT_AVAILABLE"
+        elif failure["operation"] == "import-validation":
             execution = validate_owner_source(str(failure["inputs"]["source_id"]))
+            disposition = "RETRY_EXECUTED" if execution.get("state") not in {"ERROR", "UNAVAILABLE"} else "RETRY_FAILED"
         else:
-            execution = run_pipeline(source_id=failure["inputs"].get("source_id"), candidate_id=failure["inputs"].get("candidate_id"))
-        disposition = "RETRY_EXECUTED" if execution.get("state") not in {"ERROR", "UNAVAILABLE"} else "RETRY_FAILED"
+            execution = {"state": "UNAVAILABLE", "disposition": "NOT_AVAILABLE", "reason": "This operation has no safe retry capability."}
+            disposition = "NOT_AVAILABLE"
     except Exception as exc:
         execution = {"state": "ERROR", "disposition": "ERROR", "error": str(exc)[:512]}
         disposition = "RETRY_FAILED"
     if evidence_path.read_bytes() != originating_bytes:
         raise StudioExtensionError("originating failure evidence changed during retry")
-    payload = {"schema": "scrubbots-retry-attempt", "version": 1, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": requested_changes, "disposition": disposition, "execution": execution, "originating_evidence_reference": failure["evidence_reference"], "originating_evidence_sha256_before": hashlib.sha256(originating_bytes).hexdigest(), "originating_evidence_sha256_after": hashlib.sha256(evidence_path.read_bytes()).hexdigest(), "reused_successful_stage_evidence": reused_successful_stage_evidence, "created_at": datetime.now(timezone.utc).isoformat()}
+    reused = pipeline_plan["reused_successful_stage_evidence"] if pipeline_plan is not None else []
+    payload = {"schema": "scrubbots-retry-attempt", "version": 2, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": requested_changes, "disposition": disposition, "execution": execution, "originating_pipeline_run_id": pipeline_plan["originating_pipeline_run_id"] if pipeline_plan is not None else None, "originating_evidence_reference": failure["evidence_reference"], "originating_evidence_sha256_before": hashlib.sha256(originating_bytes).hexdigest(), "originating_evidence_sha256_after": hashlib.sha256(evidence_path.read_bytes()).hexdigest(), "reused_successful_stage_evidence": reused, "reused_prior_stage_ids": [item["stage_id"] for item in reused], "reused_prior_stage_digests": [item["stage_digest"] for item in reused], "newly_attempted_stages": pipeline_plan["newly_attempted_stages"] if pipeline_plan is not None else ([failure["stage"]] if disposition != "NOT_AVAILABLE" else []), "output_identity": pipeline_plan["output_identity"] if pipeline_plan is not None else None, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(extensions_root() / "retries" / f"{attempt_id}.json", payload, immutable=True)
     return payload
 
@@ -862,7 +913,7 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
             for stage in value.get("stages", []):
                 disposition = str(stage.get("disposition", ""))
                 if disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE", "NOT_AVAILABLE"}:
-                    retryable = disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE"} and str(stage.get("stage", "")) in {"SOURCE", "NORMALIZE/DERIVE", "CANDIDATE"}
+                    retryable = disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE"} and str(stage.get("stage", "")) in _PIPELINE_STAGE_RETRY_CAPABILITIES
                     add(evidence_id=str(value.get("run_id", path.stem)) + ":" + str(stage.get("stage", "")), evidence_path=path, operation="pipeline", stage=str(stage.get("stage", "")), disposition="INCONCLUSIVE" if disposition == "NOT_AVAILABLE" else disposition, reason=str(stage.get("reason", disposition)), inputs={"source_id": value.get("source_id"), "candidate_id": value.get("candidate_id")}, retryable=retryable, non_retryable_reason="Canonical stage is unavailable or is not safely retryable." if not retryable else "")
                     break
         except (StudioExtensionError, OSError):
