@@ -5,8 +5,8 @@
 **CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED**
 
 Severity:
-- BLOCKER: 1
-- MAJOR: 2
+- BLOCKER: 0
+- MAJOR: 3
 - MINOR: 0
 - NOTE: 1
 
@@ -18,93 +18,76 @@ Severity:
 
 ## Material improvements
 
-R01 closes a large part of the original identity-boundary defect:
-- Studio/launcher no longer accepts arbitrary caller-supplied cells/grid hashes as the product similarity authority;
-- candidate/revision IDs are resolved internally;
-- candidate bundles are read through canonical bundle validation;
-- candidate artwork SHA and grid hash are verified;
-- revision working-grid hash is recomputed from stored cells;
-- threshold is bounded to 0..1;
-- a versioned `SIMILARITY_POLICY_V1` is exposed;
-- Studio now has real left/right selectors and an advisory Compare action;
-- real Godot integration covers candidate exact duplicate, arbitrary-input rejection, one-cell near duplicate, distinct candidate comparison, UI invocation and a grossly corrupt revision record.
+R01 closes the original arbitrary-caller identity blocker for canonical candidates:
+- launcher operation now accepts canonical IDs rather than caller-supplied cells/hashes;
+- candidate bundle identity is re-read and verified;
+- logical grid hashes are recomputed/checked;
+- arbitrary representation input is rejected;
+- threshold is bounded to [0,1];
+- versioned `SIMILARITY_POLICY_V1` is emitted;
+- exact / near / distinct comparisons are advisory only;
+- real Studio Compare action exists;
+- tampered revision cells/hash are rejected in the tested path.
 
-No auto-review/reject/promote action is introduced.
+## MAJOR-001 — revision-backed similarity inherits the unresolved weak revision-chain authority
 
-## BLOCKER-001 — revision similarity evidence is still not bound to an immutable revision identity
+`_similarity_artifact()` resolves revision IDs through `load_revision()`.
 
-The R01 resolver calls `load_revision()` and then verifies:
+SB-LFX-012-R01 remains CHANGES_REQUIRED because `load_revision()/list_revisions()` do not fully validate:
+- revision content identity;
+- source artwork binding;
+- parent/sequence chain;
+- baseline semantics;
+- immutable record digest.
 
-`working_grid_hash == logical_grid_hash(width, height, cells)`
+Similarity recomputes only the selected revision's logical grid hash.
 
-However SB-LFX-012-R01 remains non-fail-closed:
-- revision ID is sequence-based, not content-derived;
-- revision record has no independently verified content digest;
-- list/load does not verify source artwork identity, parent chain, sequence or immutable record content.
+Therefore a revision record that is self-consistent at the cells/grid-hash level but invalid in its canonical lineage can still be accepted as a similarity artifact.
 
-Therefore a revision file can be modified by changing:
-- `cells`; and
-- `working_grid_hash`
+### Required remediation
 
-consistently while keeping the same `revision_id`.
+Consume only the fully validated revision-chain reader from the eventual SB-LFX-012 follow-up. Until then, revision-backed similarity must be unavailable/stale rather than trusting a partially validated revision record.
 
-`_similarity_artifact()` will then accept that modified representation under the same artifact identity.
+## MAJOR-002 — advisory similarity is not integrated into Candidate / Comparison / Search surfaces
 
-The criteria explicitly make **scores unbound to artifact identities** a blocker.
+The criteria require advisory evidence to be visible in Candidate/Comparison/Search surfaces.
 
-### Required follow-up
+R01 implements only the dedicated `FactoryStudioSimilarity` page.
 
-Depend on the remediated SB-LFX-012 canonical revision validator/content identity:
-- revision ID or revision digest must bind exact immutable revision content;
-- similarity must load only a fully validated revision chain record;
-- evidence must record that immutable revision identity/digest;
-- any content mutation under the old revision identity must fail closed.
+No candidate detail, side-by-side comparison, or search result surface consumes or displays the identity-bound similarity evidence.
 
-Do not add an independent competing revision validator inside similarity.
+### Required remediation
 
-## MAJOR-001 — advisory evidence is not exposed in Candidate / Comparison / Search surfaces
+Expose the same canonical advisory evidence in at least the relevant Candidate and Comparison/Search views without recomputing it in GDScript.
 
-The authoritative criteria require advisory similarity evidence to be shown in Candidate/Comparison/Search surfaces.
+The wording must remain explicit that similarity never changes review/readiness/production disposition.
 
-R01 adds a dedicated `FactoryStudioSimilarity` page only.
+## MAJOR-003 — required acceptance matrix is still incomplete
 
-The Candidate Inbox, side-by-side Comparison and Search/Discovery surfaces do not display:
-- existing similarity evidence;
-- near-duplicate advisory markers;
-- linked pair identity/score/threshold.
+The real R01 integration proves:
+- exact duplicate;
+- arbitrary input rejection;
+- one-cell near duplicate;
+- distinct candidate;
+- one tampered revision rejection;
+- UI invocation.
 
-### Required follow-up
+It does not explicitly prove:
+- deterministic repeated identical comparison returns byte/field-equivalent evidence;
+- threshold-boundary behavior;
+- palette/color-change case at a known threshold;
+- stale identity after a legitimate revision/edit transition;
+- candidate disposition/review files remain byte-identical before/after similarity;
+- no automatic review mutation in real runtime.
 
-Integrate read-only advisory similarity summaries/links into the appropriate existing Candidate/Comparison/Search views. Do not recompute similarity in GDScript and do not auto-rank or auto-reject.
+### Required remediation
 
-## MAJOR-002 — required acceptance matrix remains incomplete
-
-The real R01 integration proves useful core cases but does not explicitly prove:
-- repeated identical comparison returns deterministic byte/value-equivalent evidence;
-- exact threshold-boundary behavior;
-- materially different canonical palette/color-change scenario beyond one near-cell mutation;
-- candidate/review disposition records remain byte-identical before/after similarity;
-- stale identity after a legitimate edit/new revision, rather than only replacing the revision JSON with malformed `{"tampered":true}`.
-
-### Required follow-up
-
-Extend the real runtime test with:
-1. deterministic repeated comparison equality;
-2. score exactly at / immediately across the configured threshold;
-3. canonical color-change case;
-4. snapshot owner-review/candidate evidence before and after comparison;
-5. old-vs-new revision identity behavior after a legitimate revision change/branch.
-
-## Publication / regression
-
-Task-final publication is log-only.
-
-Builder reports compileall PASS and real canonical similarity integration PASS. The remediation-batch global suite retains the unrelated protected tracker-contract failure.
+Extend the existing real integration with those exact assertions.
 
 ## NOTE
 
-R01 correctly removed the most dangerous arbitrary-representation product path. The remaining blocker is specifically the unresolved immutable revision-identity dependency inherited from SB-LFX-012.
+The global remediation-batch suite retains the unrelated protected tracker-contract failure.
 
 ## Disposition
 
-`SB-LFX-016` remains open pending revision-identity hardening plus advisory-surface/runtime follow-up.
+`SB-LFX-016` remains open pending R02.
