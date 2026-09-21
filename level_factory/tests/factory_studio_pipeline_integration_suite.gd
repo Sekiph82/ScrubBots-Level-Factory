@@ -38,9 +38,15 @@ func _run_suite() -> void:
 	for stage in result.get("stages", []):
 		_require(stage.has("input_identities") and stage.has("output_identities") and stage.has("evidence_reference") and stage.has("reason"), "stage lineage shape is incomplete: %s" % stage)
 	var first_run_id := str(result.get("run_id", ""))
+	var first_run_path := ProjectSettings.globalize_path("res://output/studio-extensions/pipelines").path_join(first_run_id + ".json")
+	var first_run_bytes := FileAccess.get_file_as_bytes(first_run_path)
+	var first_stage_evidence: Array = result.get("stages", []).duplicate(true)
 	pipeline.call("run_pipeline", _source_id, ""); await process_frame
 	var rerun: Dictionary = pipeline.call("snapshot")
 	_require(str(rerun.get("run_id", "")) != first_run_id, "pipeline rerun did not retain a distinct run record")
+	_require(FileAccess.get_file_as_bytes(first_run_path) == first_run_bytes, "first pipeline run evidence was rewritten after rerun")
+	for index in range(min(first_stage_evidence.size(), rerun.get("stages", []).size())):
+		_require(first_stage_evidence[index].get("evidence_reference") == rerun.get("stages", [])[index].get("evidence_reference"), "retained successful evidence reference changed across rerun")
 	var failed_run: Dictionary = instance.get("core_gateway").call("run_studio_extension", "pipeline", {"source_id": _failed_source_id})
 	var failed_dispositions := {}
 	for stage in failed_run.get("stages", []): failed_dispositions[stage.get("stage", "")] = stage.get("disposition", "")
@@ -50,11 +56,16 @@ func _run_suite() -> void:
 	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "55005", "mode": "MASK"}, "res://output/studio-runs")
 	_require(generated.get("state") == "SUCCESS", "canonical Generate path did not produce a candidate: %s" % generated)
 	_generated_candidate_id = str(generated.get("candidate_id", ""))
+	var candidate_bundle_root := ProjectSettings.globalize_path(str(generated.get("output_path", "")))
+	var candidate_bytes_before: Dictionary = _snapshot_tree(candidate_bundle_root)
 	var candidate_run: Dictionary = gateway.call("run_studio_extension", "pipeline", {"candidate_id": _generated_candidate_id})
 	var candidate_dispositions := {}
 	for stage in candidate_run.get("stages", []): candidate_dispositions[stage.get("stage", "")] = stage.get("disposition", "")
 	_require(candidate_dispositions.get("CANDIDATE") == "PASS", "generated canonical candidate path did not pass candidate stage")
 	_require(candidate_dispositions.get("SOLVE") == "NOT_AVAILABLE", "generated pipeline fabricated solver availability")
+	_require(candidate_dispositions.get("QA") in ["NOT_AVAILABLE", "BLOCKED"], "generated candidate QA became successful")
+	_require(candidate_dispositions.get("REVIEW") in ["NOT_AVAILABLE", "BLOCKED"], "generated candidate REVIEW became successful")
+	_require(_snapshot_tree(candidate_bundle_root) == candidate_bytes_before, "pipeline mutated generated candidate bundle bytes")
 	_require(FileAccess.get_file_as_bytes(ProjectSettings.globalize_path("res://output/owner-uploads").path_join(_source_id).path_join("source.png")) == source_bytes_before, "pipeline mutated owner source bytes")
 	_cleanup(instance)
 
@@ -76,6 +87,22 @@ func _remove_tree(path: String) -> void:
 		if directory.current_is_dir(): _remove_tree(child)
 		else: DirAccess.remove_absolute(child)
 	directory.list_dir_end(); DirAccess.remove_absolute(path)
+
+
+func _snapshot_tree(path: String) -> Dictionary:
+	var snapshot := {}
+	if not DirAccess.dir_exists_absolute(path): return snapshot
+	var directory := DirAccess.open(path); if directory == null: return snapshot
+	directory.list_dir_begin()
+	while true:
+		var entry := directory.get_next(); if entry.is_empty(): break
+		if entry in [".", ".."]: continue
+		var child := path.path_join(entry)
+		if directory.current_is_dir():
+			for relative in _snapshot_tree(child): snapshot[str(entry).path_join(str(relative))] = _snapshot_tree(child)[relative]
+		else: snapshot[entry] = FileAccess.get_file_as_bytes(child)
+	directory.list_dir_end()
+	return snapshot
 
 
 func _require(condition: bool, message: String) -> void:
