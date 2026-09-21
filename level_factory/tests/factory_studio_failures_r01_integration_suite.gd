@@ -32,7 +32,7 @@ func _run_suite() -> void:
 	_cleanup(instance)
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(ProjectSettings.globalize_path("res://output/.lfx013-success")); _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads")); _remove_tree(_fixture_root); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return
