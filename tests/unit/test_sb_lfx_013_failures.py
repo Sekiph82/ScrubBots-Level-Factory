@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from scrubbots_pixel_factory.studio_extensions import extensions_root, record_failure, retry_failure
+import pytest
+
+from scrubbots_pixel_factory.studio_extensions import StudioExtensionError, extensions_root, record_failure, retry_failure
+
+
+def test_product_launcher_has_no_caller_created_failure_operation() -> None:
+    launcher = (extensions_root().parents[2] / "level_factory" / "scripts" / "factory_core_launcher.py").read_text(encoding="utf-8")
+    assert 'operation == "record-failure"' not in launcher
 
 
 def test_retry_preserves_failure_and_disables_unavailable_stage() -> None:
     failure = record_failure("import-validation", "VALIDATE", "REJECTED", "FOREIGN_COLORS", {"source_id": "owner-upload-test"})
     try:
-        retry = retry_failure(failure["failure_id"], {"operator_note": "recheck"})
-        assert retry["parent_failure_id"] == failure["failure_id"]
-        assert retry["original_inputs"]["source_id"] == "owner-upload-test"
+        with pytest.raises(StudioExtensionError, match="canonical scanner"):
+            retry_failure(failure["failure_id"], {"operator_note": "recheck"})
         unavailable = record_failure("pipeline", "SOLVE", "INCONCLUSIVE", "M03 unavailable", {})
-        blocked = retry_failure(unavailable["failure_id"])
-        assert blocked["disposition"] == "NOT_AVAILABLE"
+        with pytest.raises(StudioExtensionError, match="canonical scanner"):
+            retry_failure(unavailable["failure_id"])
     finally:
         for directory in ("failures", "retries"):
             root = extensions_root() / directory

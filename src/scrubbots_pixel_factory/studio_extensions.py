@@ -780,14 +780,25 @@ def record_failure(operation: str, stage: str, disposition: str, reason: str, in
 def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> dict[str, Any]:
     failure = next((item for item in _canonical_failure_records() if item.get("failure_id") == failure_id), None)
     if failure is None:
-        fallback = extensions_root() / "failures" / f"{failure_id}.json"
-        if not fallback.exists(): raise StudioExtensionError("failure evidence is unavailable")
-        failure = _read_json(fallback)
+        raise StudioExtensionError("failure evidence is unavailable from the canonical scanner")
     if not failure.get("retryable"): return {"disposition": "NOT_AVAILABLE", "reason": "This stage has no safe retry capability.", "parent_failure_id": failure_id}
     requested_changes = dict(changes or {})
     if set(requested_changes) - {"operator_note"} or type(requested_changes.get("operator_note", "")) is not str or len(str(requested_changes.get("operator_note", ""))) > 512:
         raise StudioExtensionError("retry changes are restricted to a bounded operator_note")
     attempt_id = f"retry-{_digest({'parent': failure_id, 'changes': dict(changes or {})})[:24]}"
+    evidence_path = (_repository_root() / str(failure["evidence_reference"])).resolve()
+    if _repository_root().resolve() not in evidence_path.parents or not evidence_path.is_file():
+        raise StudioExtensionError("originating failure evidence is unavailable")
+    originating_bytes = evidence_path.read_bytes()
+    reused_successful_stage_evidence: list[dict[str, Any]] = []
+    if failure["operation"] == "pipeline":
+        try:
+            parent_pipeline = _read_json(evidence_path)
+        except (OSError, StudioExtensionError) as exc:
+            raise StudioExtensionError(f"originating pipeline evidence is invalid: {exc}") from exc
+        for stage in parent_pipeline.get("stages", []):
+            if stage.get("disposition") in {"PASS", "NOT_APPLICABLE"}:
+                reused_successful_stage_evidence.append({"stage": stage.get("stage"), "evidence_reference": stage.get("evidence_reference"), "identity": stage.get("output_identities", []), "stage_digest": _digest(stage)})
     execution: dict[str, Any]
     try:
         if failure["operation"] == "import-validation":
@@ -798,7 +809,9 @@ def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> 
     except Exception as exc:
         execution = {"state": "ERROR", "disposition": "ERROR", "error": str(exc)[:512]}
         disposition = "RETRY_FAILED"
-    payload = {"schema": "scrubbots-retry-attempt", "version": 1, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": requested_changes, "disposition": disposition, "execution": execution, "created_at": datetime.now(timezone.utc).isoformat()}
+    if evidence_path.read_bytes() != originating_bytes:
+        raise StudioExtensionError("originating failure evidence changed during retry")
+    payload = {"schema": "scrubbots-retry-attempt", "version": 1, "attempt_id": attempt_id, "parent_failure_id": failure_id, "operation": failure["operation"], "stage": failure["stage"], "original_inputs": failure["inputs"], "authorized_changes": requested_changes, "disposition": disposition, "execution": execution, "originating_evidence_reference": failure["evidence_reference"], "originating_evidence_sha256_before": hashlib.sha256(originating_bytes).hexdigest(), "originating_evidence_sha256_after": hashlib.sha256(evidence_path.read_bytes()).hexdigest(), "reused_successful_stage_evidence": reused_successful_stage_evidence, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(extensions_root() / "retries" / f"{attempt_id}.json", payload, immutable=True)
     return payload
 

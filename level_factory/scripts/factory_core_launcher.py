@@ -251,8 +251,6 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.revision_compare(str(request["candidate_id"]), str(request["left_revision_id"]), str(request["right_revision_id"]))
         elif operation == "revision-load":
             payload = extensions.revision_load(str(request["candidate_id"]), str(request["revision_id"]))
-        elif operation == "record-failure":
-            payload = extensions.record_failure(str(request["operation"]), str(request["stage"]), str(request["disposition"]), str(request["reason"]), request.get("inputs", {}))
         elif operation == "retry-failure":
             payload = extensions.retry_failure(str(request["failure_id"]), request.get("changes", {}))
         elif operation == "failures-list":
