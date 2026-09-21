@@ -43,7 +43,7 @@ func _run_suite() -> void:
 	var stale: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": candidate_id})
 	_require(stale.get("disposition") == "STALE/INVALID", "tampered metadata was not rejected fail-closed: %s" % stale)
 	var restore := FileAccess.open(bundle_root.path_join("metadata.json"), FileAccess.WRITE); restore.store_buffer(metadata_before); restore.close()
-	var owner_fixture := _fixture_owner_upload(gateway)
+	var owner_fixture := _fixture_source(gateway)
 	var owner_only: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": owner_fixture})
 	_require(owner_only.get("disposition") == "SOURCE_RETRIEVABLE_ONLY", "verified OWNER_UPLOAD was not source-retrievable-only: %s" % owner_only)
 	var missing_owner: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": "owner-upload-missing"})
@@ -52,7 +52,7 @@ func _run_suite() -> void:
 	_require(unsupported.get("disposition") != "EXACT_REPRODUCIBLE", "unsupported record was enabled for exact reproduction")
 	_cleanup(instance)
 
-func _fixture_owner_upload(gateway: RefCounted) -> String:
+func _fixture_source(gateway: RefCounted) -> String:
 	var root := OS.get_temp_dir().path_join("scrubbots_lfx_011_owner_fixture"); _remove_tree(root); DirAccess.make_dir_recursive_absolute(root)
 	var image := Image.create(20, 20, false, Image.FORMAT_RGB8); image.fill(Color8(233, 75, 75)); var path := root.path_join("owner-source.png"); image.save_png(path)
 	var imported: Dictionary = gateway.call("run_owner_import", path)
