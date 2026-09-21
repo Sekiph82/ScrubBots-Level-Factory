@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M06 — ScrubBots Factory Studio
-- Current Sprint: SB-LFX.R04 — Final retry/recovery truth closure
-- Current Task: SB-LFX-013 — R04 remediation frontier: 013, 015
-- Current Task Status: READY_FOR_REMEDIATION
-- Next Task/Action: Owner-authorized R04 remediation batch: Codex executes only `SB-LFX-013` then `SB-LFX-015` from `.hiveai/prompts/SB-LFX-013-015-C001-R04_MASTER_REMEDIATION_PROMPT.md`; all PASS/CLOSED SB-LFX tasks are preserved; Codex never edits `TASKS.md`; after the complete R04 batch ChatGPT independently re-audits only these two tasks.
+- Current Milestone: M03 — Puzzle Intelligence: Simulation, Solver & State Search
+- Current Sprint: SB-LF03.C001 — Headless simulation boundary
+- Current Task: SB-LF03-001 — Create pure/headless puzzle simulation boundary
+- Current Task Status: READY_FOR_IMPLEMENTATION
+- Next Task/Action: Codex executes only `SB-LF03-001-C001` from `.hiveai/prompts/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_PROMPT.md`; gameplay semantics remain authoritative in `Sekiph82/Scrubbots`; Codex never edits `TASKS.md`; after publication ChatGPT independently strict-audits SB-LF03-001.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LFX-011-016-C001-R03_STRICT_AUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LFX-013-015-C001-R04_STRICT_AUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: per-task original criteria + saved R03 strict audits indexed by `.hiveai/prompts/SB-LFX-013-015-C001-R04_REMEDIATION_INDEX.md`
-- Current Prompt: `.hiveai/prompts/SB-LFX-013-015-C001-R04_MASTER_REMEDIATION_PROMPT.md`
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_AUDIT_CRITERIA.md`
+- Current Prompt: `.hiveai/prompts/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -47,6 +47,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX R04 Remediation Index: `.hiveai/prompts/SB-LFX-013-015-C001-R04_REMEDIATION_INDEX.md`.
 - SB-LFX R04 Master Prompt: `.hiveai/prompts/SB-LFX-013-015-C001-R04_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LFX R04 Tracker Policy: Codex does not advance task checkboxes; ChatGPT re-audits only the two R04 tasks after the full R04 batch.
+- SB-LFX R04 Re-Audit Result: `PASS/CLOSED = 013, 015`; therefore `SB-LFX-001..017 = PASS/CLOSED`.
+- SB-LFX R04 Audit Summary: `.hiveai/audits/SB-LFX-013-015-C001-R04_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_AUDIT_CRITERIA.md`.
+- SB-LF03-001 C001 Prompt: `.hiveai/prompts/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_PROMPT.md`.
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -67,10 +71,10 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M00: Repository, Governance & Canonical Factory Platform — COMPLETE / VERIFIED
 - M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
-- M03: Puzzle Intelligence: Simulation, Solver & State Search — PLANNED
+- M03: Puzzle Intelligence: Simulation, Solver & State Search — ACTIVE
 - M04: Difficulty Intelligence & Metrics — PLANNED / PARTIALLY EVIDENCED
 - M05: Unified Factory Validation & Level QA — PLANNED / PARTIALLY EVIDENCED
-- M06: ScrubBots Factory Studio — ACTIVE / PARTIALLY EVIDENCED
+- M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
 - M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
@@ -122,10 +126,10 @@ Additional inline tags do not replace checkbox state:
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **58 / 244 = 23.77%**.
+- Unified verified completion: **60 / 244 = 24.59%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **58 / 216 = 26.85%**.
-- Level Factory + unique extension surface: **132 tasks**; **58 / 132 = 43.94% verified**.
+- Conservative verified local completion: **60 / 216 = 27.78%**.
+- Level Factory + unique extension surface: **132 tasks**; **60 / 132 = 45.45% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -150,7 +154,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LFX-001` is PASS/CLOSED through `SB-LFX-001-C001`; the Factory Operations Dashboard is a real read-only fail-closed derived view over canonical batch/action evidence with no second truth store or tracker.
 - `SB-LFX-002` is PASS/CLOSED through `SB-LFX-002-C001`; manual Pixel Art import now creates explicit content-addressed immutable OWNER_UPLOAD source records while preserving original PNG bytes exactly and making no validation/candidate claims.
 - `SB-LFX-003` is PASS/CLOSED through `SB-LFX-003-C001`; the Source Art Library re-verifies canonical OWNER_UPLOAD source truth, persists only bounded label/tag catalog metadata, and keeps unavailable review/palette/usage domains truthful.
-- SB-LFX R03 independent re-audit is complete. `PASS/CLOSED = 001..012, 014, 016, 017`; `CHANGES_REQUIRED = 013, 015`. The active owner-authorized execution is the two-task R04 remediation batch indexed by `.hiveai/prompts/SB-LFX-013-015-C001-R04_REMEDIATION_INDEX.md`; these extensions remain outside the fixed 224 LF/CP source denominator.
+- SB-LFX R04 independent re-audit is complete. `SB-LFX-001..017 = PASS/CLOSED`; the Factory Studio/operator extension frontier is fully closed. The active program frontier is now M03 Puzzle Intelligence beginning with `SB-LF03-001`; SB-LFX extensions remain outside the fixed 224 LF/CP source denominator.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -260,7 +264,7 @@ Capability source family: `SB-LF03-xxx` from the main Scrubbots master plan.
 
 ### M03.01 - Headless simulation and state contract
 
-- [ ] SB-LF03-001 — Create pure/headless puzzle simulation boundary.
+- [~] SB-LF03-001 — Create pure/headless puzzle simulation boundary.
 - [ ] SB-LF03-002 — Define compact solver state.
 - [ ] SB-LF03-003 — Define legal-move-provider interface.
 
@@ -430,9 +434,9 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan plus
 
 ### M08.04 - Owner-approved failure, batch-import and recovery extensions
 
-- [~] SB-LFX-013 — Build Failure Inbox / Retry Center that retries only eligible failed/rejected/inconclusive work while preserving failure evidence and lineage. [EXTENSION]
+- [x] SB-LFX-013 — Build Failure Inbox / Retry Center that retries only eligible failed/rejected/inconclusive work while preserving failure evidence and lineage. [EXTENSION]
 - [x] SB-LFX-014 — Support drag-and-drop multi-file Pixel Art batch import with independent immutable provenance per file. [EXTENSION]
-- [ ] SB-LFX-015 — Add Factory Studio session recovery/autosave that resumes eligible durable jobs without redoing successful stages. [EXTENSION]
+- [x] SB-LFX-015 — Add Factory Studio session recovery/autosave that resumes eligible durable jobs without redoing successful stages. [EXTENSION]
 
 ---
 
@@ -794,8 +798,8 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005` and all `SB-LF06-001..012` are PASS/CLOSED. `SB-LFX-001..012`, `014`, `016`, and `017` are PASS/CLOSED. The active extension frontier is R04: `SB-LFX-013 → 015`.
-3. M03 Puzzle Intelligence.
+2. `SB-LF01-005`, all `SB-LF06-001..012`, and all `SB-LFX-001..017` are PASS/CLOSED. M06 Factory Studio is complete.
+3. M03 Puzzle Intelligence is active, beginning with `SB-LF03-001` pure/headless simulation boundary.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
 6. M07 mutation/difficulty targeting.
