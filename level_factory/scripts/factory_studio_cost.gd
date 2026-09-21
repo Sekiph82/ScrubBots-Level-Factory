@@ -17,6 +17,11 @@ func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 var _projection: Dictionary = {}
 func refresh() -> void:
 	var request := {"scope": _scope.text.strip_edges(), "provider": _provider.text.strip_edges()}; if request["scope"] == "": request["scope"] = null; if request["provider"] == "": request["provider"] = null
-	_projection = _gateway.call("run_studio_extension", "cost-center", request) if _gateway != null else {"state": "UNAVAILABLE"}; _result.text = "Groups: %s\nValidated local evidence only; read-only." % (_projection.get("groups", []) as Array).size()
+	_projection = _gateway.call("run_studio_extension", "cost-center", request) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
+func _render() -> void:
+	if _result == null: return
+	var rows: Array[String] = []
+	for group in _projection.get("groups", []): rows.append("scope=%s | provider=%s | unit=%s | jobs=%s success=%s failure=%s | consumed=%s remaining=%s | cost/success=%s cost/owner-accepted=%s | evidence=%s | as-of=%s | status=%s" % [group.get("scope", "NOT AVAILABLE"), group.get("provider", "NOT AVAILABLE"), group.get("unit", "NOT AVAILABLE"), group.get("jobs", "NOT AVAILABLE"), group.get("success", "NOT AVAILABLE"), group.get("failure", "NOT AVAILABLE"), group.get("consumed", "NOT AVAILABLE"), group.get("remaining", "NOT AVAILABLE"), group.get("cost_per_success", "NOT AVAILABLE"), group.get("cost_per_owner_accepted", "NOT AVAILABLE"), group.get("evidence_record_ids", []), group.get("as_of", "NOT AVAILABLE"), group.get("status", "NOT AVAILABLE")])
+	_result.text = "Cost Center: %s | source=%s | network=%s credits=%s\n%s" % [_projection.get("source", _projection.get("state", "NOT AVAILABLE")), _projection.get("source", "NOT AVAILABLE"), _projection.get("network_calls", "NOT AVAILABLE"), _projection.get("credit_spend", "NOT AVAILABLE"), "\n".join(rows)]
 func show_cost() -> void: refresh()
 func snapshot() -> Dictionary: return {"state": _projection.get("state", "AVAILABLE"), "read_only": true, "network_calls": 0, "projection": _projection.duplicate(true)}

@@ -1026,29 +1026,23 @@ def _validated_accounting_records(scope: str | None = None, provider: str | None
 
 
 def canonical_cost_center(scope: str | None = None, provider: str | None = None) -> dict[str, Any]:
-    records = _validated_accounting_records(scope, provider)
     groups: dict[tuple[str, str], dict[str, Any]] = {}
-    for record in records:
-        key = (record["provider"], record["unit"])
-        group = groups.setdefault(key, {"provider": key[0], "unit": key[1], "scope": record["scope"], "jobs": 0, "success": 0, "failure": 0, "consumed": None, "remaining": None, "accepted": 0, "evidence_record_ids": [], "as_of": None, "unknown": []})
-        group["jobs"] += 1
-        group["success"] += record["status"] == "SUCCESS"
-        group["failure"] += record["status"] == "FAILED"
-        group["evidence_record_ids"].append(record["record_id"])
-        if record["consumed"] is not None:
-            group["consumed"] = (group["consumed"] or 0) + record["consumed"]
-        review = _latest_review(str(record["candidate_id"])) if record.get("candidate_id") and record.get("owner_review_id") else None
-        if record.get("status") == "SUCCESS" and review is not None and review.get("review_id") == record.get("owner_review_id") and review.get("disposition") == "ACCEPT":
-            group["accepted"] += 1
-        timestamp = datetime.fromisoformat(str(record["recorded_at"]).replace("Z", "+00:00"))
-        if group["as_of"] is None or timestamp > datetime.fromisoformat(str(group["as_of"]).replace("Z", "+00:00")):
-            group["as_of"] = record["recorded_at"]
-            group["remaining"] = record["remaining"]
-    for group in groups.values():
-        group["cost_per_success"] = group["consumed"] / group["success"] if group["consumed"] is not None and group["success"] else None
-        group["cost_per_owner_accepted"] = group["consumed"] / group["accepted"] if group["consumed"] is not None and group["accepted"] else None
-        group["unknown"] = [key for key in ("consumed", "remaining", "cost_per_success", "cost_per_owner_accepted") if group[key] is None]
-    return {"schema": "scrubbots-provider-cost-center-view", "version": 2, "scope": scope, "provider_filter": provider, "groups": sorted(groups.values(), key=lambda item: (item["provider"], item["unit"])), "read_only": True, "source": "validated-local-accounting-evidence", "network_calls": 0}
+    rejected: list[str] = []
+    if _accounting_root().exists():
+        for path in sorted(_accounting_root().glob("*.json")):
+            try: value = _read_json(path)
+            except StudioExtensionError: rejected.append(path.stem); continue
+            record_id = str(value.get("record_id", path.stem))
+            if set(value) != {"schema", "version", "record_id", "provider", "unit", "scope", "status", "consumed", "remaining", "candidate_id", "owner_review_id", "recorded_at", "evidence_reference"} or value.get("schema") != ACCOUNTING_SCHEMA:
+                rejected.append(record_id); continue
+            record_scope, record_provider = str(value.get("scope", "UNKNOWN")), str(value.get("provider", "UNKNOWN"))
+            if scope is not None and record_scope != scope or provider is not None and record_provider != provider: continue
+            key = (record_provider, str(value.get("unit", "UNKNOWN")))
+            groups.setdefault(key, {"provider": key[0], "unit": key[1], "scope": record_scope, "jobs": None, "success": None, "failure": None, "consumed": None, "remaining": None, "accepted": None, "cost_per_success": None, "cost_per_owner_accepted": None, "evidence_record_ids": [], "as_of": None, "unknown": ["jobs", "success", "failure", "consumed", "remaining", "cost_per_success", "cost_per_owner_accepted"], "status": "NOT AVAILABLE", "reason": "Local record is not bound to an authoritative provider/job execution source.", "rejected_record_ids": []})["rejected_record_ids"].append(record_id)
+    if not groups:
+        key = (provider or "NOT AVAILABLE", "NOT AVAILABLE")
+        groups[key] = {"provider": key[0], "unit": key[1], "scope": scope or "NOT AVAILABLE", "jobs": None, "success": None, "failure": None, "consumed": None, "remaining": None, "accepted": None, "cost_per_success": None, "cost_per_owner_accepted": None, "evidence_record_ids": [], "as_of": None, "unknown": ["jobs", "success", "failure", "consumed", "remaining", "cost_per_success", "cost_per_owner_accepted"], "status": "NOT AVAILABLE", "reason": "No authoritative provider/job accounting source is connected.", "rejected_record_ids": []}
+    return {"schema": "scrubbots-provider-cost-center-view", "version": 3, "scope": scope, "provider_filter": provider, "groups": sorted(groups.values(), key=lambda item: (item["provider"], item["unit"])), "read_only": True, "source": "NOT AVAILABLE — no authoritative provider execution accounting source", "authoritative": False, "rejected_record_ids": sorted(set(rejected)), "network_calls": 0, "credit_spend": 0}
 
 
 __all__ = [

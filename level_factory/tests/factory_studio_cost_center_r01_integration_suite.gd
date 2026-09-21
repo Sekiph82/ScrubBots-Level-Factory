@@ -20,12 +20,14 @@ func _run_suite() -> void:
 	var review_id := str(review.get("review_id", "")); _write_record({"schema": "scrubbots-provider-accounting-record", "version": 1, "record_id": "acct-magnific-success", "provider": "MAGNIFIC", "unit": "credits", "scope": "runtime-test", "status": "SUCCESS", "consumed": 10, "remaining": 90, "candidate_id": candidate_id, "owner_review_id": review_id, "recorded_at": "2026-09-20T10:00:00+00:00", "evidence_reference": "fixture/acct-magnific-success"})
 	_write_record({"schema": "scrubbots-provider-accounting-record", "version": 1, "record_id": "acct-magnific-failure", "provider": "MAGNIFIC", "unit": "credits", "scope": "runtime-test", "status": "FAILED", "consumed": 4, "remaining": 86, "candidate_id": candidate_id, "owner_review_id": null, "recorded_at": "2026-09-20T11:00:00+00:00", "evidence_reference": "fixture/acct-magnific-failure"})
 	_write_record({"schema": "scrubbots-provider-accounting-record", "version": 1, "record_id": "acct-pixellab-unknown", "provider": "PIXELLAB", "unit": "USD", "scope": "runtime-test", "status": "SUCCESS", "consumed": null, "remaining": null, "candidate_id": null, "owner_review_id": null, "recorded_at": "2026-09-20T12:00:00+00:00", "evidence_reference": "fixture/acct-pixellab-unknown"})
-	var view: Dictionary = gateway.call("run_studio_extension", "cost-center", {"scope": "runtime-test", "records": [{"provider": "FORGED", "consumed": 999999}]}); _require(view.get("version") == 2 and view.get("network_calls") == 0, "cost center did not use canonical read-only discovery: %s" % [view])
-	var groups: Array = view.get("groups", []); _require(groups.size() == 2, "mixed units/providers were not separated: %s" % [groups])
-	var magnific: Dictionary = groups[0] if groups[0].get("provider") == "MAGNIFIC" else groups[1]; var pixellab: Dictionary = groups[0] if groups[0].get("provider") == "PIXELLAB" else groups[1]
-	_require(magnific.get("jobs") == 2 and magnific.get("success") == 1 and magnific.get("failure") == 1 and magnific.get("consumed") == 14 and magnific.get("remaining") == 86 and magnific.get("cost_per_owner_accepted") == 14, "canonical Magnific metrics were incorrect: %s" % [magnific])
-	_require(pixellab.get("consumed") == null and pixellab.get("remaining") == null and "remaining" in pixellab.get("unknown", []), "unknown PixelLab accounting was fabricated")
-	surface.call("refresh"); await process_frame; _require(surface.call("snapshot").get("projection", {}).get("version") == 2, "Cost Center UI did not invoke canonical accounting projection")
+	var candidate_bytes_before := FileAccess.get_file_as_bytes(str(generated.get("metadata_path", ""))); var review_root := ProjectSettings.globalize_path("res://output/studio-extensions/owner-review"); var review_before: Dictionary = _snapshot_tree(review_root)
+	var view: Dictionary = gateway.call("run_studio_extension", "cost-center", {"scope": "runtime-test", "records": [{"provider": "FORGED", "consumed": 999999}]}); _require(view.get("version") == 3 and view.get("authoritative") == false and view.get("network_calls") == 0 and view.get("credit_spend") == 0, "cost center did not truthfully report unavailable accounting: %s" % [view])
+	var groups: Array = view.get("groups", []); _require(groups.size() >= 2, "cost center did not retain explicit per-provider/unit unavailable rows: %s" % [groups])
+	for group in groups: _require(group.get("consumed") == null and group.get("remaining") == null and "cost_per_success" in group.get("unknown", []), "manual accounting JSON fabricated financial metrics")
+	_write_record({"schema": "scrubbots-provider-accounting-record", "version": 1, "record_id": "acct-malformed-secret", "provider": "FORGED", "unit": "credits", "scope": "runtime-test", "status": "SUCCESS", "consumed": 999999, "secret": "do-not-render"})
+	var refreshed: Dictionary = gateway.call("run_studio_extension", "cost-center", {"scope": "runtime-test"}); _require(refreshed.get("authoritative") == false and refreshed.get("rejected_record_ids", []).has("acct-malformed-secret") and not str(refreshed).contains("do-not-render"), "malformed/secret accounting evidence was not rejected safely")
+	_require(FileAccess.get_file_as_bytes(str(generated.get("metadata_path", ""))) == candidate_bytes_before and _snapshot_tree(review_root) == review_before, "Cost Center refresh mutated candidate/review evidence")
+	surface.call("refresh"); await process_frame; _require(surface.call("snapshot").get("projection", {}).get("version") == 3 and surface.call("snapshot").get("projection", {}).get("network_calls") == 0, "Cost Center UI did not render canonical unavailable accounting projection")
 	_cleanup(instance)
 
 func _write_record(value: Dictionary) -> void:
@@ -45,6 +47,20 @@ func _remove_tree(path: String) -> void:
 		if directory.current_is_dir(): _remove_tree(child)
 		else: DirAccess.remove_absolute(child)
 	directory.list_dir_end(); DirAccess.remove_absolute(path)
+
+func _snapshot_tree(path: String) -> Dictionary:
+	var snapshot := {}
+	if not DirAccess.dir_exists_absolute(path): return snapshot
+	var directory := DirAccess.open(path); if directory == null: return snapshot
+	directory.list_dir_begin()
+	while true:
+		var entry := directory.get_next(); if entry.is_empty(): break
+		if entry in [".", ".."]: continue
+		var child := path.path_join(entry)
+		if directory.current_is_dir(): snapshot[entry] = _snapshot_tree(child)
+		else: snapshot[entry] = FileAccess.get_file_as_bytes(child)
+	directory.list_dir_end()
+	return snapshot
 
 func _require(condition: bool, message: String) -> void:
 	if not condition: _errors.append(message)
