@@ -273,7 +273,7 @@ def list_candidates() -> list[dict[str, Any]]:
             candidates.append({
                 "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
                 "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
-                "used_colors": list(bundle.artwork.palette), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
+                "used_colors": sorted(set(bundle.artwork.cells), key=lambda value: int(value[1:])), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
                 "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
                 "quality": dict(quality), "metadata": metadata,
             })
@@ -390,7 +390,7 @@ def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, 
     for source in library_refresh()["sources"]:
         records.append({"record_type": "SOURCE", "record_id": source["source_id"], "origin": source["origin"], "filename": source["original_filename"], "width": source["original_width"], "height": source["original_height"], "label": source["catalog"]["label"], "tags": source["catalog"]["tags"], "review": source["owner_review"]["disposition"], "qa": "NOT AVAILABLE"})
     for candidate in candidate_inbox()["candidates"]:
-        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"]})
+        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"], "used_color_count": len(candidate["used_colors"])})
     if collection == "Imported Sources": records = [record for record in records if record["record_type"] == "SOURCE"]
     elif collection == "Needs Review": records = [record for record in records if record["review"] == "NEEDS_REVIEW"]
     elif collection == "Owner Accepted": records = [record for record in records if record["review"] == "ACCEPT"]

@@ -11,6 +11,7 @@ var _review: OptionButton
 var _qa: OptionButton
 var _width: SpinBox
 var _height: SpinBox
+var _used_color_count: SpinBox
 var _result: Label
 var _projection: Dictionary = {}
 
@@ -32,6 +33,7 @@ func refresh_search() -> void:
 	if _qa != null and _qa.selected > 0: filters["qa"] = _qa.get_item_text(_qa.selected)
 	if _width != null and _width.value > 0: filters["width"] = int(_width.value)
 	if _height != null and _height.value > 0: filters["height"] = int(_height.value)
+	if _used_color_count != null and _used_color_count.value > 0: filters["used_color_count"] = int(_used_color_count.value)
 	_projection = _gateway.call("run_studio_extension", "discover", {"query": _query.text, "filters": filters, "collection": null if selected == "ALL" else selected}) if _gateway != null else {"state": "UNAVAILABLE"}
 	_render()
 
@@ -57,6 +59,7 @@ func _build_controls() -> void:
 	_qa = OptionButton.new(); _qa.add_item("All QA"); _qa.add_item("ACCEPT"); _qa.add_item("REJECT"); row.add_child(_qa)
 	_width = SpinBox.new(); _width.min_value = 0; _width.max_value = 59; _width.allow_greater = false; _width.prefix = "W="; row.add_child(_width)
 	_height = SpinBox.new(); _height.min_value = 0; _height.max_value = 59; _height.allow_greater = false; _height.prefix = "H="; row.add_child(_height)
+	_used_color_count = SpinBox.new(); _used_color_count.min_value = 0; _used_color_count.max_value = 16; _used_color_count.allow_greater = false; _used_color_count.prefix = "Colors="; row.add_child(_used_color_count)
 	var refresh := Button.new()
 	refresh.text = "Refresh"
 	refresh.pressed.connect(refresh_search)
