@@ -374,7 +374,7 @@ def candidate_inbox() -> dict[str, Any]:
     for candidate in list_candidates():
         review = _latest_review(candidate["candidate_id"], candidate["artwork_sha256"])
         chain, invalid = _validated_review_chain(candidate)
-        items.append({**candidate, "owner_review": review or {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}, "owner_review_history": chain, "owner_review_invalid": invalid, "provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}})
+        items.append({**candidate, "owner_review": review or {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}, "owner_review_history": chain, "owner_review_invalid": invalid, "provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "similarity_advisory": {"disposition": "NOT AVAILABLE", "reason": "Select a canonical comparison pair; similarity is never inferred in the inbox."}, "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}})
     return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "candidates": items}
 
 
@@ -391,7 +391,7 @@ def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, 
     for source in library_refresh()["sources"]:
         records.append({"record_type": "SOURCE", "record_id": source["source_id"], "origin": source["origin"], "filename": source["original_filename"], "width": source["original_width"], "height": source["original_height"], "label": source["catalog"]["label"], "tags": source["catalog"]["tags"], "review": source["owner_review"]["disposition"], "qa": "NOT AVAILABLE"})
     for candidate in candidate_inbox()["candidates"]:
-        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"], "used_color_count": len(candidate["used_colors"])})
+        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"], "used_color_count": len(candidate["used_colors"]), "similarity_advisory": {"disposition": "NOT AVAILABLE", "reason": "Select a canonical comparison pair."}})
     if collection == "Imported Sources": records = [record for record in records if record["record_type"] == "SOURCE"]
     elif collection == "Needs Review": records = [record for record in records if record["review"] == "NEEDS_REVIEW"]
     elif collection == "Owner Accepted": records = [record for record in records if record["review"] == "ACCEPT"]
@@ -416,7 +416,9 @@ def compare_candidates(candidate_ids: Sequence[str]) -> dict[str, Any]:
         _history, invalid_reviews = _validated_review_chain(candidate)
         current_review: dict[str, Any] = review or ({"disposition": "STALE", "reason": "Mismatched or corrupt review evidence is excluded."} if invalid_reviews else {"disposition": "NOT AVAILABLE", "reason": "No review evidence."})
         selected.append({k: candidate[k] for k in ("candidate_id", "artwork_sha256", "grid_hash", "width", "height", "used_colors", "origin", "source_path", "artwork_path", "quality") } | {"provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "owner_review": current_review, "owner_review_invalid": invalid_reviews, "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "solver": {"disposition": "NOT AVAILABLE", "reason": "Pending M03."}, "difficulty": {"disposition": "NOT AVAILABLE", "reason": "Pending M04."}, "provider_cost": {"disposition": "NOT AVAILABLE", "reason": "Pending reliable provider evidence."}})
-    return {"schema": "scrubbots-candidate-comparison-view", "version": 1, "read_only": True, "candidates": selected, "winner": {"disposition": "NOT AVAILABLE", "reason": "Comparison never computes a winner."}}
+    similarity_evidence = similarity_canonical(str(candidate_ids[0]), str(candidate_ids[1])) if len(candidate_ids) == 2 else {"disposition": "NOT AVAILABLE", "reason": "Similarity requires exactly two canonical identities."}
+    for item in selected: item["similarity_advisory"] = similarity_evidence
+    return {"schema": "scrubbots-candidate-comparison-view", "version": 1, "read_only": True, "candidates": selected, "similarity_advisory": similarity_evidence, "winner": {"disposition": "NOT AVAILABLE", "reason": "Comparison never computes a winner."}}
 
 
 def _pipeline_path(run_id: str) -> Path:

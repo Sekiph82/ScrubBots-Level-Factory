@@ -10,8 +10,8 @@ func _run_suite() -> void:
 	_require(packed != null, "Studio scene did not load")
 	if packed == null: _finish(); return
 	var instance := packed.instantiate(); root.add_child(instance); await process_frame
-	var gateway: RefCounted = instance.get("core_gateway"); var surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/VisualSimilarity")
-	_require(gateway != null and surface != null, "similarity surface or gateway did not instantiate")
+	var gateway: RefCounted = instance.get("core_gateway"); var surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/VisualSimilarity"); var candidates_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/CandidateInbox"); var comparison_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/CandidateComparison"); var search_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/DiscoverySearch")
+	_require(gateway != null and surface != null and candidates_surface != null and comparison_surface != null and search_surface != null, "similarity/candidate/comparison/search surfaces did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx016-similarity-a")); _remove_tree(ProjectSettings.globalize_path("res://output/.lfx016-similarity-b")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
 	var first: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "16016", "mode": "MASK"}, "res://output/.lfx016-similarity-a")
@@ -24,8 +24,15 @@ func _run_suite() -> void:
 	var root_revision: Dictionary = gateway.call("run_studio_extension", "revision-create", {"candidate_id": left_id, "width": 20, "height": 20, "cells": cells, "change_summary": "similarity root"}); var root_id := str(root_revision.get("revision", {}).get("revision_id", "")); var changed := cells.duplicate(); changed[0] = "C01" if changed[0] != "C01" else "C02"
 	var near_revision: Dictionary = gateway.call("run_studio_extension", "revision-create", {"candidate_id": left_id, "width": 20, "height": 20, "cells": changed, "parent_revision_id": root_id, "change_summary": "similarity one cell"}); var near_id := str(near_revision.get("revision", {}).get("revision_id", ""))
 	var near: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": near_id, "threshold": 0.92}); _require(near.get("disposition") == "POSSIBLE_SIMILAR" and int(near.get("distance", 0)) == 1 and near.get("advisory") == true, "near duplicate did not use canonical revision identity: %s" % near)
+	var repeated: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": near_id, "threshold": 0.92}); _require(repeated == near, "repeated identical similarity comparison was not deterministic")
+	var boundary: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": near_id, "threshold": near.get("score", 0.0)}); _require(boundary.get("disposition") == "POSSIBLE_SIMILAR", "threshold-boundary comparison was not inclusive")
+	_require(near.get("left_grid_hash") != near.get("right_grid_hash") and near.get("distance") == 1, "explicit palette-cell change did not produce changed revision identity")
 	var distinct: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": right_id, "threshold": 0.99}); _require(distinct.get("left_identity") == left_id and distinct.get("right_identity") == right_id and distinct.get("advisory") == true, "distinct comparison was not canonical/advisory: %s" % distinct)
+	var review: Dictionary = gateway.call("run_studio_extension", "owner-review", {"candidate_id": left_id, "disposition": "ACCEPT", "reason": "similarity matrix"}); var review_before: Dictionary = _snapshot_tree(ProjectSettings.globalize_path("res://output/studio-extensions/owner-review")); var similarity_before: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": near_id}); var review_after: Dictionary = _snapshot_tree(ProjectSettings.globalize_path("res://output/studio-extensions/owner-review")); _require(review_before == review_after, "similarity changed candidate-bound owner review evidence")
 	surface.call("set_ids", left_id, near_id); surface.call("compare"); await process_frame; _require(surface.call("snapshot").get("projection", {}).get("policy") == "SIMILARITY_POLICY_V1", "similarity UI did not invoke canonical policy")
+	var comparison: Dictionary = gateway.call("run_studio_extension", "comparison", {"candidate_ids": [left_id, right_id]}); _require(comparison.get("similarity_advisory", {}).get("policy") == "SIMILARITY_POLICY_V1" and comparison.get("similarity_advisory", {}).get("advisory") == true, "Comparison surface did not consume canonical similarity evidence")
+	var inbox: Dictionary = gateway.call("run_studio_extension", "candidate-inbox", {}); _require(inbox.get("candidates", []).any(func(item): return item.get("similarity_advisory", {}).get("disposition") == "NOT AVAILABLE"), "Candidate surface did not expose explicit advisory similarity state")
+	var search: Dictionary = gateway.call("run_studio_extension", "discover", {"filters": {"record_type": "CANDIDATE"}}); _require(search.get("records", []).any(func(item): return item.has("similarity_advisory")), "Search surface did not expose advisory similarity evidence state")
 	var revision_path := ProjectSettings.globalize_path("res://output/studio-extensions/revisions").path_join(left_id).path_join("%s.json" % near_id); var before := FileAccess.get_file_as_bytes(revision_path); var tamper := FileAccess.open(revision_path, FileAccess.WRITE); tamper.store_string("{\"tampered\":true}\n"); tamper.close(); var stale: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": near_id}); _require(stale.get("state") == "ERROR", "tampered canonical revision was not rejected"); var restore := FileAccess.open(revision_path, FileAccess.WRITE); restore.store_buffer(before); restore.close()
 	_cleanup(instance)
 
@@ -43,6 +50,20 @@ func _remove_tree(path: String) -> void:
 		if directory.current_is_dir(): _remove_tree(child)
 		else: DirAccess.remove_absolute(child)
 	directory.list_dir_end(); DirAccess.remove_absolute(path)
+
+func _snapshot_tree(path: String) -> Dictionary:
+	var snapshot := {}
+	if not DirAccess.dir_exists_absolute(path): return snapshot
+	var directory := DirAccess.open(path); if directory == null: return snapshot
+	directory.list_dir_begin()
+	while true:
+		var entry := directory.get_next(); if entry.is_empty(): break
+		if entry in [".", ".."]: continue
+		var child := path.path_join(entry)
+		if directory.current_is_dir(): snapshot[entry] = _snapshot_tree(child)
+		else: snapshot[entry] = FileAccess.get_file_as_bytes(child)
+	directory.list_dir_end()
+	return snapshot
 
 func _require(condition: bool, message: String) -> void:
 	if not condition: _errors.append(message)

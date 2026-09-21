@@ -43,7 +43,7 @@ func _build_controls() -> void:
 
 func _render() -> void:
 	if _state == null: return
-	_state.text = "Comparison: %s | winner=%s" % [_projection.get("state", "EMPTY"), _projection.get("winner", {}).get("disposition", "NOT AVAILABLE")]
+	_state.text = "Comparison: %s | winner=%s | similarity=%s (advisory only)" % [_projection.get("state", "EMPTY"), _projection.get("winner", {}).get("disposition", "NOT AVAILABLE"), _projection.get("similarity_advisory", {}).get("disposition", "NOT AVAILABLE")]
 	var entries: Array[String] = []
 	for candidate in _projection.get("candidates", []): entries.append("%s preview=%s grid=%s dims=%sx%s colors=%s provenance=%s structural/QA=%s review=%s solver=%s difficulty=%s cost=%s evidence=%s" % [candidate.get("candidate_id", ""), candidate.get("artwork_sha256", ""), candidate.get("grid_hash", ""), candidate.get("width", ""), candidate.get("height", ""), candidate.get("used_colors", []), candidate.get("provenance", {}), candidate.get("structural", {}).get("decision", candidate.get("structural", {}).get("disposition", "NOT AVAILABLE")), candidate.get("owner_review", {}).get("disposition", "NOT AVAILABLE"), candidate.get("solver", {}).get("disposition", "NOT AVAILABLE"), candidate.get("difficulty", {}).get("disposition", "NOT AVAILABLE"), candidate.get("provider_cost", {}).get("disposition", "NOT AVAILABLE"), candidate.get("evidence_references", [])])
 	_details.text = "\n".join(entries) if not entries.is_empty() else "No comparison loaded."
