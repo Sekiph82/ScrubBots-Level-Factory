@@ -19,85 +19,72 @@ Severity:
 ## Material improvements
 
 R01 adds:
-- a real Studio call into the existing canonical `batch-import` operation;
-- per-run aggregate count rendering;
-- real Godot integration with two valid PNG inputs, a duplicate path and a corrupt file;
-- proof of truthful 3-success / 1-failure partial outcome;
-- proof duplicate bytes reuse one content identity;
-- proof two different-byte fixtures produce distinct source identities.
+- a real Studio-triggered batch-import operation;
+- per-run projection in the Batch Import surface;
+- a runtime scenario with two distinct valid PNGs, duplicate bytes and one corrupt file;
+- truthful partial-success counts;
+- duplicate-byte source-ID reuse;
+- distinct-file identity separation.
 
 These improvements are retained.
 
-## MAJOR-001 — batch-run identity / immutable evidence collision remains unresolved
+## MAJOR-001 — repeated-identical-batch evidence collision remains unresolved
 
-The original audit found that:
-- `batch_id` is derived only from `items`;
-- persisted payload also contains fresh `created_at`;
-- immutable write uses the batch ID path.
+The original audit explicitly identified that:
+
+- `batch_id` is derived only from item results;
+- persisted payload also includes a fresh `created_at`;
+- immutable write therefore conflicts when an identical batch is run again with the same batch ID but different timestamp.
 
 R01 does not modify `batch_import()` at all.
 
-Current code still computes:
+The same defect therefore remains.
 
-`batch_id = batch-import-<digest(items)>`
+### Required remediation
 
-then writes a payload containing a new timestamp.
+Choose and implement one explicit contract:
+- unique immutable run ID per execution; or
+- fully deterministic content-addressed batch record including deterministic time semantics.
 
-Therefore running an identical batch again can target the same immutable evidence path with different bytes and conflict instead of:
-- creating a new run identity; or
-- idempotently reusing a fully deterministic identical record.
+Then add a repeat-identical-batch test proving the second execution behaves intentionally and never collides silently.
 
-### Required follow-up
+## MAJOR-002 — Studio input UX does not satisfy the multi-file selection contract
 
-Implement one explicit run-evidence policy:
-- unique immutable run identity per execution, with a separately stable input fingerprint if useful; or
-- complete deterministic content-addressed payload with no changing fields.
+The R01 surface asks the operator to type absolute PNG paths separated by `|`.
 
-Add repeat-execution runtime proof.
+The original criteria and remediation prompt require a real multi-file FileDialog and optionally drag/drop.
 
-## MAJOR-002 — real Studio input control does not satisfy multi-file FileDialog / drag-drop requirement
+A pipe-delimited text field is not a practical multi-file import UI and bypasses the intended explicit file-selection boundary.
 
-The authoritative criteria require:
+### Required remediation
 
-> Support multi-file FileDialog and/or OS drag/drop.
+Use a FileDialog configured for multiple file selection. Drag/drop is optional if not reliable.
 
-The R01 Studio surface instead exposes one free-form `LineEdit` expecting absolute PNG paths separated by `|`.
+Keep the programmatic setter only for headless testing.
 
-This is a programmable test hook, not a real bounded multi-file operator selector. It also requires the operator to type/paste raw absolute paths.
+## MAJOR-003 — required runtime evidence remains incomplete
 
-### Required follow-up
+The R01 runtime proves per-item identities and partial outcomes, but does not prove:
+- external fixture bytes remain unchanged;
+- batch-run record can be reloaded after Studio restart;
+- repeat-identical-batch behavior;
+- persisted batch-run record identity/immutability;
+- same-name/different-byte case specifically under identical display filename;
+- per-item provenance survives reload.
 
-Add a real Godot multi-file FileDialog with multiple selection enabled, or safe OS drag/drop. Keep a programmatic setter only as a test aid. Render selected files and per-item results.
+### Required remediation
 
-## MAJOR-003 — required runtime matrix remains incomplete
-
-The new integration proves partial success and duplicate identity, but it does not prove several explicit criteria:
-
-1. **same filename + different bytes**:
-   - fixtures are `first.png` and `nested-second.png`, not two different files with the same display filename;
-2. **external input immutability**:
-   - original fixture bytes are not snapshotted before import and compared afterward;
-3. **restart/reload of persisted batch result**:
-   - Studio is not restarted and batch evidence is not reloaded from durable record;
-4. **repeat execution behavior**:
-   - the same batch is not run twice, so MAJOR-001 cannot be observed/prevented;
-5. **no-overwrite proof**:
-   - source records are indirectly content-addressed, but the runtime does not snapshot the first source before the other imports/repeat run.
-
-### Required follow-up
-
-Extend the real integration to cover those exact cases while preserving canonical per-file LFX-002 import semantics.
-
-## Publication / regression
-
-Task-final publication is log-only.
-
-Builder reports focused unit PASS and real batch-import integration PASS. The remediation-batch global suite retains the unrelated protected tracker-contract failure.
+Extend the real integration to:
+1. snapshot all external input bytes before import and prove unchanged;
+2. use same display filename in different directories for different bytes;
+3. rerun an identical batch and assert the chosen idempotence/run-identity policy;
+4. restart/reload Studio and reload the persisted batch-run record;
+5. prove item source IDs/errors/counts remain intact.
 
 ## NOTE
 
-No backend source/import semantics were regressed by R01. The remaining issues are run-evidence identity, actual multi-file operator selection and the missing acceptance cases.
+The remediation-batch global suite retains the unrelated protected tracker-contract failure.
 
 ## Disposition
 
-`SB-LFX-014` remains open pending a focused R02 remediation and re-audit.
+`SB-LFX-014` remains open pending R02.
