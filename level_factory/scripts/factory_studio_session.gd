@@ -15,7 +15,7 @@ func _ready() -> void:
 func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 var _projection: Dictionary = {}
 func save_session() -> void:
-	_projection = _gateway.call("run_studio_extension", "session-save", {"session_id": _session.text.strip_edges(), "state": {"surface": "Session", "active_batch_id": "batch-runtime", "nested": {"api" + "_" + "key": "must-not-persist", "note": "saved"}}}) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
+	_projection = _gateway.call("run_studio_extension", "session-save", {"session_id": _session.text.strip_edges(), "state": {"surface": "Session", "autosave_generation": 0}}) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
 func restore_session() -> void:
 	_projection = _gateway.call("run_studio_extension", "session-restore", {"session_id": _session.text.strip_edges()}) if _gateway != null else {"state": "UNAVAILABLE"}; _render()
 func _render() -> void: _result.text = "Recovery: %s\nReferences validated: %s" % [_projection.get("recovery", _projection.get("state", "AVAILABLE")), _projection.get("validated_references", false)]

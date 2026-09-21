@@ -865,44 +865,82 @@ def batch_load(batch_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
 
 
-def _scrub_session_value(value: Any, depth: int = 0) -> Any:
-    if depth > 8:
-        raise StudioExtensionError("session state nesting exceeds the recovery boundary")
-    if isinstance(value, Mapping):
-        return {str(key): _scrub_session_value(item, depth + 1) for key, item in value.items() if not any(secret in str(key).lower() for secret in ("secret", "token", "password", "api_key", "credential"))}
-    if isinstance(value, list):
-        return [_scrub_session_value(item, depth + 1) for item in value]
-    if value is None or type(value) in {str, int, float, bool}:
-        return value
-    raise StudioExtensionError("session state contains a non-serializable value")
+_SESSION_FIELDS = {"surface", "selected_source_id", "selected_candidate_id", "active_batch_id", "active_pipeline_run_id", "active_retry_id", "active_revision_id", "autosave_generation", "draft"}
+_SESSION_DRAFT_FIELDS = {"difficulty", "width", "height", "seed", "mode"}
+_SESSION_REFERENCE_FIELDS = {"selected_source_id": "source", "selected_candidate_id": "candidate", "active_batch_id": "batch", "active_pipeline_run_id": "pipeline", "active_retry_id": "retry", "active_revision_id": "revision"}
+
+
+def _validate_session_state(state: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(state, Mapping) or set(state) - _SESSION_FIELDS:
+        raise StudioExtensionError("session contains an unknown field; allowlisted state is required")
+    normalized: dict[str, Any] = {}
+    for key, value in state.items():
+        if key == "surface":
+            if type(value) is not str or not 1 <= len(value) <= 80: raise StudioExtensionError("session surface is invalid")
+            normalized[key] = value
+        elif key == "autosave_generation":
+            if type(value) is not int or value < 0: raise StudioExtensionError("session autosave generation is invalid")
+            normalized[key] = value
+        elif key == "draft":
+            if not isinstance(value, Mapping) or set(value) - _SESSION_DRAFT_FIELDS: raise StudioExtensionError("session draft contains an unknown field")
+            draft = dict(value)
+            if any(type(draft.get(field)) not in {type(None), str, int} for field in _SESSION_DRAFT_FIELDS): raise StudioExtensionError("session draft field type is invalid")
+            normalized[key] = draft
+        elif key in _SESSION_REFERENCE_FIELDS:
+            if type(value) is not str or not _ID.fullmatch(value): raise StudioExtensionError(f"session reference {key} is invalid")
+            normalized[key] = value
+    return normalized
 
 
 def _session_reference_checks(state: Mapping[str, Any]) -> list[dict[str, Any]]:
-    checks = []
-    for key, value in state.items():
-        if str(key).endswith("_id") and value is not None:
-            valid = type(value) is str and bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value))
-            checks.append({"field": str(key), "value": value if valid else None, "disposition": "VALID" if valid else "NEEDS_OPERATOR_ACTION"})
+    checks: list[dict[str, Any]] = []
+    for field, kind in _SESSION_REFERENCE_FIELDS.items():
+        value = state.get(field)
+        if value is None: continue
+        disposition = "VALID"
+        reason = "Canonical reference resolved."
+        try:
+            if kind == "source": verify_owner_source(str(value))
+            elif kind == "candidate":
+                if not any(item["candidate_id"] == value for item in list_candidates()): raise StudioExtensionError("candidate is unavailable")
+            elif kind == "batch": batch_load(str(value))
+            elif kind == "pipeline":
+                run = _read_json(_pipeline_path(str(value)))
+                if run.get("schema") != PIPELINE_SCHEMA or run.get("run_id") != value: raise StudioExtensionError("pipeline run is invalid")
+            elif kind == "retry":
+                retry_path = extensions_root() / "retries" / f"{value}.json"; retry = _read_json(retry_path)
+                if retry.get("schema") != "scrubbots-retry-attempt" or retry.get("attempt_id") != value: raise StudioExtensionError("retry evidence is invalid")
+            elif kind == "revision":
+                candidate_id = str(state.get("selected_candidate_id", "")); load_revision(candidate_id, str(value))
+        except (StudioExtensionError, OSError, ValueError) as exc:
+            disposition = "NEEDS_OPERATOR_ACTION"; reason = str(exc)[:240]
+        checks.append({"field": field, "type": kind, "value": value, "disposition": disposition, "reason": reason})
     return checks
 
 
 def save_session(session_id: str, state: Mapping[str, Any]) -> dict[str, Any]:
     if not _ID.fullmatch(session_id): raise StudioExtensionError("session ID is invalid")
-    scrubbed = _scrub_session_value(dict(state))
-    references = _session_reference_checks(scrubbed)
-    payload = {"schema": SESSION_SCHEMA, "version": 1, "session_id": session_id, "state": json.loads(json.dumps(scrubbed, sort_keys=True, separators=(",", ":"))), "reference_validation": references, "autosave_generation": int(state.get("autosave_generation", 0)) + 1}
+    normalized = _validate_session_state(state)
+    references = _session_reference_checks(normalized)
+    payload = {"schema": SESSION_SCHEMA, "version": 2, "session_id": session_id, "state": normalized, "reference_validation": references, "autosave_generation": int(normalized.get("autosave_generation", 0)) + 1}
+    payload["session_digest"] = _digest({key: value for key, value in payload.items() if key != "session_digest"})
     _write_json(extensions_root() / "sessions" / f"{session_id}.json", payload)
     return payload
 
 
 def restore_session(session_id: str) -> dict[str, Any]:
     value = _read_json(extensions_root() / "sessions" / f"{session_id}.json")
-    if value.get("schema") != SESSION_SCHEMA or value.get("version") != 1 or value.get("session_id") != session_id: raise StudioExtensionError("session schema or identity is invalid")
-    state = value.get("state", {})
-    if not isinstance(state, Mapping): raise StudioExtensionError("session state is invalid")
+    required = {"schema", "version", "session_id", "state", "reference_validation", "autosave_generation", "session_digest"}
+    if set(value) != required or value.get("schema") != SESSION_SCHEMA or value.get("version") != 2 or value.get("session_id") != session_id or value.get("session_digest") != _digest({key: item for key, item in value.items() if key != "session_digest"}): raise StudioExtensionError("session schema, identity, or integrity digest is invalid")
+    state = _validate_session_state(value.get("state", {}))
     checks = _session_reference_checks(state)
     valid = all(check["disposition"] == "VALID" for check in checks)
-    return {**value, "reference_validation": checks, "recovery": "RESUMED" if valid else "NEEDS_OPERATOR_ACTION", "validated_references": valid}
+    if not checks: recovery = "NEW"
+    elif not valid: recovery = "NEEDS_OPERATOR_ACTION"
+    elif state.get("active_retry_id"): recovery = "RETRIED"
+    elif state.get("active_pipeline_run_id") or state.get("active_batch_id"): recovery = "RESUMED"
+    else: recovery = "NOT_RESUMABLE"
+    return {**value, "state": state, "reference_validation": checks, "recovery": recovery, "validated_references": valid}
 
 
 def similarity(left: Mapping[str, Any], right: Mapping[str, Any], threshold: float = 0.92) -> dict[str, Any]:
