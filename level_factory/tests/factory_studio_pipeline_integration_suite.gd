@@ -16,6 +16,7 @@ func _run_suite() -> void:
 	_require(packed != null, "Studio scene did not load")
 	if packed == null: _finish(); return
 	var instance := packed.instantiate(); root.add_child(instance); await process_frame
+	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx005-studio-runs"))
 	var navigation := instance.get_node_or_null("Frame/Layout/Body/NavigationPanel/Navigation")
 	var import_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/OperationsImport")
 	var pipeline := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/OneClickPipeline")
@@ -53,7 +54,7 @@ func _run_suite() -> void:
 	_require(failed_dispositions.get("NORMALIZE/DERIVE") == "BLOCKED", "validation failure did not block derivation")
 	_require(failed_dispositions.get("CANDIDATE") == "BLOCKED", "validation failure exposed a candidate")
 	var gateway: RefCounted = instance.get("core_gateway")
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "55005", "mode": "MASK"}, "res://output/studio-runs")
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "55005", "mode": "MASK"}, "res://output/.lfx005-studio-runs")
 	_require(generated.get("state") == "SUCCESS", "canonical Generate path did not produce a candidate: %s" % generated)
 	_generated_candidate_id = str(generated.get("candidate_id", ""))
 	var candidate_bundle_root := ProjectSettings.globalize_path(str(generated.get("output_path", "")))
@@ -73,7 +74,7 @@ func _run_suite() -> void:
 func _cleanup(instance: Node) -> void:
 	if not _source_id.is_empty(): _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads").path_join(_source_id))
 	if not _failed_source_id.is_empty(): _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads").path_join(_failed_source_id))
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(_fixture_root); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(ProjectSettings.globalize_path("res://output/.lfx005-studio-runs")); _remove_tree(_fixture_root); instance.queue_free(); _finish()
 
 
 func _remove_tree(path: String) -> void:

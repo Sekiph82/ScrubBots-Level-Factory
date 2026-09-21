@@ -46,3 +46,11 @@ Implementation decisions, commands, tests, failures/corrections, changed files, 
 - No dependency/license changes; no provider, network, runtime HTTP, credential, or telemetry behavior added.
 - No `TASKS.md` change.
 - Implementation commit/push and final log-only publication remain to be recorded after the implementation commit.
+
+## Full-suite correction
+
+- First required full run: `python -m pytest -q` — `757 passed, 4 failed, 2 warnings`. All four failures were UTF-8 boundary scans encountering a generated PNG left by the retained SB-LFX-005 integration under the shared `output/studio-runs` path.
+- Verified the residual artifact metadata belonged to the retained seed-55005 test fixture and quarantined that exact generated directory under the Windows temporary directory; no owner source or tracked file was removed.
+- Corrected the retained SB-LFX-005 integration to use its own bounded `.lfx005-studio-runs` fixture path and clean it before and after execution, preserving owner output paths.
+- Retained correction checks: `godot_console.exe --headless --path level_factory --script res://tests/factory_studio_pipeline_integration_suite.gd` — PASS; `python -m pytest tests/unit/test_sb_lf00_001_project_contract.py tests/unit/test_sb_lf00_002_project_boundaries.py -q` — `16 passed, 1 warning`.
+- The required full suite will be rerun after this correction and recorded with its final publication evidence.
