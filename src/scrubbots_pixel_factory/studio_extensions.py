@@ -775,7 +775,11 @@ def record_failure(operation: str, stage: str, disposition: str, reason: str, in
 
 
 def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    failure = _read_json(extensions_root() / "failures" / f"{failure_id}.json")
+    failure = next((item for item in _canonical_failure_records() if item.get("failure_id") == failure_id), None)
+    if failure is None:
+        fallback = extensions_root() / "failures" / f"{failure_id}.json"
+        if not fallback.exists(): raise StudioExtensionError("failure evidence is unavailable")
+        failure = _read_json(fallback)
     if not failure.get("retryable"): return {"disposition": "NOT_AVAILABLE", "reason": "This stage has no safe retry capability.", "parent_failure_id": failure_id}
     requested_changes = dict(changes or {})
     if set(requested_changes) - {"operator_note"} or type(requested_changes.get("operator_note", "")) is not str or len(str(requested_changes.get("operator_note", ""))) > 512:
@@ -797,14 +801,48 @@ def retry_failure(failure_id: str, changes: Mapping[str, Any] | None = None) -> 
 
 
 def list_failures() -> dict[str, Any]:
-    records = []
-    root = extensions_root() / "failures"
-    for path in sorted(root.glob("failure-*.json")) if root.exists() else []:
-        value = _read_json(path)
-        if value.get("schema") != "scrubbots-failure-evidence" or value.get("version") != 1 or value.get("failure_id") != path.stem:
+    return {"state": "SUCCESS", "disposition": "READY", "failures": _canonical_failure_records()}
+
+
+def _canonical_failure_records() -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+
+    def add(*, evidence_id: str, evidence_path: Path, operation: str, stage: str, disposition: str, reason: str, inputs: Mapping[str, Any], retryable: bool, non_retryable_reason: str = "") -> None:
+        raw = evidence_path.read_bytes()
+        failure_id = f"failure-{_digest({'evidence_id': evidence_id, 'stage': stage, 'disposition': disposition})[:24]}"
+        records.append({"schema": "scrubbots-derived-failure-inbox-entry", "version": 2, "failure_id": failure_id, "operation": operation, "stage": stage, "disposition": disposition, "reason": reason[:512], "inputs": dict(inputs), "retryable": retryable, "non_retryable_reason": non_retryable_reason if not retryable else "", "originating_evidence_id": evidence_id, "evidence_reference": _relative(evidence_path), "evidence_sha256": hashlib.sha256(raw).hexdigest()})
+
+    validation_root = extensions_root() / "validation"
+    for path in sorted(validation_root.glob("*.json")) if validation_root.exists() else []:
+        try:
+            value = _read_json(path)
+            structural = value.get("structural", {})
+            if value.get("schema") == VALIDATION_SCHEMA and structural.get("disposition") != "PASS":
+                add(evidence_id=str(value.get("source_id", path.stem)), evidence_path=path, operation="import-validation", stage="VALIDATE", disposition="REJECTED", reason="; ".join(value.get("palette", {}).get("foreign_color_count", []) if isinstance(value.get("palette", {}).get("foreign_color_count"), list) else value.get("structural", {}).get("rejection_codes", [])) or str(structural.get("reason", "SOURCE_INVALID")), inputs={"source_id": value.get("source_id")}, retryable=True)
+        except (StudioExtensionError, OSError):
             continue
-        records.append(value)
-    return {"state": "SUCCESS", "disposition": "READY", "failures": records}
+    pipeline_root = extensions_root() / "pipelines"
+    for path in sorted(pipeline_root.glob("*.json")) if pipeline_root.exists() else []:
+        try:
+            value = _read_json(path)
+            for stage in value.get("stages", []):
+                disposition = str(stage.get("disposition", ""))
+                if disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE", "NOT_AVAILABLE"}:
+                    retryable = disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE"} and str(stage.get("stage", "")) in {"SOURCE", "NORMALIZE/DERIVE", "CANDIDATE"}
+                    add(evidence_id=str(value.get("run_id", path.stem)) + ":" + str(stage.get("stage", "")), evidence_path=path, operation="pipeline", stage=str(stage.get("stage", "")), disposition="INCONCLUSIVE" if disposition == "NOT_AVAILABLE" else disposition, reason=str(stage.get("reason", disposition)), inputs={"source_id": value.get("source_id"), "candidate_id": value.get("candidate_id")}, retryable=retryable, non_retryable_reason="Canonical stage is unavailable or is not safely retryable." if not retryable else "")
+                    break
+        except (StudioExtensionError, OSError):
+            continue
+    batch_root = extensions_root() / "batches"
+    for path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
+        try:
+            value = _read_json(path)
+            for item in value.get("items", []):
+                if item.get("disposition") not in {"IMPORTED", "ALREADY_IMPORTED"}:
+                    add(evidence_id=str(value.get("batch_id", path.stem)) + ":" + str(item.get("index", "")), evidence_path=path, operation="batch-import", stage="IMPORT", disposition="REJECTED", reason=str(item.get("error", "IMPORT_REJECTED")), inputs={"display_path": item.get("display_path")}, retryable=False, non_retryable_reason="Batch item retry requires a new canonical import selection.")
+        except (StudioExtensionError, OSError):
+            continue
+    return sorted({record["failure_id"]: record for record in records}.values(), key=lambda record: (record["evidence_reference"], record["stage"], record["failure_id"]))
 
 
 def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
