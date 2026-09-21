@@ -268,6 +268,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		reproduce_surface.call("configure_gateway", gateway)
 	if revisions_surface != null and revisions_surface.has_method("configure_gateway"):
 		revisions_surface.call("configure_gateway", gateway)
+	if revisions_surface != null and target_controls != null and target_controls.has_method("manual_editor_reference") and revisions_surface.has_method("configure_editor"):
+		revisions_surface.call("configure_editor", target_controls.call("manual_editor_reference"))
 	if failures_surface != null and failures_surface.has_method("configure_gateway"):
 		failures_surface.call("configure_gateway", gateway)
 	if batch_import_surface != null and batch_import_surface.has_method("configure_gateway"):

@@ -50,6 +50,10 @@ func configure_gateway(gateway: RefCounted) -> void:
 	_refresh_action_controls()
 
 
+func manual_editor_reference() -> Node:
+	return _art_editor
+
+
 func _build_controls() -> void:
 	var heading := Label.new()
 	heading.text = "Generate target — presentation draft"

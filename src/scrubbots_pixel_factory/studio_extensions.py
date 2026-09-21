@@ -664,27 +664,32 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
 
 
 def create_revision(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "", edit_operations: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
-    if len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells): raise StudioExtensionError("revision logical grid is invalid")
+    if type(width) is not int or type(height) is not int or len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells): raise StudioExtensionError("revision logical grid is invalid")
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None: raise StudioExtensionError("revision source candidate is unavailable")
     root = extensions_root() / "revisions" / candidate_id
-    existing = sorted(root.glob("revision-*.json")) if root.exists() else []
+    existing = list_revisions(candidate_id) if root.exists() else []
     sequence = len(existing)
     parent = None
     if sequence and parent_revision_id is None:
         raise StudioExtensionError("every revision after the root must name its explicit parent revision")
+    if not sequence and parent_revision_id is not None:
+        raise StudioExtensionError("revision 0 cannot have a parent")
     if parent_revision_id is not None:
         parent = load_revision(candidate_id, parent_revision_id)
         if parent.get("width") != width or parent.get("height") != height or not isinstance(parent.get("cells"), list) or len(parent["cells"]) != len(cells):
             raise StudioExtensionError("revision parent dimensions or logical grid are invalid")
     grid_hash = logical_grid_hash(width, height, cells)
+    if parent is None and (width != candidate["width"] or height != candidate["height"] or list(cells) != list(read_bundle((_repository_root() / candidate["source_path"]).resolve()).artwork.cells)):
+        raise StudioExtensionError("revision 0 must exactly match the canonical source artwork baseline")
     changed_indices = [index for index, (before, after) in enumerate(zip(parent["cells"], cells)) if before != after] if parent else []
     operations = json.loads(json.dumps(list(edit_operations or []), sort_keys=True, separators=(",", ":")))
-    if any(not isinstance(operation, Mapping) or set(operation) - {"operation", "indices", "summary"} or not isinstance(operation.get("operation"), str) or not isinstance(operation.get("indices", []), list) for operation in operations):
+    if any(not isinstance(operation, Mapping) or set(operation) - {"operation", "indices", "summary"} or not isinstance(operation.get("operation"), str) or not isinstance(operation.get("indices", []), list) or any(type(index) is not int or index < 0 or index >= width * height for index in operation.get("indices", [])) for operation in operations):
         raise StudioExtensionError("revision edit operations are malformed")
     if parent and not operations:
         operations = [{"operation": "GRID_EDIT", "indices": changed_indices, "summary": change_summary[:240]}]
-    payload = {"schema": REVISION_SCHEMA, "version": 1, "revision_id": f"revision-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "source_artwork_sha256": candidate["artwork_sha256"], "parent_revision_id": parent_revision_id, "width": width, "height": height, "cells": list(cells), "working_grid_hash": grid_hash, "change_summary": change_summary[:240], "change_count": len(changed_indices), "edit_operations": operations, "sequence": sequence, "validation": {"disposition": "STALE / NOT CURRENT", "reason": "Manual revisions are not authoritative production validation."}, "created_at": datetime.now(timezone.utc).isoformat()}
+    payload = {"schema": REVISION_SCHEMA, "version": 2, "revision_id": f"revision-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "source_artwork_sha256": candidate["artwork_sha256"], "parent_revision_id": parent_revision_id, "width": width, "height": height, "cells": list(cells), "working_grid_hash": grid_hash, "change_summary": change_summary[:240], "change_count": len(changed_indices), "edit_operations": operations, "sequence": sequence, "validation": {"disposition": "STALE / NOT CURRENT", "reason": "Manual revisions are not authoritative production validation."}, "created_at": datetime.now(timezone.utc).isoformat()}
+    payload["revision_digest"] = _digest({key: value for key, value in payload.items() if key != "created_at"})
     _write_json(root / f"revision-{sequence:04d}.json", payload, immutable=True)
     return payload
 
@@ -702,6 +707,10 @@ def revision_compare(candidate_id: str, left_revision_id: str, right_revision_id
     return {"state": "SUCCESS", "disposition": "READY", "comparison": compare_revisions(left, right)}
 
 
+def revision_load(candidate_id: str, revision_id: str) -> dict[str, Any]:
+    return {"state": "SUCCESS", "disposition": "READY", "revision": load_revision(candidate_id, revision_id)}
+
+
 def compare_revisions(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
     if left.get("candidate_id") != right.get("candidate_id"): raise StudioExtensionError("revisions must belong to one candidate")
     changed = [index for index, (a, b) in enumerate(zip(left.get("cells", []), right.get("cells", []))) if a != b]
@@ -710,12 +719,38 @@ def compare_revisions(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict
 
 def list_revisions(candidate_id: str) -> list[dict[str, Any]]:
     root = extensions_root() / "revisions" / candidate_id
-    values = []
-    for path in sorted(root.glob("revision-*.json")) if root.exists() else []:
+    if not root.exists(): return []
+    candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
+    if candidate is None: raise StudioExtensionError("revision source candidate is unavailable")
+    values: list[dict[str, Any]] = []
+    for path in sorted(root.glob("revision-*.json")):
         value = _read_json(path)
-        if value.get("schema") != REVISION_SCHEMA or value.get("candidate_id") != candidate_id:
-            raise StudioExtensionError("revision lineage is malformed")
+        required = {"schema", "version", "revision_id", "candidate_id", "source_artwork_sha256", "parent_revision_id", "width", "height", "cells", "working_grid_hash", "change_summary", "change_count", "edit_operations", "sequence", "validation", "created_at", "revision_digest"}
+        if set(value) != required or value.get("schema") != REVISION_SCHEMA or value.get("version") != 2 or value.get("candidate_id") != candidate_id or value.get("source_artwork_sha256") != candidate["artwork_sha256"]:
+            raise StudioExtensionError("revision lineage schema or source identity is invalid")
+        if value.get("revision_digest") != _digest({key: item for key, item in value.items() if key not in {"created_at", "revision_digest"}}):
+            raise StudioExtensionError("revision content digest is invalid")
+        width, height, cells = value.get("width"), value.get("height"), value.get("cells")
+        if type(width) is not int or type(height) is not int or not isinstance(cells, list) or len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells) or value.get("working_grid_hash") != logical_grid_hash(width, height, cells):
+            raise StudioExtensionError("revision grid identity is invalid")
         values.append(value)
+    values.sort(key=lambda item: int(item["sequence"]))
+    baseline = list(read_bundle((_repository_root() / candidate["source_path"]).resolve()).artwork.cells)
+    by_id: dict[str, dict[str, Any]] = {}
+    for expected_sequence, value in enumerate(values):
+        if value.get("sequence") != expected_sequence or value.get("revision_id") != f"revision-{candidate_id}-{expected_sequence:04d}" or value.get("revision_id") in by_id:
+            raise StudioExtensionError("revision sequence or parent chain is invalid")
+        if expected_sequence == 0 and (value["width"] != candidate["width"] or value["height"] != candidate["height"] or value["cells"] != baseline or value["change_count"] != 0):
+            raise StudioExtensionError("revision 0 is not the immutable source baseline")
+        if expected_sequence > 0:
+            parent_id = value.get("parent_revision_id")
+            if parent_id not in by_id: raise StudioExtensionError("revision parent is missing or is not an earlier revision")
+            parent = by_id[parent_id]
+            changed = [index for index, (before, after) in enumerate(zip(parent["cells"], value["cells"])) if before != after]
+            if value.get("change_count") != len(changed): raise StudioExtensionError("revision change_count does not match parent delta")
+            operation_indices = sorted({index for operation in value.get("edit_operations", []) for index in operation.get("indices", [])})
+            if operation_indices != sorted(changed): raise StudioExtensionError("revision edit operations do not match parent delta")
+        by_id[value["revision_id"]] = value
     return values
 
 
@@ -932,5 +967,5 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "save_session", "restore_session", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
 ]

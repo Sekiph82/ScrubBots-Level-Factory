@@ -279,6 +279,31 @@ func reset_to_source() -> bool:
 	return true
 
 
+func load_revision_cells(width: int, height: int, cells: Array) -> bool:
+	if _source_image == null or width != _logical_width or height != _logical_height or cells.size() != width * height:
+		_last_operation_rejection = "REJECTED — revision dimensions do not match the loaded canonical editor source."
+		_refresh_editor()
+		return false
+	var revision_image := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	for index in range(cells.size()):
+		var color_id := str(cells[index])
+		if not CANONICAL_PALETTE_RGB.has(color_id):
+			_last_operation_rejection = "REJECTED — revision contains a non-canonical logical color."
+			_refresh_editor()
+			return false
+		revision_image.set_pixel(index % width, index / width, _canonical_color(color_id))
+	_working_image = revision_image
+	_error_message = ""
+	_last_operation_rejection = ""
+	_reconcile_state()
+	_refresh_editor()
+	return true
+
+
+func manual_editor_reference() -> Node:
+	return self
+
+
 func canonical_color_id_for_pixel(pixel: Color) -> String:
 	for color_id in LOGICAL_PALETTE_IDS:
 		if _canonical_color(color_id) == pixel:

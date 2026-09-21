@@ -11,21 +11,36 @@ func _run_suite() -> void:
 	if packed == null: _finish(); return
 	var instance := packed.instantiate(); root.add_child(instance); await process_frame
 	var gateway: RefCounted = instance.get("core_gateway")
+	var target := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/TargetControls")
 	var surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/ManualEditRevisions")
-	_require(gateway != null and surface != null, "revision surface or gateway did not instantiate")
+	_require(gateway != null and surface != null and target != null, "revision surface, editor target, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx012-revisions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
 	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "12012", "mode": "MASK"}, "res://output/.lfx012-revisions")
 	_require(generated.get("state") == "SUCCESS", "canonical revision fixture failed: %s" % generated)
 	var candidate_id := str(generated.get("candidate_id", "")); var bundle := str(generated.get("output_path", "")); var artwork := JSON.parse_string(FileAccess.get_file_as_string(bundle.path_join("artwork.json"))) as Dictionary
-	var cells: Array = artwork.get("cells", []).duplicate(); var first: Dictionary = gateway.call("run_studio_extension", "revision-create", {"candidate_id": candidate_id, "width": 20, "height": 20, "cells": cells, "change_summary": "root"})
+	var source_bytes := FileAccess.get_file_as_bytes(bundle.path_join("artwork.png"))
+	var editor: Node = target.call("manual_editor_reference"); editor.call("observe_action_result", generated); _require(editor.call("load_current_canonical_artwork", true), "manual editor did not load canonical source")
+	surface.call("configure_editor", editor); surface.call("set_candidate_id", candidate_id)
+	var cells: Array = editor.call("working_logical_cells_snapshot"); var first: Dictionary = surface.call("save_revision")
 	_require(first.get("state") == "SUCCESS", "root revision was not created: %s" % first)
-	var first_id := str(first.get("revision", {}).get("revision_id", "")); var changed := cells.duplicate(); changed[0] = "C01" if changed[0] != "C01" else "C02"
-	var second: Dictionary = gateway.call("run_studio_extension", "revision-create", {"candidate_id": candidate_id, "width": 20, "height": 20, "cells": changed, "parent_revision_id": first_id, "change_summary": "one cell", "edit_operations": [{"operation": "PAINT", "indices": [0], "summary": "paint cell 0"}]})
+	var first_id := str(first.get("revision", {}).get("revision_id", "")); editor.call("paint_cell", 0, 0, "C01" if cells[0] != "C01" else "C02"); var second: Dictionary = surface.call("save_revision")
 	_require(second.get("state") == "SUCCESS" and int(second.get("revision", {}).get("change_count", -1)) == 1, "child revision did not record exact change count: %s" % second)
-	var listing: Dictionary = gateway.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(listing.get("state") == "SUCCESS" and (listing.get("revisions", []) as Array).size() == 2, "revision list did not expose immutable lineage: %s" % listing)
-	var comparison: Dictionary = gateway.call("run_studio_extension", "revision-compare", {"candidate_id": candidate_id, "left_revision_id": first_id, "right_revision_id": str(second.get("revision", {}).get("revision_id", ""))}); _require(comparison.get("comparison", {}).get("changed_cell_count") == 1, "revision compare did not report the changed cell: %s" % comparison)
-	surface.call("list_revisions"); await process_frame; _require(surface.call("snapshot").get("projection", {}).get("state") == "SUCCESS", "revision UI did not invoke the canonical list operation")
+	var second_id := str(second.get("revision", {}).get("revision_id", "")); editor.call("paint_cell", 1, 0, "C03"); var third: Dictionary = surface.call("save_revision")
+	_require(third.get("state") == "SUCCESS" and int(third.get("revision", {}).get("change_count", -1)) == 1, "R2 editor save did not record exact change count: %s" % third)
+	var third_id := str(third.get("revision", {}).get("revision_id", "")); surface.call("set_candidate_id", candidate_id); surface.call("list_revisions"); await process_frame
+	var listing: Dictionary = surface.call("snapshot").get("projection", {}); _require(listing.get("state") == "SUCCESS" and (listing.get("revisions", []) as Array).size() == 3, "revision list did not expose immutable lineage: %s" % listing)
+	surface.call("set_compare_revisions", first_id, third_id)
+	var comparison: Dictionary = gateway.call("run_studio_extension", "revision-compare", {"candidate_id": candidate_id, "left_revision_id": first_id, "right_revision_id": third_id}); _require(comparison.get("comparison", {}).get("changed_cell_count") == 2, "revision compare did not report editor changes: %s" % comparison)
+	surface.call("set_candidate_id", candidate_id); surface.call("set_revision_id", second_id); var selected: Dictionary = gateway.call("run_studio_extension", "revision-load", {"candidate_id": candidate_id, "revision_id": second_id}); editor.call("load_revision_cells", int(selected.get("revision", {}).get("width", 0)), int(selected.get("revision", {}).get("height", 0)), selected.get("revision", {}).get("cells", [])); _require(editor.call("snapshot").get("dirty_cell_count") == 1, "select/undo did not replace the manual editor working grid")
+	var branch_cells: Array = editor.call("working_logical_cells_snapshot"); editor.call("paint_cell", 2, 0, "C04"); var branch: Dictionary = surface.call("save_revision"); _require(branch.get("state") == "SUCCESS" and branch.get("revision", {}).get("parent_revision_id") == second_id, "edit-after-undo did not create a branch from the selected revision: %s" % branch)
+	var branch_id := str(branch.get("revision", {}).get("revision_id", "")); _require(branch_id != third_id, "branch revision overwrote later R2 history")
+	surface.call("restore_source"); _require(editor.call("snapshot").get("dirty_cell_count") == 0, "Restore Source did not restore editor working pixels")
+	var persisted: Dictionary = gateway.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(persisted.get("state") == "SUCCESS" and (persisted.get("revisions", []) as Array).size() == 4, "restart/reload history did not retain branch and R2")
+	var corrupt_path := ProjectSettings.globalize_path("res://output/studio-extensions/revisions").path_join(candidate_id).path_join("revision-0001.json"); var corrupt_bytes := FileAccess.get_file_as_bytes(corrupt_path); var corrupt := FileAccess.open(corrupt_path, FileAccess.WRITE); corrupt.store_string("{\"corrupt\":true}\n"); corrupt.close(); var rejected: Dictionary = gateway.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(rejected.get("state") == "ERROR", "corrupt revision lineage did not fail closed"); var restore := FileAccess.open(corrupt_path, FileAccess.WRITE); restore.store_buffer(corrupt_bytes); restore.close()
+	var clean: Dictionary = gateway.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(clean.get("state") == "SUCCESS", "restored revision history did not reload")
+	for revision in clean.get("revisions", []): _require(revision.get("validation", {}).get("disposition") != "PASS", "manual revision leaked validation acceptance")
+	_require(FileAccess.get_file_as_bytes(bundle.path_join("artwork.png")) == source_bytes, "revision operations mutated source artwork bytes")
 	var standalone: Dictionary = gateway.call("run_studio_extension", "revision-create", {"candidate_id": candidate_id, "width": 20, "height": 20, "cells": cells}); _require(standalone.get("state") == "ERROR", "standalone post-root revision was not rejected")
 	_cleanup(instance)
 
