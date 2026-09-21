@@ -11,8 +11,9 @@ func _run_suite() -> void:
 	if packed == null: _finish(); return
 	var instance := packed.instantiate(); root.add_child(instance); await process_frame
 	var gateway: RefCounted = instance.get("core_gateway")
+	var target := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/TargetControls")
 	var reproduce_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/ExactReproduce")
-	_require(gateway != null and reproduce_surface != null, "reproduce surface or gateway did not instantiate")
+	_require(gateway != null and target != null and reproduce_surface != null, "target, reproduce surface, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx011-reproduce")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-reproductions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
 	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "11011", "mode": "MASK"}, "res://output/.lfx011-reproduce")
@@ -31,8 +32,12 @@ func _run_suite() -> void:
 	_require(reproduce_surface.call("capability_button_enabled"), "Exact Reproduce did not enable for a fresh EXACT_REPRODUCIBLE capability")
 	reproduce_surface.call("set_selected_identity", "tampered-selection"); await process_frame
 	_require(not reproduce_surface.call("capability_button_enabled"), "candidate identity edit did not invalidate capability")
+	_set_draft(target, "changed-live-draft", 23, 24, 2, 2, "materially-different-preset")
+	var divergent_draft: Dictionary = target.call("draft_snapshot")
+	_require(divergent_draft.get("seed") == "changed-live-draft" and divergent_draft.get("width") == 23 and divergent_draft.get("mode") == "WFC", "draft/preset values did not materially diverge")
 	reproduce_surface.call("set_selected_identity", candidate_id); reproduce_surface.call("check_capability"); await process_frame
-	var reproduced: Dictionary = gateway.call("run_studio_extension", "reproduce-exact", {"candidate_id": candidate_id})
+	reproduce_surface.call("exact_reproduce"); await process_frame
+	var reproduced: Dictionary = reproduce_surface.call("snapshot")
 	_require(reproduced.get("state") == "SUCCESS" and reproduced.get("disposition") == "MATCH", "exact reproduction did not MATCH: %s" % reproduced)
 	var output_path := str(reproduced.get("output_path", ""))
 	var repository_root := ProjectSettings.globalize_path("res://" + ".." + "/")
@@ -50,7 +55,17 @@ func _run_suite() -> void:
 	_require(missing_owner.get("disposition") in ["STALE/INVALID", "NOT_REPRODUCIBLE"], "nonexistent OWNER_UPLOAD was falsely source-retrievable: %s" % missing_owner)
 	var unsupported: Dictionary = gateway.call("run_studio_extension", "reproduce-capability", {"candidate_id": "unsupported-provider-record"})
 	_require(unsupported.get("disposition") != "EXACT_REPRODUCIBLE", "unsupported record was enabled for exact reproduction")
+	reproduce_surface.call("set_selected_identity", owner_fixture); reproduce_surface.call("check_capability"); await process_frame
+	var owner_surface: Dictionary = reproduce_surface.call("snapshot")
+	_require(owner_surface.get("disposition") == "SOURCE_RETRIEVABLE_ONLY" and not reproduce_surface.call("capability_button_enabled"), "real source-only record was enabled through the UI")
+	_require(str(owner_surface.get("reason", "")).contains("not deterministic regeneration"), "source-only UI reason was not rendered")
 	_cleanup(instance)
+
+func _set_draft(target: Node, seed_value: String, width: int, height: int, difficulty_index: int, mode_index: int, label_value: String) -> void:
+	var seed_control: LineEdit = target.get("seed_control"); var width_control: SpinBox = target.get("width_control"); var height_control: SpinBox = target.get("height_control")
+	var difficulty_control: OptionButton = target.get("difficulty_control"); var mode_control: OptionButton = target.get("mode_control"); var label_control: LineEdit = target.get("candidate_label_control")
+	seed_control.text = seed_value; width_control.value = width; height_control.value = height; difficulty_control.select(difficulty_index); mode_control.select(mode_index); label_control.text = label_value
+	target.call("_refresh_draft_readout")
 
 func _fixture_source(gateway: RefCounted) -> String:
 	var root := OS.get_temp_dir().path_join("scrubbots_lfx_011_owner_fixture"); _remove_tree(root); DirAccess.make_dir_recursive_absolute(root)
