@@ -12,6 +12,7 @@ var _qa: OptionButton
 var _width: SpinBox
 var _height: SpinBox
 var _used_color_count: SpinBox
+var _peer_id: LineEdit
 var _result: Label
 var _projection: Dictionary = {}
 
@@ -34,12 +35,15 @@ func refresh_search() -> void:
 	if _width != null and _width.value > 0: filters["width"] = int(_width.value)
 	if _height != null and _height.value > 0: filters["height"] = int(_height.value)
 	if _used_color_count != null and _used_color_count.value > 0: filters["used_color_count"] = int(_used_color_count.value)
-	_projection = _gateway.call("run_studio_extension", "discover", {"query": _query.text, "filters": filters, "collection": null if selected == "ALL" else selected}) if _gateway != null else {"state": "UNAVAILABLE"}
+	_projection = _gateway.call("run_studio_extension", "discover", {"query": _query.text, "filters": filters, "collection": null if selected == "ALL" else selected, "similarity_peer_id": _peer_id.text.strip_edges()}) if _gateway != null else {"state": "UNAVAILABLE"}
 	_render()
 
 
 func snapshot() -> Dictionary: return _projection.duplicate(true)
 func show_search() -> void: _render()
+func rendered_text() -> String: return _result.text if _result != null else ""
+func set_similarity_peer(peer_id: String) -> void:
+	if _peer_id != null: _peer_id.text = peer_id
 
 
 func _build_controls() -> void:
@@ -60,6 +64,7 @@ func _build_controls() -> void:
 	_width = SpinBox.new(); _width.min_value = 0; _width.max_value = 59; _width.allow_greater = false; _width.prefix = "W="; row.add_child(_width)
 	_height = SpinBox.new(); _height.min_value = 0; _height.max_value = 59; _height.allow_greater = false; _height.prefix = "H="; row.add_child(_height)
 	_used_color_count = SpinBox.new(); _used_color_count.min_value = 0; _used_color_count.max_value = 16; _used_color_count.allow_greater = false; _used_color_count.prefix = "Colors="; row.add_child(_used_color_count)
+	_peer_id = LineEdit.new(); _peer_id.placeholder_text = "Canonical peer ID"; row.add_child(_peer_id)
 	var refresh := Button.new()
 	refresh.text = "Refresh"
 	refresh.pressed.connect(refresh_search)
@@ -73,4 +78,8 @@ func _render() -> void:
 	var records: Array = _projection.get("records", [])
 	var ids: Array[String] = []
 	for record in records: ids.append(str(record.get("record_id", "")))
-	_result.text = "Discovery: %s | collection=%s | records=%s | %s" % [_projection.get("state", "EMPTY"), _projection.get("collection", ""), ", ".join(ids), _projection.get("reason", "No membership list is persisted; this is a fresh derived query." )]
+	var similarity_rows: Array[String] = []
+	for record in records:
+		var advisory: Dictionary = record.get("similarity_advisory", {})
+		similarity_rows.append("%s=%s score=%s evidence=%s" % [record.get("record_id", ""), advisory.get("disposition", "NOT AVAILABLE"), advisory.get("score", "not available"), advisory.get("evidence_references", "not available")])
+	_result.text = "Discovery: %s | collection=%s | records=%s\nSimilarity advisory only; owner review decides significance. Peer action: enter a canonical peer ID and Refresh.\n%s\n%s" % [_projection.get("state", "EMPTY"), _projection.get("collection", ""), ", ".join(ids), "; ".join(similarity_rows), _projection.get("reason", "No membership list is persisted; this is a fresh derived query." )]

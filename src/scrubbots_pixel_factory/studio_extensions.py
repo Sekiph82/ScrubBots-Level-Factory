@@ -378,7 +378,7 @@ def candidate_inbox() -> dict[str, Any]:
     return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "candidates": items}
 
 
-def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, collection: str | None = None) -> dict[str, Any]:
+def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, collection: str | None = None, similarity_peer_id: str | None = None) -> dict[str, Any]:
     """Return a deterministic, non-persisted discovery view over canonical records."""
 
     wanted = dict(filters or {})
@@ -391,11 +391,22 @@ def discover_records(query: str = "", filters: Mapping[str, Any] | None = None, 
     for source in library_refresh()["sources"]:
         records.append({"record_type": "SOURCE", "record_id": source["source_id"], "origin": source["origin"], "filename": source["original_filename"], "width": source["original_width"], "height": source["original_height"], "label": source["catalog"]["label"], "tags": source["catalog"]["tags"], "review": source["owner_review"]["disposition"], "qa": "NOT AVAILABLE"})
     for candidate in candidate_inbox()["candidates"]:
-        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"], "used_color_count": len(candidate["used_colors"]), "similarity_advisory": {"disposition": "NOT AVAILABLE", "reason": "Select a canonical comparison pair."}})
+        records.append({"record_type": "CANDIDATE", "record_id": candidate["candidate_id"], "origin": candidate["origin"], "filename": "", "width": candidate["width"], "height": candidate["height"], "label": "", "tags": [], "review": candidate["owner_review"].get("disposition", "NEEDS_REVIEW"), "qa": candidate["quality"].get("decision", "NOT AVAILABLE"), "used_colors": candidate["used_colors"], "used_color_count": len(candidate["used_colors"]), "similarity_advisory": {"disposition": "NOT AVAILABLE", "reason": "Select a canonical peer ID and invoke Compare; similarity is advisory only and owner review decides significance."}})
     if collection == "Imported Sources": records = [record for record in records if record["record_type"] == "SOURCE"]
     elif collection == "Needs Review": records = [record for record in records if record["review"] == "NEEDS_REVIEW"]
     elif collection == "Owner Accepted": records = [record for record in records if record["review"] == "ACCEPT"]
     elif collection == "Owner Rejected": records = [record for record in records if record["review"] == "REJECT"]
+    if similarity_peer_id:
+        for record in records:
+            if record.get("record_type") != "CANDIDATE":
+                record["similarity_advisory"] = {"disposition": "NOT AVAILABLE", "reason": "Similarity requires a canonical candidate result and peer selection."}
+            elif record.get("record_id") == similarity_peer_id:
+                record["similarity_advisory"] = {"disposition": "NOT AVAILABLE", "reason": "Select a different canonical peer ID to compare this result."}
+            else:
+                try:
+                    record["similarity_advisory"] = similarity_canonical(str(record["record_id"]), similarity_peer_id)
+                except StudioExtensionError as exc:
+                    record["similarity_advisory"] = {"disposition": "NOT AVAILABLE", "reason": str(exc)}
     needle = query.strip().casefold()
     if needle: records = [record for record in records if needle in json.dumps(record, ensure_ascii=False, sort_keys=True).casefold()]
     for key, value in wanted.items():

@@ -352,12 +352,12 @@ func show_surface(surface_name: String) -> void:
 			pipeline_surface.call("show_pipeline")
 	elif surface_name in ["Candidates", "Review"]:
 		state.text = "DERIVED CANDIDATE INBOX — EXPLICIT OWNER REVIEW"
-		detail.text = "ACCEPT and REJECT append identity-bound evidence. Review history is retained and independent from QA."
+		detail.text = "ACCEPT and REJECT append identity-bound evidence. Similarity is advisory only; owner review decides significance. Review history is retained and independent from QA."
 		if candidates_surface != null and candidates_surface.has_method("show_candidates"):
 			candidates_surface.call("show_candidates")
 	elif surface_name == "Comparison":
 		state.text = "READ-ONLY SIDE-BY-SIDE COMPARISON"
-		detail.text = "Evidence is shown only when bound to the selected candidate/artwork identity; missing solver, difficulty, and cost evidence stays unavailable."
+		detail.text = "Evidence is shown only when bound to the selected candidate/artwork identity; similarity is advisory only and owner review decides significance. Missing solver, difficulty, and cost evidence stays unavailable."
 		if comparison_surface != null and comparison_surface.has_method("show_comparison"):
 			comparison_surface.call("show_comparison")
 	elif surface_name == "Presets":
@@ -367,7 +367,7 @@ func show_surface(surface_name: String) -> void:
 			presets_surface.call("show_presets")
 	elif surface_name == "Search":
 		state.text = "DERIVED SEARCH / FILTER / SMART COLLECTIONS"
-		detail.text = "Queries are deterministic views over canonical records. Unavailable domains remain unavailable and no membership list is persisted."
+		detail.text = "Queries are deterministic views over canonical records. Similarity is advisory only; enter a canonical peer ID to render backend evidence, and owner review decides significance. Unavailable domains remain unavailable and no membership list is persisted."
 		if search_surface != null and search_surface.has_method("show_search"):
 			search_surface.call("show_search")
 	elif surface_name == "Readiness":

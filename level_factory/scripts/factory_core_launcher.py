@@ -238,7 +238,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             extensions.delete_preset(str(request["preset_id"]))
             payload = {"state": "DELETED", "preset_id": request["preset_id"]}
         elif operation == "discover":
-            payload = extensions.discover_records(str(request.get("query", "")), request.get("filters", {}), request.get("collection"))
+            payload = extensions.discover_records(str(request.get("query", "")), request.get("filters", {}), request.get("collection"), request.get("similarity_peer_id"))
         elif operation == "reproduce-capability":
             payload = extensions.reproduce_capability(str(request["candidate_id"]))
         elif operation == "reproduce-exact":
