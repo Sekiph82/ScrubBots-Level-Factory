@@ -53,3 +53,15 @@ Implementation decisions, commands, tests, failures/corrections, changed files, 
 - No dependency/license changes; no provider, network, runtime HTTP, credential, or telemetry behavior added.
 - No `TASKS.md` change.
 - Implementation commit/push and final log-only publication remain to be recorded after the implementation commit.
+
+## Final publication evidence
+
+- Implementation commit: `89fe1db3c983dd364158f2d65bc29789b2a8ebd4` (`Remediate SB-LFX-013 stage-aware retry truth`), pushed successfully to `origin/main`.
+- Subsequent in-scope R04 batch correction commit: `2b1eba23f06001c839f7772a4779eecb7510b90d` hardened the retained SB-LFX-005 fixture cleanup after the required full-suite run exposed generated-artifact leakage; no SB-LFX-013 product semantics were reopened.
+- Final full-suite result: `python -m pytest -q` — `761 passed, 1 warning`.
+- Final compile gate: `python -m compileall -q src tests` — PASS.
+- Final Godot editor boot: `godot_console.exe --headless --path level_factory --editor --quit` — exit `0`.
+- Final `git diff --check` — PASS.
+- Final `git diff --exit-code -- TASKS.md` — zero diff.
+- Final status before this terminal log-only publication: tracked worktree clean, pre-existing untracked `.uid` files preserved; local `HEAD` and `origin/main` both `2b1eba23f06001c839f7772a4779eecb7510b90d`.
+- Terminal log-only commit and push are the next publication action; its SHA is recorded in the R04 master log.
