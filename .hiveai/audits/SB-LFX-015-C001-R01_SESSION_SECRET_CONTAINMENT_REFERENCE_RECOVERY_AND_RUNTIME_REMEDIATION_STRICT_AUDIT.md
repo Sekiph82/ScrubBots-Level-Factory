@@ -6,7 +6,7 @@
 
 Severity:
 - BLOCKER: 1
-- MAJOR: 4
+- MAJOR: 3
 - MINOR: 0
 - NOTE: 1
 
@@ -15,121 +15,113 @@ Severity:
 - R01 start: `5c89b9a00d58f6459e29981933725672ff61d0c7`
 - R01 implementation: `fc3ad43aa27f4deb574c661cade9644bda5bfc04`
 - R01 terminal log-only: `0eb2a401781c407dc4d3c3af98ee9f586960bcdf`
-- Later shared hygiene commit inspected: `c340d2cc74f708721b1cf9a44baecb4e9e60bb71`
 
 ## Material improvements
 
-R01 materially improves secret containment and basic Studio wiring:
-- recursive nested mappings/lists are scrubbed for secret/token/password/api_key/credential-like keys;
-- nesting depth is bounded;
-- unsupported non-JSON values fail closed;
-- session schema/version/session_id are checked on restore;
-- real Save / Restore buttons exist;
-- real Godot integration inspects persisted bytes and proves nested `api_key` / `token` keys are absent.
+R01 now:
+- recursively removes secret-like keys from nested dictionaries/lists;
+- validates session schema/version/session ID;
+- adds Save / Restore controls in Studio;
+- distinguishes RESUMED vs NEEDS_OPERATOR_ACTION in one narrow syntactic path;
+- adds a real Godot session save/restore test.
 
-The original known nested-secret example is therefore closed.
+These improvements are retained.
 
-## BLOCKER-001 — recovery still cannot distinguish durable RESUMED / RETRIED / NEW truth
+## BLOCKER-001 — session persistence still uses heuristic scrubbing instead of an explicit allowlist schema
 
-The authoritative criteria explicitly make it a blocker if:
+The original remediation explicitly required an allowlist-based session contract.
 
-> RESUMED/RETRIED/NEW work is not distinguishable.
+Current `_scrub_session_value()` still accepts arbitrary nested mappings/lists/scalars and removes keys only when their names contain strings such as:
+- secret;
+- token;
+- password;
+- api_key;
+- credential.
 
-Current `restore_session()` returns only:
-- `RESUMED` when all syntactic ID checks pass;
-- `NEEDS_OPERATOR_ACTION` otherwise.
+This remains heuristic filtering, not an explicit approved-state schema.
 
-It never derives:
-- RETRIED;
-- NEW;
-- NOT_RESUMABLE;
+A sensitive value under an innocuous key can still persist.
 
-from actual durable job/stage state.
+### Required remediation
 
-The R01 test codifies the problem by saving a nonexistent `active_batch_id = "batch-runtime"` and asserting `RESUMED`.
-
-### Required follow-up
-
-Recovery disposition must be derived from verified canonical record type + durable job/stage/attempt state:
-- RESUMED only for an actually resumable interrupted durable operation;
-- RETRIED only when a verified retry attempt is the active continuity target;
-- NEW only for continuity with no started durable work;
-- NOT_RESUMABLE / NEEDS_OPERATOR_ACTION for unsupported, completed, corrupt or missing states as appropriate.
-
-## MAJOR-001 — “reference validation” is only regex validation
-
-`_session_reference_checks()` treats every state key ending in `_id` as a reference and considers it VALID if its string shape matches a regex.
-
-It does not open or validate:
-- batch manifests/batch-import records;
-- pipeline runs;
-- retry attempts;
-- candidates;
-- owner sources;
-- revisions.
-
-Thus a well-formed but nonexistent ID is reported as a validated canonical reference.
-
-This leaves the original false-`validated_references` finding unresolved.
-
-### Required follow-up
-
-Use explicit typed reference fields and dispatch each through its canonical reader/validator. Store/reference expected identity hashes where needed. Missing, corrupt or mismatched records must fail closed individually.
-
-## MAJOR-002 — session schema remains arbitrary state + heuristic scrubbing rather than allowlisted continuity
-
-The R01 remediation prompt required an **explicit allowlisted versioned session schema**.
-
-Current `save_session()` still accepts an arbitrary mapping and recursively copies all JSON-compatible keys except those whose names match secret-like substrings.
-
-This can persist large/irrelevant mutable state and remains a heuristic rather than a bounded continuity contract.
-
-### Required follow-up
-
-Define exact allowed fields, for example:
+Replace generic recursive preservation with a versioned typed allowlist of approved session fields, for example:
 - selected surface;
-- typed source/candidate/batch/pipeline/retry/revision references;
-- current durable stage/attempt reference;
-- bounded non-canonical draft values;
+- selected canonical record IDs;
+- active durable job references;
+- safe bounded draft fields;
 - autosave generation.
 
-Reject unknown fields/nested structures. Do not attempt to preserve arbitrary application state.
+Reject unknown keys/structures instead of persisting them.
 
-## MAJOR-003 — real autosave/interruption/restart recovery is absent
+## MAJOR-001 — canonical references are still not actually revalidated
 
-The new Studio surface provides manual Save and Restore, but no autosave trigger or durable recovery controller.
+`_session_reference_checks()` treats every key ending in `_id` as VALID when the value merely matches a regex.
 
-The real integration:
-- does not start a real pipeline/batch job;
-- does not interrupt/close Studio mid-work;
-- does not instantiate a new Studio process/session and restore;
-- does not prove successful durable stage IDs remain unchanged;
-- does not prove no duplicate source/candidate creation;
-- does not test missing/deleted canonical reference;
-- does not test corrupt session fail-closed.
+It does not resolve or validate:
+- batch IDs;
+- pipeline run IDs;
+- retry IDs;
+- source IDs;
+- candidate IDs;
+- revision IDs.
 
-### Required follow-up
+The real Godot test stores:
 
-Use a real durable batch/pipeline/retry workflow, save continuity, terminate/reinstantiate Studio, restore and prove the authoritative recovery matrix.
+`active_batch_id = "batch-runtime"`
 
-## MAJOR-004 — successful durable stages are not proven reused
+without creating any canonical batch record, yet restore reports:
 
-Because restore does not resolve real jobs/stages, there is no mechanism or runtime proof that already successful durable stages are reused instead of rerun.
+`validated_references = true`
 
-The session currently restores labels/IDs only; it does not actually resume an eligible canonical job from its durable stage boundary.
+This reproduces the original false-evidence problem in a different form.
 
-### Required follow-up
+### Required remediation
 
-Connect recovery to a real resumable operation contract, explicitly preserve completed stage/output identities, and assert they remain byte/identity-stable across recovery.
+Use typed reference fields and route each through its canonical reader/validator. A nonexistent `batch-runtime` must never validate.
 
-## Shared hygiene commit
+## MAJOR-002 — recovery classification remains fabricated from syntactic validity
 
-`c340d2cc...` changes string spelling in the session UI/test and allowlists new Godot test filenames in the project-boundary test. It does not resolve the canonical-reference or recovery-state findings above.
+Current restore logic is:
+
+- all reference strings regex-valid -> RESUMED;
+- otherwise -> NEEDS_OPERATOR_ACTION.
+
+It does not determine whether work is:
+- actually resumable;
+- already completed;
+- failed and requiring RETRIED;
+- NEW;
+- NOT_RESUMABLE.
+
+It also does not prove completed durable stages will be reused rather than rerun.
+
+### Required remediation
+
+Derive recovery disposition from real durable job/stage state and operation-specific resume capability.
+
+## MAJOR-003 — required interruption/restart matrix is still absent
+
+The real integration saves and restores one synthetic session inside the same runtime.
+
+It does not:
+- create a real pipeline/batch/retry job;
+- interrupt the application mid-work;
+- restart Studio;
+- prove completed stage IDs remain unchanged;
+- prove eligible work resumes;
+- prove no duplicate source/candidate creation;
+- corrupt a session and fail closed;
+- delete/mismatch a referenced canonical record and report it;
+- prove RETRIED / NEW / NOT_RESUMABLE classifications.
+
+### Required remediation
+
+Add a true restart/interruption integration using real durable work.
 
 ## NOTE
 
-The remediation-batch global suite retains the separate protected tracker-contract failure.
+The global remediation batch retains the unrelated tracker-contract test failure.
 
 ## Disposition
 
-`SB-LFX-015` remains open pending canonical typed-reference and real interruption/recovery remediation.
+`SB-LFX-015` remains open pending R02.
