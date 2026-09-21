@@ -14,109 +14,97 @@ Severity:
 
 - R01 start: `23ef20b37fa20d766e5fe380e14c9c946a06973a`
 - R01 implementation: `f99878fc8f69d1f6869ec0867acf7417934c0fb1`
-- R01 terminal log-only: `e0872bef72ef85e3062724db4bd13598c9e7961b`
+- R01 terminal log-only: `e0872be`
 
 ## Material improvements
 
-R01 materially improves retry execution:
-- operation/stage combinations are bounded;
-- secret-like top-level input fields are rejected;
-- eligibility is narrower than the original generic stage rule;
+R01 correctly improves several original gaps:
+- operation/stage-specific retry eligibility replaces the coarse blanket rule;
 - retry changes are restricted to bounded `operator_note`;
-- eligible import-validation retries call `validate_owner_source()`;
-- eligible pipeline retries call `run_pipeline()`;
-- retry attempts record parent failure ID, original inputs, authorized changes, disposition and execution diagnostics;
-- SOLVE/DIFFICULTY remain non-retryable;
-- Studio now has refresh and retry controls;
-- real Godot integration proves an eligible retry actually executes and unauthorized identity change is rejected.
+- eligible import-validation/pipeline retries now execute real canonical functions;
+- retry outcome is independently recorded as RETRY_EXECUTED / RETRY_FAILED;
+- unavailable SOLVE/DIFFICULTY remains non-retryable;
+- Studio now exposes Refresh Inbox and Retry controls.
 
-These improvements are retained.
+## MAJOR-001 — Failure Inbox still does not derive failures from canonical job evidence
 
-## MAJOR-001 — Failure Inbox still does not derive failure truth from canonical job evidence
+The central original finding remains.
 
-The authoritative criteria require the Inbox to consume real failed/rejected/inconclusive evidence from:
-- batch manifests;
-- pipeline runs;
-- import-validation evidence;
-- other committed canonical job evidence.
-
-R01 still uses `record_failure(...)` to manufacture a separate failure record from caller-supplied:
+`record_failure(...)` is still a product operation that accepts caller-provided:
 - operation;
 - stage;
 - disposition;
 - reason;
 - inputs.
 
-`list_failures()` then reads only those separately created `failure-*.json` records.
+Although values are now constrained, this still lets the caller manufacture an authoritative failure record rather than deriving it from:
+- canonical batch manifests;
+- import-validation evidence;
+- persisted pipeline-run evidence;
+- other real job evidence.
 
-The real Godot integration itself demonstrates the problem by calling:
+The criteria explicitly require the Failure Inbox to be a derived view over real durable failure/rejection/inconclusive records.
 
-`record-failure(import-validation, VALIDATE, REJECTED, SOURCE_INVALID, source_id=owner-upload-missing)`
+### Required remediation
 
-rather than producing and discovering a real canonical validation rejection.
+Remove free-form failure creation from the operator/product truth path.
 
-Therefore Failure Inbox truth remains a parallel normalized failure store, not a derived view over actual canonical failures.
+Implement canonical scanners/adapters that:
+- inspect verified validation/pipeline/batch/job evidence;
+- derive normalized inbox entries bound to exact originating evidence IDs;
+- never accept caller reason/disposition/input as failure authority.
 
-### Required follow-up
+A helper for tests/internal normalization is acceptable only if it cannot become product truth without an originating canonical evidence record.
 
-Build failure discovery adapters/readers over real canonical evidence:
-- validation evidence with reject/error disposition;
-- pipeline-run stage failure/block/inconclusive evidence;
-- batch-manifest attempt failure/rejection evidence where applicable.
+## MAJOR-002 — runtime matrix still uses synthetic failure evidence rather than real failed work
 
-A normalized Inbox row may reference those records, but the authoritative failure facts must come from the originating evidence ID/path/hash. Free-form `record_failure` must not be a product authority path.
+The real Godot suite begins by calling:
 
-## MAJOR-002 — Studio Retry action is not eligibility-aware
+`record-failure(import-validation, VALIDATE, REJECTED, SOURCE_INVALID, owner-upload-missing)`
 
-The real `FactoryStudioFailures` surface always renders an enabled `Retry` button.
+This does not demonstrate that a real validation rejection is automatically discovered by the Failure Inbox.
 
-It does not:
-- select a failure row with a verified `retryable` state;
-- disable retry for non-retryable/unavailable entries;
-- show the non-retryable reason before action;
-- expose operation/stage/reason/eligibility details in the Inbox.
+It also does not exercise:
+- a real generator/stage failure;
+- a real persisted pipeline failure discovered from pipeline evidence;
+- a successful control item that is provably absent from retry-failed-only;
+- a retry that succeeds and produces a bound output identity;
+- duplicate protection / successful-stage reuse.
 
-Backend rejection is useful, but the criteria explicitly require a Failure Inbox with eligibility and a Retry Eligible action.
+### Required remediation
 
-### Required follow-up
+Drive the runtime integration from actual canonical evidence:
+1. create a real validation rejection;
+2. create a real pipeline/generator-stage failure where supported;
+3. create an unavailable/inconclusive stage;
+4. create a successful control item;
+5. refresh the Inbox without manually recording failure truth;
+6. prove only eligible failures appear/retry;
+7. include at least one successful retry or, if impossible by contract, a real retry execution whose expected failure and lack of output are authoritative;
+8. prove successful prior stages are not rerun and duplicate protections remain intact.
 
-Make the UI selection-driven and capability-gated:
-- disabled by default;
-- enabled only for the selected canonically derived retryable failure;
-- show exact operation/stage/reason/evidence identity and non-retryable reason.
+## MAJOR-003 — UI does not expose the required failure evidence / eligibility detail
 
-## MAJOR-003 — required no-redo / successful-control / duplicate-protection runtime proof is incomplete
+The Failure Inbox UI currently renders only aggregate count and retry attempt ID.
 
-The R01 real integration covers:
-- one fabricated validation failure;
-- one retry that fails against a missing source;
-- unauthorized change rejection;
-- one non-retryable SOLVE record;
-- refresh.
+It does not visibly present:
+- failure list/items;
+- operation/stage;
+- reason;
+- originating evidence ID;
+- retryable vs non-retryable state;
+- disabled/non-retryable reason.
 
-It does not prove:
-- a real validation rejection discovered from canonical evidence;
-- a real pipeline/generator-stage failure from canonical evidence;
-- a successful control item is excluded from Retry Failed Only;
-- successful prior pipeline stages are reused rather than rerun;
-- retry success produces and records canonical output identity;
-- duplicate accepted output protections remain intact;
-- original originating failure evidence remains byte-identical across retry.
+The Retry button is not disabled based on selected failure eligibility; backend rejection alone is not equivalent to the required operator-visible capability state.
 
-### Required follow-up
+### Required remediation
 
-Extend the real integration with real originating evidence and snapshot the originating records before/after retry. Include at least one successful retry path and one successful control item.
-
-## Publication / regression
-
-Task-final publication is log-only.
-
-Builder reports focused test PASS and real Failure Retry integration PASS. The remediation-batch global suite retains the unrelated protected tracker-contract failure.
+Render real failure rows/details, selection, eligibility and reason. Disable Retry for non-retryable/unavailable entries and bind the selected row to its canonical originating evidence.
 
 ## NOTE
 
-R01 correctly transformed retry from a PENDING-only stub into a real local operation call. The remaining findings are primarily about authoritative failure-source truth, capability-gated UI, and acceptance evidence, not about the new retry invocation itself.
+The remediation-batch global suite retains the unrelated protected tracker-contract failure.
 
 ## Disposition
 
-`SB-LFX-013` remains open pending a canonical-evidence-derived Failure Inbox follow-up and re-audit.
+`SB-LFX-013` remains open pending a focused R02 canonical-evidence/runtime/UI remediation.
