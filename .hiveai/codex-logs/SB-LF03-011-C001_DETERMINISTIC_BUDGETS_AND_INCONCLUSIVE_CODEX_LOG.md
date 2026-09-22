@@ -57,4 +57,7 @@ The pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and
 
 ## Publication
 
-- Implementation commit and push are pending; exact commit SHA, push result, final status, and local/origin equality will be appended after publication.
+- Implementation commit: `766eae9f85d5ac73d70634c7216316a4abf33699` (`Implement SB-LF03-011 solver budgets`).
+- Push result: `origin/main` advanced from `9754c0942a5375aa003add40566690e631ed6ac2` to `766eae9f85d5ac73d70634c7216316a4abf33699`.
+- Post-push equality: local `HEAD` = `766eae9f85d5ac73d70634c7216316a4abf33699`; `origin/main` = `766eae9f85d5ac73d70634c7216316a4abf33699`; divergence `0 0`.
+- Final status before terminal log-only commit: only this builder log modified plus the pre-existing untracked `level_factory/**/*.gd.uid` files.
