@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M03 — Puzzle Intelligence: Simulation, Solver & State Search
-- Current Sprint: SB-LF03.C002 — Compact solver state contract
+- Current Sprint: SB-LF03.C002-R01 — Compact solver state remediation
 - Current Task: SB-LF03-002 — Define compact solver state
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF03-002-C001` from `.hiveai/prompts/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_PROMPT.md`; the main-game `ProofState` remains semantic authority; Codex never edits `TASKS.md`; after publication ChatGPT independently strict-audits SB-LF03-002.
+- Current Task Status: READY_FOR_REMEDIATION
+- Next Task/Action: Codex executes only `SB-LF03-002-C001-R01` from `.hiveai/prompts/SB-LF03-002-C001-R01_AUTHORITY_SOURCE_DRIFT_AND_RECONSTRUCTABILITY_REMEDIATION_PROMPT.md`; preserve accepted C001 architecture; Codex never edits `TASKS.md`; after publication ChatGPT independently re-audits SB-LF03-002.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_AUDIT_CRITERIA.md`
-- Current Prompt: `.hiveai/prompts/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_PROMPT.md`
+- Current Audit Criteria: original SB-LF03-002 C001 criteria + `.hiveai/audits/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_STRICT_AUDIT.md`
+- Current Prompt: `.hiveai/prompts/SB-LF03-002-C001-R01_AUTHORITY_SOURCE_DRIFT_AND_RECONSTRUCTABILITY_REMEDIATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -54,6 +54,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF03-001 C001 Result: `PASS/CLOSED` by `.hiveai/audits/SB-LF03-001-C001_HEADLESS_PUZZLE_SIMULATION_BOUNDARY_STRICT_AUDIT.md`.
 - SB-LF03-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_AUDIT_CRITERIA.md`.
 - SB-LF03-002 C001 Prompt: `.hiveai/prompts/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_PROMPT.md`.
+- SB-LF03-002 C001 Audit Result: `CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED` by `.hiveai/audits/SB-LF03-002-C001_COMPACT_SOLVER_STATE_CONTRACT_STRICT_AUDIT.md`.
+- SB-LF03-002 C001-R01 Prompt: `.hiveai/prompts/SB-LF03-002-C001-R01_AUTHORITY_SOURCE_DRIFT_AND_RECONSTRUCTABILITY_REMEDIATION_PROMPT.md`.
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
