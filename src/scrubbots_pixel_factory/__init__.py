@@ -207,6 +207,14 @@ from .visited_memoization import (
     StateKeyResult,
     UnavailableCanonicalStateKeyProvider,
 )
+from .solver_evidence import (
+    MAX_STATE_REFERENCES,
+    SOLVER_EVIDENCE_SCHEMA,
+    SOLVER_EVIDENCE_VERSION,
+    EvidenceSearchEngine,
+    SolverEvidenceReport,
+    SolverMetrics,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
@@ -463,6 +471,7 @@ __all__ = [
     "CANONICAL_PROVIDER_ID", "CANONICAL_PROVIDER_VERSION", "LEGAL_MOVE_KIND", "LEGAL_MOVE_PROVIDER_SCHEMA", "LEGAL_MOVE_PROVIDER_VERSION", "CanonicalLegalMoveProvider", "LegalMove", "LegalMoveProvider", "LegalMoveProviderError", "LegalMoveQuery", "LegalMoveResult", "ProviderDisposition", "ProviderEvidence",
     "BASELINE_SEARCH_POLICY", "BASELINE_SEARCH_SCHEMA", "BASELINE_SEARCH_VERSION", "BaselineSearchEngine", "BaselineSearchPolicy", "BaselineSearchResult", "SearchContractError", "SearchExecutionDisposition", "SearchTransitionProvider", "SearchVerdict", "TerminalObservation", "TerminalTruth", "TransitionObservation",
     "CANONICAL_KEY_PROVIDER_ID", "CANONICAL_KEY_PROVIDER_VERSION", "CanonicalStateKeyProvider", "DeterministicVisitedMemo", "MemoDisposition", "MemoObservation", "MemoizationContractError", "STATE_KEY_SCHEMA", "STATE_KEY_VERSION", "StateKeyDisposition", "StateKeyEvidence", "StateKeyResult", "UnavailableCanonicalStateKeyProvider",
+    "MAX_STATE_REFERENCES", "SOLVER_EVIDENCE_SCHEMA", "SOLVER_EVIDENCE_VERSION", "EvidenceSearchEngine", "SolverEvidenceReport", "SolverMetrics",
 ]
 
 __version__ = "0.1.0"

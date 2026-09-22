@@ -136,13 +136,14 @@ class BaselineSearchEngine:
         self._transition_provider = transition_provider
         self._policy = policy or BaselineSearchPolicy()
 
-    def search(self, initial_state: CompactSolverState) -> BaselineSearchResult:
+    def search(self, initial_state: CompactSolverState, observer: object | None = None) -> BaselineSearchResult:
         if not isinstance(initial_state, CompactSolverState):
             return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, (), "initial state is malformed", self._policy)
         path: list[LegalMove] = []
-        return self._visit(initial_state, path, 0)
+        return self._visit(initial_state, path, 0, observer)
 
-    def _visit(self, state: CompactSolverState, path: list[LegalMove], depth: int) -> BaselineSearchResult:
+    def _visit(self, state: CompactSolverState, path: list[LegalMove], depth: int, observer: object | None = None) -> BaselineSearchResult:
+        _notify(observer, "on_node", state, depth)
         if depth > self._policy.max_depth:
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "deterministic depth bound exhausted", self._policy)
         try:
@@ -153,6 +154,7 @@ class BaselineSearchEngine:
             return BaselineSearchResult(SearchExecutionDisposition.UNAVAILABLE, None, tuple(path), terminal.reason, self._policy)
         if terminal.disposition is SearchExecutionDisposition.ERROR:
             return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), terminal.reason, self._policy)
+        _notify(observer, "on_terminal", terminal)
         if terminal.truth is TerminalTruth.SOLVED:
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.SOLVED, tuple(path), terminal.reason, self._policy)
         if terminal.truth is TerminalTruth.PROVEN_UNSOLVABLE:
@@ -167,11 +169,13 @@ class BaselineSearchEngine:
         if moves.disposition is ProviderDisposition.ERROR:
             return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), moves.reason, self._policy)
         if not moves.moves:
+            _notify(observer, "on_dead_end", state, depth)
             if terminal.truth is TerminalTruth.UNKNOWN_BOUND:
                 return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "provider reported UNKNOWN_BOUND at a zero-move node", self._policy)
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "provider reported CONTINUE with zero legal moves", self._policy)
 
         saw_inconclusive = False
+        _notify(observer, "on_branch", len(moves.moves), depth)
         for move in moves.moves:
             try:
                 transition = self._transition_provider.transition(state, move)
@@ -181,8 +185,9 @@ class BaselineSearchEngine:
                 return BaselineSearchResult(SearchExecutionDisposition.UNAVAILABLE, None, tuple(path), transition.reason, self._policy)
             if transition.disposition is SearchExecutionDisposition.ERROR:
                 return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), transition.reason, self._policy)
+            _notify(observer, "on_child", state, move, transition)
             next_path = [*path, move]
-            child = self._visit(transition.state, next_path, depth + 1)
+            child = self._visit(transition.state, next_path, depth + 1, observer)
             if child.execution is not SearchExecutionDisposition.AVAILABLE:
                 return child
             if child.verdict is SearchVerdict.SOLVED:
@@ -192,6 +197,14 @@ class BaselineSearchEngine:
         if saw_inconclusive:
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "one or more branches were inconclusive", self._policy)
         return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.PROVEN_UNSOLVABLE, tuple(path), "all provider branches proved unsolvable", self._policy)
+
+
+def _notify(observer: object | None, method: str, *args: object) -> None:
+    if observer is None:
+        return
+    callback = getattr(observer, method, None)
+    if callback is not None:
+        callback(*args)
 
 
 __all__ = [
