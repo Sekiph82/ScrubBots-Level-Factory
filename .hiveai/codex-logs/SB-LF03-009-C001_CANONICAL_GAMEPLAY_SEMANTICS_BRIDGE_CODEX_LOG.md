@@ -50,4 +50,7 @@ The pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and
 
 ## Publication
 
-- Implementation commit and push are pending; exact commit SHA, push result, final status, and local/origin equality will be appended after publication.
+- Implementation commit: `785d45be1cbcc106cb4bfb5716828875e3c06689` (`Implement SB-LF03-009 canonical bridge adapter`).
+- Implementation push: `git push origin main` succeeded; remote advanced `531e8c8..785d45b`.
+- Post-implementation verification: local `HEAD` and `origin/main` both resolve to `785d45be1cbcc106cb4bfb5716828875e3c06689`; divergence `0 0`. Only the pre-existing untracked `level_factory/**/*.gd.uid` files remain.
+- Terminal log-only commit is pending; no product changes will be included in that commit.
