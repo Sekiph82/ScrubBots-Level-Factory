@@ -139,6 +139,23 @@ from .simulation_boundary import (
     SimulationRequest,
     SimulationResult,
 )
+from .compact_solver_state import (
+    ACTIVE_BYTE,
+    AUTHORITY_SCHEMA,
+    AUTHORITY_VERSION,
+    CLEARED_BYTE,
+    COMPACT_STATE_SCHEMA,
+    COMPACT_STATE_VERSION,
+    CompactSolverState,
+    CompactStateContractError,
+    LevelIdentity,
+    OccupiedSlot,
+    SolverStateAuthority,
+    SupplyBatch,
+    AuthorityVerification,
+    AuthorityVerificationDisposition,
+    verify_authority_checkout,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
@@ -391,6 +408,7 @@ __all__ = [
     "UnsupportedCapabilityError",
     "StudioExtensionError", "batch_import", "candidate_inbox", "compare_candidates", "compare_revisions", "cost_center", "create_revision", "delete_preset", "discover_records", "expand_preset", "library_refresh", "list_candidates", "list_revisions", "load_preset", "load_revision", "readiness_card", "record_failure", "record_owner_review", "reproduce_capability", "restore_session", "retry_failure", "run_pipeline", "save_library_metadata", "save_preset", "save_session", "similarity", "validate_owner_source", "verify_owner_source",
     "AuthorityDescriptor", "BOUNDARY_BRIDGE_VERSION", "BoundaryCapability", "BoundaryContractError", "BoundaryDisposition", "BridgeConfiguration", "CANONICAL_CHECKOUT_ENVIRONMENT", "CANONICAL_GAMEPLAY_REPOSITORY", "CanonicalGameplayBridge", "REQUIRED_CANONICAL_SOURCE_PATHS", "SIMULATION_BOUNDARY_SCHEMA", "SIMULATION_BOUNDARY_VERSION", "SimulationRequest", "SimulationResult",
+    "ACTIVE_BYTE", "AUTHORITY_SCHEMA", "AUTHORITY_VERSION", "CLEARED_BYTE", "COMPACT_STATE_SCHEMA", "COMPACT_STATE_VERSION", "CompactSolverState", "CompactStateContractError", "LevelIdentity", "OccupiedSlot", "SolverStateAuthority", "SupplyBatch", "AuthorityVerification", "AuthorityVerificationDisposition", "verify_authority_checkout",
 ]
 
 __version__ = "0.1.0"
