@@ -22,8 +22,12 @@ COMPACT_STATE_SCHEMA = "scrubbots-compact-solver-state"
 COMPACT_STATE_VERSION = 1
 AUTHORITY_SCHEMA = "scrubbots-proof-state-authority"
 AUTHORITY_VERSION = 1
+AUTHORITY_CONTRACT_SCHEMA = "scrubbots-proof-state-contract"
+AUTHORITY_CONTRACT_VERSION = 1
 CANONICAL_GAMEPLAY_REPOSITORY = "https://github.com/Sekiph82/Scrubbots"
 PROOF_STATE_SOURCE_PATH = "scripts/gameplay/solver/proof_state.gd"
+CANONICAL_PROOF_STATE_AUTHORITY_SHA = "1144704e6c3647ed1cf76c610be5bd675585734a"
+CANONICAL_PROOF_STATE_SOURCE_SHA256 = "408893348e8abab089de98586999fc15bafc3b07b83f21458152788a34e78620"
 AUTHORITY_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 SOURCE_SHA_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
@@ -50,6 +54,16 @@ PROOF_STATE_FIELDS = (
 SUPPLY_ENTRY_FIELDS = ("id", "color", "count")
 OCCUPIED_SLOT_FIELDS = ("batch_id", "color", "remaining", "seq", "state")
 SLOT_STATES = ("ACTIVE", "WAITING")
+
+_SOURCE_CONSTANT_PATTERNS = {
+    "SLOT_COUNT": re.compile(r"^\s*const\s+SLOT_COUNT\s*:=\s*(-?\d+)\s*$", re.MULTILINE),
+    "ACTIVE_BYTE": re.compile(r"^\s*const\s+ACTIVE_BYTE\s*:=\s*(-?\d+)\s*$", re.MULTILINE),
+    "CLEARED_BYTE": re.compile(r"^\s*const\s+CLEARED_BYTE\s*:=\s*(-?\d+)\s*$", re.MULTILINE),
+}
+_SOURCE_FIELD_PATTERNS = {
+    field: re.compile(rf"^\s*var\s+{re.escape(field)}\b", re.MULTILINE)
+    for field in PROOF_STATE_FIELDS
+}
 
 
 class CompactStateContractError(ValueError):
@@ -96,6 +110,10 @@ def _digest(value: Mapping[str, object]) -> str:
     return hashlib.sha256(_canonical_bytes(value)).hexdigest()
 
 
+def _source_sha256(source_bytes: bytes) -> str:
+    return hashlib.sha256(source_bytes).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class SolverStateAuthority:
     """Declared external authority identity; declaration is not verification."""
@@ -136,6 +154,23 @@ class SolverStateAuthority:
         return _digest(self.canonical_dict())
 
 
+def _authority_contract_payload(
+    authority: SolverStateAuthority,
+    source_sha256: str,
+    constants: Mapping[str, int],
+    fields: Sequence[str],
+) -> dict[str, object]:
+    return {
+        "schema": AUTHORITY_CONTRACT_SCHEMA,
+        "version": AUTHORITY_CONTRACT_VERSION,
+        "authority": authority.canonical_dict(),
+        "proof_state_source_path": PROOF_STATE_SOURCE_PATH,
+        "source_sha256": source_sha256,
+        "constants": dict(sorted(constants.items())),
+        "fields": list(fields),
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class AuthorityVerification:
     """Read-only checkout verification result, never gameplay state."""
@@ -145,6 +180,9 @@ class AuthorityVerification:
     observed_commit_sha: str | None
     proof_state_source_present: bool
     reason: str
+    committed_proof_state_blob_sha: str | None = None
+    committed_proof_state_sha256: str | None = None
+    working_proof_state_sha256: str | None = None
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -155,15 +193,125 @@ class AuthorityVerification:
             "observed_commit_sha": self.observed_commit_sha,
             "proof_state_source_present": self.proof_state_source_present,
             "reason": self.reason,
+            "committed_proof_state_blob_sha": self.committed_proof_state_blob_sha,
+            "committed_proof_state_sha256": self.committed_proof_state_sha256,
+            "working_proof_state_sha256": self.working_proof_state_sha256,
         }
 
 
-def verify_authority_checkout(authority: SolverStateAuthority, checkout_path: str | os.PathLike[str]) -> AuthorityVerification:
-    """Verify a declared SHA against an explicit local checkout without writes.
+@dataclass(frozen=True, slots=True)
+class AuthoritySourceVerification:
+    """Bounded source-contract evidence, never a gameplay state."""
 
-    This is capability evidence for a future bridge, not a gameplay operation.
-    The path is supplied by the caller and is never persisted into state
-    identity. Network access is neither requested nor used.
+    disposition: AuthorityVerificationDisposition
+    declared_commit_sha: str
+    proof_state_source_path: str
+    source_sha256: str | None
+    expected_source_sha256: str
+    observed_constants: tuple[tuple[str, int], ...]
+    observed_fields: tuple[str, ...]
+    contract_fingerprint: str | None
+    reason: str
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": AUTHORITY_CONTRACT_SCHEMA,
+            "version": AUTHORITY_CONTRACT_VERSION,
+            "disposition": self.disposition.value,
+            "declared_commit_sha": self.declared_commit_sha,
+            "proof_state_source_path": self.proof_state_source_path,
+            "source_sha256": self.source_sha256,
+            "expected_source_sha256": self.expected_source_sha256,
+            "observed_constants": dict(self.observed_constants),
+            "observed_fields": list(self.observed_fields),
+            "contract_fingerprint": self.contract_fingerprint,
+            "reason": self.reason,
+        }
+
+
+def verify_authority_source_contract(
+    authority: SolverStateAuthority,
+    source_bytes: bytes | bytearray | memoryview,
+) -> AuthoritySourceVerification:
+    """Inspect supplied ProofState bytes against the locked authority contract.
+
+    The source is caller-supplied evidence, not an implementation of gameplay.
+    It is hashed before inspection, and VERIFIED requires the exact inspected
+    authority SHA, locked relative path, source bytes, constants, and fields.
+    """
+
+    try:
+        if not isinstance(authority, SolverStateAuthority):
+            raise CompactStateContractError("authority must be a SolverStateAuthority")
+        if not isinstance(source_bytes, (bytes, bytearray, memoryview)):
+            raise CompactStateContractError("ProofState source must be bytes")
+        copied = bytes(source_bytes)
+        source_sha256 = _source_sha256(copied)
+        text = copied.decode("utf-8")
+        observed_constants: dict[str, int] = {}
+        for name, pattern in _SOURCE_CONSTANT_PATTERNS.items():
+            match = pattern.search(text)
+            if match is not None:
+                observed_constants[name] = int(match.group(1))
+        observed_fields = tuple(field for field in PROOF_STATE_FIELDS if _SOURCE_FIELD_PATTERNS[field].search(text))
+        fingerprint = _digest(_authority_contract_payload(authority, source_sha256, observed_constants, observed_fields))
+        expected_constants = {"SLOT_COUNT": SLOT_COUNT, "ACTIVE_BYTE": ACTIVE_BYTE, "CLEARED_BYTE": CLEARED_BYTE}
+        is_verified = (
+            authority.commit_sha == CANONICAL_PROOF_STATE_AUTHORITY_SHA
+            and authority.proof_state_source_path == PROOF_STATE_SOURCE_PATH
+            and source_sha256 == CANONICAL_PROOF_STATE_SOURCE_SHA256
+            and observed_constants == expected_constants
+            and observed_fields == PROOF_STATE_FIELDS
+        )
+        reason = "ProofState source bytes and bounded contract match locked canonical evidence"
+        disposition = AuthorityVerificationDisposition.VERIFIED
+        if not is_verified:
+            disposition = AuthorityVerificationDisposition.MISMATCH
+            reason = "ProofState source bytes or bounded contract drift from locked canonical evidence"
+        return AuthoritySourceVerification(
+            disposition=disposition,
+            declared_commit_sha=authority.commit_sha,
+            proof_state_source_path=authority.proof_state_source_path,
+            source_sha256=source_sha256,
+            expected_source_sha256=CANONICAL_PROOF_STATE_SOURCE_SHA256,
+            observed_constants=tuple(sorted(observed_constants.items())),
+            observed_fields=observed_fields,
+            contract_fingerprint=fingerprint,
+            reason=reason,
+        )
+    except (CompactStateContractError, UnicodeDecodeError, RuntimeError) as exc:
+        declared = authority.commit_sha if isinstance(authority, SolverStateAuthority) else ""
+        source_path = authority.proof_state_source_path if isinstance(authority, SolverStateAuthority) else PROOF_STATE_SOURCE_PATH
+        return AuthoritySourceVerification(
+            disposition=AuthorityVerificationDisposition.ERROR,
+            declared_commit_sha=declared,
+            proof_state_source_path=source_path,
+            source_sha256=None,
+            expected_source_sha256=CANONICAL_PROOF_STATE_SOURCE_SHA256,
+            observed_constants=(),
+            observed_fields=(),
+            contract_fingerprint=None,
+            reason=_bounded_reason(exc),
+        )
+
+
+def _git_output(checkout: Path, arguments: Sequence[str], *, text: bool) -> subprocess.CompletedProcess[bytes | str]:
+    return subprocess.run(
+        ["git", "-C", str(checkout), *arguments],
+        capture_output=True,
+        text=text,
+        check=False,
+        timeout=5,
+    )
+
+
+def verify_authority_checkout(authority: SolverStateAuthority, checkout_path: str | os.PathLike[str]) -> AuthorityVerification:
+    """Verify declared authority against committed and working ProofState bytes.
+
+    This is read-only capability evidence for a future bridge, not a gameplay
+    operation. Local Git resolves the declared commit and blob, then the exact
+    working-tree bytes are compared. The caller path is never persisted into
+    compact state identity and no network access is requested.
     """
 
     try:
@@ -174,79 +322,80 @@ def verify_authority_checkout(authority: SolverStateAuthority, checkout_path: st
             raise CompactStateContractError("checkout path must be a non-empty path")
         checkout = Path(raw_path).resolve()
         if not checkout.is_absolute() or not checkout.is_dir():
-            return AuthorityVerification(
-                AuthorityVerificationDisposition.UNAVAILABLE,
-                authority.commit_sha,
-                None,
-                False,
-                "canonical gameplay checkout does not exist",
-            )
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, None, False, "canonical gameplay checkout does not exist")
         proof_path = checkout / authority.proof_state_source_path
         if not proof_path.is_file():
-            return AuthorityVerification(
-                AuthorityVerificationDisposition.UNAVAILABLE,
-                authority.commit_sha,
-                None,
-                False,
-                "declared ProofState source is missing from the checkout",
-            )
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, None, False, "declared ProofState source is missing from the checkout")
+
         try:
-            process = subprocess.run(
-                ["git", "-C", str(checkout), "rev-parse", "HEAD"],
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=5,
-            )
+            head_process = _git_output(checkout, ["rev-parse", "--verify", "HEAD"], text=True)
+            commit_process = _git_output(checkout, ["rev-parse", "--verify", f"{authority.commit_sha}^{{commit}}"], text=True)
         except FileNotFoundError:
-            return AuthorityVerification(
-                AuthorityVerificationDisposition.UNAVAILABLE,
-                authority.commit_sha,
-                None,
-                True,
-                "git executable is unavailable for checkout identity verification",
-            )
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, None, True, "git executable is unavailable for checkout authority verification")
         except subprocess.TimeoutExpired:
-            return AuthorityVerification(
-                AuthorityVerificationDisposition.ERROR,
-                authority.commit_sha,
-                None,
-                True,
-                "checkout identity verification timed out",
-            )
-        observed = process.stdout.strip().lower() if process.returncode == 0 else None
+            return AuthorityVerification(AuthorityVerificationDisposition.ERROR, authority.commit_sha, None, True, "checkout authority verification timed out")
+
+        observed = head_process.stdout.strip().lower() if head_process.returncode == 0 else None
         if observed is None or AUTHORITY_SHA_PATTERN.fullmatch(observed) is None:
-            return AuthorityVerification(
-                AuthorityVerificationDisposition.UNAVAILABLE,
-                authority.commit_sha,
-                None,
-                True,
-                "checkout HEAD could not be resolved without trusting a caller-provided SHA",
-            )
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, None, True, "checkout HEAD could not be resolved")
         if observed != authority.commit_sha:
+            return AuthorityVerification(AuthorityVerificationDisposition.MISMATCH, authority.commit_sha, observed, True, "checkout HEAD does not match the declared canonical authority SHA")
+        if commit_process.returncode != 0:
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, observed, True, "declared authority commit object is not available locally")
+
+        source_ref = f"{authority.commit_sha}:{authority.proof_state_source_path}"
+        blob_process = _git_output(checkout, ["rev-parse", "--verify", source_ref], text=True)
+        if blob_process.returncode != 0:
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, observed, True, "declared ProofState source is missing from the declared commit")
+        committed_blob = blob_process.stdout.strip().lower()
+        if AUTHORITY_SHA_PATTERN.fullmatch(committed_blob) is None:
+            return AuthorityVerification(AuthorityVerificationDisposition.ERROR, authority.commit_sha, observed, True, "declared ProofState blob identity is malformed")
+        committed_process = _git_output(checkout, ["show", source_ref], text=False)
+        if committed_process.returncode != 0 or not isinstance(committed_process.stdout, bytes):
+            return AuthorityVerification(AuthorityVerificationDisposition.UNAVAILABLE, authority.commit_sha, observed, True, "declared ProofState committed bytes are unavailable")
+        committed_bytes = committed_process.stdout
+        working_bytes = proof_path.read_bytes()
+        committed_sha256 = _source_sha256(committed_bytes)
+        working_sha256 = _source_sha256(working_bytes)
+        if committed_bytes != working_bytes:
             return AuthorityVerification(
                 AuthorityVerificationDisposition.MISMATCH,
                 authority.commit_sha,
                 observed,
                 True,
-                "checkout HEAD does not match the declared canonical authority SHA",
+                "working ProofState bytes do not match the declared commit source bytes",
+                committed_blob,
+                committed_sha256,
+                working_sha256,
+            )
+
+        status_process = _git_output(checkout, ["status", "--porcelain", "--untracked-files=all"], text=True)
+        if status_process.returncode != 0:
+            return AuthorityVerification(AuthorityVerificationDisposition.ERROR, authority.commit_sha, observed, True, "checkout working-tree status could not be resolved", committed_blob, committed_sha256, working_sha256)
+        if status_process.stdout.strip():
+            return AuthorityVerification(
+                AuthorityVerificationDisposition.MISMATCH,
+                authority.commit_sha,
+                observed,
+                True,
+                "checkout working tree is dirty; authority verification fails closed",
+                committed_blob,
+                committed_sha256,
+                working_sha256,
             )
         return AuthorityVerification(
             AuthorityVerificationDisposition.VERIFIED,
             authority.commit_sha,
             observed,
             True,
-            "checkout HEAD and declared ProofState authority match",
+            "declared commit and exact committed/working ProofState bytes match in a clean checkout",
+            committed_blob,
+            committed_sha256,
+            working_sha256,
         )
-    except (CompactStateContractError, OSError, RuntimeError) as exc:
+    except (CompactStateContractError, OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         declared = authority.commit_sha if isinstance(authority, SolverStateAuthority) else ""
-        return AuthorityVerification(
-            AuthorityVerificationDisposition.ERROR,
-            declared,
-            None,
-            False,
-            _bounded_reason(exc),
-        )
+        return AuthorityVerification(AuthorityVerificationDisposition.ERROR, declared, None, False, _bounded_reason(exc))
 
 
 @dataclass(frozen=True, slots=True)
@@ -330,7 +479,7 @@ class OccupiedSlot:
         remaining = _exact_int(self.remaining, "slot remaining")
         seq = _exact_int(self.seq, "slot sequence")
         state = _text(self.state, "slot state")
-        if color < 0 or remaining < 0 or seq < 0 or state not in SLOT_STATES:
+        if color < 0 or remaining <= 0 or seq < 0 or state not in SLOT_STATES:
             raise CompactStateContractError("occupied slot scalar is outside the canonical range")
         object.__setattr__(self, "batch_id", batch_id)
         object.__setattr__(self, "color", color)
@@ -403,6 +552,7 @@ class CompactSolverState:
             frozen_supply.append(tuple(frozen_column))
 
         frozen_slots: list[OccupiedSlot | None] = []
+        occupied_sequences: list[int] = []
         for slot in self.slots:
             if slot is not None:
                 if not isinstance(slot, OccupiedSlot):
@@ -412,7 +562,11 @@ class CompactSolverState:
                 if slot.batch_id in identifiers:
                     raise CompactStateContractError("slot batch identity is duplicated in state")
                 identifiers.add(slot.batch_id)
+                occupied_sequences.append(slot.seq)
             frozen_slots.append(slot)
+
+        if occupied_sequences and next_seq <= max(occupied_sequences):
+            raise CompactStateContractError("next sequence must be greater than every occupied slot sequence")
 
         object.__setattr__(self, "active_mask", mask)
         object.__setattr__(self, "supply", tuple(frozen_supply))
@@ -513,11 +667,16 @@ class CompactSolverState:
 
 __all__ = [
     "ACTIVE_BYTE",
+    "AUTHORITY_CONTRACT_SCHEMA",
+    "AUTHORITY_CONTRACT_VERSION",
     "AUTHORITY_SCHEMA",
     "AUTHORITY_SHA_PATTERN",
     "AUTHORITY_VERSION",
     "AuthorityVerification",
     "AuthorityVerificationDisposition",
+    "AuthoritySourceVerification",
+    "CANONICAL_PROOF_STATE_AUTHORITY_SHA",
+    "CANONICAL_PROOF_STATE_SOURCE_SHA256",
     "CLEARED_BYTE",
     "COMPACT_STATE_SCHEMA",
     "COMPACT_STATE_VERSION",
@@ -539,4 +698,5 @@ __all__ = [
     "SupplyBatch",
     "OccupiedSlot",
     "verify_authority_checkout",
+    "verify_authority_source_contract",
 ]
