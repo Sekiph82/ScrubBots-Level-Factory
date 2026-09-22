@@ -177,6 +177,21 @@ from .legal_move_provider import (
     ProviderDisposition,
     ProviderEvidence,
 )
+from .baseline_search import (
+    BASELINE_SEARCH_POLICY,
+    BASELINE_SEARCH_SCHEMA,
+    BASELINE_SEARCH_VERSION,
+    BaselineSearchEngine,
+    BaselineSearchPolicy,
+    BaselineSearchResult,
+    SearchContractError,
+    SearchExecutionDisposition,
+    SearchTransitionProvider,
+    SearchVerdict,
+    TerminalObservation,
+    TerminalTruth,
+    TransitionObservation,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
@@ -431,6 +446,7 @@ __all__ = [
     "AuthorityDescriptor", "BOUNDARY_BRIDGE_VERSION", "BoundaryCapability", "BoundaryContractError", "BoundaryDisposition", "BridgeConfiguration", "CANONICAL_CHECKOUT_ENVIRONMENT", "CANONICAL_GAMEPLAY_REPOSITORY", "CanonicalGameplayBridge", "REQUIRED_CANONICAL_SOURCE_PATHS", "SIMULATION_BOUNDARY_SCHEMA", "SIMULATION_BOUNDARY_VERSION", "SimulationRequest", "SimulationResult",
     "ACTIVE_BYTE", "AUTHORITY_CONTRACT_SCHEMA", "AUTHORITY_CONTRACT_VERSION", "AUTHORITY_SCHEMA", "AUTHORITY_VERSION", "CANONICAL_PROOF_STATE_AUTHORITY_SHA", "CANONICAL_PROOF_STATE_SOURCE_SHA256", "CLEARED_BYTE", "COMPACT_STATE_SCHEMA", "COMPACT_STATE_VERSION", "CompactSolverState", "CompactStateContractError", "LevelIdentity", "OccupiedSlot", "SolverStateAuthority", "SupplyBatch", "AuthorityVerification", "AuthorityVerificationDisposition", "AuthoritySourceVerification", "verify_authority_checkout", "verify_authority_source_contract",
     "CANONICAL_PROVIDER_ID", "CANONICAL_PROVIDER_VERSION", "LEGAL_MOVE_KIND", "LEGAL_MOVE_PROVIDER_SCHEMA", "LEGAL_MOVE_PROVIDER_VERSION", "CanonicalLegalMoveProvider", "LegalMove", "LegalMoveProvider", "LegalMoveProviderError", "LegalMoveQuery", "LegalMoveResult", "ProviderDisposition", "ProviderEvidence",
+    "BASELINE_SEARCH_POLICY", "BASELINE_SEARCH_SCHEMA", "BASELINE_SEARCH_VERSION", "BaselineSearchEngine", "BaselineSearchPolicy", "BaselineSearchResult", "SearchContractError", "SearchExecutionDisposition", "SearchTransitionProvider", "SearchVerdict", "TerminalObservation", "TerminalTruth", "TransitionObservation",
 ]
 
 __version__ = "0.1.0"
