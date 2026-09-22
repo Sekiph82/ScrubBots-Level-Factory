@@ -51,4 +51,7 @@ To be appended chronologically: implementation decisions, changed files, focused
 - `godot_console.exe --headless --path level_factory --editor --quit`: Godot 4.7.2 exit `0`.
 - `git diff --check`: passed. `git diff --exit-code -- TASKS.md`: empty/passed.
 - Implementation scope is limited to this provider contract, package export, tests, docs, and this builder log. Pre-existing `.uid` files remain untracked and untouched; no dependencies/licenses changed.
-- Implementation commit, push result, terminal log-only commit, and final local/remote equality will be appended after publication.
+- Implementation commit: `14de58bf55a412803dc03df994ce719370deb5b3` (`Implement SB-LF03-003 legal move provider interface`).
+- Push succeeded from `6bf21712485dd261fa30a4d0bd3a823eb0529c68` to `14de58bf55a412803dc03df994ce719370deb5b3` on `main`.
+- Post-push fetch verification: local HEAD and `origin/main` both `14de58bf55a412803dc03df994ce719370deb5b3`; divergence `0 0`.
+- The terminal log-only commit is next and will contain only this finalized builder log.
