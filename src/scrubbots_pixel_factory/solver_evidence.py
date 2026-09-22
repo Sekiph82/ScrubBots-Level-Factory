@@ -10,6 +10,7 @@ import time
 from .baseline_search import BaselineSearchEngine, BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition
 from .compact_solver_state import CompactSolverState
 from .legal_move_provider import LegalMoveProvider
+from .search_policy import BASELINE_SEARCH_POLICY as DEFAULT_SEARCH_POLICY, SearchPolicy
 from .visited_memoization import CanonicalStateKeyProvider, DeterministicVisitedMemo, MemoDisposition
 
 
@@ -54,6 +55,7 @@ class SolverEvidenceReport:
     result: BaselineSearchResult
     metrics: SolverMetrics | None
     elapsed_seconds: float
+    search_policy: SearchPolicy = DEFAULT_SEARCH_POLICY
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -62,6 +64,7 @@ class SolverEvidenceReport:
             "execution": self.execution.value,
             "result": self.result.canonical_dict(),
             "metrics": self.metrics.canonical_dict() if self.metrics is not None else None,
+            "search_policy": self.search_policy.canonical_dict(),
         }
 
     def canonical_bytes(self) -> bytes:
@@ -133,8 +136,9 @@ class _EvidenceCollector:
 class EvidenceSearchEngine:
     """Run accepted baseline search and collect only observed evidence."""
 
-    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: object, policy: BaselineSearchPolicy | None = None, key_provider: CanonicalStateKeyProvider | None = None) -> None:
-        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy)
+    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: object, policy: BaselineSearchPolicy | None = None, key_provider: CanonicalStateKeyProvider | None = None, search_policy: SearchPolicy | None = None) -> None:
+        self._search_policy = search_policy or DEFAULT_SEARCH_POLICY
+        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy, self._search_policy)
         self._key_provider = key_provider
         self._legal_provider = legal_provider
 
@@ -147,7 +151,7 @@ class EvidenceSearchEngine:
         result = self._engine.search(initial_state, observer=collector)
         elapsed = max(0.0, time.monotonic() - started)
         metrics = collector.metrics(result) if result.execution is SearchExecutionDisposition.AVAILABLE else None
-        return SolverEvidenceReport(result.execution, result, metrics, elapsed)
+        return SolverEvidenceReport(result.execution, result, metrics, elapsed, self._search_policy)
 
 
 __all__ = [

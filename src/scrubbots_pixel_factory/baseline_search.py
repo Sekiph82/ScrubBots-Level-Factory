@@ -8,6 +8,7 @@ from typing import Protocol
 
 from .compact_solver_state import CompactSolverState
 from .legal_move_provider import LegalMove, LegalMoveProvider, LegalMoveProviderError, LegalMoveQuery, ProviderDisposition
+from .search_policy import BASELINE_SEARCH_POLICY as DEFAULT_SEARCH_POLICY, SearchPolicy
 
 
 BASELINE_SEARCH_SCHEMA = "scrubbots-baseline-search"
@@ -131,10 +132,15 @@ class BaselineSearchResult:
 class BaselineSearchEngine:
     """DFS orchestration that never interprets gameplay state itself."""
 
-    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: SearchTransitionProvider, policy: BaselineSearchPolicy | None = None) -> None:
+    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: SearchTransitionProvider, policy: BaselineSearchPolicy | None = None, search_policy: SearchPolicy | None = None) -> None:
         self._legal_provider = legal_provider
         self._transition_provider = transition_provider
         self._policy = policy or BaselineSearchPolicy()
+        self._search_policy = search_policy or DEFAULT_SEARCH_POLICY
+
+    @property
+    def search_policy(self) -> SearchPolicy:
+        return self._search_policy
 
     def search(self, initial_state: CompactSolverState, observer: object | None = None) -> BaselineSearchResult:
         if not isinstance(initial_state, CompactSolverState):
@@ -176,7 +182,7 @@ class BaselineSearchEngine:
 
         saw_inconclusive = False
         _notify(observer, "on_branch", len(moves.moves), depth)
-        for move in moves.moves:
+        for move in self._search_policy.order_moves(moves.moves):
             try:
                 transition = self._transition_provider.transition(state, move)
             except Exception as exc:

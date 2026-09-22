@@ -215,6 +215,21 @@ from .solver_evidence import (
     SolverEvidenceReport,
     SolverMetrics,
 )
+from .search_policy import (
+    BASELINE_SEARCH_POLICY as BASELINE_OPTIMIZATION_POLICY,
+    NONE_PRUNING_V1,
+    MoveOrderingPolicy,
+    OrderingPolicy,
+    PROVIDER_ORDER_V1,
+    PruningPolicy,
+    REVERSE_PROVIDER_ORDER_V1,
+    REVERSE_SEARCH_POLICY,
+    SEARCH_POLICY_SCHEMA,
+    SEARCH_POLICY_VERSION,
+    SearchOptimizationPolicy,
+    SearchPolicy,
+    SearchPolicyError,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
@@ -472,6 +487,7 @@ __all__ = [
     "BASELINE_SEARCH_POLICY", "BASELINE_SEARCH_SCHEMA", "BASELINE_SEARCH_VERSION", "BaselineSearchEngine", "BaselineSearchPolicy", "BaselineSearchResult", "SearchContractError", "SearchExecutionDisposition", "SearchTransitionProvider", "SearchVerdict", "TerminalObservation", "TerminalTruth", "TransitionObservation",
     "CANONICAL_KEY_PROVIDER_ID", "CANONICAL_KEY_PROVIDER_VERSION", "CanonicalStateKeyProvider", "DeterministicVisitedMemo", "MemoDisposition", "MemoObservation", "MemoizationContractError", "STATE_KEY_SCHEMA", "STATE_KEY_VERSION", "StateKeyDisposition", "StateKeyEvidence", "StateKeyResult", "UnavailableCanonicalStateKeyProvider",
     "MAX_STATE_REFERENCES", "SOLVER_EVIDENCE_SCHEMA", "SOLVER_EVIDENCE_VERSION", "EvidenceSearchEngine", "SolverEvidenceReport", "SolverMetrics",
+    "BASELINE_OPTIMIZATION_POLICY", "NONE_PRUNING_V1", "MoveOrderingPolicy", "OrderingPolicy", "PROVIDER_ORDER_V1", "PruningPolicy", "REVERSE_PROVIDER_ORDER_V1", "REVERSE_SEARCH_POLICY", "SEARCH_POLICY_SCHEMA", "SEARCH_POLICY_VERSION", "SearchOptimizationPolicy", "SearchPolicy", "SearchPolicyError",
 ]
 
 __version__ = "0.1.0"
