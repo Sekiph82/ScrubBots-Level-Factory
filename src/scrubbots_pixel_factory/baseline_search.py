@@ -181,6 +181,7 @@ class BaselineSearchEngine:
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "provider reported CONTINUE with zero legal moves", self._policy)
 
         saw_inconclusive = False
+        inconclusive_reason = ""
         _notify(observer, "on_branch", len(moves.moves), depth)
         for move in self._search_policy.order_moves(moves.moves):
             try:
@@ -200,8 +201,10 @@ class BaselineSearchEngine:
                 return child
             if child.verdict is SearchVerdict.INCONCLUSIVE:
                 saw_inconclusive = True
+                if not inconclusive_reason:
+                    inconclusive_reason = child.reason
         if saw_inconclusive:
-            return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "one or more branches were inconclusive", self._policy)
+            return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), inconclusive_reason or "one or more branches were inconclusive", self._policy)
         return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.PROVEN_UNSOLVABLE, tuple(path), "all provider branches proved unsolvable", self._policy)
 
 

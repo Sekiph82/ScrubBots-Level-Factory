@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import time
@@ -11,6 +11,7 @@ from .baseline_search import BaselineSearchEngine, BaselineSearchPolicy, Baselin
 from .compact_solver_state import CompactSolverState
 from .legal_move_provider import LegalMoveProvider
 from .search_policy import BASELINE_SEARCH_POLICY as DEFAULT_SEARCH_POLICY, SearchPolicy
+from .solver_budget import BudgetedSolverResult, SolverBudgetPolicy, classify_search_result
 from .visited_memoization import CanonicalStateKeyProvider, DeterministicVisitedMemo, MemoDisposition
 
 
@@ -56,6 +57,8 @@ class SolverEvidenceReport:
     metrics: SolverMetrics | None
     elapsed_seconds: float
     search_policy: SearchPolicy = DEFAULT_SEARCH_POLICY
+    budget_policy: SolverBudgetPolicy = field(default_factory=SolverBudgetPolicy)
+    budget_result: BudgetedSolverResult | None = None
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -65,6 +68,8 @@ class SolverEvidenceReport:
             "result": self.result.canonical_dict(),
             "metrics": self.metrics.canonical_dict() if self.metrics is not None else None,
             "search_policy": self.search_policy.canonical_dict(),
+            "budget_policy": self.budget_policy.canonical_dict(),
+            "budget_result": self.budget_result.canonical_dict() if self.budget_result is not None else None,
         }
 
     def canonical_bytes(self) -> bytes:
@@ -136,9 +141,18 @@ class _EvidenceCollector:
 class EvidenceSearchEngine:
     """Run accepted baseline search and collect only observed evidence."""
 
-    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: object, policy: BaselineSearchPolicy | None = None, key_provider: CanonicalStateKeyProvider | None = None, search_policy: SearchPolicy | None = None) -> None:
+    def __init__(
+        self,
+        legal_provider: LegalMoveProvider,
+        transition_provider: object,
+        policy: BaselineSearchPolicy | None = None,
+        key_provider: CanonicalStateKeyProvider | None = None,
+        search_policy: SearchPolicy | None = None,
+        budget_policy: SolverBudgetPolicy | None = None,
+    ) -> None:
         self._search_policy = search_policy or DEFAULT_SEARCH_POLICY
-        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy, self._search_policy)
+        self._budget_policy = budget_policy or SolverBudgetPolicy(max_depth=(policy.max_depth if policy is not None else SolverBudgetPolicy().max_depth))
+        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy or self._budget_policy.to_baseline_policy(), self._search_policy)
         self._key_provider = key_provider
         self._legal_provider = legal_provider
 
@@ -151,7 +165,8 @@ class EvidenceSearchEngine:
         result = self._engine.search(initial_state, observer=collector)
         elapsed = max(0.0, time.monotonic() - started)
         metrics = collector.metrics(result) if result.execution is SearchExecutionDisposition.AVAILABLE else None
-        return SolverEvidenceReport(result.execution, result, metrics, elapsed, self._search_policy)
+        budget_result = classify_search_result(result, metrics, self._budget_policy)
+        return SolverEvidenceReport(result.execution, result, metrics, elapsed, self._search_policy, self._budget_policy, budget_result)
 
 
 __all__ = [
@@ -159,6 +174,7 @@ __all__ = [
     "SOLVER_EVIDENCE_SCHEMA",
     "SOLVER_EVIDENCE_VERSION",
     "EvidenceSearchEngine",
+    "BudgetedSolverResult",
     "SolverEvidenceReport",
     "SolverMetrics",
 ]

@@ -13,6 +13,7 @@ from typing import Mapping
 from .compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, CANONICAL_PROOF_STATE_SOURCE_SHA256, SolverStateAuthority
 from .search_policy import MoveOrderingPolicy, PruningPolicy, SearchPolicy
 from .solution_analysis import SolutionAnalysisBounds
+from .solver_budget import SolverBudgetPolicy
 
 
 REPRODUCTION_SCHEMA = "scrubbots-solver-reproduction"
@@ -112,7 +113,7 @@ class ReproductionManifest:
     memo_provider_id: str | None
     memo_provider_version: str | None
     search_policy: SearchPolicy
-    budgets: SolutionAnalysisBounds
+    budgets: SolverBudgetPolicy | SolutionAnalysisBounds
     operation: str
     goal: str
     expected_disposition: str
@@ -138,7 +139,9 @@ class ReproductionManifest:
         if self.memo_provider_id is not None:
             object.__setattr__(self, "memo_provider_id", _text(self.memo_provider_id, "memo provider ID"))
             object.__setattr__(self, "memo_provider_version", _text(self.memo_provider_version, "memo provider version"))
-        if not isinstance(self.search_policy, SearchPolicy) or not isinstance(self.budgets, SolutionAnalysisBounds):
+        if isinstance(self.budgets, SolutionAnalysisBounds):
+            object.__setattr__(self, "budgets", SolverBudgetPolicy.from_solution_bounds(self.budgets))
+        if not isinstance(self.search_policy, SearchPolicy) or not isinstance(self.budgets, SolverBudgetPolicy):
             raise ReproductionContractError("search policy or budgets are malformed")
         if self.observed_evidence_digest is not None:
             object.__setattr__(self, "observed_evidence_digest", _sha(self.observed_evidence_digest, "observed evidence SHA-256"))
