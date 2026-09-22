@@ -51,4 +51,7 @@ The pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and
 
 ## Publication
 
-- Implementation commit and push are pending; exact commit SHA, push result, final status, and local/origin equality will be appended after publication.
+- Implementation commit: `ed54615f38d9f3ff4e1408ac369b73912a5cfe63` (`Implement SB-LF03-007 search policy controls`).
+- Implementation push: `git push origin main` succeeded; remote advanced `8c55d6f..ed54615`.
+- Post-implementation verification: local `HEAD` and `origin/main` both resolve to `ed54615f38d9f3ff4e1408ac369b73912a5cfe63`; divergence `0 0`. Only the pre-existing untracked `level_factory/**/*.gd.uid` files remain.
+- Terminal log-only commit is pending; no product changes will be included in that commit.
