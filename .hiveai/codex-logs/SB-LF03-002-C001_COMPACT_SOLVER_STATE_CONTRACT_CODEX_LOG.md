@@ -85,4 +85,9 @@ Pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and unt
 
 - Product/test/doc/log diff is limited to the five files above; `git diff --check` passes and root `TASKS.md` has no diff.
 - No provider credits, credentials, network calls, remote API calls, or main-game writes were used.
-- Implementation commit and push result, final diff, final status, terminal log-only commit, and final local/remote SHA equality will be appended after publication.
+- Implementation commit: `cc1b9b618acfa659683ee5613fda920747449709` (`Implement SB-LF03-002 compact solver state contract`).
+- Before push, verified branch `main`, canonical origin `https://github.com/Sekiph82/Scrubbots-Level-Factory.git`, and local implementation HEAD against `origin/main`; pushed only `main`.
+- Push succeeded: `8a83b464142d13a0a19949417a318a41d474e2c6..cc1b9b618acfa659683ee5613fda920747449709`.
+- Post-push fetch verification: local HEAD and `origin/main` both `cc1b9b618acfa659683ee5613fda920747449709`; divergence `0 0`.
+- Final implementation scope remains limited to the five files listed above; pre-existing `.uid` files remain untracked and untouched; `TASKS.md` remains unchanged.
+- The terminal log-only commit is created next and will contain this publication record; no product or test files will be included in that commit.
