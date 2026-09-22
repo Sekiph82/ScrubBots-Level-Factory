@@ -230,6 +230,18 @@ from .search_policy import (
     SearchPolicy,
     SearchPolicyError,
 )
+from .solution_analysis import (
+    ENTROPY_ANALYSIS_VERSION,
+    EntropyDisposition,
+    MOVE_SEQUENCE_EQUIVALENCE_V1,
+    SOLUTION_ANALYSIS_SCHEMA,
+    SOLUTION_ANALYSIS_VERSION,
+    SolutionAnalysisBounds,
+    SolutionAnalysisError,
+    SolutionCountDisposition,
+    SolutionCountEngine,
+    SolutionCountResult,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
@@ -488,6 +500,7 @@ __all__ = [
     "CANONICAL_KEY_PROVIDER_ID", "CANONICAL_KEY_PROVIDER_VERSION", "CanonicalStateKeyProvider", "DeterministicVisitedMemo", "MemoDisposition", "MemoObservation", "MemoizationContractError", "STATE_KEY_SCHEMA", "STATE_KEY_VERSION", "StateKeyDisposition", "StateKeyEvidence", "StateKeyResult", "UnavailableCanonicalStateKeyProvider",
     "MAX_STATE_REFERENCES", "SOLVER_EVIDENCE_SCHEMA", "SOLVER_EVIDENCE_VERSION", "EvidenceSearchEngine", "SolverEvidenceReport", "SolverMetrics",
     "BASELINE_OPTIMIZATION_POLICY", "NONE_PRUNING_V1", "MoveOrderingPolicy", "OrderingPolicy", "PROVIDER_ORDER_V1", "PruningPolicy", "REVERSE_PROVIDER_ORDER_V1", "REVERSE_SEARCH_POLICY", "SEARCH_POLICY_SCHEMA", "SEARCH_POLICY_VERSION", "SearchOptimizationPolicy", "SearchPolicy", "SearchPolicyError",
+    "ENTROPY_ANALYSIS_VERSION", "EntropyDisposition", "MOVE_SEQUENCE_EQUIVALENCE_V1", "SOLUTION_ANALYSIS_SCHEMA", "SOLUTION_ANALYSIS_VERSION", "SolutionAnalysisBounds", "SolutionAnalysisError", "SolutionCountDisposition", "SolutionCountEngine", "SolutionCountResult",
 ]
 
 __version__ = "0.1.0"
