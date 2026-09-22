@@ -50,4 +50,7 @@ The pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and
 
 ## Publication
 
-- Implementation commit and push are pending; exact commit SHA, push result, final status, and local/origin equality will be appended after publication.
+- Implementation commit: `aa8d6d25a83a2bfedc1329c1a56e08b6295ac3a4` (`Implement SB-LF03-010 reproduction bundles`).
+- Push result: `origin/main` advanced from `17eb5e05fd3000871b3b64bf3992d7b4efaf4eda` to `aa8d6d25a83a2bfedc1329c1a56e08b6295ac3a4`.
+- Post-push equality: local `HEAD` = `aa8d6d25a83a2bfedc1329c1a56e08b6295ac3a4`; `origin/main` = `aa8d6d25a83a2bfedc1329c1a56e08b6295ac3a4`; divergence `0 0`.
+- Final status before terminal log-only commit: only this builder log modified plus the pre-existing untracked `level_factory/**/*.gd.uid` files.
