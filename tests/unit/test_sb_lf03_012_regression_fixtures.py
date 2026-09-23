@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 import shutil
 import subprocess
@@ -21,11 +22,11 @@ from scrubbots_pixel_factory.compact_solver_state import (
     SolverStateAuthority,
     SupplyBatch,
 )
-from scrubbots_pixel_factory.legal_move_provider import LegalMove, LegalMoveQuery, LegalMoveResult, ProviderDisposition, ProviderEvidence
-from scrubbots_pixel_factory.reproduction import ReplayDisposition, ReplayObservation, ReproductionBundle, ReproductionContractError, ReproductionManifest, ReproductionReplay
+from scrubbots_pixel_factory.legal_move_provider import LegalMove, LegalMoveProviderError, LegalMoveQuery, LegalMoveResult, ProviderDisposition, ProviderEvidence
+from scrubbots_pixel_factory.reproduction import ReplayDisposition, ReplayExecutionContext, ReplayObservation, ReproductionBundle, ReproductionContractError, ReproductionManifest, ReproductionReplay
 from scrubbots_pixel_factory.search_policy import BASELINE_SEARCH_POLICY, REVERSE_SEARCH_POLICY
 from scrubbots_pixel_factory.solution_analysis import SolutionAnalysisBounds, SolutionCountDisposition, SolutionCountEngine
-from scrubbots_pixel_factory.solver_budget import BudgetExhaustionReason, SolverBudgetPolicy, SolverOutcomeDisposition, classify_search_result, classify_solution_count_result
+from scrubbots_pixel_factory.solver_budget import BudgetExhaustionReason, OperationalExecutionDisposition, SolverBudgetPolicy, SolverOutcomeDisposition, classify_search_result, classify_solution_count_result, wrap_operational_execution
 from scrubbots_pixel_factory.solver_evidence import EvidenceSearchEngine
 from scrubbots_pixel_factory.visited_memoization import DeterministicVisitedMemo, MemoDisposition, StateKeyDisposition, StateKeyEvidence, StateKeyResult
 
@@ -50,6 +51,10 @@ def load_corpus() -> dict[str, object]:
         seen.add(fixture["id"])
         assert fixture["payload"]["production"] is False
         assert canonical_digest(fixture["payload"]) == fixture["payload_sha256"]
+    for fixture in data["negative_fixtures"]:
+        assert fixture["version"] == 1
+        assert fixture["payload"]["production"] is False
+        assert canonical_digest(fixture["payload"]) == fixture["payload_sha256"]
     return data
 
 
@@ -58,6 +63,13 @@ def payload(fixture_id: str) -> dict[str, object]:
         if fixture["id"] == fixture_id:
             return fixture["payload"]
     raise AssertionError(f"missing fixture: {fixture_id}")
+
+
+def negative_payload(fixture_id: str) -> dict[str, object]:
+    for fixture in load_corpus()["negative_fixtures"]:
+        if fixture["id"] == fixture_id:
+            return fixture["payload"]
+    raise AssertionError(f"missing negative fixture: {fixture_id}")
 
 
 def make_state(name: str, dimensions: dict[str, int]) -> CompactSolverState:
@@ -143,7 +155,7 @@ def test_fixture_corpus_schema_ids_and_payload_checksums() -> None:
     assert bridge["id"] == "LF03_CANONICAL_BRIDGE_CAPABILITY_V1"
     assert bridge["authority_sha"] == CANONICAL_PROOF_STATE_AUTHORITY_SHA
     assert bridge["runner_path"] == "tools/scrubbots_canonical_bridge_runner.gd"
-    assert set(data["r01_negative_fixture_ids"]) == {
+    assert {fixture["id"] for fixture in data["negative_fixtures"]} == {
         "LF03_WRONG_QUERY_RESULT_BINDING_V1",
         "LF03_WRONG_STATE_KEY_BINDING_V1",
         "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
@@ -153,6 +165,57 @@ def test_fixture_corpus_schema_ids_and_payload_checksums() -> None:
         "LF03_MAX_VISITED_EXECUTION_STOP_V1",
         "LF03_TIMEOUT_NONCANONICAL_V1",
     }
+
+
+def test_negative_fixture_payloads_execute_all_historical_defect_families() -> None:
+    wrong_query = negative_payload("LF03_WRONG_QUERY_RESULT_BINDING_V1")
+    graph, legal, _transition, initial = build_graph()
+    query = LegalMoveQuery(initial, initial.digest(), AUTHORITY, legal.provider_id, legal.provider_version)
+    result = legal.query(query)
+    with pytest.raises(LegalMoveProviderError):
+        replace(result, query_digest=wrong_query["mutation"]["value"]).validate_for_query(query)
+
+    wrong_key = negative_payload("LF03_WRONG_STATE_KEY_BINDING_V1")
+    states = {name: make_state(name, {"width": 3, "height": 2, "palette_size": 4}) for name in (wrong_key["state"], wrong_key["result_state"])}
+    memo = DeterministicVisitedMemo(AUTHORITY, "lf03-regression-key", "fixture-only-v1")
+    assert memo.observe(states[wrong_key["state"]], state_key_result(states[wrong_key["result_state"]], wrong_key["key"])).disposition.value == wrong_key["expected"]["disposition"]
+
+    drift = negative_payload("LF03_TRANSITION_AUTHORITY_DRIFT_V1")
+    with pytest.raises(LegalMoveProviderError):
+        LegalMoveQuery(states[drift["state"]], states[drift["state"]].digest(), SolverStateAuthority(AUTHORITY.repository, drift["authority_sha"]), legal.provider_id, legal.provider_version)
+
+    enumeration = negative_payload("LF03_ENUMERATION_BINDING_V1")
+    evidence = ProviderEvidence(legal.provider_id, legal.provider_version, AUTHORITY, ProviderDisposition.AVAILABLE, AuthorityVerificationDisposition.VERIFIED, AuthorityVerificationDisposition.VERIFIED, "CANONICAL_RUNTIME", "fixture-only")
+    with pytest.raises(LegalMoveProviderError):
+        LegalMoveResult.from_query(query, ProviderDisposition.AVAILABLE, evidence, tuple(LegalMove(column) for column in enumeration["moves"]))
+
+    frontier = negative_payload("LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1")
+    frontier_report = EvidenceSearchEngine(legal, FixtureTransitionProvider(graph)).search(initial)
+    assert frontier_report.metrics is not None
+    assert frontier_report.metrics.frontier_peak == frontier["expected"]["frontier_peak"]
+
+    replay_tamper = negative_payload("LF03_REPLAY_IDENTITY_TAMPER_V1")
+    repro = payload("LF03_REPRODUCTION_MATCH_DIVERGED_V1")
+    manifest = ReproductionManifest(
+        candidate_source_sha256=hashlib.sha256(repro["candidate_source"].encode()).hexdigest(),
+        level_data_source_sha256=hashlib.sha256(repro["level_data_source"].encode()).hexdigest(),
+        seed=repro["seed"], normalized_config=repro["normalized_config"], generator_version="lf03-regression-generator-v1", authority=AUTHORITY,
+        source_contract_sha256=CANONICAL_PROOF_STATE_SOURCE_SHA256, provider_id="lf03-regression-fake-legal-provider", provider_version="fixture-only-v1", bridge_version="external-godot-runner-v1", search_version="DFS_CANONICAL_PROVIDER_ORDER_V1", memo_provider_id=None, memo_provider_version=None, search_policy=BASELINE_SEARCH_POLICY, budgets=SolverBudgetPolicy(max_visited_states=50, max_depth=8, max_solutions=10), operation="SOLVE", goal="SOLVED", expected_disposition="SOLVED", observed_evidence_digest=hashlib.sha256(repro["evidence_source"].encode()).hexdigest(), observed_path=tuple(repro["path"]),
+    )
+    bundle = ReproductionBundle.create(manifest)
+    tampered = replace(manifest, seed=replay_tamper["tampered_value"])
+    tampered_bundle = ReproductionBundle.create(tampered)
+    assert ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", manifest.observed_evidence_digest, manifest.observed_path, ReplayExecutionContext.from_manifest(tampered_bundle.manifest))).disposition.value == replay_tamper["expected"]["disposition"]
+
+    max_visited = negative_payload("LF03_MAX_VISITED_EXECUTION_STOP_V1")
+    limited = EvidenceSearchEngine(legal, FixtureTransitionProvider(graph), budget_policy=SolverBudgetPolicy(max_visited_states=max_visited["max_visited_states"])).search(initial)
+    assert limited.metrics is not None and limited.metrics.visited_count == max_visited["expected"]["visited_count"]
+    assert limited.budget_result is not None and limited.budget_result.disposition.value == max_visited["expected"]["disposition"]
+
+    timeout = negative_payload("LF03_TIMEOUT_NONCANONICAL_V1")
+    timeout_outcome = wrap_operational_execution(None, timeout_seconds=timeout["timeout_seconds"], timeout_occurred=timeout["before_result"])
+    assert timeout_outcome.disposition.value == timeout["expected"]["operational_disposition"]
+    assert timeout_outcome.canonical_dict() == timeout["expected"]["canonical_result"]
 
 
 def test_r01_regression_runner_is_committed_and_fixture_only_graphs_stay_nonproduction() -> None:

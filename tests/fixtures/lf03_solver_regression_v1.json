@@ -147,16 +147,7 @@
     ],
     "runner_path": "tools/scrubbots_canonical_bridge_runner.gd",
     "payload": {
-      "level": {
-        "version": 1,
-        "id": "bridge-fixture",
-        "display_name": "Bridge Fixture",
-        "difficulty": "easy",
-        "width": 2,
-        "height": 2,
-        "palette": ["C01", "C02"],
-        "cells": [0, 0, 0, 0]
-      },
+      "level_data_source_base64": "eyJjZWxscyI6WzAsMCwwLDBdLCJkaWZmaWN1bHR5IjoiVEVTVCIsImhlaWdodCI6MiwiaWQiOiJicmlkZ2UtZml4dHVyZSIsIm5hbWUiOiJCcmlkZ2UgRml4dHVyZSIsInBhbGV0dGUiOlsiQzAxIiwiQzAyIl0sInZlcnNpb24iOjEsIndpZHRoIjoyfQ==",
       "column_count": 3,
       "preview_depth": 3,
       "palette_size": 2,
@@ -166,7 +157,7 @@
         [{"id": "batch-1", "color": 0, "count": 1}],
         [{"id": "batch-2", "color": 0, "count": 1}]
       ],
-      "level_data_source_sha256": "6a6a5a42615539c8ec873e5e15d211f26b4c4b17af3412bcb0ea2d049cae7bbb"
+      "level_data_source_sha256": "af383b1fa9257493939992785d5b0f8b5edd309015c8d3d25fe77e4590da2226"
     },
     "operations": [
       {"operation": "legal_moves", "expected": {"active_count": 4, "legal_columns": [0, 1, 2]}},
@@ -175,14 +166,62 @@
     ],
     "skip_reason": "canonical owner repository or Godot executable is unavailable"
   },
-  "r01_negative_fixture_ids": [
-    "LF03_WRONG_QUERY_RESULT_BINDING_V1",
-    "LF03_WRONG_STATE_KEY_BINDING_V1",
-    "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
-    "LF03_ENUMERATION_BINDING_V1",
-    "LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1",
-    "LF03_REPLAY_IDENTITY_TAMPER_V1",
-    "LF03_MAX_VISITED_EXECUTION_STOP_V1",
-    "LF03_TIMEOUT_NONCANONICAL_V1"
+  "negative_fixtures": [
+    {
+      "id": "LF03_WRONG_QUERY_RESULT_BINDING_V1",
+      "family": "wrong_query_result_binding",
+      "version": 1,
+      "payload_sha256": "d506bdef989de18ea99d790c68f37f0bc2974a0ac3276cbf5e40d6a4acf7e68a",
+      "payload": {"production": false, "state": "alpha", "mutation": {"field": "query_digest", "value": "0000000000000000000000000000000000000000000000000000000000000000"}, "expected": {"disposition": "ERROR_OR_EXCEPTION"}}
+    },
+    {
+      "id": "LF03_WRONG_STATE_KEY_BINDING_V1",
+      "family": "wrong_state_key_binding",
+      "version": 1,
+      "payload_sha256": "58afb1f6d9f6b21f5fa438a56f6414c001cfe9c58523e0ccc43034e2cfc0687d",
+      "payload": {"production": false, "state": "alpha", "result_state": "beta", "key": "semantic-A", "expected": {"disposition": "ERROR"}}
+    },
+    {
+      "id": "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
+      "family": "transition_authority_drift",
+      "version": 1,
+      "payload_sha256": "c4ddbe57919c03b766dadf05a3c01cb636e2a64d7ff8d4e6140a6604d79ba395",
+      "payload": {"production": false, "state": "alpha", "authority_sha": "0000000000000000000000000000000000000000", "expected": {"disposition": "ERROR_OR_EXCEPTION"}}
+    },
+    {
+      "id": "LF03_ENUMERATION_BINDING_V1",
+      "family": "enumeration_binding",
+      "version": 1,
+      "payload_sha256": "ba7bb833a94eb5eac8b712b428ff763ea49c7b41edc06195aa06f1aedbad7270",
+      "payload": {"production": false, "state": "alpha", "moves": [1, 0], "expected": {"disposition": "ERROR_OR_EXCEPTION"}}
+    },
+    {
+      "id": "LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1",
+      "family": "frontier_peak_wide_shallow",
+      "version": 1,
+      "payload_sha256": "42da8ec78d4e16f0a8d62706174d3f74506284804f612456b09ddf419dbdc511",
+      "payload": {"production": false, "graph_fixture": "LF03_FAKE_GRAPH_BRANCHING_SOLVED_V1", "expected": {"frontier_peak": 2}}
+    },
+    {
+      "id": "LF03_REPLAY_IDENTITY_TAMPER_V1",
+      "family": "replay_identity_tamper",
+      "version": 1,
+      "payload_sha256": "5dfe1c2327223045bb7a03bb28e2a19acb24858300f8346050200e96c3cdc837",
+      "payload": {"production": false, "field": "seed", "tampered_value": 12013, "expected": {"disposition": "DIVERGED"}}
+    },
+    {
+      "id": "LF03_MAX_VISITED_EXECUTION_STOP_V1",
+      "family": "max_visited_execution_stop",
+      "version": 1,
+      "payload_sha256": "9625a84cc70727c2758099a63ea7edaaef10d149710c49d1f8196707cfceb62e",
+      "payload": {"production": false, "max_visited_states": 1, "expected": {"visited_count": 1, "disposition": "INCONCLUSIVE"}}
+    },
+    {
+      "id": "LF03_TIMEOUT_NONCANONICAL_V1",
+      "family": "timeout_noncanonical",
+      "version": 1,
+      "payload_sha256": "c8354987f7dcb28080d712b7895408c846f22f3de3b7cbc194869cba0b1f4709",
+      "payload": {"production": false, "timeout_seconds": 0.25, "before_result": true, "expected": {"operational_disposition": "INCONCLUSIVE", "canonical_result": null}}
+    }
   ]
 }
