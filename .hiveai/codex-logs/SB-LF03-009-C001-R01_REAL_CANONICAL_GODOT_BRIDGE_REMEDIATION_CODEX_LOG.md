@@ -22,3 +22,5 @@ Verification:
 - `python -m compileall -q src tests`: PASS; Level Factory Godot headless editor boot: PASS.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `src/scrubbots_pixel_factory/canonical_bridge.py`, `tools/scrubbots_canonical_bridge_runner.gd`, this log.
+- Implementation commit: `7e540c8145890f568991a98ce5f65c998eac18d7`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
