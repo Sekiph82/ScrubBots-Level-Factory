@@ -40,9 +40,9 @@ def test_duplicate_canonical_fixture_keys_collapse_and_hits_are_separate() -> No
     first_state = state("one")
     second_state = state("two")
     memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
-    first = memo.observe(key_result(first_state, "semantic-A"))
-    duplicate = memo.observe(key_result(second_state, "semantic-A"))
-    distinct = memo.observe(key_result(second_state, "semantic-B"))
+    first = memo.observe(first_state, key_result(first_state, "semantic-A"))
+    duplicate = memo.observe(second_state, key_result(second_state, "semantic-A"))
+    distinct = memo.observe(second_state, key_result(second_state, "semantic-B"))
     assert first.disposition is MemoDisposition.FIRST_VISIT
     assert duplicate.disposition is MemoDisposition.MEMO_HIT
     assert distinct.disposition is MemoDisposition.FIRST_VISIT
@@ -54,7 +54,7 @@ def test_repeat_identical_observation_counts_and_serialization_are_deterministic
     compact = state("repeat")
     def run() -> list[dict[str, object]]:
         memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
-        return [memo.observe(key_result(compact, key)).canonical_dict() for key in ("A", "B", "A", "A")]
+        return [memo.observe(compact, key_result(compact, key)).canonical_dict() for key in ("A", "B", "A", "A")]
     assert run() == run()
 
 
@@ -65,8 +65,8 @@ def test_malformed_key_provider_mismatch_and_factory_digest_substitution_fail_cl
     memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
     mismatch_evidence = StateKeyEvidence("other", "fixture-v1", authority(), StateKeyDisposition.AVAILABLE, AuthorityVerificationDisposition.VERIFIED, AuthorityVerificationDisposition.VERIFIED, "mismatch")
     mismatch = StateKeyResult(StateKeyDisposition.AVAILABLE, compact.digest(), compact.authority, "other", "fixture-v1", mismatch_evidence, "key", "mismatch")
-    assert memo.observe(mismatch).disposition is MemoDisposition.ERROR
-    substituted = memo.observe(key_result(compact, compact.digest()))
+    assert memo.observe(compact, mismatch).disposition is MemoDisposition.ERROR
+    substituted = memo.observe(compact, key_result(compact, compact.digest()))
     assert substituted.disposition is MemoDisposition.ERROR
     assert "digest" in substituted.reason
 
@@ -77,14 +77,14 @@ def test_unavailable_key_authority_does_not_fabricate_a_structural_key() -> None
     assert result.disposition is StateKeyDisposition.UNAVAILABLE
     assert result.opaque_key is None
     memo = DeterministicVisitedMemo(authority(), result.provider_id, result.provider_version)
-    assert memo.observe(result).disposition is MemoDisposition.UNAVAILABLE
+    assert memo.observe(compact, result).disposition is MemoDisposition.UNAVAILABLE
 
 
 def test_memo_does_not_mutate_compact_state_and_factory_digest_is_not_key_authority() -> None:
     compact = state("immutable")
     before = compact.digest()
     memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
-    memo.observe(key_result(compact, "semantic-immutable"))
+    memo.observe(compact, key_result(compact, "semantic-immutable"))
     assert compact.digest() == before
     source = (Path(__file__).resolve().parents[2] / "src" / "scrubbots_pixel_factory" / "visited_memoization.py").read_text(encoding="utf-8")
     assert "canonical_key()" not in source
@@ -100,3 +100,10 @@ def test_bound_observation_rejects_key_for_another_state_without_count_mutation(
     assert result.disposition is MemoDisposition.ERROR
     assert result.visited_count == 0
     assert result.memo_hits == 0
+
+
+def test_bare_key_result_observation_is_rejected() -> None:
+    compact = state("bare")
+    memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
+    with pytest.raises(TypeError):
+        memo.observe(key_result(compact, "unbound"))  # type: ignore[call-arg]

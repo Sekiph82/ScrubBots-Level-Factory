@@ -189,16 +189,15 @@ class DeterministicVisitedMemo:
         self._keys: set[str] = set()
         self._memo_hits = 0
 
-    def observe(self, result: StateKeyResult | CompactSolverState, bound_result: StateKeyResult | None = None) -> MemoObservation:
-        state = result if isinstance(result, CompactSolverState) else None
-        result = bound_result if state is not None else result
+    def observe(self, state: CompactSolverState, result: StateKeyResult) -> MemoObservation:
+        if not isinstance(state, CompactSolverState):
+            return self._observation(MemoDisposition.ERROR, "", None, "canonical memo state is malformed")
         if not isinstance(result, StateKeyResult):
             return self._observation(MemoDisposition.ERROR, "", None, "canonical key result is malformed")
-        if state is not None:
-            try:
-                result.validate_for_state(state, self._provider_id, self._provider_version)
-            except MemoizationContractError as exc:
-                return self._observation(MemoDisposition.ERROR, result.state_digest, None, str(exc))
+        try:
+            result.validate_for_state(state, self._provider_id, self._provider_version)
+        except MemoizationContractError as exc:
+            return self._observation(MemoDisposition.ERROR, result.state_digest, None, str(exc))
         if result.authority != self._authority or result.provider_id != self._provider_id or result.provider_version != self._provider_version:
             return self._observation(MemoDisposition.ERROR, result.state_digest, None, "key provider or authority mismatch")
         if result.disposition is StateKeyDisposition.UNAVAILABLE:
