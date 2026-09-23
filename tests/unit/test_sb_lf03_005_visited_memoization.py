@@ -90,3 +90,13 @@ def test_memo_does_not_mutate_compact_state_and_factory_digest_is_not_key_author
     assert "canonical_key()" not in source
     assert "active_mask" not in source
     assert "wfc" not in source.lower()
+
+
+def test_bound_observation_rejects_key_for_another_state_without_count_mutation() -> None:
+    first_state = state("bound-a")
+    second_state = state("bound-b")
+    memo = DeterministicVisitedMemo(authority(), "fixture-key", "fixture-v1")
+    result = memo.observe(first_state, key_result(second_state, "semantic-b"))
+    assert result.disposition is MemoDisposition.ERROR
+    assert result.visited_count == 0
+    assert result.memo_hits == 0

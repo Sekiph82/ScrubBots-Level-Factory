@@ -115,6 +115,18 @@ class StateKeyResult:
             "reason": self.reason,
         }
 
+    def validate_for_state(self, state: CompactSolverState, provider_id: str, provider_version: str) -> None:
+        if not isinstance(state, CompactSolverState):
+            raise MemoizationContractError("key validation state is malformed")
+        if self.state_digest != state.digest() or self.authority != state.authority:
+            raise MemoizationContractError("canonical key result is bound to a different state")
+        if self.provider_id != provider_id or self.provider_version != provider_version:
+            raise MemoizationContractError("canonical key provider identity mismatch")
+        if self.evidence.authority != state.authority or self.evidence.provider_id != provider_id or self.evidence.provider_version != provider_version:
+            raise MemoizationContractError("canonical key evidence identity mismatch")
+        if self.disposition is StateKeyDisposition.AVAILABLE and (self.evidence.disposition is not StateKeyDisposition.AVAILABLE or self.evidence.authority_verification is not AuthorityVerificationDisposition.VERIFIED or self.evidence.source_contract_verification is not AuthorityVerificationDisposition.VERIFIED):
+            raise MemoizationContractError("canonical key evidence is not verified")
+
 
 class CanonicalStateKeyProvider(Protocol):
     provider_id: str
@@ -177,7 +189,16 @@ class DeterministicVisitedMemo:
         self._keys: set[str] = set()
         self._memo_hits = 0
 
-    def observe(self, result: StateKeyResult) -> MemoObservation:
+    def observe(self, result: StateKeyResult | CompactSolverState, bound_result: StateKeyResult | None = None) -> MemoObservation:
+        state = result if isinstance(result, CompactSolverState) else None
+        result = bound_result if state is not None else result
+        if not isinstance(result, StateKeyResult):
+            return self._observation(MemoDisposition.ERROR, "", None, "canonical key result is malformed")
+        if state is not None:
+            try:
+                result.validate_for_state(state, self._provider_id, self._provider_version)
+            except MemoizationContractError as exc:
+                return self._observation(MemoDisposition.ERROR, result.state_digest, None, str(exc))
         if result.authority != self._authority or result.provider_id != self._provider_id or result.provider_version != self._provider_version:
             return self._observation(MemoDisposition.ERROR, result.state_digest, None, "key provider or authority mismatch")
         if result.disposition is StateKeyDisposition.UNAVAILABLE:
