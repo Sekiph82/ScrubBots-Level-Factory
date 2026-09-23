@@ -31,12 +31,17 @@ class SolverOutcomeDisposition(str, Enum):
     ERROR = "ERROR"
 
 
+class OperationalExecutionDisposition(str, Enum):
+    COMPLETED = "COMPLETED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    ERROR = "ERROR"
+
+
 class BudgetExhaustionReason(str, Enum):
     MAX_VISITED_STATES = "MAX_VISITED_STATES"
     MAX_DEPTH = "MAX_DEPTH"
     MAX_SOLUTIONS = "MAX_SOLUTIONS"
     UNKNOWN_BOUND = "UNKNOWN_BOUND"
-    OPERATIONAL_TIMEOUT = "OPERATIONAL_TIMEOUT"
 
 
 def _positive_int(value: object, name: str) -> int:
@@ -60,19 +65,10 @@ class SolverBudgetPolicy:
     max_visited_states: int = 10000
     max_depth: int = 64
     max_solutions: int = 100
-    operational_timeout_seconds: float | None = None
-
     def __post_init__(self) -> None:
         object.__setattr__(self, "max_visited_states", _positive_int(self.max_visited_states, "max visited states"))
         object.__setattr__(self, "max_depth", _non_negative_int(self.max_depth, "max depth"))
         object.__setattr__(self, "max_solutions", _positive_int(self.max_solutions, "max solutions"))
-        if self.operational_timeout_seconds is not None:
-            if type(self.operational_timeout_seconds) not in {int, float} or isinstance(self.operational_timeout_seconds, bool):
-                raise SolverBudgetError("operational timeout must be a finite positive number")
-            timeout = float(self.operational_timeout_seconds)
-            if not math.isfinite(timeout) or timeout <= 0.0:
-                raise SolverBudgetError("operational timeout must be a finite positive number")
-            object.__setattr__(self, "operational_timeout_seconds", timeout)
 
     @classmethod
     def from_solution_bounds(cls, bounds: SolutionAnalysisBounds) -> "SolverBudgetPolicy":
@@ -95,15 +91,6 @@ class SolverBudgetPolicy:
             "max_solutions": self.max_solutions,
         }
 
-    def operational_dict(self) -> dict[str, object] | None:
-        if self.operational_timeout_seconds is None:
-            return None
-        return {
-            "version": OPERATIONAL_TIMEOUT_POLICY_VERSION,
-            "timeout_seconds": self.operational_timeout_seconds,
-            "canonical": False,
-        }
-
     def digest(self) -> str:
         return hashlib.sha256(_canonical_bytes(self.canonical_dict())).hexdigest()
 
@@ -115,7 +102,6 @@ class BudgetedSolverResult:
     source_disposition: str
     reason: str
     exhaustion: BudgetExhaustionReason | None = None
-    operational_timeout_exhausted: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.disposition, SolverOutcomeDisposition):
@@ -132,21 +118,7 @@ class BudgetedSolverResult:
             raise SolverBudgetError("solver outcome exhaustion reason is malformed")
         if self.disposition is SolverOutcomeDisposition.PROVEN_UNSOLVABLE and self.exhaustion is not None:
             raise SolverBudgetError("budget exhaustion cannot produce proven unsolvability")
-        if self.operational_timeout_exhausted and self.disposition is not SolverOutcomeDisposition.INCONCLUSIVE:
-            raise SolverBudgetError("operational timeout must map to inconclusive")
-
     def canonical_dict(self) -> dict[str, object]:
-        if self.operational_timeout_exhausted:
-            return {
-                "schema": SOLVER_OUTCOME_SCHEMA,
-                "version": SOLVER_OUTCOME_VERSION,
-                "disposition": SolverOutcomeDisposition.INCONCLUSIVE.value,
-                "policy": self.policy.canonical_dict(),
-                "source": self.source,
-                "source_disposition": "INCONCLUSIVE",
-                "reason": "canonical deterministic result unavailable",
-                "exhaustion": None,
-            }
         return {
             "schema": SOLVER_OUTCOME_SCHEMA,
             "version": SOLVER_OUTCOME_VERSION,
@@ -161,34 +133,75 @@ class BudgetedSolverResult:
     def digest(self) -> str:
         return hashlib.sha256(_canonical_bytes(self.canonical_dict())).hexdigest()
 
-    def operational_dict(self) -> dict[str, object] | None:
-        if not self.operational_timeout_exhausted:
-            return None
-        return {
-            "timeout_exhausted": True,
-            "timeout_seconds": self.policy.operational_timeout_seconds,
-            "canonical": False,
-        }
+    def canonical_bytes(self) -> bytes:
+        return _canonical_bytes(self.canonical_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class OperationalTimeoutTelemetry:
+    timeout_seconds: float
+    occurred: bool = True
+
+    def __post_init__(self) -> None:
+        if type(self.timeout_seconds) not in {int, float} or isinstance(self.timeout_seconds, bool) or not math.isfinite(float(self.timeout_seconds)) or self.timeout_seconds <= 0:
+            raise SolverBudgetError("operational timeout must be a finite positive number")
+        object.__setattr__(self, "timeout_seconds", float(self.timeout_seconds))
+        if type(self.occurred) is not bool:
+            raise SolverBudgetError("operational timeout occurrence must be boolean")
+
+    def operational_dict(self) -> dict[str, object]:
+        return {"version": OPERATIONAL_TIMEOUT_POLICY_VERSION, "timeout_seconds": self.timeout_seconds, "occurred": self.occurred, "canonical": False}
+
+
+@dataclass(frozen=True, slots=True)
+class OperationalSolverOutcome:
+    disposition: OperationalExecutionDisposition
+    canonical_result: BudgetedSolverResult | None
+    timeout: OperationalTimeoutTelemetry | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.disposition, OperationalExecutionDisposition):
+            raise SolverBudgetError("operational execution disposition is malformed")
+        if self.canonical_result is not None and not isinstance(self.canonical_result, BudgetedSolverResult):
+            raise SolverBudgetError("operational canonical result is malformed")
+        if self.timeout is not None and not isinstance(self.timeout, OperationalTimeoutTelemetry):
+            raise SolverBudgetError("operational timeout telemetry is malformed")
+        if self.canonical_result is None and self.disposition is not OperationalExecutionDisposition.INCONCLUSIVE:
+            raise SolverBudgetError("missing canonical result must be operationally inconclusive")
+
+    def canonical_dict(self) -> dict[str, object] | None:
+        return self.canonical_result.canonical_dict() if self.canonical_result is not None else None
+
+    def canonical_bytes(self) -> bytes | None:
+        return self.canonical_result.canonical_bytes() if self.canonical_result is not None else None
+
+    def digest(self) -> str | None:
+        return self.canonical_result.digest() if self.canonical_result is not None else None
+
+    def operational_dict(self) -> dict[str, object]:
+        return {"disposition": self.disposition.value, "timeout": self.timeout.operational_dict() if self.timeout is not None else None, "canonical": False}
+
+
+def wrap_operational_execution(
+    result: BudgetedSolverResult | None,
+    *,
+    timeout_seconds: float | None = None,
+    timeout_occurred: bool = False,
+) -> OperationalSolverOutcome:
+    timeout = OperationalTimeoutTelemetry(timeout_seconds, timeout_occurred) if timeout_seconds is not None else None
+    if result is None:
+        if not timeout_occurred:
+            return OperationalSolverOutcome(OperationalExecutionDisposition.ERROR, None, timeout)
+        return OperationalSolverOutcome(OperationalExecutionDisposition.INCONCLUSIVE, None, timeout)
+    return OperationalSolverOutcome(OperationalExecutionDisposition.COMPLETED, result, timeout)
 
 
 def classify_search_result(
     result: BaselineSearchResult,
     metrics: object | None = None,
     policy: SolverBudgetPolicy | None = None,
-    *,
-    operational_timeout_exhausted: bool = False,
 ) -> BudgetedSolverResult:
     budget = policy or SolverBudgetPolicy()
-    if operational_timeout_exhausted:
-        return BudgetedSolverResult(
-            SolverOutcomeDisposition.INCONCLUSIVE,
-            budget,
-            "baseline_search",
-            "OPERATIONAL_TIMEOUT",
-            "operational wall-clock timeout exhausted",
-            BudgetExhaustionReason.OPERATIONAL_TIMEOUT,
-            True,
-        )
     if not isinstance(result, BaselineSearchResult):
         return BudgetedSolverResult(SolverOutcomeDisposition.ERROR, budget, "baseline_search", "MALFORMED", "search result is malformed")
     if result.execution is SearchExecutionDisposition.UNAVAILABLE:
@@ -228,20 +241,8 @@ def classify_search_result(
 def classify_solution_count_result(
     result: SolutionCountResult,
     policy: SolverBudgetPolicy | None = None,
-    *,
-    operational_timeout_exhausted: bool = False,
 ) -> BudgetedSolverResult:
     budget = policy or (SolverBudgetPolicy.from_solution_bounds(result.bounds) if isinstance(result, SolutionCountResult) else SolverBudgetPolicy())
-    if operational_timeout_exhausted:
-        return BudgetedSolverResult(
-            SolverOutcomeDisposition.INCONCLUSIVE,
-            budget,
-            "solution_count",
-            "OPERATIONAL_TIMEOUT",
-            "operational wall-clock timeout exhausted",
-            BudgetExhaustionReason.OPERATIONAL_TIMEOUT,
-            True,
-        )
     if not isinstance(result, SolutionCountResult):
         return BudgetedSolverResult(SolverOutcomeDisposition.ERROR, budget, "solution_count", "MALFORMED", "solution-count result is malformed")
     if result.disposition is SolutionCountDisposition.UNAVAILABLE:
@@ -268,6 +269,9 @@ def classify_solution_count_result(
 __all__ = [
     "BudgetExhaustionReason",
     "BudgetedSolverResult",
+    "OperationalExecutionDisposition",
+    "OperationalSolverOutcome",
+    "OperationalTimeoutTelemetry",
     "OPERATIONAL_TIMEOUT_POLICY_VERSION",
     "SOLVER_BUDGET_SCHEMA",
     "SOLVER_BUDGET_VERSION",
@@ -278,4 +282,5 @@ __all__ = [
     "SolverOutcomeDisposition",
     "classify_search_result",
     "classify_solution_count_result",
+    "wrap_operational_execution",
 ]

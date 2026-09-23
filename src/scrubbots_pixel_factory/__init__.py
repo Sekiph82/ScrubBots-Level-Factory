@@ -250,11 +250,15 @@ from .solver_budget import (
     SOLVER_OUTCOME_VERSION,
     BudgetExhaustionReason,
     BudgetedSolverResult,
+    OperationalExecutionDisposition,
+    OperationalSolverOutcome,
+    OperationalTimeoutTelemetry,
     SolverBudgetError,
     SolverBudgetPolicy,
     SolverOutcomeDisposition,
     classify_search_result,
     classify_solution_count_result,
+    wrap_operational_execution,
 )
 from .canonical_bridge import (
     CANONICAL_BRIDGE_RUNNER_VERSION,
@@ -538,7 +542,7 @@ __all__ = [
     "MAX_STATE_REFERENCES", "SOLVER_EVIDENCE_SCHEMA", "SOLVER_EVIDENCE_VERSION", "EvidenceSearchEngine", "SolverEvidenceReport", "SolverMetrics",
     "BASELINE_OPTIMIZATION_POLICY", "NONE_PRUNING_V1", "MoveOrderingPolicy", "OrderingPolicy", "PROVIDER_ORDER_V1", "PruningPolicy", "REVERSE_PROVIDER_ORDER_V1", "REVERSE_SEARCH_POLICY", "SEARCH_POLICY_SCHEMA", "SEARCH_POLICY_VERSION", "SearchOptimizationPolicy", "SearchPolicy", "SearchPolicyError",
     "ENTROPY_ANALYSIS_VERSION", "EntropyDisposition", "MOVE_SEQUENCE_EQUIVALENCE_V1", "SOLUTION_ANALYSIS_SCHEMA", "SOLUTION_ANALYSIS_VERSION", "SolutionAnalysisBounds", "SolutionAnalysisError", "SolutionCountDisposition", "SolutionCountEngine", "SolutionCountResult",
-    "OPERATIONAL_TIMEOUT_POLICY_VERSION", "SOLVER_BUDGET_SCHEMA", "SOLVER_BUDGET_VERSION", "SOLVER_OUTCOME_SCHEMA", "SOLVER_OUTCOME_VERSION", "BudgetExhaustionReason", "BudgetedSolverResult", "SolverBudgetError", "SolverBudgetPolicy", "SolverOutcomeDisposition", "classify_search_result", "classify_solution_count_result",
+    "OPERATIONAL_TIMEOUT_POLICY_VERSION", "SOLVER_BUDGET_SCHEMA", "SOLVER_BUDGET_VERSION", "SOLVER_OUTCOME_SCHEMA", "SOLVER_OUTCOME_VERSION", "BudgetExhaustionReason", "BudgetedSolverResult", "OperationalExecutionDisposition", "OperationalSolverOutcome", "OperationalTimeoutTelemetry", "SolverBudgetError", "SolverBudgetPolicy", "SolverOutcomeDisposition", "classify_search_result", "classify_solution_count_result", "wrap_operational_execution",
     "CANONICAL_BRIDGE_RUNNER_VERSION", "CANONICAL_BRIDGE_SCHEMA", "CANONICAL_BRIDGE_VERSION", "CanonicalBridgeConfiguration", "CanonicalBridgeDisposition", "CanonicalBridgeError", "CanonicalBridgeRequest", "CanonicalBridgeResponse", "CanonicalHeadlessBridge",
     "REPRODUCTION_SCHEMA", "REPRODUCTION_VERSION", "ReplayDisposition", "ReplayExecutionContext", "ReplayObservation", "ReplayResult", "ReproductionBundle", "ReproductionContractError", "ReproductionManifest", "ReproductionReplay",
 ]

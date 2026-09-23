@@ -21,6 +21,9 @@ from scrubbots_pixel_factory.solver_budget import (
     SolverBudgetError,
     SolverBudgetPolicy,
     SolverOutcomeDisposition,
+    OperationalExecutionDisposition,
+    OperationalTimeoutTelemetry,
+    wrap_operational_execution,
     classify_search_result,
     classify_solution_count_result,
 )
@@ -101,13 +104,20 @@ def test_budget_policy_exact_boundaries_and_malformed_values() -> None:
     assert policy.canonical_dict()["max_depth"] == 0
     assert policy.to_baseline_policy() == BaselineSearchPolicy(max_depth=0)
     assert policy.to_solution_bounds() == SolutionAnalysisBounds(max_depth=0, max_states=1, max_solutions=1)
-    for kwargs in ({"max_visited_states": 0}, {"max_depth": -1}, {"max_solutions": False}, {"operational_timeout_seconds": 0.0}):
+    for kwargs in ({"max_visited_states": 0}, {"max_depth": -1}, {"max_solutions": False}):
         try:
             SolverBudgetPolicy(**kwargs)
         except SolverBudgetError:
             pass
         else:
             raise AssertionError(f"malformed budget accepted: {kwargs}")
+    for kwargs in ({"timeout_seconds": 0.0}, {"timeout_seconds": float("nan")}, {"timeout_seconds": 1.0, "occurred": 1}):
+        try:
+            OperationalTimeoutTelemetry(**kwargs)
+        except SolverBudgetError:
+            pass
+        else:
+            raise AssertionError(f"malformed timeout telemetry accepted: {kwargs}")
 
 
 def test_solved_and_proven_no_solution_are_distinct_from_inconclusive() -> None:
@@ -146,14 +156,35 @@ def test_state_depth_solution_and_unknown_bounds_are_inconclusive() -> None:
 def test_operational_timeout_maps_only_to_inconclusive() -> None:
     legal, transition, initial = fixture()
     search = BaselineSearchEngine(legal, transition).search(initial)
-    result = classify_search_result(search, policy=SolverBudgetPolicy(operational_timeout_seconds=0.1), operational_timeout_exhausted=True)
-    repeat = classify_search_result(search, policy=SolverBudgetPolicy(operational_timeout_seconds=9.0), operational_timeout_exhausted=True)
-    assert result.disposition is SolverOutcomeDisposition.INCONCLUSIVE
-    assert result.exhaustion is BudgetExhaustionReason.OPERATIONAL_TIMEOUT
-    assert result.operational_timeout_exhausted is True
-    assert result.canonical_dict() == repeat.canonical_dict()
-    assert "OPERATIONAL_TIMEOUT" not in str(result.canonical_dict())
-    assert result.operational_dict() != repeat.operational_dict()
+    deterministic = classify_search_result(search)
+    attached = wrap_operational_execution(deterministic, timeout_seconds=0.1, timeout_occurred=True)
+    repeated = wrap_operational_execution(deterministic, timeout_seconds=9.0, timeout_occurred=True)
+    assert attached.disposition is OperationalExecutionDisposition.COMPLETED
+    assert attached.canonical_bytes() == deterministic.canonical_bytes()
+    assert attached.digest() == deterministic.digest()
+    assert attached.canonical_bytes() == repeated.canonical_bytes()
+    assert attached.operational_dict() != repeated.operational_dict()
+    assert "TIMEOUT" not in str(attached.canonical_dict())
+
+
+def test_timeout_before_deterministic_result_has_no_canonical_result() -> None:
+    outcome = wrap_operational_execution(None, timeout_seconds=0.1, timeout_occurred=True)
+    assert outcome.disposition is OperationalExecutionDisposition.INCONCLUSIVE
+    assert outcome.canonical_result is None
+    assert outcome.canonical_bytes() is None
+    assert "TIMEOUT" not in str(outcome.canonical_dict())
+
+
+def test_deterministic_bound_result_is_unchanged_by_operational_timeout() -> None:
+    legal, transition, initial = fixture()
+    bounded = classify_search_result(
+        BaselineSearchEngine(legal, transition, BaselineSearchPolicy(max_depth=0)).search(initial),
+        policy=SolverBudgetPolicy(max_depth=0),
+    )
+    wrapped = wrap_operational_execution(bounded, timeout_seconds=1.0, timeout_occurred=True)
+    assert wrapped.canonical_bytes() == bounded.canonical_bytes()
+    assert wrapped.canonical_result is not None
+    assert wrapped.canonical_result.exhaustion is BudgetExhaustionReason.MAX_DEPTH
 
 
 def test_evidence_engine_stops_at_real_visited_state_bound() -> None:
