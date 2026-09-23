@@ -22,3 +22,5 @@ Verification:
 - Canonical invoke remains UNAVAILABLE due dirty canonical checkout; no provider credits or network calls were used.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `src/scrubbots_pixel_factory/solver_budget.py`, `tests/unit/test_sb_lf03_011_solver_budget.py`, with traversal wiring retained from the 006 evidence commit, and this log.
+- Implementation commit: `83a12eace8d79e405580597a34f3bb98493ab76e`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
