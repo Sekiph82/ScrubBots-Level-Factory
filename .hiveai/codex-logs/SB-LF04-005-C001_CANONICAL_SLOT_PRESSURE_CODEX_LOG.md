@@ -20,4 +20,4 @@ Commands and test evidence: Initial focused run had one fixture assertion error 
 
 Files changed: `src/scrubbots_pixel_factory/difficulty_analysis.py`, package exports, this builder log, and `tests/unit/test_sb_lf04_005_slot_pressure.py`.
 
-Final diff, status, commits, push, and `origin/main` equality: pending publication.
+Implementation commit: `f5729363f5eea6801d4bf02e29c1077f066a4578`, pushed successfully. Final tracked status was clean; pre-existing untracked Godot `.uid` files remained preserved and unstaged. `TASKS.md` had zero diff. Terminal log-only commit: pending.
