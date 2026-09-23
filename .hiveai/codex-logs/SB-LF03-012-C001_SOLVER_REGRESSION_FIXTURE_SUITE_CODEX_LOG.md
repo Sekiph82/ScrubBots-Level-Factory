@@ -52,4 +52,9 @@ The pre-existing untracked `level_factory/**/*.gd.uid` files remain unstaged and
 
 ## Publication
 
-- Implementation commit and push are pending; exact commit SHA, push result, final status, and local/origin equality will be appended after publication.
+- Implementation commit: `69f19400ac4f0f1edbd519edcb3204fb5da3ca8f` (`Implement SB-LF03-012 regression fixtures`).
+- Initial `git push origin main` was rejected because `origin/main` advanced during execution. `git fetch origin main` showed remote-only commit `b263e9e` (`Add LF03-012 master batch finalization continuation prompt`).
+- Correction: merged `origin/main` without rebasing or discarding local work. Merge commit: `3cad7e14ebc1216769ee0e399b59796a3470120e`; merge content was the remote continuation prompt file only.
+- Push result: `origin/main` advanced from `b263e9e` to `3cad7e14ebc1216769ee0e399b59796a3470120e`.
+- Post-push equality: local `HEAD` = `3cad7e14ebc1216769ee0e399b59796a3470120e`; `origin/main` = `3cad7e14ebc1216769ee0e399b59796a3470120e`; divergence `0 0`.
+- Final status before terminal log-only commit: only this builder log modified plus the pre-existing untracked `level_factory/**/*.gd.uid` files.
