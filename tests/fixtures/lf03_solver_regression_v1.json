@@ -1,0 +1,150 @@
+{
+  "schema": "scrubbots-lf03-solver-regression-fixtures",
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "LF03_FAKE_GRAPH_BRANCHING_SOLVED_V1",
+      "family": "provider_search_solution_count_metrics",
+      "payload_sha256": "d29e0711f7ee6f18c1917b211aaca09a261ddbc78d50cbdaf53c7f1a4f0dd8f0",
+      "payload": {
+        "label": "fixture-only fake provider graph",
+        "production": false,
+        "authority_sha": "1144704e6c3647ed1cf76c610be5bd675585734a",
+        "state_dimensions": {
+          "width": 3,
+          "height": 2,
+          "palette_size": 4
+        },
+        "initial": "root",
+        "nodes": {
+          "root": {
+            "truth": "CONTINUE",
+            "moves": [0, 1],
+            "edges": {
+              "0": "dead",
+              "1": "middle"
+            }
+          },
+          "dead": {
+            "truth": "PROVEN_UNSOLVABLE",
+            "moves": [],
+            "edges": {}
+          },
+          "middle": {
+            "truth": "CONTINUE",
+            "moves": [2, 3],
+            "edges": {
+              "2": "goal_a",
+              "3": "goal_b"
+            }
+          },
+          "goal_a": {
+            "truth": "SOLVED",
+            "moves": [],
+            "edges": {}
+          },
+          "goal_b": {
+            "truth": "SOLVED",
+            "moves": [],
+            "edges": {}
+          },
+          "unknown": {
+            "truth": "UNKNOWN_BOUND",
+            "moves": [],
+            "edges": {}
+          }
+        },
+        "expected": {
+          "first_solution_path": [1, 2],
+          "proven_unsolvable_node": "dead",
+          "solution_count": 2,
+          "dead_end_count": 1,
+          "branch_counts": [2, 2]
+        }
+      }
+    },
+    {
+      "id": "LF03_DUPLICATE_MEMO_KEYS_V1",
+      "family": "duplicate_state_memoization",
+      "payload_sha256": "5d1ee494afb65786a2a92878fcae90f1d72aab85d1a3fcc7c4c6813426735bfb",
+      "payload": {
+        "label": "fixture-only duplicate canonical key stream",
+        "production": false,
+        "authority_sha": "1144704e6c3647ed1cf76c610be5bd675585734a",
+        "observations": [
+          {
+            "state": "alpha",
+            "key": "semantic-A",
+            "expected": "FIRST_VISIT"
+          },
+          {
+            "state": "beta",
+            "key": "semantic-A",
+            "expected": "MEMO_HIT"
+          },
+          {
+            "state": "beta",
+            "key": "semantic-B",
+            "expected": "FIRST_VISIT"
+          }
+        ],
+        "expected": {
+          "visited_count": 2,
+          "memo_hits": 1
+        }
+      }
+    },
+    {
+      "id": "LF03_REPRODUCTION_MATCH_DIVERGED_V1",
+      "family": "reproduction_match_diverged",
+      "payload_sha256": "fbba5fa4198f92ab3fe323fb05921c270f93bcaf9d2dfc570e6b38ae0a65703c",
+      "payload": {
+        "label": "fixture-only reproduction observation pair",
+        "production": false,
+        "candidate_source": "candidate-regression-v1",
+        "level_data_source": "level-regression-v1",
+        "seed": 12012,
+        "normalized_config": {
+          "fixture": "lf03-regression",
+          "width": 3,
+          "height": 2
+        },
+        "expected_disposition": "SOLVED",
+        "path": [
+          {
+            "kind": "CANONICAL_COLUMN_FRONT_V1",
+            "column": 1
+          },
+          {
+            "kind": "CANONICAL_COLUMN_FRONT_V1",
+            "column": 2
+          }
+        ],
+        "evidence_source": "lf03-regression-evidence-v1"
+      }
+    },
+    {
+      "id": "LF03_AUTHORITY_TAMPER_FAIL_CLOSED_V1",
+      "family": "authority_source_tamper",
+      "payload_sha256": "782b38fbc052d5f3843aea53a940cd2e30d79857cd04d262c6f8d0234062ae9d",
+      "payload": {
+        "label": "fixture-only canonical authority/source tamper",
+        "production": false,
+        "valid_authority_sha": "1144704e6c3647ed1cf76c610be5bd675585734a",
+        "invalid_authority_sha": "0000000000000000000000000000000000000000",
+        "expected": "ERROR_OR_EXCEPTION"
+      }
+    }
+  ],
+  "canonical_bridge_fixture": {
+    "id": "LF03_CANONICAL_BRIDGE_CAPABILITY_V1",
+    "family": "canonical_bridge_capability_gated",
+    "authority_repository": "https://github.com/Sekiph82/Scrubbots",
+    "authority_sha": "1144704e6c3647ed1cf76c610be5bd675585734a",
+    "requires_env": [
+      "SCRUBBOTS_CANONICAL_CHECKOUT",
+      "SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"
+    ],
+    "skip_reason": "canonical checkout and external bridge runner capability were not supplied"
+  }
+}
