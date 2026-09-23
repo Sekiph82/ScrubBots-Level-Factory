@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M03 — Puzzle Intelligence: Simulation, Solver & State Search
-- Current Sprint: SB-LF03.C001-R04 — Final M03 regression-corpus closure
-- Current Task: SB-LF03-012 — Add regression fixtures
-- Current Task Status: READY_FOR_REMEDIATION
-- Next Task/Action: Codex executes only `SB-LF03-012-C001-R04` from `.hiveai/prompts/SB-LF03-012-C001-R04_MASTER_REMEDIATION_PROMPT.md`; `SB-LF03-001..011` except 012 are PASS/CLOSED; Codex never edits `TASKS.md`; after R04 publication ChatGPT independently re-audits SB-LF03-012 and closes M03 only if PASS.
+- Current Milestone: M04 — Difficulty Intelligence & Metrics
+- Current Sprint: SB-LF04.C001 — Versioned LevelMetrics contract
+- Current Task: SB-LF04-001 — Define versioned LevelMetrics
+- Current Task Status: READY_FOR_IMPLEMENTATION
+- Next Task/Action: Codex executes only `SB-LF04-001-C001` from `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`; M03 remains COMPLETE/VERIFIED; Codex never edits `TASKS.md`; after publication ChatGPT independently strict-audits SB-LF04-001.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF03-009-012-C001-R03_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF03-012-C001-R04_HISTORICAL_REGRESSION_FIDELITY_CLOSURE_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: SB-LF03-012 R03 strict re-audit `.hiveai/audits/SB-LF03-012-C001-R03_DECLARATIVE_NEGATIVE_CORPUS_CLOSURE_STRICT_REAUDIT.md` + R04 remediation prompt `.hiveai/prompts/SB-LF03-012-C001-R04_HISTORICAL_REGRESSION_FIDELITY_CLOSURE_PROMPT.md`
-- Current Prompt: `.hiveai/prompts/SB-LF03-012-C001-R04_MASTER_REMEDIATION_PROMPT.md`
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_AUDIT_CRITERIA.md`
+- Current Prompt: `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -88,6 +88,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF03 R04 Remediation Index: `.hiveai/prompts/SB-LF03-012-C001-R04_REMEDIATION_INDEX.md`.
 - SB-LF03 R04 Master Prompt: `.hiveai/prompts/SB-LF03-012-C001-R04_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF03 R04 Tracker Policy: Codex does not advance task checkboxes; ChatGPT independently re-audits SB-LF03-012 after R04 publication.
+- SB-LF03 R04 Re-Audit Result: `PASS/CLOSED = 012`; therefore `SB-LF03-001..012 = PASS/CLOSED` and `M03 = COMPLETE / VERIFIED`.
+- SB-LF03 R04 Strict Re-Audit: `.hiveai/audits/SB-LF03-012-C001-R04_HISTORICAL_REGRESSION_FIDELITY_CLOSURE_STRICT_REAUDIT.md`.
+- SB-LF03 M03 Final Closure Summary: `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`.
+- SB-LF04-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_AUDIT_CRITERIA.md`.
+- SB-LF04-001 C001 Prompt: `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`.
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
@@ -108,8 +113,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M00: Repository, Governance & Canonical Factory Platform — COMPLETE / VERIFIED
 - M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
-- M03: Puzzle Intelligence: Simulation, Solver & State Search — ACTIVE
-- M04: Difficulty Intelligence & Metrics — PLANNED / PARTIALLY EVIDENCED
+- M03: Puzzle Intelligence: Simulation, Solver & State Search — COMPLETE / VERIFIED
+- M04: Difficulty Intelligence & Metrics — ACTIVE
 - M05: Unified Factory Validation & Level QA — PLANNED / PARTIALLY EVIDENCED
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
@@ -157,16 +162,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 54 VERIFIED, 46 PARTIAL, 3 MIGRATION, 93 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **54 / 224 = 24.11%**.
-- Canonical LF/CP engineering/migration coverage: **103 / 224 = 45.98%** (`VERIFIED + PARTIAL + MIGRATION`).
+- Canonical LF/CP source-requirement classification: 55 VERIFIED, 46 PARTIAL, 3 MIGRATION, 92 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **55 / 224 = 24.55%**.
+- Canonical LF/CP engineering/migration coverage: **104 / 224 = 46.43%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **71 / 244 = 29.10%**.
+- Unified verified completion: **72 / 244 = 29.51%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **71 / 216 = 32.87%**.
-- Level Factory + unique extension surface: **132 tasks**; **71 / 132 = 53.79% verified**.
+- Conservative verified local completion: **72 / 216 = 33.33%**.
+- Level Factory + unique extension surface: **132 tasks**; **72 / 132 = 54.55% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -318,7 +323,7 @@ Capability source family: `SB-LF03-xxx` from the main Scrubbots master plan.
 - [x] SB-LF03-009 — Reuse canonical reachability/routing semantics rather than importing another game's rules.
 - [x] SB-LF03-010 — Reproduce solver bugs by candidate/seed/config/version.
 - [x] SB-LF03-011 — Define budgets/timeouts and UNSOLVED vs INCONCLUSIVE.
-- [~] SB-LF03-012 — Add regression fixtures.
+- [x] SB-LF03-012 — Add regression fixtures.
 
 ---
 
@@ -328,7 +333,7 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 
 ### M04.01 - Versioned solver-derived metrics
 
-- [ ] SB-LF04-001 — Define versioned LevelMetrics. [PARTIAL]
+- [~] SB-LF04-001 — Define versioned LevelMetrics. [PARTIAL]
 - [ ] SB-LF04-002 — Record solution depth/move count where meaningful.
 - [ ] SB-LF04-003 — Record states/dead ends/branching/forced moves.
 
@@ -836,7 +841,7 @@ Owner-approved post-cutover product specification:
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
 2. `SB-LF01-005`, all `SB-LF06-001..012`, and all `SB-LFX-001..017` are PASS/CLOSED. M06 Factory Studio is complete.
-3. M03 Puzzle Intelligence is active; `SB-LF03-001..011` except `SB-LF03-012` are PASS/CLOSED; the sole remaining frontier is `SB-LF03-012-C001-R04` regression-corpus closure.
+3. M03 Puzzle Intelligence is COMPLETE / VERIFIED; `SB-LF03-001..012 = PASS/CLOSED`. The active frontier advances to M04 Difficulty Intelligence with `SB-LF04-001` as the sole active task.
 4. M04 Difficulty Intelligence.
 5. M05 Unified QA.
 6. M07 mutation/difficulty targeting.
