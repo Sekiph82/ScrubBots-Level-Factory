@@ -22,3 +22,5 @@ Verification:
 - Canonical invoke remains UNAVAILABLE due dirty owner checkout; no source regeneration was attempted.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `src/scrubbots_pixel_factory/reproduction.py`, `tests/unit/test_sb_lf03_010_reproduction.py`, this log.
+- Implementation commit: `3c9ca84fb6a3bd5e7124918f7c253213049a0b8e`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
