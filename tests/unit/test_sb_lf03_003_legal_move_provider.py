@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -129,6 +130,19 @@ def test_query_rejects_state_digest_or_authority_mismatch_and_does_not_mutate_st
     with pytest.raises(LegalMoveProviderError):
         LegalMoveQuery(compact, compact.digest(), other, "fixture", "v1")
     assert compact.digest() == digest_before
+
+
+def test_result_binding_validator_rejects_validly_typed_wrong_query_state_and_provider() -> None:
+    request = query()
+    result = LegalMoveResult.from_query(request, ProviderDisposition.AVAILABLE, capability(), (LegalMove(0),))
+    with pytest.raises(LegalMoveProviderError):
+        replace(result, query_digest="0" * 64).validate_for_query(request)
+    with pytest.raises(LegalMoveProviderError):
+        replace(result, state_digest="0" * 64).validate_for_query(request)
+    with pytest.raises(LegalMoveProviderError):
+        replace(result, provider_id="other-provider").validate_for_query(request)
+    other = query()
+    assert result.query_digest != other.digest() or result.state_digest == other.state_digest
 
 
 def test_provider_module_has_no_python_legal_move_derivation_or_gameplay_transition_surface() -> None:

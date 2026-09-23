@@ -231,6 +231,25 @@ class LegalMoveResult:
             reason=reason,
         )
 
+    def validate_for_query(self, query: LegalMoveQuery) -> None:
+        """Fail closed unless this result answers the exact supplied query."""
+        if not isinstance(query, LegalMoveQuery):
+            raise LegalMoveProviderError("legal-move validation query is malformed")
+        if self.query_digest != query.digest() or self.state_digest != query.state_digest:
+            raise LegalMoveProviderError("legal-move result is bound to a different query or state")
+        if self.authority != query.authority or self.provider_id != query.provider_id or self.provider_version != query.provider_version:
+            raise LegalMoveProviderError("legal-move result authority or provider identity mismatch")
+        capability = self.capability
+        if capability.authority != query.authority or capability.provider_id != query.provider_id or capability.provider_version != query.provider_version:
+            raise LegalMoveProviderError("legal-move capability identity mismatch")
+        if capability.disposition is not self.disposition:
+            raise LegalMoveProviderError("legal-move disposition does not match capability")
+        if self.disposition is ProviderDisposition.AVAILABLE:
+            if capability.authority_verification is not AuthorityVerificationDisposition.VERIFIED or capability.source_contract_verification is not AuthorityVerificationDisposition.VERIFIED or capability.execution_mode != "CANONICAL_RUNTIME":
+                raise LegalMoveProviderError("AVAILABLE legal-move evidence is not verified canonical runtime evidence")
+        if any(move.column >= query.state.column_count for move in self.moves):
+            raise LegalMoveProviderError("legal-move result contains a column outside the queried state")
+
     def canonical_dict(self) -> dict[str, object]:
         return {
             "schema": LEGAL_MOVE_RESULT_SCHEMA,
