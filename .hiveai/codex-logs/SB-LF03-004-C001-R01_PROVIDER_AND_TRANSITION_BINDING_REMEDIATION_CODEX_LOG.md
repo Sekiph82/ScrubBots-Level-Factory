@@ -22,3 +22,5 @@ Verification:
 - Canonical invoke remains UNAVAILABLE because the verified owner checkout is dirty; no canonical checkout was modified.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `src/scrubbots_pixel_factory/baseline_search.py`, `tests/unit/test_sb_lf03_004_baseline_search.py`, this log.
+- Implementation commit: `89f17c01d500da3f170a41cbd7f4548b643ebd53`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
