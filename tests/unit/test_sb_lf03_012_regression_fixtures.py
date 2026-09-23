@@ -141,6 +141,25 @@ def test_fixture_corpus_schema_ids_and_payload_checksums() -> None:
     bridge = data["canonical_bridge_fixture"]
     assert bridge["id"] == "LF03_CANONICAL_BRIDGE_CAPABILITY_V1"
     assert bridge["authority_sha"] == CANONICAL_PROOF_STATE_AUTHORITY_SHA
+    assert bridge["runner_path"] == "tools/scrubbots_canonical_bridge_runner.gd"
+    assert set(data["r01_negative_fixture_ids"]) == {
+        "LF03_WRONG_QUERY_RESULT_BINDING_V1",
+        "LF03_WRONG_STATE_KEY_BINDING_V1",
+        "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
+        "LF03_ENUMERATION_BINDING_V1",
+        "LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1",
+        "LF03_REPLAY_IDENTITY_TAMPER_V1",
+        "LF03_MAX_VISITED_EXECUTION_STOP_V1",
+        "LF03_TIMEOUT_NONCANONICAL_V1",
+    }
+
+
+def test_r01_regression_runner_is_committed_and_fixture_only_graphs_stay_nonproduction() -> None:
+    runner = Path(__file__).resolve().parents[2] / "tools" / "scrubbots_canonical_bridge_runner.gd"
+    assert runner.is_file()
+    source = runner.read_text(encoding="utf-8")
+    assert "ProofState" in source and "ProofKernel" in source and "SolvabilitySolver" in source
+    assert "legal_action_columns" not in (Path(__file__).resolve().parents[2] / "src" / "scrubbots_pixel_factory" / "canonical_bridge.py").read_text(encoding="utf-8")
 
 
 def test_provider_schema_branching_search_and_proven_no_solution_fixture() -> None:

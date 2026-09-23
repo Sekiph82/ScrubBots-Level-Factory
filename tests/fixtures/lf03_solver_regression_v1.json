@@ -145,6 +145,18 @@
       "SCRUBBOTS_CANONICAL_CHECKOUT",
       "SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"
     ],
-    "skip_reason": "canonical checkout and external bridge runner capability were not supplied"
-  }
+    "runner_path": "tools/scrubbots_canonical_bridge_runner.gd",
+    "required_real_operations": ["legal_moves", "placement_transition", "solve"],
+    "skip_reason": "canonical checkout authority is unavailable when the owner checkout is dirty; invoke must fail closed"
+  },
+  "r01_negative_fixture_ids": [
+    "LF03_WRONG_QUERY_RESULT_BINDING_V1",
+    "LF03_WRONG_STATE_KEY_BINDING_V1",
+    "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
+    "LF03_ENUMERATION_BINDING_V1",
+    "LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1",
+    "LF03_REPLAY_IDENTITY_TAMPER_V1",
+    "LF03_MAX_VISITED_EXECUTION_STOP_V1",
+    "LF03_TIMEOUT_NONCANONICAL_V1"
+  ]
 }
