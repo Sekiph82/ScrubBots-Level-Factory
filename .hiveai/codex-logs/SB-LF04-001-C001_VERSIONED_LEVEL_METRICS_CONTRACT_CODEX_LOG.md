@@ -89,4 +89,9 @@ Implementation and verification entries will be appended chronologically below.
 - Product/test/log files changed: `src/scrubbots_pixel_factory/level_metrics.py`, `src/scrubbots_pixel_factory/__init__.py`, `tests/unit/test_sb_lf04_001_level_metrics.py`, and this builder log. Pre-existing/generated `level_factory/**/*.gd.uid` files remain untracked and unstaged.
 - Pre-publication diff summary: 4 authorized files, 676 added lines; no protected tracker/audit/prompt files changed.
 
-Implementation and terminal publication commit SHAs will be appended after commit/push verification.
+## Implementation publication
+
+- Implementation + initial builder-log commit: `39ffe413694ebc0e3d086d14e183a07b726dba8b` (`Implement versioned LevelMetrics contract`).
+- Push command: `git push origin HEAD:main`.
+- Push result: success; `origin/main` advanced from `3c98e14520cc5a436de32e652361c53e0fbe20f6` to `39ffe413694ebc0e3d086d14e183a07b726dba8b`.
+- The builder log is now being finalized in the required terminal log-only commit.
