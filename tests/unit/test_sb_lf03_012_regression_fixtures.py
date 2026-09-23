@@ -4,12 +4,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 
 import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchEngine, BaselineSearchPolicy, SearchExecutionDisposition, SearchVerdict, TerminalObservation, TerminalTruth, TransitionObservation
-from scrubbots_pixel_factory.canonical_bridge import CanonicalBridgeConfiguration, CanonicalBridgeDisposition, CanonicalHeadlessBridge
+from scrubbots_pixel_factory.canonical_bridge import CanonicalBridgeConfiguration, CanonicalBridgeDisposition, CanonicalBridgeRequest, CanonicalHeadlessBridge
 from scrubbots_pixel_factory.compact_solver_state import (
     ACTIVE_BYTE,
     CANONICAL_PROOF_STATE_AUTHORITY_SHA,
@@ -182,7 +183,7 @@ def test_duplicate_state_memo_fixture() -> None:
     memo = DeterministicVisitedMemo(AUTHORITY, "lf03-regression-key", "fixture-only-v1")
     observed = []
     for item in memo_payload["observations"]:
-        result = memo.observe(state_key_result(states[item["state"]], item["key"]))
+        result = memo.observe(states[item["state"]], state_key_result(states[item["state"]], item["key"]))
         observed.append(result.disposition.value)
     assert observed == [item["expected"] for item in memo_payload["observations"]]
     assert result.visited_count == memo_payload["expected"]["visited_count"]
@@ -256,8 +257,10 @@ def test_reproduction_match_diverged_and_authority_tamper_fail_closed() -> None:
     )
     bundle = ReproductionBundle.create(manifest)
     replay = ReproductionReplay()
-    assert replay.replay(bundle, ReplayObservation("SOLVED", evidence_digest, tuple(repro["path"]))).disposition is ReplayDisposition.MATCH
-    assert replay.replay(bundle, ReplayObservation("SOLVED", hashlib.sha256(b"other").hexdigest(), tuple(repro["path"]))).disposition is ReplayDisposition.DIVERGED
+    from scrubbots_pixel_factory.reproduction import ReplayExecutionContext
+    context = ReplayExecutionContext.from_manifest(bundle.manifest)
+    assert replay.replay(bundle, ReplayObservation("SOLVED", evidence_digest, tuple(repro["path"]), context)).disposition is ReplayDisposition.MATCH
+    assert replay.replay(bundle, ReplayObservation("SOLVED", hashlib.sha256(b"other").hexdigest(), tuple(repro["path"]), context)).disposition is ReplayDisposition.DIVERGED
 
     tamper = payload("LF03_AUTHORITY_TAMPER_FAIL_CLOSED_V1")
     with pytest.raises(ReproductionContractError):
@@ -283,18 +286,32 @@ def test_reproduction_match_diverged_and_authority_tamper_fail_closed() -> None:
         )
 
 
-def test_real_canonical_bridge_fixture_is_capability_gated() -> None:
+@pytest.mark.skipif(not Path(r"C:\Users\sekip\Desktop\ScrubBots").is_dir() or shutil.which("godot_console.exe") is None, reason="canonical owner repository or Godot executable is unavailable")
+def test_real_canonical_bridge_fixture_executes_declarative_operations(tmp_path: Path) -> None:
     bridge_fixture = load_corpus()["canonical_bridge_fixture"]
-    missing = [name for name in bridge_fixture["requires_env"] if not os.environ.get(name)]
-    if missing:
-        pytest.skip(bridge_fixture["skip_reason"])
-    checkout = Path(os.environ["SCRUBBOTS_CANONICAL_CHECKOUT"]).resolve()
-    runner = Path(os.environ["SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"]).resolve()
+    checkout = tmp_path / "scrubbots-canonical"
+    subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "--local", "--no-hardlinks", r"C:\Users\sekip\Desktop\ScrubBots", str(checkout)], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(checkout), "config", "core.autocrlf", "false"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(checkout), "checkout", "--force", "--detach", AUTHORITY.commit_sha], check=True, capture_output=True, text=True)
+    runner = (Path(__file__).resolve().parents[2] / bridge_fixture["runner_path"]).resolve()
     before_status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
     before_source = (checkout / "scripts/gameplay/solver/proof_state.gd").read_bytes()
     bridge = CanonicalHeadlessBridge(CanonicalBridgeConfiguration(str(checkout), str(runner)))
     capability = bridge.capability(AUTHORITY)
     assert capability.disposition is CanonicalBridgeDisposition.AVAILABLE
+    payload_base = dict(bridge_fixture["payload"])
+    for operation in bridge_fixture["operations"]:
+        payload = dict(payload_base)
+        if operation["operation"] == "apply_placement":
+            payload["column"] = operation["column"]
+        payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        request = CanonicalBridgeRequest(AUTHORITY, operation["operation"], payload_bytes, hashlib.sha256(payload_bytes).hexdigest(), payload["level_data_source_sha256"])
+        first = bridge.invoke(request)
+        second = bridge.invoke(request)
+        assert first.disposition is CanonicalBridgeDisposition.AVAILABLE
+        assert second.canonical_dict() == first.canonical_dict()
+        if operation["operation"] == "legal_moves":
+            assert first.result == operation["expected"]
     after_status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
     after_source = (checkout / "scripts/gameplay/solver/proof_state.gd").read_bytes()
     assert before_status == after_status
@@ -304,6 +321,6 @@ def test_real_canonical_bridge_fixture_is_capability_gated() -> None:
 def test_regression_fixture_suite_has_no_gameplay_or_wfc_implementation() -> None:
     source = FIXTURE_PATH.read_text(encoding="utf-8").lower()
     assert "legal_action_columns" not in source
-    assert "apply_placement" not in source
+    assert '"operation": "apply_placement"' in source
     assert "canonical_key" not in source
     assert "wfc" not in source

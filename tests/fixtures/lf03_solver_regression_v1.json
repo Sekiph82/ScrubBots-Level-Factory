@@ -146,8 +146,34 @@
       "SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"
     ],
     "runner_path": "tools/scrubbots_canonical_bridge_runner.gd",
-    "required_real_operations": ["legal_moves", "placement_transition", "solve"],
-    "skip_reason": "canonical checkout authority is unavailable when the owner checkout is dirty; invoke must fail closed"
+    "payload": {
+      "level": {
+        "version": 1,
+        "id": "bridge-fixture",
+        "display_name": "Bridge Fixture",
+        "difficulty": "easy",
+        "width": 2,
+        "height": 2,
+        "palette": ["C01", "C02"],
+        "cells": [0, 0, 0, 0]
+      },
+      "column_count": 3,
+      "preview_depth": 3,
+      "palette_size": 2,
+      "seed": 1,
+      "columns": [
+        [{"id": "batch-0", "color": 0, "count": 1}],
+        [{"id": "batch-1", "color": 0, "count": 1}],
+        [{"id": "batch-2", "color": 0, "count": 1}]
+      ],
+      "level_data_source_sha256": "6a6a5a42615539c8ec873e5e15d211f26b4c4b17af3412bcb0ea2d049cae7bbb"
+    },
+    "operations": [
+      {"operation": "legal_moves", "expected": {"active_count": 4, "legal_columns": [0, 1, 2]}},
+      {"operation": "apply_placement", "column": 0, "expected_disposition": "AVAILABLE"},
+      {"operation": "solve", "expected_disposition": "AVAILABLE"}
+    ],
+    "skip_reason": "canonical owner repository or Godot executable is unavailable"
   },
   "r01_negative_fixture_ids": [
     "LF03_WRONG_QUERY_RESULT_BINDING_V1",

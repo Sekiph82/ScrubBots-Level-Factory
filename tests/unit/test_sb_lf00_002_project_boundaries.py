@@ -14,13 +14,14 @@ RESOURCE_REFERENCE_RE = re.compile(r"res://[^\s\"'(),\[\]]+")
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(
     r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\)"
 )
+TEXT_SUFFIXES = {".cfg", ".gd", ".godot", ".import", ".json", ".md", ".py", ".res", ".scene", ".tres", ".tscn", ".txt", ".uid"}
 
 
 def _project_files() -> tuple[Path, ...]:
     return tuple(
         path
         for path in PROJECT_ROOT.rglob("*")
-        if path.is_file() and ".godot" not in path.relative_to(PROJECT_ROOT).parts
+        if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES and ".godot" not in path.relative_to(PROJECT_ROOT).parts
     )
 
 
