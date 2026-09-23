@@ -107,7 +107,6 @@ class SolverBudgetPolicy:
     def digest(self) -> str:
         return hashlib.sha256(_canonical_bytes(self.canonical_dict())).hexdigest()
 
-
 @dataclass(frozen=True, slots=True)
 class BudgetedSolverResult:
     disposition: SolverOutcomeDisposition
@@ -137,6 +136,17 @@ class BudgetedSolverResult:
             raise SolverBudgetError("operational timeout must map to inconclusive")
 
     def canonical_dict(self) -> dict[str, object]:
+        if self.operational_timeout_exhausted:
+            return {
+                "schema": SOLVER_OUTCOME_SCHEMA,
+                "version": SOLVER_OUTCOME_VERSION,
+                "disposition": SolverOutcomeDisposition.INCONCLUSIVE.value,
+                "policy": self.policy.canonical_dict(),
+                "source": self.source,
+                "source_disposition": "INCONCLUSIVE",
+                "reason": "canonical deterministic result unavailable",
+                "exhaustion": None,
+            }
         return {
             "schema": SOLVER_OUTCOME_SCHEMA,
             "version": SOLVER_OUTCOME_VERSION,
@@ -150,6 +160,15 @@ class BudgetedSolverResult:
 
     def digest(self) -> str:
         return hashlib.sha256(_canonical_bytes(self.canonical_dict())).hexdigest()
+
+    def operational_dict(self) -> dict[str, object] | None:
+        if not self.operational_timeout_exhausted:
+            return None
+        return {
+            "timeout_exhausted": True,
+            "timeout_seconds": self.policy.operational_timeout_seconds,
+            "canonical": False,
+        }
 
 
 def classify_search_result(

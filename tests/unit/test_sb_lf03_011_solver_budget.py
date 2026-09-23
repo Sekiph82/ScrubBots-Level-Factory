@@ -147,12 +147,13 @@ def test_operational_timeout_maps_only_to_inconclusive() -> None:
     legal, transition, initial = fixture()
     search = BaselineSearchEngine(legal, transition).search(initial)
     result = classify_search_result(search, policy=SolverBudgetPolicy(operational_timeout_seconds=0.1), operational_timeout_exhausted=True)
+    repeat = classify_search_result(search, policy=SolverBudgetPolicy(operational_timeout_seconds=9.0), operational_timeout_exhausted=True)
     assert result.disposition is SolverOutcomeDisposition.INCONCLUSIVE
     assert result.exhaustion is BudgetExhaustionReason.OPERATIONAL_TIMEOUT
     assert result.operational_timeout_exhausted is True
-    baseline = classify_search_result(search, policy=SolverBudgetPolicy())
-    assert "operational_timeout_exhausted" not in baseline.canonical_dict()
-    assert baseline.canonical_dict() != result.canonical_dict()
+    assert result.canonical_dict() == repeat.canonical_dict()
+    assert "OPERATIONAL_TIMEOUT" not in str(result.canonical_dict())
+    assert result.operational_dict() != repeat.operational_dict()
 
 
 def test_evidence_engine_stops_at_real_visited_state_bound() -> None:
