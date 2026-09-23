@@ -23,3 +23,5 @@ Verification:
 - Canonical invoke regression: SKIPPED/UNAVAILABLE with exact reason: owner checkout at `1144704e6c3647ed1cf76c610be5bd675585734a` is dirty; authority verification must fail closed.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `tests/fixtures/lf03_solver_regression_v1.json`, `tests/unit/test_sb_lf03_012_regression_fixtures.py`, this log.
+- Implementation commit: `11816b79fa6f7c5a97acb1186735ec148b7ffa17`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
