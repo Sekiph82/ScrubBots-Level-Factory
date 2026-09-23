@@ -218,19 +218,69 @@ class ReproductionBundle:
 
 
 @dataclass(frozen=True, slots=True)
+class ReplayExecutionContext:
+    """Closed, immutable identity for one replay execution."""
+
+    values: Mapping[str, object]
+
+    REQUIRED_FIELDS = frozenset(
+        {
+            "candidate_source_sha256",
+            "level_data_source_sha256",
+            "seed",
+            "normalized_config",
+            "generator_version",
+            "authority",
+            "source_contract_sha256",
+            "provider_id",
+            "provider_version",
+            "bridge_version",
+            "search_version",
+            "memo_provider_id",
+            "memo_provider_version",
+            "search_policy",
+            "budgets",
+            "operation",
+            "goal",
+        }
+    )
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.values, Mapping):
+            raise ReproductionContractError("replay execution context must be an object")
+        normalized = _normalize_config(dict(self.values))
+        if not isinstance(normalized, dict) or set(normalized) != self.REQUIRED_FIELDS:
+            raise ReproductionContractError("replay execution context fields are not closed")
+        object.__setattr__(self, "values", normalized)
+
+    @classmethod
+    def from_manifest(cls, manifest: ReproductionManifest) -> "ReplayExecutionContext":
+        if not isinstance(manifest, ReproductionManifest):
+            raise ReproductionContractError("replay manifest is malformed")
+        return cls(manifest.execution_context())
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, object]) -> "ReplayExecutionContext":
+        return cls(value)
+
+    def canonical_dict(self) -> dict[str, object]:
+        return dict(self.values)
+
+
+@dataclass(frozen=True, slots=True)
 class ReplayObservation:
     disposition: str
     evidence_digest: str | None = None
     path: tuple[dict[str, object], ...] = ()
-    context: Mapping[str, object] | None = None
+    context: ReplayExecutionContext | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "disposition", _text(self.disposition, "replay disposition"))
         if self.evidence_digest is not None:
             object.__setattr__(self, "evidence_digest", _sha(self.evidence_digest, "replay evidence SHA-256"))
         object.__setattr__(self, "path", _path_tuple(self.path, "replay path"))
-        if self.context is not None and not isinstance(self.context, Mapping):
-            raise ReproductionContractError("replay context must be an object")
+        if self.context is not None and not isinstance(self.context, ReplayExecutionContext):
+            raise ReproductionContractError("replay context must be a closed ReplayExecutionContext")
 
 
 @dataclass(frozen=True, slots=True)
@@ -256,8 +306,9 @@ class ReproductionReplay:
         if observation.disposition == "ERROR":
             return ReplayResult(ReplayDisposition.ERROR, bundle.manifest_digest, "replay provider returned an error")
         manifest = bundle.manifest
-        context = dict(observation.context) if observation.context is not None else manifest.execution_context()
-        if context != manifest.execution_context():
+        if observation.context is None:
+            return ReplayResult(ReplayDisposition.UNAVAILABLE, bundle.manifest_digest, "replay execution context is unavailable")
+        if observation.context.canonical_dict() != manifest.execution_context():
             return ReplayResult(ReplayDisposition.DIVERGED, bundle.manifest_digest, "replay execution identity diverged")
         if observation.disposition != manifest.expected_disposition:
             return ReplayResult(ReplayDisposition.DIVERGED, bundle.manifest_digest, "replay disposition diverged")
@@ -272,6 +323,7 @@ __all__ = [
     "REPRODUCTION_SCHEMA",
     "REPRODUCTION_VERSION",
     "ReplayDisposition",
+    "ReplayExecutionContext",
     "ReplayObservation",
     "ReplayResult",
     "ReproductionBundle",

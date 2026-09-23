@@ -271,6 +271,7 @@ from .reproduction import (
     REPRODUCTION_SCHEMA,
     REPRODUCTION_VERSION,
     ReplayDisposition,
+    ReplayExecutionContext,
     ReplayObservation,
     ReplayResult,
     ReproductionBundle,
@@ -539,7 +540,7 @@ __all__ = [
     "ENTROPY_ANALYSIS_VERSION", "EntropyDisposition", "MOVE_SEQUENCE_EQUIVALENCE_V1", "SOLUTION_ANALYSIS_SCHEMA", "SOLUTION_ANALYSIS_VERSION", "SolutionAnalysisBounds", "SolutionAnalysisError", "SolutionCountDisposition", "SolutionCountEngine", "SolutionCountResult",
     "OPERATIONAL_TIMEOUT_POLICY_VERSION", "SOLVER_BUDGET_SCHEMA", "SOLVER_BUDGET_VERSION", "SOLVER_OUTCOME_SCHEMA", "SOLVER_OUTCOME_VERSION", "BudgetExhaustionReason", "BudgetedSolverResult", "SolverBudgetError", "SolverBudgetPolicy", "SolverOutcomeDisposition", "classify_search_result", "classify_solution_count_result",
     "CANONICAL_BRIDGE_RUNNER_VERSION", "CANONICAL_BRIDGE_SCHEMA", "CANONICAL_BRIDGE_VERSION", "CanonicalBridgeConfiguration", "CanonicalBridgeDisposition", "CanonicalBridgeError", "CanonicalBridgeRequest", "CanonicalBridgeResponse", "CanonicalHeadlessBridge",
-    "REPRODUCTION_SCHEMA", "REPRODUCTION_VERSION", "ReplayDisposition", "ReplayObservation", "ReplayResult", "ReproductionBundle", "ReproductionContractError", "ReproductionManifest", "ReproductionReplay",
+    "REPRODUCTION_SCHEMA", "REPRODUCTION_VERSION", "ReplayDisposition", "ReplayExecutionContext", "ReplayObservation", "ReplayResult", "ReproductionBundle", "ReproductionContractError", "ReproductionManifest", "ReproductionReplay",
 ]
 
 __version__ = "0.1.0"

@@ -5,7 +5,7 @@ import hashlib
 from pathlib import Path
 
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, CANONICAL_PROOF_STATE_SOURCE_SHA256, SolverStateAuthority
-from scrubbots_pixel_factory.reproduction import ReplayDisposition, ReplayObservation, ReproductionBundle, ReproductionContractError, ReproductionManifest, ReproductionReplay
+from scrubbots_pixel_factory.reproduction import ReplayDisposition, ReplayExecutionContext, ReplayObservation, ReproductionBundle, ReproductionContractError, ReproductionManifest, ReproductionReplay
 from scrubbots_pixel_factory.search_policy import BASELINE_SEARCH_POLICY
 from scrubbots_pixel_factory.solution_analysis import SolutionAnalysisBounds
 
@@ -51,7 +51,7 @@ def test_identical_manifest_and_bundle_bytes_are_deterministic() -> None:
 
 def test_replay_matches_existing_layer_observation() -> None:
     bundle = ReproductionBundle.create(manifest())
-    result = ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH))
+    result = ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH, ReplayExecutionContext.from_manifest(bundle.manifest)))
     assert result.disposition is ReplayDisposition.MATCH
 
 
@@ -83,10 +83,12 @@ def test_tampered_hash_or_authority_fails_closed() -> None:
 def test_replay_diverges_and_unavailable_is_distinct() -> None:
     bundle = ReproductionBundle.create(manifest())
     replay = ReproductionReplay()
-    assert replay.replay(bundle, ReplayObservation("PROVEN_UNSOLVABLE", EVIDENCE, PATH)).disposition is ReplayDisposition.DIVERGED
+    context = ReplayExecutionContext.from_manifest(bundle.manifest)
+    assert replay.replay(bundle, ReplayObservation("PROVEN_UNSOLVABLE", EVIDENCE, PATH, context)).disposition is ReplayDisposition.DIVERGED
     assert replay.replay(bundle, None).disposition is ReplayDisposition.UNAVAILABLE
     assert replay.replay(bundle, ReplayObservation("UNAVAILABLE")).disposition is ReplayDisposition.UNAVAILABLE
     assert replay.replay(bundle, ReplayObservation("ERROR")).disposition is ReplayDisposition.ERROR
+    assert replay.replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH)).disposition is ReplayDisposition.UNAVAILABLE
 
 
 def test_replay_revalidates_all_execution_identity_context_fields() -> None:
@@ -95,8 +97,20 @@ def test_replay_revalidates_all_execution_identity_context_fields() -> None:
     for field, value in (("candidate_source_sha256", "0" * 64), ("level_data_source_sha256", "1" * 64), ("seed", 8), ("generator_version", "other"), ("provider_version", "other"), ("bridge_version", "other"), ("search_version", "other"), ("operation", "OTHER")):
         tampered = dict(context)
         tampered[field] = value
-        result = ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH, tampered))
+        result = ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH, ReplayExecutionContext.from_mapping(tampered)))
         assert result.disposition is ReplayDisposition.DIVERGED, field
+
+
+def test_replay_context_is_closed_and_immutable() -> None:
+    bundle = ReproductionBundle.create(manifest())
+    context = ReplayExecutionContext.from_manifest(bundle.manifest)
+    assert context.canonical_dict() == bundle.manifest.execution_context()
+    try:
+        ReplayObservation("SOLVED", EVIDENCE, PATH, {"seed": 7})
+    except ReproductionContractError:
+        pass
+    else:
+        raise AssertionError("raw replay mappings must not bypass the closed context contract")
 
 
 def test_no_secrets_absolute_paths_or_gameplay_reimplementation() -> None:
