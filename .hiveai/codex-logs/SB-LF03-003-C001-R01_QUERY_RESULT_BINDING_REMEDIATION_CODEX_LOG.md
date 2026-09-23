@@ -22,3 +22,5 @@ Verification:
 - Canonical bridge execution: UNAVAILABLE; canonical checkout exists at `1144704e6c3647ed1cf76c610be5bd675585734a` but is dirty with owner changes, so bridge verification fails closed.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Files: `src/scrubbots_pixel_factory/legal_move_provider.py`, `tests/unit/test_sb_lf03_003_legal_move_provider.py`, this log.
+- Implementation commit: `5e9e790b66881440f6c6d5f4b43100a4eb5b2409`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
