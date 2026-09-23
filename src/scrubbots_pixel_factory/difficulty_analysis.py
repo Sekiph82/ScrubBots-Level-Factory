@@ -38,4 +38,39 @@ def populate_solution_depth_and_move_count(
     )
 
 
-__all__ = ["populate_solution_depth_and_move_count"]
+def populate_search_complexity_metrics(
+    level_metrics: LevelMetrics,
+    report: SolverEvidenceReport,
+) -> LevelMetrics:
+    """Populate observed search metrics without reconstructing legal moves."""
+
+    _accepted_report(level_metrics, report)
+    if report.execution is not SearchExecutionDisposition.AVAILABLE or report.metrics is None:
+        return level_metrics
+    observed = report.metrics
+    branch_counts = tuple(observed.branch_counts)
+    current = level_metrics.metrics or MetricValues()
+    if not branch_counts:
+        return replace(
+            level_metrics,
+            metrics=replace(
+                current,
+                states_visited=observed.visited_count,
+                dead_ends=observed.dead_end_count,
+            ),
+        )
+    branching = sum(branch_counts) / len(branch_counts)
+    forced_moves = sum(1 for count in branch_counts if count == 1)
+    return replace(
+        level_metrics,
+        metrics=replace(
+            current,
+            states_visited=observed.visited_count,
+            dead_ends=observed.dead_end_count,
+            branching=branching,
+            forced_moves=forced_moves,
+        ),
+    )
+
+
+__all__ = ["populate_search_complexity_metrics", "populate_solution_depth_and_move_count"]

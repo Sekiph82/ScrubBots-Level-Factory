@@ -274,7 +274,7 @@ from .level_metrics import (
     MetricsContractIdentity,
     SolverEvidenceIdentity,
 )
-from .difficulty_analysis import populate_solution_depth_and_move_count
+from .difficulty_analysis import populate_search_complexity_metrics, populate_solution_depth_and_move_count
 from .canonical_bridge import (
     CANONICAL_BRIDGE_RUNNER_VERSION,
     CANONICAL_BRIDGE_SCHEMA,
@@ -558,7 +558,7 @@ __all__ = [
     "BASELINE_OPTIMIZATION_POLICY", "NONE_PRUNING_V1", "MoveOrderingPolicy", "OrderingPolicy", "PROVIDER_ORDER_V1", "PruningPolicy", "REVERSE_PROVIDER_ORDER_V1", "REVERSE_SEARCH_POLICY", "SEARCH_POLICY_SCHEMA", "SEARCH_POLICY_VERSION", "SearchOptimizationPolicy", "SearchPolicy", "SearchPolicyError",
     "ENTROPY_ANALYSIS_VERSION", "EntropyDisposition", "MOVE_SEQUENCE_EQUIVALENCE_V1", "SOLUTION_ANALYSIS_SCHEMA", "SOLUTION_ANALYSIS_VERSION", "SolutionAnalysisBounds", "SolutionAnalysisError", "SolutionCountDisposition", "SolutionCountEngine", "SolutionCountResult",
     "OPERATIONAL_TIMEOUT_POLICY_VERSION", "SOLVER_BUDGET_SCHEMA", "SOLVER_BUDGET_VERSION", "SOLVER_OUTCOME_SCHEMA", "SOLVER_OUTCOME_VERSION", "BudgetExhaustionReason", "BudgetedSolverResult", "OperationalExecutionDisposition", "OperationalSolverOutcome", "OperationalTimeoutTelemetry", "SolverBudgetError", "SolverBudgetPolicy", "SolverOutcomeDisposition", "classify_search_result", "classify_solution_count_result", "wrap_operational_execution",
-    "AnalysisDisposition", "DifficultyMetadata", "LEVEL_METRICS_SCHEMA", "LEVEL_METRICS_VERSION", "LevelMetrics", "LevelMetricsError", "MetricId", "MetricValues", "METRICS_CONTRACT_SCHEMA", "METRICS_CONTRACT_VERSION", "MetricsContractIdentity", "SolverEvidenceIdentity", "populate_solution_depth_and_move_count",
+    "AnalysisDisposition", "DifficultyMetadata", "LEVEL_METRICS_SCHEMA", "LEVEL_METRICS_VERSION", "LevelMetrics", "LevelMetricsError", "MetricId", "MetricValues", "METRICS_CONTRACT_SCHEMA", "METRICS_CONTRACT_VERSION", "MetricsContractIdentity", "SolverEvidenceIdentity", "populate_search_complexity_metrics", "populate_solution_depth_and_move_count",
     "CANONICAL_BRIDGE_RUNNER_VERSION", "CANONICAL_BRIDGE_SCHEMA", "CANONICAL_BRIDGE_VERSION", "CanonicalBridgeConfiguration", "CanonicalBridgeDisposition", "CanonicalBridgeError", "CanonicalBridgeRequest", "CanonicalBridgeResponse", "CanonicalHeadlessBridge",
     "REPRODUCTION_SCHEMA", "REPRODUCTION_VERSION", "ReplayDisposition", "ReplayExecutionContext", "ReplayObservation", "ReplayResult", "ReproductionBundle", "ReproductionContractError", "ReproductionManifest", "ReproductionReplay",
 ]
