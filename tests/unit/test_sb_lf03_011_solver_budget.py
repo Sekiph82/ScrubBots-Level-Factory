@@ -150,6 +150,20 @@ def test_operational_timeout_maps_only_to_inconclusive() -> None:
     assert result.disposition is SolverOutcomeDisposition.INCONCLUSIVE
     assert result.exhaustion is BudgetExhaustionReason.OPERATIONAL_TIMEOUT
     assert result.operational_timeout_exhausted is True
+    baseline = classify_search_result(search, policy=SolverBudgetPolicy())
+    assert "operational_timeout_exhausted" not in baseline.canonical_dict()
+    assert baseline.canonical_dict() != result.canonical_dict()
+
+
+def test_evidence_engine_stops_at_real_visited_state_bound() -> None:
+    legal, transition, initial = fixture()
+    report = EvidenceSearchEngine(legal, transition, budget_policy=SolverBudgetPolicy(max_visited_states=1)).search(initial)
+    assert report.metrics is not None
+    assert report.metrics.visited_count == 1
+    assert report.budget_result is not None
+    assert report.budget_result.disposition is SolverOutcomeDisposition.INCONCLUSIVE
+    assert report.budget_result.exhaustion is BudgetExhaustionReason.MAX_VISITED_STATES
+    assert report.result.verdict is SearchVerdict.INCONCLUSIVE
 
 
 def test_budgeted_evidence_and_reproduction_are_deterministic() -> None:

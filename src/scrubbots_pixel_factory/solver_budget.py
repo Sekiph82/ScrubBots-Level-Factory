@@ -146,7 +146,6 @@ class BudgetedSolverResult:
             "source_disposition": self.source_disposition,
             "reason": self.reason,
             "exhaustion": self.exhaustion.value if self.exhaustion is not None else None,
-            "operational_timeout_exhausted": self.operational_timeout_exhausted,
         }
 
     def digest(self) -> str:
@@ -178,7 +177,7 @@ def classify_search_result(
     if result.execution is SearchExecutionDisposition.ERROR:
         return BudgetedSolverResult(SolverOutcomeDisposition.ERROR, budget, "baseline_search", result.execution.value, result.reason)
     visited = getattr(metrics, "visited_count", None)
-    if type(visited) is int and visited > budget.max_visited_states:
+    if type(visited) is int and visited >= budget.max_visited_states and result.verdict is SearchVerdict.INCONCLUSIVE:
         return BudgetedSolverResult(
             SolverOutcomeDisposition.INCONCLUSIVE,
             budget,
