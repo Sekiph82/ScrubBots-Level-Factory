@@ -40,4 +40,7 @@ Document role: CODEX BUILDER LOG
 
 ## Evidence
 
-Implementation and publication SHAs are recorded after the commits below.
+- Implementation commit: `3c51e2e` (`test: close LF03-012 R04 regression fidelity`), pushed successfully to `origin/main`.
+- The implementation commit contains only the two R04 fixture/test files and this matching builder log; no `.uid` file was staged.
+- Terminal state before the log-only append: local `main` and `origin/main` both at `3c51e2e`; `TASKS.md` remained unchanged and preserved untracked `.uid` files remained present.
+- The following publication is the required terminal log-only commit.
