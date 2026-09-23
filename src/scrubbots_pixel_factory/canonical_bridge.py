@@ -224,6 +224,21 @@ class CanonicalHeadlessBridge:
         verification = verify_authority_checkout(authority, checkout)
         if verification.disposition.value != "VERIFIED":
             return False, verification.reason
+        try:
+            status = subprocess.run(
+                ["git", "status", "--porcelain", "--untracked-files=all"],
+                cwd=checkout,
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return False, f"canonical checkout status verification failed: {type(exc).__name__}"
+        if status.returncode != 0:
+            return False, "canonical checkout status verification failed"
+        if status.stdout.strip():
+            return False, "canonical checkout is dirty; canonical bridge is UNAVAILABLE until authority is clean"
         for relative in REQUIRED_CANONICAL_SOURCE_PATHS:
             if not (checkout / relative).is_file():
                 return False, f"required canonical source is missing: {relative}"
