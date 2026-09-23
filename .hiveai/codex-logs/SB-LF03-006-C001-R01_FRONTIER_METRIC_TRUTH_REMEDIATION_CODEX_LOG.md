@@ -22,3 +22,5 @@ Verification:
 - Canonical invoke remains UNAVAILABLE due dirty owner checkout; no canonical source was changed.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
 - Implementation files: `src/scrubbots_pixel_factory/solver_evidence.py`, `tests/unit/test_sb_lf03_006_solver_evidence.py`, this log.
+- Implementation commit: `6c9494bdab59bc06ad48914dab76515092ff99e2`; pushed to `main`.
+- Terminal log-only commit follows this finalized entry.
