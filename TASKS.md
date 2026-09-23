@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M04 — Difficulty Intelligence & Metrics
-- Current Sprint: SB-LF04.C001 — Versioned LevelMetrics contract
+- Current Sprint: SB-LF04.C001-R01 — LevelMetrics acceptance-gate portability closure
 - Current Task: SB-LF04-001 — Define versioned LevelMetrics
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes only `SB-LF04-001-C001` from `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`; M03 remains COMPLETE/VERIFIED; Codex never edits `TASKS.md`; after publication ChatGPT independently strict-audits SB-LF04-001.
+- Current Task Status: READY_FOR_REMEDIATION
+- Next Task/Action: Codex executes only `SB-LF04-001-C001-R01` from `.hiveai/prompts/SB-LF04-001-C001-R01_WINDOWS_RUNNER_IDENTITY_PORTABILITY_AND_FULL_GATE_CLOSURE_PROMPT.md`; the LevelMetrics product implementation is retained; Codex never edits `TASKS.md`; after publication ChatGPT independently re-audits SB-LF04-001.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF03-012-C001-R04_HISTORICAL_REGRESSION_FIDELITY_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_AUDIT_CRITERIA.md`
-- Current Prompt: `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_AUDIT_CRITERIA.md` + `.hiveai/audits/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_STRICT_AUDIT.md`
+- Current Prompt: `.hiveai/prompts/SB-LF04-001-C001-R01_WINDOWS_RUNNER_IDENTITY_PORTABILITY_AND_FULL_GATE_CLOSURE_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -93,6 +93,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF03 M03 Final Closure Summary: `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`.
 - SB-LF04-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_AUDIT_CRITERIA.md`.
 - SB-LF04-001 C001 Prompt: `.hiveai/prompts/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_PROMPT.md`.
+- SB-LF04-001 C001 Audit Result: `CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED` by `.hiveai/audits/SB-LF04-001-C001_VERSIONED_LEVEL_METRICS_CONTRACT_STRICT_AUDIT.md`.
+- SB-LF04-001 C001-R01 Prompt: `.hiveai/prompts/SB-LF04-001-C001-R01_WINDOWS_RUNNER_IDENTITY_PORTABILITY_AND_FULL_GATE_CLOSURE_PROMPT.md`.
+- SB-LF04-001 C001-R01 Scope: Windows runner exact-byte portability + required full repository green gate only; no SB-LF04-002 work authorized.
 - Migration Cutover Date: 2026-09-14
 
 ## H!veAI Parser Contract
