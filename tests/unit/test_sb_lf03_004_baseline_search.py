@@ -15,6 +15,7 @@ from scrubbots_pixel_factory.compact_solver_state import (
 from scrubbots_pixel_factory.legal_move_provider import (
     LegalMove,
     LegalMoveResult,
+    LegalMoveQuery,
     ProviderDisposition,
     ProviderEvidence,
 )
@@ -150,6 +151,35 @@ def test_unavailable_and_provider_error_fail_closed() -> None:
     result = BaselineSearchEngine(UnavailableLegal({}), transitions).search(initial)
     assert result.execution is SearchExecutionDisposition.UNAVAILABLE
     assert result.verdict is None
+
+
+def test_wrong_query_result_and_child_authority_fail_closed() -> None:
+    legal, transitions, initial = build_fixture()
+
+    class WrongQueryLegal(FixtureLegalProvider):
+        def query(self, request):
+            other = LegalMoveQuery(state_by_name["dead"], state_by_name["dead"].digest(), request.authority, self.provider_id, self.provider_version)
+            evidence = ProviderEvidence(self.provider_id, self.provider_version, request.authority, ProviderDisposition.AVAILABLE, AuthorityVerificationDisposition.VERIFIED, AuthorityVerificationDisposition.VERIFIED, "CANONICAL_RUNTIME", "fixture")
+            return LegalMoveResult.from_query(other, ProviderDisposition.AVAILABLE, evidence, (LegalMove(0),))
+
+    wrong = BaselineSearchEngine(WrongQueryLegal({}), transitions).search(initial)
+    assert wrong.execution is SearchExecutionDisposition.ERROR
+    transitions_bad = FixtureTransitionProvider({"root": TerminalTruth.CONTINUE}, {("root", 0): "dead"})
+    bad_child = state("foreign")
+    foreign_authority = object.__new__(SolverStateAuthority)
+    object.__setattr__(foreign_authority, "repository", "https://github.com/Sekiph82/Scrubbots")
+    object.__setattr__(foreign_authority, "commit_sha", "0" * 40)
+    object.__setattr__(foreign_authority, "proof_state_source_path", "scripts/gameplay/solver/proof_state.gd")
+    object.__setattr__(foreign_authority, "authority_version", 1)
+    object.__setattr__(bad_child, "authority", foreign_authority)
+    original = state_by_name.get("dead")
+    state_by_name["dead"] = bad_child
+    try:
+        result = BaselineSearchEngine(legal, transitions_bad).search(initial)
+        assert result.execution is SearchExecutionDisposition.ERROR
+    finally:
+        if original is not None:
+            state_by_name["dead"] = original
 
 
 def test_search_module_does_not_implement_gameplay_rules() -> None:

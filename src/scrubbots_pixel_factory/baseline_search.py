@@ -132,11 +132,15 @@ class BaselineSearchResult:
 class BaselineSearchEngine:
     """DFS orchestration that never interprets gameplay state itself."""
 
-    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: SearchTransitionProvider, policy: BaselineSearchPolicy | None = None, search_policy: SearchPolicy | None = None) -> None:
+    def __init__(self, legal_provider: LegalMoveProvider, transition_provider: SearchTransitionProvider, policy: BaselineSearchPolicy | None = None, search_policy: SearchPolicy | None = None, max_visited_states: int | None = None) -> None:
         self._legal_provider = legal_provider
         self._transition_provider = transition_provider
         self._policy = policy or BaselineSearchPolicy()
         self._search_policy = search_policy or DEFAULT_SEARCH_POLICY
+        if max_visited_states is not None and (type(max_visited_states) is not int or isinstance(max_visited_states, bool) or max_visited_states < 1):
+            raise SearchContractError("max visited states must be a positive exact integer")
+        self._max_visited_states = max_visited_states
+        self._visited_count = 0
 
     @property
     def search_policy(self) -> SearchPolicy:
@@ -145,10 +149,14 @@ class BaselineSearchEngine:
     def search(self, initial_state: CompactSolverState, observer: object | None = None) -> BaselineSearchResult:
         if not isinstance(initial_state, CompactSolverState):
             return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, (), "initial state is malformed", self._policy)
+        self._visited_count = 0
         path: list[LegalMove] = []
         return self._visit(initial_state, path, 0, observer)
 
     def _visit(self, state: CompactSolverState, path: list[LegalMove], depth: int, observer: object | None = None) -> BaselineSearchResult:
+        if self._max_visited_states is not None and self._visited_count >= self._max_visited_states:
+            return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "deterministic max visited-state bound exhausted", self._policy)
+        self._visited_count += 1
         _notify(observer, "on_node", state, depth)
         if depth > self._policy.max_depth:
             return BaselineSearchResult(SearchExecutionDisposition.AVAILABLE, SearchVerdict.INCONCLUSIVE, tuple(path), "deterministic depth bound exhausted", self._policy)
@@ -168,6 +176,7 @@ class BaselineSearchEngine:
         try:
             request = LegalMoveQuery(state, state.digest(), state.authority, self._legal_provider.provider_id, self._legal_provider.provider_version)
             moves = self._legal_provider.query(request)
+            moves.validate_for_query(request)
         except Exception as exc:
             return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), f"legal provider error: {type(exc).__name__}", self._policy)
         if moves.disposition is ProviderDisposition.UNAVAILABLE:
@@ -192,6 +201,8 @@ class BaselineSearchEngine:
                 return BaselineSearchResult(SearchExecutionDisposition.UNAVAILABLE, None, tuple(path), transition.reason, self._policy)
             if transition.disposition is SearchExecutionDisposition.ERROR:
                 return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), transition.reason, self._policy)
+            if not isinstance(transition.state, CompactSolverState) or transition.state.authority != state.authority:
+                return BaselineSearchResult(SearchExecutionDisposition.ERROR, None, tuple(path), "transition child state authority or type mismatch", self._policy)
             _notify(observer, "on_child", state, move, transition)
             next_path = [*path, move]
             child = self._visit(transition.state, next_path, depth + 1, observer)
