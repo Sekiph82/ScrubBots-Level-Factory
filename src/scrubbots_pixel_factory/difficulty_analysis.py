@@ -15,6 +15,8 @@ from .solver_evidence import SolverEvidenceReport
 
 DEPENDENCY_DEPTH_SCHEMA = "scrubbots-canonical-dependency-depth"
 DEPENDENCY_DEPTH_VERSION = 1
+SLOT_PRESSURE_SCHEMA = "scrubbots-canonical-slot-pressure"
+SLOT_PRESSURE_VERSION = 1
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -126,6 +128,104 @@ def populate_dependency_depth(level_metrics: LevelMetrics, result: DependencyDep
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), dependency_depth=result.dependency_depth))
 
 
+@dataclass(frozen=True, slots=True)
+class SlotSnapshot:
+    occupied_slots: int
+    capacity: int
+
+    def __post_init__(self) -> None:
+        if type(self.occupied_slots) is not int or type(self.capacity) is not int or self.capacity <= 0 or not 0 <= self.occupied_slots <= self.capacity:
+            raise LevelMetricsError("slot snapshot occupancy must be within a positive canonical capacity")
+
+    def ratio(self) -> float:
+        return self.occupied_slots / self.capacity
+
+    def canonical_dict(self) -> dict[str, int]:
+        return {"occupied_slots": self.occupied_slots, "capacity": self.capacity}
+
+
+@dataclass(frozen=True, slots=True)
+class SlotPressureResult(_DependencyResultMixin):
+    disposition: AnalysisDisposition
+    authority: object
+    level_source_sha256: str
+    state_digest: str
+    evidence_digest: str
+    provider_id: str
+    provider_version: str
+    snapshots: tuple[SlotSnapshot, ...]
+    slot_pressure: float | None
+    reason: str
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        if not isinstance(self.disposition, AnalysisDisposition) or not isinstance(self.authority, SolverStateAuthority):
+            raise LevelMetricsError("slot pressure disposition or authority is malformed")
+        _digest_text(self.level_source_sha256, "slot pressure level source SHA-256")
+        _digest_text(self.state_digest, "slot pressure state digest")
+        _digest_text(self.evidence_digest, "slot pressure evidence digest")
+        _provider_text(self.provider_id, "slot pressure provider id")
+        _provider_text(self.provider_version, "slot pressure provider version")
+        if type(self.snapshots) is not tuple or any(not isinstance(snapshot, SlotSnapshot) for snapshot in self.snapshots):
+            raise LevelMetricsError("slot pressure snapshots must be an immutable canonical trace")
+        if type(self.reason) is not str or not self.reason.strip():
+            raise LevelMetricsError("slot pressure reason is required")
+        if self.disposition is AnalysisDisposition.AVAILABLE:
+            if not self.snapshots or self.slot_pressure is None or not 0.0 <= self.slot_pressure <= 1.0:
+                raise LevelMetricsError("AVAILABLE slot pressure requires non-empty bounded snapshots and a ratio")
+        elif self.slot_pressure is not None:
+            raise LevelMetricsError("unavailable slot pressure cannot carry a measurement")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": SLOT_PRESSURE_SCHEMA,
+            "version": SLOT_PRESSURE_VERSION,
+            "disposition": self.disposition.value,
+            "authority": self.authority.canonical_dict(),
+            "level_source_sha256": self.level_source_sha256,
+            "state_digest": self.state_digest,
+            "evidence_digest": self.evidence_digest,
+            "provider_id": self.provider_id,
+            "provider_version": self.provider_version,
+            "snapshots": [snapshot.canonical_dict() for snapshot in self.snapshots],
+            "slot_pressure": self.slot_pressure,
+            "reason": self.reason,
+        }
+
+
+def slot_pressure_from_snapshots(
+    level_metrics: LevelMetrics,
+    state_digest: str,
+    snapshots: tuple[SlotSnapshot, ...],
+    *,
+    provider_id: str = "canonical-slot-trace",
+    provider_version: str = "CANONICAL_SLOT_TRACE_V1",
+) -> SlotPressureResult:
+    if not isinstance(snapshots, tuple) or not snapshots:
+        raise LevelMetricsError("slot pressure requires a non-empty canonical trace")
+    if any(not isinstance(snapshot, SlotSnapshot) for snapshot in snapshots):
+        raise LevelMetricsError("slot pressure trace contains a malformed snapshot")
+    pressure = max(snapshot.ratio() for snapshot in snapshots)
+    return SlotPressureResult(AnalysisDisposition.AVAILABLE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "slot pressure state digest"), level_metrics.evidence_digest, provider_id, provider_version, snapshots, pressure, "canonical slot-state trace accepted")
+
+
+def unavailable_slot_pressure_result(level_metrics: LevelMetrics, state_digest: str, reason: str) -> SlotPressureResult:
+    if not isinstance(level_metrics, LevelMetrics):
+        raise LevelMetricsError("LevelMetrics is required")
+    return SlotPressureResult(AnalysisDisposition.UNAVAILABLE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "slot pressure state digest"), level_metrics.evidence_digest, "canonical-slot-trace", "CANONICAL_SLOT_TRACE_V1", (), None, reason)
+
+
+def populate_slot_pressure(level_metrics: LevelMetrics, result: SlotPressureResult) -> LevelMetrics:
+    if not isinstance(level_metrics, LevelMetrics) or not isinstance(result, SlotPressureResult):
+        raise LevelMetricsError("LevelMetrics and SlotPressureResult are required")
+    if result.authority != level_metrics.authority or result.level_source_sha256 != level_metrics.source_sha256 or result.evidence_digest != level_metrics.evidence_digest:
+        raise LevelMetricsError("slot pressure result provenance does not match LevelMetrics")
+    if result.disposition is not AnalysisDisposition.AVAILABLE:
+        return level_metrics
+    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), slot_pressure=result.slot_pressure))
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -194,8 +294,15 @@ __all__ = [
     "DEPENDENCY_DEPTH_SCHEMA",
     "DEPENDENCY_DEPTH_VERSION",
     "DependencyDepthResult",
+    "SLOT_PRESSURE_SCHEMA",
+    "SLOT_PRESSURE_VERSION",
+    "SlotPressureResult",
+    "SlotSnapshot",
     "populate_dependency_depth",
+    "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
+    "slot_pressure_from_snapshots",
+    "unavailable_slot_pressure_result",
     "unavailable_dependency_result",
 ]
