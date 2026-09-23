@@ -32,8 +32,10 @@ from .simulation_boundary import REQUIRED_CANONICAL_SOURCE_PATHS
 CANONICAL_BRIDGE_SCHEMA = "scrubbots-canonical-headless-bridge"
 CANONICAL_BRIDGE_VERSION = 1
 CANONICAL_BRIDGE_RUNNER_VERSION = "external-godot-runner-v1"
-CANONICAL_BRIDGE_RUNNER_SHA256 = "f02e0df31e4ef7424fa30462d65fdb9ee4f37b7b7d7d2692a875c5787112d174"
+CANONICAL_BRIDGE_RUNNER_SHA256 = "b66f307c4103a714d02b03ce61e7413e3ff07e0e90fb19b3417cc54afef05c3f"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_MAX_LEVEL_DATA_SOURCE_BYTES = 64 * 1024
+_LEVEL_DATA_FIELDS = frozenset({"version", "id", "name", "difficulty", "width", "height", "palette", "cells"})
 
 
 class CanonicalBridgeError(ValueError):
@@ -60,6 +62,63 @@ def _text(value: object, label: str) -> str:
     return value.strip()
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CanonicalBridgeError("LevelData source contains duplicate JSON fields")
+        result[key] = value
+    return result
+
+
+def _validate_level_data_source(source: bytes, expected_sha256: str) -> dict[str, object]:
+    if len(source) == 0 or len(source) > _MAX_LEVEL_DATA_SOURCE_BYTES:
+        raise CanonicalBridgeError("LevelData source bytes are empty or exceed the bounded size")
+    if _sha256(source) != expected_sha256:
+        raise CanonicalBridgeError("LevelData source SHA-256 does not match the request identity")
+    try:
+        parsed = json.loads(source.decode("utf-8"), object_pairs_hook=_reject_duplicate_json_keys)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CanonicalBridgeError("LevelData source is not valid UTF-8 JSON") from exc
+    if not isinstance(parsed, dict) or set(parsed) != _LEVEL_DATA_FIELDS:
+        raise CanonicalBridgeError("LevelData source fields do not match the canonical V1 contract")
+    if type(parsed["version"]) is not int or parsed["version"] != 1:
+        raise CanonicalBridgeError("LevelData source version is unsupported")
+    for field in ("id", "name", "difficulty"):
+        if type(parsed[field]) is not str or not parsed[field].strip():
+            raise CanonicalBridgeError(f"LevelData source {field} is malformed")
+    for field in ("width", "height"):
+        if type(parsed[field]) is not int or parsed[field] <= 0:
+            raise CanonicalBridgeError(f"LevelData source {field} is malformed")
+    palette = parsed["palette"]
+    if not isinstance(palette, list) or not palette or any(type(item) is not str or not item for item in palette):
+        raise CanonicalBridgeError("LevelData source palette is malformed")
+    cells = parsed["cells"]
+    if not isinstance(cells, list) or len(cells) != parsed["width"] * parsed["height"]:
+        raise CanonicalBridgeError("LevelData source cell count is malformed")
+    if any(type(cell) is not int or cell < 0 or cell >= len(palette) for cell in cells):
+        raise CanonicalBridgeError("LevelData source cell palette IDs are malformed")
+    return parsed
+
+
+def _payload_level_data_source(payload: bytes, expected_sha256: str) -> bytes:
+    try:
+        envelope = json.loads(payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_json_keys)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise CanonicalBridgeError("canonical request payload is not valid UTF-8 JSON") from exc
+    if not isinstance(envelope, dict) or "level_data_source_base64" not in envelope:
+        raise CanonicalBridgeError("canonical request payload is missing exact LevelData source bytes")
+    encoded = envelope["level_data_source_base64"]
+    if type(encoded) is not str:
+        raise CanonicalBridgeError("LevelData source bytes must be base64 text")
+    try:
+        source = base64.b64decode(encoded, validate=True)
+    except (ValueError, TypeError) as exc:
+        raise CanonicalBridgeError("LevelData source base64 is malformed") from exc
+    _validate_level_data_source(source, expected_sha256)
+    return source
+
+
 @dataclass(frozen=True, slots=True)
 class CanonicalBridgeRequest:
     authority: SolverStateAuthority
@@ -84,6 +143,7 @@ class CanonicalBridgeRequest:
         object.__setattr__(self, "state_digest", state_digest)
         object.__setattr__(self, "level_data_source_sha256", source_sha256)
         object.__setattr__(self, "bridge_version", _text(self.bridge_version, "bridge version"))
+        _payload_level_data_source(bytes(self.request_payload), source_sha256)
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -99,6 +159,9 @@ class CanonicalBridgeRequest:
 
     def digest(self) -> str:
         return _sha256(_canonical_bytes(self.canonical_dict()))
+
+    def level_data_source_bytes(self) -> bytes:
+        return _payload_level_data_source(self.request_payload, self.level_data_source_sha256)
 
     def runner_payload(self) -> dict[str, object]:
         return {**self.canonical_dict(), "request_payload_base64": base64.b64encode(self.request_payload).decode("ascii"), "request_digest": self.digest()}

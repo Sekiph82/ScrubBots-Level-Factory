@@ -40,8 +40,11 @@ func _run(path: String) -> Dictionary:
 	var payload = JSON.parse_string(payload_text)
 	if not payload is Dictionary:
 		return _error("canonical request payload must be JSON object")
-	if String(payload.get("level_data_source_sha256", "")) != String(parsed.get("level_data_source_sha256", "")):
-		return _error("LevelData source identity does not match the verified request")
+	var source_bytes = _level_data_source_bytes(payload)
+	if source_bytes == null:
+		return _error("exact LevelData source bytes are malformed")
+	if _sha256_hex(source_bytes) != String(parsed.get("level_data_source_sha256", "")):
+		return _error("LevelData source SHA-256 does not match the verified request")
 	var state = _state_from_payload(payload)
 	if state == null:
 		return _error("canonical level and supply payload is malformed")
@@ -68,13 +71,15 @@ func _run(path: String) -> Dictionary:
 		"operation": operation, "result": result, "reason": "canonical ScrubBots operation executed"}
 
 func _state_from_payload(payload: Dictionary):
-	var level_data: Dictionary = payload.get("level", {})
+	var level_data = _level_data_source_dict(payload)
+	if level_data == null:
+		return null
 	var width := int(level_data.get("width", 0))
 	var height := int(level_data.get("height", 0))
 	var cells: Array = level_data.get("cells", [])
 	if width <= 0 or height <= 0 or cells.size() != width * height:
 		return null
-	var level = LevelData.new(int(level_data.get("version", 1)), String(level_data.get("id", "")), String(level_data.get("display_name", "")), String(level_data.get("difficulty", "")), width, height, PackedStringArray(level_data.get("palette", [])), PackedInt32Array(cells))
+	var level = LevelData.new(int(level_data.get("version", 1)), String(level_data.get("id", "")), String(level_data.get("name", "")), String(level_data.get("difficulty", "")), width, height, PackedStringArray(level_data.get("palette", [])), PackedInt32Array(cells))
 	var supply = BatchSupplyEngine.create(int(payload.get("column_count", 0)), int(payload.get("preview_depth", 3)))
 	if supply == null:
 		return null
@@ -90,6 +95,68 @@ func _state_from_payload(payload: Dictionary):
 	if not supply.load_candidate(columns, int(payload.get("seed", 0)), int(payload.get("palette_size", 0))):
 		return null
 	return ProofState.from_level_and_supply(level, supply)
+
+func _level_data_source_bytes(payload: Dictionary):
+	var encoded := String(payload.get("level_data_source_base64", ""))
+	if encoded.is_empty():
+		return null
+	var source := Marshalls.base64_to_raw(encoded)
+	if source.is_empty() or source.size() > 65536:
+		return null
+	return source
+
+func _level_data_source_dict(payload: Dictionary):
+	var source = _level_data_source_bytes(payload)
+	if source == null:
+		return null
+	var parsed = JSON.parse_string(source.get_string_from_utf8())
+	if not parsed is Dictionary:
+		return null
+	for field in ["version", "id", "name", "difficulty", "width", "height", "palette", "cells"]:
+		if not parsed.has(field):
+			return null
+	var version = _json_int(parsed.get("version"))
+	if parsed.keys().size() != 8 or version == null or version != 1:
+		return null
+	if typeof(parsed.get("id")) != TYPE_STRING or String(parsed.get("id", "")).is_empty():
+		return null
+	if typeof(parsed.get("name")) != TYPE_STRING or String(parsed.get("name", "")).is_empty():
+		return null
+	if typeof(parsed.get("difficulty")) != TYPE_STRING or String(parsed.get("difficulty", "")).is_empty():
+		return null
+	var width = _json_int(parsed.get("width"))
+	if width == null or width <= 0:
+		return null
+	var height = _json_int(parsed.get("height"))
+	if height == null or height <= 0:
+		return null
+	var palette = parsed.get("palette", [])
+	var cells = parsed.get("cells", [])
+	if typeof(palette) != TYPE_ARRAY or palette.is_empty() or typeof(cells) != TYPE_ARRAY:
+		return null
+	if cells.size() != width * height:
+		return null
+	for color in palette:
+		if typeof(color) != TYPE_STRING or String(color).is_empty():
+			return null
+	for cell in cells:
+		var cell_id = _json_int(cell)
+		if cell_id == null or cell_id < 0 or cell_id >= palette.size():
+			return null
+	return parsed
+
+func _json_int(value):
+	if typeof(value) == TYPE_INT:
+		return int(value)
+	if typeof(value) == TYPE_FLOAT and is_equal_approx(value, round(value)):
+		return int(value)
+	return null
+
+func _sha256_hex(source: PackedByteArray) -> String:
+	var hashing := HashingContext.new()
+	hashing.start(HashingContext.HASH_SHA256)
+	hashing.update(source)
+	return hashing.finish().hex_encode()
 
 func _arg(args: PackedStringArray, name: String) -> String:
 	var index := args.find(name)
