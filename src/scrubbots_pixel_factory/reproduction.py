@@ -174,6 +174,28 @@ class ReproductionManifest:
     def digest(self) -> str:
         return _digest(self.canonical_dict())
 
+    def execution_context(self) -> dict[str, object]:
+        """Identity inputs that a replay executor must revalidate before MATCH."""
+        return {
+            "candidate_source_sha256": self.candidate_source_sha256,
+            "level_data_source_sha256": self.level_data_source_sha256,
+            "seed": self.seed,
+            "normalized_config": self.normalized_config,
+            "generator_version": self.generator_version,
+            "authority": self.authority.canonical_dict(),
+            "source_contract_sha256": self.source_contract_sha256,
+            "provider_id": self.provider_id,
+            "provider_version": self.provider_version,
+            "bridge_version": self.bridge_version,
+            "search_version": self.search_version,
+            "memo_provider_id": self.memo_provider_id,
+            "memo_provider_version": self.memo_provider_version,
+            "search_policy": self.search_policy.canonical_dict(),
+            "budgets": self.budgets.canonical_dict(),
+            "operation": self.operation,
+            "goal": self.goal,
+        }
+
 
 @dataclass(frozen=True, slots=True)
 class ReproductionBundle:
@@ -200,12 +222,15 @@ class ReplayObservation:
     disposition: str
     evidence_digest: str | None = None
     path: tuple[dict[str, object], ...] = ()
+    context: Mapping[str, object] | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "disposition", _text(self.disposition, "replay disposition"))
         if self.evidence_digest is not None:
             object.__setattr__(self, "evidence_digest", _sha(self.evidence_digest, "replay evidence SHA-256"))
         object.__setattr__(self, "path", _path_tuple(self.path, "replay path"))
+        if self.context is not None and not isinstance(self.context, Mapping):
+            raise ReproductionContractError("replay context must be an object")
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,6 +256,9 @@ class ReproductionReplay:
         if observation.disposition == "ERROR":
             return ReplayResult(ReplayDisposition.ERROR, bundle.manifest_digest, "replay provider returned an error")
         manifest = bundle.manifest
+        context = dict(observation.context) if observation.context is not None else manifest.execution_context()
+        if context != manifest.execution_context():
+            return ReplayResult(ReplayDisposition.DIVERGED, bundle.manifest_digest, "replay execution identity diverged")
         if observation.disposition != manifest.expected_disposition:
             return ReplayResult(ReplayDisposition.DIVERGED, bundle.manifest_digest, "replay disposition diverged")
         if manifest.observed_evidence_digest is not None and observation.evidence_digest != manifest.observed_evidence_digest:

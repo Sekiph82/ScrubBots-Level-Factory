@@ -89,6 +89,16 @@ def test_replay_diverges_and_unavailable_is_distinct() -> None:
     assert replay.replay(bundle, ReplayObservation("ERROR")).disposition is ReplayDisposition.ERROR
 
 
+def test_replay_revalidates_all_execution_identity_context_fields() -> None:
+    bundle = ReproductionBundle.create(manifest())
+    context = bundle.manifest.execution_context()
+    for field, value in (("candidate_source_sha256", "0" * 64), ("level_data_source_sha256", "1" * 64), ("seed", 8), ("generator_version", "other"), ("provider_version", "other"), ("bridge_version", "other"), ("search_version", "other"), ("operation", "OTHER")):
+        tampered = dict(context)
+        tampered[field] = value
+        result = ReproductionReplay().replay(bundle, ReplayObservation("SOLVED", EVIDENCE, PATH, tampered))
+        assert result.disposition is ReplayDisposition.DIVERGED, field
+
+
 def test_no_secrets_absolute_paths_or_gameplay_reimplementation() -> None:
     try:
         replace(manifest(), normalized_config={"api_key": "secret-value"})
