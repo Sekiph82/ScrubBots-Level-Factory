@@ -19,3 +19,5 @@ Implementation and verification entries will be appended chronologically.
 - Updated the canonical bridge fixture to carry exact LevelData V1 source bytes and the cryptographic source hash; real repeated legal_moves/apply_placement/solve calls now use the source-bound request.
 - Focused/affected command: `python -m pytest -q` over R03 009/011/012, retained LF03, LF00, and LF06 tests -> `95 passed, 1 warning`; `python -m compileall -q src tests` passed.
 - Godot headless editor boot: `godot_console.exe --headless --editor --path level_factory --quit` -> exit code 0. `git diff --check` passed and `git diff --exit-code -- TASKS.md` passed.
+- Full command: `python -m pytest -q` -> `856 passed, 1 skipped, 1 warning in 301.50s`; the single legitimate skip is the retained SB-LF03-002 capability test when external canonical checkout configuration is not supplied. No failure was hidden with skip/xfail.
+- Implementation commit: `e5c7be2`; pushed successfully to `origin/main`. This append precedes the required terminal log-only publication.
