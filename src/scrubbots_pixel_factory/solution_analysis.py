@@ -160,6 +160,7 @@ class SolutionCountEngine:
             try:
                 request = LegalMoveQuery(state, state.digest(), state.authority, self._legal_provider.provider_id, self._legal_provider.provider_version)
                 move_result = self._legal_provider.query(request)
+                move_result.validate_for_query(request)
             except Exception as exc:
                 inconclusive_reason = f"legal provider error: {type(exc).__name__}"
                 return _VisitDisposition.ERROR
@@ -184,6 +185,9 @@ class SolutionCountEngine:
                     return _VisitDisposition.UNAVAILABLE
                 if transition.disposition is SearchExecutionDisposition.ERROR:
                     inconclusive_reason = transition.reason
+                    return _VisitDisposition.ERROR
+                if not isinstance(transition.state, CompactSolverState) or transition.state.authority != state.authority:
+                    inconclusive_reason = "transition child state authority or type mismatch"
                     return _VisitDisposition.ERROR
                 child = visit(transition.state, (*path, move), depth + 1)
                 if child in {_VisitDisposition.ERROR, _VisitDisposition.UNAVAILABLE, _VisitDisposition.LOWER_BOUND}:

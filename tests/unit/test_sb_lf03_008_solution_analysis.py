@@ -4,7 +4,7 @@ from pathlib import Path
 
 from scrubbots_pixel_factory.baseline_search import SearchExecutionDisposition, TerminalObservation, TerminalTruth, TransitionObservation
 from scrubbots_pixel_factory.compact_solver_state import ACTIVE_BYTE, AuthorityVerificationDisposition, CompactSolverState, LevelIdentity, SolverStateAuthority, SupplyBatch
-from scrubbots_pixel_factory.legal_move_provider import LegalMove, LegalMoveResult, ProviderDisposition, ProviderEvidence
+from scrubbots_pixel_factory.legal_move_provider import LegalMove, LegalMoveQuery, LegalMoveResult, ProviderDisposition, ProviderEvidence
 from scrubbots_pixel_factory.search_policy import REVERSE_SEARCH_POLICY
 from scrubbots_pixel_factory.solution_analysis import EntropyDisposition, MOVE_SEQUENCE_EQUIVALENCE_V1, SolutionAnalysisBounds, SolutionCountDisposition, SolutionCountEngine
 
@@ -115,6 +115,19 @@ def test_repeat_is_deterministic_and_malformed_transition_fails_closed() -> None
     malformed = SolutionCountEngine(legal, transition).analyze(initial)
     assert malformed.disposition is SolutionCountDisposition.ERROR
     assert malformed.solution_count is None
+
+
+def test_wrong_query_result_and_authority_drift_never_produce_exact_count() -> None:
+    legal, transition, initial = fixture()
+
+    class WrongQueryLegal(LegalFixture):
+        def query(self, request):
+            other = LegalMoveQuery(STATES["goal"], STATES["goal"].digest(), request.authority, self.provider_id, self.provider_version)
+            evidence = ProviderEvidence(self.provider_id, self.provider_version, request.authority, ProviderDisposition.AVAILABLE, AuthorityVerificationDisposition.VERIFIED, AuthorityVerificationDisposition.VERIFIED, "CANONICAL_RUNTIME", "fixture")
+            return LegalMoveResult.from_query(other, ProviderDisposition.AVAILABLE, evidence, (LegalMove(0),))
+
+    wrong = SolutionCountEngine(WrongQueryLegal({"root": (0,)}), transition).analyze(initial)
+    assert wrong.disposition is SolutionCountDisposition.ERROR
 
 
 def test_invalid_bounds_and_no_gameplay_or_wfc_implementation() -> None:
