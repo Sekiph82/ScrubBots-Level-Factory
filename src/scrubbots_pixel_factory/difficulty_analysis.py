@@ -17,6 +17,8 @@ DEPENDENCY_DEPTH_SCHEMA = "scrubbots-canonical-dependency-depth"
 DEPENDENCY_DEPTH_VERSION = 1
 SLOT_PRESSURE_SCHEMA = "scrubbots-canonical-slot-pressure"
 SLOT_PRESSURE_VERSION = 1
+BAIT_DEADLOCK_SCHEMA = "scrubbots-canonical-bait-deadlock"
+BAIT_DEADLOCK_VERSION = 1
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -226,6 +228,95 @@ def populate_slot_pressure(level_metrics: LevelMetrics, result: SlotPressureResu
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), slot_pressure=result.slot_pressure))
 
 
+@dataclass(frozen=True, slots=True)
+class BaitDeadlockResult(_DependencyResultMixin):
+    disposition: AnalysisDisposition
+    authority: object
+    level_source_sha256: str
+    state_digest: str
+    evidence_digest: str
+    provider_id: str
+    provider_version: str
+    legal_move_count: int
+    proven_deadlock_move_count: int
+    bait_deadlock: float | None
+    exact: bool
+    reason: str
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        if not isinstance(self.disposition, AnalysisDisposition) or not isinstance(self.authority, SolverStateAuthority):
+            raise LevelMetricsError("bait/deadlock disposition or authority is malformed")
+        _digest_text(self.level_source_sha256, "bait/deadlock level source SHA-256")
+        _digest_text(self.state_digest, "bait/deadlock state digest")
+        _digest_text(self.evidence_digest, "bait/deadlock evidence digest")
+        _provider_text(self.provider_id, "bait/deadlock provider id")
+        _provider_text(self.provider_version, "bait/deadlock provider version")
+        if type(self.legal_move_count) is not int or self.legal_move_count < 0 or type(self.proven_deadlock_move_count) is not int or not 0 <= self.proven_deadlock_move_count <= self.legal_move_count:
+            raise LevelMetricsError("bait/deadlock counts are malformed")
+        if type(self.exact) is not bool or type(self.reason) is not str or not self.reason.strip():
+            raise LevelMetricsError("bait/deadlock exactness or reason is malformed")
+        if self.disposition is AnalysisDisposition.AVAILABLE:
+            if not self.exact or self.bait_deadlock is None or not 0.0 <= self.bait_deadlock <= 1.0:
+                raise LevelMetricsError("AVAILABLE bait/deadlock requires an exact bounded ratio")
+        elif self.bait_deadlock is not None or self.exact:
+            raise LevelMetricsError("non-AVAILABLE bait/deadlock cannot claim an exact ratio")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": BAIT_DEADLOCK_SCHEMA,
+            "version": BAIT_DEADLOCK_VERSION,
+            "disposition": self.disposition.value,
+            "authority": self.authority.canonical_dict(),
+            "level_source_sha256": self.level_source_sha256,
+            "state_digest": self.state_digest,
+            "evidence_digest": self.evidence_digest,
+            "provider_id": self.provider_id,
+            "provider_version": self.provider_version,
+            "legal_move_count": self.legal_move_count,
+            "proven_deadlock_move_count": self.proven_deadlock_move_count,
+            "bait_deadlock": self.bait_deadlock,
+            "exact": self.exact,
+            "reason": self.reason,
+        }
+
+
+def bait_deadlock_from_children(
+    level_metrics: LevelMetrics,
+    state_digest: str,
+    child_dispositions: tuple[object, ...],
+    *,
+    provider_id: str = "canonical-counterfactual",
+    provider_version: str = "CANONICAL_COUNTERFACTUAL_V1",
+) -> BaitDeadlockResult:
+    from .solver_budget import SolverOutcomeDisposition
+
+    if not isinstance(child_dispositions, tuple):
+        raise LevelMetricsError("counterfactual child classifications must be immutable")
+    if any(not isinstance(item, SolverOutcomeDisposition) for item in child_dispositions):
+        raise LevelMetricsError("counterfactual child classification is malformed")
+    if any(item in {SolverOutcomeDisposition.UNAVAILABLE, SolverOutcomeDisposition.ERROR} for item in child_dispositions):
+        disposition = AnalysisDisposition.UNAVAILABLE if SolverOutcomeDisposition.UNAVAILABLE in child_dispositions else AnalysisDisposition.ERROR
+        return BaitDeadlockResult(disposition, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "bait/deadlock state digest"), level_metrics.evidence_digest, provider_id, provider_version, len(child_dispositions), 0, None, False, "canonical counterfactual child classification is unavailable")
+    proven = sum(item is SolverOutcomeDisposition.PROVEN_UNSOLVABLE for item in child_dispositions)
+    if any(item is SolverOutcomeDisposition.INCONCLUSIVE for item in child_dispositions):
+        return BaitDeadlockResult(AnalysisDisposition.INCONCLUSIVE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "bait/deadlock state digest"), level_metrics.evidence_digest, provider_id, provider_version, len(child_dispositions), proven, None, False, "inconclusive child prevents an exact bait/deadlock ratio")
+    legal = len(child_dispositions)
+    ratio = proven / legal if legal else 0.0
+    return BaitDeadlockResult(AnalysisDisposition.AVAILABLE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "bait/deadlock state digest"), level_metrics.evidence_digest, provider_id, provider_version, legal, proven, ratio, True, "all canonical counterfactual children classified exactly")
+
+
+def populate_bait_deadlock(level_metrics: LevelMetrics, result: BaitDeadlockResult) -> LevelMetrics:
+    if not isinstance(level_metrics, LevelMetrics) or not isinstance(result, BaitDeadlockResult):
+        raise LevelMetricsError("LevelMetrics and BaitDeadlockResult are required")
+    if result.authority != level_metrics.authority or result.level_source_sha256 != level_metrics.source_sha256 or result.evidence_digest != level_metrics.evidence_digest:
+        raise LevelMetricsError("bait/deadlock result provenance does not match LevelMetrics")
+    if result.disposition is not AnalysisDisposition.AVAILABLE:
+        return level_metrics
+    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), bait_deadlock=result.bait_deadlock))
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -294,15 +385,20 @@ __all__ = [
     "DEPENDENCY_DEPTH_SCHEMA",
     "DEPENDENCY_DEPTH_VERSION",
     "DependencyDepthResult",
+    "BAIT_DEADLOCK_SCHEMA",
+    "BAIT_DEADLOCK_VERSION",
+    "BaitDeadlockResult",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
     "SlotSnapshot",
     "populate_dependency_depth",
+    "populate_bait_deadlock",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
     "slot_pressure_from_snapshots",
+    "bait_deadlock_from_children",
     "unavailable_slot_pressure_result",
     "unavailable_dependency_result",
 ]
