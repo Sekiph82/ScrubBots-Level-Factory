@@ -185,15 +185,15 @@
       "id": "LF03_TRANSITION_AUTHORITY_DRIFT_V1",
       "family": "transition_authority_drift",
       "version": 1,
-      "payload_sha256": "c4ddbe57919c03b766dadf05a3c01cb636e2a64d7ff8d4e6140a6604d79ba395",
-      "payload": {"production": false, "state": "alpha", "authority_sha": "0000000000000000000000000000000000000000", "expected": {"disposition": "ERROR_OR_EXCEPTION"}}
+      "payload_sha256": "55875ac6471998d2fa437a8aadecddf56d076ad81c7496d0e1fce0c46729dc31",
+      "payload": {"production": false, "state": "root", "foreign_authority_sha": "ffffffffffffffffffffffffffffffffffffffff", "expected": {"disposition": "ERROR"}}
     },
     {
       "id": "LF03_ENUMERATION_BINDING_V1",
       "family": "enumeration_binding",
       "version": 1,
-      "payload_sha256": "ba7bb833a94eb5eac8b712b428ff763ea49c7b41edc06195aa06f1aedbad7270",
-      "payload": {"production": false, "state": "alpha", "moves": [1, 0], "expected": {"disposition": "ERROR_OR_EXCEPTION"}}
+      "payload_sha256": "55875ac6471998d2fa437a8aadecddf56d076ad81c7496d0e1fce0c46729dc31",
+      "payload": {"production": false, "state": "root", "foreign_authority_sha": "ffffffffffffffffffffffffffffffffffffffff", "expected": {"disposition": "ERROR"}}
     },
     {
       "id": "LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1",
@@ -220,8 +220,15 @@
       "id": "LF03_TIMEOUT_NONCANONICAL_V1",
       "family": "timeout_noncanonical",
       "version": 1,
-      "payload_sha256": "c8354987f7dcb28080d712b7895408c846f22f3de3b7cbc194869cba0b1f4709",
-      "payload": {"production": false, "timeout_seconds": 0.25, "before_result": true, "expected": {"operational_disposition": "INCONCLUSIVE", "canonical_result": null}}
+      "payload_sha256": "3c5e63b6c0001f56e9ebca56274877155c8a392ce05d9208814d15e2f4d7032e",
+      "payload": {"production": false, "before_result": {"timeout_seconds": 0.25, "expected": {"operational_disposition": "INCONCLUSIVE", "canonical_result": null}}, "attached_result": {"timeout_seconds": 0.25, "expected": {"operational_disposition": "COMPLETED", "canonical_equal": true}}}
+    },
+    {
+      "id": "LF03_LEVELDATA_STALE_HASH_TAMPER_V1",
+      "family": "canonical_bridge_stale_source_hash",
+      "version": 1,
+      "payload_sha256": "5bf572cd9d627fa2fc07b24cac02ce3bcba468b5fb5ea4d0ebfcfaede1ba3e92",
+      "payload": {"production": false, "tampered_source_base64": "eyJjZWxscyI6WzAsMCwwLDFdLCJkaWZmaWN1bHR5IjoiVEVTVCIsImhlaWdodCI6MiwiaWQiOiJicmlkZ2UtZml4dHVyZSIsIm5hbWUiOiJCcmlkZ2UgRml4dHVyZSIsInBhbGV0dGUiOlsiQzAxIiwiQzAyIl0sInZlcnNpb24iOjEsIndpZHRoIjoyfQ==", "stale_source_sha256": "af383b1fa9257493939992785d5b0f8b5edd309015c8d3d25fe77e4590da2226", "expected": {"disposition": "ERROR_BEFORE_EXECUTION"}}
     }
   ]
 }

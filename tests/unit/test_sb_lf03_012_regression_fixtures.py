@@ -11,7 +11,7 @@ import subprocess
 import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchEngine, BaselineSearchPolicy, SearchExecutionDisposition, SearchVerdict, TerminalObservation, TerminalTruth, TransitionObservation
-from scrubbots_pixel_factory.canonical_bridge import CanonicalBridgeConfiguration, CanonicalBridgeDisposition, CanonicalBridgeRequest, CanonicalHeadlessBridge
+from scrubbots_pixel_factory.canonical_bridge import CanonicalBridgeConfiguration, CanonicalBridgeDisposition, CanonicalBridgeError, CanonicalBridgeRequest, CanonicalHeadlessBridge
 from scrubbots_pixel_factory.compact_solver_state import (
     ACTIVE_BYTE,
     CANONICAL_PROOF_STATE_AUTHORITY_SHA,
@@ -72,12 +72,12 @@ def negative_payload(fixture_id: str) -> dict[str, object]:
     raise AssertionError(f"missing negative fixture: {fixture_id}")
 
 
-def make_state(name: str, dimensions: dict[str, int]) -> CompactSolverState:
+def make_state(name: str, dimensions: dict[str, int], authority: SolverStateAuthority = AUTHORITY) -> CompactSolverState:
     width = dimensions["width"]
     height = dimensions["height"]
     palette_size = dimensions["palette_size"]
     return CompactSolverState(
-        AUTHORITY,
+        authority,
         LevelIdentity((name.encode().hex() + "a" * 64)[:64], name, width, height, width * height),
         bytes((ACTIVE_BYTE,) * (width * height)),
         ((SupplyBatch(f"batch-{name}", 1, 1),), (), (), ()),
@@ -127,6 +127,22 @@ class FixtureTransitionProvider:
         return TransitionObservation(SearchExecutionDisposition.AVAILABLE, STATES[destination], None, "fixture transition")
 
 
+class ForeignAuthorityTransitionProvider:
+    def __init__(self, graph: dict[str, object], foreign_state: CompactSolverState) -> None:
+        self.graph = graph
+        self.foreign_state = foreign_state
+        self.foreign_terminal_calls = 0
+
+    def terminal(self, current):
+        if current is self.foreign_state:
+            self.foreign_terminal_calls += 1
+        truth = TerminalTruth(self.graph["nodes"][current.level.level_id]["truth"])
+        return TerminalObservation(SearchExecutionDisposition.AVAILABLE, truth, "fixture terminal truth")
+
+    def transition(self, current, move):
+        return TransitionObservation(SearchExecutionDisposition.AVAILABLE, self.foreign_state, None, "fixture foreign-authority child")
+
+
 def build_graph() -> tuple[dict[str, object], FixtureLegalProvider, FixtureTransitionProvider, CompactSolverState]:
     graph = payload("LF03_FAKE_GRAPH_BRANCHING_SOLVED_V1")
     assert graph["label"] == "fixture-only fake provider graph"
@@ -164,6 +180,7 @@ def test_fixture_corpus_schema_ids_and_payload_checksums() -> None:
         "LF03_REPLAY_IDENTITY_TAMPER_V1",
         "LF03_MAX_VISITED_EXECUTION_STOP_V1",
         "LF03_TIMEOUT_NONCANONICAL_V1",
+        "LF03_LEVELDATA_STALE_HASH_TAMPER_V1",
     }
 
 
@@ -181,13 +198,21 @@ def test_negative_fixture_payloads_execute_all_historical_defect_families() -> N
     assert memo.observe(states[wrong_key["state"]], state_key_result(states[wrong_key["result_state"]], wrong_key["key"])).disposition.value == wrong_key["expected"]["disposition"]
 
     drift = negative_payload("LF03_TRANSITION_AUTHORITY_DRIFT_V1")
-    with pytest.raises(LegalMoveProviderError):
-        LegalMoveQuery(states[drift["state"]], states[drift["state"]].digest(), SolverStateAuthority(AUTHORITY.repository, drift["authority_sha"]), legal.provider_id, legal.provider_version)
+    foreign_authority = SolverStateAuthority(AUTHORITY.repository, drift["foreign_authority_sha"])
+    foreign_state = make_state("foreign-child", graph["state_dimensions"], foreign_authority)
+    foreign_transition = ForeignAuthorityTransitionProvider(graph, foreign_state)
+    drift_result = BaselineSearchEngine(legal, foreign_transition).search(STATES[drift["state"]])
+    assert drift_result.execution.value == drift["expected"]["disposition"]
+    assert drift_result.verdict is None
+    assert foreign_transition.foreign_terminal_calls == 0
 
     enumeration = negative_payload("LF03_ENUMERATION_BINDING_V1")
-    evidence = ProviderEvidence(legal.provider_id, legal.provider_version, AUTHORITY, ProviderDisposition.AVAILABLE, AuthorityVerificationDisposition.VERIFIED, AuthorityVerificationDisposition.VERIFIED, "CANONICAL_RUNTIME", "fixture-only")
-    with pytest.raises(LegalMoveProviderError):
-        LegalMoveResult.from_query(query, ProviderDisposition.AVAILABLE, evidence, tuple(LegalMove(column) for column in enumeration["moves"]))
+    enumeration_result = SolutionCountEngine(legal, foreign_transition).analyze(STATES[enumeration["state"]])
+    assert enumeration_result.disposition.value == enumeration["expected"]["disposition"]
+    assert enumeration_result.disposition is not SolutionCountDisposition.EXACT
+    assert enumeration_result.disposition is not SolutionCountDisposition.LOWER_BOUND
+    assert enumeration_result.disposition is not SolutionCountDisposition.INCONCLUSIVE
+    assert foreign_transition.foreign_terminal_calls == 0
 
     frontier = negative_payload("LF03_FRONTIER_PEAK_WIDE_SHALLOW_V1")
     frontier_report = EvidenceSearchEngine(legal, FixtureTransitionProvider(graph)).search(initial)
@@ -213,9 +238,22 @@ def test_negative_fixture_payloads_execute_all_historical_defect_families() -> N
     assert limited.budget_result is not None and limited.budget_result.disposition.value == max_visited["expected"]["disposition"]
 
     timeout = negative_payload("LF03_TIMEOUT_NONCANONICAL_V1")
-    timeout_outcome = wrap_operational_execution(None, timeout_seconds=timeout["timeout_seconds"], timeout_occurred=timeout["before_result"])
-    assert timeout_outcome.disposition.value == timeout["expected"]["operational_disposition"]
-    assert timeout_outcome.canonical_dict() == timeout["expected"]["canonical_result"]
+    timeout_outcome = wrap_operational_execution(None, timeout_seconds=timeout["before_result"]["timeout_seconds"], timeout_occurred=True)
+    assert timeout_outcome.disposition.value == timeout["before_result"]["expected"]["operational_disposition"]
+    assert timeout_outcome.canonical_dict() == timeout["before_result"]["expected"]["canonical_result"]
+    solved_budget = classify_search_result(BaselineSearchEngine(legal, FixtureTransitionProvider(graph)).search(initial))
+    attached = wrap_operational_execution(solved_budget, timeout_seconds=timeout["attached_result"]["timeout_seconds"], timeout_occurred=True)
+    assert attached.disposition.value == timeout["attached_result"]["expected"]["operational_disposition"]
+    assert (attached.canonical_bytes() == solved_budget.canonical_bytes()) is timeout["attached_result"]["expected"]["canonical_equal"]
+    assert (attached.digest() == solved_budget.digest()) is timeout["attached_result"]["expected"]["canonical_equal"]
+
+    stale = negative_payload("LF03_LEVELDATA_STALE_HASH_TAMPER_V1")
+    bridge_fixture = load_corpus()["canonical_bridge_fixture"]
+    stale_payload = dict(bridge_fixture["payload"])
+    stale_payload["level_data_source_base64"] = stale["tampered_source_base64"]
+    stale_bytes = json.dumps(stale_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    with pytest.raises(CanonicalBridgeError):
+        CanonicalBridgeRequest(AUTHORITY, "legal_moves", stale_bytes, hashlib.sha256(stale_bytes).hexdigest(), stale["stale_source_sha256"])
 
 
 def test_r01_regression_runner_is_committed_and_fixture_only_graphs_stay_nonproduction() -> None:
@@ -375,6 +413,12 @@ def test_real_canonical_bridge_fixture_executes_declarative_operations(tmp_path:
         assert second.canonical_dict() == first.canonical_dict()
         if operation["operation"] == "legal_moves":
             assert first.result == operation["expected"]
+    stale = negative_payload("LF03_LEVELDATA_STALE_HASH_TAMPER_V1")
+    stale_payload = dict(payload_base)
+    stale_payload["level_data_source_base64"] = stale["tampered_source_base64"]
+    stale_bytes = json.dumps(stale_payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    with pytest.raises(CanonicalBridgeError):
+        CanonicalBridgeRequest(AUTHORITY, "legal_moves", stale_bytes, hashlib.sha256(stale_bytes).hexdigest(), stale["stale_source_sha256"])
     after_status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
     after_source = (checkout / "scripts/gameplay/solver/proof_state.gd").read_bytes()
     assert before_status == after_status
