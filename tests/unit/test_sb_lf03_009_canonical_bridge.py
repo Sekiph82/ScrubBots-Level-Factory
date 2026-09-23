@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import os
 from pathlib import Path
+import shutil
+import subprocess
 
 import pytest
 
@@ -51,16 +53,39 @@ def test_malformed_authority_and_payload_fail_closed() -> None:
         raise AssertionError("malformed request digest must be rejected")
 
 
-@pytest.mark.skipif(not os.environ.get("SCRUBBOTS_CANONICAL_CHECKOUT") or not os.environ.get("SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"), reason="canonical checkout and external bridge runner capability were not supplied")
-def test_real_canonical_capability_and_runner_are_capability_gated() -> None:
-    checkout = Path(os.environ["SCRUBBOTS_CANONICAL_CHECKOUT"]).resolve()
-    runner = Path(os.environ["SCRUBBOTS_CANONICAL_BRIDGE_RUNNER"]).resolve()
-    before_status = __import__("subprocess").run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
+def _clean_authority_checkout(tmp_path: Path) -> Path:
+    source = Path(r"C:\Users\sekip\Desktop\ScrubBots")
+    checkout = tmp_path / "scrubbots-canonical"
+    subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "--local", "--no-hardlinks", str(source), str(checkout)], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(checkout), "config", "core.autocrlf", "false"], check=True, capture_output=True, text=True)
+    subprocess.run(["git", "-C", str(checkout), "checkout", "--force", "--detach", AUTHORITY.commit_sha], check=True, capture_output=True, text=True)
+    return checkout
+
+
+@pytest.mark.skipif(not Path(r"C:\Users\sekip\Desktop\ScrubBots").is_dir() or shutil.which("godot_console.exe") is None, reason="canonical owner repository or Godot executable is unavailable")
+def test_real_canonical_capability_and_runner_are_capability_gated(tmp_path: Path) -> None:
+    checkout = _clean_authority_checkout(tmp_path)
+    runner = (Path(__file__).resolve().parents[2] / "tools" / "scrubbots_canonical_bridge_runner.gd").resolve()
+    before_status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
     before_source = (checkout / "scripts/gameplay/solver/proof_state.gd").read_bytes()
     bridge = CanonicalHeadlessBridge(CanonicalBridgeConfiguration(str(checkout), str(runner)))
     capability = bridge.capability(AUTHORITY)
     assert capability.disposition is CanonicalBridgeDisposition.AVAILABLE
-    after_status = __import__("subprocess").run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
+    payload = {
+        "level": {"version": 1, "id": "bridge-fixture", "display_name": "Bridge Fixture", "difficulty": "easy", "width": 2, "height": 2, "palette": ["C01", "C02"], "cells": [0, 0, 0, 0]},
+        "column_count": 3,
+        "preview_depth": 3,
+        "palette_size": 2,
+        "seed": 1,
+        "columns": [[{"id": "batch-0", "color": 0, "count": 1}], [{"id": "batch-1", "color": 0, "count": 1}], [{"id": "batch-2", "color": 0, "count": 1}]],
+        "level_data_source_sha256": LEVEL_SHA,
+    }
+    import json
+    payload_bytes = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    response = bridge.invoke(CanonicalBridgeRequest(AUTHORITY, "legal_moves", payload_bytes, hashlib.sha256(payload_bytes).hexdigest(), LEVEL_SHA))
+    assert response.disposition is CanonicalBridgeDisposition.AVAILABLE
+    assert response.result == {"active_count": 4, "legal_columns": [0, 1, 2]}
+    after_status = subprocess.run(["git", "status", "--porcelain", "--untracked-files=all"], cwd=checkout, capture_output=True, text=True, check=False).stdout
     after_source = (checkout / "scripts/gameplay/solver/proof_state.gd").read_bytes()
     assert before_status == after_status
     assert before_source == after_source

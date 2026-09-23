@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import tempfile
 from typing import Mapping
@@ -31,6 +32,7 @@ from .simulation_boundary import REQUIRED_CANONICAL_SOURCE_PATHS
 CANONICAL_BRIDGE_SCHEMA = "scrubbots-canonical-headless-bridge"
 CANONICAL_BRIDGE_VERSION = 1
 CANONICAL_BRIDGE_RUNNER_VERSION = "external-godot-runner-v1"
+CANONICAL_BRIDGE_RUNNER_SHA256 = "f02e0df31e4ef7424fa30462d65fdb9ee4f37b7b7d7d2692a875c5787112d174"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -175,11 +177,10 @@ class CanonicalHeadlessBridge:
         verified, reason = self._verify(authority)
         if not verified:
             return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, None, authority.commit_sha, None, None, None, reason)
-        if self._configuration.runner_path is None:
-            return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, None, authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, None, None, "canonical checkout is verified but no external read-only Godot bridge runner is configured")
-        if not Path(self._configuration.runner_path).is_file():
-            return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, None, authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, None, None, "configured external bridge runner does not exist")
-        return CanonicalBridgeResponse(CanonicalBridgeDisposition.AVAILABLE, "capability", authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, "CAPABILITY", {}, "canonical checkout and external runner are configured and verified")
+        runner_verified, runner_reason = self._verify_runner()
+        if not runner_verified:
+            return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, None, authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, None, None, runner_reason)
+        return CanonicalBridgeResponse(CanonicalBridgeDisposition.AVAILABLE, "capability", authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, "CAPABILITY", {}, "canonical checkout, committed runner identity, and Godot executable are verified")
 
     def invoke(self, request: CanonicalBridgeRequest | object) -> CanonicalBridgeResponse:
         if not isinstance(request, CanonicalBridgeRequest):
@@ -191,13 +192,10 @@ class CanonicalHeadlessBridge:
         checkout = self._configuration.resolved_checkout()
         if runner is None or checkout is None:
             return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, "canonical headless bridge runner or checkout is not configured")
+        runner_verified, runner_reason = self._verify_runner()
+        if not runner_verified:
+            return CanonicalBridgeResponse(CanonicalBridgeDisposition.UNAVAILABLE, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, runner_reason)
         runner_file = Path(runner).resolve()
-        try:
-            runner_file.relative_to(checkout)
-        except ValueError:
-            pass
-        else:
-            return CanonicalBridgeResponse(CanonicalBridgeDisposition.ERROR, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, "external runner must not live inside the canonical checkout")
         with tempfile.TemporaryDirectory(prefix="scrubbots-canonical-bridge-") as temp_dir:
             temp = Path(temp_dir)
             request_path = temp / "request.json"
@@ -216,6 +214,31 @@ class CanonicalHeadlessBridge:
             except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError, ValueError, CanonicalBridgeError) as exc:
                 return CanonicalBridgeResponse(CanonicalBridgeDisposition.ERROR, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, f"canonical bridge response rejected: {type(exc).__name__}")
             return response
+
+    def _verify_runner(self) -> tuple[bool, str]:
+        runner = self._configuration.runner_path
+        checkout = self._configuration.resolved_checkout()
+        if runner is None:
+            return False, "canonical checkout is verified but no external read-only Godot bridge runner is configured"
+        runner_file = Path(runner).resolve()
+        expected = (Path(__file__).resolve().parents[2] / "tools" / "scrubbots_canonical_bridge_runner.gd").resolve()
+        if runner_file != expected:
+            return False, "configured bridge runner is not the committed Level Factory runner"
+        if checkout is not None:
+            try:
+                runner_file.relative_to(checkout)
+            except ValueError:
+                pass
+            else:
+                return False, "external runner must not live inside the canonical checkout"
+        if not runner_file.is_file():
+            return False, "configured external bridge runner does not exist"
+        if _sha256(runner_file.read_bytes()) != CANONICAL_BRIDGE_RUNNER_SHA256:
+            return False, "configured external bridge runner identity drifted"
+        executable = Path(self._configuration.godot_executable)
+        if not executable.is_file() and shutil.which(self._configuration.godot_executable) is None:
+            return False, "Godot executable is unavailable for the canonical bridge"
+        return True, "committed runner and Godot executable verified"
 
     def _verify(self, authority: SolverStateAuthority) -> tuple[bool, str]:
         checkout = self._configuration.resolved_checkout()
@@ -259,6 +282,7 @@ class CanonicalHeadlessBridge:
 
 __all__ = [
     "CANONICAL_BRIDGE_RUNNER_VERSION",
+    "CANONICAL_BRIDGE_RUNNER_SHA256",
     "CANONICAL_BRIDGE_SCHEMA",
     "CANONICAL_BRIDGE_VERSION",
     "CanonicalBridgeConfiguration",

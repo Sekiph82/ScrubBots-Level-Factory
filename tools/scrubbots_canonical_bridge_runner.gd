@@ -40,6 +40,8 @@ func _run(path: String) -> Dictionary:
 	var payload = JSON.parse_string(payload_text)
 	if not payload is Dictionary:
 		return _error("canonical request payload must be JSON object")
+	if String(payload.get("level_data_source_sha256", "")) != String(parsed.get("level_data_source_sha256", "")):
+		return _error("LevelData source identity does not match the verified request")
 	var state = _state_from_payload(payload)
 	if state == null:
 		return _error("canonical level and supply payload is malformed")
