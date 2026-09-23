@@ -5,43 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-002`
+Task: SB-LF04-002
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-002-C001_SOLUTION_DEPTH_AND_MOVE_COUNT_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-002-C001_SOLUTION_DEPTH_AND_MOVE_COUNT_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-002-C001_SOLUTION_DEPTH_AND_MOVE_COUNT_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-002-C001_SOLUTION_DEPTH_AND_MOVE_COUNT_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement a dedicated versioned metric-population function/module for SB-LF04-002.
+## Mission
 
-Consume accepted LevelMetrics + exact SolverEvidenceReport. Validate evidence identity before using it.
+Populate only LevelMetrics.solution_depth and move_count from the exact accepted SolverEvidenceReport bound by schema/version/digest. For AVAILABLE+SOLVED, move_count is the number of canonical LegalMove selections in the recorded witness path and solution_depth is the edge depth of that same witness. Do not call the path shortest/optimal/minimal. Solved-at-start may be 0/0. PROVEN_UNSOLVABLE, INCONCLUSIVE, UNAVAILABLE, ERROR, or missing witness evidence must leave both fields absent, never fabricated zero. Preserve all unrelated metrics and provenance. Pure deterministic transformation only; no new gameplay call, no wall-clock data, no source mutation. Tests: solved witness, solved-at-start, non-solved dispositions, evidence mismatch, deterministic repeat, prior metric preservation.
 
-Populate only solution_depth and move_count according to the recorded deterministic solution witness. A solved-at-start state may truthfully yield 0/0. Non-solved or non-AVAILABLE evidence must not receive fabricated values.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Do not run another search merely to shorten the path. Do not claim optimality.
-
-Add focused tests and documentation for the witnessed-path semantics.
-
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

@@ -1,45 +1,31 @@
 # SB-LF04-005-C001 — Canonical Slot Pressure — Strict Audit Criteria
 
-Target:
-`SB-LF04-005`
+Target: SB-LF04-005
 
-M03 is COMPLETE / VERIFIED. SB-LF04-001 LevelMetrics V1 is the accepted M04 envelope prerequisite.
+Prerequisites:
+- M03 COMPLETE / VERIFIED.
+- SB-LF04-001 LevelMetrics V1 PASS/CLOSED.
+- Every earlier M04 task in this batch is a builder dependency claim only until independently audited after the whole batch.
 
 Global invariants:
-- canonical gameplay truth remains in `Sekiph82/Scrubbots`;
-- Factory must not copy gameplay rules;
-- width/height 20..59 independently legal;
-- used colors 3..12 independent of difficulty;
-- descriptive difficulty is not derived from board size or color count;
-- operational timing is non-canonical;
-- missing canonical evidence remains absent/unavailable, never fabricated zero;
-- analysis must not mutate gameplay/art source;
-- builder never edits root `TASKS.md`.
+- Canonical gameplay truth remains in Sekiph82/Scrubbots.
+- No Python copy of gameplay rules.
+- Width and height 20..59 independently legal.
+- Used colors 3..12 independent of difficulty.
+- Difficulty is never inferred from board size or used-color count.
+- Operational timing is non-canonical.
+- Missing canonical evidence remains absent/UNAVAILABLE, never fabricated zero.
+- Analysis is read-only and never mutates gameplay/art source.
+- Builder never edits root TASKS.md.
 
-## Truth rule
+## Task-specific contract
 
-Slot pressure must be derived only from canonical gameplay slot-state observations, never from artwork, colors or guessed capacity.
+Slot pressure must use canonical gameplay slot-state observations only. Recommended V1 if canonical trace snapshots are safely available: per-state occupancy ratio = occupied canonical slots / canonical capacity, slot_pressure = maximum observed ratio, finite [0,1]. If trace snapshots cannot be retrieved without gameplay emulation, production remains UNAVAILABLE and slot_pressure absent. Never infer from art/colors. Tests cover empty/partial/full occupancy, deterministic max, malformed capacity/state, authority mismatch and unavailable behavior.
 
-Canonical slot count is five under current accepted ProofState authority.
+## Required gates
 
-Define a versioned SlotPressure provider/metric.
-
-If canonical trace state snapshots are available, the recommended V1 diagnostic is:
-- occupancy ratio for each observed canonical state = occupied slot count / canonical slot capacity;
-- slot_pressure = maximum observed occupancy ratio across the accepted trace.
-
-It must be finite in [0,1].
-
-If the accepted evidence does not contain or cannot canonically retrieve the required slot snapshots without reimplementing gameplay, leave slot_pressure absent and production provider UNAVAILABLE.
-
-Do not derive occupied slots from rendered pixels or Factory heuristics.
-
-Tests must cover 0%, partial, 100%, deterministic max, malformed capacity/state, authority mismatch, and truthful unavailable.
-
-## Required repository gates
-
-Focused task tests, affected predecessor M04 tests, retained M03 tests, full pytest green, compileall PASS, Godot headless editor boot PASS, git diff --check PASS and TASKS zero diff.
+Run focused task tests, affected earlier-M04 tests, retained M03 tests, relevant production/difficulty tests, full python -m pytest -q with zero failures, python -m compileall -q src tests, Level Factory Godot headless editor boot, git diff --check and git diff --exit-code -- TASKS.md.
 
 ## Acceptance
 
-PASS only when the task's metric/analysis semantics are versioned, deterministic, provenance-bound and do not overclaim unavailable gameplay truth.
+PASS only when semantics are versioned, deterministic, provenance-bound, honest about unavailable canonical data and do not preempt later task semantics.

@@ -1,54 +1,31 @@
 # SB-LF04-002-C001 — Solution Depth / Move Count — Strict Audit Criteria
 
-Target:
-`SB-LF04-002`
+Target: SB-LF04-002
 
-M03 is COMPLETE / VERIFIED. SB-LF04-001 LevelMetrics V1 is the accepted M04 envelope prerequisite.
+Prerequisites:
+- M03 COMPLETE / VERIFIED.
+- SB-LF04-001 LevelMetrics V1 PASS/CLOSED.
+- Every earlier M04 task in this batch is a builder dependency claim only until independently audited after the whole batch.
 
 Global invariants:
-- canonical gameplay truth remains in `Sekiph82/Scrubbots`;
-- Factory must not copy gameplay rules;
-- width/height 20..59 independently legal;
-- used colors 3..12 independent of difficulty;
-- descriptive difficulty is not derived from board size or color count;
-- operational timing is non-canonical;
-- missing canonical evidence remains absent/unavailable, never fabricated zero;
-- analysis must not mutate gameplay/art source;
-- builder never edits root `TASKS.md`.
+- Canonical gameplay truth remains in Sekiph82/Scrubbots.
+- No Python copy of gameplay rules.
+- Width and height 20..59 independently legal.
+- Used colors 3..12 independent of difficulty.
+- Difficulty is never inferred from board size or used-color count.
+- Operational timing is non-canonical.
+- Missing canonical evidence remains absent/UNAVAILABLE, never fabricated zero.
+- Analysis is read-only and never mutates gameplay/art source.
+- Builder never edits root TASKS.md.
 
-## Required semantics
+## Task-specific contract
 
-Populate only the already-defined LevelMetrics slots:
-- solution_depth
-- move_count
+Populate only LevelMetrics.solution_depth and move_count from the exact accepted SolverEvidenceReport bound by schema/version/digest. For AVAILABLE+SOLVED, move_count is the number of canonical LegalMove selections in the recorded witness path and solution_depth is the edge depth of that same witness. Do not call the path shortest/optimal/minimal. Solved-at-start may be 0/0. PROVEN_UNSOLVABLE, INCONCLUSIVE, UNAVAILABLE, ERROR, or missing witness evidence must leave both fields absent, never fabricated zero. Preserve all unrelated metrics and provenance. Pure deterministic transformation only; no new gameplay call, no wall-clock data, no source mutation. Tests: solved witness, solved-at-start, non-solved dispositions, evidence mismatch, deterministic repeat, prior metric preservation.
 
-Input must be an accepted AVAILABLE LevelMetrics envelope bound to the exact SolverEvidenceReport being consumed.
+## Required gates
 
-For an AVAILABLE + SOLVED deterministic search witness:
-- move_count = number of canonical player LegalMove selections in the accepted solution path.
-- solution_depth = edge depth of that same recorded witness.
-- Under the current one-player-move-per-edge search these values are expected to be equal, but keep the fields semantically separate.
-
-Do not call the witnessed path “shortest”, “optimal”, or “minimal” unless a future solver explicitly proves that property.
-
-For PROVEN_UNSOLVABLE, INCONCLUSIVE, UNAVAILABLE, ERROR, or missing path evidence:
-- do not fabricate zero;
-- leave solution_depth/move_count absent;
-- preserve truthful disposition/reason.
-
-Requirements:
-- exact solver evidence schema/version/digest match;
-- exact LevelData and authority lineage retained;
-- pure deterministic transformation;
-- preserve all unrelated metric slots;
-- no gameplay invocation, no source mutation, no wall-clock data.
-
-Tests must cover solved witness, zero-move solved start, unsolvable/inconclusive/unavailable, evidence digest mismatch, repeat determinism, unrelated metric preservation, and no “shortest” claim.
-
-## Required repository gates
-
-Focused task tests, affected predecessor M04 tests, retained M03 tests, full pytest green, compileall PASS, Godot headless editor boot PASS, git diff --check PASS and TASKS zero diff.
+Run focused task tests, affected earlier-M04 tests, retained M03 tests, relevant production/difficulty tests, full python -m pytest -q with zero failures, python -m compileall -q src tests, Level Factory Godot headless editor boot, git diff --check and git diff --exit-code -- TASKS.md.
 
 ## Acceptance
 
-PASS only when the task's metric/analysis semantics are versioned, deterministic, provenance-bound and do not overclaim unavailable gameplay truth.
+PASS only when semantics are versioned, deterministic, provenance-bound, honest about unavailable canonical data and do not preempt later task semantics.

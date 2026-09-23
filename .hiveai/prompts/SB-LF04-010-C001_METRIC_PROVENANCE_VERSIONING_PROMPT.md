@@ -5,39 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-010`
+Task: SB-LF04-010
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-010-C001_METRIC_PROVENANCE_VERSIONING_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-010-C001_METRIC_PROVENANCE_VERSIONING_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-010-C001_METRIC_PROVENANCE_VERSIONING_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-010-C001_METRIC_PROVENANCE_VERSIONING_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement SB-LF04-010 as the canonical provenance/versioning envelope for M04.
+## Mission
 
-Bind every derived artifact to its exact upstream digest and policy/provider version. Reject cross-wired LevelMetrics, ChallengeScore and lane results.
+Create a closed immutable DifficultyAnalysis provenance envelope binding exact LevelData/source SHA, canonical gameplay authority, SolverEvidence identity/digest, LevelMetrics schema/version/digest, each populated metric provider/policy version, ChallengeScore digest/version if present, lane mapping digest/version if present, disposition/reason and exact component availability. Reject mixed lineage such as score from metrics A plus lane result from score B. No elapsed time, timeout seconds, local paths, machine IDs or UI state in canonical provenance. Optional unavailable diagnostics remain explicitly unavailable. Tests: valid round trip, every cross-binding mismatch, unknown fields/version, deterministic bytes and no operational telemetry.
 
-Keep optional 004-007 diagnostics explicitly unavailable rather than synthesizing versions or values.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

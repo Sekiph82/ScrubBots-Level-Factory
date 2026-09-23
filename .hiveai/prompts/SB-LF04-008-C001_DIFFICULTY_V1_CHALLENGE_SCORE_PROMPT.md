@@ -5,39 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-008`
+Task: SB-LF04-008
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-008-C001_DIFFICULTY_V1_CHALLENGE_SCORE_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-008-C001_DIFFICULTY_V1_CHALLENGE_SCORE_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-008-C001_DIFFICULTY_V1_CHALLENGE_SCORE_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-008-C001_DIFFICULTY_V1_CHALLENGE_SCORE_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement Difficulty V1 Challenge Score exactly from the fixed normalization and coefficients in the audit criteria.
+## Mission
 
-Create a versioned policy/result. Score only LevelMetrics with all five required core metrics. Preserve component breakdown and source LevelMetrics digest.
+Implement deterministic engineering-policy Challenge Score V1 in [0,100] using ONLY guaranteed core metrics from 002/003: move_count, states_visited, dead_ends, branching, forced_moves. Optional 004-007 diagnostics are NOT in V1 and must not be treated as zero. Fixed normalizers: move=clamp(log1p(move_count)/log1p(64),0,1); states=clamp(log1p(states_visited)/log1p(10000),0,1); dead_end=clamp(dead_ends/max(states_visited,1),0,1); branching=clamp(branching/4.0,0,1); forced_relief=clamp(forced_moves/max(states_visited,1),0,1); forced_component=1-forced_relief. Coefficients: move .25, states .25, dead_end .15, branching .15, forced .20. score=100*weighted sum. All five required metrics must exist; do not renormalize weights. Create versioned policy/result with source LevelMetrics digest and component breakdown. No width/height/color/class in formula. Tests use hand-calculated values, bounds, missing metrics, zero-state edge, metadata independence and determinism.
 
-Do not include 004-007 optional diagnostics in V1 score, do not renormalize missing components, and do not use width/height/color-count/class metadata.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

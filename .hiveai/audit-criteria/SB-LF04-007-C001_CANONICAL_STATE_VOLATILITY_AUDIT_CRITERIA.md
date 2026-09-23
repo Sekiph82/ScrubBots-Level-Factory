@@ -1,44 +1,31 @@
-# SB-LF04-007-C001 — Color / Remaining-State Volatility — Strict Audit Criteria
+# SB-LF04-007-C001 — Canonical State Volatility — Strict Audit Criteria
 
-Target:
-`SB-LF04-007`
+Target: SB-LF04-007
 
-M03 is COMPLETE / VERIFIED. SB-LF04-001 LevelMetrics V1 is the accepted M04 envelope prerequisite.
+Prerequisites:
+- M03 COMPLETE / VERIFIED.
+- SB-LF04-001 LevelMetrics V1 PASS/CLOSED.
+- Every earlier M04 task in this batch is a builder dependency claim only until independently audited after the whole batch.
 
 Global invariants:
-- canonical gameplay truth remains in `Sekiph82/Scrubbots`;
-- Factory must not copy gameplay rules;
-- width/height 20..59 independently legal;
-- used colors 3..12 independent of difficulty;
-- descriptive difficulty is not derived from board size or color count;
-- operational timing is non-canonical;
-- missing canonical evidence remains absent/unavailable, never fabricated zero;
-- analysis must not mutate gameplay/art source;
-- builder never edits root `TASKS.md`.
+- Canonical gameplay truth remains in Sekiph82/Scrubbots.
+- No Python copy of gameplay rules.
+- Width and height 20..59 independently legal.
+- Used colors 3..12 independent of difficulty.
+- Difficulty is never inferred from board size or used-color count.
+- Operational timing is non-canonical.
+- Missing canonical evidence remains absent/UNAVAILABLE, never fabricated zero.
+- Analysis is read-only and never mutates gameplay/art source.
+- Builder never edits root TASKS.md.
 
-## Scope
+## Task-specific contract
 
-Add one versioned volatility diagnostic only where canonical state observations make it meaningful.
+Add one versioned gameplay-state volatility diagnostic only if ordered canonical trace quantities are available. Do not use pixel/art fragmentation. Recommended V1: a closed normalized signature from canonical remaining-active-cell count, supply remaining count, occupied-slot count or similarly already-exposed canonical quantities; transition delta is normalized absolute change; volatility is mean transition delta in [0,1]. Exact fields/normalizers/formula must be versioned. If trace data is unavailable without gameplay emulation, production remains UNAVAILABLE. Tests: stable trace=0, changing trace, bounds, one-state absent, malformed/unavailable and determinism.
 
-Do not use image pixel fragmentation as gameplay volatility.
+## Required gates
 
-Recommended V1 semantic when an ordered canonical state trace is available:
-- build a closed normalized gameplay-state signature from canonical quantities that are already exposed without rule reimplementation, such as remaining active-cell count, supply remaining count and occupied-slot count;
-- per transition delta = normalized absolute change across those declared quantities;
-- volatility = arithmetic mean of transition deltas, bounded [0,1].
-
-The exact signature fields, normalization denominators and formula must be versioned and documented.
-
-If required canonical trace quantities are unavailable, production volatility remains absent/UNAVAILABLE.
-
-“Color volatility” may only be included if canonical state authority exposes a stable color-distribution quantity; do not inspect rendered art as a substitute.
-
-Tests: stable trace = 0, changing trace, bounds, one-state trace absent, repeat determinism, unavailable/malformed trace.
-
-## Required repository gates
-
-Focused task tests, affected predecessor M04 tests, retained M03 tests, full pytest green, compileall PASS, Godot headless editor boot PASS, git diff --check PASS and TASKS zero diff.
+Run focused task tests, affected earlier-M04 tests, retained M03 tests, relevant production/difficulty tests, full python -m pytest -q with zero failures, python -m compileall -q src tests, Level Factory Godot headless editor boot, git diff --check and git diff --exit-code -- TASKS.md.
 
 ## Acceptance
 
-PASS only when the task's metric/analysis semantics are versioned, deterministic, provenance-bound and do not overclaim unavailable gameplay truth.
+PASS only when semantics are versioned, deterministic, provenance-bound, honest about unavailable canonical data and do not preempt later task semantics.

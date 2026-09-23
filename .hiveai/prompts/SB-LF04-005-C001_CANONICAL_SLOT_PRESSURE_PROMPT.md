@@ -5,39 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-005`
+Task: SB-LF04-005
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-005-C001_CANONICAL_SLOT_PRESSURE_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-005-C001_CANONICAL_SLOT_PRESSURE_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-005-C001_CANONICAL_SLOT_PRESSURE_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-005-C001_CANONICAL_SLOT_PRESSURE_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement SB-LF04-005 with a canonical slot-pressure provider.
+## Mission
 
-Prefer exact canonical state/trace evidence from the accepted bridge if available. V1 slot_pressure is maximum occupied-slot ratio across the observed canonical trace, capacity bound to canonical ProofState semantics.
+Slot pressure must use canonical gameplay slot-state observations only. Recommended V1 if canonical trace snapshots are safely available: per-state occupancy ratio = occupied canonical slots / canonical capacity, slot_pressure = maximum observed ratio, finite [0,1]. If trace snapshots cannot be retrieved without gameplay emulation, production remains UNAVAILABLE and slot_pressure absent. Never infer from art/colors. Tests cover empty/partial/full occupancy, deterministic max, malformed capacity/state, authority mismatch and unavailable behavior.
 
-If canonical snapshots are not safely available, keep production UNAVAILABLE rather than porting slot rules into Python.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

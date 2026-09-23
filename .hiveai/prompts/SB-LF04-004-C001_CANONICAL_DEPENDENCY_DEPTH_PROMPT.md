@@ -5,41 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-004`
+Task: SB-LF04-004
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-004-C001_CANONICAL_DEPENDENCY_DEPTH_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-004-C001_CANONICAL_DEPENDENCY_DEPTH_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-004-C001_CANONICAL_DEPENDENCY_DEPTH_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-004-C001_CANONICAL_DEPENDENCY_DEPTH_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement the SB-LF04-004 canonical dependency-depth boundary.
+## Mission
 
-First inspect current Sekiph82/Scrubbots authority for an actual dependency/precedence semantic source. If it exists and can be invoked without copying rules, bind to it. If not, implement the versioned provider contract and leave production dependency_depth unavailable/absent.
+Dependency depth is legal only from an explicit canonical dependency-semantics provider bound to accepted ScrubBots gameplay authority. M03 path depth is not dependency depth. Do not infer dependency from colors, adjacency, WFC, move order, dimensions or heuristics. Define a versioned provider/result with AVAILABLE/UNAVAILABLE/ERROR and exact authority/state/evidence binding. If no canonical dependency semantics are executable in current main-game authority, production must truthfully remain UNAVAILABLE and LevelMetrics.dependency_depth absent. Fixture-only providers may validate the contract but cannot become production authority.
 
-Never reinterpret solution path length as dependency depth.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Add fixture providers only for unit tests and make them impossible to select as production authority.
-
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

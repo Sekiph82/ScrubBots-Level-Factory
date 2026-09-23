@@ -5,39 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-003`
+Task: SB-LF04-003
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-003-C001_SEARCH_COMPLEXITY_AND_FORCED_MOVE_METRICS_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-003-C001_SEARCH_COMPLEXITY_AND_FORCED_MOVE_METRICS_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-003-C001_SEARCH_COMPLEXITY_AND_FORCED_MOVE_METRICS_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-003-C001_SEARCH_COMPLEXITY_AND_FORCED_MOVE_METRICS_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement SB-LF04-003 as a pure evidence-to-LevelMetrics population step.
+## Mission
 
-Use only accepted SolverMetrics fields. Define branching as mean(branch_counts) over emitted positive branch observations and forced_moves as count(branch_count == 1). Do not inspect board/supply/slots to infer legal moves.
+Populate states_visited=SolverMetrics.visited_count, dead_ends=dead_end_count, branching=deterministic arithmetic mean of observed branch_counts, and forced_moves=count(branch_count==1). If no branch observation exists, branching stays absent rather than zero. Use only accepted SolverMetrics; never reconstruct legal actions from CompactSolverState. Preserve 002 metrics and provenance. Tests must cover known branch tuples, forced branches, no branches, evidence mismatch, determinism and preservation.
 
-Preserve 002 metrics and all provenance.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

@@ -1,6 +1,6 @@
-# SB-LF04-009-C001 — Score to Lane / Class Rhythm — Strict Audit Criteria
+# SB-LF04-012-C001 — Analysis Non-Mutation / M04 Regression Closure — Strict Audit Criteria
 
-Target: SB-LF04-009
+Target: SB-LF04-012
 
 Prerequisites:
 - M03 COMPLETE / VERIFIED.
@@ -20,7 +20,7 @@ Global invariants:
 
 ## Task-specific contract
 
-Map AVAILABLE Difficulty V1 score by score only: EASY [0,25), MEDIUM [25,50), HARD [50,75), VERY_HARD [75,100]. Define exact boundaries and reject out-of-range scores. Predicted class is analysis output and must not rewrite requested difficulty metadata, board dimensions, colors, art or LevelData. Carry source ChallengeScore digest/version and mapping policy version. Optional comparison to descriptive/requested class is neutral match/mismatch only. Tests cover every threshold edge, same score on different sizes/colors, deterministic serialization and non-mutation.
+Final M04 closure. Create a versioned declarative checksummed M04 regression corpus covering 001 contract, 002 witness depth/moves, 003 complexity/forced metrics, 004 dependency provider available/unavailable contract, 005 slot pressure contract, 006 bait/deadlock exact/inconclusive contract, 007 volatility contract, 008 known Challenge Score values, 009 threshold mapping, 010 provenance cross-binding rejection, 011 calibration disabled state. Prove representative analysis runs preserve exact pre/post bytes/SHA of Level Data source, art/logical source fixture, and canonical ScrubBots checkout files/status where bridge is used. No recolor/resize/palette/source mutation or network write. Full M04, retained M03, production/difficulty, full pytest, compileall, Godot, real bridge where configured, diff-check and TASKS no-diff must be green.
 
 ## Required gates
 

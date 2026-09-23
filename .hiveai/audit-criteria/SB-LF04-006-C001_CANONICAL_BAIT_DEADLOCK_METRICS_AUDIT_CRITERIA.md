@@ -1,48 +1,31 @@
 # SB-LF04-006-C001 — Canonical Bait / Deadlock Metrics — Strict Audit Criteria
 
-Target:
-`SB-LF04-006`
+Target: SB-LF04-006
 
-M03 is COMPLETE / VERIFIED. SB-LF04-001 LevelMetrics V1 is the accepted M04 envelope prerequisite.
+Prerequisites:
+- M03 COMPLETE / VERIFIED.
+- SB-LF04-001 LevelMetrics V1 PASS/CLOSED.
+- Every earlier M04 task in this batch is a builder dependency claim only until independently audited after the whole batch.
 
 Global invariants:
-- canonical gameplay truth remains in `Sekiph82/Scrubbots`;
-- Factory must not copy gameplay rules;
-- width/height 20..59 independently legal;
-- used colors 3..12 independent of difficulty;
-- descriptive difficulty is not derived from board size or color count;
-- operational timing is non-canonical;
-- missing canonical evidence remains absent/unavailable, never fabricated zero;
-- analysis must not mutate gameplay/art source;
-- builder never edits root `TASKS.md`.
+- Canonical gameplay truth remains in Sekiph82/Scrubbots.
+- No Python copy of gameplay rules.
+- Width and height 20..59 independently legal.
+- Used colors 3..12 independent of difficulty.
+- Difficulty is never inferred from board size or used-color count.
+- Operational timing is non-canonical.
+- Missing canonical evidence remains absent/UNAVAILABLE, never fabricated zero.
+- Analysis is read-only and never mutates gameplay/art source.
+- Builder never edits root TASKS.md.
 
-## Truth rule
+## Task-specific contract
 
-Bait/deadlock metrics require canonical counterfactual gameplay proof.
+Bait/deadlock requires canonical counterfactual proof. Never equate search dead_end_count with bait. Recommended exact V1 when executable: canonical legal moves -> canonical transition for each -> canonical solver child classification; proven_deadlock_move_count counts only children proven PROVEN_UNSOLVABLE; bait_deadlock ratio = proven_deadlock_move_count/legal_move_count. UNKNOWN_BOUND or INCONCLUSIVE children cannot be counted as proven deadlocks and prevent an EXACT claim when exactness is required. Use M03 providers/bridge only. If unavailable, leave absent. Tests: 0, partial, all deadlock, inconclusive child, unavailable, repeat determinism and authority binding.
 
-Do not treat every search dead end as a “bait move” and do not infer traps from artwork.
+## Required gates
 
-Define a versioned provider/result for counterfactual one-move analysis.
-
-Recommended canonical V1 when executable:
-- at a canonical state, enumerate legal player moves through accepted legal provider;
-- apply each move through accepted canonical transition;
-- solve/classify child through accepted canonical solver;
-- proven_deadlock_move_count = number of legal moves whose child is PROVEN_UNSOLVABLE;
-- bait_deadlock ratio = proven_deadlock_move_count / legal_move_count, in [0,1].
-
-UNKNOWN_BOUND / INCONCLUSIVE children do not count as proven deadlock and must prevent an EXACT ratio claim if exactness is required.
-
-If canonical counterfactual proof is unavailable, leave bait_deadlock absent.
-
-All operations must use M03 providers/bridge. No second solver.
-
-Tests: exact 0, partial, all deadlock, inconclusive child, unavailable provider, repeat determinism, authority binding.
-
-## Required repository gates
-
-Focused task tests, affected predecessor M04 tests, retained M03 tests, full pytest green, compileall PASS, Godot headless editor boot PASS, git diff --check PASS and TASKS zero diff.
+Run focused task tests, affected earlier-M04 tests, retained M03 tests, relevant production/difficulty tests, full python -m pytest -q with zero failures, python -m compileall -q src tests, Level Factory Godot headless editor boot, git diff --check and git diff --exit-code -- TASKS.md.
 
 ## Acceptance
 
-PASS only when the task's metric/analysis semantics are versioned, deterministic, provenance-bound and do not overclaim unavailable gameplay truth.
+PASS only when semantics are versioned, deterministic, provenance-bound, honest about unavailable canonical data and do not preempt later task semantics.

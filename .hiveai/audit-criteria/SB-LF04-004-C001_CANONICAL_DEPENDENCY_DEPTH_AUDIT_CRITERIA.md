@@ -1,49 +1,31 @@
 # SB-LF04-004-C001 — Canonical Dependency Depth — Strict Audit Criteria
 
-Target:
-`SB-LF04-004`
+Target: SB-LF04-004
 
-M03 is COMPLETE / VERIFIED. SB-LF04-001 LevelMetrics V1 is the accepted M04 envelope prerequisite.
+Prerequisites:
+- M03 COMPLETE / VERIFIED.
+- SB-LF04-001 LevelMetrics V1 PASS/CLOSED.
+- Every earlier M04 task in this batch is a builder dependency claim only until independently audited after the whole batch.
 
 Global invariants:
-- canonical gameplay truth remains in `Sekiph82/Scrubbots`;
-- Factory must not copy gameplay rules;
-- width/height 20..59 independently legal;
-- used colors 3..12 independent of difficulty;
-- descriptive difficulty is not derived from board size or color count;
-- operational timing is non-canonical;
-- missing canonical evidence remains absent/unavailable, never fabricated zero;
-- analysis must not mutate gameplay/art source;
-- builder never edits root `TASKS.md`.
+- Canonical gameplay truth remains in Sekiph82/Scrubbots.
+- No Python copy of gameplay rules.
+- Width and height 20..59 independently legal.
+- Used colors 3..12 independent of difficulty.
+- Difficulty is never inferred from board size or used-color count.
+- Operational timing is non-canonical.
+- Missing canonical evidence remains absent/UNAVAILABLE, never fabricated zero.
+- Analysis is read-only and never mutates gameplay/art source.
+- Builder never edits root TASKS.md.
 
-## Truth rule
+## Task-specific contract
 
-Dependency depth may exist only when supplied by an explicit canonical dependency-semantics provider tied to the accepted ScrubBots gameplay authority.
+Dependency depth is legal only from an explicit canonical dependency-semantics provider bound to accepted ScrubBots gameplay authority. M03 path depth is not dependency depth. Do not infer dependency from colors, adjacency, WFC, move order, dimensions or heuristics. Define a versioned provider/result with AVAILABLE/UNAVAILABLE/ERROR and exact authority/state/evidence binding. If no canonical dependency semantics are executable in current main-game authority, production must truthfully remain UNAVAILABLE and LevelMetrics.dependency_depth absent. Fixture-only providers may validate the contract but cannot become production authority.
 
-M03 solver path depth is NOT automatically dependency depth.
+## Required gates
 
-Do not infer dependency edges from:
-- color adjacency;
-- image regions;
-- WFC constraints;
-- move order alone;
-- board dimensions;
-- heuristic causal guesses.
-
-Implement a versioned DependencyMetricProvider interface/result with AVAILABLE / UNAVAILABLE / ERROR and exact authority/state/evidence binding.
-
-If no canonical dependency semantics are executable in current main-game authority, production behavior must remain UNAVAILABLE and LevelMetrics.dependency_depth stays absent.
-
-Fixture-only providers may prove contract validation.
-
-If a real canonical provider is established, dependency_depth must be an exact non-negative integer with deterministic repeat evidence.
-
-PASS is allowed with truthful production UNAVAILABLE plus complete interface/tests; fabricated dependency depth is a blocker.
-
-## Required repository gates
-
-Focused task tests, affected predecessor M04 tests, retained M03 tests, full pytest green, compileall PASS, Godot headless editor boot PASS, git diff --check PASS and TASKS zero diff.
+Run focused task tests, affected earlier-M04 tests, retained M03 tests, relevant production/difficulty tests, full python -m pytest -q with zero failures, python -m compileall -q src tests, Level Factory Godot headless editor boot, git diff --check and git diff --exit-code -- TASKS.md.
 
 ## Acceptance
 
-PASS only when the task's metric/analysis semantics are versioned, deterministic, provenance-bound and do not overclaim unavailable gameplay truth.
+PASS only when semantics are versioned, deterministic, provenance-bound, honest about unavailable canonical data and do not preempt later task semantics.

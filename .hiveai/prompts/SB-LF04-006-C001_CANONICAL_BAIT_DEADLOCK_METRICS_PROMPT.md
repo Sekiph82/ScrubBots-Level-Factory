@@ -5,41 +5,24 @@ Document role: CODEX IMPLEMENTATION PROMPT
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-006`
+Task: SB-LF04-006
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-006-C001_CANONICAL_BAIT_DEADLOCK_METRICS_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-006-C001_CANONICAL_BAIT_DEADLOCK_METRICS_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-006-C001_CANONICAL_BAIT_DEADLOCK_METRICS_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-006-C001_CANONICAL_BAIT_DEADLOCK_METRICS_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement SB-LF04-006 as canonical counterfactual bait/deadlock analysis.
+## Mission
 
-Use accepted M03 legal-move, transition and solver authority only. Do not use dead_end_count as a synonym.
+Bait/deadlock requires canonical counterfactual proof. Never equate search dead_end_count with bait. Recommended exact V1 when executable: canonical legal moves -> canonical transition for each -> canonical solver child classification; proven_deadlock_move_count counts only children proven PROVEN_UNSOLVABLE; bait_deadlock ratio = proven_deadlock_move_count/legal_move_count. UNKNOWN_BOUND or INCONCLUSIVE children cannot be counted as proven deadlocks and prevent an EXACT claim when exactness is required. Use M03 providers/bridge only. If unavailable, leave absent. Tests: 0, partial, all deadlock, inconclusive child, unavailable, repeat determinism and authority binding.
 
-If exact counterfactual proof cannot be established for production, return UNAVAILABLE and keep LevelMetrics.bait_deadlock absent.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Fixture graphs may prove the calculation contract.
-
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.

@@ -1,43 +1,28 @@
-# SB-LF04-007-C001 — Color / Remaining-State Volatility
+# SB-LF04-007-C001 — Canonical State Volatility
 
 Document role: CODEX IMPLEMENTATION PROMPT
 
 Repository:
 https://github.com/Sekiph82/ScrubBots-Level-Factory
 
-Branch:
-`main`
+Branch: main
 
-Task:
-`SB-LF04-007`
+Task: SB-LF04-007
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LF04-007-C001_CANONICAL_STATE_VOLATILITY_AUDIT_CRITERIA.md`
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/SB-LF04-007-C001_CANONICAL_STATE_VOLATILITY_AUDIT_CRITERIA.md
 
-Expected builder log:
-`.hiveai/codex-logs/SB-LF04-007-C001_CANONICAL_STATE_VOLATILITY_CODEX_LOG.md`
+Builder log:
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LF04-007-C001_CANONICAL_STATE_VOLATILITY_CODEX_LOG.md
 
-Do not edit root `TASKS.md`.
+Do not edit root TASKS.md.
 
-Read first:
-- root TASKS, AGENTS, GOVERNANCE;
-- `.hiveai/audits/SB-LF03-M03_FINAL_CLOSURE_SUMMARY.md`;
-- SB-LF04-001 LevelMetrics implementation/audit;
-- every previously completed M04 task in this batch;
-- exact task audit criteria above.
+Read root TASKS.md, AGENTS.md, GOVERNANCE.md, M03 final closure, SB-LF04-001 LevelMetrics implementation/audit, every preceding M04 task in this batch, and the exact audit criteria.
 
-Implement SB-LF04-007 as a versioned canonical state-volatility provider.
+## Mission
 
-Use only canonical gameplay state quantities already exposed through accepted authority. Document the exact V1 formula. If the necessary trace is not available without new gameplay emulation, keep production UNAVAILABLE.
+Add one versioned gameplay-state volatility diagnostic only if ordered canonical trace quantities are available. Do not use pixel/art fragmentation. Recommended V1: a closed normalized signature from canonical remaining-active-cell count, supply remaining count, occupied-slot count or similarly already-exposed canonical quantities; transition delta is normalized absolute change; volatility is mean transition delta in [0,1]. Exact fields/normalizers/formula must be versioned. If trace data is unavailable without gameplay emulation, production remains UNAVAILABLE. Tests: stable trace=0, changing trace, bounds, one-state absent, malformed/unavailable and determinism.
 
-Do not use art/image fragmentation as volatility.
+Do not implement later M04 tasks except minimal compatibility plumbing. Do not use network/provider credits for tests. Do not create a second gameplay solver. Do not mutate art/LevelData/gameplay source.
 
-Global scope guards:
-- no second gameplay solver;
-- no WFC-as-difficulty truth;
-- no board-size/color-count difficulty inference;
-- no source/art mutation;
-- no network/provider credits for tests;
-- no later-task implementation beyond compatibility plumbing.
-
-Run all criteria-required gates, record exact counts, publish implementation + task builder log, then terminal log-only commit. Continue only when invoked by the M04 master batch.
+Create the task builder log before product/test edits. Run all required gates. Publish implementation/tests/docs + task log, then a terminal log-only commit. Continue only under the M04 master batch.
