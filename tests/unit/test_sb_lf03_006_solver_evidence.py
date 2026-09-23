@@ -66,6 +66,7 @@ def test_repeat_evidence_is_deterministic_and_timing_is_not_canonical() -> None:
     assert first.metrics.branch_counts == (2, 1)
     assert first.metrics.visited_count == 4
     assert first.metrics.memo_hits == 0
+    assert first.metrics.frontier_peak >= 2
     assert first.canonical_bytes() == second.canonical_bytes()
     assert first.telemetry_dict()["canonical"] is False
     assert "elapsed_seconds" not in first.canonical_dict()
@@ -95,3 +96,25 @@ def test_evidence_module_has_no_gameplay_or_wfc_implementation() -> None:
     assert "apply_placement" not in source
     assert "canonical_key" not in source
     assert "wfc" not in source
+
+
+def test_frontier_peak_is_pending_frontier_not_depth_plus_one() -> None:
+    initial = fixture()
+
+    class WideLegal(LegalFixture):
+        def query(self, request):
+            result = super().query(request)
+            if request.state.level.level_id == "root":
+                return LegalMoveResult.from_query(request, result.disposition, result.capability, (LegalMove(0), LegalMove(1), LegalMove(2)))
+            return result
+
+    class WideTransition(TransitionFixture):
+        def transition(self, current, move):
+            if current.level.level_id == "root":
+                return TransitionObservation(SearchExecutionDisposition.AVAILABLE, states["dead"], None, "wide fixture")
+            return super().transition(current, move)
+
+    report = EvidenceSearchEngine(WideLegal(), WideTransition()).search(initial)
+    assert report.metrics is not None
+    assert report.metrics.frontier_peak == 3
+    assert report.metrics.maximum_depth == 1

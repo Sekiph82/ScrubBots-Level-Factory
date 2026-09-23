@@ -94,18 +94,20 @@ class _EvidenceCollector:
         self.maximum_depth = 0
         self.branch_counts: list[int] = []
         self.frontier_peak = 0
+        self._pending = 1
 
     def on_node(self, state: CompactSolverState, depth: int) -> None:
         self.visited_count += 1
         self.maximum_depth = max(self.maximum_depth, depth)
-        self.frontier_peak = max(self.frontier_peak, depth + 1)
+        self._pending = max(0, self._pending - 1)
+        self.frontier_peak = max(self.frontier_peak, self._pending)
         if len(self.state_references) < MAX_STATE_REFERENCES:
             self.state_references.append(state.digest())
         else:
             self.state_reference_truncated = True
         if self.key_provider is not None and self.memo is not None:
             try:
-                observation = self.memo.observe(self.key_provider.key(state))
+                observation = self.memo.observe(state, self.key_provider.key(state))
                 if observation.disposition is MemoDisposition.MEMO_HIT:
                     self.memo_hits = observation.memo_hits
                 elif observation.disposition in {MemoDisposition.UNAVAILABLE, MemoDisposition.ERROR}:
@@ -115,6 +117,8 @@ class _EvidenceCollector:
 
     def on_branch(self, count: int, _depth: int) -> None:
         self.branch_counts.append(count)
+        self._pending += count
+        self.frontier_peak = max(self.frontier_peak, self._pending)
 
     def on_terminal(self, terminal: object) -> None:
         truth = getattr(terminal, "truth", None)
@@ -152,7 +156,7 @@ class EvidenceSearchEngine:
     ) -> None:
         self._search_policy = search_policy or DEFAULT_SEARCH_POLICY
         self._budget_policy = budget_policy or SolverBudgetPolicy(max_depth=(policy.max_depth if policy is not None else SolverBudgetPolicy().max_depth))
-        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy or self._budget_policy.to_baseline_policy(), self._search_policy)
+        self._engine = BaselineSearchEngine(legal_provider, transition_provider, policy or self._budget_policy.to_baseline_policy(), self._search_policy, self._budget_policy.max_visited_states)
         self._key_provider = key_provider
         self._legal_provider = legal_provider
 
