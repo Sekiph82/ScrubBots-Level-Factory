@@ -19,6 +19,8 @@ SLOT_PRESSURE_SCHEMA = "scrubbots-canonical-slot-pressure"
 SLOT_PRESSURE_VERSION = 1
 BAIT_DEADLOCK_SCHEMA = "scrubbots-canonical-bait-deadlock"
 BAIT_DEADLOCK_VERSION = 1
+VOLATILITY_SCHEMA = "scrubbots-canonical-state-volatility"
+VOLATILITY_VERSION = 1
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -317,6 +319,91 @@ def populate_bait_deadlock(level_metrics: LevelMetrics, result: BaitDeadlockResu
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), bait_deadlock=result.bait_deadlock))
 
 
+@dataclass(frozen=True, slots=True)
+class VolatilitySnapshot:
+    remaining_active_cells: int
+    active_capacity: int
+    supply_remaining: int
+    supply_capacity: int
+    occupied_slots: int
+    slot_capacity: int
+
+    def __post_init__(self) -> None:
+        values = (self.remaining_active_cells, self.active_capacity, self.supply_remaining, self.supply_capacity, self.occupied_slots, self.slot_capacity)
+        if any(type(value) is not int for value in values) or self.active_capacity <= 0 or self.supply_capacity <= 0 or self.slot_capacity <= 0:
+            raise LevelMetricsError("volatility snapshot capacities and counts must be exact integers")
+        if not 0 <= self.remaining_active_cells <= self.active_capacity or not 0 <= self.supply_remaining <= self.supply_capacity or not 0 <= self.occupied_slots <= self.slot_capacity:
+            raise LevelMetricsError("volatility snapshot values exceed canonical capacities")
+
+    def normalized_signature(self) -> tuple[float, float, float]:
+        return (self.remaining_active_cells / self.active_capacity, self.supply_remaining / self.supply_capacity, self.occupied_slots / self.slot_capacity)
+
+    def canonical_dict(self) -> dict[str, int]:
+        return {"remaining_active_cells": self.remaining_active_cells, "active_capacity": self.active_capacity, "supply_remaining": self.supply_remaining, "supply_capacity": self.supply_capacity, "occupied_slots": self.occupied_slots, "slot_capacity": self.slot_capacity}
+
+
+@dataclass(frozen=True, slots=True)
+class VolatilityResult(_DependencyResultMixin):
+    disposition: AnalysisDisposition
+    authority: object
+    level_source_sha256: str
+    state_digest: str
+    evidence_digest: str
+    provider_id: str
+    provider_version: str
+    snapshots: tuple[VolatilitySnapshot, ...]
+    volatility: float | None
+    reason: str
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        if not isinstance(self.disposition, AnalysisDisposition) or not isinstance(self.authority, SolverStateAuthority):
+            raise LevelMetricsError("volatility disposition or authority is malformed")
+        _digest_text(self.level_source_sha256, "volatility level source SHA-256")
+        _digest_text(self.state_digest, "volatility state digest")
+        _digest_text(self.evidence_digest, "volatility evidence digest")
+        _provider_text(self.provider_id, "volatility provider id")
+        _provider_text(self.provider_version, "volatility provider version")
+        if type(self.snapshots) is not tuple or any(not isinstance(snapshot, VolatilitySnapshot) for snapshot in self.snapshots):
+            raise LevelMetricsError("volatility snapshots must be an immutable canonical trace")
+        if type(self.reason) is not str or not self.reason.strip():
+            raise LevelMetricsError("volatility reason is required")
+        if self.disposition is AnalysisDisposition.AVAILABLE:
+            if len(self.snapshots) < 2 or self.volatility is None or not 0.0 <= self.volatility <= 1.0:
+                raise LevelMetricsError("AVAILABLE volatility requires at least two bounded snapshots")
+        elif self.volatility is not None:
+            raise LevelMetricsError("unavailable volatility cannot carry a measurement")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": VOLATILITY_SCHEMA, "version": VOLATILITY_VERSION, "disposition": self.disposition.value, "authority": self.authority.canonical_dict(), "level_source_sha256": self.level_source_sha256, "state_digest": self.state_digest, "evidence_digest": self.evidence_digest, "provider_id": self.provider_id, "provider_version": self.provider_version, "snapshots": [snapshot.canonical_dict() for snapshot in self.snapshots], "volatility": self.volatility, "reason": self.reason}
+
+
+def volatility_from_snapshots(level_metrics: LevelMetrics, state_digest: str, snapshots: tuple[VolatilitySnapshot, ...], *, provider_id: str = "canonical-state-trace", provider_version: str = "CANONICAL_STATE_TRACE_V1") -> VolatilityResult:
+    if not isinstance(snapshots, tuple) or len(snapshots) < 2 or any(not isinstance(snapshot, VolatilitySnapshot) for snapshot in snapshots):
+        raise LevelMetricsError("volatility requires at least two canonical trace snapshots")
+    deltas = []
+    for previous, current in zip(snapshots, snapshots[1:]):
+        before = previous.normalized_signature()
+        after = current.normalized_signature()
+        deltas.append(sum(abs(a - b) for a, b in zip(before, after)) / 3.0)
+    return VolatilityResult(AnalysisDisposition.AVAILABLE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "volatility state digest"), level_metrics.evidence_digest, provider_id, provider_version, snapshots, sum(deltas) / len(deltas), "canonical ordered state trace accepted")
+
+
+def unavailable_volatility_result(level_metrics: LevelMetrics, state_digest: str, reason: str) -> VolatilityResult:
+    return VolatilityResult(AnalysisDisposition.UNAVAILABLE, level_metrics.authority, level_metrics.source_sha256, _digest_text(state_digest, "volatility state digest"), level_metrics.evidence_digest, "canonical-state-trace", "CANONICAL_STATE_TRACE_V1", (), None, reason)
+
+
+def populate_volatility(level_metrics: LevelMetrics, result: VolatilityResult) -> LevelMetrics:
+    if not isinstance(level_metrics, LevelMetrics) or not isinstance(result, VolatilityResult):
+        raise LevelMetricsError("LevelMetrics and VolatilityResult are required")
+    if result.authority != level_metrics.authority or result.level_source_sha256 != level_metrics.source_sha256 or result.evidence_digest != level_metrics.evidence_digest:
+        raise LevelMetricsError("volatility result provenance does not match LevelMetrics")
+    if result.disposition is not AnalysisDisposition.AVAILABLE:
+        return level_metrics
+    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), volatility=result.volatility))
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -388,17 +475,24 @@ __all__ = [
     "BAIT_DEADLOCK_SCHEMA",
     "BAIT_DEADLOCK_VERSION",
     "BaitDeadlockResult",
+    "VOLATILITY_SCHEMA",
+    "VOLATILITY_VERSION",
+    "VolatilityResult",
+    "VolatilitySnapshot",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
     "SlotSnapshot",
     "populate_dependency_depth",
     "populate_bait_deadlock",
+    "populate_volatility",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
     "slot_pressure_from_snapshots",
     "bait_deadlock_from_children",
+    "volatility_from_snapshots",
+    "unavailable_volatility_result",
     "unavailable_slot_pressure_result",
     "unavailable_dependency_result",
 ]
