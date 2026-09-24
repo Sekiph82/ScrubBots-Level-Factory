@@ -73,9 +73,6 @@ class EvidenceDisposition(str, Enum):
     INCONCLUSIVE = "INCONCLUSIVE"
 
 
-_VERIFIED_EVIDENCE_TOKEN = object()
-
-
 @dataclass(frozen=True, slots=True)
 class MetricEvidence:
     """Versioned provider receipt; fixture receipts cannot cross production boundaries."""
@@ -88,7 +85,6 @@ class MetricEvidence:
     provider_id: str
     provider_version: str
     proof_digest: str | None = None
-    _token: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         from .compact_solver_state import SolverStateAuthority
@@ -103,10 +99,9 @@ class MetricEvidence:
         if self.proof_digest is not None:
             _digest_text(self.proof_digest, "metric evidence proof digest")
         if self.disposition is EvidenceDisposition.VERIFIED_CANONICAL:
-            if self._token is not _VERIFIED_EVIDENCE_TOKEN or self.proof_digest is None:
-                raise LevelMetricsError("verified canonical evidence requires a provider-issued proof receipt")
-        elif self._token is not None or self.proof_digest is not None:
-            raise LevelMetricsError("non-canonical evidence cannot carry a verified proof receipt")
+            raise LevelMetricsError("VERIFIED_CANONICAL is unavailable until a concrete canonical provider owns receipt issuance")
+        if self.proof_digest is not None:
+            raise LevelMetricsError("current non-canonical evidence cannot carry a proof receipt")
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -150,48 +145,11 @@ def _result_evidence(
         or evidence.provider_version != provider_version
     ):
         raise LevelMetricsError("metric provider evidence does not match the result binding")
-    if disposition is AnalysisDisposition.AVAILABLE and evidence.disposition not in {EvidenceDisposition.FIXTURE, EvidenceDisposition.VERIFIED_CANONICAL}:
+    if disposition is AnalysisDisposition.AVAILABLE and evidence.disposition is not EvidenceDisposition.FIXTURE:
         raise LevelMetricsError("AVAILABLE result has a non-available evidence disposition")
     if disposition is not AnalysisDisposition.AVAILABLE and evidence.disposition.value != disposition.value:
         raise LevelMetricsError("result and provider evidence dispositions do not match")
     return evidence
-
-
-def verified_canonical_evidence(
-    level_metrics: LevelMetrics,
-    state_digest: str,
-    provider_id: str,
-    provider_version: str,
-    proof: Mapping[str, object],
-) -> MetricEvidence:
-    """Accept only a fully bound provider receipt for a future executable canonical provider."""
-
-    if not isinstance(level_metrics, LevelMetrics) or not isinstance(proof, Mapping):
-        raise LevelMetricsError("LevelMetrics and provider proof are required")
-    required = {"authority", "level_source_sha256", "state_digest", "evidence_digest", "provider_id", "provider_version", "observations"}
-    if set(proof) != required or not isinstance(proof["observations"], (tuple, list)) or not proof["observations"]:
-        raise LevelMetricsError("canonical provider proof is incomplete")
-    if (
-        proof["authority"] != level_metrics.authority.canonical_dict()
-        or proof["level_source_sha256"] != level_metrics.source_sha256
-        or proof["state_digest"] != state_digest
-        or proof["evidence_digest"] != level_metrics.evidence_digest
-        or proof["provider_id"] != provider_id
-        or proof["provider_version"] != provider_version
-    ):
-        raise LevelMetricsError("canonical provider proof is not bound to LevelMetrics")
-    proof_digest = _digest(dict(proof))
-    return MetricEvidence(
-        EvidenceDisposition.VERIFIED_CANONICAL,
-        level_metrics.authority,
-        level_metrics.source_sha256,
-        _digest_text(state_digest, "metric evidence state digest"),
-        level_metrics.evidence_digest,
-        _provider_text(provider_id, "metric evidence provider id"),
-        _provider_text(provider_version, "metric evidence provider version"),
-        proof_digest,
-        _VERIFIED_EVIDENCE_TOKEN,
-    )
 
 
 class _DependencyResultMixin:
@@ -282,9 +240,7 @@ def populate_dependency_depth(level_metrics: LevelMetrics, result: DependencyDep
         raise LevelMetricsError("dependency result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
-    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
-        raise LevelMetricsError("fixture or unverified dependency evidence cannot populate production LevelMetrics")
-    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), dependency_depth=result.dependency_depth))
+    raise LevelMetricsError("current production dependency provider is unavailable; AVAILABLE results are fixture-only")
 
 
 @dataclass(frozen=True, slots=True)
@@ -385,9 +341,7 @@ def populate_slot_pressure(level_metrics: LevelMetrics, result: SlotPressureResu
         raise LevelMetricsError("slot pressure result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
-    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
-        raise LevelMetricsError("fixture or unverified slot trace cannot populate production LevelMetrics")
-    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), slot_pressure=result.slot_pressure))
+    raise LevelMetricsError("current production slot-trace provider is unavailable; AVAILABLE results are fixture-only")
 
 
 @dataclass(frozen=True, slots=True)
@@ -479,9 +433,7 @@ def populate_bait_deadlock(level_metrics: LevelMetrics, result: BaitDeadlockResu
         raise LevelMetricsError("bait/deadlock result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
-    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
-        raise LevelMetricsError("fixture or unverified counterfactual evidence cannot populate production LevelMetrics")
-    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), bait_deadlock=result.bait_deadlock))
+    raise LevelMetricsError("current production counterfactual provider is unavailable; AVAILABLE results are fixture-only")
 
 
 @dataclass(frozen=True, slots=True)
@@ -568,9 +520,7 @@ def populate_volatility(level_metrics: LevelMetrics, result: VolatilityResult) -
         raise LevelMetricsError("volatility result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
-    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
-        raise LevelMetricsError("fixture or unverified ordered trace cannot populate production LevelMetrics")
-    return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), volatility=result.volatility))
+    raise LevelMetricsError("current production ordered-trace provider is unavailable; AVAILABLE results are fixture-only")
 
 
 @dataclass(frozen=True, slots=True)
@@ -1004,7 +954,6 @@ def populate_search_complexity_metrics(
 __all__ = [
     "EvidenceDisposition",
     "MetricEvidence",
-    "verified_canonical_evidence",
     "DEPENDENCY_DEPTH_SCHEMA",
     "DEPENDENCY_DEPTH_VERSION",
     "DependencyDepthResult",

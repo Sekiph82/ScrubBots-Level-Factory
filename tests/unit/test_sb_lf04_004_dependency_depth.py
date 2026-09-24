@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import pytest
 
+import scrubbots_pixel_factory.difficulty_analysis as difficulty_analysis
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
-from scrubbots_pixel_factory.difficulty_analysis import DependencyDepthResult, populate_dependency_depth, unavailable_dependency_result
+from scrubbots_pixel_factory.difficulty_analysis import DependencyDepthResult, EvidenceDisposition, MetricEvidence, populate_dependency_depth, unavailable_dependency_result
 from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
@@ -42,6 +43,13 @@ def test_copied_provider_identity_cannot_claim_verified_canonical_evidence() -> 
     fixture = result(metrics)
     assert fixture.evidence.disposition.value == "FIXTURE"
     assert populate_dependency_depth(metrics, unavailable_dependency_result(metrics, "f" * 64, "canonical provider unavailable")).metrics is None
+
+
+def test_no_generic_caller_authored_proof_can_mint_verified_canonical_evidence() -> None:
+    metrics = level()
+    assert not hasattr(difficulty_analysis, "verified_canonical_evidence")
+    with pytest.raises(LevelMetricsError):
+        MetricEvidence(EvidenceDisposition.VERIFIED_CANONICAL, metrics.authority, metrics.source_sha256, "f" * 64, metrics.evidence_digest, "canonical-dependency-semantics", "CANONICAL_DEPENDENCY_SEMANTICS_V1", "a" * 64)
 
 
 def test_unavailable_canonical_semantics_remain_absent() -> None:
