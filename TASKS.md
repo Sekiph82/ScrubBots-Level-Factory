@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M04 — Difficulty Intelligence & Metrics
-- Current Sprint: SB-LF04.C001-R02-BATCH — M04 provider-trust remediation batch
-- Current Task: SB-LF04-004 — Add dependency depth only when canonical
+- Current Sprint: SB-LF04.C001-R03 — Final M04 declarative regression closure
+- Current Task: SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source
 - Current Task Status: READY_FOR_REMEDIATION
-- Next Task/Action: Codex executes only `SB-LF04-004,005,006,007,010,012-C001-R02` from `.hiveai/prompts/SB-LF04-004-012-C001-R02_MASTER_REMEDIATION_PROMPT.md`; `SB-LF04-001,002,003,008,009,011` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole R02 batch ChatGPT independently re-audits the six remediated tasks.
+- Next Task/Action: Codex executes only `SB-LF04-012-C001-R03` from `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`; `SB-LF04-001..011` remain PASS/CLOSED; Codex never edits `TASKS.md`; after R03 publication ChatGPT independently re-audits SB-LF04-012 and closes M04 only if PASS.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF04-004-012-C001-R01_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF04-004-012-C001-R02_STRICT_REAUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: R01 task re-audits summarized by `.hiveai/audits/SB-LF04-004-012-C001-R01_STRICT_REAUDIT_SUMMARY.md` + task-specific R02 prompts indexed by `.hiveai/prompts/SB-LF04-004-012-C001-R02_REMEDIATION_INDEX.md`
-- Current Prompt: `.hiveai/prompts/SB-LF04-004-012-C001-R02_MASTER_REMEDIATION_PROMPT.md`
+- Current Audit Criteria: SB-LF04-012 R02 strict re-audit `.hiveai/audits/SB-LF04-012-C001-R02_PROVIDER_TRUST_REGRESSION_CLOSURE_STRICT_REAUDIT.md` + R03 prompt `.hiveai/prompts/SB-LF04-012-C001-R03_FULLY_DECLARATIVE_TRUST_BOUNDARY_REGRESSION_CLOSURE_PROMPT.md`
+- Current Prompt: `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -113,6 +113,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF04 R02 Remediation Authorization: `SB-LF04-004,005,006,007,010,012-C001-R02 — REMEDIATE_ALL_THEN_REAUDIT`.
 - SB-LF04 R02 Remediation Index: `.hiveai/prompts/SB-LF04-004-012-C001-R02_REMEDIATION_INDEX.md`.
 - SB-LF04 R02 Master Prompt: `.hiveai/prompts/SB-LF04-004-012-C001-R02_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF04 R02 Re-Audit Result: `PASS/CLOSED = 004, 005, 006, 007, 010`; `CHANGES_REQUIRED = 012`.
+- SB-LF04 R02 Re-Audit Summary: `.hiveai/audits/SB-LF04-004-012-C001-R02_STRICT_REAUDIT_SUMMARY.md`.
+- SB-LF04 R03 Remediation Authorization: `SB-LF04-012-C001-R03 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF04 R03 Remediation Index: `.hiveai/prompts/SB-LF04-012-C001-R03_REMEDIATION_INDEX.md`.
+- SB-LF04 R03 Master Prompt: `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -184,16 +189,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 61 VERIFIED, 45 PARTIAL, 3 MIGRATION, 87 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **61 / 224 = 27.23%**.
-- Canonical LF/CP engineering/migration coverage: **109 / 224 = 48.66%** (`VERIFIED + PARTIAL + MIGRATION`).
+- Canonical LF/CP source-requirement classification: 66 VERIFIED, 44 PARTIAL, 3 MIGRATION, 83 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **66 / 224 = 29.46%**.
+- Canonical LF/CP engineering/migration coverage: **113 / 224 = 50.45%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **78 / 244 = 31.97%**.
+- Unified verified completion: **83 / 244 = 34.02%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **78 / 216 = 36.11%**.
-- Level Factory + unique extension surface: **132 tasks**; **78 / 132 = 59.09% verified**.
+- Conservative verified local completion: **83 / 216 = 38.43%**.
+- Level Factory + unique extension surface: **132 tasks**; **83 / 132 = 62.88% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -361,18 +366,18 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 
 ### M04.02 - Canonical gameplay feature metrics
 
-- [~] SB-LF04-004 — Add dependency depth only when canonical.
-- [ ] SB-LF04-005 — Add slot pressure only when canonical.
-- [ ] SB-LF04-006 — Add bait/deadlock metrics only when canonical.
-- [ ] SB-LF04-007 — Add color/remaining-state volatility where useful.
+- [x] SB-LF04-004 — Add dependency depth only when canonical.
+- [x] SB-LF04-005 — Add slot pressure only when canonical.
+- [x] SB-LF04-006 — Add bait/deadlock metrics only when canonical.
+- [x] SB-LF04-007 — Add color/remaining-state volatility where useful.
 
 ### M04.03 - Difficulty V1 challenge, provenance and calibration
 
 - [x] SB-LF04-008 — Implement/version Difficulty V1 Challenge Score components/coefficients.
 - [x] SB-LF04-009 — Map predicted score to current lane/class rhythm without equating class to board size.
-- [ ] SB-LF04-010 — Keep metric provenance/versioning. [PARTIAL]
+- [x] SB-LF04-010 — Keep metric provenance/versioning. [PARTIAL]
 - [x] SB-LF04-011 — Design future calibration against player data under approved analytics policy.
-- [ ] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
+- [~] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
 
 ---
 
