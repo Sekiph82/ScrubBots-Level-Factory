@@ -1,0 +1,8 @@
+{
+  "schema": "scrubbots-level-data-fixture",
+  "version": 1,
+  "level_id": "lf04-m04-regression",
+  "source_sha256_contract": "SOURCE_BYTES_ARE_READ_ONLY",
+  "cells": [[0, 1], [1, 0]],
+  "palette": [0, 1]
+}
