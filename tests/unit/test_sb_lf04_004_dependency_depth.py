@@ -31,10 +31,17 @@ def result(level_metrics: LevelMetrics, *, disposition: AnalysisDisposition = An
     return DependencyDepthResult(disposition, level_metrics.authority, level_metrics.source_sha256, "f" * 64, level_metrics.evidence_digest, "fixture-dependency-provider", "fixture-v1", depth, "fixture")
 
 
-def test_explicit_provider_measurement_is_applied() -> None:
+def test_fixture_provider_measurement_is_rejected_from_production() -> None:
     metrics = level()
-    updated = populate_dependency_depth(metrics, result(metrics))
-    assert updated.metrics == MetricValues(dependency_depth=4)
+    with pytest.raises(LevelMetricsError):
+        populate_dependency_depth(metrics, result(metrics))
+
+
+def test_copied_provider_identity_cannot_claim_verified_canonical_evidence() -> None:
+    metrics = level()
+    fixture = result(metrics)
+    assert fixture.evidence.disposition.value == "FIXTURE"
+    assert populate_dependency_depth(metrics, unavailable_dependency_result(metrics, "f" * 64, "canonical provider unavailable")).metrics is None
 
 
 def test_unavailable_canonical_semantics_remain_absent() -> None:

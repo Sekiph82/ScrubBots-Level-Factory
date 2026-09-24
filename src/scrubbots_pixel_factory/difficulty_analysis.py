@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from enum import Enum
 import hashlib
 import json
@@ -27,6 +27,9 @@ VOLATILITY_VERSION = 1
 CHALLENGE_SCORE_SCHEMA = "scrubbots-difficulty-challenge-score"
 CHALLENGE_SCORE_VERSION = 1
 CHALLENGE_SCORE_POLICY_VERSION = "DIFFICULTY_V1"
+CHALLENGE_SCORE_COMPONENTS = ("move", "states", "dead_end", "branching", "forced")
+CHALLENGE_SCORE_COEFFICIENTS = {"move": 0.25, "states": 0.25, "dead_end": 0.15, "branching": 0.15, "forced": 0.20}
+_SCORE_RESULT_TOKEN = object()
 LANE_MAPPING_SCHEMA = "scrubbots-score-lane-mapping"
 LANE_MAPPING_VERSION = 1
 LANE_MAPPING_POLICY_VERSION = "SCORE_LANE_V1"
@@ -60,6 +63,137 @@ def _provider_text(value: object, label: str) -> str:
     return value.strip()
 
 
+class EvidenceDisposition(str, Enum):
+    """Trust state of an M04 provider observation."""
+
+    VERIFIED_CANONICAL = "VERIFIED_CANONICAL"
+    FIXTURE = "FIXTURE"
+    UNAVAILABLE = "UNAVAILABLE"
+    ERROR = "ERROR"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+
+_VERIFIED_EVIDENCE_TOKEN = object()
+
+
+@dataclass(frozen=True, slots=True)
+class MetricEvidence:
+    """Versioned provider receipt; fixture receipts cannot cross production boundaries."""
+
+    disposition: EvidenceDisposition
+    authority: object
+    level_source_sha256: str
+    state_digest: str
+    evidence_digest: str
+    provider_id: str
+    provider_version: str
+    proof_digest: str | None = None
+    _token: object = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        if not isinstance(self.disposition, EvidenceDisposition) or not isinstance(self.authority, SolverStateAuthority):
+            raise LevelMetricsError("metric evidence disposition or authority is malformed")
+        _digest_text(self.level_source_sha256, "metric evidence level source SHA-256")
+        _digest_text(self.state_digest, "metric evidence state digest")
+        _digest_text(self.evidence_digest, "metric evidence evidence digest")
+        _provider_text(self.provider_id, "metric evidence provider id")
+        _provider_text(self.provider_version, "metric evidence provider version")
+        if self.proof_digest is not None:
+            _digest_text(self.proof_digest, "metric evidence proof digest")
+        if self.disposition is EvidenceDisposition.VERIFIED_CANONICAL:
+            if self._token is not _VERIFIED_EVIDENCE_TOKEN or self.proof_digest is None:
+                raise LevelMetricsError("verified canonical evidence requires a provider-issued proof receipt")
+        elif self._token is not None or self.proof_digest is not None:
+            raise LevelMetricsError("non-canonical evidence cannot carry a verified proof receipt")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": "scrubbots-metric-evidence",
+            "version": 1,
+            "disposition": self.disposition.value,
+            "authority": self.authority.canonical_dict(),
+            "level_source_sha256": self.level_source_sha256,
+            "state_digest": self.state_digest,
+            "evidence_digest": self.evidence_digest,
+            "provider_id": self.provider_id,
+            "provider_version": self.provider_version,
+            "proof_digest": self.proof_digest,
+        }
+
+
+def _result_evidence(
+    evidence: MetricEvidence | None,
+    disposition: AnalysisDisposition,
+    authority: object,
+    level_source_sha256: str,
+    state_digest: str,
+    evidence_digest: str,
+    provider_id: str,
+    provider_version: str,
+) -> MetricEvidence:
+    expected_disposition = {
+        AnalysisDisposition.AVAILABLE: EvidenceDisposition.FIXTURE,
+        AnalysisDisposition.UNAVAILABLE: EvidenceDisposition.UNAVAILABLE,
+        AnalysisDisposition.ERROR: EvidenceDisposition.ERROR,
+        AnalysisDisposition.INCONCLUSIVE: EvidenceDisposition.INCONCLUSIVE,
+    }[disposition]
+    if evidence is None:
+        return MetricEvidence(expected_disposition, authority, level_source_sha256, state_digest, evidence_digest, provider_id, provider_version)
+    if (
+        evidence.authority != authority
+        or evidence.level_source_sha256 != level_source_sha256
+        or evidence.state_digest != state_digest
+        or evidence.evidence_digest != evidence_digest
+        or evidence.provider_id != provider_id
+        or evidence.provider_version != provider_version
+    ):
+        raise LevelMetricsError("metric provider evidence does not match the result binding")
+    if disposition is AnalysisDisposition.AVAILABLE and evidence.disposition not in {EvidenceDisposition.FIXTURE, EvidenceDisposition.VERIFIED_CANONICAL}:
+        raise LevelMetricsError("AVAILABLE result has a non-available evidence disposition")
+    if disposition is not AnalysisDisposition.AVAILABLE and evidence.disposition.value != disposition.value:
+        raise LevelMetricsError("result and provider evidence dispositions do not match")
+    return evidence
+
+
+def verified_canonical_evidence(
+    level_metrics: LevelMetrics,
+    state_digest: str,
+    provider_id: str,
+    provider_version: str,
+    proof: Mapping[str, object],
+) -> MetricEvidence:
+    """Accept only a fully bound provider receipt for a future executable canonical provider."""
+
+    if not isinstance(level_metrics, LevelMetrics) or not isinstance(proof, Mapping):
+        raise LevelMetricsError("LevelMetrics and provider proof are required")
+    required = {"authority", "level_source_sha256", "state_digest", "evidence_digest", "provider_id", "provider_version", "observations"}
+    if set(proof) != required or not isinstance(proof["observations"], (tuple, list)) or not proof["observations"]:
+        raise LevelMetricsError("canonical provider proof is incomplete")
+    if (
+        proof["authority"] != level_metrics.authority.canonical_dict()
+        or proof["level_source_sha256"] != level_metrics.source_sha256
+        or proof["state_digest"] != state_digest
+        or proof["evidence_digest"] != level_metrics.evidence_digest
+        or proof["provider_id"] != provider_id
+        or proof["provider_version"] != provider_version
+    ):
+        raise LevelMetricsError("canonical provider proof is not bound to LevelMetrics")
+    proof_digest = _digest(dict(proof))
+    return MetricEvidence(
+        EvidenceDisposition.VERIFIED_CANONICAL,
+        level_metrics.authority,
+        level_metrics.source_sha256,
+        _digest_text(state_digest, "metric evidence state digest"),
+        level_metrics.evidence_digest,
+        _provider_text(provider_id, "metric evidence provider id"),
+        _provider_text(provider_version, "metric evidence provider version"),
+        proof_digest,
+        _VERIFIED_EVIDENCE_TOKEN,
+    )
+
+
 class _DependencyResultMixin:
     def canonical_bytes(self) -> bytes:
         return _canonical_bytes(self.canonical_dict())
@@ -81,6 +215,7 @@ class DependencyDepthResult(_DependencyResultMixin):
     provider_version: str
     dependency_depth: int | None
     reason: str
+    evidence: MetricEvidence | None = None
 
     def __post_init__(self) -> None:
         from .compact_solver_state import SolverStateAuthority
@@ -94,6 +229,7 @@ class DependencyDepthResult(_DependencyResultMixin):
         _digest_text(self.evidence_digest, "dependency evidence digest")
         _provider_text(self.provider_id, "dependency provider id")
         _provider_text(self.provider_version, "dependency provider version")
+        object.__setattr__(self, "evidence", _result_evidence(self.evidence, self.disposition, self.authority, self.level_source_sha256, self.state_digest, self.evidence_digest, self.provider_id, self.provider_version))
         if type(self.reason) is not str or not self.reason.strip():
             raise LevelMetricsError("dependency result reason is required")
         if self.disposition is AnalysisDisposition.AVAILABLE:
@@ -113,6 +249,7 @@ class DependencyDepthResult(_DependencyResultMixin):
             "evidence_digest": self.evidence_digest,
             "provider_id": self.provider_id,
             "provider_version": self.provider_version,
+            "evidence": self.evidence.canonical_dict(),
             "dependency_depth": self.dependency_depth,
             "reason": self.reason,
         }
@@ -145,6 +282,8 @@ def populate_dependency_depth(level_metrics: LevelMetrics, result: DependencyDep
         raise LevelMetricsError("dependency result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
+    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
+        raise LevelMetricsError("fixture or unverified dependency evidence cannot populate production LevelMetrics")
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), dependency_depth=result.dependency_depth))
 
 
@@ -176,6 +315,7 @@ class SlotPressureResult(_DependencyResultMixin):
     snapshots: tuple[SlotSnapshot, ...]
     slot_pressure: float | None
     reason: str
+    evidence: MetricEvidence | None = None
 
     def __post_init__(self) -> None:
         from .compact_solver_state import SolverStateAuthority
@@ -187,6 +327,7 @@ class SlotPressureResult(_DependencyResultMixin):
         _digest_text(self.evidence_digest, "slot pressure evidence digest")
         _provider_text(self.provider_id, "slot pressure provider id")
         _provider_text(self.provider_version, "slot pressure provider version")
+        object.__setattr__(self, "evidence", _result_evidence(self.evidence, self.disposition, self.authority, self.level_source_sha256, self.state_digest, self.evidence_digest, self.provider_id, self.provider_version))
         if type(self.snapshots) is not tuple or any(not isinstance(snapshot, SlotSnapshot) for snapshot in self.snapshots):
             raise LevelMetricsError("slot pressure snapshots must be an immutable canonical trace")
         if type(self.reason) is not str or not self.reason.strip():
@@ -208,6 +349,7 @@ class SlotPressureResult(_DependencyResultMixin):
             "evidence_digest": self.evidence_digest,
             "provider_id": self.provider_id,
             "provider_version": self.provider_version,
+            "evidence": self.evidence.canonical_dict(),
             "snapshots": [snapshot.canonical_dict() for snapshot in self.snapshots],
             "slot_pressure": self.slot_pressure,
             "reason": self.reason,
@@ -243,6 +385,8 @@ def populate_slot_pressure(level_metrics: LevelMetrics, result: SlotPressureResu
         raise LevelMetricsError("slot pressure result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
+    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
+        raise LevelMetricsError("fixture or unverified slot trace cannot populate production LevelMetrics")
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), slot_pressure=result.slot_pressure))
 
 
@@ -260,6 +404,7 @@ class BaitDeadlockResult(_DependencyResultMixin):
     bait_deadlock: float | None
     exact: bool
     reason: str
+    evidence: MetricEvidence | None = None
 
     def __post_init__(self) -> None:
         from .compact_solver_state import SolverStateAuthority
@@ -271,6 +416,7 @@ class BaitDeadlockResult(_DependencyResultMixin):
         _digest_text(self.evidence_digest, "bait/deadlock evidence digest")
         _provider_text(self.provider_id, "bait/deadlock provider id")
         _provider_text(self.provider_version, "bait/deadlock provider version")
+        object.__setattr__(self, "evidence", _result_evidence(self.evidence, self.disposition, self.authority, self.level_source_sha256, self.state_digest, self.evidence_digest, self.provider_id, self.provider_version))
         if type(self.legal_move_count) is not int or self.legal_move_count < 0 or type(self.proven_deadlock_move_count) is not int or not 0 <= self.proven_deadlock_move_count <= self.legal_move_count:
             raise LevelMetricsError("bait/deadlock counts are malformed")
         if type(self.exact) is not bool or type(self.reason) is not str or not self.reason.strip():
@@ -292,6 +438,7 @@ class BaitDeadlockResult(_DependencyResultMixin):
             "evidence_digest": self.evidence_digest,
             "provider_id": self.provider_id,
             "provider_version": self.provider_version,
+            "evidence": self.evidence.canonical_dict(),
             "legal_move_count": self.legal_move_count,
             "proven_deadlock_move_count": self.proven_deadlock_move_count,
             "bait_deadlock": self.bait_deadlock,
@@ -332,6 +479,8 @@ def populate_bait_deadlock(level_metrics: LevelMetrics, result: BaitDeadlockResu
         raise LevelMetricsError("bait/deadlock result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
+    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
+        raise LevelMetricsError("fixture or unverified counterfactual evidence cannot populate production LevelMetrics")
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), bait_deadlock=result.bait_deadlock))
 
 
@@ -370,6 +519,7 @@ class VolatilityResult(_DependencyResultMixin):
     snapshots: tuple[VolatilitySnapshot, ...]
     volatility: float | None
     reason: str
+    evidence: MetricEvidence | None = None
 
     def __post_init__(self) -> None:
         from .compact_solver_state import SolverStateAuthority
@@ -381,6 +531,7 @@ class VolatilityResult(_DependencyResultMixin):
         _digest_text(self.evidence_digest, "volatility evidence digest")
         _provider_text(self.provider_id, "volatility provider id")
         _provider_text(self.provider_version, "volatility provider version")
+        object.__setattr__(self, "evidence", _result_evidence(self.evidence, self.disposition, self.authority, self.level_source_sha256, self.state_digest, self.evidence_digest, self.provider_id, self.provider_version))
         if type(self.snapshots) is not tuple or any(not isinstance(snapshot, VolatilitySnapshot) for snapshot in self.snapshots):
             raise LevelMetricsError("volatility snapshots must be an immutable canonical trace")
         if type(self.reason) is not str or not self.reason.strip():
@@ -392,7 +543,7 @@ class VolatilityResult(_DependencyResultMixin):
             raise LevelMetricsError("unavailable volatility cannot carry a measurement")
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": VOLATILITY_SCHEMA, "version": VOLATILITY_VERSION, "disposition": self.disposition.value, "authority": self.authority.canonical_dict(), "level_source_sha256": self.level_source_sha256, "state_digest": self.state_digest, "evidence_digest": self.evidence_digest, "provider_id": self.provider_id, "provider_version": self.provider_version, "snapshots": [snapshot.canonical_dict() for snapshot in self.snapshots], "volatility": self.volatility, "reason": self.reason}
+        return {"schema": VOLATILITY_SCHEMA, "version": VOLATILITY_VERSION, "disposition": self.disposition.value, "authority": self.authority.canonical_dict(), "level_source_sha256": self.level_source_sha256, "state_digest": self.state_digest, "evidence_digest": self.evidence_digest, "provider_id": self.provider_id, "provider_version": self.provider_version, "evidence": self.evidence.canonical_dict(), "snapshots": [snapshot.canonical_dict() for snapshot in self.snapshots], "volatility": self.volatility, "reason": self.reason}
 
 
 def volatility_from_snapshots(level_metrics: LevelMetrics, state_digest: str, snapshots: tuple[VolatilitySnapshot, ...], *, provider_id: str = "canonical-state-trace", provider_version: str = "CANONICAL_STATE_TRACE_V1") -> VolatilityResult:
@@ -417,6 +568,8 @@ def populate_volatility(level_metrics: LevelMetrics, result: VolatilityResult) -
         raise LevelMetricsError("volatility result provenance does not match LevelMetrics")
     if result.disposition is not AnalysisDisposition.AVAILABLE:
         return level_metrics
+    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
+        raise LevelMetricsError("fixture or unverified ordered trace cannot populate production LevelMetrics")
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), volatility=result.volatility))
 
 
@@ -442,16 +595,29 @@ class ChallengeScoreResult(_DependencyResultMixin):
     source_metrics_digest: str
     components: tuple[tuple[str, ScoreComponent], ...]
     score: float
+    _token: object = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.policy_version != CHALLENGE_SCORE_POLICY_VERSION:
             raise LevelMetricsError("unsupported challenge score policy version")
         _digest_text(self.source_metrics_digest, "challenge score source metrics digest")
-        expected = ("move", "states", "dead_end", "branching", "forced")
-        if tuple(name for name, _ in self.components) != expected:
+        if self._token is not _SCORE_RESULT_TOKEN:
+            raise LevelMetricsError("ChallengeScoreResult must be produced by the validated Difficulty V1 calculator")
+        if type(self.components) is not tuple or any(type(name) is not str or not isinstance(component, ScoreComponent) for name, component in self.components):
+            raise LevelMetricsError("challenge score components are malformed")
+        if tuple(name for name, _ in self.components) != CHALLENGE_SCORE_COMPONENTS:
             raise LevelMetricsError("challenge score components are not the closed V1 catalog")
+        for name, component in self.components:
+            coefficient = CHALLENGE_SCORE_COEFFICIENTS[name]
+            if not math.isclose(float(component.coefficient), coefficient, rel_tol=0.0, abs_tol=1e-12):
+                raise LevelMetricsError("challenge score component coefficient does not match DIFFICULTY_V1")
+            if not math.isclose(float(component.contribution), float(component.normalized) * coefficient, rel_tol=0.0, abs_tol=1e-12):
+                raise LevelMetricsError("challenge score component contribution is inconsistent")
         if not isinstance(self.score, (int, float)) or isinstance(self.score, bool) or not math.isfinite(float(self.score)) or not 0.0 <= self.score <= 100.0:
             raise LevelMetricsError("challenge score must be in [0, 100]")
+        expected_score = 100.0 * sum(component.contribution for _, component in self.components)
+        if not math.isclose(float(self.score), expected_score, rel_tol=0.0, abs_tol=1e-12):
+            raise LevelMetricsError("challenge score is inconsistent with DIFFICULTY_V1 contributions")
 
     def canonical_dict(self) -> dict[str, object]:
         return {"schema": CHALLENGE_SCORE_SCHEMA, "version": CHALLENGE_SCORE_VERSION, "policy_version": self.policy_version, "source_metrics_digest": self.source_metrics_digest, "components": {name: component.canonical_dict() for name, component in self.components}, "score": float(self.score)}
@@ -478,10 +644,33 @@ def calculate_challenge_score(level_metrics: LevelMetrics) -> ChallengeScoreResu
         "branching": _clamp_unit(branching / 4.0),
         "forced": 1.0 - _clamp_unit(forced_moves / max(states_visited, 1)),
     }
-    coefficients = {"move": 0.25, "states": 0.25, "dead_end": 0.15, "branching": 0.15, "forced": 0.20}
-    components = tuple((name, ScoreComponent(normalized[name], coefficients[name], normalized[name] * coefficients[name])) for name in ("move", "states", "dead_end", "branching", "forced"))
+    components = tuple((name, ScoreComponent(normalized[name], CHALLENGE_SCORE_COEFFICIENTS[name], normalized[name] * CHALLENGE_SCORE_COEFFICIENTS[name])) for name in CHALLENGE_SCORE_COMPONENTS)
     score = _clamp_unit(sum(component.contribution for _, component in components)) * 100.0
-    return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, level_metrics.digest(), components, score)
+    return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, level_metrics.digest(), components, score, _SCORE_RESULT_TOKEN)
+
+
+def challenge_score_fixture(score: float, source_metrics_digest: str = "0" * 64) -> ChallengeScoreResult:
+    """Create a policy-valid score-only fixture for lane-boundary tests.
+
+    This helper is deliberately not a production metric calculator: it still
+    creates every component with the exact DIFFICULTY_V1 coefficients and
+    contributions, and it cannot bypass the result integrity checks.
+    """
+
+    _digest_text(source_metrics_digest, "challenge score fixture source metrics digest")
+    if isinstance(score, bool) or not isinstance(score, (int, float)) or not math.isfinite(float(score)) or not 0.0 <= float(score) <= 100.0:
+        raise LevelMetricsError("challenge score fixture must be in [0, 100]")
+    remaining = float(score) / 100.0
+    components: list[tuple[str, ScoreComponent]] = []
+    for name in CHALLENGE_SCORE_COMPONENTS:
+        coefficient = CHALLENGE_SCORE_COEFFICIENTS[name]
+        normalized = min(1.0, remaining / coefficient) if coefficient else 0.0
+        contribution = normalized * coefficient
+        components.append((name, ScoreComponent(normalized, coefficient, contribution)))
+        remaining -= contribution
+    if not math.isclose(remaining, 0.0, rel_tol=0.0, abs_tol=1e-12):
+        raise LevelMetricsError("challenge score fixture could not satisfy DIFFICULTY_V1 bounds")
+    return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, source_metrics_digest, tuple(components), float(score), _SCORE_RESULT_TOKEN)
 
 
 class LaneClass(str, Enum):
@@ -511,6 +700,12 @@ class LaneMappingResult(_DependencyResultMixin):
             raise LevelMetricsError("lane mapping class is malformed")
         if self.comparison not in {None, "MATCH", "MISMATCH"}:
             raise LevelMetricsError("lane comparison is malformed")
+        expected_lane = _lane_for_score(float(self.score))
+        if self.lane is not expected_lane:
+            raise LevelMetricsError("lane mapping class contradicts SCORE_LANE_V1 thresholds")
+        expected_comparison = None if self.requested_class is None else ("MATCH" if self.requested_class is self.lane else "MISMATCH")
+        if self.comparison != expected_comparison:
+            raise LevelMetricsError("lane mapping comparison contradicts the requested class")
 
     def canonical_dict(self) -> dict[str, object]:
         return {"schema": LANE_MAPPING_SCHEMA, "version": LANE_MAPPING_VERSION, "score_digest": self.score_digest, "score_policy_version": self.score_policy_version, "mapping_policy_version": self.mapping_policy_version, "score": float(self.score), "lane": self.lane.value, "requested_class": self.requested_class.value if self.requested_class else None, "comparison": self.comparison}
@@ -522,10 +717,14 @@ def map_challenge_score(score_result: ChallengeScoreResult, requested_class: Dif
     score = float(score_result.score)
     if score < 0.0 or score > 100.0:
         raise LevelMetricsError("score is outside the lane mapping range")
-    lane = LaneClass.EASY if score < 25.0 else LaneClass.MEDIUM if score < 50.0 else LaneClass.HARD if score < 75.0 else LaneClass.VERY_HARD
+    lane = _lane_for_score(score)
     requested = LaneClass(parse_difficulty(requested_class).value) if requested_class is not None else None
     comparison = None if requested is None else ("MATCH" if requested is lane else "MISMATCH")
     return LaneMappingResult(score_result.digest(), score_result.policy_version, LANE_MAPPING_POLICY_VERSION, score, lane, requested, comparison)
+
+
+def _lane_for_score(score: float) -> LaneClass:
+    return LaneClass.EASY if score < 25.0 else LaneClass.MEDIUM if score < 50.0 else LaneClass.HARD if score < 75.0 else LaneClass.VERY_HARD
 
 
 @dataclass(frozen=True, slots=True)
@@ -539,6 +738,18 @@ class MetricProviderIdentity:
 
     def canonical_dict(self) -> dict[str, object]:
         return {"schema": PROVIDER_IDENTITY_SCHEMA, "version": PROVIDER_IDENTITY_VERSION, "provider_id": self.provider_id, "provider_version": self.provider_version}
+
+
+SOLVER_WITNESS_PROVIDER = MetricProviderIdentity("solver-witness", "SOLVER_WITNESS_V1")
+SOLVER_METRICS_PROVIDER = MetricProviderIdentity("solver-metrics", "SOLVER_METRICS_V1")
+_FIXED_METRIC_PROVIDERS = {
+    "solution_depth": SOLVER_WITNESS_PROVIDER,
+    "move_count": SOLVER_WITNESS_PROVIDER,
+    "states_visited": SOLVER_METRICS_PROVIDER,
+    "dead_ends": SOLVER_METRICS_PROVIDER,
+    "branching": SOLVER_METRICS_PROVIDER,
+    "forced_moves": SOLVER_METRICS_PROVIDER,
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -568,10 +779,18 @@ class DifficultyAnalysis(_DependencyResultMixin):
         if type(self.level_metrics_version) is not int or self.level_metrics_version < 1:
             raise LevelMetricsError("analysis LevelMetrics version is malformed")
         _digest_text(self.level_metrics_digest, "analysis LevelMetrics digest")
-        if type(self.metric_provenance) is not tuple or any(type(name) is not str or not isinstance(provider, MetricProviderIdentity) for name, provider in self.metric_provenance):
+        if type(self.metric_provenance) is not tuple or any(type(item) is not tuple or len(item) != 2 or type(item[0]) is not str or not isinstance(item[1], MetricProviderIdentity) for item in self.metric_provenance):
             raise LevelMetricsError("analysis metric provenance is malformed")
-        if type(self.component_availability) is not tuple or any(type(name) is not str or not isinstance(value, AnalysisDisposition) for name, value in self.component_availability):
+        if type(self.component_availability) is not tuple or any(type(item) is not tuple or len(item) != 2 or type(item[0]) is not str or not isinstance(item[1], AnalysisDisposition) for item in self.component_availability):
             raise LevelMetricsError("analysis component availability is malformed")
+        catalog = {metric.value for metric in MetricId}
+        provenance_names = [name for name, _ in self.metric_provenance]
+        availability_names = [name for name, _ in self.component_availability]
+        if len(provenance_names) != len(set(provenance_names)) or len(availability_names) != len(set(availability_names)) or set(availability_names) != catalog:
+            raise LevelMetricsError("analysis provenance or availability is not the closed MetricId catalog")
+        available_names = {name for name, value in self.component_availability if value is AnalysisDisposition.AVAILABLE}
+        if set(provenance_names) != available_names:
+            raise LevelMetricsError("analysis provenance must exactly cover AVAILABLE metrics")
         if not isinstance(self.disposition, AnalysisDisposition):
             raise LevelMetricsError("analysis disposition is malformed")
         if self.reason is not None and (type(self.reason) is not str or not self.reason.strip()):
@@ -653,7 +872,15 @@ def build_difficulty_analysis(
     if unknown or any(not isinstance(provider, MetricProviderIdentity) for provider in supplied.values()):
         raise LevelMetricsError("metric provenance contains an unknown or malformed metric")
     for name in populated:
-        supplied.setdefault(name, MetricProviderIdentity("solver-evidence" if name in {"solution_depth", "move_count", "states_visited", "dead_ends", "branching", "forced_moves"} else "canonical-provider", "BOUND_PROVIDER_V1"))
+        fixed_provider = _FIXED_METRIC_PROVIDERS.get(name)
+        if fixed_provider is not None:
+            if name in supplied and supplied[name] != fixed_provider:
+                raise LevelMetricsError(f"metric {name} has an incorrect fixed producer identity")
+            supplied[name] = fixed_provider
+        elif name not in supplied:
+            raise LevelMetricsError(f"metric {name} requires its exact producer identity")
+    if set(supplied) != set(populated):
+        raise LevelMetricsError("metric provenance must exactly cover populated metrics and no unavailable metrics")
     provenance = tuple(sorted(supplied.items()))
     availability = tuple((metric.value, AnalysisDisposition.AVAILABLE if metric.value in populated else AnalysisDisposition.UNAVAILABLE) for metric in MetricId)
     return DifficultyAnalysis(level_metrics.source_sha256, level_metrics.authority, level_metrics.solver_evidence, "scrubbots-level-metrics", 1, level_metrics.digest(), provenance, availability, level_metrics.disposition, level_metrics.reason, score_result.digest() if score_result else None, score_result.policy_version if score_result else None, lane_result.digest() if lane_result else None, lane_result.mapping_policy_version if lane_result else None)
@@ -775,6 +1002,9 @@ def populate_search_complexity_metrics(
 
 
 __all__ = [
+    "EvidenceDisposition",
+    "MetricEvidence",
+    "verified_canonical_evidence",
     "DEPENDENCY_DEPTH_SCHEMA",
     "DEPENDENCY_DEPTH_VERSION",
     "DependencyDepthResult",
@@ -788,7 +1018,10 @@ __all__ = [
     "CHALLENGE_SCORE_SCHEMA",
     "CHALLENGE_SCORE_VERSION",
     "CHALLENGE_SCORE_POLICY_VERSION",
+    "CHALLENGE_SCORE_COMPONENTS",
+    "CHALLENGE_SCORE_COEFFICIENTS",
     "ChallengeScoreResult",
+    "challenge_score_fixture",
     "ScoreComponent",
     "LANE_MAPPING_SCHEMA",
     "LANE_MAPPING_VERSION",
@@ -800,6 +1033,8 @@ __all__ = [
     "PROVIDER_IDENTITY_SCHEMA",
     "PROVIDER_IDENTITY_VERSION",
     "MetricProviderIdentity",
+    "SOLVER_WITNESS_PROVIDER",
+    "SOLVER_METRICS_PROVIDER",
     "DifficultyAnalysis",
     "CALIBRATION_SCHEMA",
     "CALIBRATION_VERSION",
