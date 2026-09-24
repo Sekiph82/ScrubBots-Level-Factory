@@ -15,6 +15,14 @@ from .unified import (
     UnifiedQADisposition,
     evaluate_unified_qa,
 )
+from .round_trip import (
+    M09_ROUND_TRIP_SCHEMA,
+    M09_ROUND_TRIP_VERSION,
+    M09RoundTripReceipt,
+    M09RoundTripReport,
+    MainGameM09RoundTripProvider,
+    evaluate_m09_round_trip,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -30,4 +38,10 @@ __all__ = [
     "UnifiedQAReport",
     "UnifiedQADisposition",
     "evaluate_unified_qa",
+    "M09_ROUND_TRIP_SCHEMA",
+    "M09_ROUND_TRIP_VERSION",
+    "M09RoundTripReceipt",
+    "M09RoundTripReport",
+    "MainGameM09RoundTripProvider",
+    "evaluate_m09_round_trip",
 ]
