@@ -4,7 +4,7 @@ import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
-from scrubbots_pixel_factory.difficulty_analysis import VolatilitySnapshot, populate_volatility, unavailable_volatility_result, volatility_from_snapshots
+from scrubbots_pixel_factory.difficulty_analysis import EvidenceDisposition, VolatilitySnapshot, populate_volatility, unavailable_volatility_result, volatility_from_snapshots
 from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
@@ -44,6 +44,7 @@ def test_fixture_ordered_trace_is_explicitly_non_production() -> None:
 def test_copied_provider_identity_does_not_elevate_snapshot_trace() -> None:
     metrics = level()
     result = volatility_from_snapshots(metrics, "b" * 64, (VolatilitySnapshot(1, 2, 1, 2, 1, 2), VolatilitySnapshot(1, 2, 1, 2, 1, 2)), provider_id="canonical-state-trace", provider_version="CANONICAL_STATE_TRACE_V1")
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
     with pytest.raises(LevelMetricsError):
         populate_volatility(metrics, result)
 
