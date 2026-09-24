@@ -9,6 +9,7 @@ import subprocess
 
 import pytest
 
+import scrubbots_pixel_factory.difficulty_analysis as difficulty_analysis
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
 from scrubbots_pixel_factory.contracts.difficulty import Difficulty
@@ -125,8 +126,11 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     metrics = level()
     unavailable = unavailable_dependency_result(metrics, case["payload"]["state_digest"], "corpus provider unavailable")
     assert unavailable.disposition.value == case["expected"]["disposition"] and populate_dependency_depth(metrics, unavailable).metrics is None
+    receipt = case["payload"]["attempted_verified_receipt"]
+    source_values = {"case.state_digest": case["payload"]["state_digest"], "level_metrics.evidence_digest": metrics.evidence_digest}
+    assert not hasattr(difficulty_analysis, case["mutation"]["absent_generic_mint_symbol"])
     with pytest.raises(LevelMetricsError):
-        MetricEvidence(EvidenceDisposition.VERIFIED_CANONICAL, AUTHORITY, metrics.source_sha256, "0" * 64, metrics.solver_evidence.digest, "canonical-dependency-semantics", "CANONICAL_DEPENDENCY_SEMANTICS_V1", "1" * 64)
+        MetricEvidence(EvidenceDisposition(receipt["disposition"]), metrics.authority, metrics.source_sha256, source_values[receipt["state_digest_source"]], source_values[receipt["evidence_digest_source"]], receipt["provider_id"], receipt["provider_version"], receipt["proof_digest"])
 
     case = cases["SB-LF04-005"]
     metrics = level()
@@ -180,8 +184,21 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     provider = MetricProviderIdentity(case["payload"]["optional_provider"]["provider_id"], case["payload"]["optional_provider"]["provider_version"])
     with pytest.raises(LevelMetricsError):
         build_difficulty_analysis(metrics, metric_provenance={case["payload"]["optional_metric"]: provider})
+    binding_attempt = case["payload"]["binding_attempt"]
+    source_metric = MetricId(binding_attempt["source_metric_id"])
+    unavailable_builders = {MetricId.DEPENDENCY_DEPTH: unavailable_dependency_result}
+    assert binding_attempt["source_result_family"] == source_metric.value
+    source_result = unavailable_builders[source_metric](metrics, binding_attempt["state_digest"], binding_attempt["reason"])
     with pytest.raises(LevelMetricsError):
-        bind_verified_metric_producer(MetricId.DEPENDENCY_DEPTH, unavailable_dependency_result(metrics, "4" * 64, "fixture unavailable"), metrics)
+        bind_verified_metric_producer(MetricId(binding_attempt["attempted_target_metric_id"]), source_result, metrics)
+    for mutation in case["payload"]["cross_identity_mutations"]:
+        target = (
+            replace(metrics, level=replace(metrics.level, source_sha256=mutation["value"]))
+            if mutation["field"] == "level_source_sha256"
+            else replace(metrics, solver_evidence=SolverEvidenceIdentity(SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, mutation["value"]))
+        )
+        with pytest.raises(LevelMetricsError):
+            populate_dependency_depth(target, source_result)
 
     case = cases["SB-LF04-011"]
     plan = disabled_calibration_plan(CalibrationDataset("DIFFICULTY_V1", case["payload"]["cohort_label"], case["payload"]["completion_count"], case["payload"]["failure_count"], case["payload"]["move_count_sum"], case["payload"]["sample_count"], case["payload"]["minimum_sample_count"]))
