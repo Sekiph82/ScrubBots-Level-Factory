@@ -31,3 +31,15 @@ Document role: CODEX BUILDER LOG
 - retained M03 unit tests: `95 passed, 1 skipped in 13.04s`
 - implementation files changed: `tests/fixtures/sb_lf04_m04_regression_v1.json`, `tests/unit/test_sb_lf04_012_regression.py`, and this builder log only
 - dependency/license changes: none; offline/network boundary preserved; no source/art/LevelData mutation
+
+## Terminal verification
+
+- `python -m compileall -q src tests`: passed
+- `godot_console.exe --headless --editor --path . --quit`: passed
+- `python -m pytest -q -p no:cacheprovider`: `951 passed, 2 skipped in 320.25s`
+- skips: canonical ScrubBots checkout capability was not supplied for M03 compact-state and LF04-012 non-mutation bridge checks; no owner-native bridge was exercised
+- `git diff --check`: passed
+- `git diff --exit-code -- TASKS.md`: passed
+- corpus SHA-256: `1e4886dfd901db61195a219de627230c391011868b7c23c64bde5830498b506e`
+- implementation commit: `96ac3aa053d18ae30e9ee6536715a3a563dd23a5`, pushed to `origin/main`
+- final status before terminal log-only commit: only preserved unrelated untracked artifact directories and Godot `.uid` files; no temporary worktree was created
