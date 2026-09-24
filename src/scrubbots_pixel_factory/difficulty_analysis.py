@@ -34,6 +34,9 @@ ANALYSIS_SCHEMA = "scrubbots-difficulty-analysis"
 ANALYSIS_VERSION = 1
 PROVIDER_IDENTITY_SCHEMA = "scrubbots-metric-provider"
 PROVIDER_IDENTITY_VERSION = 1
+CALIBRATION_SCHEMA = "scrubbots-future-calibration"
+CALIBRATION_VERSION = 1
+CALIBRATION_POLICY_STATE = "DISABLED_UNTIL_POLICY_APPROVED"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -656,6 +659,57 @@ def build_difficulty_analysis(
     return DifficultyAnalysis(level_metrics.source_sha256, level_metrics.authority, level_metrics.solver_evidence, "scrubbots-level-metrics", 1, level_metrics.digest(), provenance, availability, level_metrics.disposition, level_metrics.reason, score_result.digest() if score_result else None, score_result.policy_version if score_result else None, lane_result.digest() if lane_result else None, lane_result.mapping_policy_version if lane_result else None)
 
 
+@dataclass(frozen=True, slots=True)
+class CalibrationDataset(_DependencyResultMixin):
+    score_policy_version: str
+    cohort_label: str
+    completion_count: int
+    failure_count: int
+    move_count_sum: int
+    sample_count: int
+    minimum_sample_count: int
+
+    def __post_init__(self) -> None:
+        _provider_text(self.score_policy_version, "calibration score policy version")
+        if type(self.cohort_label) is not str or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}", self.cohort_label) or "@" in self.cohort_label:
+            raise LevelMetricsError("calibration cohort label must be an anonymous safe token")
+        values = (self.completion_count, self.failure_count, self.move_count_sum, self.sample_count, self.minimum_sample_count)
+        if any(type(value) is not int or value < 0 for value in values) or self.minimum_sample_count < 1 or self.sample_count < self.minimum_sample_count or self.completion_count + self.failure_count > self.sample_count:
+            raise LevelMetricsError("calibration aggregate counts are malformed or below minimum sample count")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": CALIBRATION_SCHEMA, "version": CALIBRATION_VERSION, "score_policy_version": self.score_policy_version, "cohort_label": self.cohort_label, "completion_count": self.completion_count, "failure_count": self.failure_count, "move_count_sum": self.move_count_sum, "sample_count": self.sample_count, "minimum_sample_count": self.minimum_sample_count}
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> "CalibrationDataset":
+        fields = {"schema", "version", "score_policy_version", "cohort_label", "completion_count", "failure_count", "move_count_sum", "sample_count", "minimum_sample_count"}
+        if not isinstance(payload, Mapping) or set(payload) != fields or payload["schema"] != CALIBRATION_SCHEMA or payload["version"] != CALIBRATION_VERSION:
+            raise LevelMetricsError("calibration dataset schema/version or fields are unsupported")
+        return cls(payload["score_policy_version"], payload["cohort_label"], payload["completion_count"], payload["failure_count"], payload["move_count_sum"], payload["sample_count"], payload["minimum_sample_count"])
+
+
+@dataclass(frozen=True, slots=True)
+class CalibrationPlan(_DependencyResultMixin):
+    state: str = CALIBRATION_POLICY_STATE
+    score_policy_version: str = CHALLENGE_SCORE_POLICY_VERSION
+    dataset: CalibrationDataset | None = None
+    network_enabled: bool = False
+    collection_enabled: bool = False
+
+    def __post_init__(self) -> None:
+        if self.state != CALIBRATION_POLICY_STATE or self.score_policy_version != CHALLENGE_SCORE_POLICY_VERSION or self.network_enabled or self.collection_enabled:
+            raise LevelMetricsError("calibration is design-only and disabled until policy approval")
+        if self.dataset is not None and not isinstance(self.dataset, CalibrationDataset):
+            raise LevelMetricsError("calibration dataset is malformed")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": CALIBRATION_SCHEMA + ".plan", "version": CALIBRATION_VERSION, "state": self.state, "score_policy_version": self.score_policy_version, "dataset": self.dataset.canonical_dict() if self.dataset else None, "network_enabled": False, "collection_enabled": False}
+
+
+def disabled_calibration_plan(dataset: CalibrationDataset | None = None) -> CalibrationPlan:
+    return CalibrationPlan(dataset=dataset)
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -747,6 +801,11 @@ __all__ = [
     "PROVIDER_IDENTITY_VERSION",
     "MetricProviderIdentity",
     "DifficultyAnalysis",
+    "CALIBRATION_SCHEMA",
+    "CALIBRATION_VERSION",
+    "CALIBRATION_POLICY_STATE",
+    "CalibrationDataset",
+    "CalibrationPlan",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
@@ -757,6 +816,7 @@ __all__ = [
     "calculate_challenge_score",
     "map_challenge_score",
     "build_difficulty_analysis",
+    "disabled_calibration_plan",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
