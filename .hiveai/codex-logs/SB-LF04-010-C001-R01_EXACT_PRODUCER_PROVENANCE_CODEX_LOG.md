@@ -27,3 +27,15 @@ Document role: CODEX BUILDER LOG
 - preserved score/lane/LevelMetrics lineage and operational telemetry exclusion
 - added direct/parser negative coverage for unknown, missing, extra, and mixed-lineage provenance plus an optional-metric exact-provider positive case
 - focused task/predecessor result: `48 passed`
+
+## Completion evidence
+
+- implementation_commit: `189a768924a1953e639b6468fb7921159017b147`
+- implementation publication: pushed to `origin/main` as part of the R01 implementation chain
+- batch full pytest: `949 passed, 2 capability skips`
+- compileall: PASS
+- Godot 4.7.2 headless editor boot: PASS
+- git diff --check: PASS
+- root `TASKS.md` diff: zero
+- exact MetricId catalog and AVAILABLE/provider coverage: PASS
+- terminal log-only commit: pending
