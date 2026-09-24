@@ -24,3 +24,15 @@ Document role: CODEX BUILDER LOG
 - retained deterministic max-occupancy slot-pressure math and production UNAVAILABLE behavior
 - added evidence mismatch coverage for state digest binding, plus explicit fixture non-production assertions
 - focused task/predecessor result: `39 passed`
+
+## Completion evidence
+
+- implementation_commit: `b1840b6541f5854feb09abbfe23a67eb4ca51645`
+- implementation publication: pushed to `origin/main` as part of the R01 implementation chain
+- batch full pytest: `949 passed, 2 capability skips`
+- compileall: PASS
+- Godot 4.7.2 headless editor boot: PASS
+- git diff --check: PASS
+- root `TASKS.md` diff: zero
+- canonical slot trace provider truth: no executable canonical trace configured; fixture capacities remain non-production and production remains absent
+- terminal log-only commit: pending
