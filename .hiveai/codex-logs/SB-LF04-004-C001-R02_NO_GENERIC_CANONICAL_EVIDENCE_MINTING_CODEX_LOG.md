@@ -25,4 +25,7 @@ Document role: CODEX BUILDER LOG
 - added regression proof that the generic factory is absent and caller-authored verified evidence is rejected
 - commands: `python -m compileall -q src tests`; focused retained M04/M03 pytest set
 - focused result: `73 passed`
+- shared final gates: compileall passed; `godot_console.exe --headless --editor --path . --quit` passed; full pytest: `951 passed, 2 skipped in 272.43s`
+- skipped capabilities: canonical ScrubBots checkout was not supplied; no owner-native bridge was exercised
+- final task record is log-only; implementation commit: `e4c727ef199b003747300b4316958ac02d900c5a`
 - no dependency or license changes; no runtime network path, gameplay clone, source/art/LevelData mutation, or tracker/audit edit
