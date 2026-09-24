@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 
 import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
 from scrubbots_pixel_factory.contracts.difficulty import Difficulty
-from scrubbots_pixel_factory.difficulty_analysis import CHALLENGE_SCORE_POLICY_VERSION, calculate_challenge_score
+from scrubbots_pixel_factory.difficulty_analysis import CHALLENGE_SCORE_POLICY_VERSION, ChallengeScoreResult, ScoreComponent, calculate_challenge_score
 from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, DifficultyMetadata, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
@@ -56,3 +57,19 @@ def test_metadata_does_not_change_score_formula() -> None:
     hard = calculate_challenge_score(level(metrics, DifficultyMetadata(Difficulty.VERY_HARD, 59, 20, 12)))
     assert easy.score == hard.score
     assert easy.source_metrics_digest != hard.source_metrics_digest
+
+
+def test_result_rejects_tampered_coefficient_contribution_or_score() -> None:
+    metrics = level(MetricValues(move_count=8, states_visited=16, dead_ends=2, branching=1.5, forced_moves=3))
+    result = calculate_challenge_score(metrics)
+    first_name, first_component = result.components[0]
+    with pytest.raises(LevelMetricsError):
+        replace(result, components=((first_name, replace(first_component, coefficient=0.5)),) + result.components[1:])
+    with pytest.raises(LevelMetricsError):
+        replace(result, score=result.score + 1.0)
+
+
+def test_direct_arbitrary_score_construction_is_rejected() -> None:
+    component = ScoreComponent(0.0, 0.25, 0.0)
+    with pytest.raises(LevelMetricsError):
+        ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, "0" * 64, (("move", component), ("states", component), ("dead_end", component), ("branching", component), ("forced", component)), 25.0)
