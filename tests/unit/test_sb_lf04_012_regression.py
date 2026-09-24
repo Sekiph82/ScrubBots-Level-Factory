@@ -15,12 +15,15 @@ from scrubbots_pixel_factory.contracts.difficulty import Difficulty
 from scrubbots_pixel_factory.difficulty_analysis import (
     CalibrationDataset,
     ChallengeScoreResult,
+    EvidenceDisposition,
     LaneClass,
+    MetricEvidence,
     MetricProviderIdentity,
     ScoreComponent,
     SlotSnapshot,
     VolatilitySnapshot,
     bait_deadlock_from_children,
+    bind_verified_metric_producer,
     build_difficulty_analysis,
     calculate_challenge_score,
     challenge_score_fixture,
@@ -36,7 +39,7 @@ from scrubbots_pixel_factory.difficulty_analysis import (
     unavailable_dependency_result,
     volatility_from_snapshots,
 )
-from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
+from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricId, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.legal_move_provider import LegalMove
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
@@ -122,12 +125,15 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     metrics = level()
     unavailable = unavailable_dependency_result(metrics, case["payload"]["state_digest"], "corpus provider unavailable")
     assert unavailable.disposition.value == case["expected"]["disposition"] and populate_dependency_depth(metrics, unavailable).metrics is None
+    with pytest.raises(LevelMetricsError):
+        MetricEvidence(EvidenceDisposition.VERIFIED_CANONICAL, AUTHORITY, metrics.source_sha256, "0" * 64, metrics.solver_evidence.digest, "canonical-dependency-semantics", "CANONICAL_DEPENDENCY_SEMANTICS_V1", "1" * 64)
 
     case = cases["SB-LF04-005"]
     metrics = level()
     snapshots = tuple(SlotSnapshot(*snapshot) for snapshot in case["payload"]["snapshots"])
     result = slot_pressure_from_snapshots(metrics, case["payload"]["state_digest"], snapshots)
     assert result.slot_pressure == case["expected"]["slot_pressure"]
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
     with pytest.raises(LevelMetricsError):
         populate_slot_pressure(metrics, result)
 
@@ -136,6 +142,7 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     children = tuple(SolverOutcomeDisposition[name] for name in case["payload"]["child_dispositions"])
     result = bait_deadlock_from_children(metrics, case["payload"]["state_digest"], children)
     assert result.bait_deadlock == case["expected"]["exact_ratio"]
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
     inconclusive = bait_deadlock_from_children(metrics, case["payload"]["state_digest"], tuple(SolverOutcomeDisposition[name] for name in case["payload"]["inconclusive_children"]))
     assert inconclusive.disposition.value == case["expected"]["inconclusive_disposition"]
     with pytest.raises(LevelMetricsError):
@@ -145,6 +152,7 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     metrics = level()
     result = volatility_from_snapshots(metrics, case["payload"]["state_digest"], tuple(VolatilitySnapshot(*snapshot) for snapshot in case["payload"]["snapshots"]))
     assert result.volatility == case["expected"]["volatility"]
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
     with pytest.raises(LevelMetricsError):
         populate_volatility(metrics, result)
 
@@ -170,7 +178,10 @@ def test_corpus_payloads_drive_all_m04_behaviors() -> None:
     with pytest.raises(LevelMetricsError):
         build_difficulty_analysis(metrics, metric_provenance={case["payload"]["unknown_metric"]: MetricProviderIdentity("fixture", "v1")})
     provider = MetricProviderIdentity(case["payload"]["optional_provider"]["provider_id"], case["payload"]["optional_provider"]["provider_version"])
-    assert dict(build_difficulty_analysis(metrics, metric_provenance={case["payload"]["optional_metric"]: provider}).metric_provenance)["dependency_depth"] == provider
+    with pytest.raises(LevelMetricsError):
+        build_difficulty_analysis(metrics, metric_provenance={case["payload"]["optional_metric"]: provider})
+    with pytest.raises(LevelMetricsError):
+        bind_verified_metric_producer(MetricId.DEPENDENCY_DEPTH, unavailable_dependency_result(metrics, "4" * 64, "fixture unavailable"), metrics)
 
     case = cases["SB-LF04-011"]
     plan = disabled_calibration_plan(CalibrationDataset("DIFFICULTY_V1", case["payload"]["cohort_label"], case["payload"]["completion_count"], case["payload"]["failure_count"], case["payload"]["move_count_sum"], case["payload"]["sample_count"], case["payload"]["minimum_sample_count"]))
