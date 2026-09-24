@@ -37,6 +37,22 @@ This log covers only SB-LF05-001. The implementation will compose existing autho
 - Source/non-mutation evidence: the focused tests use immutable in-memory identities and verify source-lineage mismatch is rejected; no repository source/art/LevelData file was edited by the QA evaluator.
 - Protected tracker evidence: `git diff --exit-code -- TASKS.md` remained clean after implementation.
 
+## Gates and publication
+
+- Implementation commit: `965b8a2749d93d5721d2a99232deb214b15e4222`.
+- Implementation push: `git push origin HEAD:main` passed; remote advanced from `146865d782d43b06f637baefaca5e1e5a8e9012e`.
+- Full pytest: `954 passed, 2 skipped` in `280.48s`; skips were the permitted absent canonical ScrubBots checkout capability in retained M03/M04 bridge tests.
+- Compileall: `python -m compileall -q src tests` passed.
+- Godot: `godot_console.exe --headless --path level_factory --editor --quit` passed on Godot `4.7.2.stable.official.ed1daf0bf`.
+- `git diff --check`: passed.
+- `git diff --exit-code -- TASKS.md`: passed.
+- Final pre-terminal local HEAD and `origin/main`: both `965b8a2749d93d5721d2a99232deb214b15e4222`; divergence `0 0`.
+- Pre-existing untracked detached-worktree folders and Godot `.uid` files remained unmodified and unstaged.
+
+## Terminal log-only closure
+
+- Pending: this append is the terminal evidence update; it will be published as the required log-only commit before the next M05 task begins.
+
 ## Final handoff
 
 Pending implementation and independent ChatGPT audit. Builder evidence is not acceptance.
