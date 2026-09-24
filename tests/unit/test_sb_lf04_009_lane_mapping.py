@@ -7,6 +7,7 @@ from scrubbots_pixel_factory.difficulty_analysis import (
     ChallengeScoreResult,
     LaneClass,
     ScoreComponent,
+    challenge_score_fixture,
     map_challenge_score,
 )
 from scrubbots_pixel_factory.contracts.difficulty import Difficulty
@@ -14,8 +15,7 @@ from scrubbots_pixel_factory.level_metrics import LevelMetricsError
 
 
 def score(value: float) -> ChallengeScoreResult:
-    component = ScoreComponent(0.0, 0.0, 0.0)
-    return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, "a" * 64, (("move", component), ("states", component), ("dead_end", component), ("branching", component), ("forced", component)), value)
+    return challenge_score_fixture(value, "a" * 64)
 
 
 @pytest.mark.parametrize(
@@ -44,3 +44,11 @@ def test_mapping_carries_score_lineage_and_does_not_touch_any_level_data() -> No
     result = map_challenge_score(score(25.0), "EASY")
     assert result.score_digest == score(25.0).digest()
     assert result.lane is LaneClass.MEDIUM and result.comparison == "MISMATCH"
+
+
+def test_direct_construction_rejects_contradictory_lane_and_comparison() -> None:
+    valid = map_challenge_score(score(50.0), Difficulty.HARD)
+    with pytest.raises(LevelMetricsError):
+        type(valid)(valid.score_digest, valid.score_policy_version, valid.mapping_policy_version, valid.score, LaneClass.EASY, valid.requested_class, valid.comparison)
+    with pytest.raises(LevelMetricsError):
+        type(valid)(valid.score_digest, valid.score_policy_version, valid.mapping_policy_version, valid.score, valid.lane, Difficulty.EASY, "MATCH")
