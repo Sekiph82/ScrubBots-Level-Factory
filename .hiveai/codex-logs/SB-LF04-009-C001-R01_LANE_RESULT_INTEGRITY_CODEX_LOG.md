@@ -26,3 +26,15 @@ Document role: CODEX BUILDER LOG
 - retained score digest and challenge-policy lineage binding
 - added direct-construction negative tests for contradictory lane and contradictory comparison
 - focused task/predecessor result: `72 passed`
+
+## Completion evidence
+
+- implementation_commit: `06e883ecb82004cd8282f853044be4eecef80175`
+- implementation publication: pushed to `origin/main` as part of the R01 implementation chain
+- batch full pytest: `949 passed, 2 capability skips`
+- compileall: PASS
+- Godot 4.7.2 headless editor boot: PASS
+- git diff --check: PASS
+- root `TASKS.md` diff: zero
+- SCORE_LANE_V1 thresholds and requested-class comparison integrity: PASS
+- terminal log-only commit: pending
