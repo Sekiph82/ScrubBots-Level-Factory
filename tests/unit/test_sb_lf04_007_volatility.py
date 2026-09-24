@@ -32,7 +32,20 @@ def test_changing_trace_uses_closed_normalized_signature() -> None:
     second = VolatilitySnapshot(5, 10, 2, 4, 2, 4)
     result = volatility_from_snapshots(level(), "b" * 64, (first, second))
     assert result.volatility == pytest.approx((0.5 + 0.5 + 0.5) / 3.0)
-    assert populate_volatility(level(), result).metrics == MetricValues(volatility=result.volatility)
+    with pytest.raises(LevelMetricsError):
+        populate_volatility(level(), result)
+
+
+def test_fixture_ordered_trace_is_explicitly_non_production() -> None:
+    result = volatility_from_snapshots(level(), "b" * 64, (VolatilitySnapshot(1, 2, 1, 2, 1, 2), VolatilitySnapshot(1, 2, 1, 2, 1, 2)))
+    assert result.evidence.disposition.value == "FIXTURE"
+
+
+def test_copied_provider_identity_does_not_elevate_snapshot_trace() -> None:
+    metrics = level()
+    result = volatility_from_snapshots(metrics, "b" * 64, (VolatilitySnapshot(1, 2, 1, 2, 1, 2), VolatilitySnapshot(1, 2, 1, 2, 1, 2)), provider_id="canonical-state-trace", provider_version="CANONICAL_STATE_TRACE_V1")
+    with pytest.raises(LevelMetricsError):
+        populate_volatility(metrics, result)
 
 
 def test_bounds_and_determinism() -> None:
