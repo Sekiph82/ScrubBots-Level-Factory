@@ -29,3 +29,9 @@ Document role: CODEX BUILDER LOG
 - capability boundary: canonical checkout was not supplied, so its non-mutation test skipped truthfully
 - offline/network boundary: no runtime network use; no dependencies or licenses changed
 - security/safety: every currently available optional-provider route remains unencodable as production provenance
+
+## Terminal verification
+
+- shared final gates: compileall passed; `godot_console.exe --headless --editor --path . --quit` passed; full pytest: `951 passed, 2 skipped in 272.43s`
+- skipped capabilities: canonical ScrubBots checkout was not supplied; no owner-native bridge was exercised
+- final task record is log-only; implementation commit: `65cb7789f5afca4ec96882197cf125ee8b9a6ae8`
