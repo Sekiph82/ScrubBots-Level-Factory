@@ -33,7 +33,20 @@ def test_all_deadlocks_populate_metric() -> None:
     metrics = level()
     result = bait_deadlock_from_children(metrics, "8" * 64, (SolverOutcomeDisposition.PROVEN_UNSOLVABLE,) * 3)
     assert result.bait_deadlock == 1.0
-    assert populate_bait_deadlock(metrics, result).metrics == MetricValues(bait_deadlock=1.0)
+    with pytest.raises(LevelMetricsError):
+        populate_bait_deadlock(metrics, result)
+
+
+def test_fixture_counterfactual_tuple_cannot_claim_canonical_proof() -> None:
+    result = bait_deadlock_from_children(level(), "8" * 64, (SolverOutcomeDisposition.PROVEN_UNSOLVABLE,))
+    assert result.evidence.disposition.value == "FIXTURE"
+
+
+def test_copied_canonical_provider_string_does_not_elevate_fixture_tuple() -> None:
+    metrics = level()
+    result = bait_deadlock_from_children(metrics, "8" * 64, (SolverOutcomeDisposition.PROVEN_UNSOLVABLE,), provider_id="canonical-counterfactual", provider_version="CANONICAL_COUNTERFACTUAL_V1")
+    with pytest.raises(LevelMetricsError):
+        populate_bait_deadlock(metrics, result)
 
 
 def test_inconclusive_child_prevents_exact_claim_and_remains_absent() -> None:
