@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
 import re
 from collections.abc import Mapping
 
@@ -21,6 +22,9 @@ BAIT_DEADLOCK_SCHEMA = "scrubbots-canonical-bait-deadlock"
 BAIT_DEADLOCK_VERSION = 1
 VOLATILITY_SCHEMA = "scrubbots-canonical-state-volatility"
 VOLATILITY_VERSION = 1
+CHALLENGE_SCORE_SCHEMA = "scrubbots-difficulty-challenge-score"
+CHALLENGE_SCORE_VERSION = 1
+CHALLENGE_SCORE_POLICY_VERSION = "DIFFICULTY_V1"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -404,6 +408,70 @@ def populate_volatility(level_metrics: LevelMetrics, result: VolatilityResult) -
     return replace(level_metrics, metrics=replace(level_metrics.metrics or MetricValues(), volatility=result.volatility))
 
 
+@dataclass(frozen=True, slots=True)
+class ScoreComponent:
+    normalized: float
+    coefficient: float
+    contribution: float
+
+    def __post_init__(self) -> None:
+        if not all(isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(float(value)) for value in (self.normalized, self.coefficient, self.contribution)):
+            raise LevelMetricsError("challenge score component contains a non-finite value")
+        if not 0.0 <= float(self.normalized) <= 1.0 or float(self.coefficient) < 0.0:
+            raise LevelMetricsError("challenge score component is outside its policy bounds")
+
+    def canonical_dict(self) -> dict[str, float]:
+        return {"normalized": float(self.normalized), "coefficient": float(self.coefficient), "contribution": float(self.contribution)}
+
+
+@dataclass(frozen=True, slots=True)
+class ChallengeScoreResult(_DependencyResultMixin):
+    policy_version: str
+    source_metrics_digest: str
+    components: tuple[tuple[str, ScoreComponent], ...]
+    score: float
+
+    def __post_init__(self) -> None:
+        if self.policy_version != CHALLENGE_SCORE_POLICY_VERSION:
+            raise LevelMetricsError("unsupported challenge score policy version")
+        _digest_text(self.source_metrics_digest, "challenge score source metrics digest")
+        expected = ("move", "states", "dead_end", "branching", "forced")
+        if tuple(name for name, _ in self.components) != expected:
+            raise LevelMetricsError("challenge score components are not the closed V1 catalog")
+        if not isinstance(self.score, (int, float)) or isinstance(self.score, bool) or not math.isfinite(float(self.score)) or not 0.0 <= self.score <= 100.0:
+            raise LevelMetricsError("challenge score must be in [0, 100]")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": CHALLENGE_SCORE_SCHEMA, "version": CHALLENGE_SCORE_VERSION, "policy_version": self.policy_version, "source_metrics_digest": self.source_metrics_digest, "components": {name: component.canonical_dict() for name, component in self.components}, "score": float(self.score)}
+
+
+def _clamp_unit(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def calculate_challenge_score(level_metrics: LevelMetrics) -> ChallengeScoreResult:
+    """Calculate the fixed engineering-policy Difficulty V1 score."""
+
+    if not isinstance(level_metrics, LevelMetrics) or level_metrics.disposition is not AnalysisDisposition.AVAILABLE or level_metrics.metrics is None:
+        raise LevelMetricsError("AVAILABLE LevelMetrics with core metrics is required for Challenge Score V1")
+    metrics = level_metrics.metrics
+    required = (metrics.move_count, metrics.states_visited, metrics.dead_ends, metrics.branching, metrics.forced_moves)
+    if any(value is None for value in required):
+        raise LevelMetricsError("Challenge Score V1 requires move_count, states_visited, dead_ends, branching, and forced_moves")
+    move_count, states_visited, dead_ends, branching, forced_moves = required
+    normalized = {
+        "move": _clamp_unit(math.log1p(move_count) / math.log1p(64)),
+        "states": _clamp_unit(math.log1p(states_visited) / math.log1p(10000)),
+        "dead_end": _clamp_unit(dead_ends / max(states_visited, 1)),
+        "branching": _clamp_unit(branching / 4.0),
+        "forced": 1.0 - _clamp_unit(forced_moves / max(states_visited, 1)),
+    }
+    coefficients = {"move": 0.25, "states": 0.25, "dead_end": 0.15, "branching": 0.15, "forced": 0.20}
+    components = tuple((name, ScoreComponent(normalized[name], coefficients[name], normalized[name] * coefficients[name])) for name in ("move", "states", "dead_end", "branching", "forced"))
+    score = _clamp_unit(sum(component.contribution for _, component in components)) * 100.0
+    return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, level_metrics.digest(), components, score)
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -479,6 +547,11 @@ __all__ = [
     "VOLATILITY_VERSION",
     "VolatilityResult",
     "VolatilitySnapshot",
+    "CHALLENGE_SCORE_SCHEMA",
+    "CHALLENGE_SCORE_VERSION",
+    "CHALLENGE_SCORE_POLICY_VERSION",
+    "ChallengeScoreResult",
+    "ScoreComponent",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
@@ -486,6 +559,7 @@ __all__ = [
     "populate_dependency_depth",
     "populate_bait_deadlock",
     "populate_volatility",
+    "calculate_challenge_score",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
