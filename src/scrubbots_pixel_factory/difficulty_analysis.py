@@ -117,6 +117,12 @@ class MetricEvidence:
             "proof_digest": self.proof_digest,
         }
 
+    def canonical_bytes(self) -> bytes:
+        return _canonical_bytes(self.canonical_dict())
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
 
 def _result_evidence(
     evidence: MetricEvidence | None,
@@ -690,6 +696,74 @@ class MetricProviderIdentity:
         return {"schema": PROVIDER_IDENTITY_SCHEMA, "version": PROVIDER_IDENTITY_VERSION, "provider_id": self.provider_id, "provider_version": self.provider_version}
 
 
+METRIC_PRODUCER_BINDING_SCHEMA = "scrubbots-metric-producer-binding"
+METRIC_PRODUCER_BINDING_VERSION = 1
+
+
+@dataclass(frozen=True, slots=True)
+class MetricProducerBinding:
+    """Immutable optional-metric provenance minted only from a verified result."""
+
+    metric_id: MetricId
+    provider_id: str
+    provider_version: str
+    provider_result_schema: str
+    provider_result_version: int
+    provider_result_digest: str
+    evidence: MetricEvidence
+    evidence_canonical_digest: str
+    level_source_sha256: str
+    solver_evidence_digest: str
+    authority: object
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        if not isinstance(self.metric_id, MetricId) or self.metric_id.value not in _OPTIONAL_PROVIDER_RESULT_CONTRACTS:
+            raise LevelMetricsError("producer binding metric is not an optional provider metric")
+        _provider_text(self.provider_id, "producer binding provider id")
+        _provider_text(self.provider_version, "producer binding provider version")
+        _provider_text(self.provider_result_schema, "producer binding result schema")
+        if type(self.provider_result_version) is not int or self.provider_result_version < 1:
+            raise LevelMetricsError("producer binding result version is malformed")
+        for value, label in ((self.provider_result_digest, "producer binding result digest"), (self.evidence_canonical_digest, "producer binding evidence digest"), (self.level_source_sha256, "producer binding level source SHA-256"), (self.solver_evidence_digest, "producer binding solver evidence digest")):
+            _digest_text(value, label)
+        if not isinstance(self.authority, SolverStateAuthority) or not isinstance(self.evidence, MetricEvidence):
+            raise LevelMetricsError("producer binding authority or evidence is malformed")
+        if self.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL or self.evidence.proof_digest is None:
+            raise LevelMetricsError("producer binding requires a verified canonical provider receipt")
+        if (self.provider_id, self.provider_version, self.level_source_sha256, self.authority) != (self.evidence.provider_id, self.evidence.provider_version, self.evidence.level_source_sha256, self.evidence.authority):
+            raise LevelMetricsError("producer binding does not match its provider evidence")
+        if self.evidence_canonical_digest != self.evidence.digest() or self.solver_evidence_digest != self.evidence.evidence_digest:
+            raise LevelMetricsError("producer binding evidence digests do not match its receipt")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": METRIC_PRODUCER_BINDING_SCHEMA, "version": METRIC_PRODUCER_BINDING_VERSION, "metric_id": self.metric_id.value, "provider_id": self.provider_id, "provider_version": self.provider_version, "provider_result": {"schema": self.provider_result_schema, "version": self.provider_result_version, "digest": self.provider_result_digest}, "evidence": {"disposition": self.evidence.disposition.value, "canonical_digest": self.evidence_canonical_digest, "proof_digest": self.evidence.proof_digest}, "level_source_sha256": self.level_source_sha256, "solver_evidence_digest": self.solver_evidence_digest, "authority": self.authority.canonical_dict()}
+
+
+_OPTIONAL_PROVIDER_RESULT_CONTRACTS = {
+    MetricId.DEPENDENCY_DEPTH: (DependencyDepthResult, DEPENDENCY_DEPTH_SCHEMA, DEPENDENCY_DEPTH_VERSION),
+    MetricId.SLOT_PRESSURE: (SlotPressureResult, SLOT_PRESSURE_SCHEMA, SLOT_PRESSURE_VERSION),
+    MetricId.BAIT_DEADLOCK: (BaitDeadlockResult, BAIT_DEADLOCK_SCHEMA, BAIT_DEADLOCK_VERSION),
+    MetricId.VOLATILITY: (VolatilityResult, VOLATILITY_SCHEMA, VOLATILITY_VERSION),
+}
+
+
+def bind_verified_metric_producer(metric_id: MetricId, result: object, level_metrics: LevelMetrics) -> MetricProducerBinding:
+    """Bind an optional metric to the concrete result and receipt that produced it."""
+
+    if not isinstance(metric_id, MetricId) or metric_id not in _OPTIONAL_PROVIDER_RESULT_CONTRACTS or not isinstance(level_metrics, LevelMetrics):
+        raise LevelMetricsError("verified producer binding requires an optional MetricId and LevelMetrics")
+    result_type, schema, version = _OPTIONAL_PROVIDER_RESULT_CONTRACTS[metric_id]
+    if not isinstance(result, result_type) or result.disposition is not AnalysisDisposition.AVAILABLE or result.evidence is None:
+        raise LevelMetricsError("verified producer binding requires an AVAILABLE concrete provider result")
+    if result.evidence.disposition is not EvidenceDisposition.VERIFIED_CANONICAL:
+        raise LevelMetricsError("fixture or unavailable provider results cannot mint provenance bindings")
+    if (result.authority, result.level_source_sha256, result.evidence_digest) != (level_metrics.authority, level_metrics.source_sha256, level_metrics.solver_evidence.digest):
+        raise LevelMetricsError("provider result is not bound to this LevelMetrics identity")
+    return MetricProducerBinding(metric_id, result.provider_id, result.provider_version, schema, version, result.digest(), result.evidence, result.evidence.digest(), level_metrics.source_sha256, level_metrics.solver_evidence.digest, level_metrics.authority)
+
+
 SOLVER_WITNESS_PROVIDER = MetricProviderIdentity("solver-witness", "SOLVER_WITNESS_V1")
 SOLVER_METRICS_PROVIDER = MetricProviderIdentity("solver-metrics", "SOLVER_METRICS_V1")
 _FIXED_METRIC_PROVIDERS = {
@@ -710,7 +784,7 @@ class DifficultyAnalysis(_DependencyResultMixin):
     level_metrics_schema: str
     level_metrics_version: int
     level_metrics_digest: str
-    metric_provenance: tuple[tuple[str, MetricProviderIdentity], ...]
+    metric_provenance: tuple[tuple[str, MetricProviderIdentity | MetricProducerBinding], ...]
     component_availability: tuple[tuple[str, AnalysisDisposition], ...]
     disposition: AnalysisDisposition
     reason: str | None
@@ -729,7 +803,7 @@ class DifficultyAnalysis(_DependencyResultMixin):
         if type(self.level_metrics_version) is not int or self.level_metrics_version < 1:
             raise LevelMetricsError("analysis LevelMetrics version is malformed")
         _digest_text(self.level_metrics_digest, "analysis LevelMetrics digest")
-        if type(self.metric_provenance) is not tuple or any(type(item) is not tuple or len(item) != 2 or type(item[0]) is not str or not isinstance(item[1], MetricProviderIdentity) for item in self.metric_provenance):
+        if type(self.metric_provenance) is not tuple or any(type(item) is not tuple or len(item) != 2 or type(item[0]) is not str or not isinstance(item[1], (MetricProviderIdentity, MetricProducerBinding)) for item in self.metric_provenance):
             raise LevelMetricsError("analysis metric provenance is malformed")
         if type(self.component_availability) is not tuple or any(type(item) is not tuple or len(item) != 2 or type(item[0]) is not str or not isinstance(item[1], AnalysisDisposition) for item in self.component_availability):
             raise LevelMetricsError("analysis component availability is malformed")
@@ -741,6 +815,15 @@ class DifficultyAnalysis(_DependencyResultMixin):
         available_names = {name for name, value in self.component_availability if value is AnalysisDisposition.AVAILABLE}
         if set(provenance_names) != available_names:
             raise LevelMetricsError("analysis provenance must exactly cover AVAILABLE metrics")
+        for name, provider in self.metric_provenance:
+            fixed_provider = _FIXED_METRIC_PROVIDERS.get(name)
+            if fixed_provider is not None and provider != fixed_provider:
+                raise LevelMetricsError("analysis fixed metric provenance is malformed")
+            if fixed_provider is None:
+                if not isinstance(provider, MetricProducerBinding) or provider.metric_id.value != name:
+                    raise LevelMetricsError("analysis optional metric requires a verified producer binding")
+                if (provider.level_source_sha256, provider.solver_evidence_digest, provider.authority) != (self.level_source_sha256, self.solver_evidence.digest, self.authority):
+                    raise LevelMetricsError("analysis optional producer binding is not identity-bound")
         if not isinstance(self.disposition, AnalysisDisposition):
             raise LevelMetricsError("analysis disposition is malformed")
         if self.reason is not None and (type(self.reason) is not str or not self.reason.strip()):
@@ -786,6 +869,8 @@ class DifficultyAnalysis(_DependencyResultMixin):
         provenance_data = value["metric_provenance"]
         if not isinstance(provenance_data, Mapping):
             raise LevelMetricsError("analysis metric provenance is malformed")
+        if any(not isinstance(item, Mapping) or item.get("schema") != PROVIDER_IDENTITY_SCHEMA for item in provenance_data.values()):
+            raise LevelMetricsError("serialized optional provider bindings require a concrete receipt parser")
         provenance = tuple((name, MetricProviderIdentity(item["provider_id"], item["provider_version"])) for name, item in sorted(provenance_data.items()))
         availability_data = value["component_availability"]
         if not isinstance(availability_data, Mapping):
@@ -808,7 +893,7 @@ def build_difficulty_analysis(
     level_metrics: LevelMetrics,
     score_result: ChallengeScoreResult | None = None,
     lane_result: LaneMappingResult | None = None,
-    metric_provenance: Mapping[str, MetricProviderIdentity] | None = None,
+    metric_provenance: Mapping[str, MetricProviderIdentity | MetricProducerBinding] | None = None,
 ) -> DifficultyAnalysis:
     if not isinstance(level_metrics, LevelMetrics):
         raise LevelMetricsError("LevelMetrics is required")
@@ -819,7 +904,7 @@ def build_difficulty_analysis(
     supplied = dict(metric_provenance or {})
     populated = level_metrics.measurement_content()
     unknown = set(supplied) - {metric.value for metric in MetricId}
-    if unknown or any(not isinstance(provider, MetricProviderIdentity) for provider in supplied.values()):
+    if unknown or any(not isinstance(provider, (MetricProviderIdentity, MetricProducerBinding)) for provider in supplied.values()):
         raise LevelMetricsError("metric provenance contains an unknown or malformed metric")
     for name in populated:
         fixed_provider = _FIXED_METRIC_PROVIDERS.get(name)
@@ -827,8 +912,8 @@ def build_difficulty_analysis(
             if name in supplied and supplied[name] != fixed_provider:
                 raise LevelMetricsError(f"metric {name} has an incorrect fixed producer identity")
             supplied[name] = fixed_provider
-        elif name not in supplied:
-            raise LevelMetricsError(f"metric {name} requires its exact producer identity")
+        elif name not in supplied or not isinstance(supplied[name], MetricProducerBinding):
+            raise LevelMetricsError(f"metric {name} requires its verified producer binding")
     if set(supplied) != set(populated):
         raise LevelMetricsError("metric provenance must exactly cover populated metrics and no unavailable metrics")
     provenance = tuple(sorted(supplied.items()))
@@ -982,6 +1067,10 @@ __all__ = [
     "PROVIDER_IDENTITY_SCHEMA",
     "PROVIDER_IDENTITY_VERSION",
     "MetricProviderIdentity",
+    "METRIC_PRODUCER_BINDING_SCHEMA",
+    "METRIC_PRODUCER_BINDING_VERSION",
+    "MetricProducerBinding",
+    "bind_verified_metric_producer",
     "SOLVER_WITNESS_PROVIDER",
     "SOLVER_METRICS_PROVIDER",
     "DifficultyAnalysis",

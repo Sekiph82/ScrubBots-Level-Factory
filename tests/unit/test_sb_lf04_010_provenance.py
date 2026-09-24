@@ -6,8 +6,8 @@ import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
-from scrubbots_pixel_factory.difficulty_analysis import DifficultyAnalysis, MetricProviderIdentity, SOLVER_METRICS_PROVIDER, SOLVER_WITNESS_PROVIDER, build_difficulty_analysis, calculate_challenge_score, map_challenge_score
-from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
+from scrubbots_pixel_factory.difficulty_analysis import DifficultyAnalysis, MetricProviderIdentity, SOLVER_METRICS_PROVIDER, SOLVER_WITNESS_PROVIDER, bind_verified_metric_producer, build_difficulty_analysis, calculate_challenge_score, map_challenge_score, unavailable_dependency_result
+from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricId, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
 
@@ -81,9 +81,14 @@ def test_missing_extra_unknown_and_mixed_provenance_are_rejected() -> None:
         DifficultyAnalysis.from_dict({**payload, "metric_provenance": missing})
 
 
-def test_populated_optional_metric_requires_its_exact_provider_identity() -> None:
+def test_populated_optional_metric_rejects_strings_and_unavailable_results() -> None:
     metrics = replace(level(), metrics=MetricValues(move_count=2, states_visited=3, dead_ends=1, branching=1.0, forced_moves=1, dependency_depth=4))
     with pytest.raises(LevelMetricsError):
         build_difficulty_analysis(metrics)
-    envelope = build_difficulty_analysis(metrics, metric_provenance={"dependency_depth": MetricProviderIdentity("canonical-dependency-semantics", "CANONICAL_DEPENDENCY_SEMANTICS_V1")})
-    assert dict(envelope.metric_provenance)["dependency_depth"].provider_id == "canonical-dependency-semantics"
+    with pytest.raises(LevelMetricsError):
+        build_difficulty_analysis(metrics, metric_provenance={"dependency_depth": MetricProviderIdentity("canonical-dependency-semantics", "CANONICAL_DEPENDENCY_SEMANTICS_V1")})
+    unavailable = unavailable_dependency_result(metrics, "e" * 64, "current provider unavailable")
+    with pytest.raises(LevelMetricsError):
+        bind_verified_metric_producer(MetricId.DEPENDENCY_DEPTH, unavailable, metrics)
+    with pytest.raises(LevelMetricsError):
+        bind_verified_metric_producer(MetricId.SLOT_PRESSURE, unavailable, metrics)
