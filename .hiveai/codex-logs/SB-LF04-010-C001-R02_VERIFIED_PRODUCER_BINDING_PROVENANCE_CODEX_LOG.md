@@ -30,3 +30,9 @@ Document role: CODEX BUILDER LOG
 - result: `38 passed in 0.33s`
 - offline/network boundary: no runtime network use; no dependencies or licenses changed
 - security/safety: direct strings, fixture results, unavailable results, and cross-metric results cannot mint optional provenance
+
+## Terminal verification
+
+- shared final gates: compileall passed; `godot_console.exe --headless --editor --path . --quit` passed; full pytest: `951 passed, 2 skipped in 272.43s`
+- skipped capabilities: canonical ScrubBots checkout was not supplied; no owner-native bridge was exercised
+- final task record is log-only; implementation commit: `0e7ebdfe76a39abfe60dee2e59d11b9c67e018c3`
