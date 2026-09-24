@@ -20,4 +20,4 @@ Commands and test evidence: focused LF04-011 plus LF04-010/009 tests passed 26 t
 
 Files changed: `src/scrubbots_pixel_factory/difficulty_analysis.py`, package exports, calibration design documentation, this builder log, and `tests/unit/test_sb_lf04_011_calibration.py`.
 
-Final diff, status, commits, push, and `origin/main` equality: pending publication.
+Implementation commit: `851928d28234f0c0a28f3410bb78a7409acea466`, pushed successfully. Final tracked status was clean; pre-existing untracked nested worktree artifacts and Godot `.uid` files remained preserved and unstaged. `TASKS.md` had zero diff. Terminal log-only commit: pending.
