@@ -8,7 +8,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Sprint: SB-LF04.C001-BATCH — Remaining M04 Difficulty Intelligence batch (002..012)
 - Current Task: SB-LF04-002 — Record solution depth/move count where meaningful
 - Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes the complete remaining `SB-LF04-002..012-C001` milestone batch from `.hiveai/prompts/SB-LF04-002-012-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`; each task gets its own builder log/implementation/log-only commit; Codex never edits `TASKS.md`; after the whole batch ChatGPT independently strict-audits all eleven tasks one by one.
+- Next Task/Action: M04 builder work is published through `SB-LF04-006`; Codex continues the same authorized batch from builder cursor `SB-LF04-007` through `SB-LF04-012` and finalizes `.hiveai/codex-logs/SB-LF04-C001_MASTER_BATCH_CODEX_LOG.md` using `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`; tracker checkboxes remain ChatGPT-owned; after the whole batch ChatGPT independently strict-audits all eleven tasks.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -18,7 +18,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: per-task criteria indexed by `.hiveai/prompts/SB-LF04-002-012-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` + `.hiveai/audit-criteria/SB-LF04-002-012-C001_POST_BATCH_STRICT_AUDIT_PROTOCOL.md`
-- Current Prompt: `.hiveai/prompts/SB-LF04-002-012-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
+- Current Prompt: `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -101,6 +101,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF04 Remaining Batch Index: `.hiveai/prompts/SB-LF04-002-012-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
 - SB-LF04 Remaining Batch Master Prompt: `.hiveai/prompts/SB-LF04-002-012-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LF04 Desktop Hygiene: no persistent Desktop sibling worktrees; temporary isolation prefers `%TEMP%\ScrubBots-Level-Factory\...`; Desktop fallback only inside canonical project `.codex-worktrees\...`; durable logs stay under repo `.hiveai/codex-logs/`.
+- SB-LF04 Batch Builder Cursor: `SB-LF04-007` (002..006 builder publications already exist; task checkboxes remain unaudited/ChatGPT-owned).
+- SB-LF04 Batch Continuation Prompt: `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
