@@ -29,3 +29,17 @@ Document role: CODEX BUILDER LOG
 - initial corpus execution exposed a missing expected calibration state; corrected the payload/expected contract and recomputed the corpus SHA-256
 - focused 012 result: `3 passed, 1 capability skip`
 - full retained M04 result: `92 passed, 1 capability skip`
+
+## Completion evidence
+
+- implementation_commit: `6f60368f2b14d40372ae21abf30fae34256c7148`
+- implementation publication: pushed to `origin/main` as part of the R01 implementation chain
+- focused 012 result: `3 passed, 1 capability skip`
+- batch full pytest: `949 passed, 2 capability skips`
+- compileall: PASS
+- Godot 4.7.2 headless editor boot: PASS
+- git diff --check: PASS
+- root `TASKS.md` diff: zero
+- Level Data and logical-art exact byte/SHA non-mutation: PASS
+- canonical checkout proof: capability-gated; no checkout configured, so no bridge was exercised
+- terminal log-only commit: pending
