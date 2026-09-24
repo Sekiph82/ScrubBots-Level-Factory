@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M04 — Difficulty Intelligence & Metrics
-- Current Sprint: SB-LF04.C001-R03 — Final M04 declarative regression closure
-- Current Task: SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source
-- Current Task Status: READY_FOR_REMEDIATION
-- Next Task/Action: Codex executes only `SB-LF04-012-C001-R03` from `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`; `SB-LF04-001..011` remain PASS/CLOSED; Codex never edits `TASKS.md`; after R03 publication ChatGPT independently re-audits SB-LF04-012 and closes M04 only if PASS.
+- Current Milestone: M05 — Unified Factory Validation & Level QA
+- Current Sprint: SB-LF05.C001-BATCH — Unified QA milestone implementation batch
+- Current Task: SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation
+- Current Task Status: READY_FOR_IMPLEMENTATION
+- Next Task/Action: Codex executes the complete remaining M05 batch `SB-LF05-001,002,003,004,005,007,008,010-C001` from `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`; `SB-LF05-006,009` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole batch ChatGPT independently strict-audits all eight implemented tasks.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF04-004-012-C001-R02_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF04-012-C001-R03_FULLY_DECLARATIVE_TRUST_BOUNDARY_REGRESSION_CLOSURE_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: SB-LF04-012 R02 strict re-audit `.hiveai/audits/SB-LF04-012-C001-R02_PROVIDER_TRUST_REGRESSION_CLOSURE_STRICT_REAUDIT.md` + R03 prompt `.hiveai/prompts/SB-LF04-012-C001-R03_FULLY_DECLARATIVE_TRUST_BOUNDARY_REGRESSION_CLOSURE_PROMPT.md`
-- Current Prompt: `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`
+- Current Audit Criteria: per-task M05 criteria indexed by `.hiveai/prompts/SB-LF05-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` + `.hiveai/audit-criteria/SB-LF05-C001_POST_BATCH_STRICT_AUDIT_PROTOCOL.md`
+- Current Prompt: `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -118,6 +118,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF04 R03 Remediation Authorization: `SB-LF04-012-C001-R03 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF04 R03 Remediation Index: `.hiveai/prompts/SB-LF04-012-C001-R03_REMEDIATION_INDEX.md`.
 - SB-LF04 R03 Master Prompt: `.hiveai/prompts/SB-LF04-012-C001-R03_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF04 R03 Re-Audit Result: `PASS/CLOSED = 012`; therefore `SB-LF04-001..012 = PASS/CLOSED` and `M04 = COMPLETE / VERIFIED`.
+- SB-LF04 R03 Strict Re-Audit: `.hiveai/audits/SB-LF04-012-C001-R03_FULLY_DECLARATIVE_TRUST_BOUNDARY_REGRESSION_CLOSURE_STRICT_REAUDIT.md`.
+- SB-LF04 M04 Final Closure Summary: `.hiveai/audits/SB-LF04-M04_FINAL_CLOSURE_SUMMARY.md`.
+- SB-LF05 Batch Authorization: `SB-LF05-001,002,003,004,005,007,008,010-C001 — IMPLEMENT_ALL_THEN_AUDIT`.
+- SB-LF05 Batch Index: `.hiveai/prompts/SB-LF05-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
+- SB-LF05 Batch Master Prompt: `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
+- SB-LF05 Batch Tracker Policy: task checkboxes remain ChatGPT-owned; Codex executes all eight remaining tasks before independent post-batch audit.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -141,8 +148,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M01: Deterministic Factory Core — PLANNED / PARTIALLY EVIDENCED
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
 - M03: Puzzle Intelligence: Simulation, Solver & State Search — COMPLETE / VERIFIED
-- M04: Difficulty Intelligence & Metrics — ACTIVE
-- M05: Unified Factory Validation & Level QA — PLANNED / PARTIALLY EVIDENCED
+- M04: Difficulty Intelligence & Metrics — COMPLETE / VERIFIED
+- M05: Unified Factory Validation & Level QA — ACTIVE
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
@@ -189,16 +196,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 66 VERIFIED, 44 PARTIAL, 3 MIGRATION, 83 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **66 / 224 = 29.46%**.
+- Canonical LF/CP source-requirement classification: 67 VERIFIED, 43 PARTIAL, 3 MIGRATION, 83 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **67 / 224 = 29.91%**.
 - Canonical LF/CP engineering/migration coverage: **113 / 224 = 50.45%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **83 / 244 = 34.02%**.
+- Unified verified completion: **84 / 244 = 34.43%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **83 / 216 = 38.43%**.
-- Level Factory + unique extension surface: **132 tasks**; **83 / 132 = 62.88% verified**.
+- Conservative verified local completion: **84 / 216 = 38.89%**.
+- Level Factory + unique extension surface: **132 tasks**; **84 / 132 = 63.64% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -377,7 +384,7 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 - [x] SB-LF04-009 — Map predicted score to current lane/class rhythm without equating class to board size.
 - [x] SB-LF04-010 — Keep metric provenance/versioning. [PARTIAL]
 - [x] SB-LF04-011 — Design future calibration against player data under approved analytics policy.
-- [~] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
+- [x] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
 
 ---
 
@@ -387,7 +394,7 @@ Capability source family: `SB-LF05-xxx` from the main Scrubbots master plan.
 
 ### M05.01 - Structural and production validation
 
-- [ ] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation. [PARTIAL]
+- [~] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation. [PARTIAL]
 - [ ] SB-LF05-002 — Reuse audited M09 round-trip contract for art-first exports. [PARTIAL]
 - [ ] SB-LF05-003 — Validate dimensions/envelope/C01..C16/3..12 used colors/cells/opacity/transparency/provenance/duplicate IDs. [PARTIAL]
 
