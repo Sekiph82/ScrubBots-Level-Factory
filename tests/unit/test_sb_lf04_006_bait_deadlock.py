@@ -4,7 +4,7 @@ import pytest
 
 from scrubbots_pixel_factory.baseline_search import BaselineSearchPolicy, BaselineSearchResult, SearchExecutionDisposition, SearchVerdict
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
-from scrubbots_pixel_factory.difficulty_analysis import bait_deadlock_from_children, populate_bait_deadlock
+from scrubbots_pixel_factory.difficulty_analysis import EvidenceDisposition, bait_deadlock_from_children, populate_bait_deadlock
 from scrubbots_pixel_factory.level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues, SolverEvidenceIdentity
 from scrubbots_pixel_factory.solver_budget import BudgetedSolverResult, SolverBudgetPolicy, SolverOutcomeDisposition
 from scrubbots_pixel_factory.solver_evidence import SOLVER_EVIDENCE_SCHEMA, SOLVER_EVIDENCE_VERSION, SolverEvidenceReport, SolverMetrics
@@ -45,6 +45,7 @@ def test_fixture_counterfactual_tuple_cannot_claim_canonical_proof() -> None:
 def test_copied_canonical_provider_string_does_not_elevate_fixture_tuple() -> None:
     metrics = level()
     result = bait_deadlock_from_children(metrics, "8" * 64, (SolverOutcomeDisposition.PROVEN_UNSOLVABLE,), provider_id="canonical-counterfactual", provider_version="CANONICAL_COUNTERFACTUAL_V1")
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
     with pytest.raises(LevelMetricsError):
         populate_bait_deadlock(metrics, result)
 
