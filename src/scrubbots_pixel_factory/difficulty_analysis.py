@@ -11,7 +11,7 @@ import re
 from collections.abc import Mapping
 
 from .baseline_search import SearchExecutionDisposition, SearchVerdict
-from .level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues
+from .level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricId, MetricValues, SolverEvidenceIdentity
 from .contracts.difficulty import Difficulty, parse_difficulty
 from .solver_evidence import SolverEvidenceReport
 
@@ -30,6 +30,10 @@ CHALLENGE_SCORE_POLICY_VERSION = "DIFFICULTY_V1"
 LANE_MAPPING_SCHEMA = "scrubbots-score-lane-mapping"
 LANE_MAPPING_VERSION = 1
 LANE_MAPPING_POLICY_VERSION = "SCORE_LANE_V1"
+ANALYSIS_SCHEMA = "scrubbots-difficulty-analysis"
+ANALYSIS_VERSION = 1
+PROVIDER_IDENTITY_SCHEMA = "scrubbots-metric-provider"
+PROVIDER_IDENTITY_VERSION = 1
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -521,6 +525,137 @@ def map_challenge_score(score_result: ChallengeScoreResult, requested_class: Dif
     return LaneMappingResult(score_result.digest(), score_result.policy_version, LANE_MAPPING_POLICY_VERSION, score, lane, requested, comparison)
 
 
+@dataclass(frozen=True, slots=True)
+class MetricProviderIdentity:
+    provider_id: str
+    provider_version: str
+
+    def __post_init__(self) -> None:
+        _provider_text(self.provider_id, "metric provider id")
+        _provider_text(self.provider_version, "metric provider version")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": PROVIDER_IDENTITY_SCHEMA, "version": PROVIDER_IDENTITY_VERSION, "provider_id": self.provider_id, "provider_version": self.provider_version}
+
+
+@dataclass(frozen=True, slots=True)
+class DifficultyAnalysis(_DependencyResultMixin):
+    level_source_sha256: str
+    authority: object
+    solver_evidence: SolverEvidenceIdentity
+    level_metrics_schema: str
+    level_metrics_version: int
+    level_metrics_digest: str
+    metric_provenance: tuple[tuple[str, MetricProviderIdentity], ...]
+    component_availability: tuple[tuple[str, AnalysisDisposition], ...]
+    disposition: AnalysisDisposition
+    reason: str | None
+    challenge_score_digest: str | None = None
+    challenge_score_policy_version: str | None = None
+    lane_mapping_digest: str | None = None
+    lane_mapping_policy_version: str | None = None
+
+    def __post_init__(self) -> None:
+        from .compact_solver_state import SolverStateAuthority
+
+        _digest_text(self.level_source_sha256, "analysis level source SHA-256")
+        if not isinstance(self.authority, SolverStateAuthority) or not isinstance(self.solver_evidence, SolverEvidenceIdentity):
+            raise LevelMetricsError("analysis authority or solver evidence is malformed")
+        _provider_text(self.level_metrics_schema, "analysis LevelMetrics schema")
+        if type(self.level_metrics_version) is not int or self.level_metrics_version < 1:
+            raise LevelMetricsError("analysis LevelMetrics version is malformed")
+        _digest_text(self.level_metrics_digest, "analysis LevelMetrics digest")
+        if type(self.metric_provenance) is not tuple or any(type(name) is not str or not isinstance(provider, MetricProviderIdentity) for name, provider in self.metric_provenance):
+            raise LevelMetricsError("analysis metric provenance is malformed")
+        if type(self.component_availability) is not tuple or any(type(name) is not str or not isinstance(value, AnalysisDisposition) for name, value in self.component_availability):
+            raise LevelMetricsError("analysis component availability is malformed")
+        if not isinstance(self.disposition, AnalysisDisposition):
+            raise LevelMetricsError("analysis disposition is malformed")
+        if self.reason is not None and (type(self.reason) is not str or not self.reason.strip()):
+            raise LevelMetricsError("analysis reason is malformed")
+        for value, label in ((self.challenge_score_digest, "challenge score digest"), (self.lane_mapping_digest, "lane mapping digest")):
+            if value is not None:
+                _digest_text(value, label)
+        if (self.challenge_score_digest is None) != (self.challenge_score_policy_version is None) or (self.lane_mapping_digest is None) != (self.lane_mapping_policy_version is None):
+            raise LevelMetricsError("analysis result digest and policy version must be paired")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": ANALYSIS_SCHEMA,
+            "version": ANALYSIS_VERSION,
+            "level_source_sha256": self.level_source_sha256,
+            "authority": self.authority.canonical_dict(),
+            "solver_evidence": self.solver_evidence.canonical_dict(),
+            "level_metrics": {"schema": self.level_metrics_schema, "version": self.level_metrics_version, "digest": self.level_metrics_digest},
+            "metric_provenance": {name: provider.canonical_dict() for name, provider in self.metric_provenance},
+            "component_availability": {name: value.value for name, value in self.component_availability},
+            "challenge_score": None if self.challenge_score_digest is None else {"digest": self.challenge_score_digest, "policy_version": self.challenge_score_policy_version},
+            "lane_mapping": None if self.lane_mapping_digest is None else {"digest": self.lane_mapping_digest, "policy_version": self.lane_mapping_policy_version},
+            "disposition": self.disposition.value,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, payload: Mapping[str, object]) -> "DifficultyAnalysis":
+        fields = frozenset({"schema", "version", "level_source_sha256", "authority", "solver_evidence", "level_metrics", "metric_provenance", "component_availability", "challenge_score", "lane_mapping", "disposition", "reason"})
+        value = payload if isinstance(payload, Mapping) and set(payload) == fields else None
+        if value is None or value["schema"] != ANALYSIS_SCHEMA or value["version"] != ANALYSIS_VERSION:
+            raise LevelMetricsError("analysis schema/version or fields are unsupported")
+        from .compact_solver_state import SolverStateAuthority
+
+        authority_data = value["authority"]
+        if not isinstance(authority_data, Mapping) or set(authority_data) != {"schema", "version", "repository", "commit_sha", "proof_state_source_path"}:
+            raise LevelMetricsError("analysis authority fields are malformed")
+        authority = SolverStateAuthority(authority_data["repository"], authority_data["commit_sha"], authority_data["proof_state_source_path"], authority_data["version"])
+        evidence = SolverEvidenceIdentity.from_dict(value["solver_evidence"])
+        metric_data = value["level_metrics"]
+        if not isinstance(metric_data, Mapping) or set(metric_data) != {"schema", "version", "digest"}:
+            raise LevelMetricsError("analysis LevelMetrics identity is malformed")
+        provenance_data = value["metric_provenance"]
+        if not isinstance(provenance_data, Mapping):
+            raise LevelMetricsError("analysis metric provenance is malformed")
+        provenance = tuple((name, MetricProviderIdentity(item["provider_id"], item["provider_version"])) for name, item in sorted(provenance_data.items()))
+        availability_data = value["component_availability"]
+        if not isinstance(availability_data, Mapping):
+            raise LevelMetricsError("analysis availability is malformed")
+        try:
+            availability = tuple((name, AnalysisDisposition(item)) for name, item in sorted(availability_data.items()))
+            disposition = AnalysisDisposition(value["disposition"])
+        except (TypeError, ValueError) as exc:
+            raise LevelMetricsError("analysis disposition is malformed") from exc
+        score_data = value["challenge_score"]
+        lane_data = value["lane_mapping"]
+        if score_data is not None and (not isinstance(score_data, Mapping) or set(score_data) != {"digest", "policy_version"}):
+            raise LevelMetricsError("analysis challenge score identity is malformed")
+        if lane_data is not None and (not isinstance(lane_data, Mapping) or set(lane_data) != {"digest", "policy_version"}):
+            raise LevelMetricsError("analysis lane mapping identity is malformed")
+        return cls(value["level_source_sha256"], authority, evidence, metric_data["schema"], metric_data["version"], metric_data["digest"], provenance, availability, disposition, value["reason"], score_data["digest"] if score_data is not None else None, score_data["policy_version"] if score_data is not None else None, lane_data["digest"] if lane_data is not None else None, lane_data["policy_version"] if lane_data is not None else None)
+
+
+def build_difficulty_analysis(
+    level_metrics: LevelMetrics,
+    score_result: ChallengeScoreResult | None = None,
+    lane_result: LaneMappingResult | None = None,
+    metric_provenance: Mapping[str, MetricProviderIdentity] | None = None,
+) -> DifficultyAnalysis:
+    if not isinstance(level_metrics, LevelMetrics):
+        raise LevelMetricsError("LevelMetrics is required")
+    if score_result is not None and (not isinstance(score_result, ChallengeScoreResult) or score_result.source_metrics_digest != level_metrics.digest()):
+        raise LevelMetricsError("challenge score is not bound to this LevelMetrics digest")
+    if lane_result is not None and (score_result is None or not isinstance(lane_result, LaneMappingResult) or lane_result.score_digest != score_result.digest()):
+        raise LevelMetricsError("lane mapping is not bound to this Challenge Score digest")
+    supplied = dict(metric_provenance or {})
+    populated = level_metrics.measurement_content()
+    unknown = set(supplied) - {metric.value for metric in MetricId}
+    if unknown or any(not isinstance(provider, MetricProviderIdentity) for provider in supplied.values()):
+        raise LevelMetricsError("metric provenance contains an unknown or malformed metric")
+    for name in populated:
+        supplied.setdefault(name, MetricProviderIdentity("solver-evidence" if name in {"solution_depth", "move_count", "states_visited", "dead_ends", "branching", "forced_moves"} else "canonical-provider", "BOUND_PROVIDER_V1"))
+    provenance = tuple(sorted(supplied.items()))
+    availability = tuple((metric.value, AnalysisDisposition.AVAILABLE if metric.value in populated else AnalysisDisposition.UNAVAILABLE) for metric in MetricId)
+    return DifficultyAnalysis(level_metrics.source_sha256, level_metrics.authority, level_metrics.solver_evidence, "scrubbots-level-metrics", 1, level_metrics.digest(), provenance, availability, level_metrics.disposition, level_metrics.reason, score_result.digest() if score_result else None, score_result.policy_version if score_result else None, lane_result.digest() if lane_result else None, lane_result.mapping_policy_version if lane_result else None)
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -606,6 +741,12 @@ __all__ = [
     "LANE_MAPPING_POLICY_VERSION",
     "LaneClass",
     "LaneMappingResult",
+    "ANALYSIS_SCHEMA",
+    "ANALYSIS_VERSION",
+    "PROVIDER_IDENTITY_SCHEMA",
+    "PROVIDER_IDENTITY_VERSION",
+    "MetricProviderIdentity",
+    "DifficultyAnalysis",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
@@ -615,6 +756,7 @@ __all__ = [
     "populate_volatility",
     "calculate_challenge_score",
     "map_challenge_score",
+    "build_difficulty_analysis",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
