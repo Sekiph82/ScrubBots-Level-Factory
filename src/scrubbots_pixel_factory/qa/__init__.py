@@ -31,6 +31,13 @@ from .level_art import (
     LevelArtValidationReport,
     validate_level_art,
 )
+from .solver_gate import (
+    SOLVER_GATE_SCHEMA,
+    SOLVER_GATE_VERSION,
+    SolverGateDisposition,
+    SolverGateReport,
+    evaluate_solver_gate,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -58,4 +65,9 @@ __all__ = [
     "LevelArtContractValidator",
     "LevelArtValidationReport",
     "validate_level_art",
+    "SOLVER_GATE_SCHEMA",
+    "SOLVER_GATE_VERSION",
+    "SolverGateDisposition",
+    "SolverGateReport",
+    "evaluate_solver_gate",
 ]
