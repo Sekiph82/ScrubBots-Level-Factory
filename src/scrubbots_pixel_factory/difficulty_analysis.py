@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from enum import Enum
 import hashlib
 import json
 import math
@@ -11,6 +12,7 @@ from collections.abc import Mapping
 
 from .baseline_search import SearchExecutionDisposition, SearchVerdict
 from .level_metrics import AnalysisDisposition, LevelMetrics, LevelMetricsError, MetricValues
+from .contracts.difficulty import Difficulty, parse_difficulty
 from .solver_evidence import SolverEvidenceReport
 
 
@@ -25,6 +27,9 @@ VOLATILITY_VERSION = 1
 CHALLENGE_SCORE_SCHEMA = "scrubbots-difficulty-challenge-score"
 CHALLENGE_SCORE_VERSION = 1
 CHALLENGE_SCORE_POLICY_VERSION = "DIFFICULTY_V1"
+LANE_MAPPING_SCHEMA = "scrubbots-score-lane-mapping"
+LANE_MAPPING_VERSION = 1
+LANE_MAPPING_POLICY_VERSION = "SCORE_LANE_V1"
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 
 
@@ -472,6 +477,50 @@ def calculate_challenge_score(level_metrics: LevelMetrics) -> ChallengeScoreResu
     return ChallengeScoreResult(CHALLENGE_SCORE_POLICY_VERSION, level_metrics.digest(), components, score)
 
 
+class LaneClass(str, Enum):
+    EASY = "EASY"
+    MEDIUM = "MEDIUM"
+    HARD = "HARD"
+    VERY_HARD = "VERY_HARD"
+
+
+@dataclass(frozen=True, slots=True)
+class LaneMappingResult(_DependencyResultMixin):
+    score_digest: str
+    score_policy_version: str
+    mapping_policy_version: str
+    score: float
+    lane: LaneClass
+    requested_class: LaneClass | None = None
+    comparison: str | None = None
+
+    def __post_init__(self) -> None:
+        _digest_text(self.score_digest, "lane mapping score digest")
+        if self.score_policy_version != CHALLENGE_SCORE_POLICY_VERSION or self.mapping_policy_version != LANE_MAPPING_POLICY_VERSION:
+            raise LevelMetricsError("unsupported lane mapping policy identity")
+        if not isinstance(self.score, (int, float)) or isinstance(self.score, bool) or not math.isfinite(float(self.score)) or not 0.0 <= self.score <= 100.0:
+            raise LevelMetricsError("lane mapping score must be in [0, 100]")
+        if not isinstance(self.lane, LaneClass) or (self.requested_class is not None and not isinstance(self.requested_class, LaneClass)):
+            raise LevelMetricsError("lane mapping class is malformed")
+        if self.comparison not in {None, "MATCH", "MISMATCH"}:
+            raise LevelMetricsError("lane comparison is malformed")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": LANE_MAPPING_SCHEMA, "version": LANE_MAPPING_VERSION, "score_digest": self.score_digest, "score_policy_version": self.score_policy_version, "mapping_policy_version": self.mapping_policy_version, "score": float(self.score), "lane": self.lane.value, "requested_class": self.requested_class.value if self.requested_class else None, "comparison": self.comparison}
+
+
+def map_challenge_score(score_result: ChallengeScoreResult, requested_class: Difficulty | str | None = None) -> LaneMappingResult:
+    if not isinstance(score_result, ChallengeScoreResult):
+        raise LevelMetricsError("ChallengeScoreResult is required")
+    score = float(score_result.score)
+    if score < 0.0 or score > 100.0:
+        raise LevelMetricsError("score is outside the lane mapping range")
+    lane = LaneClass.EASY if score < 25.0 else LaneClass.MEDIUM if score < 50.0 else LaneClass.HARD if score < 75.0 else LaneClass.VERY_HARD
+    requested = LaneClass(parse_difficulty(requested_class).value) if requested_class is not None else None
+    comparison = None if requested is None else ("MATCH" if requested is lane else "MISMATCH")
+    return LaneMappingResult(score_result.digest(), score_result.policy_version, LANE_MAPPING_POLICY_VERSION, score, lane, requested, comparison)
+
+
 def _accepted_report(level_metrics: LevelMetrics, report: SolverEvidenceReport) -> None:
     if not isinstance(level_metrics, LevelMetrics) or not isinstance(report, SolverEvidenceReport):
         raise LevelMetricsError("LevelMetrics and SolverEvidenceReport are required")
@@ -552,6 +601,11 @@ __all__ = [
     "CHALLENGE_SCORE_POLICY_VERSION",
     "ChallengeScoreResult",
     "ScoreComponent",
+    "LANE_MAPPING_SCHEMA",
+    "LANE_MAPPING_VERSION",
+    "LANE_MAPPING_POLICY_VERSION",
+    "LaneClass",
+    "LaneMappingResult",
     "SLOT_PRESSURE_SCHEMA",
     "SLOT_PRESSURE_VERSION",
     "SlotPressureResult",
@@ -560,6 +614,7 @@ __all__ = [
     "populate_bait_deadlock",
     "populate_volatility",
     "calculate_challenge_score",
+    "map_challenge_score",
     "populate_slot_pressure",
     "populate_search_complexity_metrics",
     "populate_solution_depth_and_move_count",
