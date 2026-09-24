@@ -33,6 +33,14 @@ def test_fixture_trace_is_explicitly_non_production() -> None:
     assert result.evidence.disposition.value == "FIXTURE"
 
 
+def test_canonical_looking_capacity_and_provider_identity_remain_fixture_only() -> None:
+    metrics = level()
+    result = slot_pressure_from_snapshots(metrics, "6" * 64, (SlotSnapshot(5, 5),), provider_id="canonical-slot-trace", provider_version="CANONICAL_SLOT_TRACE_V1")
+    assert result.evidence.disposition is EvidenceDisposition.FIXTURE
+    with pytest.raises(LevelMetricsError):
+        populate_slot_pressure(metrics, result)
+
+
 def test_maximum_is_deterministic_and_trace_is_immutable() -> None:
     metrics = level()
     snapshots = (SlotSnapshot(1, 4), SlotSnapshot(3, 8))
