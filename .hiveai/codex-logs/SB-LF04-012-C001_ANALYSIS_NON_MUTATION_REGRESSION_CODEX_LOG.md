@@ -20,4 +20,4 @@ Commands and test evidence: M04-wide focused regression passed 80 tests. `python
 
 Files changed: checksummed M04 regression fixture, `tests/unit/test_sb_lf04_012_regression.py`, and this builder log.
 
-Final diff, status, commits, push, and `origin/main` equality: pending publication.
+Implementation commit: `79c21fccbafeac44b22e624ea39515175fb7b8d8`, pushed successfully. Final tracked status was clean; pre-existing untracked nested worktree artifacts and Godot `.uid` files remained preserved and unstaged. `TASKS.md` had zero diff. Terminal log-only commit: pending.
