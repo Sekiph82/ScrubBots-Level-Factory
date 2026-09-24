@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M04 — Difficulty Intelligence & Metrics
-- Current Sprint: SB-LF04.C001-BATCH — Remaining M04 Difficulty Intelligence batch (002..012)
-- Current Task: SB-LF04-002 — Record solution depth/move count where meaningful
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: M04 builder work is published through `SB-LF04-006`; Codex continues the same authorized batch from builder cursor `SB-LF04-007` through `SB-LF04-012` and finalizes `.hiveai/codex-logs/SB-LF04-C001_MASTER_BATCH_CODEX_LOG.md` using `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`; tracker checkboxes remain ChatGPT-owned; after the whole batch ChatGPT independently strict-audits all eleven tasks.
+- Current Sprint: SB-LF04.C001-R01-BATCH — M04 strict-audit remediation batch
+- Current Task: SB-LF04-004 — Add dependency depth only when canonical
+- Current Task Status: READY_FOR_REMEDIATION
+- Next Task/Action: Codex executes only failed M04 tasks `SB-LF04-004,005,006,007,008,009,010,012-C001-R01` from `.hiveai/prompts/SB-LF04-004-012-C001-R01_MASTER_REMEDIATION_PROMPT.md`; `SB-LF04-001,002,003,011` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole R01 batch ChatGPT independently re-audits the eight remediated tasks.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF04-001-C001-R01_WINDOWS_RUNNER_IDENTITY_PORTABILITY_AND_FULL_GATE_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF04-002-012-C001_STRICT_AUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: per-task criteria indexed by `.hiveai/prompts/SB-LF04-002-012-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` + `.hiveai/audit-criteria/SB-LF04-002-012-C001_POST_BATCH_STRICT_AUDIT_PROTOCOL.md`
-- Current Prompt: `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`
+- Current Audit Criteria: C001 task audits summarized by `.hiveai/audits/SB-LF04-002-012-C001_STRICT_AUDIT_SUMMARY.md` + task-specific R01 prompts indexed by `.hiveai/prompts/SB-LF04-004-012-C001-R01_REMEDIATION_INDEX.md`
+- Current Prompt: `.hiveai/prompts/SB-LF04-004-012-C001-R01_MASTER_REMEDIATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -103,6 +103,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF04 Desktop Hygiene: no persistent Desktop sibling worktrees; temporary isolation prefers `%TEMP%\ScrubBots-Level-Factory\...`; Desktop fallback only inside canonical project `.codex-worktrees\...`; durable logs stay under repo `.hiveai/codex-logs/`.
 - SB-LF04 Batch Builder Cursor: `SB-LF04-007` (002..006 builder publications already exist; task checkboxes remain unaudited/ChatGPT-owned).
 - SB-LF04 Batch Continuation Prompt: `.hiveai/prompts/SB-LF04-007-012-C001_MASTER_BATCH_CONTINUATION_FINALIZATION_PROMPT.md`.
+- SB-LF04 C001 Post-Batch Audit Result: `PASS/CLOSED = 002, 003, 011`; `CHANGES_REQUIRED = 004, 005, 006, 007, 008, 009, 010, 012`.
+- SB-LF04 C001 Audit Summary: `.hiveai/audits/SB-LF04-002-012-C001_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF04 R01 Remediation Authorization: `SB-LF04-004,005,006,007,008,009,010,012-C001-R01 — REMEDIATE_ALL_THEN_REAUDIT`.
+- SB-LF04 R01 Remediation Index: `.hiveai/prompts/SB-LF04-004-012-C001-R01_REMEDIATION_INDEX.md`.
+- SB-LF04 R01 Master Prompt: `.hiveai/prompts/SB-LF04-004-012-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -174,16 +179,16 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 56 VERIFIED, 45 PARTIAL, 3 MIGRATION, 92 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **56 / 224 = 25.00%**.
-- Canonical LF/CP engineering/migration coverage: **104 / 224 = 46.43%** (`VERIFIED + PARTIAL + MIGRATION`).
+- Canonical LF/CP source-requirement classification: 59 VERIFIED, 45 PARTIAL, 3 MIGRATION, 89 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **59 / 224 = 26.34%**.
+- Canonical LF/CP engineering/migration coverage: **107 / 224 = 47.77%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **73 / 244 = 29.92%**.
+- Unified verified completion: **76 / 244 = 31.15%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **73 / 216 = 33.80%**.
-- Level Factory + unique extension surface: **132 tasks**; **73 / 132 = 55.30% verified**.
+- Conservative verified local completion: **76 / 216 = 35.19%**.
+- Level Factory + unique extension surface: **132 tasks**; **76 / 132 = 57.58% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
 - `PAG-SP07-C001-R01` is PASS/CLOSED and retained as accepted evidence under `SB-LF09-003`; the broader `SB-LF09-003` source requirement remains PARTIAL and is not counted complete.
@@ -346,12 +351,12 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 ### M04.01 - Versioned solver-derived metrics
 
 - [x] SB-LF04-001 — Define versioned LevelMetrics. [PARTIAL]
-- [~] SB-LF04-002 — Record solution depth/move count where meaningful.
-- [ ] SB-LF04-003 — Record states/dead ends/branching/forced moves.
+- [x] SB-LF04-002 — Record solution depth/move count where meaningful.
+- [x] SB-LF04-003 — Record states/dead ends/branching/forced moves.
 
 ### M04.02 - Canonical gameplay feature metrics
 
-- [ ] SB-LF04-004 — Add dependency depth only when canonical.
+- [~] SB-LF04-004 — Add dependency depth only when canonical.
 - [ ] SB-LF04-005 — Add slot pressure only when canonical.
 - [ ] SB-LF04-006 — Add bait/deadlock metrics only when canonical.
 - [ ] SB-LF04-007 — Add color/remaining-state volatility where useful.
@@ -361,7 +366,7 @@ Capability source family: `SB-LF04-xxx` from the main Scrubbots master plan.
 - [ ] SB-LF04-008 — Implement/version Difficulty V1 Challenge Score components/coefficients.
 - [ ] SB-LF04-009 — Map predicted score to current lane/class rhythm without equating class to board size.
 - [ ] SB-LF04-010 — Keep metric provenance/versioning. [PARTIAL]
-- [ ] SB-LF04-011 — Design future calibration against player data under approved analytics policy.
+- [x] SB-LF04-011 — Design future calibration against player data under approved analytics policy.
 - [ ] SB-LF04-012 — Tests prove analysis does not mutate gameplay/art source. [PARTIAL]
 
 ---
