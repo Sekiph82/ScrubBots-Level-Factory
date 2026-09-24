@@ -27,3 +27,9 @@ Document role: CODEX BUILDER LOG
 - result: `32 passed in 0.27s`
 - offline/network boundary: focused tests use no network access; no dependencies or licenses changed
 - security/safety: no caller-selected identity can promote this fixture trace to production availability
+
+## Terminal verification
+
+- shared final gates: compileall passed; `godot_console.exe --headless --editor --path . --quit` passed; full pytest: `951 passed, 2 skipped in 272.43s`
+- skipped capabilities: canonical ScrubBots checkout was not supplied; no owner-native bridge was exercised
+- final task record is log-only; implementation commit: `cbb9d69a3018e2e6e2d0826f30f8c631f0a701b7`
