@@ -38,6 +38,15 @@ from .solver_gate import (
     SolverGateReport,
     evaluate_solver_gate,
 )
+from .outcomes import (
+    QA_OUTCOME_SCHEMA,
+    QA_OUTCOME_VERSION,
+    QAOutcome,
+    QAOutcomeRecord,
+    QAOutcomeStatistics,
+    classify_solver_qa,
+    summarize_solver_qa,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -70,4 +79,11 @@ __all__ = [
     "SolverGateDisposition",
     "SolverGateReport",
     "evaluate_solver_gate",
+    "QA_OUTCOME_SCHEMA",
+    "QA_OUTCOME_VERSION",
+    "QAOutcome",
+    "QAOutcomeRecord",
+    "QAOutcomeStatistics",
+    "classify_solver_qa",
+    "summarize_solver_qa",
 ]
