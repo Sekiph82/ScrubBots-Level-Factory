@@ -1,0 +1,18 @@
+{
+  "schema": "scrubbots-m04-regression-corpus",
+  "version": 1,
+  "corpus_sha256": "6a7df38f1f46d7d49829b4d3b33fe8e648f9e71ba5570340dfc2f9d165a4077b",
+  "cases": [
+    {"id": "SB-LF04-001", "contract": "closed_level_metrics_v1"},
+    {"id": "SB-LF04-002", "contract": "solved_witness_depth_and_move_count", "solution_depth": 3, "move_count": 3},
+    {"id": "SB-LF04-003", "contract": "observed_complexity", "states_visited": 12, "dead_ends": 3, "branching": 2.25, "forced_moves": 2},
+    {"id": "SB-LF04-004", "contract": "dependency_provider_unavailable", "disposition": "UNAVAILABLE"},
+    {"id": "SB-LF04-005", "contract": "slot_pressure_trace", "slot_pressure": 1.0},
+    {"id": "SB-LF04-006", "contract": "bait_deadlock_exact_and_inconclusive", "exact_ratio": 0.5, "inconclusive_disposition": "INCONCLUSIVE"},
+    {"id": "SB-LF04-007", "contract": "stable_volatility_trace", "volatility": 0.0},
+    {"id": "SB-LF04-008", "contract": "challenge_score_v1_zero_core", "score": 20.0},
+    {"id": "SB-LF04-009", "contract": "lane_thresholds", "thresholds": [0.0, 25.0, 50.0, 75.0, 100.0]},
+    {"id": "SB-LF04-010", "contract": "mixed_lineage_rejected", "rejected": true},
+    {"id": "SB-LF04-011", "contract": "calibration_disabled", "state": "DISABLED_UNTIL_POLICY_APPROVED"}
+  ]
+}
