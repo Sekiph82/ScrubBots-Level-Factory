@@ -19,3 +19,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - Derived destinations are resolved and rejected when they alias the immutable source; missing/stale/corrupt records and source mutation fail closed. Repeated verification is deterministic/idempotent.
 - Added alias, corruption, mutation, dimension, and idempotence coverage. Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS. No source bytes were rewritten.
+
+## Publication closure
+
+- Implementation commit: `1b64d33d97cf68e4492c1808f8027c6fcd7833ec`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
