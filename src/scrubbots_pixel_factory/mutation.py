@@ -1016,6 +1016,18 @@ class OwnerSourceRecord:
             raise MutationContractError("owner source length/dimensions are malformed")
         object.__setattr__(self, "source_path", _text(self.source_path, "owner source path").replace("\\", "/"))
 
+    @classmethod
+    def from_m05_owner_upload(cls, record: Mapping[str, object]) -> "OwnerSourceRecord":
+        """Adapt only the accepted M05 OWNER_UPLOAD record; never mint an alias."""
+        required = {"source_id", "origin", "status", "validation_state", "source_sha256", "byte_length", "original_width", "original_height", "immutable_relative_path"}
+        if not isinstance(record, Mapping) or not required.issubset(record) or record.get("origin") != "OWNER_UPLOAD" or record.get("status") != "SOURCE_ONLY" or record.get("validation_state") != "UNVALIDATED":
+            raise MutationContractError("record is not an accepted M05 OWNER_UPLOAD source identity")
+        source_id = record.get("source_id")
+        path = record.get("immutable_relative_path")
+        if type(source_id) is not str or not source_id.startswith("owner-upload-") or path != f"owner-uploads/{source_id}/source.png":
+            raise MutationContractError("OWNER_UPLOAD identity or canonical path is malformed")
+        return cls(source_id, record["source_sha256"], record["byte_length"], record["original_width"], record["original_height"], path)  # type: ignore[arg-type]
+
 
 @dataclass(frozen=True, slots=True)
 class OwnerSourceReport:
