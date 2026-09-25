@@ -18,6 +18,9 @@ from scrubbots_pixel_factory import (
     select_target,
 )
 from scrubbots_pixel_factory import build_typed_target
+from scrubbots_pixel_factory import AuthenticTargetCandidate, revalidate_mutation_from_authentic_adapters
+from scrubbots_pixel_factory.mutation_targeting import select_authentic_target
+from test_sb_lf07_004_revalidation import _authentic_chain
 from sb_lf07_r01_support import engine, m39_authority
 
 
@@ -85,3 +88,17 @@ def test_production_typed_target_builder_rejects_legacy_generic_records() -> Non
     envelope = _envelope("typed-target", 60.0)
     with pytest.raises(Exception):
         build_typed_target(50.0, 70.0, envelope.difficulty, envelope.qa)  # type: ignore[arg-type]
+
+
+def test_authentic_target_uses_stable_m04_policy_and_never_synthesizes_safety_truth() -> None:
+    _, _, mutation, _, _, _, _, solver_adapter, difficulty_adapter, qa_adapter = _authentic_chain()
+    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver_adapter, difficulty_adapter, qa_adapter)
+    candidate = AuthenticTargetCandidate(envelope, solver_adapter, difficulty_adapter, qa_adapter)
+    target = build_typed_target(0.0, 100.0, difficulty_adapter, qa_adapter)
+    assert target.safety.load_ok is False
+    assert target.safety.risk_ok is False
+    assert target.safety.retention_ok is False
+    assert target.safety.version == "UNAVAILABLE"
+    assert target.policy_digest != difficulty_adapter.producer_digest
+    selection = select_authentic_target(target, (candidate,))
+    assert selection.disposition is TargetDisposition.INCONCLUSIVE

@@ -7,11 +7,18 @@ import json
 import math
 
 from .m07_services import MutationContractError, TargetDisposition, TargetSelection, TypedChallengeTarget, SafetyConstraintEvidence, ValidationEnvelope, ValidationDisposition
+from .difficulty_analysis import CHALLENGE_SCORE_POLICY_VERSION, CHALLENGE_SCORE_SCHEMA, CHALLENGE_SCORE_VERSION
 from .mutation_evidence import AuthenticEvidenceAdapter
 
 
 def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()).hexdigest()
+
+
+def _challenge_score_policy_digest(policy_version: str) -> str:
+    if policy_version != CHALLENGE_SCORE_POLICY_VERSION:
+        raise MutationContractError("unsupported accepted Challenge Score policy identity")
+    return _digest({"schema": CHALLENGE_SCORE_SCHEMA, "version": CHALLENGE_SCORE_VERSION, "policy_version": policy_version})
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,10 +42,10 @@ def build_typed_target(minimum: float, maximum: float, difficulty: AuthenticEvid
     policy = difficulty.record.payload.get("policy_version")
     if type(score) not in (int, float) or not math.isfinite(float(score)) or type(policy) is not str:
         raise MutationContractError("accepted M04 Challenge Score/policy evidence is unavailable")
-    report = qa.producer
-    accepted = getattr(getattr(report, "disposition", None), "value", None) == "ACCEPT"
-    policy_digest = _digest({"producer": difficulty.producer_digest, "policy_version": policy})
-    safety = SafetyConstraintEvidence("scrubbots-m05-safety", 1, policy_digest, accepted, accepted, accepted, qa.producer_digest)
+    policy_digest = _challenge_score_policy_digest(policy)
+    # No accepted repository producer currently supplies load, risk, or retention
+    # truth. A generic M05 ACCEPT is structural QA, not these constraints.
+    safety = SafetyConstraintEvidence("scrubbots-m07-safety-availability", "UNAVAILABLE", policy_digest, False, False, False, "0" * 64)
     return TypedChallengeTarget(minimum, maximum, policy_digest, safety)
 
 
@@ -59,7 +66,7 @@ def select_authentic_target(target: TypedChallengeTarget, candidates: Sequence[A
             saw_inconclusive = True
             continue
         score = item.envelope.challenge_score
-        candidate_policy = _digest({"producer": item.difficulty.producer_digest, "policy_version": item.difficulty.record.payload.get("policy_version")})
+        candidate_policy = _challenge_score_policy_digest(item.difficulty.record.payload.get("policy_version")) if type(item.difficulty.record.payload.get("policy_version")) is str else None
         if candidate_policy != target.policy_digest or not target.safety.load_ok or not target.safety.risk_ok or not target.safety.retention_ok or score is None:
             saw_inconclusive = True
             continue
