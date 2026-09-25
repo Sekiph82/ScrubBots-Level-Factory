@@ -19,3 +19,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - Preserved `UNKNOWN_BOUND`, `INCONCLUSIVE`, and timeout semantics as retry/review outcomes rather than unsolvable rejection.
 - Added direct-construction adversarial coverage. Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
+
+## Publication closure
+
+- Implementation commit: `27757cb55e7b8c13426a2aefeb8e11bd50824b3e`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
