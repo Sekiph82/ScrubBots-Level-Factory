@@ -1,10 +1,4 @@
-"""Composable M05 QA over accepted Factory and main-game authorities.
-
-This module deliberately does not implement gameplay or duplicate the
-main-game validators.  Structural and production truth is supplied by an
-exact-source provider; this layer only binds its result to immutable Factory
-and M04 identities and derives a closed overall disposition.
-"""
+"""Provenance-bound composition of Factory QA and current main-game evidence."""
 
 from __future__ import annotations
 
@@ -17,17 +11,9 @@ import re
 from typing import Protocol, runtime_checkable
 
 from ..contracts import CANONICAL_PALETTE
-from ..contracts.production import (
-    PRODUCTION_COLOR_MAX,
-    PRODUCTION_COLOR_MIN,
-    PRODUCTION_DIMENSION_MAX,
-    PRODUCTION_DIMENSION_MIN,
-    validate_production_dimensions,
-    validate_production_used_color_count,
-)
+from ..contracts.production import validate_production_dimensions, validate_production_used_color_count
 from ..difficulty_analysis import DifficultyAnalysis
 from ..level_metrics import AnalysisDisposition
-
 
 UNIFIED_QA_SCHEMA = "scrubbots-unified-qa"
 UNIFIED_QA_VERSION = 1
@@ -37,7 +23,7 @@ _COMMIT = re.compile(r"^[0-9a-f]{7,64}$")
 
 
 class QAContractError(ValueError):
-    """Raised when an M05 QA identity or provider receipt is malformed."""
+    """Raised when a QA identity, payload, or provider receipt is malformed."""
 
 
 class StageDisposition(str, Enum):
@@ -78,6 +64,8 @@ def _digest(value: object) -> str:
 
 def _attribute(value: object, *names: str) -> object:
     for name in names:
+        if isinstance(value, Mapping) and name in value:
+            return value[name]
         if hasattr(value, name):
             return getattr(value, name)
     raise AttributeError(f"artifact is missing one of: {', '.join(names)}")
@@ -85,8 +73,6 @@ def _attribute(value: object, *names: str) -> object:
 
 @dataclass(frozen=True, slots=True)
 class AuthorityIdentity:
-    """Exact repository/source authority for one QA evidence receipt."""
-
     repository: str
     commit_sha: str
     source_path: str
@@ -108,7 +94,7 @@ class AuthorityIdentity:
 
 @dataclass(frozen=True, slots=True)
 class LevelDataIdentity:
-    """Minimal exact Level Data V1 identity consumed by QA."""
+    """Exact immutable LevelData bytes plus fields derived from that payload."""
 
     level_id: str
     source_sha256: str
@@ -116,6 +102,7 @@ class LevelDataIdentity:
     width: int
     height: int
     cell_count: int
+    level_data_bytes: bytes = b""
     schema: str = "scrubbots-level-data"
     version: int = 1
 
@@ -126,18 +113,56 @@ class LevelDataIdentity:
         if self.schema != "scrubbots-level-data" or self.version != 1:
             raise QAContractError("unsupported Level Data V1 schema")
         if any(type(value) is not int or value < 1 for value in (self.width, self.height, self.cell_count)):
-            raise QAContractError("Level Data dimensions and cell_count must be positive integers")
+            raise QAContractError("Level Data dimensions and cell_count must be positive exact integers")
         if self.cell_count != self.width * self.height:
             raise QAContractError("Level Data cell_count must equal width*height")
+        if type(self.level_data_bytes) is not bytes:
+            raise QAContractError("Level Data payload must be immutable bytes")
+        if self.level_data_bytes and hashlib.sha256(self.level_data_bytes).hexdigest() != self.level_data_sha256:
+            raise QAContractError("Level Data SHA-256 does not match the exact payload bytes")
+
+    @property
+    def has_exact_payload(self) -> bool:
+        return bool(self.level_data_bytes)
 
     @classmethod
-    def from_bytes(cls, level_id: str, source_sha256: str, level_data_bytes: bytes, width: int, height: int) -> "LevelDataIdentity":
-        if not isinstance(level_data_bytes, bytes):
+    def from_bytes(cls, level_id: str, source_sha256: str, level_data_bytes: bytes, width: int | None = None, height: int | None = None) -> "LevelDataIdentity":
+        if type(level_data_bytes) is not bytes:
             raise QAContractError("Level Data bytes must be immutable bytes")
-        return cls(level_id, _sha(source_sha256, "Level Data source_sha256"), hashlib.sha256(level_data_bytes).hexdigest(), width, height, width * height)
+        payload: Mapping[str, object] | None = None
+        try:
+            decoded = json.loads(level_data_bytes.decode("utf-8"))
+            if isinstance(decoded, Mapping):
+                payload = decoded
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            payload = None
+        if payload is not None:
+            payload_schema = payload.get("schema")
+            payload_version = payload.get("version")
+            if payload_schema is not None and payload_schema != "scrubbots-level-data":
+                raise QAContractError("Level Data payload schema is unsupported")
+            if payload_version is not None and payload_version != 1:
+                raise QAContractError("Level Data payload version is unsupported")
+            payload_level_id = payload.get("level_id")
+            payload_width = payload.get("width")
+            payload_height = payload.get("height")
+            payload_cells = payload.get("cells")
+            if payload_level_id is not None and payload_level_id != level_id:
+                raise QAContractError("Level Data level_id does not match exact payload")
+            if payload_width is not None and payload_height is not None:
+                if type(payload_width) is not int or type(payload_height) is not int:
+                    raise QAContractError("Level Data payload dimensions must be exact integers")
+                if (width is not None and width != payload_width) or (height is not None and height != payload_height):
+                    raise QAContractError("parallel Level Data dimensions disagree with exact payload")
+                width, height = payload_width, payload_height
+            if payload_cells is not None and (not isinstance(payload_cells, list) or width is None or height is None or len(payload_cells) != width * height):
+                raise QAContractError("Level Data payload cells do not match exact dimensions")
+        if type(width) is not int or type(height) is not int:
+            raise QAContractError("Level Data dimensions must be supplied by or derived from exact payload")
+        return cls(level_id, _sha(source_sha256, "Level Data source_sha256"), hashlib.sha256(level_data_bytes).hexdigest(), width, height, width * height, level_data_bytes)
 
     @classmethod
-    def from_mapping(cls, level_id: str, source_sha256: str, level_data: Mapping[str, object], width: int, height: int) -> "LevelDataIdentity":
+    def from_mapping(cls, level_id: str, source_sha256: str, level_data: Mapping[str, object], width: int | None = None, height: int | None = None) -> "LevelDataIdentity":
         if not isinstance(level_data, Mapping):
             raise QAContractError("Level Data must be a mapping")
         return cls.from_bytes(level_id, source_sha256, _canonical_bytes(dict(level_data)), width, height)
@@ -151,35 +176,37 @@ class LevelDataIdentity:
 
 @dataclass(frozen=True, slots=True)
 class ExternalValidationResult:
-    """Provider-owned result; the Factory never calculates main-game truth."""
-
     disposition: StageDisposition
     authority: AuthorityIdentity
     evidence_digest: str
     reason: str
     provider_id: str = "main-game-exact-source"
     provider_version: str = "M05_PROVIDER_V1"
+    level_data_sha256: str | None = None
+    level_data_source_sha256: str | None = None
+    level_id: str | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.disposition, StageDisposition):
-            raise QAContractError("provider disposition is malformed")
-        if not isinstance(self.authority, AuthorityIdentity):
-            raise QAContractError("provider authority is malformed")
+        if not isinstance(self.disposition, StageDisposition) or not isinstance(self.authority, AuthorityIdentity):
+            raise QAContractError("provider disposition or authority is malformed")
         _sha(self.evidence_digest, "provider evidence_digest")
         _text(self.reason, "provider reason")
         _text(self.provider_id, "provider_id")
         _text(self.provider_version, "provider_version")
+        for value, label in ((self.level_data_sha256, "provider Level Data SHA-256"), (self.level_data_source_sha256, "provider Level Data source SHA-256")):
+            if value is not None:
+                _sha(value, label)
+        if self.level_id is not None:
+            _text(self.level_id, "provider level_id")
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": "scrubbots-main-game-validation", "version": 1, "disposition": self.disposition.value, "authority": self.authority.canonical_dict(), "evidence_digest": self.evidence_digest, "reason": self.reason, "provider_id": self.provider_id, "provider_version": self.provider_version}
+        return {"schema": "scrubbots-main-game-validation", "version": 1, "disposition": self.disposition.value, "authority": self.authority.canonical_dict(), "evidence_digest": self.evidence_digest, "reason": self.reason, "provider_id": self.provider_id, "provider_version": self.provider_version, "level_data_sha256": self.level_data_sha256, "level_data_source_sha256": self.level_data_source_sha256, "level_id": self.level_id}
 
 
 @runtime_checkable
 class MainGameValidationProvider(Protocol):
-    """Exact-source provider boundary for main-game structural/production QA."""
-
     def validate(self, stage: str, level_data: LevelDataIdentity, artifact: object) -> ExternalValidationResult:
-        """Return provider-owned truth for STRUCTURAL or PRODUCTION."""
+        """Validate exact immutable LevelData bytes in the current main-game boundary."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,10 +219,8 @@ class QAStage:
 
     def __post_init__(self) -> None:
         _text(self.stage_id, "QA stage_id")
-        if not isinstance(self.disposition, StageDisposition):
-            raise QAContractError("QA stage disposition is malformed")
-        if not isinstance(self.authority, AuthorityIdentity):
-            raise QAContractError("QA stage authority is malformed")
+        if not isinstance(self.disposition, StageDisposition) or not isinstance(self.authority, AuthorityIdentity):
+            raise QAContractError("QA stage disposition or authority is malformed")
         _sha(self.evidence_digest, "QA stage evidence_digest")
         _text(self.reason, "QA stage reason")
 
@@ -210,28 +235,34 @@ def _authority_from(value: object, fallback: AuthorityIdentity) -> AuthorityIden
         try:
             return AuthorityIdentity(str(value["repository"]), str(value["commit_sha"]), str(value.get("proof_state_source_path", value.get("source_path"))), str(value.get("version", value.get("contract_version"))))
         except (KeyError, TypeError, QAContractError) as exc:
-            raise QAContractError("M04 authority cannot be converted to an exact QA authority") from exc
+            raise QAContractError("M04 authority cannot be converted to exact QA authority") from exc
     canonical = getattr(value, "canonical_dict", None)
     if callable(canonical):
         return _authority_from(canonical(), fallback)
     return fallback
 
 
-def _stage_from_provider(stage_id: str, result: ExternalValidationResult, expected_authority: AuthorityIdentity | None) -> QAStage:
-    if expected_authority is not None and result.authority != expected_authority:
-        return QAStage(stage_id, StageDisposition.ERROR, expected_authority, _digest({"stage": stage_id, "provider": result.canonical_dict(), "error": "AUTHORITY_DRIFT"}), "provider authority does not match the requested exact main-game authority")
-    return QAStage(stage_id, result.disposition, result.authority, result.evidence_digest, result.reason)
-
-
 def _unavailable(stage_id: str, authority: AuthorityIdentity | None, reason: str) -> QAStage:
-    selected = authority or AuthorityIdentity("Sekiph82/Scrubbots", "UNAVAILABLE", "main-game/M05", "UNAVAILABLE")
+    selected = authority or AuthorityIdentity("https://github.com/Sekiph82/Scrubbots", "UNAVAILABLE", "main-game/M05", "UNAVAILABLE")
     return QAStage(stage_id, StageDisposition.UNAVAILABLE, selected, _digest({"stage": stage_id, "authority": selected.canonical_dict(), "reason": reason}), reason)
+
+
+def _stage_from_provider(stage_id: str, result: ExternalValidationResult, level_data: LevelDataIdentity, expected_authority: AuthorityIdentity | None) -> QAStage:
+    if expected_authority is not None and result.authority != expected_authority:
+        return QAStage(stage_id, StageDisposition.ERROR, expected_authority, _digest({"stage": stage_id, "provider": result.canonical_dict(), "error": "AUTHORITY_DRIFT"}), "provider authority does not match requested exact main-game authority")
+    if result.level_data_sha256 is None or result.level_data_source_sha256 is None or result.level_id is None:
+        return QAStage(stage_id, StageDisposition.UNAVAILABLE, result.authority, _digest({"stage": stage_id, "provider": result.canonical_dict(), "error": "EXACT_LEVELDATA_BINDING_UNAVAILABLE"}), "provider did not return exact LevelData payload/source/level identity binding")
+    if (result.level_data_sha256, result.level_data_source_sha256, result.level_id) != (level_data.level_data_sha256, level_data.source_sha256, level_data.level_id):
+        return QAStage(stage_id, StageDisposition.ERROR, result.authority, _digest({"stage": stage_id, "provider": result.canonical_dict(), "error": "LEVELDATA_IDENTITY_DRIFT"}), "provider receipt is bound to different LevelData bytes, source, or level")
+    return QAStage(stage_id, result.disposition, result.authority, result.evidence_digest, result.reason)
 
 
 def _factory_stage(level_data: LevelDataIdentity, artifact: object, authority: AuthorityIdentity) -> QAStage:
     try:
         width = _attribute(artifact, "target_width", "width")
         height = _attribute(artifact, "target_height", "height")
+        if type(width) is not int or type(height) is not int:
+            raise QAContractError("factory dimensions must be exact integers")
         cells = tuple(_attribute(artifact, "logical_cells", "cells"))
         declared = tuple(_attribute(artifact, "used_palette_ids", "palette"))
         validate_production_dimensions(width, height)
@@ -241,7 +272,7 @@ def _factory_stage(level_data: LevelDataIdentity, artifact: object, authority: A
         validate_production_used_color_count(cells)
         if declared != used:
             raise QAContractError("factory artifact palette is not derived from logical cells")
-        source_hash = _attribute(artifact, "raw_sha256", "source_sha256") if hasattr(artifact, "raw_sha256") or hasattr(artifact, "source_sha256") else None
+        source_hash = _attribute(artifact, "raw_sha256", "source_sha256") if hasattr(artifact, "raw_sha256") or hasattr(artifact, "source_sha256") or isinstance(artifact, Mapping) else None
         if source_hash is not None and source_hash != level_data.source_sha256:
             raise QAContractError("factory artifact source identity differs from Level Data source identity")
         artifact_digest = getattr(artifact, "digest", None)
@@ -256,17 +287,10 @@ def _difficulty_stage(level_data: LevelDataIdentity, analysis: DifficultyAnalysi
     if analysis is None:
         return _unavailable("DIFFICULTY_V1", fallback, "M04 DifficultyAnalysis is unavailable")
     try:
-        if not isinstance(analysis, DifficultyAnalysis):
-            raise QAContractError("M04 analysis has the wrong type")
-        if analysis.level_source_sha256 != level_data.source_sha256:
+        if not isinstance(analysis, DifficultyAnalysis) or analysis.level_source_sha256 != level_data.source_sha256:
             raise QAContractError("M04 analysis source identity differs from Level Data")
         authority = _authority_from(analysis.authority, fallback)
-        disposition = {
-            AnalysisDisposition.AVAILABLE: StageDisposition.PASS,
-            AnalysisDisposition.INCONCLUSIVE: StageDisposition.INCONCLUSIVE,
-            AnalysisDisposition.UNAVAILABLE: StageDisposition.UNAVAILABLE,
-            AnalysisDisposition.ERROR: StageDisposition.ERROR,
-        }[analysis.disposition]
+        disposition = {AnalysisDisposition.AVAILABLE: StageDisposition.PASS, AnalysisDisposition.INCONCLUSIVE: StageDisposition.INCONCLUSIVE, AnalysisDisposition.UNAVAILABLE: StageDisposition.UNAVAILABLE, AnalysisDisposition.ERROR: StageDisposition.ERROR}[analysis.disposition]
         return QAStage("DIFFICULTY_V1", disposition, authority, analysis.digest(), analysis.reason or "M04 Difficulty V1 analysis bound")
     except (AttributeError, TypeError, ValueError, QAContractError) as exc:
         return QAStage("DIFFICULTY_V1", StageDisposition.ERROR, fallback, _digest({"level_data": level_data.digest(), "reason": str(exc)}), f"M04 difficulty evidence is invalid: {exc}")
@@ -286,29 +310,19 @@ def _provider_result(provider: object, stage: str, level_data: LevelDataIdentity
     return result
 
 
-def evaluate_unified_qa(
-    level_data: LevelDataIdentity,
-    artifact: object,
-    *,
-    provider: MainGameValidationProvider | object | None,
-    main_game_authority: AuthorityIdentity | None,
-    difficulty_analysis: DifficultyAnalysis | None,
-    factory_authority: AuthorityIdentity | None = None,
-) -> "UnifiedQAReport":
-    """Compose M05 stages without replacing any upstream authority."""
-
+def evaluate_unified_qa(level_data: LevelDataIdentity, artifact: object, *, provider: MainGameValidationProvider | object | None, main_game_authority: AuthorityIdentity | None, difficulty_analysis: DifficultyAnalysis | None, factory_authority: AuthorityIdentity | None = None) -> "UnifiedQAReport":
     if not isinstance(level_data, LevelDataIdentity):
         raise QAContractError("LevelDataIdentity is required")
-    factory = factory_authority or AuthorityIdentity("Sekiph82/ScrubBots-Level-Factory", "UNAVAILABLE", "src/scrubbots_pixel_factory/qa", FACTORY_QA_AUTHORITY)
-    stages = [QAStage("LEVEL_DATA_V1", StageDisposition.PASS, factory, level_data.digest(), "exact Level Data V1 source and byte identities are bound")]
+    factory = factory_authority or AuthorityIdentity("https://github.com/Sekiph82/ScrubBots-Level-Factory", "UNAVAILABLE", "src/scrubbots_pixel_factory/qa", FACTORY_QA_AUTHORITY)
+    stages = [QAStage("LEVEL_DATA_V1", StageDisposition.PASS if level_data.has_exact_payload else StageDisposition.UNAVAILABLE, factory, level_data.digest(), "exact LevelData bytes/source identity are bound" if level_data.has_exact_payload else "exact LevelData payload bytes are unavailable")]
     for stage_id in ("STRUCTURAL", "PRODUCTION"):
         if provider is None:
             stages.append(_unavailable(stage_id, main_game_authority, "exact main-game validation capability is unavailable"))
             continue
         try:
-            stages.append(_stage_from_provider(stage_id, _provider_result(provider, stage_id, level_data, artifact), main_game_authority))
+            stages.append(_stage_from_provider(stage_id, _provider_result(provider, stage_id, level_data, artifact), level_data, main_game_authority))
         except Exception as exc:
-            authority = main_game_authority or AuthorityIdentity("Sekiph82/Scrubbots", "UNAVAILABLE", "main-game/M05", "UNAVAILABLE")
+            authority = main_game_authority or AuthorityIdentity("https://github.com/Sekiph82/Scrubbots", "UNAVAILABLE", "main-game/M05", "UNAVAILABLE")
             stages.append(QAStage(stage_id, StageDisposition.ERROR, authority, _digest({"stage": stage_id, "error": str(exc)}), f"main-game validation provider error: {exc}"))
     stages.append(_factory_stage(level_data, artifact, factory))
     stages.append(_difficulty_stage(level_data, difficulty_analysis, factory))
@@ -323,9 +337,7 @@ class UnifiedQAReport:
     version: int = UNIFIED_QA_VERSION
 
     def __post_init__(self) -> None:
-        if self.schema != UNIFIED_QA_SCHEMA or self.version != UNIFIED_QA_VERSION:
-            raise QAContractError("unsupported Unified QA schema/version")
-        if not isinstance(self.level_data, LevelDataIdentity) or type(self.stages) is not tuple:
+        if self.schema != UNIFIED_QA_SCHEMA or self.version != UNIFIED_QA_VERSION or not isinstance(self.level_data, LevelDataIdentity) or type(self.stages) is not tuple:
             raise QAContractError("Unified QA report identity is malformed")
         expected = ("LEVEL_DATA_V1", "STRUCTURAL", "PRODUCTION", "FACTORY_PRODUCTION_ENVELOPE", "DIFFICULTY_V1")
         if tuple(stage.stage_id for stage in self.stages) != expected or any(not isinstance(stage, QAStage) for stage in self.stages):
@@ -354,18 +366,4 @@ class UnifiedQAReport:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
-__all__ = [
-    "FACTORY_QA_AUTHORITY",
-    "UNIFIED_QA_SCHEMA",
-    "UNIFIED_QA_VERSION",
-    "AuthorityIdentity",
-    "ExternalValidationResult",
-    "LevelDataIdentity",
-    "MainGameValidationProvider",
-    "QAContractError",
-    "QAStage",
-    "StageDisposition",
-    "UnifiedQAReport",
-    "UnifiedQADisposition",
-    "evaluate_unified_qa",
-]
+__all__ = ["FACTORY_QA_AUTHORITY", "UNIFIED_QA_SCHEMA", "UNIFIED_QA_VERSION", "AuthorityIdentity", "ExternalValidationResult", "LevelDataIdentity", "MainGameValidationProvider", "QAContractError", "QAStage", "StageDisposition", "UnifiedQAReport", "UnifiedQADisposition", "evaluate_unified_qa", "_canonical_bytes", "_digest", "_sha"]
