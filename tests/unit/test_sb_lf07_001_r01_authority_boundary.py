@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 
 import pytest
 import scrubbots_pixel_factory.mutation_base as mutation_base
@@ -65,3 +66,11 @@ def test_task001_substrate_surface_has_no_future_task_services() -> None:
     assert not hasattr(mutation_base, "select_target")
     assert not hasattr(mutation_base, "run_bounded_mutations")
     assert not hasattr(mutation_base, "OwnerSourceRecord")
+
+
+def test_base_substrate_is_physical_and_does_not_depend_on_service_monolith() -> None:
+    source = Path(mutation_base.__file__).read_text(encoding="utf-8")
+    assert "from .m07_services" not in source
+    assert "import m07_services" not in source
+    for symbol in ("AuthorityIdentity", "MutationCandidate", "MutationRequest", "MutationResult", "MutationRegistry", "MutationEngine"):
+        assert getattr(mutation_base, symbol).__module__ == mutation_base.__name__
