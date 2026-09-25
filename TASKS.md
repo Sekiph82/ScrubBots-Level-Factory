@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M07 — Mutation & Automatic Difficulty Targeting
-- Current Sprint: SB-LF07.C001-R02 — M07 second strict remediation batch
+- Current Sprint: SB-LF07.C001-R03 — M07 selective third strict remediation batch
 - Current Task: SB-LF07-001 — Mutation interface/immutable lineage
-- Current Task Status: CHANGES_REQUIRED / R02_AUTHORIZED / REMEDIATE_ALL_THEN_REAUDIT
-- Next Task/Action: Codex executes `SB-LF07-001..010-C001-R02` sequentially without stopping from `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`, closes every remaining R01 finding, resolves Scrubbots current-main separately inside each authority-dependent task, creates one R02 log per task plus a master R02 log, never edits `TASKS.md` or ChatGPT audits, then stops. ChatGPT independently re-audits all ten tasks; only R02-audited PASS tasks advance checkboxes.
+- Current Task Status: CHANGES_REQUIRED / R03_AUTHORIZED / SELECTIVE_REMEDIATE_THEN_REAUDIT
+- Next Task/Action: Codex executes only `SB-LF07-001,004,005,006,007,008,009,010-C001-R03` from `.hiveai/prompts/SB-LF07-C001-R03_MASTER_REMEDIATION_PROMPT.md`; `SB-LF07-002` and `003` are frozen PASS/CLOSED and must not be reimplemented. Codex creates eight task logs plus one master log, never edits `TASKS.md` or ChatGPT audits, then stops for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF07-001-010-C001-R01_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF07-001-010-C001-R02_STRICT_REAUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: original `SB-LF07-001..010-C001` strict criteria plus the ten R01 re-audits summarized by `.hiveai/audits/SB-LF07-001-010-C001-R01_STRICT_REAUDIT_SUMMARY.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: original `SB-LF07-001..010-C001` strict criteria plus the R02 re-audits summarized by `.hiveai/audits/SB-LF07-001-010-C001-R02_STRICT_REAUDIT_SUMMARY.md`; `SB-LF07-002` and `003` are accepted PASS/CLOSED.
+- Current Prompt: `.hiveai/prompts/SB-LF07-C001-R03_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -154,6 +154,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF07 R02 Remediation Index: `.hiveai/prompts/SB-LF07-001-010-C001-R02_REMEDIATION_INDEX.md`.
 - SB-LF07 R02 Master Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF07 R02 Tracker Policy: Codex does not advance task checkboxes; ChatGPT independently re-audits all ten after the complete R02 batch.
+- SB-LF07 R02 Re-Audit Result: `PASS/CLOSED = 002,003`; `CHANGES_REQUIRED = 001,004,005,006,007,008,009,010`.
+- SB-LF07 R02 Re-Audit Summary: `.hiveai/audits/SB-LF07-001-010-C001-R02_STRICT_REAUDIT_SUMMARY.md`.
+- SB-LF07 R03 Remediation Authorization: `SB-LF07-001,004,005,006,007,008,009,010-C001-R03 — SELECTIVE_REMEDIATE_THEN_REAUDIT`.
+- SB-LF07 R03 Remediation Index: `.hiveai/prompts/SB-LF07-C001-R03_REMEDIATION_INDEX.md`.
+- SB-LF07 R03 Master Prompt: `.hiveai/prompts/SB-LF07-C001-R03_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF07 R03 Tracker Policy: `002` and `003` remain frozen PASS/CLOSED; Codex remediates only the eight open tasks and ChatGPT re-audits only those after the complete R03 batch.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -499,8 +505,8 @@ Capability source family: `SB-LF07-xxx` from the main Scrubbots master plan.
 ### M07.01 - Mutation contract and safe operators
 
 - [~] SB-LF07-001 — Mutation interface/immutable lineage.
-- [ ] SB-LF07-002 — Safe hardening mutations only for canonical mechanics.
-- [ ] SB-LF07-003 — Safe easing mutations only for canonical mechanics.
+- [x] SB-LF07-002 — Safe hardening mutations only for canonical mechanics.
+- [x] SB-LF07-003 — Safe easing mutations only for canonical mechanics.
 - [ ] SB-LF07-004 — Re-solve/revalidate after every mutation.
 - [ ] SB-LF07-005 — Preserve seed/parent/mutation provenance.
 
