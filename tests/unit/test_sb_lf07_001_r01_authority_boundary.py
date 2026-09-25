@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 
 import pytest
+import scrubbots_pixel_factory.mutation_base as mutation_base
 
 from scrubbots_pixel_factory import (
     AuthorityIdentity,
@@ -57,3 +58,10 @@ def test_source_blob_drift_and_missing_current_main_fail_closed() -> None:
 def test_malformed_resolver_inputs_are_rejected_before_identity_use() -> None:
     with pytest.raises(MutationContractError):
         CurrentMainAuthorityResolver(None, lambda _commit, _path: SOURCE)  # type: ignore[arg-type]
+
+
+def test_task001_substrate_surface_has_no_future_task_services() -> None:
+    assert not hasattr(mutation_base, "evidence")
+    assert not hasattr(mutation_base, "select_target")
+    assert not hasattr(mutation_base, "run_bounded_mutations")
+    assert not hasattr(mutation_base, "OwnerSourceRecord")
