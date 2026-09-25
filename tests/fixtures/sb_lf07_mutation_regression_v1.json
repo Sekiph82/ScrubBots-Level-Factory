@@ -1,0 +1,22 @@
+{
+  "schema": "scrubbots-m07-mutation-regression",
+  "version": 1,
+  "authority": {
+    "repository": "https://github.com/Sekiph82/Scrubbots",
+    "commit_sha": "edf672f61989d28fd1931917ab49b2d64cc416d6",
+    "palette_contract": "Palette V3 C01..C16 BG01-presentation-only"
+  },
+  "cases": [
+    {"id": "immutable-lineage", "contract": "SB-LF07-001", "expected": "deterministic-child"},
+    {"id": "canonical-hardening", "contract": "SB-LF07-002", "operator": "CANONICAL_PREVIEW_DEPTH_HARDEN_V1", "expected": "preview-depth-4"},
+    {"id": "canonical-easing", "contract": "SB-LF07-003", "operator": "CANONICAL_PLUS_ONE_SLOT_EASE_V1", "expected": "slot-capacity-6"},
+    {"id": "post-mutation-truth-chain", "contract": "SB-LF07-004", "expected": "m03-m04-m05-bound"},
+    {"id": "provenance-tamper-cycle-root", "contract": "SB-LF07-005", "expected": "fail-closed"},
+    {"id": "challenge-targeting", "contract": "SB-LF07-006", "expected": "score-range-only"},
+    {"id": "bounded-exhaustion", "contract": "SB-LF07-007", "expected": "explicit-exhausted"},
+    {"id": "matched-efficiency", "contract": "SB-LF07-008", "expected": "telemetry-excluded"},
+    {"id": "owner-source-preservation", "contract": "SB-LF07-009", "expected": "bytes-unchanged"},
+    {"id": "palette-and-proxy-regression", "contract": "SB-LF07-010", "expected": "c01-c16-no-size-color-difficulty"}
+  ],
+  "corpus_sha256": "1476462748abb8a7bc33c4ccfb470542c2c1962e2bedfc53c71f720f5fea5d0b"
+}
