@@ -31,6 +31,22 @@ This log covers only SB-LF05-005. It will define closed QA semantics and statist
 - Added `tests/unit/test_sb_lf05_005_qa_outcomes.py` covering the distinct outcome mapping, rejection statistics, and deterministic statistics identity.
 - Focused command: `$env:PYTHONPATH='src'; python -m pytest -q tests/unit/test_sb_lf05_005_qa_outcomes.py -p no:cacheprovider` -> `2 passed`.
 
+## Gates and publication
+
+- Implementation commit: `c84d6f2bf2f87f364ed4c121bd90ea7b6472be22`.
+- Implementation push: `git push origin HEAD:main` passed; remote advanced from `7e77b671f2561795edc9732a399b1dfde46c0835`.
+- Full pytest: `965 passed, 2 skipped` in `299.65s`; the two skips were the permitted absent canonical ScrubBots checkout capability in retained M03/M04 bridge tests.
+- Compileall: `python -m compileall -q src tests` passed.
+- Godot: `godot_console.exe --headless --path level_factory --editor --quit` passed on Godot `4.7.2.stable.official.ed1daf0bf`.
+- `git diff --check`: passed.
+- `git diff --exit-code -- TASKS.md`: passed.
+- Final pre-terminal local HEAD and `origin/main`: both `c84d6f2bf2f87f364ed4c121bd90ea7b6472be22`; divergence `0 0`.
+- Pre-existing untracked detached-worktree folders and Godot `.uid` files remained unmodified and unstaged.
+
+## Terminal log-only closure
+
+- Pending: this append is the terminal evidence update; it will be published as the required log-only commit before the next M05 task begins.
+
 ## Final handoff
 
 Pending implementation and independent ChatGPT audit. Builder evidence is not acceptance.
