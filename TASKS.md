@@ -5,11 +5,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M07 — Mutation & Automatic Difficulty Targeting
-- Current Sprint: SB-LF07.C001 — Mutation interface and immutable lineage
+- Current Sprint: SB-LF07.C001 — M07 mutation/difficulty-targeting master implementation batch
 - Current Task: SB-LF07-001 — Mutation interface/immutable lineage
-- Current Task Status: PLANNED / PROMPT_REQUIRED
-- Next Task/Action: ChatGPT authors the strict audit criteria and implementation prompt for `SB-LF07-001`, grounded in accepted M03/M04/M05/M06 contracts and canonical Palette V3; only then is Codex implementation authorized.
-- Required Actor: CHATGPT
+- Current Task Status: AUTHORIZED / IMPLEMENT_ALL_THEN_AUDIT
+- Next Task/Action: Codex executes `SB-LF07-001..010-C001` sequentially without stopping from `.hiveai/prompts/SB-LF07-001-010-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`, creates one dedicated builder log per task plus a master log, never edits `TASKS.md` or ChatGPT audits, then stops. ChatGPT independently strict-audits all ten tasks one-by-one and writes one audit report per task; only audited PASS tasks advance checkboxes.
+- Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: PENDING authoring for `SB-LF07-001`; must preserve accepted M03 solver/state authority, M04 Difficulty V1 truth, M05 QA/handoff truth, M06 editor separation, immutable owner sources, and canonical Palette V3.
-- Current Prompt: PENDING authoring for `SB-LF07-001`.
+- Current Audit Criteria: `.hiveai/prompts/SB-LF07-001-010-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` indexes the ten dedicated strict audit criteria under `.hiveai/audit-criteria/SB-LF07-001..010-C001_*_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF07-001-010-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -138,6 +138,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Palette V3 Maintenance Result: `PASS/CLOSED` by `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`.
 - Palette V3 Accepted Level Factory SHA: `c99142468987378ee8d03a4807a87275cdcb604e`.
 - Palette V3 Accepted Scrubbots SHA: `edf672f61989d28fd1931917ab49b2d64cc416d6`.
+- SB-LF07 Batch Implementation Authorization: `SB-LF07-001..010-C001 — IMPLEMENT_ALL_THEN_AUDIT`.
+- SB-LF07 Batch Index: `.hiveai/prompts/SB-LF07-001-010-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
+- SB-LF07 Batch Master Prompt: `.hiveai/prompts/SB-LF07-001-010-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
+- SB-LF07 Batch Tracker Policy: Codex implements all ten sequentially and never advances checkboxes; after the complete batch ChatGPT audits `001..010` individually, writes a separate strict audit file for each task, updates tracker state, and creates remediation only for CHANGES_REQUIRED tasks.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -482,7 +486,7 @@ Capability source family: `SB-LF07-xxx` from the main Scrubbots master plan.
 
 ### M07.01 - Mutation contract and safe operators
 
-- [ ] SB-LF07-001 — Mutation interface/immutable lineage.
+- [~] SB-LF07-001 — Mutation interface/immutable lineage.
 - [ ] SB-LF07-002 — Safe hardening mutations only for canonical mechanics.
 - [ ] SB-LF07-003 — Safe easing mutations only for canonical mechanics.
 - [ ] SB-LF07-004 — Re-solve/revalidate after every mutation.
