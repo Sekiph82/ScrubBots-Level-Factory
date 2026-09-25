@@ -1,0 +1,68 @@
+# SB-LF07-001..010-C001-R02 — Remediation Index
+
+Document role: CHATGPT REMEDIATION AUTHORIZATION / INDEX
+
+R01 strict re-audit result:
+- PASS/CLOSED: none.
+- CHANGES_REQUIRED: 001,002,003,004,005,006,007,008,009,010.
+
+Original C001 strict criteria remain authoritative. R02 must close the remaining R01 findings without weakening earlier accepted M03/M04/M05/M06/Palette V3 contracts.
+
+Policy:
+- Codex remediates 001..010 sequentially without intermediate ChatGPT review.
+- Resolve Scrubbots current main freshly inside every authority-dependent task, not once per batch.
+- Codex never edits root TASKS.md or .hiveai/audits/**.
+- Each task receives a separate R02 builder log and implementation + terminal-log commits.
+- No task self-promotes PASS/CLOSED.
+- ChatGPT independently re-audits all ten only after the complete R02 batch.
+
+## SB-LF07-001
+- R01 re-audit: `.hiveai/audits/SB-LF07-001-C001-R01_MUTATION_INTERFACE_IMMUTABLE_LINEAGE_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-001-C001-R02_MUTATION_INTERFACE_IMMUTABLE_LINEAGE_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-001-C001-R02_MUTATION_INTERFACE_IMMUTABLE_LINEAGE_CODEX_LOG.md`
+
+## SB-LF07-002
+- R01 re-audit: `.hiveai/audits/SB-LF07-002-C001-R01_SAFE_HARDENING_CANONICAL_MECHANICS_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-002-C001-R02_SAFE_HARDENING_CANONICAL_MECHANICS_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-002-C001-R02_SAFE_HARDENING_CANONICAL_MECHANICS_CODEX_LOG.md`
+
+## SB-LF07-003
+- R01 re-audit: `.hiveai/audits/SB-LF07-003-C001-R01_SAFE_EASING_CANONICAL_MECHANICS_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-003-C001-R02_SAFE_EASING_CANONICAL_MECHANICS_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-003-C001-R02_SAFE_EASING_CANONICAL_MECHANICS_CODEX_LOG.md`
+
+## SB-LF07-004
+- R01 re-audit: `.hiveai/audits/SB-LF07-004-C001-R01_RESOLVE_REVALIDATE_EVERY_MUTATION_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-004-C001-R02_RESOLVE_REVALIDATE_EVERY_MUTATION_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-004-C001-R02_RESOLVE_REVALIDATE_EVERY_MUTATION_CODEX_LOG.md`
+
+## SB-LF07-005
+- R01 re-audit: `.hiveai/audits/SB-LF07-005-C001-R01_SEED_PARENT_MUTATION_PROVENANCE_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-005-C001-R02_SEED_PARENT_MUTATION_PROVENANCE_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-005-C001-R02_SEED_PARENT_MUTATION_PROVENANCE_CODEX_LOG.md`
+
+## SB-LF07-006
+- R01 re-audit: `.hiveai/audits/SB-LF07-006-C001-R01_TARGET_CHALLENGE_SCORE_RANGE_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-006-C001-R02_TARGET_CHALLENGE_SCORE_RANGE_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-006-C001-R02_TARGET_CHALLENGE_SCORE_RANGE_CODEX_LOG.md`
+
+## SB-LF07-007
+- R01 re-audit: `.hiveai/audits/SB-LF07-007-C001-R01_BOUNDED_MUTATION_ATTEMPTS_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-007-C001-R02_BOUNDED_MUTATION_ATTEMPTS_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-007-C001-R02_BOUNDED_MUTATION_ATTEMPTS_CODEX_LOG.md`
+
+## SB-LF07-008
+- R01 re-audit: `.hiveai/audits/SB-LF07-008-C001-R01_MUTATE_VS_REGENERATE_EFFICIENCY_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-008-C001-R02_MUTATE_VS_REGENERATE_EFFICIENCY_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-008-C001-R02_MUTATE_VS_REGENERATE_EFFICIENCY_CODEX_LOG.md`
+
+## SB-LF07-009
+- R01 re-audit: `.hiveai/audits/SB-LF07-009-C001-R01_OWNER_SOURCE_ART_NON_MUTATION_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-009-C001-R02_OWNER_SOURCE_ART_NON_MUTATION_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-009-C001-R02_OWNER_SOURCE_ART_NON_MUTATION_CODEX_LOG.md`
+
+## SB-LF07-010
+- R01 re-audit: `.hiveai/audits/SB-LF07-010-C001-R01_DETERMINISTIC_MUTATION_REGRESSION_STRICT_REAUDIT.md`
+- R02 prompt: `.hiveai/prompts/SB-LF07-010-C001-R02_DETERMINISTIC_MUTATION_REGRESSION_REMEDIATION_PROMPT.md`
+- R02 log: `.hiveai/codex-logs/SB-LF07-010-C001-R02_DETERMINISTIC_MUTATION_REGRESSION_CODEX_LOG.md`
+
