@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 from .mutation_base import MutationCandidate, MutationDisposition, MutationEngine, MutationRequest
+from .mutation_evidence import provenance_from_authentic_validation
 from .m07_services import AttemptBudget, AttemptDisposition, AttemptProvenance, AttemptRecord, AttemptReport, MutationProvenance, MutationResult, TypedChallengeTarget
 from .mutation_targeting import AuthenticTargetCandidate, select_authentic_target
 
@@ -26,7 +27,7 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
             continue
         candidate = validator(mutation)
         selection = select_authentic_target(target, (candidate,))
-        provenance = MutationProvenance.from_result(request, mutation, attempt_ordinal=ordinal, evidence_digests=(candidate.envelope.evidence_digest,))
+        provenance = provenance_from_authentic_validation(request, mutation, candidate.envelope, candidate.solver, candidate.difficulty, candidate.qa, attempt_ordinal=ordinal)
         records.append(AttemptRecord(ordinal, seed, mutation, candidate.envelope, selection, provenance, attempt))
         if selection.disposition.value == "MATCH":
             return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), candidate.envelope, "authenticated target matched before budget exhaustion")

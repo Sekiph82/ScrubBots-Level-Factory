@@ -17,13 +17,14 @@ def _digest(value: object) -> str:
 @dataclass(frozen=True, slots=True)
 class AuthenticTargetCandidate:
     envelope: ValidationEnvelope
+    solver: AuthenticEvidenceAdapter
     difficulty: AuthenticEvidenceAdapter
     qa: AuthenticEvidenceAdapter
 
     def __post_init__(self) -> None:
-        if self.difficulty.stage != "M04_DIFFICULTY" or self.qa.stage != "M05_QA":
-            raise MutationContractError("target candidate requires authentic M04 and M05 adapters")
-        if self.envelope.difficulty.canonical_dict() != self.difficulty.record.canonical_dict() or self.envelope.qa.canonical_dict() != self.qa.record.canonical_dict():
+        if self.solver.stage != "M03_SOLVER" or self.difficulty.stage != "M04_DIFFICULTY" or self.qa.stage != "M05_QA":
+            raise MutationContractError("target candidate requires authentic M03/M04/M05 adapters")
+        if (self.envelope.solver.canonical_dict() != self.solver.record.canonical_dict() or self.envelope.difficulty.canonical_dict() != self.difficulty.record.canonical_dict() or self.envelope.qa.canonical_dict() != self.qa.record.canonical_dict()):
             raise MutationContractError("target candidate evidence is not the exact authenticated envelope evidence")
 
 

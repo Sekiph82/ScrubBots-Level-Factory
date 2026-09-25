@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
+import json
+from types import SimpleNamespace
 import pytest
 
 from scrubbots_pixel_factory import (
@@ -15,7 +18,17 @@ from scrubbots_pixel_factory import (
     LineageRootRegistration,
     ProvenanceLedger,
     TypedEvidenceReference,
+    AuthenticTargetCandidate,
+    SafetyConstraintEvidence,
+    TypedChallengeTarget,
+    provenance_from_authentic_validation,
+    revalidate_mutation_from_authentic_adapters,
+    run_authentic_bounded_mutations,
 )
+from scrubbots_pixel_factory.mutation_base import MutationResult
+from scrubbots_pixel_factory.mutation_evidence import AuthenticEvidenceAdapter
+from scrubbots_pixel_factory.mutation_targeting import select_authentic_target
+from test_sb_lf07_004_revalidation import _authentic_chain
 from sb_lf07_r01_support import engine, m39_authority
 
 
@@ -104,3 +117,32 @@ def test_ledger_rejects_real_multi_edge_cycle() -> None:
     b_to_a = dataclasses.replace(root_to_a, parent=b_identity, child=dataclasses.replace(a_identity, parent_candidate_id=b_identity.candidate_id), pre_state_digest=b_identity.state_digest, post_state_digest=a_identity.state_digest)
     with pytest.raises(MutationContractError):
         ledger.record(b_to_a)
+
+
+def test_authentic_runner_emits_unique_typed_producer_references_and_rejects_replay_or_stage_drift() -> None:
+    parent, request, mutation, solver, analysis, score, qa, solver_adapter, difficulty_adapter, qa_adapter = _authentic_chain()
+    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver_adapter, difficulty_adapter, qa_adapter)
+    provenance = provenance_from_authentic_validation(request, mutation, envelope, solver_adapter, difficulty_adapter, qa_adapter)
+    assert [item.stage for item in provenance.evidence_references] == ["M03_SOLVER", "M04_DIFFICULTY", "M05_QA"]
+    assert all(item.producer_digest for item in provenance.evidence_references)
+    policy_digest = hashlib.sha256(json.dumps({"producer": difficulty_adapter.producer_digest, "policy_version": difficulty_adapter.record.payload["policy_version"]}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    target = TypedChallengeTarget(0.0, 100.0, policy_digest, SafetyConstraintEvidence("scrubbots-m05-safety", "1", policy_digest, True, True, True, qa_adapter.producer_digest))
+    candidate = AuthenticTargetCandidate(envelope, solver_adapter, difficulty_adapter, qa_adapter)
+    report = run_authentic_bounded_mutations(
+        parent,
+        base_seed=request.seed,
+        budget=__import__("scrubbots_pixel_factory").AttemptBudget(1),
+        request_factory=lambda parent, ordinal, seed: request,
+        engine=__import__("sb_lf07_r01_support", fromlist=["engine"]).engine(),
+        validator=lambda result: candidate if result.digest() == mutation.digest() else (_ for _ in ()).throw(AssertionError("runner replay drift")),
+        target=target,
+        source_context=SimpleNamespace(passed=True),
+    )
+    assert report.attempts[0].provenance is not None
+    assert report.attempts[0].provenance.evidence_references == provenance.evidence_references
+    with pytest.raises(MutationContractError):
+        provenance_from_authentic_validation(request, mutation, envelope, difficulty_adapter, solver_adapter, qa_adapter)
+    with pytest.raises(MutationContractError):
+        provenance_from_authentic_validation(dataclasses.replace(request, seed=52), mutation, envelope, solver_adapter, difficulty_adapter, qa_adapter)
+    with pytest.raises(MutationContractError):
+        provenance_from_authentic_validation(request, mutation, envelope, solver_adapter, object(), qa_adapter)  # type: ignore[arg-type]

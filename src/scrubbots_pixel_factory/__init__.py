@@ -429,6 +429,7 @@ from .mutation_evidence import (
     adapt_m03_solver,
     adapt_m04_difficulty,
     adapt_m05_qa,
+    provenance_from_authentic_validation,
     revalidate_mutation_from_authentic_adapters,
 )
 from .mutation_targeting import AuthenticTargetCandidate, build_typed_target, select_authentic_target

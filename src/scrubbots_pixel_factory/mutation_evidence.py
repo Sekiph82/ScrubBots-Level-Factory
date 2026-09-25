@@ -1,6 +1,6 @@
 """SB-LF07-004 adapters over accepted M03/M04/M05 producer objects."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
 import json
 from typing import Any
@@ -11,7 +11,7 @@ from .difficulty_analysis import AnalysisDisposition, ChallengeScoreResult, Diff
 from .qa.unified import UnifiedQAReport, UnifiedQADisposition
 from .solver_evidence import SolverEvidenceReport
 from .mutation_base import MutationContractError
-from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationResult, ValidationEnvelope, revalidate_mutation
+from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationProvenance, MutationRequest, MutationResult, TypedEvidenceReference, ValidationEnvelope, revalidate_mutation
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,4 +160,20 @@ def revalidate_mutation_from_authentic_adapters(mutation: MutationResult, solver
     return revalidate_mutation(mutation, solver.record, difficulty.record, qa.record)
 
 
-__all__ = ["AuthenticEvidenceAdapter", "adapt_m03_solver", "adapt_m04_difficulty", "adapt_m05_qa", "revalidate_mutation_from_authentic_adapters"]
+def provenance_from_authentic_validation(request: MutationRequest, mutation: MutationResult, envelope: ValidationEnvelope, solver: AuthenticEvidenceAdapter, difficulty: AuthenticEvidenceAdapter, qa: AuthenticEvidenceAdapter, *, attempt_ordinal: int = 0) -> MutationProvenance:
+    adapters = (solver, difficulty, qa)
+    if not all(isinstance(item, AuthenticEvidenceAdapter) for item in adapters):
+        raise MutationContractError("typed production provenance requires authentic producer adapters")
+    if tuple(item.stage for item in adapters) != ("M03_SOLVER", "M04_DIFFICULTY", "M05_QA"):
+        raise MutationContractError("typed production provenance stages are incomplete or reordered")
+    expected = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
+    if not isinstance(envelope, ValidationEnvelope) or envelope.canonical_dict() != expected.canonical_dict():
+        raise MutationContractError("typed production provenance requires the exact authentic validation envelope")
+    if envelope.mutation_digest != mutation.digest() or mutation.child is None or envelope.child != mutation.child.identity:
+        raise MutationContractError("typed production provenance is not bound to the exact mutation child")
+    base = MutationProvenance.from_result(request, mutation, attempt_ordinal=attempt_ordinal)
+    references = tuple(TypedEvidenceReference(item.stage, item.record.evidence_digest, item.producer_digest) for item in adapters)
+    return replace(base, evidence_references=references)
+
+
+__all__ = ["AuthenticEvidenceAdapter", "adapt_m03_solver", "adapt_m04_difficulty", "adapt_m05_qa", "revalidate_mutation_from_authentic_adapters", "provenance_from_authentic_validation"]

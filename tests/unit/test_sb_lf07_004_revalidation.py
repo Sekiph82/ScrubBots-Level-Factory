@@ -134,11 +134,11 @@ def _authentic_chain():
     solver_adapter = adapt_m03_solver(solver, mutation)
     difficulty_adapter = adapt_m04_difficulty(analysis, score, mutation, solver=solver_adapter)
     qa_adapter = adapt_m05_qa(qa, mutation)
-    return mutation, solver, analysis, score, qa, solver_adapter, difficulty_adapter, qa_adapter
+    return parent, request, mutation, solver, analysis, score, qa, solver_adapter, difficulty_adapter, qa_adapter
 
 
 def test_authentic_producer_chain_binds_exact_child_and_rejects_unrelated_objects() -> None:
-    mutation, solver, analysis, score, qa, solver_adapter, difficulty_adapter, qa_adapter = _authentic_chain()
+    _, _, mutation, solver, analysis, score, qa, solver_adapter, difficulty_adapter, qa_adapter = _authentic_chain()
     envelope = revalidate_mutation_from_authentic_adapters(mutation, solver_adapter, difficulty_adapter, qa_adapter)
     assert envelope.disposition is ValidationDisposition.ELIGIBLE
     with pytest.raises(MutationContractError):
