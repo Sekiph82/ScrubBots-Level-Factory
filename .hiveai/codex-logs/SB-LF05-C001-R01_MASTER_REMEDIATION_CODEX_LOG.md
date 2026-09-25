@@ -56,4 +56,5 @@ Document role: CODEX BUILDER LOG
 ## Final publication state
 
 - Immediately before this master-log publication: local HEAD and `origin/main` were both `a6e9948bb70b908ed8b254559ec0ac97b10298b4`; divergence `0 0`.
-- Master log publication commit: pending in this initial publication; a final log-only closure append will record its SHA and final equality.
+- Master log publication commit: `c997deec314f1141ba9fcb6dc418cb32035d48d5`.
+- Final master-log terminal closure commit: pending in this append; after it, local HEAD and `origin/main` will be re-verified and this batch will stop for independent ChatGPT re-audit.
