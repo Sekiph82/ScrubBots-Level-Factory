@@ -17,6 +17,7 @@ from scrubbots_pixel_factory import (
     ValidationDisposition,
     evidence,
     revalidate_mutation,
+    revalidate_mutation_from_authentic_adapters,
     revalidate_mutation_from_typed_receipts,
 )
 from sb_lf07_r01_support import engine, m39_authority
@@ -94,3 +95,12 @@ def test_typed_receipt_rejects_forged_producer_stage_or_missing_score() -> None:
     bad = type(difficulty)(difficulty.stage, difficulty.disposition, difficulty.child_state_digest, difficulty.request_digest, difficulty.parent_state_digest, difficulty.operator_id, difficulty.authority_digest, {"policy_version": "DIFFICULTY_V1"})
     with pytest.raises(MutationContractError):
         M04DifficultyEvidenceReceipt("M04_DIFFICULTY", "difficulty-evidence", "1", "2" * 64, bad)
+
+
+def test_production_authentic_adapter_entry_point_rejects_self_signed_wrappers() -> None:
+    mutation = _mutation()
+    solver, difficulty, qa = _records(mutation)
+    with pytest.raises(MutationContractError):
+        revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)  # type: ignore[arg-type]
+    with pytest.raises(MutationContractError):
+        revalidate_mutation_from_authentic_adapters(mutation, object(), object(), object())  # type: ignore[arg-type]

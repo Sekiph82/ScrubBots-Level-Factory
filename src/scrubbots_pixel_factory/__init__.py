@@ -422,6 +422,13 @@ from .mutation import (
     select_target,
     verify_owner_source_immutable,
 )
+from .mutation_evidence import (
+    AuthenticEvidenceAdapter,
+    adapt_m03_solver,
+    adapt_m04_difficulty,
+    adapt_m05_qa,
+    revalidate_mutation_from_authentic_adapters,
+)
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,
