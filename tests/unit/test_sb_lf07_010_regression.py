@@ -32,7 +32,7 @@ from scrubbots_pixel_factory import (
     select_target,
     verify_owner_source_immutable,
 )
-from sb_lf07_r01_support import engine as concrete_engine, m23_authority, m39_authority
+from sb_lf07_r01_support import engine as concrete_engine, m39_authority
 
 
 ROOT = Path(__file__).parents[2]
@@ -42,7 +42,7 @@ CORPUS = ROOT / "tests" / "fixtures" / "sb_lf07_mutation_regression_v1.json"
 def _parent(candidate_id: str = "regression-parent") -> MutationCandidate:
     return MutationCandidate.root(
         candidate_id,
-        {"width": 20, "height": 20, "color_count": 3, "difficulty_label": "EASY", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5, "booster": "+1_SLOT"}},
+        {"width": 20, "height": 20, "color_count": 3, "difficulty_label": "EASY", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}},
         level_data_sha256="1" * 64,
         source_art_sha256="2" * 64,
     )
@@ -69,7 +69,7 @@ def test_checksummed_m07_regression_corpus_is_complete_and_versioned() -> None:
 def test_repeated_clean_regression_run_has_identical_canonical_digests_and_attempts() -> None:
     parent = _parent()
     engine = concrete_engine()
-    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=101, intent=MutationIntent.HARDEN, authority=m23_authority())
+    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=101, intent=MutationIntent.HARDEN, authority=m39_authority())
     first = engine.apply(request, parent)
     second = engine.apply(request, parent)
     assert first.digest() == second.digest()
@@ -78,7 +78,7 @@ def test_repeated_clean_regression_run_has_identical_canonical_digests_and_attem
     assert MutationProvenance.from_result(request, first, attempt_ordinal=0).digest() == MutationProvenance.from_result(request, second, attempt_ordinal=0).digest()
 
     def factory(candidate, ordinal, seed):
-        return MutationRequest.for_candidate(candidate, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m23_authority())
+        return MutationRequest.for_candidate(candidate, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m39_authority())
 
     def validate(result):
         return revalidate_mutation(result, *_evidence_chain(result))
@@ -91,7 +91,7 @@ def test_repeated_clean_regression_run_has_identical_canonical_digests_and_attem
 
 
 def test_regression_corpus_exercises_real_easing_truth_chain_and_negative_tamper() -> None:
-    parent = _parent()
+    parent = MutationCandidate.root("regression-easing-parent", {"width": 20, "height": 20, "color_count": 3, "difficulty_label": "EASY", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5, "booster": "+1_SLOT"}})
     request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_EASE_V1", operator_version="1", seed=102, intent=MutationIntent.EASE, authority=m39_authority())
     mutation = concrete_engine().apply(request, parent)
     assert mutation.disposition is MutationDisposition.APPLIED

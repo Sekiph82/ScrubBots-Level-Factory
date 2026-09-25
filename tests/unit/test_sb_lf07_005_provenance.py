@@ -14,12 +14,12 @@ from scrubbots_pixel_factory import (
     MutationRequest,
     ProvenanceLedger,
 )
-from sb_lf07_r01_support import engine, m23_authority
+from sb_lf07_r01_support import engine, m39_authority
 
 
 def _applied():
-    parent = MutationCandidate.root("provenance-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5}})
-    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=51, intent=MutationIntent.HARDEN, authority=m23_authority())
+    parent = MutationCandidate.root("provenance-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}})
+    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=51, intent=MutationIntent.HARDEN, authority=m39_authority())
     result = engine().apply(request, parent)
     assert result.disposition is MutationDisposition.APPLIED
     return request, result

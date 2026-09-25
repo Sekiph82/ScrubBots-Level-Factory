@@ -15,13 +15,13 @@ from scrubbots_pixel_factory import (
     MutationIntent,
     MutationRequest,
 )
-from sb_lf07_r01_support import engine, m23_authority
+from sb_lf07_r01_support import engine, m39_authority
 
 
 def _parent() -> MutationCandidate:
     return MutationCandidate.root(
         "candidate-root",
-        {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5}, "config": {"seed_class": "fixture"}},
+        {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}, "config": {"seed_class": "fixture"}},
         level_data_sha256="a" * 64,
         source_art_sha256="b" * 64,
     )
@@ -45,11 +45,11 @@ def test_root_parent_is_deeply_immutable_and_request_replay_is_deterministic() -
     before = json.dumps(parent.canonical_dict(), sort_keys=True)
     request = MutationRequest.for_candidate(
         parent,
-        operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1",
+        operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1",
         operator_version="1",
         seed=41,
         intent=MutationIntent.HARDEN,
-        authority=m23_authority(),
+        authority=m39_authority(),
     )
     first = engine().apply(request, parent)
     second = engine().apply(request, parent)
@@ -61,20 +61,20 @@ def test_root_parent_is_deeply_immutable_and_request_replay_is_deterministic() -
     assert first.child.parent_candidate_id == parent.candidate_id
     assert json.dumps(parent.canonical_dict(), sort_keys=True) == before
     with pytest.raises(TypeError):
-        parent.payload["gameplay"]["preview_depth"] = 4  # type: ignore[index]
+        parent.payload["gameplay"]["slot_capacity"] = 5  # type: ignore[index]
 
 
 def test_stale_parent_authority_and_operator_drift_fail_closed() -> None:
     parent = _parent()
     request = MutationRequest.for_candidate(
         parent,
-        operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1",
+        operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1",
         operator_version="1",
         seed=8,
         intent=MutationIntent.HARDEN,
-        authority=m23_authority(),
+        authority=m39_authority(),
     )
-    stale = MutationCandidate.root("candidate-root", {"gameplay": {"column_count": 3, "preview_depth": 4, "slot_capacity": 5}, "config": {"seed_class": "fixture"}}, level_data_sha256="a" * 64, source_art_sha256="b" * 64)
+    stale = MutationCandidate.root("candidate-root", {"gameplay": {"column_count": 3, "preview_depth": 4, "slot_capacity": 5, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}, "config": {"seed_class": "fixture"}}, level_data_sha256="a" * 64, source_art_sha256="b" * 64)
     assert engine().apply(request, stale).disposition is MutationDisposition.ERROR
     bad = MutationRequest(parent.identity, request.operator_id, request.operator_version, request.seed, MutationIntent.EASE, request.authority)
     assert engine().apply(bad, parent).disposition is MutationDisposition.ERROR

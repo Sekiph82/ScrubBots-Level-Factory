@@ -582,23 +582,6 @@ def _allowed_gameplay_change(before: Mapping[str, object], after: Mapping[str, o
     return True
 
 
-def _preview_hardening(payload: Mapping[str, object]) -> tuple[MutationDisposition, Mapping[str, object] | None, str]:
-    gameplay = _gameplay(payload)
-    if gameplay is None or type(gameplay.get("preview_depth")) is not int:
-        return MutationDisposition.INAPPLICABLE, None, "canonical M23 preview_depth state is absent"
-    depth = int(gameplay["preview_depth"])
-    if depth < 3 or depth > 4 or type(gameplay.get("column_count")) is not int or not 3 <= int(gameplay["column_count"]) <= 5:
-        return MutationDisposition.ERROR, None, "canonical M23 preview/column bounds are invalid"
-    if depth == 4:
-        return MutationDisposition.NO_CHANGE, None, "canonical M23 preview depth is already at its hardening bound"
-    gameplay["preview_depth"] = depth + 1
-    out = _copy_payload(payload)
-    out["gameplay"] = gameplay
-    if not _allowed_gameplay_change(_gameplay(payload) or {}, gameplay, "preview_depth"):
-        return MutationDisposition.ERROR, None, "hardening transform changed an unauthorized gameplay field"
-    return MutationDisposition.APPLIED, out, "increased canonical M23 FIFO preview depth by one"
-
-
 def _slot_easing(payload: Mapping[str, object]) -> tuple[MutationDisposition, Mapping[str, object] | None, str]:
     gameplay = _gameplay(payload)
     if gameplay is None or type(gameplay.get("slot_capacity")) is not int:
@@ -618,10 +601,31 @@ def _slot_easing(payload: Mapping[str, object]) -> tuple[MutationDisposition, Ma
     return MutationDisposition.APPLIED, out, "activated the canonical M39 temporary sixth slot"
 
 
+def _slot_hardening(payload: Mapping[str, object]) -> tuple[MutationDisposition, Mapping[str, object] | None, str]:
+    """Reverse only the authority-defined, uncommitted +1 Slot transition."""
+
+    gameplay = _gameplay(payload)
+    if gameplay is None or type(gameplay.get("slot_capacity")) is not int:
+        return MutationDisposition.INAPPLICABLE, None, "canonical M39 slot capacity state is absent"
+    if gameplay.get("booster") != "+1_SLOT":
+        return MutationDisposition.INAPPLICABLE, None, "canonical +1 Slot booster identity is not present"
+    if gameplay.get("sixth_slot_state") != "EMPTY" or gameplay.get("live_work_on_sixth", 0) != 0:
+        return MutationDisposition.INAPPLICABLE, None, "canonical M39 rollback requires an empty, uncommitted sixth slot"
+    if int(gameplay["slot_capacity"]) != 6:
+        return MutationDisposition.NO_CHANGE if int(gameplay["slot_capacity"]) == 5 else MutationDisposition.ERROR, None, "canonical M39 rollback requires active six-slot capacity"
+    gameplay["slot_capacity"] = 5
+    out = _copy_payload(payload)
+    out["gameplay"] = gameplay
+    if not _allowed_gameplay_change(_gameplay(payload) or {}, gameplay, "slot_capacity"):
+        return MutationDisposition.ERROR, None, "hardening rollback changed an unauthorized gameplay field"
+    return MutationDisposition.APPLIED, out, "rolled back the canonical M39 uncommitted temporary sixth slot to the five-slot baseline"
+
+
 CANONICAL_M23_SOURCE_PATH = "scripts/gameplay/supply/batch_supply_engine.gd"
 CANONICAL_M39_SOURCE_PATH = "scripts/gameplay/slots/five_slot_batch_engine.gd"
 CANONICAL_M23_CONTRACT_VERSION = "M23_V02_FIFO_PREVIEW_DEPTH"
 CANONICAL_M39_CONTRACT_VERSION = "M39_V04_PLUS_ONE_SLOT"
+CANONICAL_M39_ROLLBACK_CONTRACT_VERSION = "M39_V04_PLUS_ONE_SLOT_ROLLBACK"
 CANONICAL_M23_PREVIEW_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, CANONICAL_M23_SOURCE_PATH, CANONICAL_M23_CONTRACT_VERSION)
 CANONICAL_M39_SLOT_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, CANONICAL_M39_SOURCE_PATH, CANONICAL_M39_CONTRACT_VERSION)
 
@@ -641,9 +645,8 @@ def canonical_mutation_registry(*, m23_authority: AuthorityIdentity | None = Non
     """
 
     registry = MutationRegistry()
-    if m23_authority is not None and m23_authority.commit_sha != "UNAVAILABLE" and m23_authority.source_blob_sha256 is not None:
-        registry._install(MutationOperator("CANONICAL_PREVIEW_DEPTH_HARDEN_V1", "1", MutationIntent.HARDEN, m23_authority, "increase_preview_depth"), _preview_hardening)
     if m39_authority is not None and m39_authority.commit_sha != "UNAVAILABLE" and m39_authority.source_blob_sha256 is not None:
+        registry._install(MutationOperator("CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", "1", MutationIntent.HARDEN, m39_authority, "rollback_sixth_slot"), _slot_hardening)
         registry._install(MutationOperator("CANONICAL_PLUS_ONE_SLOT_EASE_V1", "1", MutationIntent.EASE, m39_authority, "activate_sixth_slot"), _slot_easing)
     return registry
 
@@ -1031,5 +1034,5 @@ def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, afte
 
 
 __all__ = [
-    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "LineageEdge", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "TargetDisposition", "TargetSelection", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
+    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "LineageEdge", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "TargetDisposition", "TargetSelection", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
 ]

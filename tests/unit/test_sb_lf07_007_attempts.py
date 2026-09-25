@@ -18,15 +18,15 @@ from scrubbots_pixel_factory import (
     revalidate_mutation,
     run_bounded_mutations,
 )
-from sb_lf07_r01_support import engine as concrete_engine, m23_authority
+from sb_lf07_r01_support import engine as concrete_engine, m39_authority
 
 
 def _parent() -> MutationCandidate:
-    return MutationCandidate.root("attempt-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5}})
+    return MutationCandidate.root("attempt-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}})
 
 
 def _request(parent: MutationCandidate, ordinal: int, seed: int) -> MutationRequest:
-    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m23_authority())
+    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m39_authority())
 
 
 def _validate(mutation):
