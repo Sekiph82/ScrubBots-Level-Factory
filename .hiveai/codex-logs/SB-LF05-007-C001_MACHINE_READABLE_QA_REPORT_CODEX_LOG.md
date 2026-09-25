@@ -31,6 +31,22 @@ This log covers only SB-LF05-007. The report will bind exact artifact digests an
 - Added `tests/unit/test_sb_lf05_007_qa_report.py` covering accepted, structural reject, solver inconclusive, unavailable, semantic reject/unreviewed, unknown fields, caller-supplied disposition tampering, and deterministic round-trip.
 - Focused command: `$env:PYTHONPATH='src'; python -m pytest -q tests/unit/test_sb_lf05_007_qa_report.py -p no:cacheprovider` -> `7 passed`.
 
+## Gates and publication
+
+- Implementation commit: `221b50bf7d792565873bd007f5ffb2c7d2008b5e`.
+- Implementation push: `git push origin HEAD:main` passed; remote advanced from `80dccefbe96b988a038f84571d61c630635723df`.
+- Full pytest: `972 passed, 2 skipped` in `339.68s`; the two skips were the permitted absent canonical ScrubBots checkout capability in retained M03/M04 bridge tests.
+- Compileall: `python -m compileall -q src tests` passed.
+- Godot: `godot_console.exe --headless --path level_factory --editor --quit` passed on Godot `4.7.2.stable.official.ed1daf0bf`.
+- `git diff --check`: passed.
+- `git diff --exit-code -- TASKS.md`: passed.
+- Final pre-terminal local HEAD and `origin/main`: both `221b50bf7d792565873bd007f5ffb2c7d2008b5e`; divergence `0 0`.
+- Pre-existing untracked detached-worktree folders and Godot `.uid` files remained unmodified and unstaged.
+
+## Terminal log-only closure
+
+- Pending: this append is the terminal evidence update; it will be published as the required log-only commit before the next M05 task begins.
+
 ## Final handoff
 
 Pending implementation and independent ChatGPT audit. Builder evidence is not acceptance.
