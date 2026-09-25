@@ -913,15 +913,25 @@ class OwnerSourceReport:
     reason: str
 
 
-def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, after: bytes, *, derived_paths: Iterable[str] = ()) -> OwnerSourceReport:
+def _path_identity(value: str) -> str:
+    return "/".join(part for part in value.replace("\\", "/").split("/") if part not in ("", ".")).lower()
+
+
+def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, after: bytes, *, before_dimensions: tuple[int, int] | None = None, after_dimensions: tuple[int, int] | None = None, derived_paths: Iterable[str] = ()) -> OwnerSourceReport:
     before_sha = hashlib.sha256(before).hexdigest()
     after_sha = hashlib.sha256(after).hexdigest()
-    derived = {str(path).replace("\\", "/") for path in derived_paths}
-    source = record.source_path
+    derived = {_path_identity(str(path)) for path in derived_paths}
+    source = _path_identity(record.source_path)
     if source in derived:
         return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "derived artifact aliases immutable OWNER_UPLOAD path")
     if before_sha != record.source_sha256 or len(before) != record.byte_length:
         return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "pre-operation OWNER_UPLOAD bytes do not match accepted record")
+    if before_dimensions is not None and before_dimensions != (record.width, record.height):
+        return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "pre-operation OWNER_UPLOAD dimensions do not match accepted record")
+    if after_dimensions is not None and after_dimensions != (record.width, record.height):
+        return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed OWNER_UPLOAD dimensions")
+    if before_dimensions is not None and after_dimensions is not None and before_dimensions != after_dimensions:
+        return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed OWNER_UPLOAD dimensions")
     if after_sha != before_sha or len(after) != len(before):
         return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed immutable OWNER_UPLOAD bytes")
     return OwnerSourceReport("PASS", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "OWNER_UPLOAD bytes, length, dimensions and source identity remained unchanged")
