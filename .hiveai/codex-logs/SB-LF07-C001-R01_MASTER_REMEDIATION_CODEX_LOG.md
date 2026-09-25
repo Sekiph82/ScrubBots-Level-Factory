@@ -50,7 +50,8 @@ Document role: CODEX BUILDER LOG
 
 ## Publication checkpoint
 
-- Master log implementation/evidence commit: pending.
-- Master terminal log-only commit: pending.
-- Final local HEAD and origin/main equality: pending.
+- Master log implementation/evidence commit: `7a72acf2dd567e07f8783016f342d8ff56edea73`, pushed to origin/main.
+- Master terminal log-only commit: pending after this final checkpoint append.
+- Final local HEAD and origin/main equality: pending after terminal log publication.
 
+- 2026-09-25: Master builder log terminal checkpoint appended after all ten ordered task publications and final gates.
