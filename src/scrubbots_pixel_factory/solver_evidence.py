@@ -59,6 +59,15 @@ class SolverEvidenceReport:
     search_policy: SearchPolicy = DEFAULT_SEARCH_POLICY
     budget_policy: SolverBudgetPolicy = field(default_factory=SolverBudgetPolicy)
     budget_result: BudgetedSolverResult | None = None
+    # Optional provenance is populated only by a canonical bridge.  Keeping it
+    # on the M03 envelope prevents M05 from relabelling an old receipt.
+    level_id: str | None = None
+    level_source_sha256: str | None = None
+    request_id: str | None = None
+    authority: object | None = None
+    provider_id: str | None = None
+    provider_version: str | None = None
+    state_digest: str | None = None
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -70,6 +79,15 @@ class SolverEvidenceReport:
             "search_policy": self.search_policy.canonical_dict(),
             "budget_policy": self.budget_policy.canonical_dict(),
             "budget_result": self.budget_result.canonical_dict() if self.budget_result is not None else None,
+            "provenance": {
+                "level_id": self.level_id,
+                "level_source_sha256": self.level_source_sha256,
+                "request_id": self.request_id,
+                "authority": self.authority.canonical_dict() if hasattr(self.authority, "canonical_dict") else self.authority,
+                "provider_id": self.provider_id,
+                "provider_version": self.provider_version,
+                "state_digest": self.state_digest,
+            },
         }
 
     def canonical_bytes(self) -> bytes:
