@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: MAINT — Cross-Repository Canonical Palette Governance
-- Current Sprint: MAINT-PALETTE-V3-C001 — Canonical Alpix C01..C16 synchronization
-- Current Task: MAINT-PALETTE-V3-001 — Synchronize canonical Palette V3 across Level Factory and main game
-- Current Task Status: AUTHORIZED / NOT_STARTED
-- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-PALETTE-V3-C001_CANONICAL_ALPIX_PALETTE_CROSS_REPO_MIGRATION_PROMPT.md` across `Sekiph82/ScrubBots-Level-Factory` and `Sekiph82/Scrubbots`, updates every live palette-dependent code/data/config/test/doc/UI/fixture/reference to Palette V3, proves no live V2/old-color dependency remains, commits/pushes both repos, and stops for independent ChatGPT audit. Codex does not edit root `TASKS.md`.
-- Required Actor: CODEX
+- Current Milestone: M07 — Mutation & Automatic Difficulty Targeting
+- Current Sprint: SB-LF07.C001 — Mutation interface and immutable lineage
+- Current Task: SB-LF07-001 — Mutation interface/immutable lineage
+- Current Task Status: PLANNED / PROMPT_REQUIRED
+- Next Task/Action: ChatGPT authors the strict audit criteria and implementation prompt for `SB-LF07-001`, grounded in accepted M03/M04/M05/M06 contracts and canonical Palette V3; only then is Codex implementation authorized.
+- Required Actor: CHATGPT
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF05-C001-R01_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: Palette V3 authority is `Sekiph82/Scrubbots/data/palettes/scrubbots_palette_v3.json`; migration must preserve C01..C16/BG01 semantics, current Difficulty V1 rules, historical evidence immutability, and full regression gates
-- Current Prompt: `.hiveai/prompts/MAINT-PALETTE-V3-C001_CANONICAL_ALPIX_PALETTE_CROSS_REPO_MIGRATION_PROMPT.md`
+- Current Audit Criteria: PENDING authoring for `SB-LF07-001`; must preserve accepted M03 solver/state authority, M04 Difficulty V1 truth, M05 QA/handoff truth, M06 editor separation, immutable owner sources, and canonical Palette V3.
+- Current Prompt: PENDING authoring for `SB-LF07-001`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -135,6 +135,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF05 R01 Strict Re-Audit: `.hiveai/audits/SB-LF05-C001-R01_STRICT_REAUDIT_SUMMARY.md`.
 - Canonical Palette V3 Authority: `Sekiph82/Scrubbots/data/palettes/scrubbots_palette_v3.json` (`scrubbots-global-palette/v3`, owner-locked 2026-09-25, exact Alpix fixed-palette subset).
 - Palette Maintenance Directive: `MAINT-PALETTE-V3-001` is an owner-directed cross-repository maintenance action and does not alter the canonical 224 LF/CP source-requirement denominator.
+- Palette V3 Maintenance Result: `PASS/CLOSED` by `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`.
+- Palette V3 Accepted Level Factory SHA: `c99142468987378ee8d03a4807a87275cdcb604e`.
+- Palette V3 Accepted Scrubbots SHA: `edf672f61989d28fd1931917ab49b2d64cc416d6`.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -161,7 +164,7 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M04: Difficulty Intelligence & Metrics — COMPLETE / VERIFIED
 - M05: Unified Factory Validation & Level QA — COMPLETE / VERIFIED
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
-- M07: Mutation & Automatic Difficulty Targeting — PLANNED
+- M07: Mutation & Automatic Difficulty Targeting — ACTIVE
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
 - M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
@@ -888,8 +891,8 @@ Owner-approved post-cutover product specification:
 3. M03 Puzzle Intelligence is COMPLETE / VERIFIED; `SB-LF03-001..012 = PASS/CLOSED`.
 4. M04 Difficulty Intelligence is COMPLETE / VERIFIED; `SB-LF04-001..012 = PASS/CLOSED`.
 5. M05 Unified Factory Validation & Level QA is COMPLETE / VERIFIED; `SB-LF05-001..010 = PASS/CLOSED`.
-6. Execute owner-directed `MAINT-PALETTE-V3-001` cross-repository Palette V3 synchronization and independently audit it before opening the next product milestone.
-7. M07 mutation/difficulty targeting.
+6. Owner-directed `MAINT-PALETTE-V3-001` cross-repository Palette V3 synchronization is PASS/CLOSED by `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`.
+7. M07 mutation/difficulty targeting is the active frontier, beginning with `SB-LF07-001` mutation interface/immutable lineage.
 8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions.
 9. Continue M09 advanced generation only as justified, including `SB-LFX-016..017` similarity/provider-accounting extensions when their dependencies are real.
 10. M10 Campaign Intelligence.
