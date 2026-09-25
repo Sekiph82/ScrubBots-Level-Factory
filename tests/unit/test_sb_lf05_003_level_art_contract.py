@@ -10,12 +10,15 @@ AUTHORITY = AuthorityIdentity("https://github.com/Sekiph82/ScrubBots-Level-Facto
 
 
 def _level_data(width: int = 20, height: int = 20) -> LevelDataIdentity:
-    return LevelDataIdentity.from_mapping("level-003", SOURCE_SHA, {"cells": width * height}, width, height)
+    cells = [("C01", "C02", "C03")[index % 3] for index in range(width * height)]
+    return LevelDataIdentity.from_mapping("level-003", SOURCE_SHA, {"schema": "scrubbots-level-data", "version": 1, "level_id": "level-003", "width": width, "height": height, "cells": cells}, width, height)
 
 
 def _artifact(width: int = 20, height: int = 20, colors: tuple[str, ...] = ("C01", "C02", "C03"), **extra: object) -> SimpleNamespace:
     cells = tuple(colors[index % len(colors)] for index in range(width * height))
-    values = {"level_id": "level-003", "width": width, "height": height, "cells": cells, "palette": tuple(colors), "raw_sha256": SOURCE_SHA, "source_provenance": SimpleNamespace(raw_sha256=SOURCE_SHA)}
+    level_data_obj = _level_data(width, height)
+    level_data_sha = level_data_obj.level_data_sha256
+    values = {"level_id": "level-003", "width": width, "height": height, "cells": cells, "palette": tuple(colors), "palette_indices": tuple(index % len(colors) for index in range(width * height)), "logical_alpha": (255,) * (width * height), "raw_sha256": SOURCE_SHA, "source_provenance": SimpleNamespace(raw_sha256=SOURCE_SHA), "level_data_sha256": level_data_sha, "compiler_artifact_sha256": "c" * 64, "compiler_source_sha256": SOURCE_SHA, "compiler_level_data_sha256": level_data_sha, "compiler_dimensions": {"width": width, "height": height}, "level_data_dimensions": {"width": width, "height": height}, "compiler_palette": tuple(("C01", "C02", "C03")), "level_data_palette": tuple(("C01", "C02", "C03")), "compiler_cells": tuple(("C01", "C02", "C03")[index % 3] for index in range(width * height)), "level_data_cells": tuple(("C01", "C02", "C03")[index % 3] for index in range(width * height))}
     values.update(extra)
     return SimpleNamespace(**values)
 
