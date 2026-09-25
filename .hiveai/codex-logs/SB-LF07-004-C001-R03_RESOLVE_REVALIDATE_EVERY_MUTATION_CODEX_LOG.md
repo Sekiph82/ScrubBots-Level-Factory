@@ -40,5 +40,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `94d29ddf7a6df6d0f4ee9d005d52ebd2ddcb7c30` (`Remediate SB-LF07-004 authentic producer binding`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `7f4399f6eb25d7c4acb090bf83a951e364e8d18f`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `7f4399f6eb25d7c4acb090bf83a951e364e8d18f`.

@@ -32,12 +32,19 @@ Document role: CODEX BUILDER LOG
 - Removed the two stale R02 regression expectations that depended on the deleted duplicate source helper and caller-created accounting/config authority.
 - Focused result: `python -m pytest -q -p no:cacheprovider tests/unit/test_sb_lf07_010_regression.py` — 6 passed.
 - Affected M07 result: enumerated `tests/unit/test_sb_lf07_*` files and ran pytest — 73 passed.
+- Initial full pytest result: 1,057 passed, 2 truthful canonical-checkout skips, and one stale governance-test expectation for the superseded R02 `TASKS.md` status. Updated only `tests/unit/test_sb_lf00_007_governance_authority.py` to assert the authoritative current R03 selective-remediation status; `TASKS.md` and `.hiveai/audits/**` were not modified.
+- Corrective implementation commit: `59c6ee5b6c82c842bcc28863d67ac8cfc574a73f` (`Align governance regression with authoritative R03 state`), pushed to `origin/main`.
+- Final full pytest result after correction: `1058 passed, 2 skipped` in 242.74 seconds. Skips were the existing truthful canonical ScrubBots checkout/bridge capability skips.
+- Final `python -m compileall -q src tests`: PASS.
+- Final Godot headless editor initialization: `godot_console.exe --headless --path level_factory --editor --quit` — PASS on Godot 4.7.2 stable.
+- Final `git diff --check`: PASS. Final TASKS/audit immutability proof: `git diff --name-only -- TASKS.md .hiveai/audits` returned no paths; neither protected area was edited.
+- Final tracked status before terminal-log commit contained only this log and the governance-test correction; pre-existing owner-untracked work remained untouched.
 - Offline/network boundary: regression is deterministic and local-only; no network, telemetry, cloud generation, or API-key dependency added.
 - Dependency/license/security: no dependency or license changes; unrelated evidence, stale authority, source mutation, accounting forgery, and lineage graph corruption fail closed.
 - Changed files: `tests/unit/test_sb_lf07_010_regression.py` and this builder log.
 
 ## Publication checkpoints
 
-- Implementation commit: `8e725a0f9557d4fce3956e9d50dea6f51aa2ab84` (`Remediate SB-LF07-010 authentic regression closure`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Implementation commits: `8e725a0f9557d4fce3956e9d50dea6f51aa2ab84` (`Remediate SB-LF07-010 authentic regression closure`) and corrective `59c6ee5b6c82c842bcc28863d67ac8cfc574a73f` (`Align governance regression with authoritative R03 state`), both pushed to `origin/main`.
+- Terminal log-only commit: `ef111b2c153b79c3ad16593cf71fb091d92914c0`, pushed successfully; final-gate evidence was appended in the subsequent log-evidence reconciliation before master publication.
+- Final local HEAD and `origin/main` equality at the original task checkpoint: `ef111b2c153b79c3ad16593cf71fb091d92914c0`; final batch equality is recorded in the master log.

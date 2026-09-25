@@ -39,5 +39,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `15c8e05ea45674e394183a20fe8c74c0d23f2ef1` (`Remediate SB-LF07-005 typed mutation provenance`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `ad1da0cf36f237fb4bde1ac7ad45a4631c0cfee4`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `ad1da0cf36f237fb4bde1ac7ad45a4631c0cfee4`.

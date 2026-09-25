@@ -37,5 +37,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `5600c42efdcbca03b28f55a55216c4d0d3fcbfe1` (`Remediate SB-LF07-006 truthful target constraints`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `fc853789343fa085d20f652e6f04663884ae6253`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `fc853789343fa085d20f652e6f04663884ae6253`.

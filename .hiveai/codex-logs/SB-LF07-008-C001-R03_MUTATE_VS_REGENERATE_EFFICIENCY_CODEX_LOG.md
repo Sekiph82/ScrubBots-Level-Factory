@@ -41,5 +41,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `aef37cdef19153360fa1df412e2d00978a75bdc1` (`Remediate SB-LF07-008 actual route efficiency`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `2e20cf9dffac048f15e19955ba6ef9e9e750fc73`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `2e20cf9dffac048f15e19955ba6ef9e9e750fc73`.

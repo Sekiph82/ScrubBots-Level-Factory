@@ -39,5 +39,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `8a25a2a9920ce2a45854a4c61bf3a8a4f197ae44` (`Remediate SB-LF07-009 source preservation lifecycle`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `3568d5420efac37cdb955db03b520b44b67d2b59`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `3568d5420efac37cdb955db03b520b44b67d2b59`.

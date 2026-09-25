@@ -37,5 +37,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation commit: `524e515218b901763047825c1c37611b5a03ea9e` (`Remediate SB-LF07-007 authentic bounded runner`), pushed to `origin/main`.
-- Terminal log-only commit: pending after this chronological entry is committed.
-- Final local HEAD and `origin/main` equality: implementation push completed; final equality is recorded after the log-only push.
+- Terminal log-only commit: `4e6f5934856bc3800589578c6d77b44db495dc5e`, pushed successfully.
+- Final local HEAD and `origin/main` equality at the task checkpoint: `4e6f5934856bc3800589578c6d77b44db495dc5e`.
