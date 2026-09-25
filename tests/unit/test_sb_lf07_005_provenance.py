@@ -59,3 +59,15 @@ def test_ledger_rejects_conflicting_duplicate_child_provenance() -> None:
     conflicting = dataclasses.replace(provenance, attempt_ordinal=1)
     with pytest.raises(MutationContractError):
         ledger.record(conflicting)
+
+
+def test_ledger_rejects_orphan_parent_and_result_operator_drift() -> None:
+    request, result = _applied()
+    provenance = MutationProvenance.from_result(request, result)
+    orphan_parent = dataclasses.replace(provenance.parent, candidate_id="orphan-intermediate", parent_candidate_id="root-parent")
+    orphan_child = dataclasses.replace(provenance.child, parent_candidate_id="orphan-intermediate")
+    orphan = dataclasses.replace(provenance, parent=orphan_parent, child=orphan_child)
+    with pytest.raises(MutationContractError):
+        ProvenanceLedger().record(orphan)
+    with pytest.raises(MutationContractError):
+        MutationProvenance.from_result(dataclasses.replace(request, operator_version="forged"), result)

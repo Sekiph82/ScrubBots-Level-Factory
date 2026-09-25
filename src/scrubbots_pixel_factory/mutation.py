@@ -481,7 +481,7 @@ class MutationProvenance:
     def from_result(cls, request: MutationRequest, result: MutationResult, *, attempt_ordinal: int = 0, evidence_digests: Iterable[str] = ()) -> "MutationProvenance":
         if result.disposition is not MutationDisposition.APPLIED or result.child is None or result.lineage is None or result.post_state_digest is None:
             raise MutationContractError("provenance requires an applied mutation result")
-        if result.request_digest != request.digest() or request.parent != result.parent or result.authority != request.authority:
+        if result.request_digest != request.digest() or request.parent != result.parent or result.authority != request.authority or result.operator_id != request.operator_id or result.operator_version != request.operator_version:
             raise MutationContractError("provenance request/result drift")
         return cls(request.digest(), request.seed, "M07_SEED_DERIVATION_V1", result.lineage.lineage_root, result.parent, result.child.identity, request.operator_id, request.operator_version, request.intent, request.authority, attempt_ordinal, result.pre_state_digest, result.post_state_digest, result.disposition, result.reason, tuple(evidence_digests))
 
@@ -500,6 +500,23 @@ class ProvenanceLedger:
 
     def record(self, provenance: MutationProvenance) -> str:
         key = (provenance.lineage_root, provenance.child.candidate_id)
+        if provenance.parent.parent_candidate_id is not None:
+            parent_key = (provenance.lineage_root, provenance.parent.candidate_id)
+            if parent_key not in self._records:
+                raise MutationContractError("provenance parent is missing from the lineage graph")
+        cursor = provenance.parent.candidate_id
+        seen = {provenance.child.candidate_id}
+        while cursor in seen:
+            raise MutationContractError("provenance lineage contains a cycle")
+        seen.add(cursor)
+        while True:
+            parent_record = self._records.get((provenance.lineage_root, cursor))
+            if parent_record is None:
+                break
+            cursor = parent_record.parent.candidate_id
+            if cursor in seen:
+                raise MutationContractError("provenance lineage contains a cycle")
+            seen.add(cursor)
         existing = self._records.get(key)
         if existing is not None and existing.digest() != provenance.digest():
             raise MutationContractError("duplicate child has conflicting provenance")
