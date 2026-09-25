@@ -55,6 +55,12 @@ from .report import (
     SemanticReviewDisposition,
     build_qa_report,
 )
+from .source_preservation import (
+    SOURCE_PRESERVATION_SCHEMA,
+    SOURCE_PRESERVATION_VERSION,
+    SourcePreservationReport,
+    verify_owner_source_preservation,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -100,4 +106,8 @@ __all__ = [
     "QAReportDisposition",
     "SemanticReviewDisposition",
     "build_qa_report",
+    "SOURCE_PRESERVATION_SCHEMA",
+    "SOURCE_PRESERVATION_VERSION",
+    "SourcePreservationReport",
+    "verify_owner_source_preservation",
 ]
