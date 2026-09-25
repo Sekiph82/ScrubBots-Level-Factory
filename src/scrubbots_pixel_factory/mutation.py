@@ -357,6 +357,93 @@ class MutationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class MutationProvenance:
+    """Canonical reconstruction record for one mutation attempt."""
+
+    request_digest: str
+    seed: int
+    seed_derivation_version: str
+    lineage_root: str
+    parent: CandidateIdentity
+    child: CandidateIdentity
+    operator_id: str
+    operator_version: str
+    intent: MutationIntent
+    authority: AuthorityIdentity
+    attempt_ordinal: int
+    pre_state_digest: str
+    post_state_digest: str
+    disposition: MutationDisposition
+    reason: str
+    evidence_digests: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        _sha(self.request_digest, "provenance request digest")
+        if type(self.seed) is not int or not -(2**63) <= self.seed <= 2**63 - 1:
+            raise MutationContractError("provenance seed is malformed")
+        object.__setattr__(self, "seed_derivation_version", _text(self.seed_derivation_version, "seed derivation version"))
+        _sha(self.lineage_root, "provenance lineage root")
+        if not isinstance(self.parent, CandidateIdentity) or not isinstance(self.child, CandidateIdentity):
+            raise MutationContractError("provenance parent/child identity is malformed")
+        if self.parent.lineage_root != self.child.lineage_root or self.parent.lineage_root != self.lineage_root:
+            raise MutationContractError("provenance mixed lineage roots")
+        if self.parent.candidate_id == self.child.candidate_id or self.child.parent_candidate_id != self.parent.candidate_id:
+            raise MutationContractError("provenance self-parent or non-edge")
+        object.__setattr__(self, "operator_id", _text(self.operator_id, "provenance operator id"))
+        object.__setattr__(self, "operator_version", _text(self.operator_version, "provenance operator version"))
+        if not isinstance(self.intent, MutationIntent) or not isinstance(self.authority, AuthorityIdentity):
+            raise MutationContractError("provenance intent or authority is malformed")
+        if type(self.attempt_ordinal) is not int or self.attempt_ordinal < 0:
+            raise MutationContractError("provenance attempt ordinal must be non-negative")
+        _sha(self.pre_state_digest, "provenance pre-state digest")
+        _sha(self.post_state_digest, "provenance post-state digest")
+        if self.pre_state_digest != self.parent.state_digest or self.post_state_digest != self.child.state_digest:
+            raise MutationContractError("provenance pre/post digests do not bind exact parent and child")
+        if not isinstance(self.disposition, MutationDisposition):
+            raise MutationContractError("provenance disposition is not closed")
+        object.__setattr__(self, "reason", _text(self.reason, "provenance reason"))
+        digests = tuple(self.evidence_digests)
+        for digest in digests:
+            _sha(digest, "provenance evidence digest")
+        object.__setattr__(self, "evidence_digests", digests)
+
+    @classmethod
+    def from_result(cls, request: MutationRequest, result: MutationResult, *, attempt_ordinal: int = 0, evidence_digests: Iterable[str] = ()) -> "MutationProvenance":
+        if result.disposition is not MutationDisposition.APPLIED or result.child is None or result.lineage is None or result.post_state_digest is None:
+            raise MutationContractError("provenance requires an applied mutation result")
+        if result.request_digest != request.digest() or request.parent != result.parent or result.authority != request.authority:
+            raise MutationContractError("provenance request/result drift")
+        return cls(request.digest(), request.seed, "M07_SEED_DERIVATION_V1", result.lineage.lineage_root, result.parent, result.child.identity, request.operator_id, request.operator_version, request.intent, request.authority, attempt_ordinal, result.pre_state_digest, result.post_state_digest, result.disposition, result.reason, tuple(evidence_digests))
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": PROVENANCE_SCHEMA, "version": PROVENANCE_VERSION, "request_digest": self.request_digest, "seed": self.seed, "seed_derivation_version": self.seed_derivation_version, "lineage_root": self.lineage_root, "parent": self.parent.canonical_dict(), "child": self.child.canonical_dict(), "operator_id": self.operator_id, "operator_version": self.operator_version, "intent": self.intent.value, "authority": self.authority.canonical_dict(), "attempt_ordinal": self.attempt_ordinal, "pre_state_digest": self.pre_state_digest, "post_state_digest": self.post_state_digest, "disposition": self.disposition.value, "reason": self.reason, "evidence_digests": list(self.evidence_digests)}
+
+    def digest(self) -> str:
+        return _digest(self.canonical_dict())
+
+
+class ProvenanceLedger:
+    """Immutable-child ledger rejecting conflicting duplicate provenance."""
+
+    def __init__(self) -> None:
+        self._records: dict[tuple[str, str], MutationProvenance] = {}
+
+    def record(self, provenance: MutationProvenance) -> str:
+        key = (provenance.lineage_root, provenance.child.candidate_id)
+        existing = self._records.get(key)
+        if existing is not None and existing.digest() != provenance.digest():
+            raise MutationContractError("duplicate child has conflicting provenance")
+        self._records[key] = provenance
+        return provenance.digest()
+
+    def get(self, lineage_root: str, child_candidate_id: str) -> MutationProvenance | None:
+        return self._records.get((lineage_root, child_candidate_id))
+
+    def snapshot(self) -> tuple[MutationProvenance, ...]:
+        return tuple(self._records[key] for key in sorted(self._records))
+
+
+@dataclass(frozen=True, slots=True)
 class MutationOperator:
     operator_id: str
     version: str
