@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 
-from scrubbots_pixel_factory import MutationCandidate, MutationDisposition, MutationIntent, MutationRequest
+from scrubbots_pixel_factory import AuthorityIdentity, CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_M39_CONTRACT_VERSION, CANONICAL_M39_SOURCE_PATH, CurrentMainAuthorityResolver, MutationCandidate, MutationDisposition, MutationEngine, MutationIntent, MutationRequest, resolve_current_main_authority
+from scrubbots_pixel_factory.mutation_hardening import build_hardening_registry
 from sb_lf07_r01_support import CURRENT_MAIN_SHA, M39_BLOB_SHA, engine, m39_authority
 
 
@@ -56,3 +58,18 @@ def test_hardening_does_not_use_size_color_or_difficulty_proxies() -> None:
     assert result.child.payload["height"] == 20  # type: ignore[index]
     assert result.child.payload["color_count"] == 3  # type: ignore[index]
     assert result.child.payload["difficulty_label"] == "EASY"  # type: ignore[index]
+
+
+def test_r02_builds_from_fresh_task_time_main_and_rejects_prior_sha_with_same_blob() -> None:
+    current = "4028de71c2970b7346fe7985a9646aba2728b519"
+    source = b"m39-source-at-task-time"
+    blob = hashlib.sha256(source).hexdigest()
+    resolver = CurrentMainAuthorityResolver(lambda: current, lambda _commit, _path: source)
+    resolved = resolve_current_main_authority(resolver, source_path=CANONICAL_M39_SOURCE_PATH, contract_version=CANONICAL_M39_CONTRACT_VERSION, expected_blob_sha256=blob)
+    assert resolved.available
+    registry = build_hardening_registry(resolved.authority)
+    parent = _parent()
+    request = _request(parent, resolved.authority)
+    assert MutationEngine(registry).apply(request, parent).disposition is MutationDisposition.APPLIED
+    prior = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, "1" * 40, CANONICAL_M39_SOURCE_PATH, CANONICAL_M39_CONTRACT_VERSION, blob)
+    assert MutationEngine(registry).apply(_request(parent, prior), parent).disposition is MutationDisposition.ERROR
