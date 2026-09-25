@@ -5,8 +5,10 @@ import pytest
 from scrubbots_pixel_factory import (
     EfficiencyCounters,
     EfficiencyWorkload,
+    GeneratorRouteEvidence,
     MutationContractError,
     compare_efficiency,
+    compare_efficiency_from_routes,
 )
 
 
@@ -45,3 +47,18 @@ def test_negative_or_non_integer_counters_fail_closed() -> None:
         EfficiencyCounters(-1, 0, 0, 0, 0, 0)
     with pytest.raises(MutationContractError):
         EfficiencyCounters(1.0, 0, 0, 0, 0, 0)  # type: ignore[arg-type]
+
+
+def test_route_evidence_compares_real_matched_workload_and_digests() -> None:
+    left = GeneratorRouteEvidence("mutation", "a" * 64, 5, 2, 1, 90, "b" * 64)
+    right = GeneratorRouteEvidence("regenerate", "a" * 64, 5, 1, 2, 110, "c" * 64)
+    comparison = compare_efficiency_from_routes(left, right)
+    assert comparison.mutation.accepted == 2
+    assert comparison.regenerate.rejected == 2
+
+
+def test_route_evidence_rejects_unmatched_workload_identity() -> None:
+    left = GeneratorRouteEvidence("mutation", "a" * 64, 1, 1, 0, 1, "b" * 64)
+    right = GeneratorRouteEvidence("regenerate", "c" * 64, 1, 1, 0, 1, "d" * 64)
+    with pytest.raises(MutationContractError):
+        compare_efficiency_from_routes(left, right)

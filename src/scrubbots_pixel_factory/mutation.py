@@ -1196,7 +1196,7 @@ def compare_efficiency_from_routes(mutation: GeneratorRouteEvidence, regenerate:
     if mutation.workload_digest != regenerate.workload_digest:
         raise MutationContractError("route evidence workloads are not matched")
     workload = EfficiencyWorkload(mutation.workload_digest, mutation.workload_digest, mutation.workload_digest, mutation.workload_digest)
-    return EfficiencyComparison(workload, EfficiencyCounters(mutation.produced, mutation.produced, mutation.accepted, mutation.rejected, mutation.solver_workload), EfficiencyCounters(regenerate.produced, regenerate.produced, regenerate.accepted, regenerate.rejected, regenerate.solver_workload), telemetry=None)
+    return EfficiencyComparison(workload, EfficiencyCounters(mutation.produced, mutation.produced, mutation.accepted, 0, mutation.rejected, mutation.solver_workload), EfficiencyCounters(regenerate.produced, regenerate.produced, regenerate.accepted, 0, regenerate.rejected, regenerate.solver_workload), telemetry=None)
 
 
 __all__ = [
