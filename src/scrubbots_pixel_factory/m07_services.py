@@ -427,6 +427,36 @@ class MutationResult:
 
 
 @dataclass(frozen=True, slots=True)
+class LineageRootRegistration:
+    lineage_root: str
+    root: CandidateIdentity
+
+    def __post_init__(self) -> None:
+        _sha(self.lineage_root, "registered lineage root")
+        if not isinstance(self.root, CandidateIdentity) or self.root.lineage_root != self.lineage_root or self.root.parent_candidate_id is not None:
+            raise MutationContractError("registered lineage root identity is malformed")
+
+    def digest(self) -> str:
+        return _digest({"lineage_root": self.lineage_root, "root": self.root.canonical_dict()})
+
+
+@dataclass(frozen=True, slots=True)
+class TypedEvidenceReference:
+    stage: str
+    evidence_digest: str
+    producer_digest: str
+
+    def __post_init__(self) -> None:
+        if self.stage not in {"M03_SOLVER", "M04_DIFFICULTY", "M05_QA"}:
+            raise MutationContractError("typed provenance evidence stage is not accepted")
+        _sha(self.evidence_digest, "typed provenance evidence digest")
+        _sha(self.producer_digest, "typed provenance producer digest")
+
+    def canonical_dict(self) -> dict[str, str]:
+        return {"stage": self.stage, "evidence_digest": self.evidence_digest, "producer_digest": self.producer_digest}
+
+
+@dataclass(frozen=True, slots=True)
 class MutationProvenance:
     """Canonical reconstruction record for one mutation attempt."""
 
@@ -446,6 +476,7 @@ class MutationProvenance:
     disposition: MutationDisposition
     reason: str
     evidence_digests: tuple[str, ...] = ()
+    evidence_references: tuple[TypedEvidenceReference, ...] = ()
 
     def __post_init__(self) -> None:
         _sha(self.request_digest, "provenance request digest")
@@ -476,6 +507,10 @@ class MutationProvenance:
         for digest in digests:
             _sha(digest, "provenance evidence digest")
         object.__setattr__(self, "evidence_digests", digests)
+        refs = tuple(self.evidence_references)
+        if any(not isinstance(ref, TypedEvidenceReference) for ref in refs) or len({ref.stage for ref in refs}) != len(refs):
+            raise MutationContractError("typed provenance evidence references must be unique by stage")
+        object.__setattr__(self, "evidence_references", refs)
 
     @classmethod
     def from_result(cls, request: MutationRequest, result: MutationResult, *, attempt_ordinal: int = 0, evidence_digests: Iterable[str] = ()) -> "MutationProvenance":
@@ -483,10 +518,10 @@ class MutationProvenance:
             raise MutationContractError("provenance requires an applied mutation result")
         if result.request_digest != request.digest() or request.parent != result.parent or result.authority != request.authority or result.operator_id != request.operator_id or result.operator_version != request.operator_version:
             raise MutationContractError("provenance request/result drift")
-        return cls(request.digest(), request.seed, "M07_SEED_DERIVATION_V1", result.lineage.lineage_root, result.parent, result.child.identity, request.operator_id, request.operator_version, request.intent, request.authority, attempt_ordinal, result.pre_state_digest, result.post_state_digest, result.disposition, result.reason, tuple(evidence_digests))
+        return cls(request.digest(), request.seed, "M07_SEED_DERIVATION_V1", result.lineage.lineage_root, result.parent, result.child.identity, request.operator_id, request.operator_version, request.intent, request.authority, attempt_ordinal, result.pre_state_digest, result.post_state_digest, result.disposition, result.reason, tuple(evidence_digests), ())
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": PROVENANCE_SCHEMA, "version": PROVENANCE_VERSION, "request_digest": self.request_digest, "seed": self.seed, "seed_derivation_version": self.seed_derivation_version, "lineage_root": self.lineage_root, "parent": self.parent.canonical_dict(), "child": self.child.canonical_dict(), "operator_id": self.operator_id, "operator_version": self.operator_version, "intent": self.intent.value, "authority": self.authority.canonical_dict(), "attempt_ordinal": self.attempt_ordinal, "pre_state_digest": self.pre_state_digest, "post_state_digest": self.post_state_digest, "disposition": self.disposition.value, "reason": self.reason, "evidence_digests": list(self.evidence_digests)}
+        return {"schema": PROVENANCE_SCHEMA, "version": PROVENANCE_VERSION, "request_digest": self.request_digest, "seed": self.seed, "seed_derivation_version": self.seed_derivation_version, "lineage_root": self.lineage_root, "parent": self.parent.canonical_dict(), "child": self.child.canonical_dict(), "operator_id": self.operator_id, "operator_version": self.operator_version, "intent": self.intent.value, "authority": self.authority.canonical_dict(), "attempt_ordinal": self.attempt_ordinal, "pre_state_digest": self.pre_state_digest, "post_state_digest": self.post_state_digest, "disposition": self.disposition.value, "reason": self.reason, "evidence_digests": list(self.evidence_digests), "evidence_references": [ref.canonical_dict() for ref in self.evidence_references]}
 
     def digest(self) -> str:
         return _digest(self.canonical_dict())
@@ -497,10 +532,24 @@ class ProvenanceLedger:
 
     def __init__(self) -> None:
         self._records: dict[tuple[str, str], MutationProvenance] = {}
+        self._roots: dict[str, LineageRootRegistration] = {}
+
+    def register_root(self, registration: LineageRootRegistration) -> str:
+        if not isinstance(registration, LineageRootRegistration):
+            raise MutationContractError("lineage root registration is malformed")
+        existing = self._roots.get(registration.lineage_root)
+        if existing is not None and existing.digest() != registration.digest():
+            raise MutationContractError("lineage root registration conflicts")
+        self._roots[registration.lineage_root] = registration
+        return registration.digest()
 
     def record(self, provenance: MutationProvenance) -> str:
         key = (provenance.lineage_root, provenance.child.candidate_id)
-        if provenance.parent.parent_candidate_id is not None:
+        if provenance.parent.parent_candidate_id is None:
+            registered = self._roots.get(provenance.lineage_root)
+            if registered is None or registered.root != provenance.parent:
+                raise MutationContractError("first edge parent is not the explicitly registered lineage root")
+        else:
             parent_key = (provenance.lineage_root, provenance.parent.candidate_id)
             if parent_key not in self._records:
                 raise MutationContractError("provenance parent is missing from the lineage graph")
@@ -1218,5 +1267,5 @@ def compare_efficiency_from_routes(mutation: GeneratorRouteEvidence, regenerate:
 
 
 __all__ = [
-    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AttemptProvenance", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "GeneratorRouteEvidence", "LineageEdge", "M03SolverEvidenceReceipt", "M04DifficultyEvidenceReceipt", "M05QAEvidenceReceipt", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "ProducerEvidenceReceipt", "SafetyConstraintEvidence", "TargetDisposition", "TargetSelection", "TypedChallengeTarget", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "compare_efficiency_from_routes", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "revalidate_mutation_from_typed_receipts", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
+    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AttemptProvenance", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "GeneratorRouteEvidence", "LineageEdge", "LineageRootRegistration", "M03SolverEvidenceReceipt", "M04DifficultyEvidenceReceipt", "M05QAEvidenceReceipt", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationProvenance", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "ProducerEvidenceReceipt", "SafetyConstraintEvidence", "TargetDisposition", "TargetSelection", "TypedChallengeTarget", "TypedEvidenceReference", "ValidationDisposition", "ValidationEnvelope", "ProvenanceLedger", "canonical_mutation_registry", "compare_efficiency", "compare_efficiency_from_routes", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "revalidate_mutation_from_typed_receipts", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
 ]
