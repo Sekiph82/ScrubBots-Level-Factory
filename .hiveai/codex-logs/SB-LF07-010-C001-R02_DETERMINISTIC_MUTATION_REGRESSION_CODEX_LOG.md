@@ -31,6 +31,7 @@ Document role: CODEX BUILDER LOG
 - 2026-09-25: Focused task010 regression gate passed `6 passed`. Existing checksummed corpus, deterministic mutation/proxy preservation, Palette V3, and legacy negative fixtures remain retained; R02 assertions cover the new boundaries.
 - 2026-09-25: The first complete-suite run exposed two verification-fixture mismatches: the owner-controlled TASKS.md had advanced from R01 to R02 authorization, and the dynamic authority probe raised a network error when GitHub DNS was unavailable. The governance expectation was aligned to the live R02 state; the authority helper now reports `UNAVAILABLE` and the dependent test skips truthfully rather than reusing a stale SHA or claiming evidence.
 - 2026-09-25: Focused correction gate passed `13 passed`; the complete repository suite then passed `1050 passed, 2 skipped` in `349.89s`. The two skips were pre-existing canonical-checkout capability skips in SB-LF03-002 and SB-LF04-012.
+- 2026-09-25: Final task-time authority resolution for the dynamic regression path returned ScrubBots main `1cd31e789f6ca638cfbf367606193d1523b7e08d`, M39 source `scripts/gameplay/slots/five_slot_batch_engine.gd`, blob SHA-256 `67096958a85b2a295ce3b574bacadec4a12e9e0badc8516f002901aa437e0518`, contract `M39_V04_PLUS_ONE_SLOT`; this is distinct from the earlier task-time resolutions and no batch-start SHA was reused.
 - 2026-09-25: No tracker/audit/prompt/dependency/license/runtime-network product path was changed; dynamic authority is test-time injected/resolved only.
 
 ## Publication checkpoints
