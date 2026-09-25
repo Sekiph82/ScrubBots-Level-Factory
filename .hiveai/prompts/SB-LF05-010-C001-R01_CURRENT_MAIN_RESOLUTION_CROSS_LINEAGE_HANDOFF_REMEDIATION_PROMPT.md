@@ -1,0 +1,3 @@
+# SB-LF05-010-C001-R01 — Current-Main/Cross-Lineage Handoff Remediation
+
+At execution resolve current Sekiph82/Scrubbots@main and pin exact SHA. Cross-bind LevelData bytes/hash, logical PNG bytes/hash, source provenance, M05 report, M03 solver, M04 difficulty and semantic evidence. Provider must prove exact current LevelValidator + ProductionLevelValidator + applicable M09 on clean checkout, unchanged. QA ACCEPT means handoff eligibility only. Derive M30 compatibility from validated eligibility; M47/M48 remain PENDING. Add stale/mixed hashes, wrong SHA, validator/M09 reject, non-mutation tests. Do not edit TASKS.md/audits.

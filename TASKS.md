@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M05 — Unified Factory Validation & Level QA
-- Current Sprint: SB-LF05.C001-BATCH — Unified QA milestone implementation batch
+- Current Sprint: SB-LF05.C001-R01 — Unified QA strict remediation batch
 - Current Task: SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation
-- Current Task Status: READY_FOR_IMPLEMENTATION
-- Next Task/Action: Codex executes the complete remaining M05 batch `SB-LF05-001,002,003,004,005,007,008,010-C001` from `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`; `SB-LF05-006,009` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole batch ChatGPT independently strict-audits all eight implemented tasks.
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED
+- Next Task/Action: Codex executes the complete R01 remediation batch `SB-LF05-001,002,003,004,005,007,008,010-C001-R01` from `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`; `SB-LF05-006,009` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole batch ChatGPT independently strict-reaudits only the eight remediated tasks.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF04-012-C001-R03_FULLY_DECLARATIVE_TRUST_BOUNDARY_REGRESSION_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF05-C001_STRICT_AUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: per-task M05 criteria indexed by `.hiveai/prompts/SB-LF05-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` + `.hiveai/audit-criteria/SB-LF05-C001_POST_BATCH_STRICT_AUDIT_PROTOCOL.md`
-- Current Prompt: `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
+- Current Audit Criteria: original per-task M05 criteria + `.hiveai/audits/SB-LF05-C001_STRICT_AUDIT_SUMMARY.md`; R01 must close frozen findings without weakening accepted M03/M04/M06/SP05/SP06 contracts
+- Current Prompt: `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -125,6 +125,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF05 Batch Index: `.hiveai/prompts/SB-LF05-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
 - SB-LF05 Batch Master Prompt: `.hiveai/prompts/SB-LF05-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LF05 Batch Tracker Policy: task checkboxes remain ChatGPT-owned; Codex executes all eight remaining tasks before independent post-batch audit.
+- SB-LF05 C001 Post-Batch Audit Result: `CHANGES_REQUIRED = 001, 002, 003, 004, 005, 007, 008, 010`; `006,009` remain previously PASS/CLOSED.
+- SB-LF05 C001 Audit Summary: `.hiveai/audits/SB-LF05-C001_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF05 R01 Remediation Authorization: `SB-LF05-001,002,003,004,005,007,008,010-C001-R01 — REMEDIATE_ALL_THEN_REAUDIT`.
+- SB-LF05 R01 Remediation Index: `.hiveai/prompts/SB-LF05-C001-R01_REMEDIATION_INDEX.md`.
+- SB-LF05 R01 Master Prompt: `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF05 R01 Tracker Policy: Codex does not advance task checkboxes; ChatGPT re-audits only the eight R01 tasks after the full remediation batch.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14

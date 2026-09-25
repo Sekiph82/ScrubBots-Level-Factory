@@ -1,0 +1,3 @@
+# SB-LF05-001-C001-R01 — Exact LevelData/Main-Game Boundary Remediation
+
+Read the C001 strict audit and original criteria. Carry exact immutable LevelData JSON/bytes through provider; derive fields from payload; bind structural/production receipts to exact LevelData digest/source + exact main-game SHA/provider/version; actual exact-SHA LevelValidator/ProductionLevelValidator execution or UNAVAILABLE; preserve current 20..59 rectangular and Difficulty V1 truth. Add malformed/version/TEST/unknown/rectangular/cross-class/M04 mismatch/authority/source/capability/determinism/non-mutation tests. Do not edit TASKS.md/audits.
