@@ -21,3 +21,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - Added negative coverage for malformed dimensions, missing opacity, stale source/provenance, compiler lineage, palette/index, alpha, and duplicate IDs.
 - Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
+
+## Publication closure
+
+- Implementation commit: `bbbedc544e1f31ecbded1d685b45a7b04b30ee75`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
