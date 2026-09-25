@@ -1,0 +1,64 @@
+from __future__ import annotations
+
+import pytest
+
+from scrubbots_pixel_factory import (
+    AttemptBudget,
+    AttemptDisposition,
+    CANONICAL_M23_PREVIEW_AUTHORITY,
+    ChallengeTarget,
+    EvidenceDisposition,
+    MutationCandidate,
+    MutationContractError,
+    MutationEngine,
+    MutationIntent,
+    MutationRequest,
+    derive_attempt_seed,
+    evidence,
+    revalidate_mutation,
+    run_bounded_mutations,
+)
+
+
+def _parent() -> MutationCandidate:
+    return MutationCandidate.root("attempt-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5}})
+
+
+def _request(parent: MutationCandidate, ordinal: int, seed: int) -> MutationRequest:
+    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=CANONICAL_M23_PREVIEW_AUTHORITY)
+
+
+def _validate(mutation):
+    solver = evidence("M03_SOLVER", EvidenceDisposition.SOLVED, mutation, {"status": "SOLVED"})
+    difficulty = evidence("M04_DIFFICULTY", EvidenceDisposition.AVAILABLE, mutation, {"policy_version": "DIFFICULTY_V1", "challenge_score": 60.0})
+    qa = evidence("M05_QA", EvidenceDisposition.PASS, mutation, {"structural": True})
+    return revalidate_mutation(mutation, solver, difficulty, qa)
+
+
+def test_success_before_limit_records_ordinal_seed_and_provenance() -> None:
+    calls: list[int] = []
+    engine = MutationEngine()
+    report = run_bounded_mutations(_parent(), base_seed=70, budget=AttemptBudget(3), request_factory=lambda parent, ordinal, seed: (calls.append(ordinal) or _request(parent, ordinal, seed)), engine=engine, validator=_validate, target=ChallengeTarget(50, 70, "DIFFICULTY_V1"))
+    assert report.disposition is AttemptDisposition.TARGET_MATCH
+    assert len(report.attempts) == 1
+    assert calls == [0]
+    assert report.attempts[0].provenance is not None
+    assert report.attempts[0].provenance.attempt_ordinal == 0
+    assert report.attempts[0].effective_seed == derive_attempt_seed(70, 0)
+
+
+def test_exact_limit_exhaustion_is_not_unsolvable_or_success() -> None:
+    report = run_bounded_mutations(_parent(), base_seed=71, budget=AttemptBudget(2), request_factory=_request, engine=MutationEngine(), validator=_validate, target=ChallengeTarget(90, 100, "DIFFICULTY_V1"))
+    assert report.disposition is AttemptDisposition.EXHAUSTED
+    assert len(report.attempts) == 2
+    assert report.selected is None
+    assert all(record.mutation.disposition.value != "UNSOLVABLE" for record in report.attempts)
+
+
+def test_invalid_budgets_fail_closed_and_seed_replay_is_stable() -> None:
+    for value in (0, -1, 10001):
+        with pytest.raises(MutationContractError):
+            AttemptBudget(value)
+    assert derive_attempt_seed(100, 3) == derive_attempt_seed(100, 3)
+    with pytest.raises(MutationContractError):
+        derive_attempt_seed(100, -1)

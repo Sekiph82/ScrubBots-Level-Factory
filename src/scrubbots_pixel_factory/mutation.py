@@ -787,6 +787,7 @@ class AttemptRecord:
     mutation: MutationResult
     validation: ValidationEnvelope | None
     selection: TargetSelection | None
+    provenance: MutationProvenance | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -816,7 +817,8 @@ def run_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: 
             continue
         validation = validator(mutation)
         selection = select_target(target, (validation,))
-        records.append(AttemptRecord(ordinal, effective_seed, mutation, validation, selection))
+        provenance = MutationProvenance.from_result(request, mutation, attempt_ordinal=ordinal, evidence_digests=(validation.evidence_digest,))
+        records.append(AttemptRecord(ordinal, effective_seed, mutation, validation, selection, provenance))
         if selection.disposition is TargetDisposition.MATCH:
             return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), validation, "target matched before budget exhaustion")
         if mutation.child is not None:
