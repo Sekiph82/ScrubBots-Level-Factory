@@ -24,3 +24,10 @@ Preflight commands and subsequent implementation, focused/regression tests, comp
 - `python -m compileall -q src tests`: PASS. `godot_console.exe --headless --path level_factory --editor --quit`: PASS, Godot `4.7.2.stable.official.ed1daf0bf`.
 - `git diff --check`: PASS. `git diff --exit-code -- TASKS.md`: PASS; no tracker edits.
 - Full corrected regression: `$env:PYTHONPATH='.'; python -m pytest -q -p no:cacheprovider` -> `985 passed, 2 skipped` (the two pre-existing canonical `Sekiph82/Scrubbots` capability skips were unavailable, not hidden).
+
+## Publication closure
+
+- Implementation commit: `6692b7a`.
+- Terminal log-only commit: pending in this append.
+- No provider credits, runtime network calls, main-game checkout mutation, catalog mutation, or source-art mutation occurred.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
