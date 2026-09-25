@@ -57,4 +57,4 @@ This is builder evidence only. The builder did not perform independent audit, di
 
 ## Publication checkpoint
 
-- Master log commit: pending; after its push, local `HEAD` and `origin/main` will be verified equal and work will stop.
+- Master log publication commit: `d8c43a9c3fe8432e0bd7302500e4877277000d50`, pushed to `origin/main`; post-push verification showed local `HEAD == origin/main == d8c43a9c3fe8432e0bd7302500e4877277000d50`. This final line correction is log-only and does not change implementation, tests, TASKS, or audits.
