@@ -915,7 +915,10 @@ class AttemptReport:
 def derive_attempt_seed(base_seed: int, ordinal: int) -> int:
     if type(base_seed) is not int or type(ordinal) is not int or ordinal < 0:
         raise MutationContractError("attempt seed inputs are malformed")
-    return base_seed + ordinal * 2654435761
+    derived = base_seed + ordinal * 2654435761
+    if not -(2**63) <= derived <= 2**63 - 1:
+        raise MutationContractError("derived attempt seed exceeds signed 64-bit range")
+    return derived
 
 
 def run_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], ValidationEnvelope], target: ChallengeTarget) -> AttemptReport:

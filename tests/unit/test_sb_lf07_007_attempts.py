@@ -5,11 +5,13 @@ import pytest
 from scrubbots_pixel_factory import (
     AttemptBudget,
     AttemptDisposition,
+    AttemptProvenance,
     CANONICAL_M23_PREVIEW_AUTHORITY,
     ChallengeTarget,
     EvidenceDisposition,
     MutationCandidate,
     MutationContractError,
+    MutationDisposition,
     MutationEngine,
     MutationIntent,
     MutationRequest,
@@ -63,3 +65,10 @@ def test_invalid_budgets_fail_closed_and_seed_replay_is_stable() -> None:
     assert derive_attempt_seed(100, 3) == derive_attempt_seed(100, 3)
     with pytest.raises(MutationContractError):
         derive_attempt_seed(100, -1)
+
+
+def test_signed64_overflow_is_rejected_and_non_applied_attempts_have_typed_provenance() -> None:
+    with pytest.raises(MutationContractError):
+        derive_attempt_seed(2**63 - 1, 1)
+    record = AttemptProvenance(0, 17, "a" * 64, "candidate", MutationDisposition.ERROR, "canonical capability unavailable")
+    assert record.mutation_disposition.value == "ERROR"
