@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M07 — Mutation & Automatic Difficulty Targeting
-- Current Sprint: SB-LF07.C001-R01 — M07 strict remediation batch
+- Current Sprint: SB-LF07.C001-R02 — M07 second strict remediation batch
 - Current Task: SB-LF07-001 — Mutation interface/immutable lineage
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_ALL_THEN_REAUDIT
-- Next Task/Action: Codex executes `SB-LF07-001..010-C001-R01` sequentially without stopping from `.hiveai/prompts/SB-LF07-001-010-C001-R01_MASTER_REMEDIATION_PROMPT.md`, closes each frozen C001 audit finding, creates one dedicated R01 log per task plus a master R01 log, never edits `TASKS.md` or ChatGPT audits, then stops. ChatGPT independently re-audits all ten tasks one-by-one; only R01-audited PASS tasks advance checkboxes.
+- Current Task Status: CHANGES_REQUIRED / R02_AUTHORIZED / REMEDIATE_ALL_THEN_REAUDIT
+- Next Task/Action: Codex executes `SB-LF07-001..010-C001-R02` sequentially without stopping from `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`, closes every remaining R01 finding, resolves Scrubbots current-main separately inside each authority-dependent task, creates one R02 log per task plus a master R02 log, never edits `TASKS.md` or ChatGPT audits, then stops. ChatGPT independently re-audits all ten tasks; only R02-audited PASS tasks advance checkboxes.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF07-001-010-C001_STRICT_AUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF07-001-010-C001-R01_STRICT_REAUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: original `SB-LF07-001..010-C001` strict criteria plus the ten frozen C001 audits summarized by `.hiveai/audits/SB-LF07-001-010-C001_STRICT_AUDIT_SUMMARY.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: original `SB-LF07-001..010-C001` strict criteria plus the ten R01 re-audits summarized by `.hiveai/audits/SB-LF07-001-010-C001-R01_STRICT_REAUDIT_SUMMARY.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -148,6 +148,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF07 R01 Remediation Index: `.hiveai/prompts/SB-LF07-001-010-C001-R01_REMEDIATION_INDEX.md`.
 - SB-LF07 R01 Master Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF07 R01 Tracker Policy: Codex does not advance task checkboxes; ChatGPT independently re-audits all ten tasks after the full R01 batch.
+- SB-LF07 R01 Re-Audit Result: `PASS/CLOSED = none`; `CHANGES_REQUIRED = 001,002,003,004,005,006,007,008,009,010`.
+- SB-LF07 R01 Re-Audit Summary: `.hiveai/audits/SB-LF07-001-010-C001-R01_STRICT_REAUDIT_SUMMARY.md`.
+- SB-LF07 R02 Remediation Authorization: `SB-LF07-001..010-C001-R02 — REMEDIATE_ALL_THEN_REAUDIT`.
+- SB-LF07 R02 Remediation Index: `.hiveai/prompts/SB-LF07-001-010-C001-R02_REMEDIATION_INDEX.md`.
+- SB-LF07 R02 Master Prompt: `.hiveai/prompts/SB-LF07-001-010-C001-R02_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF07 R02 Tracker Policy: Codex does not advance task checkboxes; ChatGPT independently re-audits all ten after the complete R02 batch.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
