@@ -664,10 +664,13 @@ def canonical_mutation_registry(*, m23_authority: AuthorityIdentity | None = Non
     registry = MutationRegistry()
     if m39_authority is not None and m39_authority.commit_sha != "UNAVAILABLE" and m39_authority.source_blob_sha256 is not None:
         from .mutation_hardening import build_hardening_registry
+        from .mutation_easing import build_easing_registry
         hardening = build_hardening_registry(m39_authority)
         for operator in hardening.snapshot():
             registry._install(operator, lambda payload, op=operator: hardening.transform(op, payload))
-        registry._install(MutationOperator("CANONICAL_PLUS_ONE_SLOT_EASE_V1", "1", MutationIntent.EASE, m39_authority, "activate_sixth_slot"), _slot_easing)
+        easing = build_easing_registry(m39_authority)
+        for operator in easing.snapshot():
+            registry._install(operator, lambda payload, op=operator: easing.transform(op, payload))
     return registry
 
 
