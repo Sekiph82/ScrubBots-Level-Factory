@@ -26,7 +26,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.data-files]
-"data/palette" = ["data/palette/scrubbots_palette_v2.json"]
+"data/palette" = ["data/palette/scrubbots_palette_v3.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

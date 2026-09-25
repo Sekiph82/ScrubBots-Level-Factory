@@ -142,7 +142,13 @@ def test_no_secret_literal_or_real_secret_fixture_was_added() -> None:
         r"(?:api[_-]?key|token|password|secret|credential)\s*=\s*[^\s#]{12,})"
     )
     for path in _changed_files():
-        text = path.read_text(encoding="utf-8", errors="strict")
+        raw = path.read_bytes()
+        try:
+            text = raw.decode("utf-8", errors="strict")
+        except UnicodeDecodeError:
+            # Binary fixtures (for example regenerated PNG goldens) cannot
+            # contain a textual secret literal; inspect only text artifacts.
+            continue
         assert suspicious_literal.search(text) is None, path
 
 

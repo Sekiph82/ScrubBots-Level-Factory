@@ -7,7 +7,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory import CANONICAL_PALETTE, GenerationRequest, GeneratorOptions
 from scrubbots_pixel_factory.generators.router import HybridCandidate, HybridGenerator
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
 
@@ -162,7 +162,8 @@ def write_outputs() -> None:
         stages = " → ".join(escape(name) for name in entry["stage_names"])
         topology = entry["topology_evidence"]
         cards.append(f'<article><h2>{escape(entry["case_id"])} · {escape(entry["strategy"])}</h2><p>{entry["difficulty"]} · seed {entry["master_seed"]} · {entry["dimensions"][0]}×{entry["dimensions"][1]} · {", ".join(entry["palette"])}</p><p>Stages: {stages}</p><p>Topology: <code>{entry["final_topology_digest"]}</code><br>Grid: <code>{entry["final_logical_grid_digest"]}</code><br>Result: <code>{entry["final_result_digest"]}</code></p><div class="panels"><section>Before topology{_render_topology(topology["before"], entry["dimensions"][0], entry["dimensions"][1])}</section><section>After/final topology{_render_topology(topology["after"], entry["dimensions"][0], entry["dimensions"][1])}</section><section>Final colored output{_render_grid(entry)}</section></div></article>')
-    html = """<!doctype html><meta charset="utf-8"><title>M06 Hybrid Contact Sheet</title><style>body{background:#202533;color:#e8cfa0;font:12px sans-serif;margin:16px}main{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:12px}article{background:#30394a;padding:10px;border:1px solid #596779}h2{font-size:14px;margin:0 0 6px}p{line-height:1.35;overflow-wrap:anywhere}.panels{display:flex;gap:8px;align-items:flex-start}.panels section{font-size:10px}.grid,.topology{display:grid;grid-template-columns:repeat(var(--w),5px);grid-template-rows:repeat(var(--h),5px);gap:0;background:#202533;width:max-content;margin-top:3px}.grid span,.topology span{width:5px;height:5px;display:block}.topology .occupied{background:#e8cfa0}.topology .empty{background:#202533}.c-01{background:#E94B4B}.c-02{background:#F28C3C}.c-03{background:#F2C94C}.c-04{background:#55B85A}.c-05{background:#63D6A3}.c-06{background:#42C7D9}.c-07{background:#3E7EDB}.c-08{background:#3451A3}.c-09{background:#845EC2}.c-10{background:#E66FA5}.c-11{background:#956447}.c-12{background:#E8CFA0}.c-13{background:#B8C2CC}.c-14{background:#3D4652}.c-15{background:#FFFFFF}.c-16{background:#000000}code{font-size:10px}</style><main>""" + "".join(cards) + "</main>\n"
+    palette_css = "".join(f".c-{color_id[1:].lower()}{{background:{CANONICAL_PALETTE.hex_for(color_id)}}}" for color_id in CANONICAL_PALETTE.ids)
+    html = """<!doctype html><meta charset="utf-8"><title>M06 Hybrid Contact Sheet</title><style>body{background:#202533;color:#fff8b8;font:12px sans-serif;margin:16px}main{display:grid;grid-template-columns:repeat(3,minmax(280px,1fr));gap:12px}article{background:#30394a;padding:10px;border:1px solid #596779}h2{font-size:14px;margin:0 0 6px}p{line-height:1.35;overflow-wrap:anywhere}.panels{display:flex;gap:8px;align-items:flex-start}.panels section{font-size:10px}.grid,.topology{display:grid;grid-template-columns:repeat(var(--w),5px);grid-template-rows:repeat(var(--h),5px);gap:0;background:#202533;width:max-content;margin-top:3px}.grid span,.topology span{width:5px;height:5px;display:block}.topology .occupied{background:#FFF8B8}.topology .empty{background:#202533}""" + palette_css + """code{font-size:10px}</style><main>""" + "".join(cards) + "</main>\n"
     (review / "M06_HYBRID_CONTACT_SHEET.html").write_text(html, encoding="utf-8")
 
 

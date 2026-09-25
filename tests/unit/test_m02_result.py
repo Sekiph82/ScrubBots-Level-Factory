@@ -108,7 +108,7 @@ def test_success_rejects_wrong_length_or_illegal_color_count(grid) -> None:
         )
 
 
-@pytest.mark.parametrize("bad", ["C17", "BG01", "#E94B4B"])
+@pytest.mark.parametrize("bad", ["C17", "BG01", "#123456"])
 def test_success_rejects_off_palette_cells(bad) -> None:
     result = valid_result()
     cells = list(result.logical_grid)

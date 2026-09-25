@@ -193,8 +193,8 @@ def test_weighted_subset_optimization_retains_the_hand_computed_low_cost_subset(
 def test_weighted_subset_ties_resolve_by_canonical_palette_tuple() -> None:
     ids = tuple(f"C{index:02d}" for index in range(1, 14))
     final, details = enforce_difficulty_color_budget(Difficulty.EASY, ids)
-    assert details["retained_palette_ids"] == ("C01", "C02", "C04", "C05", "C06", "C07", "C08", "C09", "C10", "C11", "C12", "C13")
-    assert "C03" not in actual_used_palette_ids(final)
+    assert details["retained_palette_ids"] == tuple(f"C{index:02d}" for index in range(1, 13))
+    assert actual_used_palette_ids(final) == tuple(f"C{index:02d}" for index in range(1, 13))
 
 
 def test_legal_rectangles_work_for_each_difficulty_and_24x24_is_not_special(tmp_path: Path) -> None:

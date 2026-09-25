@@ -12,17 +12,9 @@ from scrubbots_pixel_factory.contracts.color_usage import (
 from scrubbots_pixel_factory.contracts.difficulty import Difficulty
 
 
-COLOR_BANDS = {
-    Difficulty.EASY: (3, 5),
-    Difficulty.MEDIUM: (6, 7),
-    Difficulty.HARD: (8, 9),
-    Difficulty.VERY_HARD: (10, 12),
-}
-
-
-@pytest.mark.parametrize("difficulty,bounds", COLOR_BANDS.items())
-def test_actual_used_color_minimum_and_maximum(difficulty, bounds) -> None:
-    minimum, maximum = bounds
+@pytest.mark.parametrize("difficulty", Difficulty)
+def test_actual_used_color_uses_one_global_envelope_for_every_difficulty(difficulty) -> None:
+    minimum, maximum = (3, 12)
     cells = [f"C{i:02d}" for i in range(1, maximum + 1)]
     assert len(validate_used_color_count(difficulty, cells[:minimum])) == minimum
     assert len(validate_used_color_count(difficulty, cells)) == maximum
@@ -38,7 +30,7 @@ def test_duplicate_cells_do_not_inflate_count_and_used_ids_are_sorted() -> None:
     assert actual_used_palette_ids(cells) == ("C01", "C02", "C03")
 
 
-@pytest.mark.parametrize("bad_cell", ["BG01", "C17", "#E94B4B", "not-a-color"])
+@pytest.mark.parametrize("bad_cell", ["BG01", "C17", "#123456", "not-a-color"])
 def test_bg01_and_off_palette_cells_are_rejected(bad_cell: str) -> None:
     with pytest.raises(ColorUsageContractError):
         actual_used_palette_ids(["C01", bad_cell])
@@ -64,7 +56,7 @@ def test_seeded_subsets_are_stable_legal_sorted_and_vary() -> None:
     samples = [select_palette_subset(Difficulty.VERY_HARD, seed) for seed in range(64)]
     assert samples == [select_palette_subset(Difficulty.VERY_HARD, seed) for seed in range(64)]
     assert len(set(samples)) > 1
-    assert all(10 <= len(subset) <= 12 for subset in samples)
+    assert all(3 <= len(subset) <= 12 for subset in samples)
     assert all(subset == tuple(sorted(subset, key=lambda value: int(value[1:]))) for subset in samples)
 
 

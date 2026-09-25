@@ -218,7 +218,7 @@ func _run_suite() -> void:
 				if x == edited_x and y == edited_y:
 					continue
 				_check(editor_working_after_edit.get_pixel(x, y) == editor_source_image.get_pixel(x, y), "Edit changed an untouched logical cell at %s,%s" % [x, y])
-		_check(editor_working_after_edit.get_pixel(edited_x, edited_y) == (Color8(0, 0, 0, 255) if selected_color == "C16" else Color8(233, 75, 75, 255)), "Edited cell RGB does not equal selected canonical palette RGB")
+		_check(editor_working_after_edit.get_pixel(edited_x, edited_y) == (Color8(0, 0, 0, 255) if selected_color == "C16" else Color8(255, 69, 0, 255)), "Edited cell RGB does not equal selected canonical palette RGB")
 	_check(FileAccess.get_file_as_bytes(source_artwork_path) == source_bytes_before, "Editing changed canonical source artwork bytes")
 	_check(str(editor_dirty.get("source_artwork_sha256", "")) == source_sha_before, "Editing changed captured canonical source artwork hash")
 	_check(preview.call("snapshot").get("artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Dirty edit relabeled canonical preview source")

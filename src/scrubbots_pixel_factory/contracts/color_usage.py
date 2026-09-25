@@ -41,27 +41,18 @@ def count_used_colors(cells: object) -> int:
 
 
 def validate_used_color_count(difficulty: Difficulty | str, cells: object) -> tuple[str, ...]:
-    selected = parse_difficulty(difficulty)
+    parse_difficulty(difficulty)
     used = actual_used_palette_ids(cells)
-    band = _color_count_band(selected)
-    if not band[0] <= len(used) <= band[1]:
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
+    if not minimum <= len(used) <= maximum:
         raise ColorUsageContractError(
-            f"{selected.value} requires {band[0]}..{band[1]} distinct used colors; received {len(used)}"
+            f"V1 used-color envelope requires {minimum}..{maximum} distinct used colors; received {len(used)}"
         )
     return used
 
 
-def _color_count_band(difficulty: Difficulty) -> tuple[int, int]:
-    return {
-        Difficulty.EASY: (3, 5),
-        Difficulty.MEDIUM: (6, 7),
-        Difficulty.HARD: (8, 9),
-        Difficulty.VERY_HARD: (10, 12),
-    }[difficulty]
-
-
 def validate_palette_subset(difficulty: Difficulty | str, subset: Iterable[str]) -> tuple[str, ...]:
-    selected = parse_difficulty(difficulty)
+    parse_difficulty(difficulty)
     if isinstance(subset, str):
         raise ColorUsageContractError("explicit palette subset must be an iterable of C-ID strings")
     try:
@@ -79,10 +70,10 @@ def validate_palette_subset(difficulty: Difficulty | str, subset: Iterable[str])
             CANONICAL_PALETTE.validate_logical_id(value)
     except (PaletteContractError, TypeError) as exc:
         raise ColorUsageContractError(str(exc)) from exc
-    minimum, maximum = _color_count_band(selected)
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
     if not minimum <= len(values) <= maximum:
         raise ColorUsageContractError(
-            f"{selected.value} explicit palette subset must contain {minimum}..{maximum} IDs; received {len(values)}"
+            f"explicit palette subset must contain {minimum}..{maximum} IDs; received {len(values)}"
         )
     return tuple(sorted(values, key=lambda value: int(value[1:])))
 
@@ -90,9 +81,9 @@ def validate_palette_subset(difficulty: Difficulty | str, subset: Iterable[str])
 def select_palette_subset(difficulty: Difficulty | str, seed: int | str) -> tuple[str, ...]:
     """Select a stable legal subset and return it in canonical ascending order."""
 
-    selected = parse_difficulty(difficulty)
+    parse_difficulty(difficulty)
     validate_seed(seed)
-    minimum, maximum = _color_count_band(selected)
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
     size = minimum + stable_index("palette-subset.size", seed, maximum - minimum + 1)
     ranked = sorted(
         CANONICAL_PALETTE.ids,

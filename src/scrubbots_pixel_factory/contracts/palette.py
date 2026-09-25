@@ -10,9 +10,9 @@ from typing import Any, Iterable, Mapping
 
 
 _REPOSITORY_PALETTE_PATH = (
-    Path(__file__).resolve().parents[3] / "data" / "palette" / "scrubbots_palette_v2.json"
+    Path(__file__).resolve().parents[3] / "data" / "palette" / "scrubbots_palette_v3.json"
 )
-_INSTALLED_PALETTE_PATH = Path(sys.prefix) / "data" / "palette" / "scrubbots_palette_v2.json"
+_INSTALLED_PALETTE_PATH = Path(sys.prefix) / "data" / "palette" / "scrubbots_palette_v3.json"
 PALETTE_DATA_PATH = (
     _REPOSITORY_PALETTE_PATH
     if _REPOSITORY_PALETTE_PATH.is_file()
@@ -46,9 +46,23 @@ class BackgroundColor:
 class CanonicalPalette:
     """Immutable canonical palette with fail-closed lookup methods."""
 
-    __slots__ = ("_colors", "_by_id", "_by_rgb", "_by_hex", "background")
+    __slots__ = (
+        "_colors",
+        "_by_id",
+        "_by_rgb",
+        "_by_hex",
+        "background",
+        "used_color_envelope",
+        "difficulty_class_derived_from_color_count",
+    )
 
-    def __init__(self, colors: Iterable[PaletteColor], background: BackgroundColor):
+    def __init__(
+        self,
+        colors: Iterable[PaletteColor],
+        background: BackgroundColor,
+        used_color_envelope: tuple[int, int],
+        difficulty_class_derived_from_color_count: bool,
+    ):
         ordered = tuple(colors)
         if tuple(color.id for color in ordered) != tuple(f"C{i:02d}" for i in range(1, 17)):
             raise PaletteContractError("canonical colors must be ordered C01 through C16")
@@ -57,6 +71,12 @@ class CanonicalPalette:
         object.__setattr__(self, "_by_rgb", MappingProxyType({c.rgb: c.id for c in ordered}))
         object.__setattr__(self, "_by_hex", MappingProxyType({c.hex: c.id for c in ordered}))
         object.__setattr__(self, "background", background)
+        object.__setattr__(self, "used_color_envelope", used_color_envelope)
+        object.__setattr__(
+            self,
+            "difficulty_class_derived_from_color_count",
+            difficulty_class_derived_from_color_count,
+        )
 
     def __setattr__(self, _name: str, _value: object) -> None:
         raise AttributeError("canonical palette is immutable")
@@ -139,24 +159,21 @@ def _load_json(path: str | Path) -> Mapping[str, Any]:
 def load_palette(path: str | Path = PALETTE_DATA_PATH) -> CanonicalPalette:
     raw = _load_json(path)
     if (
-        raw.get("schema") != "scrubbots-global-palette/v2"
-        or raw.get("version") != 2
+        raw.get("schema") != "scrubbots-global-palette/v3"
+        or raw.get("version") != 3
         or raw.get("ownerLocked") is not True
     ):
         raise PaletteContractError("unsupported canonical palette schema/version")
     production_rules = raw.get("productionRules")
-    expected_bands = {
-        "EASY": {"min": 3, "max": 5},
-        "MEDIUM": {"min": 6, "max": 7},
-        "HARD": {"min": 8, "max": 9},
-        "VERY_HARD": {"min": 10, "max": 12},
-    }
     if not isinstance(production_rules, dict):
         raise PaletteContractError("productionRules are required")
     if production_rules.get("offPaletteLogicalCellColors") != "FORBIDDEN":
         raise PaletteContractError("off-palette logical cell policy must be FORBIDDEN")
-    if production_rules.get("difficultyColorCountBands") != expected_bands:
-        raise PaletteContractError("difficulty color-count bands do not match the owner-locked contract")
+    envelope = production_rules.get("usedColorEnvelopeV1")
+    if envelope != {"min": 3, "max": 12}:
+        raise PaletteContractError("usedColorEnvelopeV1 must be exactly 3..12")
+    if production_rules.get("difficultyClassDerivedFromColorCount") is not False:
+        raise PaletteContractError("difficulty class must not be derived from color count")
     entries = raw.get("colors")
     if not isinstance(entries, list) or len(entries) != 16:
         raise PaletteContractError("canonical palette must contain exactly 16 colors")
@@ -214,7 +231,7 @@ def load_palette(path: str | Path = PALETTE_DATA_PATH) -> CanonicalPalette:
         raise PaletteContractError("BG01 production role must remain presentation-only")
     if background.id in seen_ids:
         raise PaletteContractError("BG01 must not be a logical palette ID")
-    return CanonicalPalette(colors, background)
+    return CanonicalPalette(colors, background, (3, 12), False)
 
 
 CANONICAL_PALETTE = load_palette()

@@ -42,7 +42,7 @@ def test_contact_sheet_is_self_contained_integer_block_presentation() -> None:
     html = (REVIEW / "M03_MASK_CONTACT_SHEET.html").read_text(encoding="utf-8")
     assert "<script>" in html and html.count("createElement('canvas')") >= 2 and "imageSmoothingEnabled=false" in html
     assert "http://" not in html and "https://" not in html and "cdn" not in html.lower()
-    assert "C01" in html and "#E94B4B" in html
+    assert "C01" in html and "#FF4500" in html
 
 
 def test_weak_family_review_masks_are_materially_distinct() -> None:

@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest
+from scrubbots_pixel_factory import CANONICAL_PALETTE, GenerationRequest
 from scrubbots_pixel_factory.core import DeterministicRNG
 from scrubbots_pixel_factory.generators.rules import (
     PRIMITIVE_NAMES,
@@ -119,7 +119,7 @@ def build_manifest() -> dict[str, object]:
 
 
 def build_html(manifest: dict[str, object]) -> str:
-    palette = {f"C{index:02d}": color for index, color in enumerate(("#E94B4B", "#F28C3C", "#F2C94C", "#55B85A", "#63D6A3", "#42C7D9", "#3E7EDB", "#3451A3", "#845EC2", "#E66FA5", "#956447", "#E8CFA0", "#B8C2CC", "#3D4652", "#FFFFFF", "#000000"), 1)}
+    palette = {color_id: CANONICAL_PALETTE.hex_for(color_id) for color_id in CANONICAL_PALETTE.ids}
     data = json.dumps(manifest, separators=(",", ":"), ensure_ascii=False)
     colors = json.dumps(palette, separators=(",", ":"))
     return f"""<!doctype html><meta charset='utf-8'><title>M04 RULES Review</title><style>body{{background:#202533;color:#fff;font:12px sans-serif}}article{{display:inline-block;vertical-align:top;margin:8px;padding:8px;background:#303849}}canvas{{image-rendering:pixelated;display:block;margin:4px 0}}</style><main id='sheet'></main><script>const manifest={data};const colors={colors};const root=document.getElementById('sheet');for(const c of manifest.candidates){{const a=document.createElement('article');const h=document.createElement('h3');h.textContent=(c.kind==='primitive'?c.primitive:c.recipe)+' · '+(c.difficulty||'PRIMITIVE')+' · seed '+c.seed;a.appendChild(h);for(const mode of ['geometry_mask','logical_grid']){{const canvas=document.createElement('canvas');canvas.width=c.dimensions[0]*4;canvas.height=c.dimensions[1]*4;canvas.style.width=canvas.width+'px';canvas.style.height=canvas.height+'px';const x=canvas.getContext('2d');x.imageSmoothingEnabled=false;const cells=c[mode];for(let i=0;i<cells.length;i++){{const value=mode==='geometry_mask'?(cells[i]?'#FFFFFF':'#202533'):colors[cells[i]];x.fillStyle=value;x.fillRect((i%c.dimensions[0])*4,Math.floor(i/c.dimensions[0])*4,4,4);}}a.appendChild(canvas);}}const p=document.createElement('p');p.textContent='occupancy '+(c.diagnostics.occupancy_pct??(c.diagnostics.occupied_cells*100/(c.dimensions[0]*c.dimensions[1])).toFixed(2))+' · singleton '+c.diagnostics.singleton_count;p.style.margin='0';a.appendChild(p);root.appendChild(a);}}</script>"""

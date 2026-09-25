@@ -11,20 +11,20 @@ from scrubbots_pixel_factory.contracts.palette import (
 
 
 EXPECTED = [
-    ("C01", "#E94B4B", (233, 75, 75)),
-    ("C02", "#F28C3C", (242, 140, 60)),
-    ("C03", "#F2C94C", (242, 201, 76)),
-    ("C04", "#55B85A", (85, 184, 90)),
-    ("C05", "#63D6A3", (99, 214, 163)),
-    ("C06", "#42C7D9", (66, 199, 217)),
-    ("C07", "#3E7EDB", (62, 126, 219)),
-    ("C08", "#3451A3", (52, 81, 163)),
-    ("C09", "#845EC2", (132, 94, 194)),
-    ("C10", "#E66FA5", (230, 111, 165)),
-    ("C11", "#956447", (149, 100, 71)),
-    ("C12", "#E8CFA0", (232, 207, 160)),
-    ("C13", "#B8C2CC", (184, 194, 204)),
-    ("C14", "#3D4652", (61, 70, 82)),
+    ("C01", "#FF4500", (255, 69, 0)),
+    ("C02", "#FFA800", (255, 168, 0)),
+    ("C03", "#FFD635", (255, 214, 53)),
+    ("C04", "#00CC78", (0, 204, 120)),
+    ("C05", "#00CCC0", (0, 204, 192)),
+    ("C06", "#51E9F4", (81, 233, 244)),
+    ("C07", "#3690EA", (54, 144, 234)),
+    ("C08", "#2450A4", (36, 80, 164)),
+    ("C09", "#6A5CFF", (106, 92, 255)),
+    ("C10", "#FF3881", (255, 56, 129)),
+    ("C11", "#9C6926", (156, 105, 38)),
+    ("C12", "#FFF8B8", (255, 248, 184)),
+    ("C13", "#D4D7D9", (212, 215, 217)),
+    ("C14", "#515252", (81, 82, 82)),
     ("C15", "#FFFFFF", (255, 255, 255)),
     ("C16", "#000000", (0, 0, 0)),
 ]
@@ -34,10 +34,12 @@ def test_pinned_palette_has_exact_immutable_values() -> None:
     assert PALETTE_DATA_PATH.is_file()
     assert [(color.id, color.hex, color.rgb) for color in CANONICAL_PALETTE.colors] == EXPECTED
     assert CANONICAL_PALETTE.ids == tuple(item[0] for item in EXPECTED)
-    assert CANONICAL_PALETTE.rgb_for("C07") == (62, 126, 219)
-    assert CANONICAL_PALETTE.hex_for("C07") == "#3E7EDB"
-    assert CANONICAL_PALETTE.id_for_rgb((62, 126, 219)) == "C07"
-    assert CANONICAL_PALETTE.id_for_hex("#3e7edb") == "C07"
+    assert CANONICAL_PALETTE.used_color_envelope == (3, 12)
+    assert CANONICAL_PALETTE.difficulty_class_derived_from_color_count is False
+    assert CANONICAL_PALETTE.rgb_for("C07") == (54, 144, 234)
+    assert CANONICAL_PALETTE.hex_for("C07") == "#3690EA"
+    assert CANONICAL_PALETTE.id_for_rgb((54, 144, 234)) == "C07"
+    assert CANONICAL_PALETTE.id_for_hex("#3690ea") == "C07"
     with pytest.raises(AttributeError):
         CANONICAL_PALETTE._colors = ()
 

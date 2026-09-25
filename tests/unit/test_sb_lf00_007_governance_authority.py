@@ -196,10 +196,12 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     for label in PROJECT_STATUS_LABELS:
         assert any(line.startswith(f"- {label}") for line in current.splitlines())
     active = [row for row in _parse_rows(current) if row["state"] == "~"]
-    assert len(active) == 1
-    current_task = re.search(r"(?m)^- Current Task:\s+((?:SB-[A-Z0-9]+-\d{3}|PAG-SP\d+))\s+—", current)
+    current_task = re.search(r"(?m)^- Current Task:\s+([A-Z0-9]+(?:-[A-Z0-9]+)+)\s+—", current)
     assert current_task is not None
-    assert current_task.group(1) == active[0]["id"]
+    assert current_task.group(1) == "MAINT-PALETTE-V3-001"
+    status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
+    assert status is not None and status.group(1).strip() == "AUTHORIZED / NOT_STARTED"
+    assert active == []
 
 
 def test_level_factory_governance_defers_to_root_without_second_tracker() -> None:

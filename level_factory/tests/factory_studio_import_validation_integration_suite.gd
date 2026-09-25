@@ -101,7 +101,7 @@ func _run_suite() -> void:
 
 func _write_valid(path: String) -> void:
 	var image := Image.create(20, 20, false, Image.FORMAT_RGB8)
-	var colors := [Color8(233, 75, 75), Color8(242, 140, 60), Color8(242, 201, 76), Color8(85, 184, 90)]
+	var colors := [Color8(255, 69, 0), Color8(255, 168, 0), Color8(255, 214, 53), Color8(0, 204, 120)]
 	for y in range(20):
 		for x in range(20): image.set_pixel(x, y, colors[(x + y) % colors.size()])
 	image.save_png(path)
@@ -115,7 +115,7 @@ func _write_nonlogical(path: String) -> void:
 
 func _write_alpha(path: String) -> void:
 	var image := Image.create(20, 20, false, Image.FORMAT_RGBA8)
-	image.fill(Color(0.91, 0.29, 0.29, 0.5))
+	image.fill(Color8(255, 69, 0, 128))
 	image.save_png(path)
 
 

@@ -117,7 +117,25 @@ class MaskSpriteGenerator:
                     config.symmetry,
                 )
                 mask = resolve_mask(definition, attempt_rng.stage_rng("geometry"), config)
-                colorized = colorize_with_roles(mask, palette, attempt_rng.stage_rng("colorization"))
+                colorized = None
+                # Palette V3 permits the global 3..12 envelope without
+                # requiring every family geometry to host all twelve colors.
+                # Keep the request's deterministic ascending subset first,
+                # then trim only when semantic role geometry cannot allocate
+                # every requested color.  The emitted result remains a valid
+                # 3..12 local subset of the canonical C01..C16 palette.
+                for palette_size in range(len(palette), 2, -1):
+                    try:
+                        colorized = colorize_with_roles(
+                            mask,
+                            palette[:palette_size],
+                            attempt_rng.stage_rng("colorization"),
+                        )
+                        break
+                    except MaskContractError:
+                        continue
+                if colorized is None:
+                    raise MaskContractError("semantic role geometry could not allocate a Palette V3 subset")
                 result = GenerationResult.success(
                     request=request,
                     width=width,
@@ -130,7 +148,7 @@ class MaskSpriteGenerator:
                     rng_algorithm=RNG_ALGORITHM,
                     provenance={"stage_seeds": stream.stage_seeds(), "retry_seeds": dict(retry_seeds)},
                 )
-                return MaskCandidate(result, mask, family, attempt, palette, colorized.roles, colorized.role_assignments)
+                return MaskCandidate(result, mask, family, attempt, result.used_palette, colorized.roles, colorized.role_assignments)
             except (TypeError, ValueError, MaskContractError, ResultContractError):
                 continue
         return self._failure(FailureCode.RETRY_EXHAUSTED, "bounded MASK generation attempts exhausted", request)

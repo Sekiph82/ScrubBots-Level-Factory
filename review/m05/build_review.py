@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory import CANONICAL_PALETTE, GenerationRequest, GeneratorOptions
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator, WFCCandidate
 
 
@@ -74,7 +74,7 @@ def build_manifest() -> dict[str, object]:
 
 
 def build_html(manifest: dict[str, object]) -> str:
-    palette = {f"C{index:02d}": color for index, color in enumerate(("#E94B4B", "#F28C3C", "#F2C94C", "#55B85A", "#63D6A3", "#42C7D9", "#3E7EDB", "#3451A3", "#845EC2", "#E66FA5", "#956447", "#E8CFA0", "#B8C2CC", "#3D4652", "#FFFFFF", "#000000"), 1)}
+    palette = {color_id: CANONICAL_PALETTE.hex_for(color_id) for color_id in CANONICAL_PALETTE.ids}
     data = json.dumps(manifest, separators=(",", ":"), ensure_ascii=False)
     colors = json.dumps(palette, separators=(",", ":"))
     return f"""<!doctype html><meta charset='utf-8'><title>M05 WFC Review</title><style>body{{background:#202533;color:#fff;font:12px sans-serif}}article{{display:inline-block;vertical-align:top;margin:8px;padding:8px;background:#303849;max-width:300px}}canvas{{image-rendering:pixelated;display:block;margin:4px 0;max-width:280px;height:auto}}small{{color:#b8c2cc;display:block}}</style><main id='sheet'></main><script>const manifest={data};const colors={colors};const root=document.getElementById('sheet');function canvasFor(cells,w,h,label){{const a=document.createElement('div');const l=document.createElement('small');l.textContent=label;a.appendChild(l);const canvas=document.createElement('canvas');const scale=Math.max(1,Math.floor(280/w));canvas.width=w*scale;canvas.height=h*scale;const x=canvas.getContext('2d');x.imageSmoothingEnabled=false;for(let i=0;i<cells.length;i++){{x.fillStyle=colors[cells[i]];x.fillRect((i%w)*scale,Math.floor(i/w)*scale,scale,scale);}}a.appendChild(canvas);return a;}}for(const c of manifest.candidates){{const a=document.createElement('article');const h=document.createElement('h3');h.textContent=c.exemplar_id+' · N'+c.metadata.pattern_size+' · seed '+c.seed;a.appendChild(h);a.appendChild(canvasFor(c.exemplar.logical_pixels,c.exemplar.width,c.exemplar.height,'Exemplar motif'));a.appendChild(canvasFor(c.logical_grid,c.dimensions[0],c.dimensions[1],'Generated WFC output'));const p=document.createElement('small');p.textContent='difficulty '+c.difficulty+' · output '+c.dimensions.join('×')+' · raw '+c.metadata.raw_extracted_window_count+' · transformed '+c.metadata.transformed_observation_count+' · unique '+c.metadata.unique_pattern_count+' · attempt '+c.metadata.attempt;a.appendChild(p);root.appendChild(a);}}</script>"""
