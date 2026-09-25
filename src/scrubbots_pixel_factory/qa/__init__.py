@@ -47,6 +47,14 @@ from .outcomes import (
     classify_solver_qa,
     summarize_solver_qa,
 )
+from .report import (
+    QA_REPORT_SCHEMA,
+    QA_REPORT_VERSION,
+    MachineReadableQAReport,
+    QAReportDisposition,
+    SemanticReviewDisposition,
+    build_qa_report,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -86,4 +94,10 @@ __all__ = [
     "QAOutcomeStatistics",
     "classify_solver_qa",
     "summarize_solver_qa",
+    "QA_REPORT_SCHEMA",
+    "QA_REPORT_VERSION",
+    "MachineReadableQAReport",
+    "QAReportDisposition",
+    "SemanticReviewDisposition",
+    "build_qa_report",
 ]
