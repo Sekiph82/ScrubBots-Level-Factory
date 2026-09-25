@@ -4,8 +4,8 @@ from collections.abc import Callable
 
 from .mutation_base import MutationCandidate, MutationDisposition, MutationEngine, MutationRequest
 from .mutation_evidence import provenance_from_authentic_validation
-from .m07_services import AttemptBudget, AttemptDisposition, AttemptProvenance, AttemptRecord, AttemptReport, MutationProvenance, MutationResult, TypedChallengeTarget
-from .mutation_targeting import AuthenticTargetCandidate, select_authentic_target
+from .m07_services import AttemptBudget, AttemptDisposition, AttemptProvenance, AttemptRecord, AttemptReport, MutationContractError, MutationDisposition, MutationResult, TypedChallengeTarget, ValidationDisposition
+from .mutation_targeting import AuthenticTargetCandidate, TargetDisposition, select_authentic_target
 
 
 def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None) -> AttemptReport:
@@ -25,13 +25,27 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
             records.append(AttemptRecord(ordinal, seed, mutation, None, None, None, attempt))
             terminals.append(AttemptDisposition.ERROR if mutation.disposition is MutationDisposition.ERROR else AttemptDisposition.UNAVAILABLE if mutation.disposition is MutationDisposition.UNAVAILABLE else AttemptDisposition.REJECTED)
             continue
-        candidate = validator(mutation)
+        try:
+            candidate = validator(mutation)
+        except MutationContractError as exc:
+            records.append(AttemptRecord(ordinal, seed, mutation, None, None, None, attempt))
+            terminals.append(AttemptDisposition.ERROR)
+            current = mutation.child or current
+            continue
         selection = select_authentic_target(target, (candidate,))
         provenance = provenance_from_authentic_validation(request, mutation, candidate.envelope, candidate.solver, candidate.difficulty, candidate.qa, attempt_ordinal=ordinal)
         records.append(AttemptRecord(ordinal, seed, mutation, candidate.envelope, selection, provenance, attempt))
-        if selection.disposition.value == "MATCH":
+        if selection.disposition is TargetDisposition.MATCH:
             return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), candidate.envelope, "authenticated target matched before budget exhaustion")
-        terminals.append(AttemptDisposition.UNAVAILABLE if selection.disposition.value == "UNAVAILABLE" else AttemptDisposition.INCONCLUSIVE if selection.disposition.value == "INCONCLUSIVE" else AttemptDisposition.REJECTED)
+        envelope_terminal = {ValidationDisposition.ERROR: AttemptDisposition.ERROR, ValidationDisposition.UNAVAILABLE: AttemptDisposition.UNAVAILABLE, ValidationDisposition.INCONCLUSIVE: AttemptDisposition.INCONCLUSIVE, ValidationDisposition.REJECTED: AttemptDisposition.REJECTED}.get(candidate.envelope.disposition)
+        if envelope_terminal is not None:
+            terminals.append(envelope_terminal)
+        elif selection.disposition is TargetDisposition.UNAVAILABLE:
+            terminals.append(AttemptDisposition.UNAVAILABLE)
+        elif selection.disposition is TargetDisposition.INCONCLUSIVE:
+            terminals.append(AttemptDisposition.INCONCLUSIVE)
+        elif selection.disposition is not TargetDisposition.NO_MATCH:
+            terminals.append(AttemptDisposition.REJECTED)
         current = mutation.child or current
     for terminal in (AttemptDisposition.ERROR, AttemptDisposition.UNAVAILABLE, AttemptDisposition.INCONCLUSIVE, AttemptDisposition.REJECTED):
         if terminal in terminals:
