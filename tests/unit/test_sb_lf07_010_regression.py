@@ -16,6 +16,7 @@ from scrubbots_pixel_factory import (
     ChallengeTarget,
     EfficiencyCounters,
     EfficiencyWorkload,
+    GeneratorRouteEvidence,
     EvidenceDisposition,
     MutationCandidate,
     MutationContractError,
@@ -25,7 +26,10 @@ from scrubbots_pixel_factory import (
     MutationProvenance,
     MutationRequest,
     OwnerSourceRecord,
+    SafetyConstraintEvidence,
+    TypedChallengeTarget,
     compare_efficiency,
+    compare_efficiency_from_routes,
     evidence,
     revalidate_mutation,
     run_bounded_mutations,
@@ -116,3 +120,16 @@ def test_regression_corpus_covers_efficiency_owner_source_and_palette_v3() -> No
     assert CANONICAL_PALETTE.background.id == "BG01"
     assert CANONICAL_PALETTE.used_color_envelope == (3, 12)
     assert CANONICAL_PALETTE.difficulty_class_derived_from_color_count is False
+
+
+def test_r01_corpus_binds_typed_target_route_and_owner_identity() -> None:
+    policy = "a" * 64
+    safety = SafetyConstraintEvidence("m04-safety", "1", policy, True, True, True, "b" * 64)
+    target = TypedChallengeTarget(50, 70, policy, safety)
+    assert target.digest()
+    route_a = GeneratorRouteEvidence("mutation", "c" * 64, 2, 1, 0, 4, "d" * 64)
+    route_b = GeneratorRouteEvidence("regenerate", "c" * 64, 2, 0, 1, 8, "e" * 64)
+    assert compare_efficiency_from_routes(route_a, route_b).digest()
+    upload = "owner-upload-" + "f" * 64
+    owner = OwnerSourceRecord.from_m05_owner_upload({"source_id": upload, "origin": "OWNER_UPLOAD", "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED", "source_sha256": "1" * 64, "byte_length": 1, "original_width": 1, "original_height": 1, "immutable_relative_path": f"owner-uploads/{upload}/source.png"})
+    assert owner.source_id == upload
