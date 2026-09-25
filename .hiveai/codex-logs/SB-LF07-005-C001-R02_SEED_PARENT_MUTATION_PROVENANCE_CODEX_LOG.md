@@ -34,5 +34,5 @@ Document role: CODEX BUILDER LOG
 ## Publication checkpoints
 
 - Implementation/evidence commit: `8244f2d19d111ab59a3e2bbd98f2a0f658c21c0f`, pushed to origin/main.
-- Terminal log-only commit: pending after this chronological append.
-- Final local HEAD and origin/main equality: pending after terminal log publication.
+- Terminal log-only commit: `cdecef8821399789d8adca4444f5d70ee34eccd4`, pushed successfully.
+- Final local HEAD and origin/main equality: `cdecef8821399789d8adca4444f5d70ee34eccd4` = `origin/main`.

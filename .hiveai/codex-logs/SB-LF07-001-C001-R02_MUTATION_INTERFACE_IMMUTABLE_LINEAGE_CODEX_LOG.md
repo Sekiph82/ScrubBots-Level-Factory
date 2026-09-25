@@ -36,8 +36,8 @@ Document role: CODEX BUILDER LOG
 
 ## Publication checkpoints
 
-- Implementation/evidence commit: `1de4651ca6d3c5f72a6e28e5635b29aa7990bbde`, pending push.
-- Terminal log-only commit: pending after this chronological append.
-- Final local HEAD and origin/main equality: pending after terminal log publication.
+- Implementation/evidence commit: `1de4651ca6d3c5f72a6e28e5635b29aa7990bbde`, pushed successfully.
+- Terminal log-only commit: `462df71ce5bb16ebb81c69d8fbcc5926a1016773`, pushed successfully.
+- Final local HEAD and origin/main equality: `462df71ce5bb16ebb81c69d8fbcc5926a1016773` = `origin/main`.
 
 - 2026-09-25: Implementation pushed successfully; only this builder log is staged for the separate terminal publication commit. Pre-existing owner untracked files remain untouched.

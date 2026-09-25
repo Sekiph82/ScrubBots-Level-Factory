@@ -37,5 +37,5 @@ Document role: CODEX BUILDER LOG
 
 - Implementation/evidence commit: `38772d88a2046000fbba6742a1f81bfa7c299874`, pushed to origin/main.
 - Verification correction commit: `e542212d11b51e8fd2f0147f7f1b4dd785acb3b5`, pushed to origin/main. This changed only verification expectations and truthful unavailable-capability handling; it did not change product runtime behavior.
-- Terminal log-only commit: pending after this chronological append.
-- Final local HEAD and origin/main equality: pending after terminal log publication.
+- Terminal log-only commit: `106050b9ad2a78c10bb11aef8b36d2e7ad377e0c`, pushed successfully.
+- Final local HEAD and origin/main equality: `106050b9ad2a78c10bb11aef8b36d2e7ad377e0c` = `origin/main`.
