@@ -15,12 +15,13 @@ from scrubbots_pixel_factory import (
     evidence,
     revalidate_mutation,
 )
+from sb_lf07_r01_support import engine, m23_authority
 
 
 def _mutation():
     parent = MutationCandidate.root("revalidate-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 5}})
-    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=31, intent=MutationIntent.HARDEN, authority=CANONICAL_M23_PREVIEW_AUTHORITY)
-    result = MutationEngine().apply(request, parent)
+    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=31, intent=MutationIntent.HARDEN, authority=m23_authority())
+    result = engine().apply(request, parent)
     assert result.disposition is MutationDisposition.APPLIED
     return result
 

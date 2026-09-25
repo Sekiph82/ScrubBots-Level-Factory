@@ -38,7 +38,10 @@ OWNER_SOURCE_SCHEMA = "scrubbots-owner-source-mutation-gate"
 OWNER_SOURCE_VERSION = 1
 
 CANONICAL_GAMEPLAY_REPOSITORY = "https://github.com/Sekiph82/Scrubbots"
-CANONICAL_GAMEPLAY_SHA = "edf672f61989d28fd1931917ab49b2d64cc416d6"
+# This is deliberately an unavailable capability marker, not a claim about the
+# current ScrubBots branch.  Concrete operators must receive a binding from
+# resolve_current_main_authority() at execution time.
+CANONICAL_GAMEPLAY_SHA = "UNAVAILABLE"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
 _FORBIDDEN_PROXY_FIELDS = frozenset(
@@ -167,23 +170,90 @@ class AuthorityIdentity:
     commit_sha: str
     source_path: str
     contract_version: str
+    source_blob_sha256: str | None = None
 
     def __post_init__(self) -> None:
         if _text(self.repository, "authority repository") != CANONICAL_GAMEPLAY_REPOSITORY:
             raise MutationContractError("authority repository is not canonical ScrubBots")
-        if type(self.commit_sha) is not str or _SHA1.fullmatch(self.commit_sha) is None:
-            raise MutationContractError("authority commit SHA must be a lowercase 40-character SHA")
+        if type(self.commit_sha) is not str or (self.commit_sha != "UNAVAILABLE" and _SHA1.fullmatch(self.commit_sha) is None):
+            raise MutationContractError("authority commit SHA must be a lowercase 40-character SHA or UNAVAILABLE")
         source = _text(self.source_path, "authority source path").replace("\\", "/")
         if source.startswith("/") or ".." in Path(source).parts:
             raise MutationContractError("authority source path must be a relative repository path")
         object.__setattr__(self, "source_path", source)
         object.__setattr__(self, "contract_version", _text(self.contract_version, "authority contract version"))
+        if self.source_blob_sha256 is not None:
+            _sha(self.source_blob_sha256, "authority source blob SHA-256")
 
     def canonical_dict(self) -> dict[str, str]:
-        return {"repository": self.repository, "commit_sha": self.commit_sha, "source_path": self.source_path, "contract_version": self.contract_version}
+        return {"repository": self.repository, "commit_sha": self.commit_sha, "source_path": self.source_path, "contract_version": self.contract_version, "source_blob_sha256": self.source_blob_sha256}
 
     def digest(self) -> str:
         return _digest(self.canonical_dict())
+
+
+class AuthorityResolutionDisposition(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    UNAVAILABLE = "UNAVAILABLE"
+    DRIFT = "DRIFT"
+    ERROR = "ERROR"
+
+
+@dataclass(frozen=True, slots=True)
+class AuthorityResolution:
+    disposition: AuthorityResolutionDisposition
+    authority: AuthorityIdentity
+    reason: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.disposition, AuthorityResolutionDisposition) or not isinstance(self.authority, AuthorityIdentity):
+            raise MutationContractError("authority resolution is malformed")
+        _text(self.reason, "authority resolution reason")
+
+    @property
+    def available(self) -> bool:
+        return self.disposition is AuthorityResolutionDisposition.AVAILABLE
+
+
+class CurrentMainAuthorityResolver:
+    """Read-only injected capability for resolving exact current main authority.
+
+    The resolver has no network dependency of its own. Callers provide the
+    checkout/API head and source-blob readers, so offline production paths can
+    truthfully return UNAVAILABLE instead of silently using a stale SHA.
+    """
+
+    def __init__(self, head_reader: Callable[[], str], blob_reader: Callable[[str, str], bytes]) -> None:
+        if not callable(head_reader) or not callable(blob_reader):
+            raise MutationContractError("current-main resolver requires callable head/blob readers")
+        self._head_reader = head_reader
+        self._blob_reader = blob_reader
+
+    def resolve(self, *, source_path: str, contract_version: str, expected_blob_sha256: str) -> AuthorityResolution:
+        try:
+            path = _text(source_path, "authority source path").replace("\\", "/")
+            version = _text(contract_version, "authority contract version")
+            expected = _sha(expected_blob_sha256, "expected authority source blob SHA-256")
+            head = self._head_reader()
+            if type(head) is not str or _SHA1.fullmatch(head) is None:
+                return AuthorityResolution(AuthorityResolutionDisposition.UNAVAILABLE, AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, "UNAVAILABLE", path, version, None), "current ScrubBots main SHA is unavailable")
+            blob = self._blob_reader(head, path)
+            if type(blob) is not bytes:
+                return AuthorityResolution(AuthorityResolutionDisposition.UNAVAILABLE, AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, "UNAVAILABLE", path, version, None), "current ScrubBots source blob capability returned no immutable bytes")
+            actual = hashlib.sha256(blob).hexdigest()
+            if actual != expected:
+                authority = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, head, path, version, actual)
+                return AuthorityResolution(AuthorityResolutionDisposition.DRIFT, authority, "current ScrubBots source blob differs from the accepted mechanic contract")
+            return AuthorityResolution(AuthorityResolutionDisposition.AVAILABLE, AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, head, path, version, actual), "current ScrubBots main and exact source blob resolved")
+        except (MutationContractError, OSError, TypeError, ValueError) as exc:
+            path = str(source_path).replace("\\", "/")
+            return AuthorityResolution(AuthorityResolutionDisposition.ERROR, AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, "UNAVAILABLE", path, str(contract_version), None), f"current ScrubBots authority resolution failed: {exc}")
+
+
+def resolve_current_main_authority(resolver: CurrentMainAuthorityResolver | None, *, source_path: str, contract_version: str, expected_blob_sha256: str) -> AuthorityResolution:
+    if resolver is None:
+        return AuthorityResolution(AuthorityResolutionDisposition.UNAVAILABLE, AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, "UNAVAILABLE", source_path, contract_version, None), "current ScrubBots main resolver capability is unavailable")
+    return resolver.resolve(source_path=source_path, contract_version=contract_version, expected_blob_sha256=expected_blob_sha256)
 
 
 @dataclass(frozen=True, slots=True)
@@ -485,6 +555,10 @@ class MutationRegistry:
     def snapshot(self) -> tuple[MutationOperator, ...]:
         return tuple(self._operators[key] for key in sorted(self._operators))
 
+    @property
+    def is_empty(self) -> bool:
+        return not self._operators
+
 
 def _copy_payload(payload: Mapping[str, object]) -> dict[str, object]:
     return _deep_thaw(payload)  # type: ignore[return-value]
@@ -544,14 +618,33 @@ def _slot_easing(payload: Mapping[str, object]) -> tuple[MutationDisposition, Ma
     return MutationDisposition.APPLIED, out, "activated the canonical M39 temporary sixth slot"
 
 
-CANONICAL_M23_PREVIEW_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, "scripts/gameplay/supply/batch_supply_engine.gd", "M23_V02_FIFO_PREVIEW_DEPTH")
-CANONICAL_M39_SLOT_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, "scripts/gameplay/slots/five_slot_batch_engine.gd", "M39_V04_PLUS_ONE_SLOT")
+CANONICAL_M23_SOURCE_PATH = "scripts/gameplay/supply/batch_supply_engine.gd"
+CANONICAL_M39_SOURCE_PATH = "scripts/gameplay/slots/five_slot_batch_engine.gd"
+CANONICAL_M23_CONTRACT_VERSION = "M23_V02_FIFO_PREVIEW_DEPTH"
+CANONICAL_M39_CONTRACT_VERSION = "M39_V04_PLUS_ONE_SLOT"
+CANONICAL_M23_PREVIEW_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, CANONICAL_M23_SOURCE_PATH, CANONICAL_M23_CONTRACT_VERSION)
+CANONICAL_M39_SLOT_AUTHORITY = AuthorityIdentity(CANONICAL_GAMEPLAY_REPOSITORY, CANONICAL_GAMEPLAY_SHA, CANONICAL_M39_SOURCE_PATH, CANONICAL_M39_CONTRACT_VERSION)
 
 
 def _default_registry() -> MutationRegistry:
+    # The base substrate deliberately installs no concrete future-task policy.
+    # Concrete operator factories must install authority-bound operators.
+    return MutationRegistry()
+
+
+def canonical_mutation_registry(*, m23_authority: AuthorityIdentity | None = None, m39_authority: AuthorityIdentity | None = None) -> MutationRegistry:
+    """Build the concrete operator layer from execution-time authority bindings.
+
+    The base default registry remains empty.  A missing or unavailable binding
+    produces an empty concrete registry, so callers cannot accidentally execute
+    a mechanic under an unresolved current-main identity.
+    """
+
     registry = MutationRegistry()
-    registry._install(MutationOperator("CANONICAL_PREVIEW_DEPTH_HARDEN_V1", "1", MutationIntent.HARDEN, CANONICAL_M23_PREVIEW_AUTHORITY, "increase_preview_depth"), _preview_hardening)
-    registry._install(MutationOperator("CANONICAL_PLUS_ONE_SLOT_EASE_V1", "1", MutationIntent.EASE, CANONICAL_M39_SLOT_AUTHORITY, "activate_sixth_slot"), _slot_easing)
+    if m23_authority is not None and m23_authority.commit_sha != "UNAVAILABLE" and m23_authority.source_blob_sha256 is not None:
+        registry._install(MutationOperator("CANONICAL_PREVIEW_DEPTH_HARDEN_V1", "1", MutationIntent.HARDEN, m23_authority, "increase_preview_depth"), _preview_hardening)
+    if m39_authority is not None and m39_authority.commit_sha != "UNAVAILABLE" and m39_authority.source_blob_sha256 is not None:
+        registry._install(MutationOperator("CANONICAL_PLUS_ONE_SLOT_EASE_V1", "1", MutationIntent.EASE, m39_authority, "activate_sixth_slot"), _slot_easing)
     return registry
 
 
@@ -559,8 +652,8 @@ DEFAULT_MUTATION_REGISTRY = _default_registry()
 
 
 class MutationEngine:
-    def __init__(self, registry: MutationRegistry = DEFAULT_MUTATION_REGISTRY) -> None:
-        self.registry = registry
+    def __init__(self, registry: MutationRegistry | None = None) -> None:
+        self.registry = registry if registry is not None else MutationRegistry()
 
     def apply(self, request: MutationRequest, parent: MutationCandidate) -> MutationResult:
         try:
@@ -938,5 +1031,5 @@ def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, afte
 
 
 __all__ = [
-    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AuthorityIdentity", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M39_SLOT_AUTHORITY", "CandidateIdentity", "ChallengeTarget", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "LineageEdge", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "TargetDisposition", "TargetSelection", "ValidationDisposition", "ValidationEnvelope", "compare_efficiency", "derive_attempt_seed", "evidence", "revalidate_mutation", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
+    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "LineageEdge", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "TargetDisposition", "TargetSelection", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
 ]

@@ -13,6 +13,7 @@ from scrubbots_pixel_factory import (
     revalidate_mutation,
     select_target,
 )
+from sb_lf07_r01_support import engine, m23_authority
 
 
 def _envelope(candidate_id: str, score: float, *, policy: str = "DIFFICULTY_V1", safe: bool = True, risk: object = True, include_proxies: bool = False):
@@ -20,8 +21,8 @@ def _envelope(candidate_id: str, score: float, *, policy: str = "DIFFICULTY_V1",
     if include_proxies:
         payload.update({"width": 20, "height": 20, "color_count": 3, "difficulty_label": "EASY"})
     parent = MutationCandidate.root(candidate_id, payload)
-    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=61, intent=MutationIntent.HARDEN, authority=CANONICAL_M23_PREVIEW_AUTHORITY)
-    mutation = MutationEngine().apply(request, parent)
+    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=61, intent=MutationIntent.HARDEN, authority=m23_authority())
+    mutation = engine().apply(request, parent)
     solver = evidence("M03_SOLVER", EvidenceDisposition.SOLVED, mutation, {"status": "SOLVED"})
     difficulty = evidence("M04_DIFFICULTY", EvidenceDisposition.AVAILABLE, mutation, {"policy_version": policy, "challenge_score": score, "lane": "HARD", "load": safe, "risk": risk, "retention": safe})
     qa = evidence("M05_QA", EvidenceDisposition.PASS, mutation, {"structural": True, "production": True})

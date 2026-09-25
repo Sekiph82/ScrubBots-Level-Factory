@@ -18,6 +18,7 @@ from scrubbots_pixel_factory import (
     revalidate_mutation,
     run_bounded_mutations,
 )
+from sb_lf07_r01_support import engine as concrete_engine, m23_authority
 
 
 def _parent() -> MutationCandidate:
@@ -25,7 +26,7 @@ def _parent() -> MutationCandidate:
 
 
 def _request(parent: MutationCandidate, ordinal: int, seed: int) -> MutationRequest:
-    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=CANONICAL_M23_PREVIEW_AUTHORITY)
+    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PREVIEW_DEPTH_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m23_authority())
 
 
 def _validate(mutation):
@@ -37,7 +38,7 @@ def _validate(mutation):
 
 def test_success_before_limit_records_ordinal_seed_and_provenance() -> None:
     calls: list[int] = []
-    engine = MutationEngine()
+    engine = concrete_engine()
     report = run_bounded_mutations(_parent(), base_seed=70, budget=AttemptBudget(3), request_factory=lambda parent, ordinal, seed: (calls.append(ordinal) or _request(parent, ordinal, seed)), engine=engine, validator=_validate, target=ChallengeTarget(50, 70, "DIFFICULTY_V1"))
     assert report.disposition is AttemptDisposition.TARGET_MATCH
     assert len(report.attempts) == 1
@@ -48,7 +49,7 @@ def test_success_before_limit_records_ordinal_seed_and_provenance() -> None:
 
 
 def test_exact_limit_exhaustion_is_not_unsolvable_or_success() -> None:
-    report = run_bounded_mutations(_parent(), base_seed=71, budget=AttemptBudget(2), request_factory=_request, engine=MutationEngine(), validator=_validate, target=ChallengeTarget(90, 100, "DIFFICULTY_V1"))
+    report = run_bounded_mutations(_parent(), base_seed=71, budget=AttemptBudget(2), request_factory=_request, engine=concrete_engine(), validator=_validate, target=ChallengeTarget(90, 100, "DIFFICULTY_V1"))
     assert report.disposition is AttemptDisposition.EXHAUSTED
     assert len(report.attempts) == 2
     assert report.selected is None

@@ -15,6 +15,7 @@ from scrubbots_pixel_factory import (
     MutationIntent,
     MutationRequest,
 )
+from sb_lf07_r01_support import engine, m23_authority
 
 
 def _parent() -> MutationCandidate:
@@ -48,10 +49,10 @@ def test_root_parent_is_deeply_immutable_and_request_replay_is_deterministic() -
         operator_version="1",
         seed=41,
         intent=MutationIntent.HARDEN,
-        authority=__import__("scrubbots_pixel_factory").CANONICAL_M23_PREVIEW_AUTHORITY,
+        authority=m23_authority(),
     )
-    first = MutationEngine().apply(request, parent)
-    second = MutationEngine().apply(request, parent)
+    first = engine().apply(request, parent)
+    second = engine().apply(request, parent)
     assert first.disposition is MutationDisposition.APPLIED
     assert first.child is not None and second.child is not None
     assert first.child is not second.child
@@ -71,12 +72,12 @@ def test_stale_parent_authority_and_operator_drift_fail_closed() -> None:
         operator_version="1",
         seed=8,
         intent=MutationIntent.HARDEN,
-        authority=__import__("scrubbots_pixel_factory").CANONICAL_M23_PREVIEW_AUTHORITY,
+        authority=m23_authority(),
     )
     stale = MutationCandidate.root("candidate-root", {"gameplay": {"column_count": 3, "preview_depth": 4, "slot_capacity": 5}, "config": {"seed_class": "fixture"}}, level_data_sha256="a" * 64, source_art_sha256="b" * 64)
-    assert MutationEngine().apply(request, stale).disposition is MutationDisposition.ERROR
+    assert engine().apply(request, stale).disposition is MutationDisposition.ERROR
     bad = MutationRequest(parent.identity, request.operator_id, request.operator_version, request.seed, MutationIntent.EASE, request.authority)
-    assert MutationEngine().apply(bad, parent).disposition is MutationDisposition.ERROR
+    assert engine().apply(bad, parent).disposition is MutationDisposition.ERROR
 
 
 def test_identity_digests_exclude_paths_and_wall_clock_metadata() -> None:
