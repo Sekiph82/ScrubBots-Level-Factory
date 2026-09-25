@@ -23,3 +23,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - `python -m compileall -q src tests`: PASS; Godot `4.7.2.stable.official.ed1daf0bf` headless editor quit: PASS.
 - Full corrected regression: `985 passed, 2 skipped`; canonical main-game capability skips remain unavailable and were not promoted.
 - `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS. No provider credits or network-bound tests were used.
+
+## Publication closure
+
+- Implementation commit: `9f4f1f1c23ffd1abdfe4ba0a3a65eaf68c206fb7`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
