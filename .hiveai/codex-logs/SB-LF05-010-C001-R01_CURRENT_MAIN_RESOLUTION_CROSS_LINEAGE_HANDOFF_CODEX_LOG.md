@@ -20,3 +20,10 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - Validator/M09 rejection, stale/wrong authority, mixed hashes, absent resolver/provider, and missing proof tests are covered. Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - No canonical `Sekiph82/Scrubbots` checkout was supplied to this builder session; exact native validator/M09 execution is therefore represented as `UNAVAILABLE`, never fabricated. Mocked tests use no provider credits/network calls and do not mutate a main-game checkout/catalog.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
+
+## Publication closure
+
+- Implementation commit: `053c732171654c621d44e1fdce7f90f126ec0b6d`.
+- Final focused verification after implementation commit: `34 passed`; compileall/Godot/diff/TASKS checks all PASS.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
