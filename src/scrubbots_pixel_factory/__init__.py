@@ -431,6 +431,7 @@ from .mutation_evidence import (
     adapt_m05_qa,
     revalidate_mutation_from_authentic_adapters,
 )
+from .mutation_targeting import AuthenticTargetCandidate, build_typed_target, select_authentic_target
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,

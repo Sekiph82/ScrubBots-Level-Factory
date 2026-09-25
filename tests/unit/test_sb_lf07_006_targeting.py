@@ -17,6 +17,7 @@ from scrubbots_pixel_factory import (
     revalidate_mutation,
     select_target,
 )
+from scrubbots_pixel_factory import build_typed_target
 from sb_lf07_r01_support import engine, m39_authority
 
 
@@ -78,3 +79,9 @@ def test_typed_target_rejects_policy_drift_and_untyped_safety_values() -> None:
     safety = SafetyConstraintEvidence("m04-safety", "1", "a" * 64, True, True, True, "b" * 64)
     with pytest.raises(Exception):
         TypedChallengeTarget(50.0, 70.0, "c" * 64, safety)
+
+
+def test_production_typed_target_builder_rejects_legacy_generic_records() -> None:
+    envelope = _envelope("typed-target", 60.0)
+    with pytest.raises(Exception):
+        build_typed_target(50.0, 70.0, envelope.difficulty, envelope.qa)  # type: ignore[arg-type]
