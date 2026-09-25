@@ -35,7 +35,20 @@ from scrubbots_pixel_factory import (
     run_bounded_mutations,
     select_target,
     verify_owner_source_immutable,
+    MutationAttemptRouteEvidence,
+    RegenerationRouteEvidence,
+    TrustedAccountingEvidence,
+    GenerationRequest,
+    GeneratorRouter,
+    revalidate_mutation_from_authentic_adapters,
+    SourceLinkedMutationContext,
 )
+from scrubbots_pixel_factory.mutation_base import MutationCandidate as BaseMutationCandidate
+from scrubbots_pixel_factory.mutation_hardening import build_hardening_registry
+from scrubbots_pixel_factory.mutation_easing import build_easing_registry
+from scrubbots_pixel_factory.qa import OwnerSourceRecord as M05OwnerSourceRecord
+from scrubbots_pixel_factory.semantic.qualification.models import CostUsageRecord
+from sb_lf07_r02_support import fresh_m39_authority
 from sb_lf07_r01_support import engine as concrete_engine, m39_authority
 
 
@@ -133,3 +146,22 @@ def test_r01_corpus_binds_typed_target_route_and_owner_identity() -> None:
     upload = "owner-upload-" + "f" * 64
     owner = OwnerSourceRecord.from_m05_owner_upload({"source_id": upload, "origin": "OWNER_UPLOAD", "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED", "source_sha256": "1" * 64, "byte_length": 1, "original_width": 1, "original_height": 1, "immutable_relative_path": f"owner-uploads/{upload}/source.png"})
     assert owner.source_id == upload
+
+
+def test_r02_regression_exercises_separated_services_fresh_authority_and_real_route() -> None:
+    authority = fresh_m39_authority()
+    assert authority.commit_sha != "281ea38218aaf24ab88c70e998f59b14df9d1c97"
+    assert not hasattr(__import__("scrubbots_pixel_factory.mutation_base", fromlist=["x"]), "evidence")
+    assert build_hardening_registry(authority).snapshot()[0].operator_id.endswith("HARDEN_V1")
+    assert build_easing_registry(authority).snapshot()[0].operator_id.endswith("EASE_V1")
+    parent = _parent("r02-dynamic-authority")
+    request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=303, intent=MutationIntent.HARDEN, authority=authority)
+    result = MutationEngine(build_hardening_registry(authority)).apply(request, parent)
+    assert result.disposition is MutationDisposition.APPLIED
+    solver, difficulty, qa = _evidence_chain(result)
+    with pytest.raises(MutationContractError):
+        revalidate_mutation_from_authentic_adapters(result, solver, difficulty, qa)  # type: ignore[arg-type]
+    generation = GeneratorRouter().generate(GenerationRequest("EASY", 303, "MASK", width=20, height=20))
+    workload = EfficiencyWorkload("a" * 64, "b" * 64, "c" * 64, "d" * 64)
+    regen = RegenerationRouteEvidence.from_generation_result(generation, workload, config_digest="e" * 64, accounting=TrustedAccountingEvidence.from_cost_usage(CostUsageRecord(provider_attempt_count=1)))
+    assert regen.counters.produced == 1
