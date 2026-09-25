@@ -15,6 +15,7 @@ from scrubbots_pixel_factory import (
     MutationEngine,
     MutationIntent,
     MutationRequest,
+    MutationRegistry,
     derive_attempt_seed,
     evidence,
     revalidate_mutation,
@@ -52,9 +53,10 @@ def test_success_before_limit_records_ordinal_seed_and_provenance() -> None:
 
 def test_exact_limit_exhaustion_is_not_unsolvable_or_success() -> None:
     report = run_bounded_mutations(_parent(), base_seed=71, budget=AttemptBudget(2), request_factory=_request, engine=concrete_engine(), validator=_validate, target=ChallengeTarget(90, 100, "DIFFICULTY_V1"))
-    assert report.disposition is AttemptDisposition.EXHAUSTED
+    assert report.disposition is AttemptDisposition.REJECTED
     assert len(report.attempts) == 2
     assert report.selected is None
+    assert all(record.attempt_provenance is not None for record in report.attempts)
     assert all(record.mutation.disposition.value != "UNSOLVABLE" for record in report.attempts)
 
 
@@ -72,3 +74,12 @@ def test_signed64_overflow_is_rejected_and_non_applied_attempts_have_typed_prove
         derive_attempt_seed(2**63 - 1, 1)
     record = AttemptProvenance(0, 17, "a" * 64, "candidate", MutationDisposition.ERROR, "canonical capability unavailable")
     assert record.mutation_disposition.value == "ERROR"
+
+
+def test_runner_records_non_applied_provenance_and_returns_error() -> None:
+    parent = _parent()
+    request_factory = lambda candidate, ordinal, seed: _request(candidate, ordinal, seed)
+    report = run_bounded_mutations(parent, base_seed=90, budget=AttemptBudget(1), request_factory=request_factory, engine=MutationEngine(MutationRegistry()), validator=_validate, target=ChallengeTarget(50, 70, "DIFFICULTY_V1"))
+    assert report.disposition is AttemptDisposition.REJECTED
+    assert report.attempts[0].attempt_provenance is not None
+    assert report.attempts[0].mutation.disposition is MutationDisposition.INAPPLICABLE

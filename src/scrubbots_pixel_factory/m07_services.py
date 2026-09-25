@@ -956,6 +956,7 @@ class AttemptRecord:
     validation: ValidationEnvelope | None
     selection: TargetSelection | None
     provenance: MutationProvenance | None = None
+    attempt_provenance: AttemptProvenance | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -979,22 +980,29 @@ def derive_attempt_seed(base_seed: int, ordinal: int) -> int:
 def run_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], ValidationEnvelope], target: ChallengeTarget) -> AttemptReport:
     records: list[AttemptRecord] = []
     current = parent
+    terminal_candidates: list[AttemptDisposition] = []
     for ordinal in range(budget.max_attempts):
         effective_seed = derive_attempt_seed(base_seed, ordinal)
         request = request_factory(current, ordinal, effective_seed)
         mutation = engine.apply(request, current)
+        attempt_provenance = AttemptProvenance(ordinal, effective_seed, mutation.request_digest, mutation.parent.candidate_id, mutation.disposition, mutation.reason, mutation.operator_id, mutation.operator_version, mutation.authority.digest(), mutation.parent.state_digest)
         if mutation.disposition is not MutationDisposition.APPLIED:
-            records.append(AttemptRecord(ordinal, effective_seed, mutation, None, None))
+            records.append(AttemptRecord(ordinal, effective_seed, mutation, None, None, None, attempt_provenance))
+            terminal_candidates.append({MutationDisposition.ERROR: AttemptDisposition.ERROR, MutationDisposition.UNAVAILABLE: AttemptDisposition.UNAVAILABLE}.get(mutation.disposition, AttemptDisposition.REJECTED))
             continue
         validation = validator(mutation)
         selection = select_target(target, (validation,))
         provenance = MutationProvenance.from_result(request, mutation, attempt_ordinal=ordinal, evidence_digests=(validation.evidence_digest,))
-        records.append(AttemptRecord(ordinal, effective_seed, mutation, validation, selection, provenance))
+        records.append(AttemptRecord(ordinal, effective_seed, mutation, validation, selection, provenance, attempt_provenance))
         if selection.disposition is TargetDisposition.MATCH:
             return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), validation, "target matched before budget exhaustion")
+        terminal_candidates.append({ValidationDisposition.UNAVAILABLE: AttemptDisposition.UNAVAILABLE, ValidationDisposition.INCONCLUSIVE: AttemptDisposition.INCONCLUSIVE, ValidationDisposition.REJECTED: AttemptDisposition.REJECTED, ValidationDisposition.ERROR: AttemptDisposition.ERROR}.get(validation.disposition, AttemptDisposition.REJECTED))
         if mutation.child is not None:
             current = mutation.child
-    return AttemptReport(AttemptDisposition.EXHAUSTED, budget, tuple(records), None, "finite mutation budget exhausted without target success")
+    precedence = (AttemptDisposition.ERROR, AttemptDisposition.UNAVAILABLE, AttemptDisposition.INCONCLUSIVE, AttemptDisposition.REJECTED)
+    terminal = next((value for value in precedence if value in terminal_candidates), AttemptDisposition.EXHAUSTED)
+    reason = "finite mutation budget exhausted without target success" if terminal is AttemptDisposition.EXHAUSTED else f"strongest observed terminal disposition: {terminal.value}"
+    return AttemptReport(terminal, budget, tuple(records), None, reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1228,6 +1236,10 @@ class AttemptProvenance:
     parent_candidate_id: str
     mutation_disposition: MutationDisposition
     reason: str
+    operator_id: str = "UNAVAILABLE"
+    operator_version: str = "UNAVAILABLE"
+    authority_digest: str = "0" * 64
+    parent_state_digest: str = "0" * 64
 
     def __post_init__(self) -> None:
         if type(self.ordinal) is not int or self.ordinal < 0:
@@ -1239,6 +1251,10 @@ class AttemptProvenance:
         if not isinstance(self.mutation_disposition, MutationDisposition):
             raise MutationContractError("attempt provenance disposition is malformed")
         _text(self.reason, "attempt provenance reason")
+        _text(self.operator_id, "attempt provenance operator id")
+        _text(self.operator_version, "attempt provenance operator version")
+        _sha(self.authority_digest, "attempt provenance authority digest")
+        _sha(self.parent_state_digest, "attempt provenance parent state digest")
 
 
 @dataclass(frozen=True, slots=True)
