@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
+from enum import Enum
 import hashlib
 
 from .solver_gate import SolverGateDisposition
@@ -14,12 +15,19 @@ QA_OUTCOME_SCHEMA = "scrubbots-qa-outcome-semantics"
 QA_OUTCOME_VERSION = 1
 
 
-class QAOutcome(str):
+class QAOutcome(str, Enum):
     ACCEPTABLE_SOLVER_PROOF = "ACCEPTABLE_SOLVER_PROOF"
     REJECT_PROVEN_UNSOLVABLE = "REJECT_PROVEN_UNSOLVABLE"
     INCONCLUSIVE_REVIEW_OR_RETRY_REQUIRED = "INCONCLUSIVE_REVIEW_OR_RETRY_REQUIRED"
     UNAVAILABLE = "UNAVAILABLE"
     ERROR = "ERROR"
+
+
+QA_OUTCOME_CATALOG = tuple(item.value for item in QAOutcome)
+QA_OUTCOME_REASON_CODES = frozenset({
+    "ACCEPTABLE_SOLVER_PROOF", "REJECT_PROVEN_UNSOLVABLE", "INCONCLUSIVE", "UNKNOWN_BOUND",
+    "TIMEOUT_BEFORE_RESULT", "UNAVAILABLE", "ERROR",
+})
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,13 +36,16 @@ class QAOutcomeRecord:
     reason_code: str
 
     def __post_init__(self) -> None:
-        if self.outcome not in {value for value in QAOutcome.__dict__.values() if isinstance(value, str)}:
+        if not isinstance(self.outcome, QAOutcome):
+            try:
+                object.__setattr__(self, "outcome", QAOutcome(self.outcome))
+            except (TypeError, ValueError) as exc:
+                raise QAContractError("unknown closed QA outcome") from exc
+        if type(self.reason_code) is not str or self.reason_code not in QA_OUTCOME_REASON_CODES:
             raise QAContractError("unknown closed QA outcome")
-        if type(self.reason_code) is not str or not self.reason_code.strip():
-            raise QAContractError("QA outcome reason_code is required")
 
     def canonical_dict(self) -> dict[str, str]:
-        return {"outcome": self.outcome, "reason_code": self.reason_code}
+        return {"outcome": self.outcome.value, "reason_code": self.reason_code}
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,13 +56,14 @@ class QAOutcomeStatistics:
     version: int = QA_OUTCOME_VERSION
 
     def __post_init__(self) -> None:
-        if type(self.total) is not int or self.total < 0 or type(self.counts) is not tuple:
+        if type(self.total) is not int or self.total < 0 or type(self.counts) is not tuple or self.schema != QA_OUTCOME_SCHEMA or self.version != QA_OUTCOME_VERSION:
             raise QAContractError("QA outcome statistics are malformed")
-        if sum(count for _, count in self.counts) != self.total or any(type(count) is not int or count < 0 for _, count in self.counts):
+        keys = [key for key, _ in self.counts]
+        if len(keys) != len(set(keys)) or any(not isinstance(key, QAOutcome) for key in keys) or sum(count for _, count in self.counts) != self.total or any(type(count) is not int or count < 0 for _, count in self.counts):
             raise QAContractError("QA outcome statistics do not sum to total")
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": self.schema, "version": self.version, "total": self.total, "counts": {key: value for key, value in self.counts}}
+        return {"schema": self.schema, "version": self.version, "total": self.total, "counts": {key.value: value for key, value in self.counts}}
 
     def canonical_bytes(self) -> bytes:
         return _canonical_bytes(self.canonical_dict())
@@ -78,7 +90,10 @@ def classify_solver_qa(value: SolverGateDisposition | str, *, reason_code: str |
         outcome = mapping[str(normalized)]
     except KeyError as exc:
         raise QAContractError("unknown solver QA disposition") from exc
-    return QAOutcomeRecord(outcome, reason_code or str(normalized))
+    selected_reason = reason_code or str(normalized)
+    if selected_reason not in QA_OUTCOME_REASON_CODES:
+        raise QAContractError("unknown closed QA outcome reason code")
+    return QAOutcomeRecord(outcome, selected_reason)
 
 
 def summarize_solver_qa(values: tuple[QAOutcomeRecord, ...] | list[QAOutcomeRecord]) -> QAOutcomeStatistics:
@@ -86,7 +101,7 @@ def summarize_solver_qa(values: tuple[QAOutcomeRecord, ...] | list[QAOutcomeReco
     if any(not isinstance(value, QAOutcomeRecord) for value in records):
         raise QAContractError("solver QA statistics require typed outcome records")
     counts = Counter(record.outcome for record in records)
-    return QAOutcomeStatistics(len(records), tuple(sorted(counts.items())))
+    return QAOutcomeStatistics(len(records), tuple(sorted(counts.items(), key=lambda item: item[0].value)))
 
 
-__all__ = ["QA_OUTCOME_SCHEMA", "QA_OUTCOME_VERSION", "QAOutcome", "QAOutcomeRecord", "QAOutcomeStatistics", "classify_solver_qa", "summarize_solver_qa"]
+__all__ = ["QA_OUTCOME_SCHEMA", "QA_OUTCOME_VERSION", "QA_OUTCOME_CATALOG", "QA_OUTCOME_REASON_CODES", "QAOutcome", "QAOutcomeRecord", "QAOutcomeStatistics", "classify_solver_qa", "summarize_solver_qa"]
