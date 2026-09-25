@@ -1033,6 +1033,152 @@ def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, afte
     return OwnerSourceReport("PASS", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "OWNER_UPLOAD bytes, length, dimensions and source identity remained unchanged")
 
 
+# R01 typed boundaries.  The legacy EvidenceRecord constructor remains useful
+# for historical fixtures, but production orchestration must use these sealed
+# producer receipts.  A receipt carries the producer schema/version and its
+# digest; labels supplied in a free-form payload are never sufficient.
+@dataclass(frozen=True, slots=True)
+class ProducerEvidenceReceipt:
+    producer: str
+    schema: str
+    version: str
+    producer_digest: str
+    record: EvidenceRecord
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "producer", _text(self.producer, "evidence producer"))
+        object.__setattr__(self, "schema", _text(self.schema, "evidence producer schema"))
+        object.__setattr__(self, "version", _text(self.version, "evidence producer version"))
+        _sha(self.producer_digest, "evidence producer digest")
+        if not isinstance(self.record, EvidenceRecord):
+            raise MutationContractError("typed evidence receipt record is malformed")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"producer": self.producer, "schema": self.schema, "version": self.version, "producer_digest": self.producer_digest, "record": self.record.canonical_dict()}
+
+    def digest(self) -> str:
+        return _digest(self.canonical_dict())
+
+
+@dataclass(frozen=True, slots=True)
+class M03SolverEvidenceReceipt(ProducerEvidenceReceipt):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.producer != "M03_SOLVER" or self.record.stage != "M03_SOLVER":
+            raise MutationContractError("M03 receipt is not an accepted solver producer")
+
+
+@dataclass(frozen=True, slots=True)
+class M04DifficultyEvidenceReceipt(ProducerEvidenceReceipt):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.producer != "M04_DIFFICULTY" or self.record.stage != "M04_DIFFICULTY":
+            raise MutationContractError("M04 receipt is not an accepted difficulty producer")
+        if type(self.record.payload.get("challenge_score")) not in (int, float):
+            raise MutationContractError("M04 receipt lacks typed Challenge Score")
+
+
+@dataclass(frozen=True, slots=True)
+class M05QAEvidenceReceipt(ProducerEvidenceReceipt):
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if self.producer != "M05_QA" or self.record.stage != "M05_QA":
+            raise MutationContractError("M05 receipt is not an accepted QA producer")
+
+
+def revalidate_mutation_from_typed_receipts(mutation: MutationResult, solver: M03SolverEvidenceReceipt, difficulty: M04DifficultyEvidenceReceipt, qa: M05QAEvidenceReceipt) -> ValidationEnvelope:
+    """Production validation entry point; generic/free-form records are rejected."""
+    if not all(isinstance(item, ProducerEvidenceReceipt) for item in (solver, difficulty, qa)):
+        raise MutationContractError("production validation requires typed M03/M04/M05 producer receipts")
+    return revalidate_mutation(mutation, solver.record, difficulty.record, qa.record)
+
+
+@dataclass(frozen=True, slots=True)
+class SafetyConstraintEvidence:
+    schema: str
+    version: str
+    policy_digest: str
+    load_ok: bool
+    risk_ok: bool
+    retention_ok: bool
+    producer_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "schema", _text(self.schema, "safety evidence schema"))
+        object.__setattr__(self, "version", _text(self.version, "safety evidence version"))
+        _sha(self.policy_digest, "safety policy digest")
+        _sha(self.producer_digest, "safety producer digest")
+        if not all(type(value) is bool for value in (self.load_ok, self.risk_ok, self.retention_ok)):
+            raise MutationContractError("safety constraints must be typed booleans")
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {"schema": self.schema, "version": self.version, "policy_digest": self.policy_digest, "load_ok": self.load_ok, "risk_ok": self.risk_ok, "retention_ok": self.retention_ok, "producer_digest": self.producer_digest}
+
+
+@dataclass(frozen=True, slots=True)
+class TypedChallengeTarget:
+    minimum: float
+    maximum: float
+    policy_digest: str
+    safety: SafetyConstraintEvidence
+
+    def __post_init__(self) -> None:
+        if not all(type(value) in (int, float) and math.isfinite(float(value)) for value in (self.minimum, self.maximum)) or self.minimum > self.maximum:
+            raise MutationContractError("typed Challenge Score range is malformed")
+        _sha(self.policy_digest, "typed target policy digest")
+        if self.safety.policy_digest != self.policy_digest:
+            raise MutationContractError("target safety evidence is bound to another policy")
+
+    def digest(self) -> str:
+        return _digest({"minimum": self.minimum, "maximum": self.maximum, "policy_digest": self.policy_digest, "safety": self.safety.canonical_dict()})
+
+
+@dataclass(frozen=True, slots=True)
+class AttemptProvenance:
+    ordinal: int
+    effective_seed: int
+    request_digest: str
+    parent_candidate_id: str
+    mutation_disposition: MutationDisposition
+    reason: str
+
+    def __post_init__(self) -> None:
+        if type(self.ordinal) is not int or self.ordinal < 0:
+            raise MutationContractError("attempt provenance ordinal is malformed")
+        if type(self.effective_seed) is not int or not -(2**63) <= self.effective_seed <= 2**63 - 1:
+            raise MutationContractError("attempt provenance seed is outside signed 64-bit range")
+        _sha(self.request_digest, "attempt provenance request digest")
+        _text(self.parent_candidate_id, "attempt provenance parent candidate id")
+        if not isinstance(self.mutation_disposition, MutationDisposition):
+            raise MutationContractError("attempt provenance disposition is malformed")
+        _text(self.reason, "attempt provenance reason")
+
+
+@dataclass(frozen=True, slots=True)
+class GeneratorRouteEvidence:
+    route: str
+    workload_digest: str
+    produced: int
+    accepted: int
+    rejected: int
+    solver_workload: int
+    accounting_digest: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "route", _text(self.route, "generator route"))
+        _sha(self.workload_digest, "generator workload digest")
+        _sha(self.accounting_digest, "generator accounting digest")
+        if any(type(value) is not int or value < 0 for value in (self.produced, self.accepted, self.rejected, self.solver_workload)):
+            raise MutationContractError("generator evidence counters are malformed")
+
+
+def compare_efficiency_from_routes(mutation: GeneratorRouteEvidence, regenerate: GeneratorRouteEvidence) -> EfficiencyComparison:
+    if mutation.workload_digest != regenerate.workload_digest:
+        raise MutationContractError("route evidence workloads are not matched")
+    workload = EfficiencyWorkload(mutation.workload_digest, mutation.workload_digest, mutation.workload_digest, mutation.workload_digest)
+    return EfficiencyComparison(workload, EfficiencyCounters(mutation.produced, mutation.produced, mutation.accepted, mutation.rejected, mutation.solver_workload), EfficiencyCounters(regenerate.produced, regenerate.produced, regenerate.accepted, regenerate.rejected, regenerate.solver_workload), telemetry=None)
+
+
 __all__ = [
-    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "LineageEdge", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "TargetDisposition", "TargetSelection", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
+    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AttemptProvenance", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "GeneratorRouteEvidence", "LineageEdge", "M03SolverEvidenceReceipt", "M04DifficultyEvidenceReceipt", "M05QAEvidenceReceipt", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "ProducerEvidenceReceipt", "SafetyConstraintEvidence", "TargetDisposition", "TargetSelection", "TypedChallengeTarget", "ValidationDisposition", "ValidationEnvelope", "canonical_mutation_registry", "compare_efficiency", "compare_efficiency_from_routes", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "revalidate_mutation_from_typed_receipts", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
 ]
