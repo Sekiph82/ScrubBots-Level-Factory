@@ -537,6 +537,8 @@ class AttemptReport:
     attempts: tuple[AttemptRecord, ...]
     selected: ValidationEnvelope | None
     reason: str
+    target: object | None = None
+    seed_config_digest: str | None = None
 
 
 def derive_attempt_seed(base_seed: int, ordinal: int) -> int:

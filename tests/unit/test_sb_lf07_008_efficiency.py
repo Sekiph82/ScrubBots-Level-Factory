@@ -16,7 +16,9 @@ from scrubbots_pixel_factory import (
     RegenerationRouteEvidence,
     TrustedAccountingEvidence,
 )
+from scrubbots_pixel_factory.mutation_efficiency import compare_efficiency_from_authentic_routes
 from scrubbots_pixel_factory.semantic.qualification.models import CostUsageRecord
+from test_sb_lf07_007_attempts import _authentic_runner_fixture, _run_authentic
 
 
 def _workload() -> EfficiencyWorkload:
@@ -72,13 +74,31 @@ def test_route_evidence_rejects_unmatched_workload_identity() -> None:
 
 
 def test_real_generation_result_and_accepted_accounting_are_required_for_regeneration_route() -> None:
-    workload = _workload()
-    result = GeneratorRouter().generate(GenerationRequest("EASY", 123, "MASK", width=20, height=20))
-    route = RegenerationRouteEvidence.from_generation_result(result, workload, config_digest="e" * 64, accounting=TrustedAccountingEvidence.from_cost_usage(CostUsageRecord(provider_attempt_count=1)))
+    parent, request, mutation, candidate, target, _ = _authentic_runner_fixture()
+    report = _run_authentic(parent, request, mutation, candidate, target, budget=1)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    result = GeneratorRouter().generate(GenerationRequest("EASY", request.seed, "MASK", width=20, height=20))
+    route = RegenerationRouteEvidence.from_generation_result(result, target=target, budget=report.budget)
     assert route.counters.produced == 1
-    assert route.accounting is not None
+    assert route.accounting is None
+    comparison = compare_efficiency_from_authentic_routes(mutation_route, route)
+    assert comparison.regenerate_cost is None
     with pytest.raises(MutationContractError):
-        RegenerationRouteEvidence.from_generation_result(object(), workload, config_digest="e" * 64)  # type: ignore[arg-type]
+        TrustedAccountingEvidence.from_cost_usage(CostUsageRecord(provider_attempt_count=1))
+    with pytest.raises(MutationContractError):
+        RegenerationRouteEvidence.from_generation_result(object(), target=target, budget=report.budget, config_digest="e" * 64)  # type: ignore[arg-type]
+
+
+def test_actual_route_rejects_forged_workload_and_config_identity() -> None:
+    parent, request, mutation, candidate, target, _ = _authentic_runner_fixture()
+    report = _run_authentic(parent, request, mutation, candidate, target, budget=1)
+    actual = MutationAttemptRouteEvidence.from_attempt_report(report)
+    forged = EfficiencyWorkload("f" * 64, actual.workload.seed_config_digest, actual.workload.validation_policy_digest, actual.workload.budget_digest)
+    with pytest.raises(MutationContractError):
+        MutationAttemptRouteEvidence.from_attempt_report(report, forged)
+    result = GeneratorRouter().generate(GenerationRequest("EASY", request.seed, "MASK", width=20, height=20))
+    with pytest.raises(MutationContractError):
+        RegenerationRouteEvidence.from_generation_result(result, target=target, budget=report.budget, config_digest="e" * 64)
 
 
 def test_mutation_route_rejects_caller_counter_dto_and_requires_attempt_report() -> None:
