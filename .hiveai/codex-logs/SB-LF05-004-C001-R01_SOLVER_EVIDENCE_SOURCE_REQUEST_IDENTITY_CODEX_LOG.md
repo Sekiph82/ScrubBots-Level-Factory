@@ -19,3 +19,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - Solver gate now rejects cross-level, cross-request, authority, provider, state, budget, and receipt-digest replay as `ERROR`; only matching authoritative `PROVEN_UNSOLVABLE` rejects, while timeout/inconclusive/unavailable remain distinct.
 - Added replay and digest-adversarial tests. Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS. No second solver or provider credits/network calls were used.
+
+## Publication closure
+
+- Implementation commit: `159a7c08d7963650fdecce1ce3e5a8f0318abf8a`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
