@@ -19,3 +19,9 @@ Focused/regression tests, compileall, Godot headless, diff-check, protected-trac
 - QA reports now bind exact source/LevelData/logical-art identities plus typed main-game, production, M03 solver, M04 analysis/score/lane, and semantic evidence digests when corresponding stages pass. Overall disposition remains derived, never caller-supplied; canonical identity excludes timing/path data.
 - Added unknown-field, missing-identity, caller-disposition, semantic-unreviewed, and deterministic parser coverage. Focused M05/R01 suite: `34 passed`; full corrected regression: `985 passed, 2 skipped`.
 - `python -m compileall -q src tests`: PASS; Godot headless editor quit: PASS; `git diff --check`: PASS; `git diff --exit-code -- TASKS.md`: PASS.
+
+## Publication closure
+
+- Implementation commit: `84ef3c133037a6f418f6bf3c3c341e1cb2af5a91`.
+- Terminal log-only commit: pending in this append.
+- Builder handoff remains `AWAITING_AUDIT`; no PASS/CLOSED claim is made.
