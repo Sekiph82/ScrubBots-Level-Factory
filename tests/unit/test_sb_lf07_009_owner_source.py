@@ -4,6 +4,8 @@ import hashlib
 import pytest
 
 from scrubbots_pixel_factory import MutationContractError, OwnerSourceRecord, verify_owner_source_immutable
+from scrubbots_pixel_factory.mutation_source import SourceLinkedMutationContext
+from scrubbots_pixel_factory.qa import OwnerSourceRecord as M05OwnerSourceRecord
 
 
 def _record() -> tuple[OwnerSourceRecord, bytes]:
@@ -55,3 +57,16 @@ def test_only_m05_owner_upload_record_can_be_adapted_to_source_identity() -> Non
     assert record.source_id.startswith("owner-upload-")
     with pytest.raises(MutationContractError):
         OwnerSourceRecord.from_m05_owner_upload({"source_id": record.source_id, "origin": "SYNTHETIC", "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED"})
+
+
+def test_source_linked_context_uses_m05_verifier_and_requires_before_after_pass(tmp_path) -> None:
+    raw = b"accepted-m05-source"
+    source = tmp_path / "source.png"
+    source.write_bytes(raw)
+    record = M05OwnerSourceRecord("owner-upload-r02", str(source), hashlib.sha256(raw).hexdigest(), len(raw), 20, 20)
+    context = SourceLinkedMutationContext.establish(record)
+    assert context.before.disposition == "PASS"
+    checked = context.verify_after()
+    assert checked.passed
+    with pytest.raises(MutationContractError):
+        SourceLinkedMutationContext.establish(_record()[0])  # type: ignore[arg-type]

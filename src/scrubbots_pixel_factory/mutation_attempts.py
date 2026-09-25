@@ -7,11 +7,14 @@ from .m07_services import AttemptBudget, AttemptDisposition, AttemptProvenance, 
 from .mutation_targeting import AuthenticTargetCandidate, select_authentic_target
 
 
-def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget) -> AttemptReport:
+def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None) -> AttemptReport:
     from .m07_services import derive_attempt_seed
     records: list[AttemptRecord] = []
     current = parent
     terminals: list[AttemptDisposition] = []
+    if parent.source_art_sha256 is not None:
+        if source_context is None or not getattr(source_context, "passed", False):
+            return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "mandatory accepted M05 OWNER_UPLOAD preservation PASS is unavailable")
     for ordinal in range(budget.max_attempts):
         seed = derive_attempt_seed(base_seed, ordinal)
         request = request_factory(current, ordinal, seed)
