@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M05 — Unified Factory Validation & Level QA
-- Current Sprint: SB-LF05.C001-R01 — Unified QA strict remediation batch
-- Current Task: SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED
-- Next Task/Action: Codex executes the complete R01 remediation batch `SB-LF05-001,002,003,004,005,007,008,010-C001-R01` from `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`; `SB-LF05-006,009` remain PASS/CLOSED; Codex never edits `TASKS.md`; after the whole batch ChatGPT independently strict-reaudits only the eight remediated tasks.
+- Current Milestone: MAINT — Cross-Repository Canonical Palette Governance
+- Current Sprint: MAINT-PALETTE-V3-C001 — Canonical Alpix C01..C16 synchronization
+- Current Task: MAINT-PALETTE-V3-001 — Synchronize canonical Palette V3 across Level Factory and main game
+- Current Task Status: AUTHORIZED / NOT_STARTED
+- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-PALETTE-V3-C001_CANONICAL_ALPIX_PALETTE_CROSS_REPO_MIGRATION_PROMPT.md` across `Sekiph82/ScrubBots-Level-Factory` and `Sekiph82/Scrubbots`, updates every live palette-dependent code/data/config/test/doc/UI/fixture/reference to Palette V3, proves no live V2/old-color dependency remains, commits/pushes both repos, and stops for independent ChatGPT audit. Codex does not edit root `TASKS.md`.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF05-C001_STRICT_AUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF05-C001-R01_STRICT_REAUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: original per-task M05 criteria + `.hiveai/audits/SB-LF05-C001_STRICT_AUDIT_SUMMARY.md`; R01 must close frozen findings without weakening accepted M03/M04/M06/SP05/SP06 contracts
-- Current Prompt: `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`
+- Current Audit Criteria: Palette V3 authority is `Sekiph82/Scrubbots/data/palettes/scrubbots_palette_v3.json`; migration must preserve C01..C16/BG01 semantics, current Difficulty V1 rules, historical evidence immutability, and full regression gates
+- Current Prompt: `.hiveai/prompts/MAINT-PALETTE-V3-C001_CANONICAL_ALPIX_PALETTE_CROSS_REPO_MIGRATION_PROMPT.md`
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -131,6 +131,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF05 R01 Remediation Index: `.hiveai/prompts/SB-LF05-C001-R01_REMEDIATION_INDEX.md`.
 - SB-LF05 R01 Master Prompt: `.hiveai/prompts/SB-LF05-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LF05 R01 Tracker Policy: Codex does not advance task checkboxes; ChatGPT re-audits only the eight R01 tasks after the full remediation batch.
+- SB-LF05 R01 Re-Audit Result: `PASS/CLOSED = 001, 002, 003, 004, 005, 007, 008, 010`; `006,009` remain PASS/CLOSED; therefore `SB-LF05-001..010 = PASS/CLOSED` and `M05 = COMPLETE / VERIFIED`.
+- SB-LF05 R01 Strict Re-Audit: `.hiveai/audits/SB-LF05-C001-R01_STRICT_REAUDIT_SUMMARY.md`.
+- Canonical Palette V3 Authority: `Sekiph82/Scrubbots/data/palettes/scrubbots_palette_v3.json` (`scrubbots-global-palette/v3`, owner-locked 2026-09-25, exact Alpix fixed-palette subset).
+- Palette Maintenance Directive: `MAINT-PALETTE-V3-001` is an owner-directed cross-repository maintenance action and does not alter the canonical 224 LF/CP source-requirement denominator.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -155,7 +159,7 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M02: Semantic / Constraint Candidate Generation — PLANNED / PARTIALLY EVIDENCED
 - M03: Puzzle Intelligence: Simulation, Solver & State Search — COMPLETE / VERIFIED
 - M04: Difficulty Intelligence & Metrics — COMPLETE / VERIFIED
-- M05: Unified Factory Validation & Level QA — ACTIVE
+- M05: Unified Factory Validation & Level QA — COMPLETE / VERIFIED
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
 - M07: Mutation & Automatic Difficulty Targeting — PLANNED
 - M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
@@ -202,9 +206,9 @@ Additional inline tags do not replace checkbox state:
 
 ## Current truth and progress
 
-- Canonical LF/CP source-requirement classification: 67 VERIFIED, 43 PARTIAL, 3 MIGRATION, 83 NEW/OPEN, 28 GAME_RUNTIME.
-- Canonical LF/CP source-requirement completion: **67 / 224 = 29.91%**.
-- Canonical LF/CP engineering/migration coverage: **113 / 224 = 50.45%** (`VERIFIED + PARTIAL + MIGRATION`).
+- Canonical LF/CP source-requirement classification: 75 VERIFIED, 38 PARTIAL, 3 MIGRATION, 80 NEW/OPEN, 28 GAME_RUNTIME.
+- Canonical LF/CP source-requirement completion: **75 / 224 = 33.48%**.
+- Canonical LF/CP engineering/migration coverage: **116 / 224 = 51.79%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
@@ -400,25 +404,25 @@ Capability source family: `SB-LF05-xxx` from the main Scrubbots master plan.
 
 ### M05.01 - Structural and production validation
 
-- [~] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation. [PARTIAL]
-- [ ] SB-LF05-002 — Reuse audited M09 round-trip contract for art-first exports. [PARTIAL]
-- [ ] SB-LF05-003 — Validate dimensions/envelope/C01..C16/3..12 used colors/cells/opacity/transparency/provenance/duplicate IDs. [PARTIAL]
+- [x] SB-LF05-001 — Compose structural LevelData validation with current production compatibility + Difficulty V1 evaluation.
+- [x] SB-LF05-002 — Reuse audited M09 round-trip contract for art-first exports.
+- [x] SB-LF05-003 — Validate dimensions/envelope/C01..C16/3..12 used colors/cells/opacity/transparency/provenance/duplicate IDs.
 
 ### M05.02 - Solver disposition
 
-- [ ] SB-LF05-004 — Reject proven-unsolvable candidates when solver authoritative.
-- [ ] SB-LF05-005 — Distinguish INCONCLUSIVE from UNSOLVABLE.
+- [x] SB-LF05-004 — Reject proven-unsolvable candidates when solver authoritative.
+- [x] SB-LF05-005 — Distinguish INCONCLUSIVE from UNSOLVABLE.
 
 ### M05.03 - QA reports, source preservation and semantic readability
 
 - [x] SB-LF05-006 — Actionable rejection reasons.
-- [ ] SB-LF05-007 — Machine-readable QA report. [PARTIAL]
-- [ ] SB-LF05-008 — Preserve owner source images byte-for-byte. [PARTIAL]
+- [x] SB-LF05-007 — Machine-readable QA report.
+- [x] SB-LF05-008 — Preserve owner source images byte-for-byte.
 - [x] SB-LF05-009 — Visual recognizability/readability gates, not structural-only false positives.
 
 ### M05.04 - Main-game acceptance handoff
 
-- [ ] SB-LF05-010 — Feed accepted artifacts into M30/M47/M48 rather than bypassing them.
+- [x] SB-LF05-010 — Feed accepted artifacts into M30/M47/M48 rather than bypassing them.
 
 ---
 
@@ -881,14 +885,15 @@ Owner-approved post-cutover product specification:
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
 2. `SB-LF01-005`, all `SB-LF06-001..012`, and all `SB-LFX-001..017` are PASS/CLOSED. M06 Factory Studio is complete.
-3. M03 Puzzle Intelligence is COMPLETE / VERIFIED; `SB-LF03-001..012 = PASS/CLOSED`. The active frontier advances to M04 Difficulty Intelligence with `SB-LF04-001` as the sole active task.
-4. M04 Difficulty Intelligence.
-5. M05 Unified QA.
-6. M07 mutation/difficulty targeting.
-7. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions.
-8. Continue M09 advanced generation only as justified, including `SB-LFX-016..017` similarity/provider-accounting extensions when their dependencies are real.
-9. M10 Campaign Intelligence.
-10. M11-M14 Content Platform architecture/pack/manifest/publisher.
-11. M18-M20 storage/operations/security.
-12. M17 rollback/scheduling once manifest/publisher/storage are real.
-13. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots`.
+3. M03 Puzzle Intelligence is COMPLETE / VERIFIED; `SB-LF03-001..012 = PASS/CLOSED`.
+4. M04 Difficulty Intelligence is COMPLETE / VERIFIED; `SB-LF04-001..012 = PASS/CLOSED`.
+5. M05 Unified Factory Validation & Level QA is COMPLETE / VERIFIED; `SB-LF05-001..010 = PASS/CLOSED`.
+6. Execute owner-directed `MAINT-PALETTE-V3-001` cross-repository Palette V3 synchronization and independently audit it before opening the next product milestone.
+7. M07 mutation/difficulty targeting.
+8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions.
+9. Continue M09 advanced generation only as justified, including `SB-LFX-016..017` similarity/provider-accounting extensions when their dependencies are real.
+10. M10 Campaign Intelligence.
+11. M11-M14 Content Platform architecture/pack/manifest/publisher.
+12. M18-M20 storage/operations/security.
+13. M17 rollback/scheduling once manifest/publisher/storage are real.
+14. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots`.
