@@ -200,7 +200,7 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     assert current_task is not None
     assert current_task.group(1) == "SB-LF07-001"
     status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
-    assert status is not None and status.group(1).strip() == "CHANGES_REQUIRED / R02_AUTHORIZED / REMEDIATE_ALL_THEN_REAUDIT"
+    assert status is not None and status.group(1).strip() == "CHANGES_REQUIRED / R03_AUTHORIZED / SELECTIVE_REMEDIATE_THEN_REAUDIT"
     assert [row["id"] for row in active] == ["SB-LF07-001"]
 
 
