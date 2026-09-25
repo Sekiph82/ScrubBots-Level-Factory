@@ -11,9 +11,13 @@ from scrubbots_pixel_factory import (
     MutationIntent,
     MutationRequest,
     MutationContractError,
+    M03SolverEvidenceReceipt,
+    M04DifficultyEvidenceReceipt,
+    M05QAEvidenceReceipt,
     ValidationDisposition,
     evidence,
     revalidate_mutation,
+    revalidate_mutation_from_typed_receipts,
 )
 from sb_lf07_r01_support import engine, m39_authority
 
@@ -68,3 +72,25 @@ def test_child_hash_and_stage_order_are_bound_not_caller_claims() -> None:
     bad_solver = type(solver)(solver.stage, solver.disposition, "0" * 64, solver.request_digest, solver.parent_state_digest, solver.operator_id, solver.authority_digest, solver.payload)
     with pytest.raises(MutationContractError):
         revalidate_mutation(mutation, bad_solver, difficulty, qa)
+
+
+def test_production_entry_point_requires_typed_m03_m04_m05_receipts() -> None:
+    mutation = _mutation()
+    solver, difficulty, qa = _records(mutation)
+    with pytest.raises(MutationContractError):
+        revalidate_mutation_from_typed_receipts(mutation, solver, difficulty, qa)  # type: ignore[arg-type]
+    typed_solver = M03SolverEvidenceReceipt("M03_SOLVER", "solver-evidence", "1", "1" * 64, solver)
+    typed_difficulty = M04DifficultyEvidenceReceipt("M04_DIFFICULTY", "difficulty-evidence", "1", "2" * 64, difficulty)
+    typed_qa = M05QAEvidenceReceipt("M05_QA", "qa-evidence", "1", "3" * 64, qa)
+    envelope = revalidate_mutation_from_typed_receipts(mutation, typed_solver, typed_difficulty, typed_qa)
+    assert envelope.disposition is ValidationDisposition.ELIGIBLE
+
+
+def test_typed_receipt_rejects_forged_producer_stage_or_missing_score() -> None:
+    mutation = _mutation()
+    solver, difficulty, qa = _records(mutation)
+    with pytest.raises(MutationContractError):
+        M03SolverEvidenceReceipt("M04_DIFFICULTY", "solver-evidence", "1", "1" * 64, solver)
+    bad = type(difficulty)(difficulty.stage, difficulty.disposition, difficulty.child_state_digest, difficulty.request_digest, difficulty.parent_state_digest, difficulty.operator_id, difficulty.authority_digest, {"policy_version": "DIFFICULTY_V1"})
+    with pytest.raises(MutationContractError):
+        M04DifficultyEvidenceReceipt("M04_DIFFICULTY", "difficulty-evidence", "1", "2" * 64, bad)

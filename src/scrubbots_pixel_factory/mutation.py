@@ -1063,7 +1063,7 @@ class ProducerEvidenceReceipt:
 @dataclass(frozen=True, slots=True)
 class M03SolverEvidenceReceipt(ProducerEvidenceReceipt):
     def __post_init__(self) -> None:
-        super().__post_init__()
+        ProducerEvidenceReceipt.__post_init__(self)
         if self.producer != "M03_SOLVER" or self.record.stage != "M03_SOLVER":
             raise MutationContractError("M03 receipt is not an accepted solver producer")
 
@@ -1071,7 +1071,7 @@ class M03SolverEvidenceReceipt(ProducerEvidenceReceipt):
 @dataclass(frozen=True, slots=True)
 class M04DifficultyEvidenceReceipt(ProducerEvidenceReceipt):
     def __post_init__(self) -> None:
-        super().__post_init__()
+        ProducerEvidenceReceipt.__post_init__(self)
         if self.producer != "M04_DIFFICULTY" or self.record.stage != "M04_DIFFICULTY":
             raise MutationContractError("M04 receipt is not an accepted difficulty producer")
         if type(self.record.payload.get("challenge_score")) not in (int, float):
@@ -1081,7 +1081,7 @@ class M04DifficultyEvidenceReceipt(ProducerEvidenceReceipt):
 @dataclass(frozen=True, slots=True)
 class M05QAEvidenceReceipt(ProducerEvidenceReceipt):
     def __post_init__(self) -> None:
-        super().__post_init__()
+        ProducerEvidenceReceipt.__post_init__(self)
         if self.producer != "M05_QA" or self.record.stage != "M05_QA":
             raise MutationContractError("M05 receipt is not an accepted QA producer")
 
