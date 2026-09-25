@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from scrubbots_pixel_factory import (
     CANONICAL_M23_PREVIEW_AUTHORITY,
     ChallengeTarget,
@@ -9,6 +11,8 @@ from scrubbots_pixel_factory import (
     MutationIntent,
     MutationRequest,
     TargetDisposition,
+    SafetyConstraintEvidence,
+    TypedChallengeTarget,
     evidence,
     revalidate_mutation,
     select_target,
@@ -59,3 +63,18 @@ def test_forbidden_metadata_proxies_do_not_drive_selection() -> None:
 def test_no_acceptable_candidate_is_truthful_no_match() -> None:
     target = ChallengeTarget(80.0, 90.0, "DIFFICULTY_V1")
     assert select_target(target, (_envelope("none", 60.0),)).disposition is TargetDisposition.NO_MATCH
+
+
+def test_typed_target_binds_policy_digest_and_all_safety_dimensions() -> None:
+    policy_digest = "a" * 64
+    safety = SafetyConstraintEvidence("m04-safety", "1", policy_digest, True, True, True, "b" * 64)
+    target = TypedChallengeTarget(50.0, 70.0, policy_digest, safety)
+    assert target.digest() != policy_digest
+
+
+def test_typed_target_rejects_policy_drift_and_untyped_safety_values() -> None:
+    with pytest.raises(Exception):
+        SafetyConstraintEvidence("m04-safety", "1", "a" * 64, True, "true", True, "b" * 64)  # type: ignore[arg-type]
+    safety = SafetyConstraintEvidence("m04-safety", "1", "a" * 64, True, True, True, "b" * 64)
+    with pytest.raises(Exception):
+        TypedChallengeTarget(50.0, 70.0, "c" * 64, safety)
