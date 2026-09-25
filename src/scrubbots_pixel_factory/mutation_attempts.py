@@ -17,7 +17,8 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
     terminals: list[AttemptDisposition] = []
     seed_config_digest = hashlib.sha256(json.dumps({"seed": base_seed}, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     if parent.source_art_sha256 is not None:
-        if source_context is None or not getattr(source_context, "passed", False):
+        from .mutation_source import SourceLinkedMutationContext
+        if not isinstance(source_context, SourceLinkedMutationContext) or source_context.before.disposition != "PASS":
             return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "mandatory accepted M05 OWNER_UPLOAD preservation PASS is unavailable", target, seed_config_digest)
     for ordinal in range(budget.max_attempts):
         seed = derive_attempt_seed(base_seed, ordinal)
@@ -37,6 +38,11 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
             continue
         selection = select_authentic_target(target, (candidate,))
         provenance = provenance_from_authentic_validation(request, mutation, candidate.envelope, candidate.solver, candidate.difficulty, candidate.qa, attempt_ordinal=ordinal)
+        if source_context is not None and hasattr(source_context, "verify_after"):
+            source_context = source_context.verify_after()
+            if source_context.after is None or source_context.after.disposition != "PASS":
+                records.append(AttemptRecord(ordinal, seed, mutation, candidate.envelope, None, provenance, attempt))
+                return AttemptReport(AttemptDisposition.ERROR, budget, tuple(records), None, "accepted M05 OWNER_UPLOAD post-check failed after authentic mutation validation", target, seed_config_digest)
         records.append(AttemptRecord(ordinal, seed, mutation, candidate.envelope, selection, provenance, attempt))
         if selection.disposition is TargetDisposition.MATCH:
             return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), candidate.envelope, "authenticated target matched before budget exhaustion", target, seed_config_digest)

@@ -33,6 +33,9 @@ from scrubbots_pixel_factory import (
 )
 from scrubbots_pixel_factory.mutation_base import MutationResult
 from test_sb_lf07_004_revalidation import _authentic_chain
+from test_sb_lf07_004_revalidation import AUTHENTIC_SOURCE_PATH
+from scrubbots_pixel_factory.mutation_source import SourceLinkedMutationContext
+from scrubbots_pixel_factory.qa import OwnerSourceRecord as M05OwnerSourceRecord
 from sb_lf07_r01_support import engine as concrete_engine, m39_authority
 
 
@@ -128,7 +131,8 @@ def _run_authentic(parent, request, mutation, candidate, target, *, budget=2, en
             calls.append(("validator", len(calls)))
         return candidate
 
-    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=factory, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator, target=target, source_context=type("SourcePass", (), {"passed": True})())
+    source_context = SourceLinkedMutationContext.establish(M05OwnerSourceRecord("r03-runner-source", str(AUTHENTIC_SOURCE_PATH), hashlib.sha256(AUTHENTIC_SOURCE_PATH.read_bytes()).hexdigest(), len(AUTHENTIC_SOURCE_PATH.read_bytes()), 20, 20))
+    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=factory, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator, target=target, source_context=source_context)
 
 
 def test_authentic_runner_covers_all_terminal_dispositions_and_precedence() -> None:

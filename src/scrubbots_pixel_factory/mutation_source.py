@@ -17,9 +17,13 @@ class SourceLinkedMutationContext:
         if not isinstance(record, OwnerSourceRecord):
             raise MutationContractError("source-linked orchestration requires accepted M05 OwnerSourceRecord")
         before = verify_owner_source_preservation(record)
+        if before.disposition != "PASS":
+            raise MutationContractError("accepted M05 OWNER_UPLOAD pre-check failed")
         return cls(record, before)
 
     def verify_after(self, *, analysis=None, derived_artifact_paths=()) -> "SourceLinkedMutationContext":
+        if self.before.disposition != "PASS":
+            raise MutationContractError("accepted M05 OWNER_UPLOAD pre-check was not PASS")
         report = verify_owner_source_preservation(self.record, analysis=analysis, derived_artifact_paths=derived_artifact_paths)
         return SourceLinkedMutationContext(self.record, self.before, report)
 

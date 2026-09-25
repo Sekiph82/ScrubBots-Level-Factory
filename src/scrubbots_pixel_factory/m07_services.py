@@ -19,6 +19,8 @@ import re
 from types import MappingProxyType
 from typing import Any
 
+from .qa.source_preservation import OwnerSourceRecord as M05OwnerSourceRecord, SourcePreservationReport, verify_owner_source_preservation
+
 
 MUTATION_SCHEMA = "scrubbots-mutation"
 MUTATION_VERSION = 1
@@ -636,69 +638,9 @@ def compare_efficiency(left: EfficiencyWorkload, right: EfficiencyWorkload, muta
     return EfficiencyComparison(left, mutation, regenerate, mutation_cost, regenerate_cost, telemetry)
 
 
-@dataclass(frozen=True, slots=True)
-class OwnerSourceRecord:
-    source_id: str
-    source_sha256: str
-    byte_length: int
-    width: int
-    height: int
-    source_path: str
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "source_id", _text(self.source_id, "owner source id"))
-        _sha(self.source_sha256, "owner source SHA-256")
-        if any(type(value) is not int or value <= 0 for value in (self.byte_length, self.width, self.height)):
-            raise MutationContractError("owner source length/dimensions are malformed")
-        object.__setattr__(self, "source_path", _text(self.source_path, "owner source path").replace("\\", "/"))
-
-    @classmethod
-    def from_m05_owner_upload(cls, record: Mapping[str, object]) -> "OwnerSourceRecord":
-        """Adapt only the accepted M05 OWNER_UPLOAD record; never mint an alias."""
-        required = {"source_id", "origin", "status", "validation_state", "source_sha256", "byte_length", "original_width", "original_height", "immutable_relative_path"}
-        if not isinstance(record, Mapping) or not required.issubset(record) or record.get("origin") != "OWNER_UPLOAD" or record.get("status") != "SOURCE_ONLY" or record.get("validation_state") != "UNVALIDATED":
-            raise MutationContractError("record is not an accepted M05 OWNER_UPLOAD source identity")
-        source_id = record.get("source_id")
-        path = record.get("immutable_relative_path")
-        if type(source_id) is not str or not source_id.startswith("owner-upload-") or path != f"owner-uploads/{source_id}/source.png":
-            raise MutationContractError("OWNER_UPLOAD identity or canonical path is malformed")
-        return cls(source_id, record["source_sha256"], record["byte_length"], record["original_width"], record["original_height"], path)  # type: ignore[arg-type]
-
-
-@dataclass(frozen=True, slots=True)
-class OwnerSourceReport:
-    disposition: str
-    source_id: str
-    before_sha256: str | None
-    after_sha256: str | None
-    byte_length: int
-    width: int
-    height: int
-    reason: str
-
-
-def _path_identity(value: str) -> str:
-    return "/".join(part for part in value.replace("\\", "/").split("/") if part not in ("", ".")).lower()
-
-
-def verify_owner_source_immutable(record: OwnerSourceRecord, before: bytes, after: bytes, *, before_dimensions: tuple[int, int] | None = None, after_dimensions: tuple[int, int] | None = None, derived_paths: Iterable[str] = ()) -> OwnerSourceReport:
-    before_sha = hashlib.sha256(before).hexdigest()
-    after_sha = hashlib.sha256(after).hexdigest()
-    derived = {_path_identity(str(path)) for path in derived_paths}
-    source = _path_identity(record.source_path)
-    if source in derived:
-        return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "derived artifact aliases immutable OWNER_UPLOAD path")
-    if before_sha != record.source_sha256 or len(before) != record.byte_length:
-        return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "pre-operation OWNER_UPLOAD bytes do not match accepted record")
-    if before_dimensions is not None and before_dimensions != (record.width, record.height):
-        return OwnerSourceReport("ERROR", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "pre-operation OWNER_UPLOAD dimensions do not match accepted record")
-    if after_dimensions is not None and after_dimensions != (record.width, record.height):
-        return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed OWNER_UPLOAD dimensions")
-    if before_dimensions is not None and after_dimensions is not None and before_dimensions != after_dimensions:
-        return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed OWNER_UPLOAD dimensions")
-    if after_sha != before_sha or len(after) != len(before):
-        return OwnerSourceReport("FAIL", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "M07 operation changed immutable OWNER_UPLOAD bytes")
-    return OwnerSourceReport("PASS", record.source_id, before_sha, after_sha, len(after), record.width, record.height, "OWNER_UPLOAD bytes, length, dimensions and source identity remained unchanged")
+OwnerSourceRecord = M05OwnerSourceRecord
+OwnerSourceReport = SourcePreservationReport
+verify_owner_source_immutable = verify_owner_source_preservation
 
 
 # R01 typed boundaries.  The legacy EvidenceRecord constructor remains useful

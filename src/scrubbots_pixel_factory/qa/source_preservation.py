@@ -42,6 +42,14 @@ class OwnerSourceRecord:
             raise QAContractError("OWNER_UPLOAD source record must be a mapping")
         return cls(str(value["source_id"]), str(value.get("source_path", value.get("immutable_path", ""))), value["source_sha256"], value["byte_length"], value.get("original_width", value.get("width")), value.get("original_height", value.get("height")), value.get("origin", "OWNER_UPLOAD"), value.get("status", "SOURCE_ONLY"), value.get("validation_state", "UNVALIDATED"), value.get("schema", "scrubbots-owner-upload-source"), value.get("version", 1))
 
+    @classmethod
+    def from_m05_owner_upload(cls, record: Mapping[str, object]) -> "OwnerSourceRecord":
+        if not isinstance(record, Mapping):
+            raise QAContractError("OWNER_UPLOAD source record must be a mapping")
+        value = dict(record)
+        value["source_path"] = value.get("source_path", value.get("immutable_relative_path", ""))
+        return cls.from_mapping(value)
+
     def canonical_dict(self) -> dict[str, object]:
         return {"schema": self.schema, "version": self.version, "source_id": self.source_id, "source_sha256": self.source_sha256, "byte_length": self.byte_length, "width": self.width, "height": self.height, "origin": self.origin, "status": self.status, "validation_state": self.validation_state}
 

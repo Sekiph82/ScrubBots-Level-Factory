@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
+from pathlib import Path
+import tempfile
 
 import pytest
 
@@ -115,8 +118,13 @@ def test_production_authentic_adapter_entry_point_rejects_self_signed_wrappers()
         revalidate_mutation_from_authentic_adapters(mutation, object(), object(), object())  # type: ignore[arg-type]
 
 
-def _authentic_chain():
-    source = "a" * 64
+AUTHENTIC_SOURCE_PATH = Path(tempfile.gettempdir()) / "scrubbots-r03-authentic-source.bin"
+
+
+def _authentic_chain(source_bytes: bytes | None = None):
+    raw = source_bytes if source_bytes is not None else b"scrubbots-r03-authentic-source"
+    AUTHENTIC_SOURCE_PATH.write_bytes(raw)
+    source = hashlib.sha256(raw).hexdigest()
     level_data = LevelDataIdentity.from_mapping("authentic-child", source, {"schema": "scrubbots-level-data", "version": 1, "level_id": "authentic-child", "width": 1, "height": 1, "cells": [0]})
     parent = MutationCandidate.root("authentic-parent", {"level_id": "authentic-child", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}}, level_data_sha256=level_data.level_data_sha256, source_art_sha256=source)
     request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=41, intent=MutationIntent.HARDEN, authority=m39_authority())

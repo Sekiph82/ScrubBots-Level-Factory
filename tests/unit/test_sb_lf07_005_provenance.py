@@ -29,6 +29,9 @@ from scrubbots_pixel_factory.mutation_base import MutationResult
 from scrubbots_pixel_factory.mutation_evidence import AuthenticEvidenceAdapter
 from scrubbots_pixel_factory.mutation_targeting import select_authentic_target
 from test_sb_lf07_004_revalidation import _authentic_chain
+from test_sb_lf07_004_revalidation import AUTHENTIC_SOURCE_PATH
+from scrubbots_pixel_factory.mutation_source import SourceLinkedMutationContext
+from scrubbots_pixel_factory.qa import OwnerSourceRecord as M05OwnerSourceRecord
 from sb_lf07_r01_support import engine, m39_authority
 
 
@@ -136,7 +139,7 @@ def test_authentic_runner_emits_unique_typed_producer_references_and_rejects_rep
         engine=__import__("sb_lf07_r01_support", fromlist=["engine"]).engine(),
         validator=lambda result: candidate if result.digest() == mutation.digest() else (_ for _ in ()).throw(AssertionError("runner replay drift")),
         target=target,
-        source_context=SimpleNamespace(passed=True),
+        source_context=SourceLinkedMutationContext.establish(M05OwnerSourceRecord("r03-provenance-source", str(AUTHENTIC_SOURCE_PATH), hashlib.sha256(AUTHENTIC_SOURCE_PATH.read_bytes()).hexdigest(), len(AUTHENTIC_SOURCE_PATH.read_bytes()), 20, 20)),
     )
     assert report.attempts[0].provenance is not None
     assert report.attempts[0].provenance.evidence_references == provenance.evidence_references
