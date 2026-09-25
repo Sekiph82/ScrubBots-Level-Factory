@@ -5,7 +5,7 @@ import pytest
 from scrubbots_pixel_factory.qa import QAContractError, QAReportDisposition, SemanticReviewDisposition, build_qa_report
 
 
-IDS = {"source_sha256": "a" * 64, "level_data_digest": "b" * 64, "logical_art_digest": "c" * 64}
+IDS = {"source_sha256": "a" * 64, "level_data_digest": "b" * 64, "logical_art_digest": "c" * 64, "main_game_authority_digest": "d" * 64, "main_game_result_digest": "e" * 64, "production_facts_digest": "f" * 64, "solver_evidence_digest": "1" * 64}
 
 
 def test_accepted_report_derives_disposition_and_round_trips_deterministically() -> None:
