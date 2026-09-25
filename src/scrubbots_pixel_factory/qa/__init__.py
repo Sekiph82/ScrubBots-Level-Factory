@@ -61,6 +61,14 @@ from .source_preservation import (
     SourcePreservationReport,
     verify_owner_source_preservation,
 )
+from .handoff import (
+    HANDOFF_SCHEMA,
+    HANDOFF_VERSION,
+    HandoffValidationReceipt,
+    MainGameAcceptanceHandoff,
+    MainGameAcceptanceProvider,
+    build_main_game_handoff,
+)
 
 __all__ = [
     "FACTORY_QA_AUTHORITY",
@@ -110,4 +118,10 @@ __all__ = [
     "SOURCE_PRESERVATION_VERSION",
     "SourcePreservationReport",
     "verify_owner_source_preservation",
+    "HANDOFF_SCHEMA",
+    "HANDOFF_VERSION",
+    "HandoffValidationReceipt",
+    "MainGameAcceptanceHandoff",
+    "MainGameAcceptanceProvider",
+    "build_main_game_handoff",
 ]
