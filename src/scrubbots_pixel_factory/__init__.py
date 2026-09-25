@@ -433,6 +433,7 @@ from .mutation_evidence import (
 )
 from .mutation_targeting import AuthenticTargetCandidate, build_typed_target, select_authentic_target
 from .mutation_attempts import run_authentic_bounded_mutations
+from .mutation_efficiency import MutationAttemptRouteEvidence, RegenerationRouteEvidence, TrustedAccountingEvidence, compare_efficiency_from_authentic_routes
 from .semantic import (
     CELL_MAJORITY_POLICY_VERSION,
     CandidateStatus,

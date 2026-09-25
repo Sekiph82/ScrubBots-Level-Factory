@@ -9,7 +9,14 @@ from scrubbots_pixel_factory import (
     MutationContractError,
     compare_efficiency,
     compare_efficiency_from_routes,
+    EfficiencyComparison,
+    GeneratorRouter,
+    GenerationRequest,
+    MutationAttemptRouteEvidence,
+    RegenerationRouteEvidence,
+    TrustedAccountingEvidence,
 )
+from scrubbots_pixel_factory.semantic.qualification.models import CostUsageRecord
 
 
 def _workload() -> EfficiencyWorkload:
@@ -62,3 +69,18 @@ def test_route_evidence_rejects_unmatched_workload_identity() -> None:
     right = GeneratorRouteEvidence("regenerate", "c" * 64, 1, 1, 0, 1, "d" * 64)
     with pytest.raises(MutationContractError):
         compare_efficiency_from_routes(left, right)
+
+
+def test_real_generation_result_and_accepted_accounting_are_required_for_regeneration_route() -> None:
+    workload = _workload()
+    result = GeneratorRouter().generate(GenerationRequest("EASY", 123, "MASK", width=20, height=20))
+    route = RegenerationRouteEvidence.from_generation_result(result, workload, config_digest="e" * 64, accounting=TrustedAccountingEvidence.from_cost_usage(CostUsageRecord(provider_attempt_count=1)))
+    assert route.counters.produced == 1
+    assert route.accounting is not None
+    with pytest.raises(MutationContractError):
+        RegenerationRouteEvidence.from_generation_result(object(), workload, config_digest="e" * 64)  # type: ignore[arg-type]
+
+
+def test_mutation_route_rejects_caller_counter_dto_and_requires_attempt_report() -> None:
+    with pytest.raises(MutationContractError):
+        MutationAttemptRouteEvidence.from_attempt_report(object(), _workload())  # type: ignore[arg-type]
