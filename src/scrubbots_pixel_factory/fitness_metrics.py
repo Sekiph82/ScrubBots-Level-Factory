@@ -276,11 +276,17 @@ class FitnessEvaluation:
             raise FitnessMetricError("fitness evaluation results are missing")
         if any(not isinstance(item, CandidateFitness) for item in self.results):
             raise FitnessMetricError("fitness evaluation results are malformed")
+        candidate_ids = tuple(item.candidate_id for item in self.results)
+        if len(set(candidate_ids)) != len(candidate_ids):
+            raise FitnessMetricError("fitness evaluation results contain duplicate candidate IDs")
+        lineage_digests = tuple(item.lineage_digest for item in self.results)
+        if len(set(lineage_digests)) != len(lineage_digests):
+            raise FitnessMetricError("fitness evaluation results contain duplicate lineage identities")
         if self.policy_digest != FitnessPolicy().digest():
             raise FitnessMetricError("fitness evaluation policy is unsupported")
         if any(item.policy_digest != self.policy_digest for item in self.results):
             raise FitnessMetricError("fitness results have mismatched policy bindings")
-        if tuple(item.candidate_id for item in self.results) != tuple(sorted(item.candidate_id for item in self.results)):
+        if candidate_ids != tuple(sorted(candidate_ids)):
             raise FitnessMetricError("fitness results are not canonically ordered")
         _sha(self.evaluation_digest, "fitness evaluation digest")
         if self.evaluation_digest != _digest(self._payload_dict()):
@@ -297,13 +303,20 @@ class FitnessEvaluation:
     def canonical_dict(self) -> dict[str, object]:
         return {**self._payload_dict(), "evaluation_digest": self.evaluation_digest}
 
-    def for_candidate(self, candidate: CandidateEvidence, policy: FitnessPolicy) -> CandidateFitness:
+    def for_candidate(
+        self,
+        candidate: CandidateEvidence,
+        policy: FitnessPolicy,
+        artifacts: Mapping[str, bytes],
+    ) -> CandidateFitness:
+        """Retrieve a result only after exact artifact-bound recomputation."""
+
         if policy.digest() != self.policy_digest:
             raise FitnessMetricError("fitness evaluation policy binding is stale")
         match = next((item for item in self.results if item.candidate_id == candidate.candidate_id), None)
         if match is None or match.lineage_digest != candidate.lineage_digest:
             raise FitnessMetricError("fitness result is missing or bound to another candidate")
-        return match
+        return validate_fitness_result(candidate, match, policy, artifacts)
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "FitnessEvaluation":

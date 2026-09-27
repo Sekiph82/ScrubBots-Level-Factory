@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from scrubbots_pixel_factory import (
     DEFAULT_FITNESS_METRIC_CATALOG,
     EXPERIMENTAL_OPT_IN,
     FITNESS_SCORE_SCALE,
+    FitnessEvaluation,
     FitnessMetricError,
     FitnessMetricValue,
     FitnessPolicy,
@@ -121,6 +123,36 @@ def _population() -> tuple[tuple[CandidateEvidence, ...], dict[str, bytes]]:
     return candidates, artifacts
 
 
+def _digest(value: object) -> str:
+    return hashlib.sha256(json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _rehashed_result(
+    result: CandidateFitness,
+    *,
+    candidate_id: str | None = None,
+    lineage_digest: str | None = None,
+    metrics: tuple[FitnessMetricValue, ...] | None = None,
+) -> CandidateFitness:
+    updated = result.canonical_dict()
+    updated["candidate_id"] = candidate_id or result.candidate_id
+    updated["lineage_digest"] = lineage_digest or result.lineage_digest
+    updated["metrics"] = [item.canonical_dict() for item in (metrics or result.metrics)]
+    updated["aggregate_score"] = FitnessPolicy().aggregate({item["metric_id"]: item["normalized_value"] for item in updated["metrics"]})
+    updated["fitness_digest"] = _digest({key: value for key, value in updated.items() if key != "fitness_digest"})
+    return CandidateFitness.from_dict(updated)
+
+
+def _evaluation_payload(results: tuple[CandidateFitness, ...], policy: FitnessPolicy) -> dict[str, object]:
+    payload = {
+        "schema": "scrubbots-experimental-fitness",
+        "version": 1,
+        "policy_digest": policy.digest(),
+        "results": [item.canonical_dict() for item in results],
+    }
+    return {**payload, "evaluation_digest": _digest(payload)}
+
+
 def test_closed_catalog_and_policy_digest_are_canonical_and_versioned() -> None:
     policy = FitnessPolicy()
     restored = FitnessPolicy.from_dict(policy.canonical_dict())
@@ -151,13 +183,57 @@ def test_each_result_binds_exact_candidate_lineage_and_policy() -> None:
     candidates, artifacts = _population()
     policy = FitnessPolicy()
     evaluation = evaluate_fitness(candidates, policy, artifacts)
-    result = evaluation.for_candidate(candidates[0], policy)
+    result = evaluation.for_candidate(candidates[0], policy, artifacts)
 
     assert validate_fitness_result(candidates[0], result, policy, artifacts) == result
     with pytest.raises(FitnessMetricError, match="another candidate|forged|stale"):
         validate_fitness_result(candidates[1], result, policy, artifacts)
     with pytest.raises(FitnessMetricError):
         replace(result, aggregate_score=0)
+
+
+def test_public_lookup_rejects_forged_rehashed_result_and_stale_or_cross_candidate_bytes() -> None:
+    candidates, artifacts = _population()
+    policy = FitnessPolicy()
+    evaluation = evaluate_fitness(candidates, policy, artifacts)
+    original = evaluation.results[0]
+    forged_metrics = (
+        FitnessMetricValue(original.metrics[0].metric_id, original.metrics[0].normalized_value // 2),
+        original.metrics[1],
+    )
+    forged = _rehashed_result(original, metrics=forged_metrics)
+    forged_evaluation = FitnessEvaluation.from_dict(_evaluation_payload((forged, *evaluation.results[1:]), policy))
+
+    with pytest.raises(FitnessMetricError, match="forged|stale|another candidate"):
+        forged_evaluation.for_candidate(candidates[0], policy, artifacts)
+
+    stale_artifacts = dict(artifacts)
+    stale_artifacts[candidates[0].bundle_ref] = b"stale bundle bytes"
+    with pytest.raises(FitnessMetricError, match="stale|unavailable|forged"):
+        evaluation.for_candidate(candidates[0], policy, stale_artifacts)
+
+    with pytest.raises(FitnessMetricError, match="another candidate|forged|stale"):
+        validate_fitness_result(candidates[1], original, policy, artifacts)
+
+
+def test_fitness_evaluation_rejects_duplicate_ids_and_lineage_on_direct_and_restored_paths() -> None:
+    candidates, artifacts = _population()
+    policy = FitnessPolicy()
+    evaluation = evaluate_fitness(candidates, policy, artifacts)
+    first, second = evaluation.results[:2]
+
+    duplicate_id_results = (first, first)
+    with pytest.raises(FitnessMetricError, match="duplicate candidate"):
+        FitnessEvaluation(policy.digest(), duplicate_id_results, _evaluation_payload(duplicate_id_results, policy)["evaluation_digest"])
+    with pytest.raises(FitnessMetricError, match="duplicate candidate"):
+        FitnessEvaluation.from_dict(_evaluation_payload(duplicate_id_results, policy))
+
+    duplicate_lineage_second = _rehashed_result(second, lineage_digest=first.lineage_digest)
+    duplicate_lineage_results = (first, duplicate_lineage_second)
+    with pytest.raises(FitnessMetricError, match="duplicate lineage"):
+        FitnessEvaluation(policy.digest(), duplicate_lineage_results, _evaluation_payload(duplicate_lineage_results, policy)["evaluation_digest"])
+    with pytest.raises(FitnessMetricError, match="duplicate lineage"):
+        FitnessEvaluation.from_dict(_evaluation_payload(duplicate_lineage_results, policy))
 
 
 def test_missing_or_forged_metric_evidence_fails_closed() -> None:
