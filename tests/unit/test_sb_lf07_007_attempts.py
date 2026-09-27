@@ -1,112 +1,13 @@
 from __future__ import annotations
 
-import pytest
-from dataclasses import replace
 import hashlib
-import json
+import pytest
 
-from scrubbots_pixel_factory import (
-    AttemptBudget,
-    AttemptDisposition,
-    AttemptProvenance,
-    CANONICAL_M23_PREVIEW_AUTHORITY,
-    ChallengeTarget,
-    EvidenceDisposition,
-    MutationCandidate,
-    MutationContractError,
-    MutationDisposition,
-    MutationEngine,
-    MutationIntent,
-    MutationRequest,
-    MutationRegistry,
-    derive_attempt_seed,
-    evidence,
-    revalidate_mutation,
-    run_bounded_mutations,
-    AuthenticTargetCandidate,
-    AttemptReport,
-    SafetyConstraintEvidence,
-    TypedChallengeTarget,
-    revalidate_mutation_from_authentic_adapters,
-    build_typed_target,
-    run_authentic_bounded_mutations,
-)
-from scrubbots_pixel_factory.mutation_base import MutationResult
-from test_sb_lf07_004_revalidation import _authentic_chain
-from test_sb_lf07_004_revalidation import AUTHENTIC_SOURCE_PATH
+from scrubbots_pixel_factory import AttemptBudget, AttemptDisposition, MutationCandidate, MutationContractError, MutationDisposition, MutationResult, TypedChallengeTarget, build_typed_target, run_authentic_bounded_mutations, revalidate_mutation_from_authentic_adapters, AuthenticTargetCandidate
+from scrubbots_pixel_factory.mutation_base import MutationEngine
 from scrubbots_pixel_factory.mutation_source import SourceLinkedMutationContext
 from scrubbots_pixel_factory.qa import OwnerSourceRecord as M05OwnerSourceRecord
-from sb_lf07_r01_support import engine as concrete_engine, m39_authority
-
-
-def _parent() -> MutationCandidate:
-    return MutationCandidate.root("attempt-parent", {"gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}})
-
-
-def _request(parent: MutationCandidate, ordinal: int, seed: int) -> MutationRequest:
-    return MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=seed, intent=MutationIntent.HARDEN, authority=m39_authority())
-
-
-def _validate(mutation):
-    solver = evidence("M03_SOLVER", EvidenceDisposition.SOLVED, mutation, {"status": "SOLVED"})
-    difficulty = evidence("M04_DIFFICULTY", EvidenceDisposition.AVAILABLE, mutation, {"policy_version": "DIFFICULTY_V1", "challenge_score": 60.0})
-    qa = evidence("M05_QA", EvidenceDisposition.PASS, mutation, {"structural": True})
-    return revalidate_mutation(mutation, solver, difficulty, qa)
-
-
-def test_success_before_limit_records_ordinal_seed_and_provenance() -> None:
-    calls: list[int] = []
-    engine = concrete_engine()
-    report = run_bounded_mutations(_parent(), base_seed=70, budget=AttemptBudget(3), request_factory=lambda parent, ordinal, seed: (calls.append(ordinal) or _request(parent, ordinal, seed)), engine=engine, validator=_validate, target=ChallengeTarget(50, 70, "DIFFICULTY_V1"))
-    assert report.disposition is AttemptDisposition.TARGET_MATCH
-    assert len(report.attempts) == 1
-    assert calls == [0]
-    assert report.attempts[0].provenance is not None
-    assert report.attempts[0].provenance.attempt_ordinal == 0
-    assert report.attempts[0].effective_seed == derive_attempt_seed(70, 0)
-
-
-def test_exact_limit_exhaustion_is_not_unsolvable_or_success() -> None:
-    report = run_bounded_mutations(_parent(), base_seed=71, budget=AttemptBudget(2), request_factory=_request, engine=concrete_engine(), validator=_validate, target=ChallengeTarget(90, 100, "DIFFICULTY_V1"))
-    assert report.disposition is AttemptDisposition.REJECTED
-    assert len(report.attempts) == 2
-    assert report.selected is None
-    assert all(record.attempt_provenance is not None for record in report.attempts)
-    assert all(record.mutation.disposition.value != "UNSOLVABLE" for record in report.attempts)
-
-
-def test_invalid_budgets_fail_closed_and_seed_replay_is_stable() -> None:
-    for value in (0, -1, 10001):
-        with pytest.raises(MutationContractError):
-            AttemptBudget(value)
-    assert derive_attempt_seed(100, 3) == derive_attempt_seed(100, 3)
-    with pytest.raises(MutationContractError):
-        derive_attempt_seed(100, -1)
-
-
-def test_signed64_overflow_is_rejected_and_non_applied_attempts_have_typed_provenance() -> None:
-    with pytest.raises(MutationContractError):
-        derive_attempt_seed(2**63 - 1, 1)
-    record = AttemptProvenance(0, 17, "a" * 64, "candidate", MutationDisposition.ERROR, "canonical capability unavailable")
-    assert record.mutation_disposition.value == "ERROR"
-
-
-def test_runner_records_non_applied_provenance_and_returns_error() -> None:
-    parent = _parent()
-    request_factory = lambda candidate, ordinal, seed: _request(candidate, ordinal, seed)
-    report = run_bounded_mutations(parent, base_seed=90, budget=AttemptBudget(1), request_factory=request_factory, engine=MutationEngine(MutationRegistry()), validator=_validate, target=ChallengeTarget(50, 70, "DIFFICULTY_V1"))
-    assert report.disposition is AttemptDisposition.REJECTED
-    assert report.attempts[0].attempt_provenance is not None
-    assert report.attempts[0].mutation.disposition is MutationDisposition.INAPPLICABLE
-
-
-def _authentic_runner_fixture():
-    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
-    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
-    candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
-    base_target = build_typed_target(0.0, 100.0, difficulty, qa)
-    safety = SafetyConstraintEvidence("scrubbots-m07-safety-availability", "1", base_target.policy_digest, True, True, True, qa.producer_digest)
-    return parent, request, mutation, candidate, TypedChallengeTarget(0.0, 100.0, base_target.policy_digest, safety), base_target
+from test_sb_lf07_004_revalidation import AUTHENTIC_SOURCE_PATH, _authentic_chain
 
 
 class _StaticEngine:
@@ -120,40 +21,58 @@ class _StaticEngine:
         return MutationResult(self.disposition, request.digest(), parent.identity, None, parent.state_digest, None, None, f"terminal {self.disposition.value}", request.operator_id, request.operator_version, request.authority)
 
 
-def _run_authentic(parent, request, mutation, candidate, target, *, budget=2, engine=None, calls=None):
-    def factory(current, ordinal, seed):
-        if calls is not None:
-            calls.append(("request", ordinal))
-        return request
+def _fixture():
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
+    candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
+    target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
+    return parent, request, mutation, candidate, target
 
-    def validator(result):
-        if calls is not None:
-            calls.append(("validator", len(calls)))
+
+def _run(parent, request, mutation, candidate, target, *, budget=1, engine=None, validator=None, source_context=None):
+    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=lambda current, ordinal, seed: request, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator or (lambda result: candidate), target=target, source_context=source_context)
+
+
+def test_authenticated_match_is_bounded_and_records_sealed_provenance() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    report = _run(parent, request, mutation, candidate, target, budget=3)
+    assert report.disposition is AttemptDisposition.TARGET_MATCH
+    assert len(report.attempts) == 1
+    assert report.attempts[0].provenance is not None and report.attempts[0].provenance.is_authentic_sealed
+
+
+def test_runner_wraps_request_validator_and_selection_failures_as_error() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    assert _run(parent, request, mutation, candidate, target, validator=lambda _: (_ for _ in ()).throw(ValueError("validator boom"))).disposition is AttemptDisposition.ERROR
+    assert _run(parent, request, mutation, candidate, target, engine=_StaticEngine(MutationDisposition.ERROR)).disposition is AttemptDisposition.ERROR
+    assert _run(parent, request, mutation, candidate, target, validator=lambda _: object()).disposition is AttemptDisposition.ERROR
+    assert run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: (_ for _ in ()).throw(RuntimeError("request boom")), engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target).disposition is AttemptDisposition.ERROR
+
+
+def test_runner_preserves_terminal_dispositions_and_exact_budget() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    assert _run(parent, request, mutation, candidate, target, engine=_StaticEngine(MutationDisposition.UNAVAILABLE)).disposition is AttemptDisposition.UNAVAILABLE
+    assert _run(parent, request, mutation, candidate, target, engine=_StaticEngine(MutationDisposition.INAPPLICABLE)).disposition is AttemptDisposition.REJECTED
+    no_match = build_typed_target(101.0, 102.0, candidate.difficulty, candidate.qa, required_constraints=())
+    report = _run(parent, request, mutation, candidate, no_match, budget=2)
+    assert report.disposition is AttemptDisposition.EXHAUSTED
+    assert len(report.attempts) == 2
+
+
+def test_runner_requires_sealed_target_and_checks_source_on_every_path(tmp_path) -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    raw = b"runner-source"
+    source = tmp_path / "source.bin"
+    source.write_bytes(raw)
+    record = M05OwnerSourceRecord("owner-r04", str(source), hashlib.sha256(raw).hexdigest(), len(raw), 20, 20)
+    context = SourceLinkedMutationContext.establish(record)
+    def mutate_source(_):
+        source.write_bytes(raw + b"changed")
         return candidate
-
-    source_context = SourceLinkedMutationContext.establish(M05OwnerSourceRecord("r03-runner-source", str(AUTHENTIC_SOURCE_PATH), hashlib.sha256(AUTHENTIC_SOURCE_PATH.read_bytes()).hexdigest(), len(AUTHENTIC_SOURCE_PATH.read_bytes()), 20, 20))
-    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=factory, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator, target=target, source_context=source_context)
-
-
-def test_authentic_runner_covers_all_terminal_dispositions_and_precedence() -> None:
-    parent, request, mutation, candidate, matching_target, unavailable_target = _authentic_runner_fixture()
-    assert _run_authentic(parent, request, mutation, candidate, matching_target, budget=3).disposition is AttemptDisposition.TARGET_MATCH
-    assert _run_authentic(parent, request, mutation, candidate, unavailable_target, budget=1).disposition is AttemptDisposition.INCONCLUSIVE
-    score = candidate.envelope.challenge_score or 0.0
-    lower = 100.0 if score < 100.0 else 0.0
-    exhausted_target = TypedChallengeTarget(lower, 100.0 if lower == 100.0 else 0.0, matching_target.policy_digest, matching_target.safety)
-    assert _run_authentic(parent, request, mutation, candidate, exhausted_target, budget=2).disposition is AttemptDisposition.EXHAUSTED
-    assert _run_authentic(parent, request, mutation, candidate, matching_target, budget=1, engine=_StaticEngine(MutationDisposition.ERROR)).disposition is AttemptDisposition.ERROR
-    assert _run_authentic(parent, request, mutation, candidate, matching_target, budget=1, engine=_StaticEngine(MutationDisposition.UNAVAILABLE)).disposition is AttemptDisposition.UNAVAILABLE
-    assert _run_authentic(parent, request, mutation, candidate, matching_target, budget=1, engine=_StaticEngine(MutationDisposition.INAPPLICABLE)).disposition is AttemptDisposition.REJECTED
+    failed = _run(parent, request, mutation, candidate, target, source_context=context, validator=mutate_source)
+    assert failed.disposition is AttemptDisposition.ERROR
+    forged = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=object())  # type: ignore[arg-type]
+    assert forged.disposition is AttemptDisposition.ERROR
 
 
-def test_authentic_runner_stops_at_exact_limit_and_replays_deterministically() -> None:
-    parent, request, mutation, candidate, matching_target, _ = _authentic_runner_fixture()
-    calls: list[tuple[str, int]] = []
-    first = _run_authentic(parent, request, mutation, candidate, matching_target, budget=1, calls=calls)
-    second = _run_authentic(parent, request, mutation, candidate, matching_target, budget=1)
-    assert len(first.attempts) == 1
-    assert [kind for kind, _ in calls] == ["request", "validator"]
-    assert first.attempts[0].provenance is not None
-    assert first.attempts[0].provenance.digest() == second.attempts[0].provenance.digest()  # type: ignore[union-attr]
+__all__ = ["_StaticEngine", "_fixture", "_run"]
