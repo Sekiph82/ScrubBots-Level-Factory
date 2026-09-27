@@ -18,6 +18,7 @@ from scrubbots_pixel_factory import (
 )
 from scrubbots_pixel_factory.difficulty_analysis import LaneClass
 from scrubbots_pixel_factory.m08_batch import digest, lineage_digest_for
+from scrubbots_pixel_factory.studio_extensions import REVIEW_SCHEMA, _digest as studio_digest
 
 
 def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvidence:
@@ -28,6 +29,7 @@ def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvid
         "m05_digest": f"m05:{candidate}".encode(),
         "level_data_digest": f"level:{candidate}".encode(),
         "logical_art_digest": f"art:{candidate}".encode(),
+        "grid_hash": f"grid:{candidate}".encode(),
         "source_provenance_digest": f"source:{candidate}".encode(),
         "generation_request_digest": f"request:{candidate}".encode(),
         "generation_result_digest": f"result:{candidate}".encode(),
@@ -149,6 +151,25 @@ def test_artifact_set_verifies_exact_canonical_bytes_without_reencoding() -> Non
         evidence.generation_result_ref: b"result",
         evidence.generation_metadata_ref: b"generation",
     }
+
+
+def _review(evidence: CandidateEvidence, disposition: str, sequence: int = 1, previous_review_id: str | None = None) -> dict[str, object]:
+    review_id = f"review-{evidence.candidate_id}-{sequence:04d}"
+    return {
+        "schema": REVIEW_SCHEMA,
+        "version": 1,
+        "review_id": review_id,
+        "candidate_id": evidence.candidate_id,
+        "candidate_identity_hash": studio_digest({"candidate_id": evidence.candidate_id, "grid_hash": evidence.grid_hash}),
+        "artwork_sha256": evidence.logical_art_digest,
+        "grid_hash": evidence.grid_hash,
+        "disposition": disposition,
+        "reason": "fixture",
+        "note": "fixture",
+        "sequence": sequence,
+        "created_at": "2026-09-27T00:00:00+00:00",
+        "previous_review_id": previous_review_id,
+    }
     updated = {**evidence.as_dict(), "level_data_digest": __import__("hashlib").sha256(b"level").hexdigest(), "logical_art_digest": __import__("hashlib").sha256(b"art").hexdigest(), "bundle_digest": __import__("hashlib").sha256(b"bundle").hexdigest(), "source_provenance_digest": __import__("hashlib").sha256(b"source").hexdigest(), "m03_digest": __import__("hashlib").sha256(b"m03").hexdigest(), "m04_digest": __import__("hashlib").sha256(b"m04").hexdigest(), "m05_digest": __import__("hashlib").sha256(b"m05").hexdigest(), "generation_request_digest": __import__("hashlib").sha256(b"request").hexdigest(), "generation_result_digest": __import__("hashlib").sha256(b"result").hexdigest(), "generation_metadata_digest": __import__("hashlib").sha256(b"generation").hexdigest()}
     updated["lineage_digest"] = lineage_digest_for(updated)
     evidence = CandidateEvidence.from_dict(updated)
@@ -204,17 +225,42 @@ def test_owner_review_summary_is_separate_and_handoff_requires_latest_accept() -
     result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("candidate")})
     pending = build_handoff(result, "candidate", [])
     assert pending["disposition"] == "NOT_OWNER_ACCEPTED"
-    artwork_digest = result.entries[0].evidence.logical_art_digest
-    reject = {"candidate_id": "candidate", "artwork_sha256": artwork_digest, "disposition": "REJECT", "review_id": "review-1"}
-    accept = {"candidate_id": "candidate", "artwork_sha256": artwork_digest, "disposition": "ACCEPT", "review_id": "review-2"}
+    reject = _review(result.entries[0].evidence, "REJECT")
+    accept = _review(result.entries[0].evidence, "ACCEPT", 2, reject["review_id"])
     summary = review_summary(result, [reject, accept])
     assert summary["OWNER_ACCEPTED"] == 1 and result.statistics["accepted"] == 1
     ready = build_handoff(result, "candidate", [reject, accept], artifacts=_artifact_map(result.entries[0].evidence))
     assert ready["disposition"] == "READY" and "handoff_digest" in ready
     assert build_handoff(result, "candidate", [reject, accept])["disposition"] == "UNAVAILABLE"
-    assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}], artifacts=_artifact_map(result.entries[0].evidence))["disposition"] == "NOT_OWNER_ACCEPTED"
+    assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}], artifacts=_artifact_map(result.entries[0].evidence))["disposition"] == "INVALID_REVIEW_EVIDENCE"
     assert review_summary(result, [accept, reject]) == review_summary(result, [reject, accept])
     assert review_summary(result, [accept, dict(accept)])["INVALID_REVIEW_EVIDENCE"] == 1
+
+
+def test_owner_review_gate_rejects_incomplete_or_corrupt_canonical_chain() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 18, "review-chain")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("reviewed")})
+    evidence = result.entries[0].evidence
+    valid = _review(evidence, "ACCEPT")
+
+    missing = dict(valid)
+    del missing["grid_hash"]
+    assert review_summary(result, [missing])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    gap = _review(evidence, "ACCEPT", 2, valid["review_id"])
+    assert review_summary(result, [gap])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    predecessor = _review(evidence, "ACCEPT", 2, "review-wrong-0001")
+    assert review_summary(result, [valid, predecessor])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    duplicate_id = [valid, dict(valid)]
+    assert review_summary(result, duplicate_id)["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    corrupt_after_accept = _review(evidence, "ACCEPT", 2, valid["review_id"])
+    corrupt_after_accept["grid_hash"] = "f" * 64
+    summary = review_summary(result, [valid, corrupt_after_accept])
+    assert summary["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+    assert build_handoff(result, evidence.candidate_id, [valid, corrupt_after_accept], artifacts=_artifact_map(evidence))["disposition"] == "INVALID_REVIEW_EVIDENCE"
 
 
 def test_high_rejection_is_finite_one_lane_can_exhaust_while_another_completes() -> None:

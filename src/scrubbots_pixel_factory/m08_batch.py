@@ -14,6 +14,7 @@ from pathlib import PurePosixPath
 from typing import Any, Callable, Iterable, Mapping
 
 from .difficulty_analysis import LaneClass
+from .studio_extensions import StudioExtensionError, validate_owner_review_chain
 
 SCHEMA = "scrubbots-m08-production-batch"
 VERSION = 1
@@ -24,7 +25,7 @@ _DISPOSITIONS = {"ACCEPT", "REJECT", "INCONCLUSIVE", "UNAVAILABLE", "ERROR"}
 _ATTEMPT_DISPOSITIONS = {"ACCEPT", "REJECT", "DUPLICATE", "INCONCLUSIVE", "UNAVAILABLE", "ERROR"}
 _LINEAGE_KEYS = (
     "candidate_id", "lane", "m03_disposition", "m03_digest", "m04_disposition", "m04_digest", "m04_lane_digest",
-    "m05_disposition", "m05_digest", "level_data_digest", "level_data_ref", "logical_art_digest", "logical_art_ref",
+    "m05_disposition", "m05_digest", "level_data_digest", "level_data_ref", "logical_art_digest", "logical_art_ref", "grid_hash",
     "source_provenance_digest", "source_provenance_ref", "bundle_digest", "bundle_ref", "m03_ref", "m04_ref", "m05_ref",
     "generation_request_digest", "generation_request_ref", "generation_result_digest", "generation_result_ref",
     "generation_metadata_digest", "generation_metadata_ref", "preview_digest", "preview_ref", "mutation_digest", "mutation_ref",
@@ -152,6 +153,7 @@ class CandidateEvidence:
     m05_digest: str
     level_data_digest: str
     logical_art_digest: str
+    grid_hash: str
     source_provenance_digest: str
     generation_request_digest: str
     generation_request_ref: str
@@ -178,7 +180,7 @@ class CandidateEvidence:
             raise M08ContractError("candidate identity/lane is malformed")
         if self.m03_disposition != "ACCEPT" or self.m04_disposition != "ACCEPT" or self.m05_disposition != "ACCEPT":
             raise M08ContractError("only current M03/M04/M05 ACCEPT evidence can form a Factory-accepted candidate")
-        for value, label in ((self.m03_digest, "M03"), (self.m04_digest, "M04"), (self.m04_lane_digest, "M04 lane"), (self.m05_digest, "M05 QA"), (self.level_data_digest, "LevelData"), (self.logical_art_digest, "logical art"), (self.source_provenance_digest, "source provenance"), (self.generation_request_digest, "generation request"), (self.generation_result_digest, "generation result"), (self.generation_metadata_digest, "generation metadata"), (self.bundle_digest, "bundle"), (self.lineage_digest, "candidate lineage")):
+        for value, label in ((self.m03_digest, "M03"), (self.m04_digest, "M04"), (self.m04_lane_digest, "M04 lane"), (self.m05_digest, "M05 QA"), (self.level_data_digest, "LevelData"), (self.logical_art_digest, "logical art"), (self.grid_hash, "grid"), (self.source_provenance_digest, "source provenance"), (self.generation_request_digest, "generation request"), (self.generation_result_digest, "generation result"), (self.generation_metadata_digest, "generation metadata"), (self.bundle_digest, "bundle"), (self.lineage_digest, "candidate lineage")):
             _sha(value, label)
         for value, label in ((self.preview_digest, "preview"), (self.mutation_digest, "M07 mutation")):
             if value is not None:
@@ -193,14 +195,14 @@ class CandidateEvidence:
             raise M08ContractError("candidate artifact identities are not bound to one lineage")
 
     def as_dict(self) -> dict[str, Any]:
-        return {"candidate_id": self.candidate_id, "lane": self.lane.value, "m03_disposition": self.m03_disposition, "m03_digest": self.m03_digest, "m04_disposition": self.m04_disposition, "m04_digest": self.m04_digest, "m04_lane_digest": self.m04_lane_digest, "m05_disposition": self.m05_disposition, "m05_digest": self.m05_digest, "level_data_digest": self.level_data_digest, "logical_art_digest": self.logical_art_digest, "source_provenance_digest": self.source_provenance_digest, "generation_request_digest": self.generation_request_digest, "generation_request_ref": self.generation_request_ref, "generation_result_digest": self.generation_result_digest, "generation_result_ref": self.generation_result_ref, "generation_metadata_digest": self.generation_metadata_digest, "generation_metadata_ref": self.generation_metadata_ref, "bundle_digest": self.bundle_digest, "lineage_digest": self.lineage_digest, "level_data_ref": self.level_data_ref, "logical_art_ref": self.logical_art_ref, "bundle_ref": self.bundle_ref, "source_provenance_ref": self.source_provenance_ref, "m03_ref": self.m03_ref, "m04_ref": self.m04_ref, "m05_ref": self.m05_ref, "preview_digest": self.preview_digest, "preview_ref": self.preview_ref, "mutation_digest": self.mutation_digest, "mutation_ref": self.mutation_ref}
+        return {"candidate_id": self.candidate_id, "lane": self.lane.value, "m03_disposition": self.m03_disposition, "m03_digest": self.m03_digest, "m04_disposition": self.m04_disposition, "m04_digest": self.m04_digest, "m04_lane_digest": self.m04_lane_digest, "m05_disposition": self.m05_disposition, "m05_digest": self.m05_digest, "level_data_digest": self.level_data_digest, "logical_art_digest": self.logical_art_digest, "grid_hash": self.grid_hash, "source_provenance_digest": self.source_provenance_digest, "generation_request_digest": self.generation_request_digest, "generation_request_ref": self.generation_request_ref, "generation_result_digest": self.generation_result_digest, "generation_result_ref": self.generation_result_ref, "generation_metadata_digest": self.generation_metadata_digest, "generation_metadata_ref": self.generation_metadata_ref, "bundle_digest": self.bundle_digest, "lineage_digest": self.lineage_digest, "level_data_ref": self.level_data_ref, "logical_art_ref": self.logical_art_ref, "bundle_ref": self.bundle_ref, "source_provenance_ref": self.source_provenance_ref, "m03_ref": self.m03_ref, "m04_ref": self.m04_ref, "m05_ref": self.m05_ref, "preview_digest": self.preview_digest, "preview_ref": self.preview_ref, "mutation_digest": self.mutation_digest, "mutation_ref": self.mutation_ref}
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "CandidateEvidence":
         fields = set(cls.__dataclass_fields__)
         if set(value) != fields:
             raise M08ContractError("candidate evidence fields are unsupported or incomplete")
-        return cls(value["candidate_id"], _lane(value["lane"]), value["m03_disposition"], value["m03_digest"], value["m04_disposition"], value["m04_digest"], value["m04_lane_digest"], value["m05_disposition"], value["m05_digest"], value["level_data_digest"], value["logical_art_digest"], value["source_provenance_digest"], value["generation_request_digest"], value["generation_request_ref"], value["generation_result_digest"], value["generation_result_ref"], value["generation_metadata_digest"], value["generation_metadata_ref"], value["bundle_digest"], value["lineage_digest"], value["level_data_ref"], value["logical_art_ref"], value["bundle_ref"], value["source_provenance_ref"], value["m03_ref"], value["m04_ref"], value["m05_ref"], value["preview_digest"], value["preview_ref"], value["mutation_digest"], value["mutation_ref"])
+        return cls(value["candidate_id"], _lane(value["lane"]), value["m03_disposition"], value["m03_digest"], value["m04_disposition"], value["m04_digest"], value["m04_lane_digest"], value["m05_disposition"], value["m05_digest"], value["level_data_digest"], value["logical_art_digest"], value["grid_hash"], value["source_provenance_digest"], value["generation_request_digest"], value["generation_request_ref"], value["generation_result_digest"], value["generation_result_ref"], value["generation_metadata_digest"], value["generation_metadata_ref"], value["bundle_digest"], value["lineage_digest"], value["level_data_ref"], value["logical_art_ref"], value["bundle_ref"], value["source_provenance_ref"], value["m03_ref"], value["m04_ref"], value["m05_ref"], value["preview_digest"], value["preview_ref"], value["mutation_digest"], value["mutation_ref"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -484,40 +486,11 @@ def verify_artifact_set(evidence: CandidateEvidence, artifacts: Mapping[str, byt
 
 
 def _review_chain(result: BatchResult, evidence: CandidateEvidence, reviews: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
-    candidate_reviews = [dict(review) for review in reviews if isinstance(review, Mapping) and review.get("candidate_id") == evidence.candidate_id]
-    valid: list[dict[str, Any]] = []
-    invalid: list[str] = []
-    seen_review_ids: set[str] = set()
-    for review in candidate_reviews:
-        review_id = str(review.get("review_id", f"review-{len(valid) + 1}"))
-        if review_id in seen_review_ids:
-            invalid.append(review_id)
-            continue
-        seen_review_ids.add(review_id)
-        if review.get("disposition") not in {"ACCEPT", "REJECT"} or review.get("artwork_sha256", evidence.logical_art_digest) != evidence.logical_art_digest:
-            invalid.append(review_id)
-            continue
-        sequence = review.get("sequence")
-        if sequence is not None and (type(sequence) is not int or sequence < 1):
-            invalid.append(review_id)
-            continue
-        valid.append(review)
-    if any(item.get("sequence") is not None for item in valid):
-        ordered = sorted(valid, key=lambda item: item.get("sequence", 0))
-        previous: str | None = None
-        contiguous: list[dict[str, Any]] = []
-        for expected, review in enumerate(ordered, 1):
-            if review.get("sequence") != expected or review.get("previous_review_id") != previous:
-                invalid.append(str(review.get("review_id", "unknown")))
-                break
-            contiguous.append(review)
-            previous = str(review.get("review_id"))
-        valid = contiguous
-    else:
-        # Test/durable adapters without sequence numbers still have a stable
-        # derived view; canonical SB-LFX records use sequence and predecessor.
-        valid.sort(key=lambda item: str(item.get("review_id", "")))
-    return valid, invalid
+    candidate = {"candidate_id": evidence.candidate_id, "artwork_sha256": evidence.logical_art_digest, "grid_hash": evidence.grid_hash}
+    try:
+        return validate_owner_review_chain(candidate, reviews)
+    except StudioExtensionError as exc:
+        return [], [f"candidate-review:{exc}"]
 
 
 def review_summary(result: BatchResult, reviews: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
@@ -527,10 +500,10 @@ def review_summary(result: BatchResult, reviews: Iterable[Mapping[str, Any]]) ->
     for entry in result.entries:
         chain, bad = _review_chain(result, entry.evidence, all_reviews)
         candidate_id = entry.evidence.candidate_id
-        states[candidate_id] = "OWNER_ACCEPTED" if chain and chain[-1]["disposition"] == "ACCEPT" else "OWNER_REJECTED" if chain and chain[-1]["disposition"] == "REJECT" else "NEEDS_REVIEW"
+        states[candidate_id] = "INVALID_REVIEW_EVIDENCE" if bad else "OWNER_ACCEPTED" if chain and chain[-1]["disposition"] == "ACCEPT" else "OWNER_REJECTED" if chain and chain[-1]["disposition"] == "REJECT" else "NEEDS_REVIEW"
         if bad:
             invalid[candidate_id] = sorted(bad)
-    return {"NEEDS_REVIEW": sum(value == "NEEDS_REVIEW" for value in states.values()), "OWNER_ACCEPTED": sum(value == "OWNER_ACCEPTED" for value in states.values()), "OWNER_REJECTED": sum(value == "OWNER_REJECTED" for value in states.values()), "INVALID_REVIEW_EVIDENCE": len(invalid), "invalid_review_evidence": invalid, "states": dict(sorted(states.items()))}
+    return {"NEEDS_REVIEW": sum(value == "NEEDS_REVIEW" for value in states.values()), "OWNER_ACCEPTED": sum(value == "OWNER_ACCEPTED" for value in states.values()), "OWNER_REJECTED": sum(value == "OWNER_REJECTED" for value in states.values()), "INVALID_REVIEW_EVIDENCE": sum(value == "INVALID_REVIEW_EVIDENCE" for value in states.values()), "invalid_review_evidence": invalid, "states": dict(sorted(states.items()))}
 
 
 def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapping[str, Any]], *, artifacts: Mapping[str, bytes] | None = None) -> dict[str, Any]:
@@ -538,7 +511,9 @@ def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapp
     if entry is None:
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_FACTORY_ACCEPTED", "candidate_id": candidate_id}
     chain, invalid = _review_chain(result, entry.evidence, reviews)
-    if invalid or not chain or chain[-1]["disposition"] != "ACCEPT":
+    if invalid:
+        return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "INVALID_REVIEW_EVIDENCE", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "invalid_review_evidence": sorted(invalid)}
+    if not chain or chain[-1]["disposition"] != "ACCEPT":
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_OWNER_ACCEPTED", "candidate_id": candidate_id, "batch_result_digest": result.digest()}
     if artifacts is None:
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "UNAVAILABLE", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "reason": "immutable artifact bytes were not supplied for digest verification"}
