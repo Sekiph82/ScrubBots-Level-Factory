@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
-from scrubbots_pixel_factory import AttemptBudget, EfficiencyCounters, EfficiencyWorkload, GeneratorRouter, GenerationRequest, MutationContractError, MutationAttemptRouteEvidence, RegenerationRouteEvidence, TrustedAccountingEvidence
+from scrubbots_pixel_factory import AttemptBudget, EfficiencyCounters, EfficiencyWorkload, GeneratorRouter, GenerationRequest, MutationCandidate, MutationContractError, MutationAttemptRouteEvidence, RegenerationRouteEvidence, TrustedAccountingEvidence
 from scrubbots_pixel_factory.mutation_efficiency import compare_efficiency_from_authentic_routes
 from scrubbots_pixel_factory.semantic.qualification.models import CostUsageRecord
 from test_sb_lf07_007_attempts import _fixture, _run
@@ -66,6 +68,46 @@ def test_generation_request_without_parent_provenance_remains_unavailable() -> N
     mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
     assert report.workload is None
     assert mutation_route.workload.availability == "UNAVAILABLE"
+
+
+def test_forged_raw_parent_digest_cannot_establish_workload_or_match() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, candidate, target = _fixture()
+    forged_parent = MutationCandidate.root(
+        parent.candidate_id,
+        {**dict(parent.payload), "generation_request_digest": aligned.digest()},
+        level_data_sha256=parent.level_data_sha256,
+        source_art_sha256=parent.source_art_sha256,
+    )
+    report = _run(forged_parent, request, mutation, candidate, target, generation_request=aligned)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    regeneration_route = RegenerationRouteEvidence.from_generation_result(GeneratorRouter().generate(aligned), target=target, budget=report.budget)
+    assert mutation_route.workload.availability == "UNAVAILABLE"
+    assert compare_efficiency_from_authentic_routes(mutation_route, regeneration_route).disposition != "MATCHED"
+
+
+def test_sealed_parent_binding_rejects_wrong_parent_and_tampered_digests() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    result = GeneratorRouter().generate(aligned)
+    parent, *_ = _fixture()
+    sealed = parent.with_accepted_generation_result(result)
+    other = MutationCandidate.root("other-parent", dict(parent.payload))
+    with pytest.raises(MutationContractError):
+        replace(other, generation_provenance=sealed.generation_provenance)
+    with pytest.raises(MutationContractError):
+        replace(sealed.generation_provenance, request_digest="f" * 64)
+    with pytest.raises(MutationContractError):
+        replace(sealed.generation_provenance, result_digest="e" * 64)
+
+
+def test_sealed_result_for_another_request_cannot_authorize_aligned_workload() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    other_request = GenerationRequest("EASY", 41, "MASK", width=21, height=21)
+    parent, request, mutation, candidate, target = _fixture()
+    parent = parent.with_accepted_generation_result(GeneratorRouter().generate(other_request))
+    report = _run(parent, request, mutation, candidate, target, generation_request=aligned)
+    assert report.disposition.value == "ERROR"
+    assert report.workload is None
 
 
 def test_same_seed_different_generation_configuration_is_not_matched() -> None:

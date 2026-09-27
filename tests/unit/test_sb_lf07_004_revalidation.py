@@ -8,7 +8,7 @@ import tempfile
 import pytest
 
 from scrubbots_pixel_factory import (
-    MutationCandidate, MutationContractError, MutationDisposition, MutationIntent,
+    GeneratorRouter, MutationCandidate, MutationContractError, MutationDisposition, MutationIntent,
     MutationRequest, ValidationDisposition, revalidate_mutation_from_authentic_adapters,
 )
 from scrubbots_pixel_factory.compact_solver_state import CANONICAL_PROOF_STATE_AUTHORITY_SHA, LevelIdentity, SolverStateAuthority
@@ -30,9 +30,10 @@ def _authentic_chain(source_bytes: bytes | None = None, generation_request=None)
     source = hashlib.sha256(raw).hexdigest()
     level_data = LevelDataIdentity.from_mapping("authentic-child", source, {"schema": "scrubbots-level-data", "version": 1, "level_id": "authentic-child", "width": 1, "height": 1, "cells": [0]})
     payload = {"level_id": "authentic-child", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}}
-    if generation_request is not None:
-        payload["generation_request_digest"] = generation_request.digest()
     parent = MutationCandidate.root("authentic-parent", payload, level_data_sha256=level_data.level_data_sha256, source_art_sha256=source)
+    if generation_request is not None:
+        accepted_result = GeneratorRouter().generate(generation_request)
+        parent = parent.with_accepted_generation_result(accepted_result)
     request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=41, intent=MutationIntent.HARDEN, authority=m39_authority())
     mutation = engine().apply(request, parent)
     assert mutation.child is not None

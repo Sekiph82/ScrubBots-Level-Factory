@@ -8,7 +8,7 @@ any higher M07 policy/evidence service.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
@@ -25,6 +25,7 @@ CANONICAL_GAMEPLAY_REPOSITORY = "https://github.com/Sekiph82/Scrubbots"
 CANONICAL_GAMEPLAY_SHA = "UNAVAILABLE"
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SHA1 = re.compile(r"^[0-9a-f]{40}$")
+_AUTHENTIC_GENERATION_PROVENANCE_TOKEN = object()
 
 class MutationContractError(ValueError):
     """Raised when a closed M07 contract cannot be constructed."""
@@ -223,6 +224,74 @@ class CandidateIdentity:
         return _digest(self.canonical_dict())
 
 
+@dataclass(frozen=True, slots=True, init=False)
+class SealedGenerationProvenance:
+    """Factory-owned binding between an accepted generation result and parent."""
+
+    request_digest: str
+    result_digest: str
+    generator_id: str
+    generator_version: str
+    generator_mode: str
+    seed: int | str
+    config_identity: str
+    parent: CandidateIdentity
+    _authenticity_token: object | None = field(default=None, init=False, repr=False, compare=False)
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
+        raise MutationContractError("sealed generation provenance must be built from an accepted GenerationResult")
+
+    @classmethod
+    def _from_accepted_result(cls, result: object, parent: CandidateIdentity) -> "SealedGenerationProvenance":
+        from .core import GenerationResult
+
+        if not isinstance(result, GenerationResult) or not result.is_success or result.request is None:
+            raise MutationContractError("sealed generation provenance requires an accepted GenerationResult")
+        if not isinstance(parent, CandidateIdentity):
+            raise MutationContractError("sealed generation provenance requires an exact parent identity")
+        request = result.request
+        if result.seed != request.seed or result.generator_mode != request.generator_mode:
+            raise MutationContractError("accepted GenerationResult metadata is not bound to its request")
+        if type(result.generator_id) is not str or not result.generator_id.strip() or type(result.generator_version) is not str or not result.generator_version.strip():
+            raise MutationContractError("accepted GenerationResult generator identity is incomplete")
+        obj = object.__new__(cls)
+        values = {
+            "request_digest": request.digest(),
+            "result_digest": result.digest(),
+            "generator_id": result.generator_id,
+            "generator_version": result.generator_version,
+            "generator_mode": result.generator_mode,
+            "seed": result.seed,
+            "config_identity": request.digest(),
+            "parent": parent,
+        }
+        for name, value in values.items():
+            object.__setattr__(obj, name, value)
+        object.__setattr__(obj, "_authenticity_token", _AUTHENTIC_GENERATION_PROVENANCE_TOKEN)
+        return obj
+
+    @property
+    def is_authentic_sealed(self) -> bool:
+        return self._authenticity_token is _AUTHENTIC_GENERATION_PROVENANCE_TOKEN
+
+    def canonical_dict(self) -> dict[str, object]:
+        if not self.is_authentic_sealed:
+            raise MutationContractError("generation provenance is not sealed")
+        return {
+            "request_digest": self.request_digest,
+            "result_digest": self.result_digest,
+            "generator_id": self.generator_id,
+            "generator_version": self.generator_version,
+            "generator_mode": self.generator_mode,
+            "seed": self.seed,
+            "config_identity": self.config_identity,
+            "parent": self.parent.canonical_dict(),
+        }
+
+    def digest(self) -> str:
+        return _digest(self.canonical_dict())
+
+
 @dataclass(frozen=True, slots=True)
 class MutationCandidate:
     candidate_id: str
@@ -231,6 +300,7 @@ class MutationCandidate:
     source_art_sha256: str | None = None
     lineage_root: str | None = None
     parent_candidate_id: str | None = None
+    generation_provenance: SealedGenerationProvenance | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidate_id", _text(self.candidate_id, "candidate id"))
@@ -245,6 +315,11 @@ class MutationCandidate:
             _sha(self.lineage_root, "lineage root")
         if self.parent_candidate_id == self.candidate_id:
             raise MutationContractError("candidate cannot parent itself")
+        if self.generation_provenance is not None:
+            if not isinstance(self.generation_provenance, SealedGenerationProvenance) or not self.generation_provenance.is_authentic_sealed:
+                raise MutationContractError("candidate generation provenance must be sealed")
+            if self.generation_provenance.parent != self.identity:
+                raise MutationContractError("candidate generation provenance is bound to another parent")
 
     @property
     def state_digest(self) -> str:
@@ -256,7 +331,13 @@ class MutationCandidate:
         return CandidateIdentity(self.candidate_id, self.state_digest, self.level_data_sha256, self.source_art_sha256, root, self.parent_candidate_id)
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": "scrubbots-mutation-candidate", "version": 1, "identity": self.identity.canonical_dict(), "payload": _deep_thaw(self.payload)}
+        return {
+            "schema": "scrubbots-mutation-candidate",
+            "version": 1,
+            "identity": self.identity.canonical_dict(),
+            "payload": _deep_thaw(self.payload),
+            "generation_provenance": self.generation_provenance.canonical_dict() if self.generation_provenance is not None else None,
+        }
 
     def digest(self) -> str:
         return _digest(self.canonical_dict())
@@ -266,6 +347,26 @@ class MutationCandidate:
         draft = cls(candidate_id, payload, level_data_sha256, source_art_sha256)
         root = _digest({"candidate_id": draft.candidate_id, "state_digest": draft.state_digest})
         return cls(candidate_id, payload, level_data_sha256, source_art_sha256, root)
+
+    @classmethod
+    def from_accepted_generation_result(
+        cls,
+        result: object,
+        candidate_id: str,
+        payload: Mapping[str, object],
+        *,
+        level_data_sha256: str | None = None,
+        source_art_sha256: str | None = None,
+    ) -> "MutationCandidate":
+        """Construct a parent and seal it from an accepted producer result."""
+        draft = cls.root(candidate_id, payload, level_data_sha256=level_data_sha256, source_art_sha256=source_art_sha256)
+        provenance = SealedGenerationProvenance._from_accepted_result(result, draft.identity)
+        return cls(candidate_id, payload, level_data_sha256, source_art_sha256, draft.lineage_root, None, provenance)
+
+    def with_accepted_generation_result(self, result: object) -> "MutationCandidate":
+        """Attach a producer-derived seal to this exact immutable parent."""
+        provenance = SealedGenerationProvenance._from_accepted_result(result, self.identity)
+        return MutationCandidate(self.candidate_id, self.payload, self.level_data_sha256, self.source_art_sha256, self.lineage_root, self.parent_candidate_id, provenance)
 
 
 @dataclass(frozen=True, slots=True)
@@ -465,6 +566,6 @@ __all__ = [
     "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CandidateIdentity",
     "CurrentMainAuthorityResolver", "LineageEdge", "LineageRootRegistration",
     "MutationCandidate", "MutationContractError", "MutationDisposition",
-    "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry",
+    "MutationEngine", "MutationIntent", "MutationOperator", "MutationRegistry", "SealedGenerationProvenance",
     "MutationRequest", "MutationResult", "resolve_current_main_authority",
 ]
