@@ -5,12 +5,14 @@ import hashlib
 import json
 
 from .mutation_base import MutationCandidate, MutationDisposition, MutationEngine, MutationRequest
+from .core import GenerationRequest
 from .mutation_evidence import provenance_from_authentic_validation
 from .m07_services import (
     AttemptBudget, AttemptDisposition, AttemptProvenance, AttemptRecord, AttemptReport,
     MutationContractError, MutationResult, TypedChallengeTarget, ValidationDisposition,
 )
 from .mutation_targeting import AuthenticTargetCandidate, TargetDisposition, select_authentic_target
+from .mutation_workload import canonical_workload_identity
 
 
 def _digest(value: object) -> str:
@@ -63,19 +65,26 @@ def _source_entry_guard(parent: MutationCandidate, source_context):
         return source_context, f"source-linked M05 pre-check failed before operation: {type(exc).__name__}: {exc}"
 
 
-def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None) -> AttemptReport:
+def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None, generation_request: GenerationRequest | None = None) -> AttemptReport:
     from .m07_services import derive_attempt_seed
     records: list[AttemptRecord] = []
     current = parent
     terminals: list[AttemptDisposition] = []
     seed_config_digest, workload_available = _config_identity(parent)
+    workload = None
+    if generation_request is not None:
+        try:
+            workload = canonical_workload_identity(generation_request, target, budget)
+            seed_config_digest, workload_available = workload.seed_config_digest, True
+        except MutationContractError:
+            return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "exact GenerationRequest could not establish the canonical workload identity", target, seed_config_digest, False, None)
 
     if not isinstance(target, TypedChallengeTarget) or not target.is_authentic_sealed:
-        return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "sealed authentic target authority is required", target, seed_config_digest, workload_available)
+        return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "sealed authentic target authority is required", target, seed_config_digest, workload_available, workload)
 
     source_context, source_error = _source_entry_guard(parent, source_context)
     if source_error is not None:
-        return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, source_error, target, seed_config_digest, workload_available)
+        return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, source_error, target, seed_config_digest, workload_available, workload)
 
     for ordinal in range(budget.max_attempts):
         seed = derive_attempt_seed(base_seed, ordinal)
@@ -143,14 +152,14 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
                     terminals.append(AttemptDisposition.ERROR)
                     terminal_error = post_error
         if terminal_error is not None:
-            return AttemptReport(AttemptDisposition.ERROR, budget, tuple(records), None, terminal_error, target, seed_config_digest, workload_available)
+            return AttemptReport(AttemptDisposition.ERROR, budget, tuple(records), None, terminal_error, target, seed_config_digest, workload_available, workload)
         if matched_validation is not None:
-            return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), matched_validation, "authenticated target matched before budget exhaustion", target, seed_config_digest, workload_available)
+            return AttemptReport(AttemptDisposition.TARGET_MATCH, budget, tuple(records), matched_validation, "authenticated target matched before budget exhaustion", target, seed_config_digest, workload_available, workload)
 
     for terminal in (AttemptDisposition.ERROR, AttemptDisposition.UNAVAILABLE, AttemptDisposition.INCONCLUSIVE, AttemptDisposition.REJECTED):
         if terminal in terminals:
-            return AttemptReport(terminal, budget, tuple(records), None, f"strongest observed terminal disposition: {terminal.value}", target, seed_config_digest, workload_available)
-    return AttemptReport(AttemptDisposition.EXHAUSTED, budget, tuple(records), None, "finite mutation budget exhausted without target success", target, seed_config_digest, workload_available)
+            return AttemptReport(terminal, budget, tuple(records), None, f"strongest observed terminal disposition: {terminal.value}", target, seed_config_digest, workload_available, workload)
+    return AttemptReport(AttemptDisposition.EXHAUSTED, budget, tuple(records), None, "finite mutation budget exhausted without target success", target, seed_config_digest, workload_available, workload)
 
 
 __all__ = ["run_authentic_bounded_mutations"]

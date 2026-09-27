@@ -22,6 +22,39 @@ def test_full_workload_identity_includes_configuration_and_is_not_seed_only() ->
     assert comparison.disposition == "UNAVAILABLE"
 
 
+def test_mutation_and_regeneration_can_match_on_one_exact_workload_identity() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    generation_request = GenerationRequest("EASY", request.seed, "MASK", width=20, height=20)
+    report = _run(parent, request, mutation, candidate, target, generation_request=generation_request)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    result = GeneratorRouter().generate(generation_request)
+    regeneration_route = RegenerationRouteEvidence.from_generation_result(result, target=target, budget=report.budget)
+    comparison = compare_efficiency_from_authentic_routes(mutation_route, regeneration_route)
+    assert mutation_route.workload == regeneration_route.workload
+    assert comparison.disposition == "MATCHED"
+    assert comparison.mutation_cost is None
+    assert comparison.regenerate_cost is None
+
+
+def test_same_seed_different_generation_configuration_is_not_matched() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    base = GenerationRequest("EASY", request.seed, "MASK", width=20, height=20)
+    variants = (
+        GenerationRequest("EASY", request.seed, "MASK", width=21, height=21),
+        GenerationRequest("EASY", request.seed, "RULES", width=20, height=20),
+        GenerationRequest("EASY", request.seed, "MASK", width=20, height=20, style="ROBOT"),
+        GenerationRequest("EASY", request.seed, "MASK", width=20, height=20, theme="NIGHT"),
+        GenerationRequest("EASY", request.seed, "MASK", width=20, height=20, palette_subset=("C01", "C02", "C03")),
+        GenerationRequest("EASY", request.seed, "MASK", width=20, height=20, generator_options={"namespace": "r05", "version": 1, "values": {"variant": "different"}}),
+    )
+    report = _run(parent, request, mutation, candidate, target, generation_request=base)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    for variant in variants:
+        result = GeneratorRouter().generate(variant)
+        regeneration_route = RegenerationRouteEvidence.from_generation_result(result, target=target, budget=report.budget)
+        assert compare_efficiency_from_authentic_routes(mutation_route, regeneration_route).disposition == "UNAVAILABLE"
+
+
 def test_regeneration_success_without_the_same_accepted_chain_is_inconclusive() -> None:
     parent, request, mutation, candidate, target = _fixture()
     report = _run(parent, request, mutation, candidate, target)

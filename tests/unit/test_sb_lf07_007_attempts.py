@@ -38,10 +38,10 @@ def _matching_source_context(parent):
 _MISSING = object()
 
 
-def _run(parent, request, mutation, candidate, target, *, budget=1, engine=None, validator=None, source_context=_MISSING):
+def _run(parent, request, mutation, candidate, target, *, budget=1, engine=None, validator=None, source_context=_MISSING, generation_request=None):
     if source_context is _MISSING:
         source_context = _matching_source_context(parent)
-    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=lambda current, ordinal, seed: request, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator or (lambda result: candidate), target=target, source_context=source_context)
+    return run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(budget), request_factory=lambda current, ordinal, seed: request, engine=engine or _StaticEngine(MutationDisposition.APPLIED, mutation), validator=validator or (lambda result: candidate), target=target, source_context=source_context, generation_request=generation_request)
 
 
 def test_authenticated_match_is_bounded_and_records_sealed_provenance() -> None:

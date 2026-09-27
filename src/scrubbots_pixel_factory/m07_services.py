@@ -613,6 +613,7 @@ class AttemptReport:
     target: object | None = None
     seed_config_digest: str | None = None
     workload_config_available: bool = False
+    workload: EfficiencyWorkload | None = None
 
 
 def derive_attempt_seed(base_seed: int, ordinal: int) -> int:

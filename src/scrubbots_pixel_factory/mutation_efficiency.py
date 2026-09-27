@@ -6,6 +6,7 @@ import json
 
 from .core import GenerationResult, ResultStatus
 from .m07_services import AttemptBudget, AttemptReport, EfficiencyComparison, EfficiencyCounters, EfficiencyWorkload, MutationContractError, TypedChallengeTarget
+from .mutation_workload import canonical_workload_identity
 from .semantic.qualification.models import CostUsageRecord
 
 
@@ -32,7 +33,9 @@ class MutationAttemptRouteEvidence:
     def from_attempt_report(cls, report: AttemptReport, workload: EfficiencyWorkload | None = None) -> "MutationAttemptRouteEvidence":
         if not isinstance(report, AttemptReport) or not isinstance(report.target, TypedChallengeTarget) or type(report.seed_config_digest) is not str or not isinstance(report.budget, AttemptBudget):
             raise MutationContractError("mutation route requires an authentic AttemptReport with target, seed/config, and budget identity")
-        actual = EfficiencyWorkload(report.target.digest(), report.seed_config_digest, _digest({"validation_policy_digest": report.target.policy_digest}), report.budget.digest(), "AVAILABLE" if report.workload_config_available else "UNAVAILABLE")
+        actual = report.workload
+        if actual is None:
+            actual = EfficiencyWorkload(report.target.digest(), _digest({"availability": "UNAVAILABLE", "reason": "exact_generation_request_not_bound"}), _digest({"availability": "UNAVAILABLE", "reason": "validation_policy_not_bound"}), report.budget.digest(), "UNAVAILABLE")
         if workload is not None and workload != actual:
             raise MutationContractError("caller-supplied mutation workload is not the actual AttemptReport workload")
         return cls(report, actual)
@@ -67,8 +70,8 @@ class RegenerationRouteEvidence:
             raise MutationContractError("regeneration result must retain its exact request identity")
         if config_digest is not None or accounting is not None:
             raise MutationContractError("caller config/accounting evidence is not authoritative")
+        actual = canonical_workload_identity(result.request, target, budget)
         config_digest = result.request.digest()
-        actual = EfficiencyWorkload(target.digest(), config_digest, _digest({"validation_policy_digest": target.policy_digest}), budget.digest())
         if workload is not None and workload != actual:
             raise MutationContractError("caller-supplied regeneration workload is not the actual route workload")
         return cls(result, actual, result.generator_id or "UNAVAILABLE", result.generator_version or "UNAVAILABLE", result.request.digest(), config_digest, None)
