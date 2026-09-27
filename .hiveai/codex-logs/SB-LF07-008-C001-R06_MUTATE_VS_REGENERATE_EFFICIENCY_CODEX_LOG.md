@@ -37,3 +37,7 @@ Document role: CODEX BUILDER LOG
 - Push result: pushed `HEAD:main` successfully.
 - Post-implementation verification: local HEAD and `origin/main` both `a5680fb5ea57b82e6e6ce671aed6ff00f39808f5`.
 - The implementation does not edit `TASKS.md` or `.hiveai/audits/**`, does not alter frozen product behavior, and does not self-promote any task or M07 status.
+- 2026-09-27T09:08:00+03:00 — Final affected M07 gate: `33 passed`.
+- 2026-09-27T09:09:00+03:00 — Retained M03/M04/M05/M06/Palette V3 gate: `296 passed, 2 skipped`; both skips were accepted canonical ScrubBots capability gates.
+- 2026-09-27T09:16:00+03:00 — Full repository pytest: `1039 passed, 2 skipped in 421.27s`; both skips were accepted canonical ScrubBots capability gates.
+- 2026-09-27T09:17:00+03:00 — `python -m compileall -q src tests` passed; Godot 4.7.2 headless editor quit passed; `git diff --check` passed; protected-file diff returned no paths.
