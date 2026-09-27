@@ -175,7 +175,7 @@ class MutationProvenance:
         if refs:
             if self._authenticity_token is not _AUTHENTIC_PROVENANCE_TOKEN or self._authenticity_digest is None:
                 raise MutationContractError("typed production provenance requires the sealed authentic factory")
-            expected_binding = _digest({"request_digest": self.request_digest, "post_state_digest": self.post_state_digest, "evidence_references": [ref.canonical_dict() for ref in refs]})
+            expected_binding = _digest({"request_digest": self.request_digest, "post_state_digest": self.post_state_digest, "evidence_digests": list(self.evidence_digests), "evidence_references": [ref.canonical_dict() for ref in refs]})
             if self._authenticity_digest != expected_binding:
                 raise MutationContractError("typed production provenance evidence binding drift")
         object.__setattr__(self, "evidence_references", refs)
@@ -213,7 +213,8 @@ class MutationProvenance:
             raise MutationContractError("authentic production provenance requires ordered M03/M04/M05 references")
         base = cls.from_result(request, result, attempt_ordinal=attempt_ordinal)
         object.__setattr__(base, "evidence_references", tuple(references))
-        object.__setattr__(base, "_authenticity_digest", _digest({"request_digest": base.request_digest, "post_state_digest": base.post_state_digest, "evidence_references": [ref.canonical_dict() for ref in references]}))
+        object.__setattr__(base, "evidence_digests", tuple(ref.evidence_digest for ref in references))
+        object.__setattr__(base, "_authenticity_digest", _digest({"request_digest": base.request_digest, "post_state_digest": base.post_state_digest, "evidence_digests": list(base.evidence_digests), "evidence_references": [ref.canonical_dict() for ref in references]}))
         object.__setattr__(base, "_authenticity_token", _AUTHENTIC_PROVENANCE_TOKEN)
         return base
 
