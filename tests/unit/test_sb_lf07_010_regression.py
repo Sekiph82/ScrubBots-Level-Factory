@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 import pytest
 
-from scrubbots_pixel_factory import AttemptBudget, AttemptDisposition, CANONICAL_PALETTE, GenerationRequest, GeneratorRouter, MutationContractError, MutationDisposition, MutationProvenance, SafetyConstraintEvidence, TypedEvidenceReference, run_authentic_bounded_mutations, build_typed_target, revalidate_mutation_from_authentic_adapters, AuthenticTargetCandidate
+from scrubbots_pixel_factory import AttemptBudget, AttemptDisposition, CANONICAL_PALETTE, GenerationRequest, GeneratorRouter, MutationCandidate, MutationContractError, MutationDisposition, MutationProvenance, SafetyConstraintEvidence, TypedEvidenceReference, run_authentic_bounded_mutations, build_typed_target, revalidate_mutation_from_authentic_adapters, AuthenticTargetCandidate
 from scrubbots_pixel_factory.mutation_efficiency import MutationAttemptRouteEvidence, RegenerationRouteEvidence, compare_efficiency_from_authentic_routes
 from scrubbots_pixel_factory.mutation_targeting import select_authentic_target
 from test_sb_lf07_004_revalidation import _authentic_chain
@@ -76,3 +76,46 @@ def test_r04_efficiency_and_palette_regressions_remain_truthful() -> None:
     assert route.counters.solver_workload_available is False
     assert [color.id for color in CANONICAL_PALETTE.colors] == [f"C{i:02d}" for i in range(1, 17)]
     assert CANONICAL_PALETTE.difficulty_class_derived_from_color_count is False
+
+
+def test_r07_forged_raw_generation_digest_stays_unavailable() -> None:
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
+    candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
+    target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
+    forged_parent = MutationCandidate.root(
+        parent.candidate_id,
+        {**dict(parent.payload), "generation_request_digest": generation_request.digest()},
+        level_data_sha256=parent.level_data_sha256,
+        source_art_sha256=parent.source_art_sha256,
+    )
+    report = run_authentic_bounded_mutations(
+        forged_parent,
+        base_seed=request.seed,
+        budget=AttemptBudget(1),
+        request_factory=lambda *_: request,
+        engine=_StaticEngine(MutationDisposition.APPLIED, mutation),
+        validator=lambda _: candidate,
+        target=target,
+        source_context=_matching_source_context(forged_parent),
+        generation_request=generation_request,
+    )
+    regenerated = RegenerationRouteEvidence.from_generation_result(GeneratorRouter().generate(generation_request), target=target, budget=report.budget)
+    assert MutationAttemptRouteEvidence.from_attempt_report(report).workload.availability == "UNAVAILABLE"
+    assert compare_efficiency_from_authentic_routes(MutationAttemptRouteEvidence.from_attempt_report(report), regenerated).disposition != "MATCHED"
+
+
+def test_r07_wrong_result_and_parent_binding_are_rejected() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    other = GenerationRequest("EASY", 41, "MASK", width=21, height=21)
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
+    candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
+    target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
+    bound_to_other = parent.with_accepted_generation_result(GeneratorRouter().generate(other))
+    report = run_authentic_bounded_mutations(bound_to_other, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(bound_to_other), generation_request=aligned)
+    assert report.disposition is AttemptDisposition.ERROR
+    unrelated = MutationCandidate.root("unrelated-parent", dict(parent.payload))
+    with pytest.raises(MutationContractError):
+        replace(unrelated, generation_provenance=bound_to_other.generation_provenance)
