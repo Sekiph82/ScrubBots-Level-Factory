@@ -198,3 +198,16 @@ def test_interruption_resume_after_rejection_is_bounded_and_deterministic() -> N
     complete = run_batch(plan, produce, history=partial.attempts)
     assert complete.status == "COMPLETE" and len(complete.attempts) == 10
     assert run_batch(plan, produce, history=complete.attempts).digest() == complete.digest()
+
+
+def test_statistics_and_lane_counts_cannot_be_inflated_without_history() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 12, "tamper")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+    tampered = result.as_dict()
+    tampered["statistics"]["accepted"] = 1
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
+    tampered = result.as_dict()
+    tampered["lanes"]["EASY"]["attempted"] = 0
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)

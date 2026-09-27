@@ -249,6 +249,12 @@ class BatchResult:
         for key, value in self.statistics.items():
             if type(value) is not int or value < 0:
                 raise M08ContractError(f"batch statistic {key} is malformed")
+        expected_statistics = _stats(self.attempts)
+        if dict(self.statistics) != expected_statistics:
+            raise M08ContractError("batch statistics do not reconcile with immutable attempt history")
+        expected_attempted = {request.lane: sum(item.lane is request.lane for item in self.attempts) for request in self.plan.cadence}
+        if dict(self.attempted) != expected_attempted:
+            raise M08ContractError("lane attempted counts do not reconcile with immutable attempt history")
         _sha(self.history_digest, "history digest")
         if self.attempts:
             accepted = {(item.lane, item.attempt): item for item in self.attempts if item.disposition == "ACCEPT"}
