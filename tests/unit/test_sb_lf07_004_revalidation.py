@@ -24,12 +24,15 @@ from sb_lf07_r01_support import engine, m39_authority
 AUTHENTIC_SOURCE_PATH = Path(tempfile.gettempdir()) / "scrubbots-r04-authentic-source.bin"
 
 
-def _authentic_chain(source_bytes: bytes | None = None):
+def _authentic_chain(source_bytes: bytes | None = None, generation_request=None):
     raw = source_bytes if source_bytes is not None else b"scrubbots-r04-authentic-source"
     AUTHENTIC_SOURCE_PATH.write_bytes(raw)
     source = hashlib.sha256(raw).hexdigest()
     level_data = LevelDataIdentity.from_mapping("authentic-child", source, {"schema": "scrubbots-level-data", "version": 1, "level_id": "authentic-child", "width": 1, "height": 1, "cells": [0]})
-    parent = MutationCandidate.root("authentic-parent", {"level_id": "authentic-child", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}}, level_data_sha256=level_data.level_data_sha256, source_art_sha256=source)
+    payload = {"level_id": "authentic-child", "gameplay": {"column_count": 3, "preview_depth": 3, "slot_capacity": 6, "booster": "+1_SLOT", "sixth_slot_state": "EMPTY", "live_work_on_sixth": 0}}
+    if generation_request is not None:
+        payload["generation_request_digest"] = generation_request.digest()
+    parent = MutationCandidate.root("authentic-parent", payload, level_data_sha256=level_data.level_data_sha256, source_art_sha256=source)
     request = MutationRequest.for_candidate(parent, operator_id="CANONICAL_PLUS_ONE_SLOT_ROLLBACK_HARDEN_V1", operator_version="1", seed=41, intent=MutationIntent.HARDEN, authority=m39_authority())
     mutation = engine().apply(request, parent)
     assert mutation.child is not None

@@ -21,8 +21,8 @@ class _StaticEngine:
         return MutationResult(self.disposition, request.digest(), parent.identity, None, parent.state_digest, None, None, f"terminal {self.disposition.value}", request.operator_id, request.operator_version, request.authority)
 
 
-def _fixture():
-    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+def _fixture(generation_request=None):
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain(generation_request=generation_request)
     envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
     candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
     target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())

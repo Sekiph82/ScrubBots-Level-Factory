@@ -23,8 +23,8 @@ def test_full_workload_identity_includes_configuration_and_is_not_seed_only() ->
 
 
 def test_mutation_and_regeneration_can_match_on_one_exact_workload_identity() -> None:
-    parent, request, mutation, candidate, target = _fixture()
-    generation_request = GenerationRequest("EASY", request.seed, "MASK", width=20, height=20)
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, candidate, target = _fixture(generation_request)
     report = _run(parent, request, mutation, candidate, target, generation_request=generation_request)
     mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
     result = GeneratorRouter().generate(generation_request)
@@ -34,6 +34,38 @@ def test_mutation_and_regeneration_can_match_on_one_exact_workload_identity() ->
     assert comparison.disposition == "MATCHED"
     assert comparison.mutation_cost is None
     assert comparison.regenerate_cost is None
+
+
+def test_mutation_seed_a_cannot_match_workload_seed_b() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, candidate, target = _fixture(aligned)
+    workload_seed_b = GenerationRequest("EASY", 42, "MASK", width=20, height=20)
+    report = _run(parent, request, mutation, candidate, target, generation_request=workload_seed_b)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    regeneration_route = RegenerationRouteEvidence.from_generation_result(GeneratorRouter().generate(workload_seed_b), target=target, budget=report.budget)
+    comparison = compare_efficiency_from_authentic_routes(mutation_route, regeneration_route)
+    assert report.disposition.value == "ERROR"
+    assert mutation_route.workload.availability == "UNAVAILABLE"
+    assert comparison.disposition != "MATCHED"
+
+
+def test_same_seed_parent_bound_configuration_digest_mismatch_fails_closed() -> None:
+    aligned = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, candidate, target = _fixture(aligned)
+    wrong_config = GenerationRequest("EASY", 41, "MASK", width=21, height=21)
+    report = _run(parent, request, mutation, candidate, target, generation_request=wrong_config)
+    assert report.disposition.value == "ERROR"
+    assert "parent generation provenance" in report.reason
+    assert report.workload is None
+
+
+def test_generation_request_without_parent_provenance_remains_unavailable() -> None:
+    parent, request, mutation, candidate, target = _fixture()
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    report = _run(parent, request, mutation, candidate, target, generation_request=generation_request)
+    mutation_route = MutationAttemptRouteEvidence.from_attempt_report(report)
+    assert report.workload is None
+    assert mutation_route.workload.availability == "UNAVAILABLE"
 
 
 def test_same_seed_different_generation_configuration_is_not_matched() -> None:

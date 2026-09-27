@@ -12,7 +12,7 @@ from .m07_services import (
     MutationContractError, MutationResult, TypedChallengeTarget, ValidationDisposition,
 )
 from .mutation_targeting import AuthenticTargetCandidate, TargetDisposition, select_authentic_target
-from .mutation_workload import canonical_workload_identity
+from .mutation_workload import canonical_workload_identity, parent_generation_request_digest
 
 
 def _digest(value: object) -> str:
@@ -72,9 +72,15 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
     seed_config_digest, workload_available = _config_identity(parent)
     workload = None
     if generation_request is not None:
+        if type(base_seed) is not int or generation_request.seed != base_seed:
+            return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "generation workload seed does not match the mutation base-seed contract", target, seed_config_digest, False, None)
         try:
-            workload = canonical_workload_identity(generation_request, target, budget)
-            seed_config_digest, workload_available = workload.seed_config_digest, True
+            parent_digest = parent_generation_request_digest(parent)
+            if parent_digest is not None:
+                if generation_request.digest() != parent_digest:
+                    return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "generation workload digest does not match the parent generation provenance", target, seed_config_digest, False, None)
+                workload = canonical_workload_identity(generation_request, target, budget)
+                seed_config_digest, workload_available = workload.seed_config_digest, True
         except MutationContractError:
             return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "exact GenerationRequest could not establish the canonical workload identity", target, seed_config_digest, False, None)
 

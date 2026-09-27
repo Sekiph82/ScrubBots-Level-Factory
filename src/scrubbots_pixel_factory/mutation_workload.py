@@ -1,7 +1,13 @@
 """One canonical identity for authentic mutation/regeneration comparisons."""
 
+from collections.abc import Mapping
+import re
+
 from .core import GenerationRequest
-from .m07_services import AttemptBudget, EfficiencyWorkload, MutationContractError, TypedChallengeTarget
+from .m07_services import AttemptBudget, EfficiencyWorkload, MutationCandidate, MutationContractError, TypedChallengeTarget
+
+
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 def canonical_workload_identity(request: GenerationRequest, target: TypedChallengeTarget, budget: AttemptBudget) -> EfficiencyWorkload:
@@ -21,4 +27,24 @@ def canonical_workload_identity(request: GenerationRequest, target: TypedChallen
     )
 
 
-__all__ = ["canonical_workload_identity"]
+def parent_generation_request_digest(parent: MutationCandidate) -> str | None:
+    """Read only an explicit, canonical parent generation binding.
+
+    Raw generation configuration is deliberately not hashed here. A caller
+    must provide the accepted digest as provenance; otherwise comparison stays
+    unavailable rather than inferring authority from mutable payload data.
+    """
+    if not isinstance(parent, MutationCandidate):
+        raise MutationContractError("parent generation provenance requires a MutationCandidate")
+    direct = parent.payload.get("generation_request_digest")
+    if type(direct) is str and _SHA256.fullmatch(direct) is not None:
+        return direct
+    provenance = parent.payload.get("generation_provenance")
+    if isinstance(provenance, Mapping):
+        nested = provenance.get("generation_request_digest")
+        if type(nested) is str and _SHA256.fullmatch(nested) is not None:
+            return nested
+    return None
+
+
+__all__ = ["canonical_workload_identity", "parent_generation_request_digest"]
