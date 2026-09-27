@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M08 — Batch Factory & Weekly Production
-- Current Sprint: SB-LF08.C001 — M08 open-task master implementation batch
-- Current Task: SB-LF08-001 — Generate requested accepted counts by lane/class cadence
-- Current Task Status: AUTHORIZED / IMPLEMENT_ALL_THEN_AUDIT
-- Next Task/Action: Codex executes `SB-LF08-001,006,007,008,009-C001` sequentially from `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`, creates one builder log per task plus a master log, preserves accepted `SB-LF08-002,003,004,005,010` and `SB-LFX-013,014,015`, never edits `TASKS.md` or ChatGPT audits, then stops for independent per-task audit.
+- Current Sprint: SB-LF08.C001-R01 — M08 strict remediation batch
+- Current Task: SB-LF08-001-C001-R01 — Remediate accepted counts and manifest history binding
+- Current Task Status: AUTHORIZED / REMEDIATE_ALL_THEN_REAUDIT
+- Next Task/Action: Codex executes `SB-LF08-001,006,007,008,009-C001-R01` sequentially from `.hiveai/prompts/SB-LF08-C001-R01_MASTER_REMEDIATION_PROMPT.md`, creates one builder log per task plus a master log, preserves accepted `SB-LF08-002,003,004,005,010` and `SB-LFX-013,014,015`, never edits `TASKS.md` or ChatGPT audits, then stops for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` indexes the five dedicated strict criteria for `SB-LF08-001,006,007,008,009`.
-- Current Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/prompts/SB-LF08-C001-R01_REMEDIATION_INDEX.md` indexes the five R01 strict criteria for `SB-LF08-001,006,007,008,009`.
+- Current Prompt: `.hiveai/prompts/SB-LF08-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -188,6 +188,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF08 C001 Implementation/Audit Index: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
 - SB-LF08 C001 Master Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LF08 C001 Tracker Policy: accepted `002,003,004,005,010` and `SB-LFX-013,014,015` remain frozen; Codex implements only `001,006,007,008,009`; ChatGPT audits those five individually after the complete batch.
+- SB-LF08 C001 Strict Audit Result: `CHANGES_REQUIRED = 001,006,007,008,009`; no M08 C001 task is PASS/CLOSED.
+- SB-LF08 C001 Strict Audit Summary: `.hiveai/audits/SB-LF08-C001_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF08 C001-R01 Remediation Authorization: `SB-LF08-001,006,007,008,009-C001-R01 — REMEDIATE_ALL_THEN_REAUDIT`.
+- SB-LF08 C001-R01 Remediation Index: `.hiveai/prompts/SB-LF08-C001-R01_REMEDIATION_INDEX.md`.
+- SB-LF08 C001-R01 Master Prompt: `.hiveai/prompts/SB-LF08-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF08 C001-R01 Tracker Policy: Codex remediates all five tasks sequentially without tracker/audit edits; ChatGPT re-audits only after the complete R01 batch.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
