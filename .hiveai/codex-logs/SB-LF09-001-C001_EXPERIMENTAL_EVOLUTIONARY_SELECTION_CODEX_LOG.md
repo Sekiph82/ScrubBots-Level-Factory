@@ -57,3 +57,11 @@ Further entries will be appended chronologically as implementation, verification
 - Implementation commit: `6e1097bfb49801c6e89fc54d6db7fa9e8d7ebb15` (`Implement experimental evolutionary selection`).
 - Implementation commit contains only the authorized module, package export, and focused tests; this log remains separate and unpublished until the terminal log commit.
 - Local state after implementation commit: detached `HEAD` at `6e1097bfb49801c6e89fc54d6db7fa9e8d7ebb15`, one commit ahead of fetched `origin/main`; only this new log is untracked.
+
+## Push and handoff record
+
+- Final pre-push fetch: `git fetch origin --prune` succeeded; fetched `origin/main` remained `4ee246a8391c97123ebfdde7c319b4500d864866` and was an ancestor of `b0e312145fa0b752f130f7e05213f16b13c6a288`.
+- Push command: `git push origin HEAD:main`; result `4ee246a..b0e3121 HEAD -> main`, non-forceful fast-forward succeeded.
+- Post-push verification at 2026-09-27T22:26:31.9442505+03:00: local HEAD `b0e312145fa0b752f130f7e05213f16b13c6a288` equals fetched `origin/main` `b0e312145fa0b752f130f7e05213f16b13c6a288`.
+- Published builder-log URL for the implementation/log publication: `https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/b0e312145fa0b752f130f7e05213f16b13c6a288/.hiveai/codex-logs/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_CODEX_LOG.md`.
+- This final append is a log-only handoff update; it does not alter product implementation, accepted evidence, `TASKS.md`, prompts, or audits. Independent ChatGPT audit remains pending.
