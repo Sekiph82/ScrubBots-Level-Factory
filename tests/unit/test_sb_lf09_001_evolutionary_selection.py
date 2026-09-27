@@ -51,6 +51,9 @@ def _artifact_material(
         "generation_metadata_digest": f"generation:{tokens['generation_metadata_digest']}".encode(),
         "bundle_digest": f"bundle:{tokens['bundle_digest']}".encode(),
     }
+    for digest_field, label in (("preview_digest", "preview"), ("mutation_digest", "mutation")):
+        if digest_field in tokens:
+            raw[digest_field] = f"{label}:{tokens[digest_field]}".encode()
     refs = {
         "level_data_ref": f"level-data/{candidate}.json",
         "logical_art_ref": f"art/{candidate}.png",
@@ -62,6 +65,8 @@ def _artifact_material(
         "generation_request_ref": f"generation/request-{candidate}.json",
         "generation_result_ref": f"generation/result-{candidate}.json",
         "generation_metadata_ref": f"generation/metadata-{candidate}.json",
+        "preview_ref": f"previews/{candidate}.png" if "preview_digest" in raw else None,
+        "mutation_ref": f"mutations/{candidate}.json" if "mutation_digest" in raw else None,
     }
     refs.update(shared_refs or {})
     artifacts = {
@@ -100,12 +105,12 @@ def _evidence(
                 "generation_request_ref": f"generation/request-{candidate}.json",
                 "generation_result_ref": f"generation/result-{candidate}.json",
                 "generation_metadata_ref": f"generation/metadata-{candidate}.json",
+                "preview_ref": f"previews/{candidate}.png" if "preview_digest" in raw else None,
+                "mutation_ref": f"mutations/{candidate}.json" if "mutation_digest" in raw else None,
             }.items()
         },
-        "preview_digest": None,
-        "preview_ref": None,
-        "mutation_digest": None,
-        "mutation_ref": None,
+        "preview_digest": hashlib.sha256(raw["preview_digest"]).hexdigest() if "preview_digest" in raw else None,
+        "mutation_digest": hashlib.sha256(raw["mutation_digest"]).hexdigest() if "mutation_digest" in raw else None,
     }
     values.update(shared_refs or {})
     values["lineage_digest"] = lineage_digest_for(
@@ -249,17 +254,28 @@ def test_missing_and_stale_artifact_bytes_fail_closed_before_ranking() -> None:
 
 
 @pytest.mark.parametrize("reference_field,digest_field", CANDIDATE_ARTIFACT_IDENTITY_FIELDS)
-def test_every_required_artifact_identity_is_candidate_specific(
+def test_every_listed_artifact_identity_is_candidate_specific(
     reference_field: str, digest_field: str
 ) -> None:
     policy = EvolutionarySelectionPolicy(population_size=1, generations=1, evaluation_budget=2)
-    first = _evidence("candidate-a")
+    first_kwargs: dict[str, dict[str, str]] = {}
+    if reference_field == "preview_ref":
+        first_kwargs = {
+            "shared_tokens": {digest_field: "candidate-a"},
+            "shared_refs": {reference_field: "previews/candidate-a.png"},
+        }
+    elif reference_field == "mutation_ref":
+        first_kwargs = {
+            "shared_tokens": {digest_field: "candidate-a"},
+            "shared_refs": {reference_field: "mutations/candidate-a.json"},
+        }
+    first = _evidence("candidate-a", **first_kwargs)
     second_kwargs = {
         "shared_tokens": {digest_field: "candidate-a"},
         "shared_refs": {reference_field: getattr(first, reference_field)},
     }
     second = _evidence("candidate-b", **second_kwargs)
-    _, first_artifacts = _artifact_material("candidate-a")
+    _, first_artifacts = _artifact_material("candidate-a", **first_kwargs)
     _, second_artifacts = _artifact_material("candidate-b", **second_kwargs)
     artifacts = {**first_artifacts, **second_artifacts}
 
@@ -277,6 +293,8 @@ def test_identity_policy_is_explicitly_versioned_with_no_shared_exception() -> N
     assert policy.canonical_dict()["candidate_specific_artifact_fields"] == [
         list(pair) for pair in CANDIDATE_ARTIFACT_IDENTITY_FIELDS
     ]
+    assert ("preview_ref", "preview_digest") in CANDIDATE_ARTIFACT_IDENTITY_FIELDS
+    assert ("mutation_ref", "mutation_digest") in CANDIDATE_ARTIFACT_IDENTITY_FIELDS
 
 
 def test_canonical_evidence_constructor_rejects_forged_lineage_binding() -> None:

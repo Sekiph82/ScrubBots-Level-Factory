@@ -20,7 +20,7 @@ from .m08_batch import CandidateEvidence, M08ContractError, verify_artifact_set
 SELECTION_SCHEMA = "scrubbots-experimental-evolutionary-selection"
 SELECTION_VERSION = 1
 SELECTION_POLICY_VERSION = "EVOLUTIONARY_SELECTION_V2"
-CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION = "ALL_REQUIRED_ARTIFACT_IDENTITIES_CANDIDATE_SPECIFIC_V1"
+CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION = "ALL_CANDIDATE_ARTIFACT_IDENTITIES_CANDIDATE_SPECIFIC_V2"
 EXPERIMENTAL_OPT_IN = "EXPERIMENTAL_EVOLUTIONARY_SELECTION_V1"
 _SHA256_ZERO = "0" * 64
 
@@ -40,6 +40,8 @@ CANDIDATE_ARTIFACT_IDENTITY_FIELDS = (
     ("generation_request_ref", "generation_request_digest"),
     ("generation_result_ref", "generation_result_digest"),
     ("generation_metadata_ref", "generation_metadata_digest"),
+    ("preview_ref", "preview_digest"),
+    ("mutation_ref", "mutation_digest"),
 )
 
 
