@@ -41,6 +41,11 @@ Document role: CODEX BUILDER LOG
 
 - Product commit is ready for the ordered R01 publication. The dedicated log commit and non-force push result will be recorded after this log is finalized.
 
+- Dedicated log commit: `ed260a0e0817fe7db6d38dd794235aed2aaf47cd` (`Record SB-LF08-001 R01 builder evidence`).
+- `git push origin HEAD:main` — exit `0`; no force or destructive synchronization was used.
+- Post-push verification: isolated `HEAD == origin/main == ed260a0e0817fe7db6d38dd794235aed2aaf47cd`; divergence `0 0`; canonical mirror remains untouched.
+- Task marker: `READY_FOR_NEXT_ORDERED_TASK` (builder evidence only; independent audit remains pending for the complete R01 batch).
+
 ## Handoff
 
 - Pending implementation and independent ChatGPT audit. No acceptance or tracker-state claim is made by this builder log.
