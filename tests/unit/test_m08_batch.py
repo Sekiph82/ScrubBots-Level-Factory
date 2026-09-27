@@ -17,7 +17,7 @@ from scrubbots_pixel_factory import (
     verify_artifact_set,
 )
 from scrubbots_pixel_factory.difficulty_analysis import LaneClass
-from scrubbots_pixel_factory.m08_batch import digest
+from scrubbots_pixel_factory.m08_batch import digest, lineage_digest_for
 
 
 def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvidence:
@@ -43,8 +43,15 @@ def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvid
         "m03_ref": "evidence/m03-" + candidate + ".json",
         "m04_ref": "evidence/m04-" + candidate + ".json",
         "m05_ref": "evidence/m05-" + candidate + ".json",
-        "generation_ref": "generation/" + candidate + ".json",
+        "generation_request_ref": "generation/request-" + candidate + ".json",
+        "generation_result_ref": "generation/result-" + candidate + ".json",
+        "generation_metadata_ref": "generation/metadata-" + candidate + ".json",
+        "preview_digest": None,
+        "preview_ref": None,
+        "mutation_digest": None,
+        "mutation_ref": None,
     }
+    values["lineage_digest"] = lineage_digest_for({"candidate_id": candidate, "lane": lane.value, "m03_disposition": "ACCEPT", "m04_disposition": "ACCEPT", "m05_disposition": "ACCEPT", **values})
     return CandidateEvidence(candidate, lane, "ACCEPT", m04_disposition="ACCEPT", m05_disposition="ACCEPT", **values)
 
 
@@ -58,7 +65,9 @@ def _artifact_map(evidence: CandidateEvidence) -> dict[str, bytes]:
         evidence.m03_ref: f"m03:{candidate}".encode(),
         evidence.m04_ref: f"m04:{candidate}".encode(),
         evidence.m05_ref: f"m05:{candidate}".encode(),
-        evidence.generation_ref: f"generation:{candidate}".encode(),
+        evidence.generation_request_ref: f"request:{candidate}".encode(),
+        evidence.generation_result_ref: f"result:{candidate}".encode(),
+        evidence.generation_metadata_ref: f"generation:{candidate}".encode(),
     }
 
 
@@ -136,13 +145,48 @@ def test_artifact_set_verifies_exact_canonical_bytes_without_reencoding() -> Non
         evidence.m03_ref: b"m03",
         evidence.m04_ref: b"m04",
         evidence.m05_ref: b"m05",
-        evidence.generation_ref: b"generation",
+        evidence.generation_request_ref: b"request",
+        evidence.generation_result_ref: b"result",
+        evidence.generation_metadata_ref: b"generation",
     }
-    evidence = replace(evidence, level_data_digest=__import__("hashlib").sha256(b"level").hexdigest(), logical_art_digest=__import__("hashlib").sha256(b"art").hexdigest(), bundle_digest=__import__("hashlib").sha256(b"bundle").hexdigest(), source_provenance_digest=__import__("hashlib").sha256(b"source").hexdigest(), m03_digest=__import__("hashlib").sha256(b"m03").hexdigest(), m04_digest=__import__("hashlib").sha256(b"m04").hexdigest(), m05_digest=__import__("hashlib").sha256(b"m05").hexdigest(), generation_metadata_digest=__import__("hashlib").sha256(b"generation").hexdigest())
+    updated = {**evidence.as_dict(), "level_data_digest": __import__("hashlib").sha256(b"level").hexdigest(), "logical_art_digest": __import__("hashlib").sha256(b"art").hexdigest(), "bundle_digest": __import__("hashlib").sha256(b"bundle").hexdigest(), "source_provenance_digest": __import__("hashlib").sha256(b"source").hexdigest(), "m03_digest": __import__("hashlib").sha256(b"m03").hexdigest(), "m04_digest": __import__("hashlib").sha256(b"m04").hexdigest(), "m05_digest": __import__("hashlib").sha256(b"m05").hexdigest(), "generation_request_digest": __import__("hashlib").sha256(b"request").hexdigest(), "generation_result_digest": __import__("hashlib").sha256(b"result").hexdigest(), "generation_metadata_digest": __import__("hashlib").sha256(b"generation").hexdigest()}
+    updated["lineage_digest"] = lineage_digest_for(updated)
+    evidence = CandidateEvidence.from_dict(updated)
     checked = verify_artifact_set(evidence, artifacts)
-    assert checked["disposition"] == "ACCEPT" and len(checked["verified_references"]) == 8
+    assert checked["disposition"] == "ACCEPT" and len(checked["verified_references"]) == 10
     with pytest.raises(M08ContractError):
         verify_artifact_set(evidence, {**artifacts, evidence.m05_ref: b"tampered"})
+
+
+def test_generation_identity_bytes_are_all_required_and_lineage_bound() -> None:
+    evidence = _evidence("generation-bound")
+    artifacts = _artifact_map(evidence)
+    for reference in (evidence.generation_request_ref, evidence.generation_result_ref, evidence.generation_metadata_ref):
+        missing = dict(artifacts)
+        del missing[reference]
+        with pytest.raises(M08ContractError):
+            verify_artifact_set(evidence, missing)
+    stale = {**artifacts, evidence.generation_result_ref: b"result-from-another-candidate"}
+    with pytest.raises(M08ContractError):
+        verify_artifact_set(evidence, stale)
+
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 16, "lineage")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": evidence})
+    swapped = result.as_dict()
+    other = _evidence("other-generation")
+    swapped["accepted_entries"][0]["evidence"]["generation_request_ref"] = other.generation_request_ref
+    swapped["accepted_entries"][0]["evidence"]["generation_request_digest"] = other.generation_request_digest
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(swapped)
+
+
+def test_restore_rejects_tampered_deterministic_per_lane_statistics() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2), LaneRequest(LaneClass.HARD, 1, 2)), 17, "lane-stats")
+    result = run_batch(plan, lambda lane, ordinal, _seed: {"disposition": "REJECT"} if lane is LaneClass.EASY or ordinal == 0 else {"disposition": "ACCEPT", "evidence": _evidence("hard", lane)})
+    tampered = result.as_dict()
+    tampered["lanes"][LaneClass.EASY.value]["statistics"]["rejected"] += 1
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
 
 
 def test_manifest_round_trip_and_cross_candidate_tamper_fail_closed() -> None:

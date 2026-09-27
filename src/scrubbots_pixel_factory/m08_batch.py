@@ -22,6 +22,13 @@ HANDOFF_VERSION = 1
 POLICY_VERSION = "M08_FACTORY_ACCEPTANCE_V1"
 _DISPOSITIONS = {"ACCEPT", "REJECT", "INCONCLUSIVE", "UNAVAILABLE", "ERROR"}
 _ATTEMPT_DISPOSITIONS = {"ACCEPT", "REJECT", "DUPLICATE", "INCONCLUSIVE", "UNAVAILABLE", "ERROR"}
+_LINEAGE_KEYS = (
+    "candidate_id", "lane", "m03_disposition", "m03_digest", "m04_disposition", "m04_digest", "m04_lane_digest",
+    "m05_disposition", "m05_digest", "level_data_digest", "level_data_ref", "logical_art_digest", "logical_art_ref",
+    "source_provenance_digest", "source_provenance_ref", "bundle_digest", "bundle_ref", "m03_ref", "m04_ref", "m05_ref",
+    "generation_request_digest", "generation_request_ref", "generation_result_digest", "generation_result_ref",
+    "generation_metadata_digest", "generation_metadata_ref", "preview_digest", "preview_ref", "mutation_digest", "mutation_ref",
+)
 
 
 class M08ContractError(ValueError):
@@ -62,6 +69,13 @@ def _lane(value: Any) -> LaneClass:
         return value if isinstance(value, LaneClass) else LaneClass(value)
     except (TypeError, ValueError) as exc:
         raise M08ContractError("unsupported M04 lane/class") from exc
+
+
+def lineage_digest_for(value: Mapping[str, Any]) -> str:
+    """Return the canonical identity binding for one candidate artifact set."""
+    if any(key not in value for key in _LINEAGE_KEYS):
+        raise M08ContractError("candidate lineage fields are incomplete")
+    return digest({key: value[key] for key in _LINEAGE_KEYS})
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,9 +154,13 @@ class CandidateEvidence:
     logical_art_digest: str
     source_provenance_digest: str
     generation_request_digest: str
+    generation_request_ref: str
     generation_result_digest: str
+    generation_result_ref: str
     generation_metadata_digest: str
+    generation_metadata_ref: str
     bundle_digest: str
+    lineage_digest: str
     level_data_ref: str
     logical_art_ref: str
     bundle_ref: str
@@ -150,7 +168,6 @@ class CandidateEvidence:
     m03_ref: str
     m04_ref: str
     m05_ref: str
-    generation_ref: str
     preview_digest: str | None = None
     preview_ref: str | None = None
     mutation_digest: str | None = None
@@ -161,27 +178,29 @@ class CandidateEvidence:
             raise M08ContractError("candidate identity/lane is malformed")
         if self.m03_disposition != "ACCEPT" or self.m04_disposition != "ACCEPT" or self.m05_disposition != "ACCEPT":
             raise M08ContractError("only current M03/M04/M05 ACCEPT evidence can form a Factory-accepted candidate")
-        for value, label in ((self.m03_digest, "M03"), (self.m04_digest, "M04"), (self.m04_lane_digest, "M04 lane"), (self.m05_digest, "M05 QA"), (self.level_data_digest, "LevelData"), (self.logical_art_digest, "logical art"), (self.source_provenance_digest, "source provenance"), (self.generation_request_digest, "generation request"), (self.generation_result_digest, "generation result"), (self.generation_metadata_digest, "generation metadata"), (self.bundle_digest, "bundle")):
+        for value, label in ((self.m03_digest, "M03"), (self.m04_digest, "M04"), (self.m04_lane_digest, "M04 lane"), (self.m05_digest, "M05 QA"), (self.level_data_digest, "LevelData"), (self.logical_art_digest, "logical art"), (self.source_provenance_digest, "source provenance"), (self.generation_request_digest, "generation request"), (self.generation_result_digest, "generation result"), (self.generation_metadata_digest, "generation metadata"), (self.bundle_digest, "bundle"), (self.lineage_digest, "candidate lineage")):
             _sha(value, label)
         for value, label in ((self.preview_digest, "preview"), (self.mutation_digest, "M07 mutation")):
             if value is not None:
                 _sha(value, label)
-        for value, label in ((self.level_data_ref, "LevelData ref"), (self.logical_art_ref, "logical art ref"), (self.bundle_ref, "bundle ref"), (self.source_provenance_ref, "source ref"), (self.m03_ref, "M03 ref"), (self.m04_ref, "M04 ref"), (self.m05_ref, "M05 ref"), (self.generation_ref, "generation ref")):
+        for value, label in ((self.level_data_ref, "LevelData ref"), (self.logical_art_ref, "logical art ref"), (self.bundle_ref, "bundle ref"), (self.source_provenance_ref, "source ref"), (self.m03_ref, "M03 ref"), (self.m04_ref, "M04 ref"), (self.m05_ref, "M05 ref"), (self.generation_request_ref, "generation request ref"), (self.generation_result_ref, "generation result ref"), (self.generation_metadata_ref, "generation metadata ref")):
             _safe_ref(value, label)
         _safe_ref(self.preview_ref, "preview ref", allow_none=True)
         _safe_ref(self.mutation_ref, "mutation ref", allow_none=True)
         if (self.preview_digest is None) != (self.preview_ref is None) or (self.mutation_digest is None) != (self.mutation_ref is None):
             raise M08ContractError("optional preview/mutation identity must be explicit and paired")
+        if self.lineage_digest != lineage_digest_for(self.as_dict()):
+            raise M08ContractError("candidate artifact identities are not bound to one lineage")
 
     def as_dict(self) -> dict[str, Any]:
-        return {"candidate_id": self.candidate_id, "lane": self.lane.value, "m03_disposition": self.m03_disposition, "m03_digest": self.m03_digest, "m04_disposition": self.m04_disposition, "m04_digest": self.m04_digest, "m04_lane_digest": self.m04_lane_digest, "m05_disposition": self.m05_disposition, "m05_digest": self.m05_digest, "level_data_digest": self.level_data_digest, "logical_art_digest": self.logical_art_digest, "source_provenance_digest": self.source_provenance_digest, "generation_request_digest": self.generation_request_digest, "generation_result_digest": self.generation_result_digest, "generation_metadata_digest": self.generation_metadata_digest, "bundle_digest": self.bundle_digest, "level_data_ref": self.level_data_ref, "logical_art_ref": self.logical_art_ref, "bundle_ref": self.bundle_ref, "source_provenance_ref": self.source_provenance_ref, "m03_ref": self.m03_ref, "m04_ref": self.m04_ref, "m05_ref": self.m05_ref, "generation_ref": self.generation_ref, "preview_digest": self.preview_digest, "preview_ref": self.preview_ref, "mutation_digest": self.mutation_digest, "mutation_ref": self.mutation_ref}
+        return {"candidate_id": self.candidate_id, "lane": self.lane.value, "m03_disposition": self.m03_disposition, "m03_digest": self.m03_digest, "m04_disposition": self.m04_disposition, "m04_digest": self.m04_digest, "m04_lane_digest": self.m04_lane_digest, "m05_disposition": self.m05_disposition, "m05_digest": self.m05_digest, "level_data_digest": self.level_data_digest, "logical_art_digest": self.logical_art_digest, "source_provenance_digest": self.source_provenance_digest, "generation_request_digest": self.generation_request_digest, "generation_request_ref": self.generation_request_ref, "generation_result_digest": self.generation_result_digest, "generation_result_ref": self.generation_result_ref, "generation_metadata_digest": self.generation_metadata_digest, "generation_metadata_ref": self.generation_metadata_ref, "bundle_digest": self.bundle_digest, "lineage_digest": self.lineage_digest, "level_data_ref": self.level_data_ref, "logical_art_ref": self.logical_art_ref, "bundle_ref": self.bundle_ref, "source_provenance_ref": self.source_provenance_ref, "m03_ref": self.m03_ref, "m04_ref": self.m04_ref, "m05_ref": self.m05_ref, "preview_digest": self.preview_digest, "preview_ref": self.preview_ref, "mutation_digest": self.mutation_digest, "mutation_ref": self.mutation_ref}
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "CandidateEvidence":
         fields = set(cls.__dataclass_fields__)
         if set(value) != fields:
             raise M08ContractError("candidate evidence fields are unsupported or incomplete")
-        return cls(value["candidate_id"], _lane(value["lane"]), value["m03_disposition"], value["m03_digest"], value["m04_disposition"], value["m04_digest"], value["m04_lane_digest"], value["m05_disposition"], value["m05_digest"], value["level_data_digest"], value["logical_art_digest"], value["source_provenance_digest"], value["generation_request_digest"], value["generation_result_digest"], value["generation_metadata_digest"], value["bundle_digest"], value["level_data_ref"], value["logical_art_ref"], value["bundle_ref"], value["source_provenance_ref"], value["m03_ref"], value["m04_ref"], value["m05_ref"], value["generation_ref"], value["preview_digest"], value["preview_ref"], value["mutation_digest"], value["mutation_ref"])
+        return cls(value["candidate_id"], _lane(value["lane"]), value["m03_disposition"], value["m03_digest"], value["m04_disposition"], value["m04_digest"], value["m04_lane_digest"], value["m05_disposition"], value["m05_digest"], value["level_data_digest"], value["logical_art_digest"], value["source_provenance_digest"], value["generation_request_digest"], value["generation_request_ref"], value["generation_result_digest"], value["generation_result_ref"], value["generation_metadata_digest"], value["generation_metadata_ref"], value["bundle_digest"], value["lineage_digest"], value["level_data_ref"], value["logical_art_ref"], value["bundle_ref"], value["source_provenance_ref"], value["m03_ref"], value["m04_ref"], value["m05_ref"], value["preview_digest"], value["preview_ref"], value["mutation_digest"], value["mutation_ref"])
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,7 +296,7 @@ class BatchResult:
             raise M08ContractError("history digest does not match canonical plan, history and statistics")
 
     def as_dict(self) -> dict[str, Any]:
-        lanes = {request.lane.value: {"requested": request.requested_accepted, "attempted": int(self.attempted.get(request.lane, 0)), "accepted": sum(item.lane is request.lane for item in self.entries)} for request in self.plan.cadence}
+        lanes = {request.lane.value: {"requested": request.requested_accepted, "attempted": int(self.attempted.get(request.lane, 0)), "accepted": sum(item.lane is request.lane for item in self.entries), "statistics": _lane_statistics(request.lane, self.attempts)} for request in self.plan.cadence}
         return {"schema": SCHEMA, "version": VERSION, "plan": self.plan.as_dict(), "plan_digest": self.plan.digest(), "lanes": lanes, "statistics": dict(sorted(self.statistics.items())), "attempts": [item.as_dict() for item in self.attempts], "accepted_entries": [item.as_dict() for item in sorted(self.entries, key=lambda item: (item.lane.value, item.attempt, item.evidence.candidate_id))], "status": self.status, "history_digest": self.history_digest}
 
     def digest(self) -> str:
@@ -306,10 +325,12 @@ class BatchResult:
         if set(value["lanes"]) != expected_lanes:
             raise M08ContractError("batch result lane set is incomplete or unknown")
         for key, lane in value["lanes"].items():
-            if not isinstance(lane, Mapping) or set(lane) != {"requested", "attempted", "accepted"}:
+            if not isinstance(lane, Mapping) or set(lane) != {"requested", "attempted", "accepted", "statistics"}:
                 raise M08ContractError("batch result lane statistics are incomplete")
             if any(type(lane[field]) is not int or lane[field] < 0 for field in ("requested", "attempted", "accepted")):
                 raise M08ContractError("batch result lane statistics are malformed")
+            if not isinstance(lane["statistics"], Mapping) or set(lane["statistics"]) != set(_stats(())) or any(type(item) is not int or item < 0 for item in lane["statistics"].values()):
+                raise M08ContractError("batch result per-lane statistics are malformed")
         attempted = {_lane(key): item["attempted"] for key, item in value["lanes"].items()}
         result = cls(plan, tuple(entries), attempted, value["statistics"], value["status"], value["history_digest"], tuple(attempts))
         if result.as_dict() != dict(value):
@@ -372,6 +393,10 @@ def _history_digest(plan: BatchPlan, attempts: Iterable[AttemptRecord], statisti
 def _stats(attempts: Iterable[AttemptRecord]) -> dict[str, int]:
     records = list(attempts)
     return {"generated": len(records), "accepted": sum(item.disposition == "ACCEPT" for item in records), "rejected": sum(item.disposition == "REJECT" for item in records), "duplicate": sum(item.disposition == "DUPLICATE" for item in records), "unavailable": sum(item.disposition == "UNAVAILABLE" for item in records), "inconclusive": sum(item.disposition == "INCONCLUSIVE" for item in records), "error": sum(item.disposition == "ERROR" for item in records)}
+
+
+def _lane_statistics(lane: LaneClass, attempts: Iterable[AttemptRecord]) -> dict[str, int]:
+    return _stats(item for item in attempts if item.lane is lane)
 
 
 def run_batch(plan: BatchPlan, producer: Callable[[LaneClass, int, int], Mapping[str, Any] | None], *, history: Iterable[AcceptedBatchEntry | AttemptRecord] = (), max_total_attempts: int | None = None) -> BatchResult:
@@ -440,9 +465,13 @@ def verify_artifact_set(evidence: CandidateEvidence, artifacts: Mapping[str, byt
         (evidence.m03_ref, evidence.m03_digest),
         (evidence.m04_ref, evidence.m04_digest),
         (evidence.m05_ref, evidence.m05_digest),
-        (evidence.generation_ref, evidence.generation_metadata_digest),
+        (evidence.generation_request_ref, evidence.generation_request_digest),
+        (evidence.generation_result_ref, evidence.generation_result_digest),
+        (evidence.generation_metadata_ref, evidence.generation_metadata_digest),
     )
     optional = ((evidence.preview_ref, evidence.preview_digest), (evidence.mutation_ref, evidence.mutation_digest))
+    if lineage_digest_for(evidence.as_dict()) != evidence.lineage_digest:
+        raise M08ContractError("candidate artifact lineage binding is invalid")
     verified: list[str] = []
     for reference, expected in (*required, *optional):
         if reference is None:
@@ -451,7 +480,7 @@ def verify_artifact_set(evidence: CandidateEvidence, artifacts: Mapping[str, byt
         if not isinstance(value, bytes) or expected is None or hashlib.sha256(value).hexdigest() != expected:
             raise M08ContractError(f"artifact bytes are missing or stale for {reference}")
         verified.append(reference)
-    return {"disposition": "ACCEPT", "verified_references": tuple(sorted(verified)), "artifact_set_digest": digest({"references": sorted(verified), "digests": sorted((reference, hashlib.sha256(artifacts[reference]).hexdigest()) for reference in verified)})}
+    return {"disposition": "ACCEPT", "lineage_digest": evidence.lineage_digest, "verified_references": tuple(sorted(verified)), "artifact_set_digest": digest({"lineage_digest": evidence.lineage_digest, "references": sorted(verified), "digests": sorted((reference, hashlib.sha256(artifacts[reference]).hexdigest()) for reference in verified)})}
 
 
 def _review_chain(result: BatchResult, evidence: CandidateEvidence, reviews: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -522,4 +551,4 @@ def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapp
     return payload
 
 
-__all__ = ["AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "SCHEMA", "build_handoff", "digest", "review_summary", "run_batch", "verify_artifact_set"]
+__all__ = ["AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "SCHEMA", "build_handoff", "digest", "lineage_digest_for", "review_summary", "run_batch", "verify_artifact_set"]
