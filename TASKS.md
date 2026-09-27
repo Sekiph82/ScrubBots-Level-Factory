@@ -30,7 +30,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF09-002 C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_STRICT_AUDIT.md`; the closed deterministic catalog and offline boundary pass, but public result lookup accepts caller-rehashed fitness evidence and duplicate evaluation entries are not rejected.
 - SB-LF09-002 C001-R01 Remediation Authorization: `SB-LF09-002-C001-R01 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-002 C001-R01 Prompt: `.hiveai/prompts/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_PROMPT.md`.
-- SB-LF09-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.- SB-LF09-002 C001-R01 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_STRICT_AUDIT.md`; exact artifact-bound lookup, duplicate-ID/lineage rejection, focused coverage, and retained regression evidence passed.
+- SB-LF09-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.\n- SB-LF09-002 C001-R01 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_STRICT_AUDIT.md`; exact artifact-bound lookup, duplicate-ID/lineage rejection, focused coverage, and retained regression evidence passed.
 - SB-LF09-002 C001-R01 Implementation Commit: `852c71cd9643eadc09125dc385d17a3386756f15`
 - SB-LF09-002 C001-R01 Final Builder Publication: `d5b8211f0ad2cbbeb72d0c600f3050cd85f7bed5`
 - SB-LF09-002 C001-R01 Closing Strict Audit Commit: `dd28b540391538e8ae132478af2396e78cde6565`
