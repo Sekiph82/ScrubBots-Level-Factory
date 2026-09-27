@@ -58,3 +58,11 @@ Further entries will be appended chronologically as implementation, verification
 - The isolated worktree contains the published implementation plus this new matching log only; `TASKS.md`, `.hiveai/audits/**`, prompts, and accepted M00-M08 evidence remain unchanged.
 - Separate log-publication commit and post-push SHA verification remain to be recorded.
 - Status: `AWAITING_CHATGPT_AUDIT`.
+
+## Terminal log publication
+
+- Log publication commit: `dc7dd367334f2a8a80f27625170c21298310ed56` (`Record R01 evidence remediation builder log`).
+- Log publication URL: `https://github.com/Sekiph82/ScrubBots-Level-Factory/commit/dc7dd367334f2a8a80f27625170c21298310ed56`.
+- Push command: `git push origin HEAD:main`; result `483eb5e..dc7dd36 HEAD -> main`, non-forceful fast-forward succeeded.
+- Post-log-publication fetch verification before this terminal append: isolated local HEAD `dc7dd367334f2a8a80f27625170c21298310ed56` equaled fetched `origin/main`.
+- Terminal status: `AWAITING_CHATGPT_AUDIT`; no acceptance, audit verdict, tracker transition, or lifecycle closure is claimed.
