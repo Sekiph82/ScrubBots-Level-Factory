@@ -198,10 +198,28 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     active = [row for row in _parse_rows(current) if row["state"] == "~"]
     current_task = re.search(r"(?m)^- Current Task:\s+([A-Z0-9]+(?:-[A-Z0-9]+)+)\s+—", current)
     assert current_task is not None
-    assert current_task.group(1) == "SB-LF07-001"
+    current_row = [row for row in _parse_rows(current) if row["id"] == current_task.group(1)]
+    assert len(current_row) == 1
+    if active:
+        assert len(active) == 1
+        assert current_task.group(1) == active[0]["id"]
+    else:
+        # Some authoritative tracker transitions leave Current Task declared
+        # while no task is marked [~]. In that state, the declared task must
+        # still be a live non-closed row; do not invent or require a transient
+        # cycle/task marker in the regression.
+        assert current_row[0]["state"] in {" ", "!"}
+    sprint = re.search(r"(?m)^- Current Sprint:\s+([^—]+)—", current)
+    assert sprint is not None
+    assert current_task.group(1).rsplit("-", 1)[0] in sprint.group(1)
+    next_action = re.search(r"(?m)^- Next Task/Action:\s+(.+)$", current)
+    assert next_action is not None and current_task.group(1) in next_action.group(1)
     status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
-    assert status is not None and status.group(1).strip() == "CHANGES_REQUIRED / R03_AUTHORIZED / SELECTIVE_REMEDIATE_THEN_REAUDIT"
-    assert [row["id"] for row in active] == ["SB-LF07-001"]
+    assert status is not None
+    status_parts = [part.strip() for part in status.group(1).split("/")]
+    assert len(status_parts) >= 2 and all(status_parts)
+    actor = re.search(r"(?m)^- Required Actor:\s+(.+)$", current)
+    assert actor is not None and actor.group(1).strip() and actor.group(1).strip().upper() == actor.group(1).strip()
 
 
 def test_level_factory_governance_defers_to_root_without_second_tracker() -> None:
