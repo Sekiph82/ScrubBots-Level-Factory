@@ -8,13 +8,14 @@ research path unreachable from the production generator and publication APIs.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
 from typing import Any
 
 from .m08_batch import CandidateEvidence, M08ContractError, verify_artifact_set
+from .fitness_metrics import FitnessEvaluation, FitnessMetricError, FitnessPolicy, evaluate_fitness
 
 
 SELECTION_SCHEMA = "scrubbots-experimental-evolutionary-selection"
@@ -84,6 +85,7 @@ class EvolutionarySelectionPolicy:
     policy_version: str = SELECTION_POLICY_VERSION
     schema: str = SELECTION_SCHEMA
     version: int = SELECTION_VERSION
+    fitness_policy: FitnessPolicy = field(default_factory=FitnessPolicy)
 
     def __post_init__(self) -> None:
         if self.schema != SELECTION_SCHEMA or self.version != SELECTION_VERSION:
@@ -100,6 +102,8 @@ class EvolutionarySelectionPolicy:
             raise EvolutionarySelectionError("selection seed must be a signed 64-bit integer")
         if type(self.policy_version) is not str or not self.policy_version.strip():
             raise EvolutionarySelectionError("selection policy version is required")
+        if not isinstance(self.fitness_policy, FitnessPolicy):
+            raise EvolutionarySelectionError("fitness policy is malformed")
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -115,6 +119,8 @@ class EvolutionarySelectionPolicy:
             "candidate_specific_artifact_fields": [
                 [reference, digest] for reference, digest in CANDIDATE_ARTIFACT_IDENTITY_FIELDS
             ],
+            "fitness_policy": self.fitness_policy.canonical_dict(),
+            "fitness_policy_digest": self.fitness_policy.digest(),
         }
 
     def digest(self) -> str:
@@ -201,6 +207,9 @@ class SelectionProvenance:
     verified_artifact_set_digests: tuple[tuple[str, str], ...]
     selected_lineage_digests: tuple[str, ...]
     selection_digest: str
+    fitness_policy_digest: str | None = None
+    fitness_evaluation_digest: str | None = None
+    selected_fitness_digests: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         _sha(self.policy_digest, "selection policy digest")
@@ -220,6 +229,14 @@ class SelectionProvenance:
         for digest in self.selected_lineage_digests:
             _sha(digest, "selected lineage digest")
         _sha(self.selection_digest, "selection digest")
+        if self.fitness_policy_digest is not None:
+            _sha(self.fitness_policy_digest, "fitness policy digest")
+        if self.fitness_evaluation_digest is not None:
+            _sha(self.fitness_evaluation_digest, "fitness evaluation digest")
+        for candidate_id, digest in self.selected_fitness_digests:
+            if type(candidate_id) is not str or not candidate_id:
+                raise EvolutionarySelectionError("selected fitness candidate identity is malformed")
+            _sha(digest, "selected fitness digest")
 
     def canonical_dict(self) -> dict[str, object]:
         return {
@@ -238,6 +255,9 @@ class SelectionProvenance:
             ],
             "selected_lineage_digests": list(self.selected_lineage_digests),
             "selection_digest": self.selection_digest,
+            "fitness_policy_digest": self.fitness_policy_digest,
+            "fitness_evaluation_digest": self.fitness_evaluation_digest,
+            "selected_fitness_digests": [[candidate_id, digest] for candidate_id, digest in self.selected_fitness_digests],
         }
 
 
@@ -251,6 +271,7 @@ class EvolutionarySelectionResult:
     evaluations: int
     reason: str
     provenance: SelectionProvenance | None = None
+    fitness: FitnessEvaluation | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.disposition, SelectionDisposition):
@@ -266,9 +287,9 @@ class EvolutionarySelectionResult:
         if any(not isinstance(candidate, CandidateEvidence) for candidate in self.selected):
             raise EvolutionarySelectionError("selection result contains malformed evidence")
         if self.disposition is SelectionDisposition.SELECTED:
-            if self.provenance is None or not self.selected or self.generations_completed < 1 or self.evaluations < 1:
+            if self.provenance is None or self.fitness is None or not self.selected or self.generations_completed < 1 or self.evaluations < 1:
                 raise EvolutionarySelectionError("selected result lacks immutable provenance")
-        elif self.selected or self.provenance is not None:
+        elif self.selected or self.provenance is not None or self.fitness is not None:
             raise EvolutionarySelectionError("non-selected result cannot expose a promotion-like selection")
 
     def canonical_dict(self) -> dict[str, object]:
@@ -283,6 +304,7 @@ class EvolutionarySelectionResult:
             "evaluations": self.evaluations,
             "reason": self.reason,
             "provenance": self.provenance.canonical_dict() if self.provenance is not None else None,
+            "fitness": self.fitness.canonical_dict() if self.fitness is not None else None,
         }
 
     def digest(self) -> str:
@@ -363,17 +385,37 @@ def run_experimental_evolutionary_selection(
             input_digest=input_digest,
         )
 
+    try:
+        fitness_evaluation = evaluate_fitness(normalized, policy.fitness_policy, artifacts)
+    except FitnessMetricError as exc:
+        reason = str(exc) or "fitness evidence is unavailable or malformed"
+        disposition = SelectionDisposition.UNAVAILABLE if any(
+            token in reason for token in ("unavailable", "missing", "stale", "artifact bytes")
+        ) else SelectionDisposition.INVALID_INPUT
+        return _closed_result(disposition, policy, reason, input_digest=input_digest)
+    fitness_by_lineage = {item.lineage_digest: item for item in fitness_evaluation.results}
+
     survivors: tuple[CandidateEvidence, ...] = normalized[: policy.population_size]
     for generation in range(policy.generations):
         ranked = sorted(
             normalized,
-            key=lambda candidate: (-_score(candidate, policy, generation), candidate.candidate_id, candidate.lineage_digest),
+            key=lambda candidate: (
+                -fitness_by_lineage[candidate.lineage_digest].aggregate_score,
+                -_score(candidate, policy, generation),
+                candidate.candidate_id,
+                candidate.lineage_digest,
+            ),
         )
         survivors = tuple(ranked[: policy.population_size])
     selected = tuple(
         sorted(
             survivors,
-            key=lambda candidate: (-_score(candidate, policy, policy.generations), candidate.candidate_id, candidate.lineage_digest),
+            key=lambda candidate: (
+                -fitness_by_lineage[candidate.lineage_digest].aggregate_score,
+                -_score(candidate, policy, policy.generations),
+                candidate.candidate_id,
+                candidate.lineage_digest,
+            ),
         )[: policy.elite_count]
     )
     selection_digest = _digest(
@@ -396,6 +438,9 @@ def run_experimental_evolutionary_selection(
         verified_artifact_set_digests,
         tuple(candidate.lineage_digest for candidate in selected),
         selection_digest,
+        policy.fitness_policy.digest(),
+        fitness_evaluation.evaluation_digest,
+        tuple((candidate.candidate_id, fitness_by_lineage[candidate.lineage_digest].fitness_digest) for candidate in selected),
     )
     return EvolutionarySelectionResult(
         SelectionDisposition.SELECTED,
@@ -406,6 +451,7 @@ def run_experimental_evolutionary_selection(
         required_evaluations,
         "experimental selection completed over accepted evidence identities",
         provenance,
+        fitness_evaluation,
     )
 
 
