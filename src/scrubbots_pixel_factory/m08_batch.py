@@ -293,6 +293,12 @@ class BatchResult:
         accepted_by_lane = {lane: sum(item.disposition == "ACCEPT" for item in self.attempts if item.lane is lane) for lane in requests}
         if any(accepted_by_lane[lane] > request.requested_accepted for lane, request in requests.items()):
             raise M08ContractError("accepted history exceeds a requested lane count")
+        complete = all(accepted_by_lane[lane] >= request.requested_accepted for lane, request in requests.items())
+        budgets_exhausted = all(self.attempted[lane] >= request.attempt_budget for lane, request in requests.items())
+        unavailable = bool(self.attempts) and all(item.disposition in {"UNAVAILABLE", "INCONCLUSIVE"} for item in self.attempts) and not complete
+        expected_status = "COMPLETE" if complete else "UNAVAILABLE" if unavailable else "EXHAUSTED" if budgets_exhausted else "PARTIAL"
+        if self.status != expected_status:
+            raise M08ContractError("batch status does not reconcile with immutable history")
         expected_history_digest = _history_digest(self.plan, self.attempts, expected_statistics)
         if self.history_digest != expected_history_digest:
             raise M08ContractError("history digest does not match canonical plan, history and statistics")

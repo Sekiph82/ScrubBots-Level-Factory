@@ -308,6 +308,69 @@ def test_high_rejection_is_finite_one_lane_can_exhaust_while_another_completes()
     assert result.statistics["generated"] == sum(result.statistics[key] for key in ("accepted", "rejected", "duplicate", "unavailable", "inconclusive", "error"))
 
 
+def test_high_rejection_stress_matrix_is_offline_bounded_and_terminal_reruns_are_identical() -> None:
+    reject_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 6),), 21, "reject-matrix")
+    exhausted = run_batch(reject_plan, lambda *_: {"disposition": "REJECT"})
+    assert exhausted.status == "EXHAUSTED" and exhausted.statistics["rejected"] == 6
+    assert run_batch(reject_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=exhausted.attempts).digest() == exhausted.digest()
+
+    late_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 20),), 22, "late-matrix")
+
+    def late_producer(_lane: LaneClass, ordinal: int, _seed: int):
+        return {"disposition": "ACCEPT", "evidence": _evidence("late-matrix")} if ordinal == 19 else {"disposition": "REJECT"}
+
+    partial = run_batch(late_plan, late_producer, max_total_attempts=7)
+    complete = run_batch(late_plan, late_producer, history=partial.attempts)
+    assert partial.status == "PARTIAL" and len(partial.attempts) == 7
+    assert complete.status == "COMPLETE" and len(complete.attempts) == 20
+    assert run_batch(late_plan, late_producer, history=complete.attempts).digest() == complete.digest()
+
+    duplicate_plan = BatchPlan((LaneRequest(LaneClass.EASY, 2, 5),), 23, "duplicate-matrix")
+
+    def duplicate_producer(_lane: LaneClass, ordinal: int, _seed: int):
+        return {"disposition": "ACCEPT", "evidence": _evidence("repeat" if ordinal < 2 else "unique")}
+
+    duplicates = run_batch(duplicate_plan, duplicate_producer)
+    assert duplicates.status == "COMPLETE" and duplicates.statistics["duplicate"] == 1
+    assert run_batch(duplicate_plan, duplicate_producer, history=duplicates.attempts).digest() == duplicates.digest()
+
+    unavailable_plan = BatchPlan(tuple(LaneRequest(lane, 1, 2) for lane in (LaneClass.EASY, LaneClass.HARD)), 24, "unavailable-matrix")
+    unavailable = run_batch(unavailable_plan, lambda lane, _ordinal, _seed: {"disposition": "UNAVAILABLE" if lane is LaneClass.EASY else "INCONCLUSIVE"})
+    assert unavailable.status == "UNAVAILABLE" and unavailable.statistics["unavailable"] == 2 and unavailable.statistics["inconclusive"] == 2
+    assert run_batch(unavailable_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=unavailable.attempts).digest() == unavailable.digest()
+
+    asymmetry_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2), LaneRequest(LaneClass.HARD, 1, 3)), 25, "asymmetry-matrix")
+    asymmetry = run_batch(asymmetry_plan, lambda lane, ordinal, _seed: {"disposition": "ACCEPT", "evidence": _evidence("easy-asymmetry", lane)} if lane is LaneClass.EASY and ordinal == 1 else {"disposition": "REJECT"})
+    assert asymmetry.status == "EXHAUSTED" and asymmetry.attempted[LaneClass.EASY] == 2 and asymmetry.attempted[LaneClass.HARD] == 3
+    assert run_batch(asymmetry_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=asymmetry.attempts).digest() == asymmetry.digest()
+
+    source_evidence = _evidence("source-preservation")
+    source_artifacts = _artifact_map(source_evidence)
+    source_snapshot = dict(source_artifacts)
+    assert verify_artifact_set(source_evidence, source_artifacts)["disposition"] == "ACCEPT"
+    assert source_artifacts == source_snapshot
+
+
+def test_terminal_restore_rejects_lane_asymmetry_duplicate_reuse_and_status_forgery() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 26, "corruption-matrix")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+
+    lane_asymmetry = result.as_dict()
+    lane_asymmetry["attempts"][0]["lane"] = LaneClass.HARD.value
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(lane_asymmetry))
+
+    duplicate_reuse = result.as_dict()
+    duplicate_reuse["attempts"][0].update({"disposition": "DUPLICATE", "candidate_id": "ghost", "duplicate_of": "ghost"})
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(duplicate_reuse))
+
+    status_forgery = result.as_dict()
+    status_forgery["status"] = "COMPLETE"
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(status_forgery)
+
+
 def test_interruption_resume_after_rejection_is_bounded_and_deterministic() -> None:
     plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 10),), 10, "resume")
 
