@@ -7,18 +7,18 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
 - Current Sprint: SB-LF09.C001 — Experimental evolutionary selection
 - Current Task: SB-LF09-002 — Versioned fitness metrics
-- Current Task Status: READY_FOR_IMPLEMENTATION / M09-002_AUTHORIZED
-- Next Task/Action: Codex implements only `SB-LF09-002-C001` from `.hiveai/prompts/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence and PASS/CLOSED `SB-LF09-001`, never edits `TASKS.md` or ChatGPT audits, then stops for independent audit.
+- Current Task Status: CHANGES_REQUIRED / M09-002-R01_AUTHORIZED
+- Next Task/Action: Codex implements only `SB-LF09-002-C001-R01` from `.hiveai/prompts/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence and PASS/CLOSED `SB-LF09-001`, never edits `TASKS.md` or ChatGPT audits, then stops for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -27,6 +27,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF09-002 C001 Authorization: `SB-LF09-002-C001 — IMPLEMENT_THEN_AUDIT`.
 - SB-LF09-002 C001 Prompt: `.hiveai/prompts/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_PROMPT.md`.
 - SB-LF09-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
+- SB-LF09-002 C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_STRICT_AUDIT.md`; the closed deterministic catalog and offline boundary pass, but public result lookup accepts caller-rehashed fitness evidence and duplicate evaluation entries are not rejected.
+- SB-LF09-002 C001-R01 Remediation Authorization: `SB-LF09-002-C001-R01 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF09-002 C001-R01 Prompt: `.hiveai/prompts/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_PROMPT.md`.
+- SB-LF09-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
