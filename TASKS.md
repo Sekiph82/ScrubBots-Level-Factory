@@ -7,8 +7,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
 - Current Sprint: SB-LF09.C001 — Experimental evolutionary selection
 - Current Task: SB-LF09-001 — Prototype evolutionary selection behind experimental flag
-- Current Task Status: CHANGES_REQUIRED / M09-001_R01_REMEDIATION_AUTHORIZED
-- Next Task/Action: Codex implements only `SB-LF09-001-C001-R01` from `.hiveai/prompts/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_REMEDIATION_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence, never edits `TASKS.md` or ChatGPT audits, then stops for independent re-audit.
+- Current Task Status: CHANGES_REQUIRED / M09-001_R02_REMEDIATION_AUTHORIZED
+- Next Task/Action: Codex implements only `SB-LF09-001-C001-R02` from `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence, never edits `TASKS.md` or ChatGPT audits, then stops for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
+- SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
+- SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
+- SB-LF09-001 C001-R02 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_AUDIT_CRITERIA.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
