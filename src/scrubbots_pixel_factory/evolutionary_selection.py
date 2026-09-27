@@ -7,21 +7,40 @@ research path unreachable from the production generator and publication APIs.
 """
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 import hashlib
 import json
 from typing import Any
 
-from .m08_batch import CandidateEvidence, M08ContractError
+from .m08_batch import CandidateEvidence, M08ContractError, verify_artifact_set
 
 
 SELECTION_SCHEMA = "scrubbots-experimental-evolutionary-selection"
 SELECTION_VERSION = 1
-SELECTION_POLICY_VERSION = "EVOLUTIONARY_SELECTION_V1"
+SELECTION_POLICY_VERSION = "EVOLUTIONARY_SELECTION_V2"
+CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION = "ALL_REQUIRED_ARTIFACT_IDENTITIES_CANDIDATE_SPECIFIC_V1"
 EXPERIMENTAL_OPT_IN = "EXPERIMENTAL_EVOLUTIONARY_SELECTION_V1"
 _SHA256_ZERO = "0" * 64
+
+# The experimental lane has no implicit cross-candidate sharing. Every
+# required M08 artifact reference/digest pair is candidate-specific; optional
+# artifacts are also candidate-specific whenever present. Keeping this list
+# versioned and in the policy digest prevents a future shared-identity change
+# from becoming an undocumented compatibility assumption.
+CANDIDATE_ARTIFACT_IDENTITY_FIELDS = (
+    ("level_data_ref", "level_data_digest"),
+    ("logical_art_ref", "logical_art_digest"),
+    ("bundle_ref", "bundle_digest"),
+    ("source_provenance_ref", "source_provenance_digest"),
+    ("m03_ref", "m03_digest"),
+    ("m04_ref", "m04_digest"),
+    ("m05_ref", "m05_digest"),
+    ("generation_request_ref", "generation_request_digest"),
+    ("generation_result_ref", "generation_result_digest"),
+    ("generation_metadata_ref", "generation_metadata_digest"),
+)
 
 
 class EvolutionarySelectionError(ValueError):
@@ -90,6 +109,10 @@ class EvolutionarySelectionPolicy:
             "elite_count": self.elite_count,
             "seed": self.seed,
             "policy_version": self.policy_version,
+            "artifact_identity_policy_version": CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION,
+            "candidate_specific_artifact_fields": [
+                [reference, digest] for reference, digest in CANDIDATE_ARTIFACT_IDENTITY_FIELDS
+            ],
         }
 
     def digest(self) -> str:
@@ -121,6 +144,27 @@ def _validate_candidates(candidates: Sequence[CandidateEvidence]) -> tuple[Candi
         raise M08ContractError("duplicate accepted bundle identity")
     if len({identity[3] for identity in identities}) != len(identities):
         raise M08ContractError("duplicate accepted generation identity")
+    seen_artifact_identities: dict[str, dict[str, str]] = {
+        field: {} for pair in CANDIDATE_ARTIFACT_IDENTITY_FIELDS for field in pair
+    }
+    for candidate in ordered:
+        for reference_field, digest_field in CANDIDATE_ARTIFACT_IDENTITY_FIELDS:
+            reference = getattr(candidate, reference_field)
+            digest = getattr(candidate, digest_field)
+            if reference is None and digest is None:
+                continue
+            if reference is None or digest is None:
+                raise M08ContractError(
+                    f"candidate-specific artifact identity is incomplete for {reference_field}"
+                )
+            for field, value in ((reference_field, reference), (digest_field, digest)):
+                prior_candidate = seen_artifact_identities[field].get(value)
+                if prior_candidate is not None and prior_candidate != candidate.candidate_id:
+                    raise M08ContractError(
+                        f"cross-candidate {field} identity collision between "
+                        f"{prior_candidate} and {candidate.candidate_id}"
+                    )
+                seen_artifact_identities[field][value] = candidate.candidate_id
     return ordered
 
 
@@ -152,6 +196,7 @@ class SelectionProvenance:
     seed: int
     generations_completed: int
     evaluations: int
+    verified_artifact_set_digests: tuple[tuple[str, str], ...]
     selected_lineage_digests: tuple[str, ...]
     selection_digest: str
 
@@ -166,6 +211,10 @@ class SelectionProvenance:
             raise EvolutionarySelectionError("selection provenance generation count is malformed")
         if type(self.evaluations) is not int or self.evaluations < 1:
             raise EvolutionarySelectionError("selection provenance evaluation count is malformed")
+        for candidate_id, artifact_set_digest in self.verified_artifact_set_digests:
+            if type(candidate_id) is not str or not candidate_id:
+                raise EvolutionarySelectionError("verified artifact candidate identity is malformed")
+            _sha(artifact_set_digest, "verified artifact-set digest")
         for digest in self.selected_lineage_digests:
             _sha(digest, "selected lineage digest")
         _sha(self.selection_digest, "selection digest")
@@ -180,6 +229,11 @@ class SelectionProvenance:
             "seed": self.seed,
             "generations_completed": self.generations_completed,
             "evaluations": self.evaluations,
+            "artifact_identity_policy_version": CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION,
+            "verified_artifact_set_digests": [
+                [candidate_id, artifact_set_digest]
+                for candidate_id, artifact_set_digest in self.verified_artifact_set_digests
+            ],
             "selected_lineage_digests": list(self.selected_lineage_digests),
             "selection_digest": self.selection_digest,
         }
@@ -248,6 +302,7 @@ def run_experimental_evolutionary_selection(
     policy: EvolutionarySelectionPolicy,
     *,
     opt_in: str | None = None,
+    artifacts: Mapping[str, bytes] | None = None,
 ) -> EvolutionarySelectionResult:
     """Run the finite research selector; default invocation performs no work."""
 
@@ -261,7 +316,35 @@ def run_experimental_evolutionary_selection(
         normalized = _validate_candidates(candidates)
     except (M08ContractError, TypeError, ValueError) as exc:
         return _closed_result(SelectionDisposition.INVALID_INPUT, policy, str(exc) or "candidate evidence is invalid")
-    input_digest = _digest([candidate.as_dict() for candidate in normalized])
+    if artifacts is None:
+        return _closed_result(
+            SelectionDisposition.UNAVAILABLE,
+            policy,
+            "canonical artifact bytes are unavailable for evidence verification",
+        )
+    try:
+        verified_artifacts = tuple(
+            (candidate.candidate_id, verify_artifact_set(candidate, artifacts))
+            for candidate in normalized
+        )
+    except (M08ContractError, TypeError, AttributeError) as exc:
+        reason = str(exc) or "canonical artifact evidence is unavailable or stale"
+        disposition = (
+            SelectionDisposition.INVALID_INPUT
+            if "lineage binding" in reason
+            else SelectionDisposition.UNAVAILABLE
+        )
+        return _closed_result(disposition, policy, reason)
+    verified_artifact_set_digests = tuple(
+        (candidate_id, result["artifact_set_digest"])
+        for candidate_id, result in verified_artifacts
+    )
+    input_digest = _digest(
+        {
+            "candidates": [candidate.as_dict() for candidate in normalized],
+            "verified_artifact_set_digests": [list(item) for item in verified_artifact_set_digests],
+        }
+    )
     if len(normalized) < policy.population_size:
         return _closed_result(
             SelectionDisposition.INSUFFICIENT_POPULATION,
@@ -308,6 +391,7 @@ def run_experimental_evolutionary_selection(
         policy.seed,
         policy.generations,
         required_evaluations,
+        verified_artifact_set_digests,
         tuple(candidate.lineage_digest for candidate in selected),
         selection_digest,
     )
@@ -325,6 +409,8 @@ def run_experimental_evolutionary_selection(
 
 __all__ = [
     "EXPERIMENTAL_OPT_IN",
+    "CANDIDATE_ARTIFACT_IDENTITY_FIELDS",
+    "CANDIDATE_ARTIFACT_IDENTITY_POLICY_VERSION",
     "EvolutionarySelectionError",
     "EvolutionarySelectionPolicy",
     "EvolutionarySelectionResult",
