@@ -438,6 +438,7 @@ from .m08_batch import (
     digest as m08_digest,
     review_summary,
     run_batch,
+    verify_artifact_set,
 )
 from .mutation_efficiency import MutationAttemptRouteEvidence, RegenerationRouteEvidence, TrustedAccountingEvidence, compare_efficiency_from_authentic_routes
 from .mutation_source import SourceLinkedMutationContext
@@ -691,7 +692,7 @@ __all__ = [
     "default_benchmark_corpus", "default_evidence_references", "default_provider_workflow_matrix",
     "summarize_qualification",
     "UnsupportedCapabilityError",
-    "AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "M08_BATCH_SCHEMA", "build_handoff", "m08_digest", "review_summary", "run_batch",
+    "AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "M08_BATCH_SCHEMA", "build_handoff", "m08_digest", "review_summary", "run_batch", "verify_artifact_set",
     "StudioExtensionError", "batch_import", "candidate_inbox", "compare_candidates", "compare_revisions", "cost_center", "create_revision", "delete_preset", "discover_records", "expand_preset", "library_refresh", "list_candidates", "list_revisions", "load_preset", "load_revision", "readiness_card", "record_failure", "record_owner_review", "reproduce_capability", "restore_session", "retry_failure", "run_pipeline", "save_library_metadata", "save_preset", "save_session", "similarity", "validate_owner_source", "verify_owner_source",
     "AuthorityDescriptor", "BOUNDARY_BRIDGE_VERSION", "BoundaryCapability", "BoundaryContractError", "BoundaryDisposition", "BridgeConfiguration", "CANONICAL_CHECKOUT_ENVIRONMENT", "CANONICAL_GAMEPLAY_REPOSITORY", "CanonicalGameplayBridge", "REQUIRED_CANONICAL_SOURCE_PATHS", "SIMULATION_BOUNDARY_SCHEMA", "SIMULATION_BOUNDARY_VERSION", "SimulationRequest", "SimulationResult",
     "ACTIVE_BYTE", "AUTHORITY_CONTRACT_SCHEMA", "AUTHORITY_CONTRACT_VERSION", "AUTHORITY_SCHEMA", "AUTHORITY_VERSION", "CANONICAL_PROOF_STATE_AUTHORITY_SHA", "CANONICAL_PROOF_STATE_SOURCE_SHA256", "CLEARED_BYTE", "COMPACT_STATE_SCHEMA", "COMPACT_STATE_VERSION", "CompactSolverState", "CompactStateContractError", "LevelIdentity", "OccupiedSlot", "SolverStateAuthority", "SupplyBatch", "AuthorityVerification", "AuthorityVerificationDisposition", "AuthoritySourceVerification", "verify_authority_checkout", "verify_authority_source_contract",

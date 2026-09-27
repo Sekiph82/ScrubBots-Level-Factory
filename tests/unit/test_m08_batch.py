@@ -13,6 +13,7 @@ from scrubbots_pixel_factory import (
     build_handoff,
     review_summary,
     run_batch,
+    verify_artifact_set,
 )
 from scrubbots_pixel_factory.difficulty_analysis import LaneClass
 
@@ -104,6 +105,25 @@ def test_artifact_contract_requires_safe_refs_and_optional_pairing() -> None:
         replace(_evidence("unsafe"), bundle_ref="../escape")
     with pytest.raises(M08ContractError):
         replace(_evidence("unpaired"), preview_digest="a" * 64)
+
+
+def test_artifact_set_verifies_exact_canonical_bytes_without_reencoding() -> None:
+    evidence = _evidence("bytes")
+    artifacts = {
+        evidence.level_data_ref: b"level",
+        evidence.logical_art_ref: b"art",
+        evidence.bundle_ref: b"bundle",
+        evidence.source_provenance_ref: b"source",
+        evidence.m03_ref: b"m03",
+        evidence.m04_ref: b"m04",
+        evidence.m05_ref: b"m05",
+        evidence.generation_ref: b"generation",
+    }
+    evidence = replace(evidence, level_data_digest=__import__("hashlib").sha256(b"level").hexdigest(), logical_art_digest=__import__("hashlib").sha256(b"art").hexdigest(), bundle_digest=__import__("hashlib").sha256(b"bundle").hexdigest(), source_provenance_digest=__import__("hashlib").sha256(b"source").hexdigest(), m03_digest=__import__("hashlib").sha256(b"m03").hexdigest(), m04_digest=__import__("hashlib").sha256(b"m04").hexdigest(), m05_digest=__import__("hashlib").sha256(b"m05").hexdigest(), generation_metadata_digest=__import__("hashlib").sha256(b"generation").hexdigest())
+    checked = verify_artifact_set(evidence, artifacts)
+    assert checked["disposition"] == "ACCEPT" and len(checked["verified_references"]) == 8
+    with pytest.raises(M08ContractError):
+        verify_artifact_set(evidence, {**artifacts, evidence.m05_ref: b"tampered"})
 
 
 def test_manifest_round_trip_and_cross_candidate_tamper_fail_closed() -> None:

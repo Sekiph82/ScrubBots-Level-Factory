@@ -375,6 +375,35 @@ def run_batch(plan: BatchPlan, producer: Callable[[LaneClass, int, int], Mapping
     return BatchResult(plan, entries, attempted, statistics, status, history_digest, tuple(attempts))
 
 
+def verify_artifact_set(evidence: CandidateEvidence, artifacts: Mapping[str, bytes]) -> dict[str, Any]:
+    """Verify canonical immutable bytes referenced by one accepted entry.
+
+    The batch contract stores references and digests; this helper is the
+    boundary check used before materializing a result manifest.  It never
+    regenerates or re-encodes an artifact and ignores no required identity.
+    """
+    required = (
+        (evidence.level_data_ref, evidence.level_data_digest),
+        (evidence.logical_art_ref, evidence.logical_art_digest),
+        (evidence.bundle_ref, evidence.bundle_digest),
+        (evidence.source_provenance_ref, evidence.source_provenance_digest),
+        (evidence.m03_ref, evidence.m03_digest),
+        (evidence.m04_ref, evidence.m04_digest),
+        (evidence.m05_ref, evidence.m05_digest),
+        (evidence.generation_ref, evidence.generation_metadata_digest),
+    )
+    optional = ((evidence.preview_ref, evidence.preview_digest), (evidence.mutation_ref, evidence.mutation_digest))
+    verified: list[str] = []
+    for reference, expected in (*required, *optional):
+        if reference is None:
+            continue
+        value = artifacts.get(reference)
+        if not isinstance(value, bytes) or expected is None or hashlib.sha256(value).hexdigest() != expected:
+            raise M08ContractError(f"artifact bytes are missing or stale for {reference}")
+        verified.append(reference)
+    return {"disposition": "ACCEPT", "verified_references": tuple(sorted(verified)), "artifact_set_digest": digest({"references": sorted(verified), "digests": sorted((reference, hashlib.sha256(artifacts[reference]).hexdigest()) for reference in verified)})}
+
+
 def _review_chain(result: BatchResult, evidence: CandidateEvidence, reviews: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
     candidate_reviews = [dict(review) for review in reviews if isinstance(review, Mapping) and review.get("candidate_id") == evidence.candidate_id]
     valid: list[dict[str, Any]] = []
@@ -428,4 +457,4 @@ def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapp
     return payload
 
 
-__all__ = ["AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "SCHEMA", "build_handoff", "digest", "review_summary", "run_batch"]
+__all__ = ["AcceptedBatchEntry", "AttemptRecord", "BatchPlan", "BatchResult", "CandidateEvidence", "HANDOFF_SCHEMA", "LaneRequest", "M08ContractError", "POLICY_VERSION", "SCHEMA", "build_handoff", "digest", "review_summary", "run_batch", "verify_artifact_set"]
