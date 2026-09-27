@@ -208,5 +208,5 @@ and independently re-audited.
 
 Use the bounded prompt and criteria published with this audit:
 
-- [R01 remediation prompt](https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/b1c304701a422bb5b02f096576b58db84e57264b/.hiveai/prompts/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_REMEDIATION_PROMPT.md)
-- [R01 audit criteria](https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/b1c304701a422bb5b02f096576b58db84e57264b/.hiveai/audit-criteria/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_AUDIT_CRITERIA.md)
+- [R01 remediation prompt](https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/57095e5edcd74c08abf268d5a029ef674ef41bbf/.hiveai/prompts/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_REMEDIATION_PROMPT.md)
+- [R01 audit criteria](https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/57095e5edcd74c08abf268d5a029ef674ef41bbf/.hiveai/audit-criteria/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_AUDIT_CRITERIA.md)
