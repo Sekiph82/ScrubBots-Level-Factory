@@ -48,6 +48,21 @@ def _postcheck(source_context):
     return checked, None
 
 
+def _source_entry_guard(parent: MutationCandidate, source_context):
+    """Require the exact accepted M05 source context before any operation."""
+    if parent.source_art_sha256 is None:
+        return source_context, None
+    from .mutation_source import SourceLinkedMutationContext
+    if not isinstance(source_context, SourceLinkedMutationContext):
+        return source_context, "source-linked parent requires an accepted M05 SourceLinkedMutationContext"
+    if source_context.record.source_sha256 != parent.source_art_sha256:
+        return source_context, "source-linked context record does not match the exact parent source identity"
+    try:
+        return SourceLinkedMutationContext.establish(source_context.record), None
+    except Exception as exc:
+        return source_context, f"source-linked M05 pre-check failed before operation: {type(exc).__name__}: {exc}"
+
+
 def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None) -> AttemptReport:
     from .m07_services import derive_attempt_seed
     records: list[AttemptRecord] = []
@@ -57,6 +72,10 @@ def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int
 
     if not isinstance(target, TypedChallengeTarget) or not target.is_authentic_sealed:
         return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, "sealed authentic target authority is required", target, seed_config_digest, workload_available)
+
+    source_context, source_error = _source_entry_guard(parent, source_context)
+    if source_error is not None:
+        return AttemptReport(AttemptDisposition.ERROR, budget, tuple(), None, source_error, target, seed_config_digest, workload_available)
 
     for ordinal in range(budget.max_attempts):
         seed = derive_attempt_seed(base_seed, ordinal)
