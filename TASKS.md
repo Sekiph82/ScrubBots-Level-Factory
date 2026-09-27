@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M07 — Mutation & Automatic Difficulty Targeting
-- Current Sprint: SB-LF07.C001-R07 — M07 final provenance-seal remediation batch
-- Current Task: SB-LF07-008 — Compare mutate vs regenerate efficiency
-- Current Task Status: CHANGES_REQUIRED / R07_AUTHORIZED / FINAL_PROVENANCE_REMEDIATE_THEN_REAUDIT
-- Next Task/Action: Codex executes only `SB-LF07-008,010-C001-R07` from `.hiveai/prompts/SB-LF07-C001-R07_MASTER_REMEDIATION_PROMPT.md`; `SB-LF07-001,002,003,004,005,006,007,009` are frozen PASS/CLOSED. Codex must replace self-asserted parent generation digests with sealed producer-derived generation provenance, create two task logs plus one master log, never edit `TASKS.md` or ChatGPT audits, then stop for independent final M07 re-audit.
+- Current Milestone: M08 — Batch Factory & Weekly Production
+- Current Sprint: SB-LF08.C001 — M08 open-task master implementation batch
+- Current Task: SB-LF08-001 — Generate requested accepted counts by lane/class cadence
+- Current Task Status: AUTHORIZED / IMPLEMENT_ALL_THEN_AUDIT
+- Next Task/Action: Codex executes `SB-LF08-001,006,007,008,009-C001` sequentially from `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`, creates one builder log per task plus a master log, preserves accepted `SB-LF08-002,003,004,005,010` and `SB-LFX-013,014,015`, never edits `TASKS.md` or ChatGPT audits, then stops for independent per-task audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF07-C001-R06_STRICT_REAUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF07-C001_FINAL_STRICT_CLOSURE_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: original `SB-LF07-001..010-C001` strict criteria plus the R06 re-audits summarized by `.hiveai/audits/SB-LF07-C001-R06_STRICT_REAUDIT_SUMMARY.md`; `SB-LF07-001,002,003,004,005,006,007,009` are accepted PASS/CLOSED.
-- Current Prompt: `.hiveai/prompts/SB-LF07-C001-R07_MASTER_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` indexes the five dedicated strict criteria for `SB-LF08-001,006,007,008,009`.
+- Current Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -182,6 +182,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF07 R07 Remediation Authorization: `SB-LF07-008,010-C001-R07 — FINAL_PROVENANCE_REMEDIATE_THEN_REAUDIT`.
 - SB-LF07 R07 Remediation Index: `.hiveai/prompts/SB-LF07-C001-R07_REMEDIATION_INDEX.md`.
 - SB-LF07 R07 Master Prompt: `.hiveai/prompts/SB-LF07-C001-R07_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF07 R07 Re-Audit Result: `PASS/CLOSED = 001,002,003,004,005,006,007,008,009,010`; therefore `M07 = COMPLETE / VERIFIED`.
+- SB-LF07 Final Closure Summary: `.hiveai/audits/SB-LF07-C001_FINAL_STRICT_CLOSURE_SUMMARY.md`.
+- SB-LF08 C001 Implementation Authorization: `SB-LF08-001,006,007,008,009-C001 — IMPLEMENT_ALL_THEN_AUDIT`.
+- SB-LF08 C001 Implementation/Audit Index: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
+- SB-LF08 C001 Master Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
+- SB-LF08 C001 Tracker Policy: accepted `002,003,004,005,010` and `SB-LFX-013,014,015` remain frozen; Codex implements only `001,006,007,008,009`; ChatGPT audits those five individually after the complete batch.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -208,8 +214,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M04: Difficulty Intelligence & Metrics — COMPLETE / VERIFIED
 - M05: Unified Factory Validation & Level QA — COMPLETE / VERIFIED
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
-- M07: Mutation & Automatic Difficulty Targeting — ACTIVE
-- M08: Batch Factory & Weekly Production — PLANNED / PARTIALLY EVIDENCED
+- M07: Mutation & Automatic Difficulty Targeting — COMPLETE / VERIFIED
+- M08: Batch Factory & Weekly Production — ACTIVE
 - M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
@@ -536,9 +542,9 @@ Capability source family: `SB-LF07-xxx` from the main Scrubbots master plan.
 
 - [x] SB-LF07-006 — Target Challenge Score range while respecting load/risk/retention constraints.
 - [x] SB-LF07-007 — Bound mutation attempts.
-- [ ] SB-LF07-008 — Compare mutate vs regenerate efficiency.
+- [x] SB-LF07-008 — Compare mutate vs regenerate efficiency.
 - [x] SB-LF07-009 — Never mutate owner source art silently.
-- [ ] SB-LF07-010 — Deterministic mutation regression tests.
+- [x] SB-LF07-010 — Deterministic mutation regression tests.
 
 ---
 
@@ -548,7 +554,7 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan plus
 
 ### M08.01 - Batch counts, rejection statistics and resumability
 
-- [ ] SB-LF08-001 — Generate requested accepted counts by lane/class cadence. [PARTIAL]
+- [~] SB-LF08-001 — Generate requested accepted counts by lane/class cadence. [PARTIAL]
 - [x] SB-LF08-002 — Separate generated from accepted count.
 - [x] SB-LF08-003 — Rejection statistics.
 - [x] SB-LF08-004 — Deterministic/resumable batch jobs.
