@@ -1,6 +1,6 @@
 """SB-LF07-004 adapters over accepted M03/M04/M05 producer objects."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import hashlib
 import json
 from typing import Any
@@ -11,7 +11,7 @@ from .difficulty_analysis import AnalysisDisposition, ChallengeScoreResult, Diff
 from .qa.unified import UnifiedQAReport, UnifiedQADisposition
 from .solver_evidence import SolverEvidenceReport
 from .mutation_base import MutationContractError
-from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationProvenance, MutationRequest, MutationResult, TypedEvidenceReference, ValidationEnvelope, revalidate_mutation
+from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationProvenance, MutationRequest, MutationResult, TypedEvidenceReference, ValidationEnvelope, _revalidate_mutation_from_records
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,7 +137,13 @@ def adapt_m05_qa(report: UnifiedQAReport, mutation: MutationResult) -> Authentic
     if not any(stage.disposition.value in {"PASS", "FAIL", "ERROR", "UNAVAILABLE", "INCONCLUSIVE"} for stage in report.stages):
         raise MutationContractError("M05 UnifiedQAReport stages are unavailable")
     authorities = [stage.authority.canonical_dict() for stage in report.stages]
-    if not authorities or any(item.get("repository") != mutation.authority.repository or item.get("commit_sha") in (None, "UNAVAILABLE") for item in authorities) or len({json.dumps(item, sort_keys=True) for item in authorities}) != 1:
+    expected_authority = {
+        "repository": mutation.authority.repository,
+        "commit_sha": mutation.authority.commit_sha,
+        "source_path": mutation.authority.source_path,
+        "contract_version": mutation.authority.contract_version,
+    }
+    if not authorities or any({key: item.get(key) for key in expected_authority} != expected_authority for item in authorities):
         raise MutationContractError("M05 UnifiedQAReport stages do not share one accepted authority identity")
     status_map = {UnifiedQADisposition.ACCEPT: EvidenceDisposition.PASS, UnifiedQADisposition.REJECT: EvidenceDisposition.REJECT, UnifiedQADisposition.INCONCLUSIVE: EvidenceDisposition.INCONCLUSIVE, UnifiedQADisposition.UNAVAILABLE: EvidenceDisposition.UNAVAILABLE, UnifiedQADisposition.ERROR: EvidenceDisposition.ERROR}
     status = status_map[report.disposition]
@@ -157,7 +163,7 @@ def revalidate_mutation_from_authentic_adapters(mutation: MutationResult, solver
             raise MutationContractError("authentic producer record is not bound to the exact mutation child/request/parent")
         if adapter.producer_digest != getattr(adapter.producer, "digest")():
             raise MutationContractError("authentic producer digest drift")
-    return revalidate_mutation(mutation, solver.record, difficulty.record, qa.record)
+    return _revalidate_mutation_from_records(mutation, solver.record, difficulty.record, qa.record)
 
 
 def provenance_from_authentic_validation(request: MutationRequest, mutation: MutationResult, envelope: ValidationEnvelope, solver: AuthenticEvidenceAdapter, difficulty: AuthenticEvidenceAdapter, qa: AuthenticEvidenceAdapter, *, attempt_ordinal: int = 0) -> MutationProvenance:
@@ -171,9 +177,8 @@ def provenance_from_authentic_validation(request: MutationRequest, mutation: Mut
         raise MutationContractError("typed production provenance requires the exact authentic validation envelope")
     if envelope.mutation_digest != mutation.digest() or mutation.child is None or envelope.child != mutation.child.identity:
         raise MutationContractError("typed production provenance is not bound to the exact mutation child")
-    base = MutationProvenance.from_result(request, mutation, attempt_ordinal=attempt_ordinal)
     references = tuple(TypedEvidenceReference(item.stage, item.record.evidence_digest, item.producer_digest) for item in adapters)
-    return replace(base, evidence_references=references)
+    return MutationProvenance.seal_authentic(request, mutation, references, attempt_ordinal=attempt_ordinal)
 
 
 __all__ = ["AuthenticEvidenceAdapter", "adapt_m03_solver", "adapt_m04_difficulty", "adapt_m05_qa", "revalidate_mutation_from_authentic_adapters", "provenance_from_authentic_validation"]

@@ -9,7 +9,7 @@ truth remains external and post-mutation evidence remains mandatory.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 import hashlib
 import json
@@ -38,6 +38,10 @@ EFFICIENCY_SCHEMA = "scrubbots-mutate-regenerate-efficiency"
 EFFICIENCY_VERSION = 1
 OWNER_SOURCE_SCHEMA = "scrubbots-owner-source-mutation-gate"
 OWNER_SOURCE_VERSION = 1
+
+_AUTHENTIC_PROVENANCE_TOKEN = object()
+_AUTHENTIC_SAFETY_TOKEN = object()
+_AUTHENTIC_TARGET_TOKEN = object()
 
 CANONICAL_GAMEPLAY_REPOSITORY = "https://github.com/Sekiph82/Scrubbots"
 # This is deliberately an unavailable capability marker, not a claim about the
@@ -133,6 +137,8 @@ class MutationProvenance:
     reason: str
     evidence_digests: tuple[str, ...] = ()
     evidence_references: tuple[TypedEvidenceReference, ...] = ()
+    _authenticity_digest: str | None = field(default=None, init=False, repr=False, compare=False)
+    _authenticity_token: object | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         _sha(self.request_digest, "provenance request digest")
@@ -166,6 +172,12 @@ class MutationProvenance:
         refs = tuple(self.evidence_references)
         if any(not isinstance(ref, TypedEvidenceReference) for ref in refs) or len({ref.stage for ref in refs}) != len(refs):
             raise MutationContractError("typed provenance evidence references must be unique by stage")
+        if refs:
+            if self._authenticity_token is not _AUTHENTIC_PROVENANCE_TOKEN or self._authenticity_digest is None:
+                raise MutationContractError("typed production provenance requires the sealed authentic factory")
+            expected_binding = _digest({"request_digest": self.request_digest, "post_state_digest": self.post_state_digest, "evidence_references": [ref.canonical_dict() for ref in refs]})
+            if self._authenticity_digest != expected_binding:
+                raise MutationContractError("typed production provenance evidence binding drift")
         object.__setattr__(self, "evidence_references", refs)
 
     @classmethod
@@ -181,6 +193,29 @@ class MutationProvenance:
 
     def digest(self) -> str:
         return _digest(self.canonical_dict())
+
+    @property
+    def is_authentic_sealed(self) -> bool:
+        return self._authenticity_token is _AUTHENTIC_PROVENANCE_TOKEN and self._authenticity_digest is not None and len(self.evidence_references) == 3
+
+    @classmethod
+    def seal_authentic(
+        cls,
+        request: MutationRequest,
+        result: MutationResult,
+        references: tuple[TypedEvidenceReference, ...],
+        *,
+        attempt_ordinal: int = 0,
+    ) -> "MutationProvenance":
+        if any(not isinstance(ref, TypedEvidenceReference) for ref in references):
+            raise MutationContractError("authentic production provenance references are malformed")
+        if tuple(ref.stage for ref in references) != ("M03_SOLVER", "M04_DIFFICULTY", "M05_QA"):
+            raise MutationContractError("authentic production provenance requires ordered M03/M04/M05 references")
+        base = cls.from_result(request, result, attempt_ordinal=attempt_ordinal)
+        object.__setattr__(base, "evidence_references", tuple(references))
+        object.__setattr__(base, "_authenticity_digest", _digest({"request_digest": base.request_digest, "post_state_digest": base.post_state_digest, "evidence_references": [ref.canonical_dict() for ref in references]}))
+        object.__setattr__(base, "_authenticity_token", _AUTHENTIC_PROVENANCE_TOKEN)
+        return base
 
 
 class ProvenanceLedger:
@@ -200,6 +235,8 @@ class ProvenanceLedger:
         return registration.digest()
 
     def record(self, provenance: MutationProvenance) -> str:
+        if not isinstance(provenance, MutationProvenance) or not provenance.is_authentic_sealed:
+            raise MutationContractError("production-auditable provenance must carry sealed authentic M03/M04/M05 references")
         key = (provenance.lineage_root, provenance.child.candidate_id)
         if provenance.parent.parent_candidate_id is None:
             registered = self._roots.get(provenance.lineage_root)
@@ -406,7 +443,7 @@ def evidence(stage: str, disposition: EvidenceDisposition, mutation: MutationRes
     return EvidenceRecord(stage, disposition, mutation.child.state_digest, mutation.request_digest, mutation.parent.state_digest, mutation.operator_id, mutation.authority.digest(), payload)
 
 
-def revalidate_mutation(mutation: MutationResult, solver: EvidenceRecord, difficulty: EvidenceRecord, qa: EvidenceRecord) -> ValidationEnvelope:
+def _revalidate_mutation_from_records(mutation: MutationResult, solver: EvidenceRecord, difficulty: EvidenceRecord, qa: EvidenceRecord) -> ValidationEnvelope:
     if mutation.disposition is not MutationDisposition.APPLIED or mutation.child is None:
         raise MutationContractError("only APPLIED mutations can be revalidated")
     records = (solver, difficulty, qa)
@@ -435,6 +472,12 @@ def revalidate_mutation(mutation: MutationResult, solver: EvidenceRecord, diffic
         disposition, reason = ValidationDisposition.ELIGIBLE, "mutated child passed the complete M03/M04/M05 evidence chain"
     expected_digest = _digest({"schema": VALIDATION_SCHEMA, "version": VALIDATION_VERSION, "mutation_digest": mutation.digest(), "child": mutation.child.identity.canonical_dict(), "solver": solver.canonical_dict(), "difficulty": difficulty.canonical_dict(), "qa": qa.canonical_dict(), "disposition": disposition.value, "reason": reason})
     return ValidationEnvelope(mutation.digest(), mutation.child.identity, solver, difficulty, qa, disposition, reason, expected_digest)
+
+
+def revalidate_mutation(mutation: MutationResult, solver: EvidenceRecord, difficulty: EvidenceRecord, qa: EvidenceRecord) -> ValidationEnvelope:
+    """Retired synthetic compatibility surface; never creates production eligibility."""
+
+    raise MutationContractError("legacy synthetic revalidation is not a production API; use authentic producer adapters")
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,6 +584,7 @@ class AttemptReport:
     reason: str
     target: object | None = None
     seed_config_digest: str | None = None
+    workload_config_available: bool = False
 
 
 def derive_attempt_seed(base_seed: int, ordinal: int) -> int:
@@ -588,13 +632,16 @@ class EfficiencyCounters:
     inconclusive: int
     rejected: int
     solver_workload: int
+    solver_workload_available: bool = False
 
     def __post_init__(self) -> None:
         if any(type(value) is not int or value < 0 for value in (self.attempts, self.produced, self.accepted, self.inconclusive, self.rejected, self.solver_workload)):
             raise MutationContractError("efficiency counters must be non-negative integers")
+        if type(self.solver_workload_available) is not bool:
+            raise MutationContractError("solver workload availability must be a boolean")
 
-    def canonical_dict(self) -> dict[str, int]:
-        return {"attempts": self.attempts, "produced": self.produced, "accepted": self.accepted, "inconclusive": self.inconclusive, "rejected": self.rejected, "solver_workload": self.solver_workload}
+    def canonical_dict(self) -> dict[str, object]:
+        return {"attempts": self.attempts, "produced": self.produced, "accepted": self.accepted, "inconclusive": self.inconclusive, "rejected": self.rejected, "solver_workload": self.solver_workload, "solver_workload_available": self.solver_workload_available}
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,13 +650,16 @@ class EfficiencyWorkload:
     seed_config_digest: str
     validation_policy_digest: str
     budget_digest: str
+    availability: str = "AVAILABLE"
 
     def __post_init__(self) -> None:
         for value, label in ((self.target_digest, "target"), (self.seed_config_digest, "seed/config"), (self.validation_policy_digest, "validation policy"), (self.budget_digest, "budget")):
             _sha(value, f"efficiency {label} digest")
+        if self.availability not in {"AVAILABLE", "UNAVAILABLE", "INCONCLUSIVE"}:
+            raise MutationContractError("efficiency workload availability is not closed")
 
     def canonical_dict(self) -> dict[str, str]:
-        return {"target_digest": self.target_digest, "seed_config_digest": self.seed_config_digest, "validation_policy_digest": self.validation_policy_digest, "budget_digest": self.budget_digest}
+        return {"target_digest": self.target_digest, "seed_config_digest": self.seed_config_digest, "validation_policy_digest": self.validation_policy_digest, "budget_digest": self.budget_digest, "availability": self.availability}
 
 
 @dataclass(frozen=True, slots=True)
@@ -620,13 +670,15 @@ class EfficiencyComparison:
     mutation_cost: Mapping[str, object] | None = None
     regenerate_cost: Mapping[str, object] | None = None
     telemetry: Mapping[str, object] | None = None
+    disposition: str = "MATCHED"
+    reason: str | None = None
 
     def canonical_dict(self) -> dict[str, object]:
         def trusted(cost: Mapping[str, object] | None) -> Mapping[str, object] | None:
             if cost is None or cost.get("trusted") is not True:
                 return None
             return {str(key): value for key, value in cost.items() if key != "trusted"}
-        return {"schema": EFFICIENCY_SCHEMA, "version": EFFICIENCY_VERSION, "workload": self.workload.canonical_dict(), "mutation": self.mutation.canonical_dict(), "regenerate": self.regenerate.canonical_dict(), "mutation_cost": trusted(self.mutation_cost), "regenerate_cost": trusted(self.regenerate_cost)}
+        return {"schema": EFFICIENCY_SCHEMA, "version": EFFICIENCY_VERSION, "workload": self.workload.canonical_dict(), "mutation": self.mutation.canonical_dict(), "regenerate": self.regenerate.canonical_dict(), "mutation_cost": trusted(self.mutation_cost), "regenerate_cost": trusted(self.regenerate_cost), "disposition": self.disposition, "reason": self.reason}
 
     def digest(self) -> str:
         return _digest(self.canonical_dict())
@@ -697,10 +749,9 @@ class M05QAEvidenceReceipt(ProducerEvidenceReceipt):
 
 
 def revalidate_mutation_from_typed_receipts(mutation: MutationResult, solver: M03SolverEvidenceReceipt, difficulty: M04DifficultyEvidenceReceipt, qa: M05QAEvidenceReceipt) -> ValidationEnvelope:
-    """Production validation entry point; generic/free-form records are rejected."""
-    if not all(isinstance(item, ProducerEvidenceReceipt) for item in (solver, difficulty, qa)):
-        raise MutationContractError("production validation requires typed M03/M04/M05 producer receipts")
-    return revalidate_mutation(mutation, solver.record, difficulty.record, qa.record)
+    """Retired self-asserted receipt surface; never creates production eligibility."""
+
+    raise MutationContractError("self-asserted producer receipts are not a production API; use authentic producer adapters")
 
 
 @dataclass(frozen=True, slots=True)
@@ -712,17 +763,78 @@ class SafetyConstraintEvidence:
     risk_ok: bool
     retention_ok: bool
     producer_digest: str
+    availability: str = "UNAVAILABLE"
+    required_constraints: tuple[str, ...] = ("load", "risk", "retention")
+    _authenticity_token: object | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "schema", _text(self.schema, "safety evidence schema"))
-        object.__setattr__(self, "version", _text(self.version, "safety evidence version"))
-        _sha(self.policy_digest, "safety policy digest")
-        _sha(self.producer_digest, "safety producer digest")
-        if not all(type(value) is bool for value in (self.load_ok, self.risk_ok, self.retention_ok)):
+        raise MutationContractError("safety evidence must be built by an accepted authority path")
+
+    @classmethod
+    def _from_authority(
+        cls,
+        schema: str,
+        version: str,
+        policy_digest: str,
+        load_ok: bool,
+        risk_ok: bool,
+        retention_ok: bool,
+        producer_digest: str,
+        availability: str,
+        required_constraints: tuple[str, ...],
+    ) -> "SafetyConstraintEvidence":
+        if not all(type(value) is bool for value in (load_ok, risk_ok, retention_ok)):
             raise MutationContractError("safety constraints must be typed booleans")
+        if any(value is True for value in (load_ok, risk_ok, retention_ok)):
+            raise MutationContractError("no accepted producer currently authorizes TRUE load/risk/retention safety")
+        _text(schema, "safety evidence schema")
+        _text(version, "safety evidence version")
+        _sha(policy_digest, "safety policy digest")
+        _sha(producer_digest, "safety producer digest")
+        if availability not in {"UNAVAILABLE", "NOT_REQUESTED"}:
+            raise MutationContractError("safety evidence availability is not an accepted sealed state")
+        if tuple(required_constraints) not in (("load", "risk", "retention"), ()):
+            raise MutationContractError("safety required-constraint set is not versioned")
+        obj = object.__new__(cls)
+        for name, value in {
+            "schema": schema,
+            "version": version,
+            "policy_digest": policy_digest,
+            "load_ok": load_ok,
+            "risk_ok": risk_ok,
+            "retention_ok": retention_ok,
+            "producer_digest": producer_digest,
+            "availability": availability,
+            "required_constraints": tuple(required_constraints),
+        }.items():
+            object.__setattr__(obj, name, value)
+        object.__setattr__(obj, "_authenticity_token", _AUTHENTIC_SAFETY_TOKEN)
+        return obj
+
+    @classmethod
+    def unavailable(cls, policy_digest: str) -> "SafetyConstraintEvidence":
+        return cls._from_authority("scrubbots-m07-safety-availability", "M07_SAFETY_AUTHORITY_V1", policy_digest, False, False, False, "0" * 64, "UNAVAILABLE", ("load", "risk", "retention"))
+
+    @classmethod
+    def no_constraints_requested(cls, policy_digest: str) -> "SafetyConstraintEvidence":
+        return cls._from_authority("scrubbots-m07-safety-availability", "M07_NO_SAFETY_CONSTRAINTS_V1", policy_digest, False, False, False, _digest({"policy_digest": policy_digest, "mode": "NOT_REQUESTED"}), "NOT_REQUESTED", ())
+
+    @property
+    def is_authentic_sealed(self) -> bool:
+        return self._authenticity_token is _AUTHENTIC_SAFETY_TOKEN
 
     def canonical_dict(self) -> dict[str, object]:
-        return {"schema": self.schema, "version": self.version, "policy_digest": self.policy_digest, "load_ok": self.load_ok, "risk_ok": self.risk_ok, "retention_ok": self.retention_ok, "producer_digest": self.producer_digest}
+        return {
+            "schema": self.schema,
+            "version": self.version,
+            "policy_digest": self.policy_digest,
+            "load_ok": self.load_ok,
+            "risk_ok": self.risk_ok,
+            "retention_ok": self.retention_ok,
+            "producer_digest": self.producer_digest,
+            "availability": self.availability,
+            "required_constraints": list(self.required_constraints),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -731,13 +843,31 @@ class TypedChallengeTarget:
     maximum: float
     policy_digest: str
     safety: SafetyConstraintEvidence
+    _authenticity_token: object | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
-        if not all(type(value) in (int, float) and math.isfinite(float(value)) for value in (self.minimum, self.maximum)) or self.minimum > self.maximum:
+        raise MutationContractError("typed target must be constructed by the sealed authentic target builder")
+
+    @classmethod
+    def _from_authority(cls, minimum: float, maximum: float, policy_digest: str, safety: SafetyConstraintEvidence) -> "TypedChallengeTarget":
+        if not all(type(value) in (int, float) and math.isfinite(float(value)) for value in (minimum, maximum)) or minimum > maximum:
             raise MutationContractError("typed Challenge Score range is malformed")
-        _sha(self.policy_digest, "typed target policy digest")
-        if self.safety.policy_digest != self.policy_digest:
+        if not isinstance(safety, SafetyConstraintEvidence) or not safety.is_authentic_sealed:
+            raise MutationContractError("typed target requires sealed authority-derived safety evidence")
+        _sha(policy_digest, "typed target policy digest")
+        if safety.policy_digest != policy_digest:
             raise MutationContractError("target safety evidence is bound to another policy")
+        obj = object.__new__(cls)
+        object.__setattr__(obj, "minimum", minimum)
+        object.__setattr__(obj, "maximum", maximum)
+        object.__setattr__(obj, "policy_digest", policy_digest)
+        object.__setattr__(obj, "safety", safety)
+        object.__setattr__(obj, "_authenticity_token", _AUTHENTIC_TARGET_TOKEN)
+        return obj
+
+    @property
+    def is_authentic_sealed(self) -> bool:
+        return self._authenticity_token is _AUTHENTIC_TARGET_TOKEN and self.safety.is_authentic_sealed
 
     def digest(self) -> str:
         return _digest({"minimum": self.minimum, "maximum": self.maximum, "policy_digest": self.policy_digest, "safety": self.safety.canonical_dict()})
@@ -798,5 +928,5 @@ def compare_efficiency_from_routes(mutation: GeneratorRouteEvidence, regenerate:
 
 
 __all__ = [
-    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AttemptProvenance", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "ChallengeTarget", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "EvidenceRecord", "GeneratorRouteEvidence", "LineageEdge", "LineageRootRegistration", "M03SolverEvidenceReceipt", "M04DifficultyEvidenceReceipt", "M05QAEvidenceReceipt", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationProvenance", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "ProducerEvidenceReceipt", "SafetyConstraintEvidence", "TargetDisposition", "TargetSelection", "TypedChallengeTarget", "TypedEvidenceReference", "ValidationDisposition", "ValidationEnvelope", "ProvenanceLedger", "canonical_mutation_registry", "compare_efficiency", "compare_efficiency_from_routes", "derive_attempt_seed", "evidence", "resolve_current_main_authority", "revalidate_mutation", "revalidate_mutation_from_typed_receipts", "run_bounded_mutations", "select_target", "verify_owner_source_immutable",
+    "ATTEMPT_BUDGET_SCHEMA", "ATTEMPT_BUDGET_VERSION", "AttemptBudget", "AttemptDisposition", "AttemptRecord", "AttemptReport", "AttemptProvenance", "AuthorityIdentity", "AuthorityResolution", "AuthorityResolutionDisposition", "CANONICAL_GAMEPLAY_REPOSITORY", "CANONICAL_GAMEPLAY_SHA", "CANONICAL_M23_CONTRACT_VERSION", "CANONICAL_M23_PREVIEW_AUTHORITY", "CANONICAL_M23_SOURCE_PATH", "CANONICAL_M39_CONTRACT_VERSION", "CANONICAL_M39_ROLLBACK_CONTRACT_VERSION", "CANONICAL_M39_SLOT_AUTHORITY", "CANONICAL_M39_SOURCE_PATH", "CandidateIdentity", "CurrentMainAuthorityResolver", "DEFAULT_MUTATION_REGISTRY", "EFFICIENCY_SCHEMA", "EFFICIENCY_VERSION", "EfficiencyComparison", "EfficiencyCounters", "EfficiencyWorkload", "EvidenceDisposition", "GeneratorRouteEvidence", "LineageEdge", "LineageRootRegistration", "MutationCandidate", "MutationContractError", "MutationDisposition", "MutationEngine", "MutationIntent", "MutationOperator", "MutationProvenance", "MutationRegistry", "MutationRequest", "MutationResult", "OwnerSourceRecord", "OwnerSourceReport", "SafetyConstraintEvidence", "TargetDisposition", "TargetSelection", "TypedChallengeTarget", "TypedEvidenceReference", "ValidationDisposition", "ValidationEnvelope", "ProvenanceLedger", "canonical_mutation_registry", "compare_efficiency", "compare_efficiency_from_routes", "derive_attempt_seed", "resolve_current_main_authority", "verify_owner_source_immutable",
 ]
