@@ -28,11 +28,12 @@ def test_regression_corpus_remains_versioned_and_complete() -> None:
 
 
 def test_r04_positive_closure_uses_only_sealed_authentic_apis() -> None:
-    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain(generation_request=generation_request)
     envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
     candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
     target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
-    generation_request = GenerationRequest("EASY", request.seed, "MASK", width=20, height=20)
+    assert generation_request.seed == request.seed
     report = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(parent), generation_request=generation_request)
     assert report.disposition is AttemptDisposition.TARGET_MATCH
     assert report.attempts[0].provenance is not None and report.attempts[0].provenance.is_authentic_sealed
@@ -43,11 +44,12 @@ def test_r04_positive_closure_uses_only_sealed_authentic_apis() -> None:
 
 
 def test_r04_negative_closure_rejects_forged_safety_and_provenance_replacement() -> None:
-    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain(generation_request=generation_request)
     envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
     candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
     target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
-    report = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(parent), generation_request=GenerationRequest("EASY", request.seed, "MASK", width=20, height=20))
+    report = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(parent), generation_request=generation_request)
     provenance = report.attempts[0].provenance
     assert provenance is not None
     with pytest.raises(MutationContractError):
@@ -63,11 +65,12 @@ def test_r04_negative_closure_rejects_forged_safety_and_provenance_replacement()
 
 
 def test_r04_efficiency_and_palette_regressions_remain_truthful() -> None:
-    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain()
+    generation_request = GenerationRequest("EASY", 41, "MASK", width=20, height=20)
+    parent, request, mutation, _, _, _, _, solver, difficulty, qa = _authentic_chain(generation_request=generation_request)
     envelope = revalidate_mutation_from_authentic_adapters(mutation, solver, difficulty, qa)
     candidate = AuthenticTargetCandidate(envelope, solver, difficulty, qa)
     target = build_typed_target(0.0, 100.0, difficulty, qa, required_constraints=())
-    report = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(parent), generation_request=GenerationRequest("EASY", request.seed, "MASK", width=20, height=20))
+    report = run_authentic_bounded_mutations(parent, base_seed=request.seed, budget=AttemptBudget(1), request_factory=lambda *_: request, engine=_StaticEngine(MutationDisposition.APPLIED, mutation), validator=lambda _: candidate, target=target, source_context=_matching_source_context(parent), generation_request=generation_request)
     route = MutationAttemptRouteEvidence.from_attempt_report(report)
     assert route.counters.accepted == 1
     assert route.counters.solver_workload_available is False
