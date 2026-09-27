@@ -263,6 +263,36 @@ def test_owner_review_gate_rejects_incomplete_or_corrupt_canonical_chain() -> No
     assert build_handoff(result, evidence.candidate_id, [valid, corrupt_after_accept], artifacts=_artifact_map(evidence))["disposition"] == "INVALID_REVIEW_EVIDENCE"
 
 
+def test_handoff_requires_strict_complete_result_and_is_byte_deterministic() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 19, "handoff")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("handoff")})
+    evidence = result.entries[0].evidence
+    review = _review(evidence, "ACCEPT")
+    artifacts = _artifact_map(evidence)
+    first = build_handoff(result.as_dict(), evidence.candidate_id, [review], artifacts=artifacts)
+    second = build_handoff(result.as_dict(), evidence.candidate_id, [review], artifacts=dict(artifacts))
+    assert first == second and first["disposition"] == "READY"
+
+    corrupt_manifest = result.as_dict()
+    corrupt_manifest["history_digest"] = "0" * 64
+    assert build_handoff(corrupt_manifest, evidence.candidate_id, [review], artifacts=artifacts)["disposition"] == "ERROR"
+    assert build_handoff(result.as_dict(), "other-candidate", [review], artifacts=artifacts)["disposition"] == "NOT_FACTORY_ACCEPTED"
+
+    corrupt_review = {**review, "candidate_identity_hash": "0" * 64}
+    assert build_handoff(result, evidence.candidate_id, [corrupt_review], artifacts=artifacts)["disposition"] == "INVALID_REVIEW_EVIDENCE"
+    missing_generation = dict(artifacts)
+    del missing_generation[evidence.generation_request_ref]
+    assert build_handoff(result, evidence.candidate_id, [review], artifacts=missing_generation)["disposition"] == "ERROR"
+
+
+def test_handoff_rejects_candidate_from_non_complete_batch() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1), LaneRequest(LaneClass.HARD, 1, 1)), 20, "handoff-incomplete")
+    result = run_batch(plan, lambda lane, _ordinal, _seed: {"disposition": "ACCEPT", "evidence": _evidence("easy", lane)} if lane is LaneClass.EASY else {"disposition": "REJECT"})
+    evidence = result.entries[0].evidence
+    assert result.status == "EXHAUSTED"
+    assert build_handoff(result, evidence.candidate_id, [_review(evidence, "ACCEPT")], artifacts=_artifact_map(evidence))["disposition"] == "NOT_FACTORY_ACCEPTED"
+
+
 def test_high_rejection_is_finite_one_lane_can_exhaust_while_another_completes() -> None:
     plan = BatchPlan(tuple(LaneRequest(lane, 1, 100) for lane in LaneClass), 9, "stress")
 

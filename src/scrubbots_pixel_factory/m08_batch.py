@@ -506,10 +506,17 @@ def review_summary(result: BatchResult, reviews: Iterable[Mapping[str, Any]]) ->
     return {"NEEDS_REVIEW": sum(value == "NEEDS_REVIEW" for value in states.values()), "OWNER_ACCEPTED": sum(value == "OWNER_ACCEPTED" for value in states.values()), "OWNER_REJECTED": sum(value == "OWNER_REJECTED" for value in states.values()), "INVALID_REVIEW_EVIDENCE": sum(value == "INVALID_REVIEW_EVIDENCE" for value in states.values()), "invalid_review_evidence": invalid, "states": dict(sorted(states.items()))}
 
 
-def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapping[str, Any]], *, artifacts: Mapping[str, bytes] | None = None) -> dict[str, Any]:
+def build_handoff(result: BatchResult | Mapping[str, Any], candidate_id: str, reviews: Iterable[Mapping[str, Any]], *, artifacts: Mapping[str, bytes] | None = None) -> dict[str, Any]:
+    try:
+        serialized = result.as_dict() if isinstance(result, BatchResult) else dict(result)
+        result = BatchResult.from_dict(serialized)
+    except (M08ContractError, TypeError, ValueError) as exc:
+        return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "ERROR", "candidate_id": candidate_id, "reason": f"batch result is not strictly parseable: {exc}"}
     entry = next((item for item in result.entries if item.evidence.candidate_id == candidate_id), None)
     if entry is None:
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_FACTORY_ACCEPTED", "candidate_id": candidate_id}
+    if result.status != "COMPLETE":
+        return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_FACTORY_ACCEPTED", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "reason": f"batch result status is {result.status}, not COMPLETE"}
     chain, invalid = _review_chain(result, entry.evidence, reviews)
     if invalid:
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "INVALID_REVIEW_EVIDENCE", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "invalid_review_evidence": sorted(invalid)}
