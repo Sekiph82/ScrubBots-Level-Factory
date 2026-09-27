@@ -148,6 +148,8 @@ def test_owner_review_summary_is_separate_and_handoff_requires_latest_accept() -
     ready = build_handoff(result, "candidate", [reject, accept])
     assert ready["disposition"] == "READY" and "handoff_digest" in ready
     assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}])["disposition"] == "NOT_OWNER_ACCEPTED"
+    assert review_summary(result, [accept, reject]) == review_summary(result, [reject, accept])
+    assert review_summary(result, [accept, dict(accept)])["INVALID_REVIEW_EVIDENCE"] == 1
 
 
 def test_high_rejection_is_finite_one_lane_can_exhaust_while_another_completes() -> None:

@@ -408,8 +408,13 @@ def _review_chain(result: BatchResult, evidence: CandidateEvidence, reviews: Ite
     candidate_reviews = [dict(review) for review in reviews if isinstance(review, Mapping) and review.get("candidate_id") == evidence.candidate_id]
     valid: list[dict[str, Any]] = []
     invalid: list[str] = []
+    seen_review_ids: set[str] = set()
     for review in candidate_reviews:
         review_id = str(review.get("review_id", f"review-{len(valid) + 1}"))
+        if review_id in seen_review_ids:
+            invalid.append(review_id)
+            continue
+        seen_review_ids.add(review_id)
         if review.get("disposition") not in {"ACCEPT", "REJECT"} or review.get("artwork_sha256", evidence.logical_art_digest) != evidence.logical_art_digest:
             invalid.append(review_id)
             continue
@@ -429,6 +434,10 @@ def _review_chain(result: BatchResult, evidence: CandidateEvidence, reviews: Ite
             contiguous.append(review)
             previous = str(review.get("review_id"))
         valid = contiguous
+    else:
+        # Test/durable adapters without sequence numbers still have a stable
+        # derived view; canonical SB-LFX records use sequence and predecessor.
+        valid.sort(key=lambda item: str(item.get("review_id", "")))
     return valid, invalid
 
 
