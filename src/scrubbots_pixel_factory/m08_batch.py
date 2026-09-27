@@ -214,8 +214,9 @@ class AttemptRecord:
     def __post_init__(self) -> None:
         if not isinstance(self.lane, LaneClass) or type(self.attempt) is not int or self.attempt < 0 or self.disposition not in _ATTEMPT_DISPOSITIONS:
             raise M08ContractError("attempt record is malformed")
-        if self.plan_digest is not None:
-            _sha(self.plan_digest, "attempt plan digest")
+        if self.plan_digest is None:
+            raise M08ContractError("attempt record must carry its exact plan digest")
+        _sha(self.plan_digest, "attempt plan digest")
         if self.disposition == "ACCEPT":
             if not self.evidence or self.candidate_id != self.evidence.candidate_id or self.duplicate_of is not None:
                 raise M08ContractError("accepted attempt must carry its exact candidate evidence")
@@ -241,26 +242,39 @@ class BatchResult:
     def __post_init__(self) -> None:
         if self.status not in {"COMPLETE", "PARTIAL", "EXHAUSTED", "UNAVAILABLE", "ERROR"}:
             raise M08ContractError("unknown terminal batch status")
-        if any(entry.plan_digest != self.plan.digest() for entry in self.entries):
+        plan_digest = self.plan.digest()
+        if any(entry.plan_digest != plan_digest for entry in self.entries):
             raise M08ContractError("accepted entry is bound to another plan")
+        requests = {request.lane: request for request in self.plan.cadence}
+        if set(self.attempted) != set(requests):
+            raise M08ContractError("lane attempted counts do not match the batch plan")
         ids = [entry.evidence.candidate_id for entry in self.entries]
         if len(ids) != len(set(ids)) or len({(entry.lane, entry.attempt) for entry in self.entries}) != len(self.entries):
             raise M08ContractError("accepted entries are duplicated")
+        for entry in self.entries:
+            request = requests.get(entry.lane)
+            if request is None or entry.attempt >= request.attempt_budget:
+                raise M08ContractError("accepted entry exceeds its finite lane budget")
         for key, value in self.statistics.items():
             if type(value) is not int or value < 0:
                 raise M08ContractError(f"batch statistic {key} is malformed")
         expected_statistics = _stats(self.attempts)
         if dict(self.statistics) != expected_statistics:
             raise M08ContractError("batch statistics do not reconcile with immutable attempt history")
+        _validate_attempt_history(self.plan, self.attempts)
         expected_attempted = {request.lane: sum(item.lane is request.lane for item in self.attempts) for request in self.plan.cadence}
         if dict(self.attempted) != expected_attempted:
             raise M08ContractError("lane attempted counts do not reconcile with immutable attempt history")
-        _sha(self.history_digest, "history digest")
-        if self.attempts:
-            accepted = {(item.lane, item.attempt): item for item in self.attempts if item.disposition == "ACCEPT"}
-            expected = {(item.lane, item.attempt): item for item in self.entries}
-            if set(accepted) != set(expected) or any(accepted[key].evidence != expected[key].evidence for key in expected):
-                raise M08ContractError("attempt history and accepted entries disagree")
+        accepted = {(item.lane, item.attempt): item for item in self.attempts if item.disposition == "ACCEPT"}
+        expected = {(item.lane, item.attempt): item for item in self.entries}
+        if set(accepted) != set(expected) or any(accepted[key].evidence != expected[key].evidence for key in expected):
+            raise M08ContractError("attempt history and accepted entries disagree")
+        accepted_by_lane = {lane: sum(item.disposition == "ACCEPT" for item in self.attempts if item.lane is lane) for lane in requests}
+        if any(accepted_by_lane[lane] > request.requested_accepted for lane, request in requests.items()):
+            raise M08ContractError("accepted history exceeds a requested lane count")
+        expected_history_digest = _history_digest(self.plan, self.attempts, expected_statistics)
+        if self.history_digest != expected_history_digest:
+            raise M08ContractError("history digest does not match canonical plan, history and statistics")
 
     def as_dict(self) -> dict[str, Any]:
         lanes = {request.lane.value: {"requested": request.requested_accepted, "attempted": int(self.attempted.get(request.lane, 0)), "accepted": sum(item.lane is request.lane for item in self.entries)} for request in self.plan.cadence}
@@ -275,7 +289,7 @@ class BatchResult:
         if set(value) != required or value.get("schema") != SCHEMA or value.get("version") != VERSION:
             raise M08ContractError("batch result schema is unsupported or incomplete")
         plan = BatchPlan.from_dict(value["plan"])
-        if value["plan_digest"] != plan.digest() or not isinstance(value["attempts"], list) or not isinstance(value["accepted_entries"], list):
+        if value["plan_digest"] != plan.digest() or not isinstance(value["lanes"], Mapping) or not isinstance(value["statistics"], Mapping) or not isinstance(value["attempts"], list) or not isinstance(value["accepted_entries"], list):
             raise M08ContractError("batch result plan/history binding is invalid")
         attempts: list[AttemptRecord] = []
         for item in value["attempts"]:
@@ -288,6 +302,14 @@ class BatchResult:
             if not isinstance(item, Mapping) or set(item) != {"plan_digest", "lane", "attempt", "evidence"}:
                 raise M08ContractError("accepted entry fields are unsupported or incomplete")
             entries.append(AcceptedBatchEntry(item["plan_digest"], _lane(item["lane"]), item["attempt"], CandidateEvidence.from_dict(item["evidence"])))
+        expected_lanes = {request.lane.value for request in plan.cadence}
+        if set(value["lanes"]) != expected_lanes:
+            raise M08ContractError("batch result lane set is incomplete or unknown")
+        for key, lane in value["lanes"].items():
+            if not isinstance(lane, Mapping) or set(lane) != {"requested", "attempted", "accepted"}:
+                raise M08ContractError("batch result lane statistics are incomplete")
+            if any(type(lane[field]) is not int or lane[field] < 0 for field in ("requested", "attempted", "accepted")):
+                raise M08ContractError("batch result lane statistics are malformed")
         attempted = {_lane(key): item["attempted"] for key, item in value["lanes"].items()}
         result = cls(plan, tuple(entries), attempted, value["statistics"], value["status"], value["history_digest"], tuple(attempts))
         if result.as_dict() != dict(value):
@@ -304,25 +326,47 @@ def _normalize_history(plan: BatchPlan, history: Iterable[AcceptedBatchEntry | A
                 raise M08ContractError("resume history is bound to a different plan")
             normalized.append(AttemptRecord(item.lane, item.attempt, "ACCEPT", item.evidence.candidate_id, evidence=item.evidence, plan_digest=plan_digest))
         elif isinstance(item, AttemptRecord):
-            if item.plan_digest is not None and item.plan_digest != plan_digest:
+            if item.plan_digest != plan_digest:
                 raise M08ContractError("resume attempt is bound to a different plan")
             normalized.append(item)
         else:
             raise M08ContractError("resume history item is unsupported")
+    _validate_attempt_history(plan, normalized)
+    return sorted(normalized, key=lambda item: (next(index for index, request in enumerate(plan.cadence) if request.lane is item.lane), item.attempt))
+
+
+def _validate_attempt_history(plan: BatchPlan, attempts: Iterable[AttemptRecord]) -> None:
+    records = list(attempts)
+    plan_digest = plan.digest()
+    requests = {request.lane: request for request in plan.cadence}
     seen: set[tuple[LaneClass, int]] = set()
-    for item in normalized:
+    accepted_ids: set[str] = set()
+    for item in records:
         key = (item.lane, item.attempt)
-        if item.lane not in {request.lane for request in plan.cadence} or key in seen:
+        if item.plan_digest != plan_digest:
+            raise M08ContractError("attempt history is bound to a different plan")
+        request = requests.get(item.lane)
+        if request is None or key in seen:
             raise M08ContractError("resume history has an unknown or duplicate attempt")
-        budget = next(request.attempt_budget for request in plan.cadence if request.lane is item.lane)
-        if item.attempt >= budget:
+        if item.attempt >= request.attempt_budget:
             raise M08ContractError("resume history exceeds its finite lane budget")
+        if item.disposition == "ACCEPT":
+            if item.candidate_id in accepted_ids:
+                raise M08ContractError("resume history repeats an accepted candidate")
+            accepted_ids.add(item.candidate_id)
+            if sum(record.disposition == "ACCEPT" and record.lane is item.lane for record in records) > request.requested_accepted:
+                raise M08ContractError("accepted history exceeds a requested lane count")
+        elif item.disposition == "DUPLICATE" and (item.candidate_id != item.duplicate_of or item.duplicate_of not in accepted_ids):
+            raise M08ContractError("duplicate history does not reference a prior accepted candidate")
         seen.add(key)
     for request in plan.cadence:
-        lane_attempts = sorted(item.attempt for item in normalized if item.lane is request.lane)
+        lane_attempts = sorted(item.attempt for item in records if item.lane is request.lane)
         if lane_attempts != list(range(len(lane_attempts))):
             raise M08ContractError("resume history is not a contiguous deterministic prefix")
-    return sorted(normalized, key=lambda item: (next(index for index, request in enumerate(plan.cadence) if request.lane is item.lane), item.attempt))
+
+
+def _history_digest(plan: BatchPlan, attempts: Iterable[AttemptRecord], statistics: Mapping[str, int]) -> str:
+    return digest({"plan_digest": plan.digest(), "attempts": [item.as_dict() for item in attempts], "statistics": dict(sorted(statistics.items()))})
 
 
 def _stats(attempts: Iterable[AttemptRecord]) -> dict[str, int]:
@@ -377,7 +421,7 @@ def run_batch(plan: BatchPlan, producer: Callable[[LaneClass, int, int], Mapping
     interrupted = max_total_attempts is not None and len(attempts) >= max_total_attempts and not budgets_exhausted and not complete
     unavailable = bool(attempts) and all(item.disposition in {"UNAVAILABLE", "INCONCLUSIVE"} for item in attempts) and not complete
     status = "COMPLETE" if complete else "UNAVAILABLE" if unavailable else "PARTIAL" if interrupted else "EXHAUSTED" if budgets_exhausted else "PARTIAL"
-    history_digest = digest({"plan_digest": plan.digest(), "attempts": [item.as_dict() for item in attempts], "statistics": statistics})
+    history_digest = _history_digest(plan, attempts, statistics)
     return BatchResult(plan, entries, attempted, statistics, status, history_digest, tuple(attempts))
 
 

@@ -17,6 +17,7 @@ from scrubbots_pixel_factory import (
     verify_artifact_set,
 )
 from scrubbots_pixel_factory.difficulty_analysis import LaneClass
+from scrubbots_pixel_factory.m08_batch import digest
 
 
 def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvidence:
@@ -207,6 +208,75 @@ def test_statistics_and_lane_counts_cannot_be_inflated_without_history() -> None
     tampered["statistics"]["accepted"] = 1
     with pytest.raises(M08ContractError):
         type(result).from_dict(tampered)
+
+
+def _recompute_tampered_history(manifest: dict) -> dict:
+    attempts = manifest["attempts"]
+    statistics = {
+        "generated": len(attempts),
+        "accepted": sum(item["disposition"] == "ACCEPT" for item in attempts),
+        "rejected": sum(item["disposition"] == "REJECT" for item in attempts),
+        "duplicate": sum(item["disposition"] == "DUPLICATE" for item in attempts),
+        "unavailable": sum(item["disposition"] == "UNAVAILABLE" for item in attempts),
+        "inconclusive": sum(item["disposition"] == "INCONCLUSIVE" for item in attempts),
+        "error": sum(item["disposition"] == "ERROR" for item in attempts),
+    }
+    manifest["statistics"] = statistics
+    for lane, values in manifest["lanes"].items():
+        lane_attempts = [item for item in attempts if item["lane"] == lane]
+        values["attempted"] = len(lane_attempts)
+        values["accepted"] = sum(item["disposition"] == "ACCEPT" for item in lane_attempts)
+    manifest["history_digest"] = digest({"plan_digest": manifest["plan_digest"], "attempts": attempts, "statistics": statistics})
+    return manifest
+
+
+def test_restore_rejects_accepted_count_inflation_even_when_history_is_rehashed() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 13, "inflated")
+    result = run_batch(plan, lambda _lane, ordinal, _seed: {"disposition": "REJECT"} if ordinal == 0 else {"disposition": "ACCEPT", "evidence": _evidence("first")})
+    tampered = result.as_dict()
+    extra = _evidence("extra")
+    tampered["attempts"][1] = AttemptRecord(LaneClass.EASY, 1, "ACCEPT", "extra", evidence=extra, plan_digest=plan.digest()).as_dict()
+    tampered["accepted_entries"].append({"plan_digest": plan.digest(), "lane": LaneClass.EASY.value, "attempt": 1, "evidence": extra.as_dict()})
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(tampered))
+
+
+def test_restore_rejects_over_budget_and_non_contiguous_history() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 14, "bounded")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"}, max_total_attempts=1)
+    over_budget = result.as_dict()
+    over_budget["attempts"].append(AttemptRecord(LaneClass.EASY, 1, "REJECT", plan_digest=plan.digest()).as_dict())
+    over_budget["plan"]["cadence"][0]["attempt_budget"] = 1
+    over_budget["plan_digest"] = BatchPlan.from_dict(over_budget["plan"]).digest()
+    for attempt in over_budget["attempts"]:
+        attempt["plan_digest"] = over_budget["plan_digest"]
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(over_budget))
+
+    non_contiguous = result.as_dict()
+    non_contiguous["attempts"].append(AttemptRecord(LaneClass.EASY, 1, "REJECT", plan_digest=plan.digest()).as_dict())
+    non_contiguous["attempts"].pop(0)
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(non_contiguous))
+
+
+def test_restore_recomputes_history_digest_and_requires_exact_attempt_plan_binding() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 15, "digest")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+    arbitrary_digest = result.as_dict()
+    arbitrary_digest["history_digest"] = "0" * 64
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(arbitrary_digest)
+
+    missing_plan = result.as_dict()
+    missing_plan["attempts"][0]["plan_digest"] = None
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(missing_plan)
+
+    wrong_plan = result.as_dict()
+    wrong_plan["attempts"][0]["plan_digest"] = "f" * 64
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(wrong_plan)
     tampered = result.as_dict()
     tampered["lanes"]["EASY"]["attempted"] = 0
     with pytest.raises(M08ContractError):
