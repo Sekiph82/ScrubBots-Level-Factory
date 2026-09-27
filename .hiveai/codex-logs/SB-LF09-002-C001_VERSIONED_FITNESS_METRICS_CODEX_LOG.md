@@ -57,9 +57,15 @@ Implementation has not started at log creation. The authorized change is limited
 - Before implementation push: fetched `origin`; local implementation HEAD was `d8718f69b32fc6d1960c01ac42c80522bf9c2de4`, `origin/main` was `64e6795d44bc56d8eb00714c56f765432a460ebb`, and divergence was `1 0` (ahead-only).
 - Implementation push: non-forceful `git push origin HEAD:main` succeeded, advancing `origin/main` from `64e6795d44bc56d8eb00714c56f765432a460ebb` to `d8718f69b32fc6d1960c01ac42c80522bf9c2de4`.
 - The owner mirror remains untouched and dirty/behind. No sibling repository was used or altered. No `TASKS.md` or ChatGPT audit file was edited.
-- The separate builder-log publication commit and final post-push verification remain pending.
+- Separate log-publication commit: `c8125cd96d53b95ab77842834ba5d7e93a199dcf` — https://github.com/Sekiph82/ScrubBots-Level-Factory/commit/c8125cd96d53b95ab77842834ba5d7e93a199dcf
+- Log-publication push: non-forceful `git push origin HEAD:main` succeeded, advancing `origin/main` from `d8718f69b32fc6d1960c01ac42c80522bf9c2de4` to `c8125cd96d53b95ab77842834ba5d7e93a199dcf`.
+- Final verification before this append: at `2026-09-28T00:39:35.9895269+03:00`, local HEAD and `origin/main` both equaled `c8125cd96d53b95ab77842834ba5d7e93a199dcf`, divergence was `0 0`, and the execution worktree contained only this authorized uncommitted final log append.
+- A final append-only log-publication commit will publish this verification text; no prior prompt, log, audit, tracker, or owner file is rewritten.
 - Required final handoff marker: `AWAITING_CHATGPT_AUDIT`.
 
 ## Final publication verification
 
-- Pending final local HEAD, `origin/main`, divergence, worktree status, exact commit SHA and URL, push result, and final handoff marker.
+- Implementation commit: `d8718f69b32fc6d1960c01ac42c80522bf9c2de4` — https://github.com/Sekiph82/ScrubBots-Level-Factory/commit/d8718f69b32fc6d1960c01ac42c80522bf9c2de4
+- Separate log-publication commit: `c8125cd96d53b95ab77842834ba5d7e93a199dcf` — https://github.com/Sekiph82/ScrubBots-Level-Factory/commit/c8125cd96d53b95ab77842834ba5d7e93a199dcf
+- Final append-only publication commit: this append is the final log-publication step; its exact SHA is verified after commit.
+- Final handoff marker: `AWAITING_CHATGPT_AUDIT`.
