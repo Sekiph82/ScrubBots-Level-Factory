@@ -57,10 +57,9 @@ def _source_entry_guard(parent: MutationCandidate, source_context):
     from .mutation_source import SourceLinkedMutationContext
     if not isinstance(source_context, SourceLinkedMutationContext):
         return source_context, "source-linked parent requires an accepted M05 SourceLinkedMutationContext"
-    if source_context.record.source_sha256 != parent.source_art_sha256:
-        return source_context, "source-linked context record does not match the exact parent source identity"
     try:
-        return SourceLinkedMutationContext.establish(source_context.record), None
+        checked = SourceLinkedMutationContext.establish(source_context.record)
+        return checked.require_exact_parent_source(parent.source_art_sha256), None
     except Exception as exc:
         return source_context, f"source-linked M05 pre-check failed before operation: {type(exc).__name__}: {exc}"
 

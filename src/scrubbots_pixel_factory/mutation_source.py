@@ -27,6 +27,11 @@ class SourceLinkedMutationContext:
         report = verify_owner_source_preservation(self.record, analysis=analysis, derived_artifact_paths=derived_artifact_paths)
         return SourceLinkedMutationContext(self.record, self.before, report)
 
+    def require_exact_parent_source(self, source_sha256: str) -> "SourceLinkedMutationContext":
+        if type(source_sha256) is not str or self.record.source_sha256 != source_sha256:
+            raise MutationContractError("M05 source context record does not match the exact parent source identity")
+        return self
+
     @property
     def passed(self) -> bool:
         return self.before.disposition == "PASS" and self.after is not None and self.after.disposition == "PASS"
