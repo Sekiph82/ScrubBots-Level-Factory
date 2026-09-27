@@ -66,4 +66,3 @@ Record the exact implementation and separate log-publication SHAs and full
 GitHub URLs, every failed command and correction, changed files, focused and
 regression results, offline/security review, final status, and final equality
 or divergence with `origin/main`. Passing builder evidence is not acceptance.
-

@@ -26,4 +26,3 @@ preserving deterministic offline experimental behavior.
    compileall, Godot headless boot, diff/protected-file checks, and truthful
    unavailable-capability reporting pass. No owner-only, native-device,
    physical, subjective, or unavailable bridge acceptance may be claimed.
-
