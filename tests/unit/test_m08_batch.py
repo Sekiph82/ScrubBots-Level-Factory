@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 
 import pytest
 
@@ -19,18 +20,21 @@ from scrubbots_pixel_factory.difficulty_analysis import LaneClass
 
 
 def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvidence:
+    raw = {
+        "m03_digest": f"m03:{candidate}".encode(),
+        "m04_digest": f"m04:{candidate}".encode(),
+        "m04_lane_digest": f"lane:{candidate}".encode(),
+        "m05_digest": f"m05:{candidate}".encode(),
+        "level_data_digest": f"level:{candidate}".encode(),
+        "logical_art_digest": f"art:{candidate}".encode(),
+        "source_provenance_digest": f"source:{candidate}".encode(),
+        "generation_request_digest": f"request:{candidate}".encode(),
+        "generation_result_digest": f"result:{candidate}".encode(),
+        "generation_metadata_digest": f"generation:{candidate}".encode(),
+        "bundle_digest": f"bundle:{candidate}".encode(),
+    }
     values = {
-        "m03_digest": "a" * 64,
-        "m04_digest": "b" * 64,
-        "m04_lane_digest": "c" * 64,
-        "m05_digest": "d" * 64,
-        "level_data_digest": "e" * 64,
-        "logical_art_digest": "f" * 64,
-        "source_provenance_digest": "1" * 64,
-        "generation_request_digest": "2" * 64,
-        "generation_result_digest": "3" * 64,
-        "generation_metadata_digest": "4" * 64,
-        "bundle_digest": "5" * 64,
+        **{key: hashlib.sha256(value).hexdigest() for key, value in raw.items()},
         "level_data_ref": "level-data/" + candidate + ".json",
         "logical_art_ref": "art/" + candidate + ".png",
         "bundle_ref": "bundles/" + candidate,
@@ -41,6 +45,20 @@ def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvid
         "generation_ref": "generation/" + candidate + ".json",
     }
     return CandidateEvidence(candidate, lane, "ACCEPT", m04_disposition="ACCEPT", m05_disposition="ACCEPT", **values)
+
+
+def _artifact_map(evidence: CandidateEvidence) -> dict[str, bytes]:
+    candidate = evidence.candidate_id
+    return {
+        evidence.level_data_ref: f"level:{candidate}".encode(),
+        evidence.logical_art_ref: f"art:{candidate}".encode(),
+        evidence.bundle_ref: f"bundle:{candidate}".encode(),
+        evidence.source_provenance_ref: f"source:{candidate}".encode(),
+        evidence.m03_ref: f"m03:{candidate}".encode(),
+        evidence.m04_ref: f"m04:{candidate}".encode(),
+        evidence.m05_ref: f"m05:{candidate}".encode(),
+        evidence.generation_ref: f"generation:{candidate}".encode(),
+    }
 
 
 def test_deterministic_ordered_lane_cadence_counts_only_bound_evidence() -> None:
@@ -141,13 +159,15 @@ def test_owner_review_summary_is_separate_and_handoff_requires_latest_accept() -
     result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("candidate")})
     pending = build_handoff(result, "candidate", [])
     assert pending["disposition"] == "NOT_OWNER_ACCEPTED"
-    reject = {"candidate_id": "candidate", "artwork_sha256": "f" * 64, "disposition": "REJECT", "review_id": "review-1"}
-    accept = {"candidate_id": "candidate", "artwork_sha256": "f" * 64, "disposition": "ACCEPT", "review_id": "review-2"}
+    artwork_digest = result.entries[0].evidence.logical_art_digest
+    reject = {"candidate_id": "candidate", "artwork_sha256": artwork_digest, "disposition": "REJECT", "review_id": "review-1"}
+    accept = {"candidate_id": "candidate", "artwork_sha256": artwork_digest, "disposition": "ACCEPT", "review_id": "review-2"}
     summary = review_summary(result, [reject, accept])
     assert summary["OWNER_ACCEPTED"] == 1 and result.statistics["accepted"] == 1
-    ready = build_handoff(result, "candidate", [reject, accept])
+    ready = build_handoff(result, "candidate", [reject, accept], artifacts=_artifact_map(result.entries[0].evidence))
     assert ready["disposition"] == "READY" and "handoff_digest" in ready
-    assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}])["disposition"] == "NOT_OWNER_ACCEPTED"
+    assert build_handoff(result, "candidate", [reject, accept])["disposition"] == "UNAVAILABLE"
+    assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}], artifacts=_artifact_map(result.entries[0].evidence))["disposition"] == "NOT_OWNER_ACCEPTED"
     assert review_summary(result, [accept, reject]) == review_summary(result, [reject, accept])
     assert review_summary(result, [accept, dict(accept)])["INVALID_REVIEW_EVIDENCE"] == 1
 

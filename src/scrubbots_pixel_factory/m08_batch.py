@@ -454,14 +454,20 @@ def review_summary(result: BatchResult, reviews: Iterable[Mapping[str, Any]]) ->
     return {"NEEDS_REVIEW": sum(value == "NEEDS_REVIEW" for value in states.values()), "OWNER_ACCEPTED": sum(value == "OWNER_ACCEPTED" for value in states.values()), "OWNER_REJECTED": sum(value == "OWNER_REJECTED" for value in states.values()), "INVALID_REVIEW_EVIDENCE": len(invalid), "invalid_review_evidence": invalid, "states": dict(sorted(states.items()))}
 
 
-def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
+def build_handoff(result: BatchResult, candidate_id: str, reviews: Iterable[Mapping[str, Any]], *, artifacts: Mapping[str, bytes] | None = None) -> dict[str, Any]:
     entry = next((item for item in result.entries if item.evidence.candidate_id == candidate_id), None)
     if entry is None:
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_FACTORY_ACCEPTED", "candidate_id": candidate_id}
     chain, invalid = _review_chain(result, entry.evidence, reviews)
     if invalid or not chain or chain[-1]["disposition"] != "ACCEPT":
         return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "NOT_OWNER_ACCEPTED", "candidate_id": candidate_id, "batch_result_digest": result.digest()}
-    payload: dict[str, Any] = {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "READY", "batch_result_digest": result.digest(), "plan_digest": result.plan.digest(), "candidate": entry.as_dict(), "owner_review_chain": chain, "owner_review_chain_digest": digest({"chain": chain})}
+    if artifacts is None:
+        return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "UNAVAILABLE", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "reason": "immutable artifact bytes were not supplied for digest verification"}
+    try:
+        artifact_check = verify_artifact_set(entry.evidence, artifacts)
+    except M08ContractError as exc:
+        return {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "ERROR", "candidate_id": candidate_id, "batch_result_digest": result.digest(), "reason": str(exc)}
+    payload: dict[str, Any] = {"schema": HANDOFF_SCHEMA, "version": HANDOFF_VERSION, "disposition": "READY", "batch_result_digest": result.digest(), "plan_digest": result.plan.digest(), "candidate": entry.as_dict(), "owner_review_chain": chain, "owner_review_chain_digest": digest({"chain": chain}), "artifact_set_digest": artifact_check["artifact_set_digest"]}
     payload["handoff_digest"] = digest(payload)
     return payload
 
