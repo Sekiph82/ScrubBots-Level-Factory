@@ -39,6 +39,11 @@ Document role: CODEX BUILDER LOG
 - Product implementation commit: `db3bdcbc8450ba8e78283685126b9fb99020c836` (`Close M08 high rejection safety matrix`).
 - The product commit is ready for separate terminal log publication. The final master log will be created only after this task log is published and the remote SHA is verified.
 
+- Dedicated log commit: `6ec602faa6beaf58ecae20cbd50714ad05cd9e81` (`Record SB-LF08-009 R01 builder evidence`).
+- `git push origin HEAD:main` — exit `0`; no force or destructive synchronization was used.
+- Post-push verification: isolated `HEAD == origin/main == 6ec602faa6beaf58ecae20cbd50714ad05cd9e81`; divergence `0 0`; canonical mirror remains untouched.
+- Task marker: `READY_FOR_MASTER_LOG` (builder evidence only; independent audit remains pending for the complete R01 batch).
+
 ## Handoff
 
 - Pending implementation and independent ChatGPT audit. No acceptance or tracker-state claim is made by this builder log.
