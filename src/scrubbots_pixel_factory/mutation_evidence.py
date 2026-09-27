@@ -1,6 +1,6 @@
 """SB-LF07-004 adapters over accepted M03/M04/M05 producer objects."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 from typing import Any
@@ -11,7 +11,7 @@ from .difficulty_analysis import AnalysisDisposition, ChallengeScoreResult, Diff
 from .qa.unified import UnifiedQAReport, UnifiedQADisposition
 from .solver_evidence import SolverEvidenceReport
 from .mutation_base import MutationContractError
-from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationProvenance, MutationRequest, MutationResult, TypedEvidenceReference, ValidationEnvelope, _revalidate_mutation_from_records
+from .m07_services import EvidenceDisposition, EvidenceRecord, MutationDisposition, MutationProvenance, MutationRequest, MutationResult, ValidationEnvelope, _AUTHENTIC_EVIDENCE_ADAPTER_TOKEN, _revalidate_mutation_from_records
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +22,7 @@ class AuthenticEvidenceAdapter:
     producer_version: int
     record: EvidenceRecord
     producer_digest: str
+    _authentic_adapter_token: object | None = field(default=None, init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if type(self.stage) is not str or not self.stage:
@@ -30,6 +31,7 @@ class AuthenticEvidenceAdapter:
             raise MutationContractError("producer digest is not derived from the accepted producer object")
         if self.record.stage != self.stage or self.record.evidence_digest is None:
             raise MutationContractError("authentic evidence record is malformed")
+        object.__setattr__(self, "_authentic_adapter_token", _AUTHENTIC_EVIDENCE_ADAPTER_TOKEN)
 
 
 def _record(stage: str, disposition: EvidenceDisposition, mutation: MutationResult, payload: dict[str, object]) -> EvidenceRecord:
@@ -177,8 +179,7 @@ def provenance_from_authentic_validation(request: MutationRequest, mutation: Mut
         raise MutationContractError("typed production provenance requires the exact authentic validation envelope")
     if envelope.mutation_digest != mutation.digest() or mutation.child is None or envelope.child != mutation.child.identity:
         raise MutationContractError("typed production provenance is not bound to the exact mutation child")
-    references = tuple(TypedEvidenceReference(item.stage, item.record.evidence_digest, item.producer_digest) for item in adapters)
-    return MutationProvenance.seal_authentic(request, mutation, references, attempt_ordinal=attempt_ordinal)
+    return MutationProvenance._seal_from_authentic_adapters(request, mutation, envelope, adapters, attempt_ordinal=attempt_ordinal)
 
 
 __all__ = ["AuthenticEvidenceAdapter", "adapt_m03_solver", "adapt_m04_difficulty", "adapt_m05_qa", "revalidate_mutation_from_authentic_adapters", "provenance_from_authentic_validation"]

@@ -40,6 +40,7 @@ OWNER_SOURCE_SCHEMA = "scrubbots-owner-source-mutation-gate"
 OWNER_SOURCE_VERSION = 1
 
 _AUTHENTIC_PROVENANCE_TOKEN = object()
+_AUTHENTIC_EVIDENCE_ADAPTER_TOKEN = object()
 _AUTHENTIC_SAFETY_TOKEN = object()
 _AUTHENTIC_TARGET_TOKEN = object()
 
@@ -199,20 +200,46 @@ class MutationProvenance:
         return self._authenticity_token is _AUTHENTIC_PROVENANCE_TOKEN and self._authenticity_digest is not None and len(self.evidence_references) == 3
 
     @classmethod
-    def seal_authentic(
+    def _seal_from_authentic_adapters(
         cls,
         request: MutationRequest,
         result: MutationResult,
-        references: tuple[TypedEvidenceReference, ...],
+        envelope: "ValidationEnvelope",
+        adapters: tuple[object, ...],
         *,
         attempt_ordinal: int = 0,
     ) -> "MutationProvenance":
-        if any(not isinstance(ref, TypedEvidenceReference) for ref in references):
-            raise MutationContractError("authentic production provenance references are malformed")
-        if tuple(ref.stage for ref in references) != ("M03_SOLVER", "M04_DIFFICULTY", "M05_QA"):
-            raise MutationContractError("authentic production provenance requires ordered M03/M04/M05 references")
+        """Seal only the adapter/envelope boundary owned by mutation_evidence.
+
+        This is intentionally module-private and does not accept caller-created
+        TypedEvidenceReference values.  The adapter token prevents a structurally
+        similar object from entering the production sealing path.
+        """
+        if not isinstance(envelope, ValidationEnvelope) or len(adapters) != 3:
+            raise MutationContractError("authentic production provenance requires one validation envelope and three adapters")
+        expected_stages = ("M03_SOLVER", "M04_DIFFICULTY", "M05_QA")
+        if tuple(getattr(adapter, "stage", None) for adapter in adapters) != expected_stages:
+            raise MutationContractError("authentic producer stages are incomplete or reordered")
+        if envelope.mutation_digest != result.digest() or result.child is None or envelope.child != result.child.identity:
+            raise MutationContractError("authentic validation envelope is not bound to the exact mutation result")
+        envelope_records = (envelope.solver, envelope.difficulty, envelope.qa)
+        records: list[EvidenceRecord] = []
+        producer_digests: list[str] = []
+        for adapter, expected_record in zip(adapters, envelope_records):
+            if getattr(adapter, "_authentic_adapter_token", None) is not _AUTHENTIC_EVIDENCE_ADAPTER_TOKEN:
+                raise MutationContractError("production provenance requires authentic evidence adapters")
+            record = getattr(adapter, "record", None)
+            producer = getattr(adapter, "producer", None)
+            producer_digest = getattr(adapter, "producer_digest", None)
+            if not isinstance(record, EvidenceRecord) or record.canonical_dict() != expected_record.canonical_dict():
+                raise MutationContractError("authentic validation envelope does not contain the exact adapter records")
+            if not callable(getattr(producer, "digest", None)) or producer_digest != producer.digest():
+                raise MutationContractError("authentic producer digest drift")
+            records.append(record)
+            producer_digests.append(producer_digest)
         base = cls.from_result(request, result, attempt_ordinal=attempt_ordinal)
-        object.__setattr__(base, "evidence_references", tuple(references))
+        references = tuple(TypedEvidenceReference(stage, record.evidence_digest, producer_digest) for stage, record, producer_digest in zip(expected_stages, records, producer_digests))
+        object.__setattr__(base, "evidence_references", references)
         object.__setattr__(base, "evidence_digests", tuple(ref.evidence_digest for ref in references))
         object.__setattr__(base, "_authenticity_digest", _digest({"request_digest": base.request_digest, "post_state_digest": base.post_state_digest, "evidence_digests": list(base.evidence_digests), "evidence_references": [ref.canonical_dict() for ref in references]}))
         object.__setattr__(base, "_authenticity_token", _AUTHENTIC_PROVENANCE_TOKEN)
