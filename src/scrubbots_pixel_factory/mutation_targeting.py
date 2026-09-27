@@ -35,7 +35,7 @@ class AuthenticTargetCandidate:
             raise MutationContractError("target candidate evidence is not the exact authenticated envelope evidence")
 
 
-def build_typed_target(minimum: float, maximum: float, difficulty: AuthenticEvidenceAdapter, qa: AuthenticEvidenceAdapter) -> TypedChallengeTarget:
+def build_typed_target(minimum: float, maximum: float, difficulty: AuthenticEvidenceAdapter, qa: AuthenticEvidenceAdapter, *, required_constraints: tuple[str, ...] = ("load", "risk", "retention")) -> TypedChallengeTarget:
     if difficulty.stage != "M04_DIFFICULTY" or qa.stage != "M05_QA":
         raise MutationContractError("typed target requires authentic M04/M05 adapters")
     score = difficulty.record.payload.get("challenge_score")
@@ -43,15 +43,21 @@ def build_typed_target(minimum: float, maximum: float, difficulty: AuthenticEvid
     if type(score) not in (int, float) or not math.isfinite(float(score)) or type(policy) is not str:
         raise MutationContractError("accepted M04 Challenge Score/policy evidence is unavailable")
     policy_digest = _challenge_score_policy_digest(policy)
-    # No accepted repository producer currently supplies load, risk, or retention
-    # truth. A generic M05 ACCEPT is structural QA, not these constraints.
-    safety = SafetyConstraintEvidence("scrubbots-m07-safety-availability", "UNAVAILABLE", policy_digest, False, False, False, "0" * 64)
-    return TypedChallengeTarget(minimum, maximum, policy_digest, safety)
+    required_constraints = tuple(required_constraints)
+    if required_constraints == ("load", "risk", "retention"):
+        safety = SafetyConstraintEvidence.unavailable(policy_digest)
+    elif required_constraints == ():
+        safety = SafetyConstraintEvidence.no_constraints_requested(policy_digest)
+    else:
+        raise MutationContractError("target safety requirements must use the explicit full or no-constraint mode")
+    return TypedChallengeTarget._from_authority(minimum, maximum, policy_digest, safety)
 
 
 def select_authentic_target(target: TypedChallengeTarget, candidates: Sequence[AuthenticTargetCandidate]) -> TargetSelection:
-    if not isinstance(target, TypedChallengeTarget):
+    if not isinstance(target, TypedChallengeTarget) or not target.is_authentic_sealed:
         raise MutationContractError("typed target is required")
+    if target.safety.availability == "UNAVAILABLE" and target.safety.required_constraints:
+        return TargetSelection(TargetDisposition.UNAVAILABLE, target.digest(), None, "authentic safety capability is unavailable", _digest({"target": target.digest(), "selected": None, "reason": "authentic safety capability is unavailable"}))
     matches: list[ValidationEnvelope] = []
     saw_unavailable = False
     saw_inconclusive = False
@@ -67,7 +73,7 @@ def select_authentic_target(target: TypedChallengeTarget, candidates: Sequence[A
             continue
         score = item.envelope.challenge_score
         candidate_policy = _challenge_score_policy_digest(item.difficulty.record.payload.get("policy_version")) if type(item.difficulty.record.payload.get("policy_version")) is str else None
-        if candidate_policy != target.policy_digest or not target.safety.load_ok or not target.safety.risk_ok or not target.safety.retention_ok or score is None:
+        if candidate_policy != target.policy_digest or score is None:
             saw_inconclusive = True
             continue
         if target.minimum <= score <= target.maximum:
