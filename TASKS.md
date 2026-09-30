@@ -5,11 +5,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: SB-LF09.C001 — Experimental evolutionary selection
+- Current Sprint: SB-LF09.C001 — Telemetry calibration policy implementation
 - Current Task: SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy
-- Current Task Status: OWNER_REQUIRED / M09-004_ANALYTICS_DATA_POLICY
-- Next Task/Action: Owner must approve the analytics/data policy, telemetry scope, privacy/retention rules, and permitted calibration evidence before ChatGPT can publish any Codex implementation prompt or audit criteria; Codex must not begin SB-LF09-004.
-- Required Actor: OWNER
+- Current Task Status: AUTHORIZED / OWNER_POLICY_APPROVED / IMPLEMENT_THEN_AUDIT
+- Next Task/Action: Codex executes `SB-LF09-004-C001` from `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md` under owner-approved `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`, creates the dedicated builder log, never edits `TASKS.md` or ChatGPT audits, then stops for independent audit.
+- Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: None — SB-LF09-004 is blocked pending approved analytics/data policy.
-- Current Prompt: None — ChatGPT will publish a bounded prompt only after the owner-policy gate is satisfied.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -41,6 +41,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF09-003 C001 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`.
 - SB-LF09-003 C001 Implementation Commit: `e404b5d35da96f4334506098fdb39ccbe44f0f0e`.
 - SB-LF09-003 C001 Final Builder Publication: `bcf520dcf407c53c7629bb725f4c25c3d2daf151`.
+- SB-LF09-004 Owner Policy: `APPROVED 2026-09-30` by `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`.
+- SB-LF09-004 C001 Authorization: `SB-LF09-004-C001 — IMPLEMENT_THEN_AUDIT`.
+- SB-LF09-004 C001 Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
+- SB-LF09-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -638,7 +642,7 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 ### M09.04 - Telemetry calibration policy
 
-- [ ] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
+- [~] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
 
 ### M09.05 - Runtime prohibition, lineage, cost and promotion audit
 
