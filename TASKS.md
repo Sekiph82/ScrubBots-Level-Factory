@@ -299,10 +299,11 @@ Additional inline tags do not replace checkbox state:
 - Canonical LF/CP engineering/migration coverage: **116 / 224 = 51.79%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
-- Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **84 / 244 = 34.43%**.
-- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **84 / 216 = 38.89%**.
+- Two owner-approved Content Platform integrity extensions are live as `SB-CPX-001..002` and are outside the fixed 224 LF/CP source-requirement denominator.
+- Unified live task denominator: **246** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 2 Content Platform integrity extensions.
+- Unified verified completion: **84 / 246 = 34.15%**.
+- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **218 live tasks**.
+- Conservative verified local completion: **84 / 218 = 38.53%**.
 - Level Factory + unique extension surface: **132 tasks**; **84 / 132 = 63.64% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
@@ -730,6 +731,10 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP01-009 — Deterministic bytes where container permits. [PARTIAL]
 - [ ] SB-CP01-010 — Reject unsupported versions safely. [PARTIAL]
 
+### M12.04 - Solver-proven supply identity extension
+
+- [ ] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
+
 ---
 
 # M13 - Remote Manifest & Content Versioning
@@ -783,6 +788,10 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP03-010 — No silent live overwrite.
 - [ ] SB-CP03-011 — One-command publish only after stages individually testable.
 - [ ] SB-CP03-012 — Publish report.
+
+### M14.04 - Current-main supply replay promotion gate
+
+- [ ] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
 
 ---
 
@@ -954,6 +963,7 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
 - PAG-SP11/PAG-SP12/PAG-SP13 are the three legacy unique extension tasks retained under M09.06.
 - `SB-LFX-001..017` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
+- `SB-CPX-001..002` are owner-approved Content Platform integrity extensions for exact solver-proven supply-plan packaging and current-main promotion replay; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
 - Windows Factory Studio v1.3.6 is retained as M06 migration evidence; its operator/provider/job/accounting layers are reusable, while its legacy compiler is not canonical.
 
