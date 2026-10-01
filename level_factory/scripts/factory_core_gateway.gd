@@ -25,9 +25,9 @@ const STUDIO_EXTENSION_OPERATION := "studio-extension"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
 const FUTURE_ACTION_REASONS := {
-	"Solve": "UNAVAILABLE — gameplay solver is pending M03; WFC is not used as the gameplay solver.",
+	"Solve": "UNAVAILABLE — use the canonical ZIP pipeline; WFC is not the gameplay solver.",
 	"Validate": "UNAVAILABLE — no standalone canonical validation capability is connected.",
-	"Analyze": "UNAVAILABLE — analysis is pending M04.",
+	"Analyze": "UNAVAILABLE — official Difficulty V1 analysis is not connected.",
 }
 
 var python_executable := ""

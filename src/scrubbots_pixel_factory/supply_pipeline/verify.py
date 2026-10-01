@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from .game_rules import GameRules, find_godot
+from .contracts import validate_column_count
 from .scrubbots_solver import ScrubBotsSolver
 from .solution_verifier import SolutionVerifier
 
@@ -35,13 +36,18 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path) -> dic
     if type(bound) is not int or bound < 1:
         return {"state": "ERROR", "disposition": "ERROR", "reason": "maxRobotsPerBatch must be a positive integer per-plan bound"}
     try:
-        rules = GameRules()
+        selected_columns = validate_column_count(plan.get("columnCount"))
+        if plan.get("visiblePreviewDepth") != 3:
+            return {"state": "ERROR", "disposition": "ERROR", "reason": "visiblePreviewDepth must be exactly 3"}
+        rules = GameRules(column_count=selected_columns)
     except FileNotFoundError as exc:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": str(exc)}
     if find_godot() is None:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "Godot executable unavailable"}
-    if plan["levelId"] != level.get("id") or plan["columnCount"] != rules.column_count or plan["visiblePreviewDepth"] != rules.preview_depth:
+    if plan["levelId"] != level.get("id") or plan["columnCount"] != selected_columns or plan["visiblePreviewDepth"] != 3:
         return {"state": "ERROR", "disposition": "ERROR", "reason": "plan and current game dimensions do not match"}
+    if not rules.live_column_verification_available:
+        return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "live game column compatibility is pending the separate game task", "column_count": selected_columns, "authority": rules.authority}
     level_palette = [_hex(value) for value in level.get("palette", [])]
     cid_to_hex = {cid: _hex(color) for cid, color in rules.palette}
     local_by_hex = {value: index for index, value in enumerate(level_palette)}
@@ -62,7 +68,7 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path) -> dic
             columns.append(parsed)
     except (KeyError, TypeError, ValueError) as exc:
         return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc)}
-    if len(columns) != rules.column_count:
+    if len(columns) != selected_columns:
         return {"state": "ERROR", "disposition": "ERROR", "reason": "supply column count mismatch"}
     cells = [int(value) for value in level.get("cells", [])]
     counts: dict[int, int] = {}
@@ -74,7 +80,7 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path) -> dic
     except (OSError, RuntimeError, ValueError) as exc:
         return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc), "authority": rules.authority}
     record = response.get("results", [{}])[0]
-    verification = SolutionVerifier().verify(counts, sum(counts.values()), columns, record)
+    verification = SolutionVerifier().verify(counts, sum(counts.values()), columns, record, selected_columns)
     ready = record.get("status") == "SOLVED" and verification["all_ok"]
     return {
         "schema": "scrubbots-primary-supply-verification/v1",

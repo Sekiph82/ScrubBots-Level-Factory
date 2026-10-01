@@ -16,9 +16,7 @@ class DifficultyModel:
     def __init__(self, rules):
         self.rules = rules
 
-    def band_for(self, image_score, override=None):
-        if override in CLASSES:
-            return override
+    def band_for(self, image_score):
         for cls, edge in zip(CLASSES, COMPLEXITY_EDGES):
             if image_score < edge:
                 return cls
@@ -33,9 +31,10 @@ class DifficultyModel:
         t = max(0.0, min(1.0, (image_score - left[i]) / (right[i] - left[i])))
         return min(hi - t * (hi - lo), float(self.rules.max_robots_per_batch or 10 ** 9))
 
-    def plan_size(self, playable, mean):
-        total = max(self.rules.column_count, round(playable / mean))
-        return total, math.ceil(total / self.rules.column_count)
+    def plan_size(self, playable, mean, column_count=None):
+        columns = self.rules.column_count if column_count is None else column_count
+        total = max(columns, round(playable / mean))
+        return total, math.ceil(total / columns)
 
     def final(self, official, image_score, gameplay):
         """official: bridge difficultyV1 (ok + challengeScore) or None (non-production image).
@@ -43,8 +42,4 @@ class DifficultyModel:
         if official and official.get("ok"):
             d = float(official["challengeScore"])
             return self.rules.classify(d), round(d, 2), "ScrubBots Difficulty V1 challengeScore (official analyzer)"
-        # provisional: transparent/non-production images cannot be analysed by the game
-        d = 0.5 * image_score + 0.5 * gameplay.get("pressure_index", 0.0)
-        return self.rules.classify(d), round(d, 2), "PROVISIONAL image+solver blend (official analyzer needs a full-canvas level)"
-
-
+        return None, None, "UNAVAILABLE — official ScrubBots Difficulty V1 evidence is required"

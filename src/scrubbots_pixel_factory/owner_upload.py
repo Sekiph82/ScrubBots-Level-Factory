@@ -166,8 +166,8 @@ def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
             "claims": {
                 "candidate": "NOT AVAILABLE — this task stores source bytes only.",
                 "quality": "NOT AVAILABLE — validation is pending SB-LFX-004.",
-                "solver": "NOT AVAILABLE — gameplay solver is pending M03.",
-                "difficulty": "NOT AVAILABLE — measured difficulty is pending M04.",
+                "solver": "NOT AVAILABLE — canonical ZIP solver evidence is not connected.",
+                "difficulty": "NOT AVAILABLE — official Difficulty V1 evidence is not connected.",
                 "owner_acceptance": "NOT AVAILABLE — owner acceptance is not performed by source ingestion.",
             },
         }

@@ -5,7 +5,6 @@ extends VBoxContainer
 ## Generate target draft and action presentation for Factory Studio.
 ## Python Factory Core remains the authority for request interpretation and artifacts.
 
-const CANONICAL_DIFFICULTIES: Array[String] = ["EASY", "MEDIUM", "HARD", "VERY_HARD"]
 const CANONICAL_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
 const ACTIONS: Array[String] = ["Generate", "Solve", "Validate", "Analyze", "Reproduce"]
 const MIN_DIMENSION := 20
@@ -17,7 +16,6 @@ const ART_EDITOR_SCRIPT_PATH := "res://scripts/factory_studio_art_editor.gd"
 const PUZZLE_CONFIG_GATE_SCRIPT_PATH := "res://scripts/factory_studio_puzzle_config_gate.gd"
 const ART_REVALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_art_revalidation.gd"
 
-var difficulty_control: OptionButton
 var width_control: SpinBox
 var height_control: SpinBox
 var seed_control: LineEdit
@@ -70,14 +68,6 @@ func _build_controls() -> void:
 		var puzzle_config_gate := puzzle_config_gate_script.new() as Node
 		puzzle_config_gate.name = "ApprovedPuzzleConfigGate"
 		add_child(puzzle_config_gate)
-
-	difficulty_control = OptionButton.new()
-	difficulty_control.name = "Difficulty"
-	for difficulty in CANONICAL_DIFFICULTIES:
-		difficulty_control.add_item(difficulty)
-	difficulty_control.select(0)
-	difficulty_control.item_selected.connect(_on_control_changed)
-	add_child(_make_row("Difficulty", difficulty_control))
 
 	width_control = _make_dimension_control("Width")
 	add_child(_make_row("Width", width_control))
@@ -193,7 +183,6 @@ func draft_snapshot() -> Dictionary:
 		"state": "DRAFT",
 		"core_validation": "UNAVAILABLE",
 		"generation_state": "NOT EXECUTED — presentation draft only",
-		"difficulty": _selected_option(difficulty_control, CANONICAL_DIFFICULTIES[0]),
 		"width": int(width_control.value) if width_control != null else MIN_DIMENSION,
 		"height": int(height_control.value) if height_control != null else MIN_DIMENSION,
 		"seed": seed_control.text if seed_control != null else "",
@@ -226,7 +215,7 @@ func _refresh_draft_readout() -> void:
 		snapshot["generation_state"],
 		snapshot["width"],
 		snapshot["height"],
-		snapshot["difficulty"],
+		 "automatic gameplay band after ZIP Difficulty V1",
 		snapshot["mode"],
 		snapshot["seed"],
 		snapshot["candidate_presentation"],

@@ -11,14 +11,21 @@ import shutil
 import subprocess
 from pathlib import Path
 
+from .contracts import BASELINE_SLOT_COUNT, VISIBLE_PREVIEW_DEPTH, validate_column_count
+
 DEFAULT_PROJECT = Path.home() / "Desktop" / "Scrubbots"
 
 
 def _gd_const(path, name):
-    m = re.search(rf"const\s+{name}\s*:?=\s*(\d+)", Path(path).read_text(encoding="utf-8"))
+    m = re.search(rf"const\s+{name}(?:\s*:\s*[A-Za-z_][A-Za-z0-9_]*)?\s*(?::=|=)\s*(\d+)", Path(path).read_text(encoding="utf-8"))
     if not m:
         raise RuntimeError(f"constant {name} not found in {path}")
     return int(m.group(1))
+
+
+def _gd_const_optional(path, name):
+    m = re.search(rf"const\s+{name}(?:\s*:\s*[A-Za-z_][A-Za-z0-9_]*)?\s*(?::=|=)\s*(\d+)", Path(path).read_text(encoding="utf-8"))
+    return int(m.group(1)) if m else None
 
 
 def find_godot():
@@ -35,7 +42,7 @@ def find_godot():
 
 
 class GameRules:
-    def __init__(self, project=None, batch_cap="none"):
+    def __init__(self, project=None, batch_cap="none", column_count=None):
         """Read the current game's dimensions, palette and difficulty authority.
 
         ``batch_cap`` is retained as a compatibility argument for callers that
@@ -50,13 +57,35 @@ class GameRules:
         loader = p / "scripts/gameplay/supply/supply_plan_loader.gd"
         self.loader_cap = None
         self.max_robots_per_batch = None
-        self.column_count = _gd_const(loader, "COLUMN_COUNT")
-        self.preview_depth = _gd_const(loader, "VISIBLE_PREVIEW_DEPTH")
+        fixed_columns = _gd_const_optional(loader, "COLUMN_COUNT")
+        self.game_min_columns = _gd_const_optional(loader, "MIN_COLUMNS")
+        self.game_max_columns = _gd_const_optional(loader, "MAX_COLUMNS")
+        self.game_column_count = fixed_columns if fixed_columns is not None else self.game_min_columns
+        if self.game_column_count is None:
+            raise RuntimeError(f"column-count authority not found in {loader}")
+        self.game_preview_depth = _gd_const(loader, "VISIBLE_PREVIEW_DEPTH")
+        self.column_count = validate_column_count(
+            self.game_column_count if column_count is None else column_count
+        )
+        self.preview_depth = VISIBLE_PREVIEW_DEPTH
         self.slot_count = _gd_const(p / "scripts/gameplay/solver/proof_state.gd", "SLOT_COUNT")
+        self.baseline_slot_count = BASELINE_SLOT_COUNT
         prog = json.loads((p / "data/config/level_progression_v1.json").read_text(encoding="utf-8"))
         self.lanes = {k: float(v["base"]) for k, v in prog["lanes"].items()}
         pal = json.loads((p / "data/palettes/scrubbots_palette_v3.json").read_text(encoding="utf-8"))
         self.palette = [(c["id"], c["hex"].upper()) for c in pal["colors"]]  # [(C01, #FF4500), ...]
+
+    @property
+    def live_column_verification_available(self):
+        """Whether the checked-out game loader can validate this product plan."""
+
+        supports_selected = (
+            self.game_min_columns is not None
+            and self.game_max_columns is not None
+            and self.game_min_columns <= self.column_count <= self.game_max_columns
+        )
+        fixed_matches = self.game_column_count == self.column_count
+        return (supports_selected or fixed_matches) and self.game_preview_depth == self.preview_depth
 
     @staticmethod
     def _authority_identity(project: Path) -> dict[str, str]:

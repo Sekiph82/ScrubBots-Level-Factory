@@ -39,8 +39,8 @@ var _quality_decision := ""
 var _quality_rejection_codes: Array = []
 var _structural_metrics: Dictionary = {}
 var _canonical_quality_evidence: Dictionary = {}
-var _solution_disposition := "UNAVAILABLE — gameplay solver pending M03."
-var _difficulty_disposition := "UNAVAILABLE — Difficulty Intelligence pending M04."
+var _solution_disposition := "UNAVAILABLE — canonical ZIP solver evidence is not connected."
+var _difficulty_disposition := "UNAVAILABLE — official Difficulty V1 evidence is not connected."
 var _load_risk_disposition := "UNAVAILABLE — no canonical gameplay load/risk model exists yet."
 var _retained_after_failure := false
 var _error_message := ""
@@ -304,7 +304,7 @@ func _refresh_labels() -> void:
 			_state_label.text = "Evidence panel: ERROR — %s%s" % [_error_message, " Prior evidence is retained/stale." if _retained_after_failure else ""]
 		else:
 			_state_label.text = "Evidence panel: READY%s" % retention
-		_identity_label.text = "Identity / provenance\nCandidate=%s | grid_hash=%s | dimensions=%sx%s | action=%s\nGenerator=%s %s (%s) | request=%s v%s | target/request difficulty=%s\nBundle=%s\nMetadata=%s" % [
+		_identity_label.text = "Identity / provenance\nCandidate=%s | grid_hash=%s | dimensions=%sx%s | action=%s\nGenerator=%s %s (%s) | canonical request=%s v%s | official difficulty evidence=%s\nBundle=%s\nMetadata=%s" % [
 			_candidate_id,
 			_grid_hash,
 			_logical_width,

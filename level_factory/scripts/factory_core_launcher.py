@@ -164,8 +164,8 @@ def _dashboard_projection(manifest_path: Path) -> dict[str, object]:
         "latest_attempt": latest_attempt,
         "unavailable": {
             "owner_review": "NOT AVAILABLE — no canonical owner-review queue is connected.",
-            "solver": "NOT AVAILABLE — gameplay solver evidence is pending M03.",
-            "difficulty_v1": "NOT AVAILABLE — measured Difficulty V1 is pending M04.",
+            "solver": "NOT AVAILABLE — canonical ZIP solver evidence is not connected.",
+            "difficulty_v1": "NOT AVAILABLE — official Difficulty V1 evidence is not connected.",
             "timing": "NOT AVAILABLE — canonical batch timing evidence is not recorded.",
             "provider_cost": "NOT AVAILABLE — provider accounting is not connected.",
         },
@@ -416,7 +416,7 @@ def _primary_supply_main(arguments: Sequence[str]) -> int:
     parser.add_argument("--level-id", default="pixelart_level")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--candidates", type=int, default=300)
-    parser.add_argument("--target", choices=("EASY", "MEDIUM", "HARD", "VERY_HARD"))
+    parser.add_argument("--column-count", type=int, choices=(3, 4, 5), default=3)
     parser.add_argument("--verify-top", type=int, default=1)
     parser.add_argument("--screen-budget", type=int, default=3000)
     parser.add_argument("--metric-top", type=int, default=12)
@@ -427,7 +427,7 @@ def _primary_supply_main(arguments: Sequence[str]) -> int:
     from scrubbots_pixel_factory.supply_pipeline.primary import run_primary_supply_pipeline
     payload = run_primary_supply_pipeline(
         args.image, output=args.output, level_id=args.level_id, seed=args.seed,
-        candidates=args.candidates, target=args.target, verify_top=args.verify_top,
+        candidates=args.candidates, column_count=args.column_count, verify_top=args.verify_top,
         screen_budget=args.screen_budget, metric_top=args.metric_top,
         viability_budget=args.viability_budget, real_max_visited=args.real_max_visited,
         level_number=args.level_number,

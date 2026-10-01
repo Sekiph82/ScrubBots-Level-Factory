@@ -95,7 +95,7 @@ def _supply_optimize(args: argparse.Namespace) -> ExitCode:
 
     payload = run_primary_supply_pipeline(
         args.image, output=args.output, level_id=args.level_id, seed=args.seed,
-        candidates=args.candidates, target=args.target, verify_top=args.verify_top,
+        candidates=args.candidates, column_count=args.column_count, verify_top=args.verify_top,
         screen_budget=args.screen_budget, metric_top=args.metric_top,
         viability_budget=args.viability_budget, real_max_visited=args.real_max_visited,
         level_number=args.level_number,
@@ -956,7 +956,7 @@ def _parser() -> argparse.ArgumentParser:
     supply_optimize.add_argument("--level-id", default="pixelart_level")
     supply_optimize.add_argument("--seed", type=int, default=0)
     supply_optimize.add_argument("--candidates", type=int, default=300)
-    supply_optimize.add_argument("--target", choices=("EASY", "MEDIUM", "HARD", "VERY_HARD"))
+    supply_optimize.add_argument("--column-count", type=int, choices=(3, 4, 5), default=3)
     supply_optimize.add_argument("--verify-top", type=int, default=1)
     supply_optimize.add_argument("--screen-budget", type=int, default=3000)
     supply_optimize.add_argument("--metric-top", type=int, default=12)

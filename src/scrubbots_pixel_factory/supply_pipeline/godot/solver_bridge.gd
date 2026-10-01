@@ -4,7 +4,7 @@ extends SceneTree
 ##
 ##   godot --headless --path <ScrubBots> -s <this file> -- <request.json> <response.json>
 ##
-## For each candidate supply (3 FIFO columns of {color: local palette index, count}) it:
+## For each candidate supply (3..5 FIFO columns of {color: local palette index, count}) it:
 ##   1. builds a real LevelData + BatchSupplyEngine (ColorBatch.make / load_candidate);
 ##   2. builds the initial ProofState (transparent source pixels start CLEARED: open space);
 ##   3. runs the game's SolvabilitySolver.solve (bounded, deterministic DFS over the real
@@ -22,6 +22,9 @@ const ProofState = preload("res://scripts/gameplay/solver/proof_state.gd")
 const SolvabilitySolver = preload("res://scripts/gameplay/solver/solvability_solver.gd")
 const SupplyPlanLoader = preload("res://scripts/gameplay/supply/supply_plan_loader.gd")
 const Analyzer = preload("res://scripts/difficulty/level_difficulty_analyzer_v1.gd")
+const MIN_COLUMNS := 3
+const MAX_COLUMNS := 5
+const VISIBLE_PREVIEW_DEPTH := 3
 
 func _initialize() -> void:
 	var args := OS.get_cmdline_user_args()
@@ -34,13 +37,19 @@ func _initialize() -> void:
 		printerr("bad request json")
 		quit(2)
 		return
+	var selected_column_count := int(req.get("column_count", MIN_COLUMNS))
+	var selected_preview_depth := int(req.get("visible_preview_depth", VISIBLE_PREVIEW_DEPTH))
 	var out := {"schema": "pixelartstudio.scrubbots_bridge.v1",
 		"authority": req.get("game_authority", {"git_head": "UNAVAILABLE"}),
 		"gameConstants": {"slotCount": ProofState.SLOT_COUNT,
 			"batchCountPolicy": "positive per-plan metadata bound; no global cap",
-			"columnCount": SupplyPlanLoader.COLUMN_COUNT,
-			"previewDepth": SupplyPlanLoader.VISIBLE_PREVIEW_DEPTH},
+			"columnCount": selected_column_count,
+			"previewDepth": VISIBLE_PREVIEW_DEPTH},
 		"results": []}
+	if selected_column_count < MIN_COLUMNS or selected_column_count > MAX_COLUMNS or selected_preview_depth != VISIBLE_PREVIEW_DEPTH:
+		printerr("invalid Level Factory supply contract")
+		quit(2)
+		return
 	var lv: Dictionary = req["level"]
 	var cells := PackedInt32Array()
 	var transparent: Array = []
@@ -63,7 +72,7 @@ func _initialize() -> void:
 	for i in range(cands.size()):
 		var cand: Dictionary = cands[i]
 		var rec := {"id": cand["id"]}
-		var eng = _engine(cand["columns"], level)
+		var eng = _engine(cand["columns"], level, selected_column_count)
 		if eng == null:
 			rec["status"] = "MALFORMED"
 			out["results"].append(rec)
@@ -108,9 +117,9 @@ func _initialize() -> void:
 	f.close()
 	quit(0)
 
-func _engine(columns: Array, level):
-	var eng = BatchSupplyEngine.create(3, 3)
-	if eng == null or columns.size() != 3:
+func _engine(columns: Array, level, column_count: int):
+	var eng = BatchSupplyEngine.create(column_count, 3)
+	if eng == null or columns.size() != column_count:
 		return null
 	var cols: Array = []
 	var n := 0

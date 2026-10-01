@@ -19,7 +19,7 @@ func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 
 func save_generate_preset() -> void:
 	if _gateway == null: return
-	_projection = _gateway.call("run_studio_extension", "preset-save", {"preset_id": _id.text.strip_edges(), "name": _name.text.strip_edges(), "operation": "Generate", "settings": {"difficulty": "EASY", "width": 20, "height": 20, "seed": 0, "mode": "MASK"}})
+	_projection = _gateway.call("run_studio_extension", "preset-save", {"preset_id": _id.text.strip_edges(), "name": _name.text.strip_edges(), "operation": "Generate", "settings": {"width": 20, "height": 20, "seed": 0, "mode": "MASK"}})
 	_render()
 
 

@@ -2,8 +2,8 @@
 
 
 class SolutionVerifier:
-    def verify(self, counts, playable, columns, real):
-        """counts: {local color: exact image count}; columns: 3 lists of (color, count);
+    def verify(self, counts, playable, columns, real, expected_column_count=None):
+        """counts: {local color: exact image count}; columns: 3..5 lists of (color, count);
         real: bridge result for this candidate (SolvabilitySolver + replay)."""
         flat = [b for col in columns for b in col]
         per = {}
@@ -21,6 +21,8 @@ class SolutionVerifier:
                 fifo_ok = False
                 break
             ptr[c] += 1
+        expected_columns = len(columns) if expected_column_count is None else expected_column_count
+        valid_column_count = type(expected_columns) is int and 3 <= expected_columns <= 5
         checks = {
             "histogram_sums_to_playable": sum(counts.values()) == playable,
             "per_color_supply_equals_image": per == counts,
@@ -28,7 +30,8 @@ class SolutionVerifier:
             "all_batches_sum_to_playable": sum(n for _, n in flat) == playable,
             "columns_sum_to_playable": sum(col_tot) == playable,
             "every_batch_positive": all(n >= 1 for _, n in flat),
-            "three_nonempty_columns": len(columns) == 3 and all(columns),
+            "selected_column_count_valid": valid_column_count and len(columns) == expected_columns,
+            "selected_columns_nonempty": valid_column_count and all(columns),
             "solver_status_SOLVED": real.get("status") == "SOLVED",
             "replay_ok": bool(rp.get("ok")),
             "replay_reaches_WIN": bool(rp.get("solved")),
@@ -36,5 +39,4 @@ class SolutionVerifier:
             "trace_consumes_all_supply_in_FIFO_order": fifo_ok and ptr == [len(c) for c in columns],
         }
         return {"all_ok": all(checks.values()), "checks": checks, "column_pixel_totals": col_tot}
-
 

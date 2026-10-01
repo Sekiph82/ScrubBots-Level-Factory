@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .game_rules import GameRules, find_godot
+from .contracts import DEFAULT_COLUMN_COUNT, validate_column_count
 from .supply_exporter import SupplyExporter
 from .supply_optimizer import NoValidSupply, SupplyOptimizer
 
@@ -19,7 +20,7 @@ PIPELINE_SCHEMA = "scrubbots-primary-supply-pipeline/v1"
 ROUTE_ID = "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY"
 
 
-def _unavailable(reason: str, *, image: Path, level_id: str) -> dict[str, Any]:
+def _unavailable(reason: str, *, image: Path, level_id: str, column_count: int = DEFAULT_COLUMN_COUNT) -> dict[str, Any]:
     return {
         "schema": PIPELINE_SCHEMA,
         "route": ROUTE_ID,
@@ -27,6 +28,8 @@ def _unavailable(reason: str, *, image: Path, level_id: str) -> dict[str, Any]:
         "disposition": "UNAVAILABLE",
         "level_id": level_id,
         "image_path": str(image),
+        "column_count": column_count,
+        "visible_preview_depth": 3,
         "reason": reason[:512],
         "screening": {"role": "RANKING_ONLY", "acceptance_authority": "NOT AVAILABLE"},
     }
@@ -39,7 +42,7 @@ def run_primary_supply_pipeline(
     level_id: str = "pixelart_level",
     seed: int = 0,
     candidates: int = 300,
-    target: str | None = None,
+    column_count: int = DEFAULT_COLUMN_COUNT,
     verify_top: int = 1,
     screen_budget: int = 3000,
     metric_top: int = 12,
@@ -47,24 +50,34 @@ def run_primary_supply_pipeline(
     real_max_visited: int | None = None,
     level_number: int = 1,
     progress: Callable[[str], None] | None = None,
+    game_project: str | Path | None = None,
+    rules: GameRules | None = None,
+    solver: Any | None = None,
 ) -> dict[str, Any]:
     image_path = Path(image).expanduser().resolve()
     output_path = Path(output).expanduser().resolve()
-    if not image_path.is_file():
-        return _unavailable("local image input does not exist", image=image_path, level_id=level_id)
     try:
-        rules = GameRules()
+        selected_columns = validate_column_count(column_count)
+    except ValueError as exc:
+        return _unavailable(str(exc), image=image_path, level_id=level_id)
+    if not image_path.is_file():
+        return _unavailable("local image input does not exist", image=image_path, level_id=level_id, column_count=selected_columns)
+    try:
+        rules = rules or GameRules(game_project, column_count=selected_columns)
     except FileNotFoundError as exc:
-        return _unavailable(f"canonical ScrubBots project unavailable: {exc}", image=image_path, level_id=level_id)
-    if find_godot() is None:
-        return _unavailable("Godot executable unavailable; Python screening cannot accept a supply", image=image_path, level_id=level_id)
+        return _unavailable(f"canonical ScrubBots project unavailable: {exc}", image=image_path, level_id=level_id, column_count=selected_columns)
+    if getattr(rules, "column_count", selected_columns) != selected_columns:
+        return _unavailable("rules column_count does not match the explicit product selection", image=image_path, level_id=level_id, column_count=selected_columns)
+    if solver is None and find_godot() is None:
+        return _unavailable("Godot executable unavailable; live game solve/replay verification is pending", image=image_path, level_id=level_id, column_count=selected_columns)
+    if solver is None and not getattr(rules, "live_column_verification_available", True):
+        return _unavailable("live game 4/5-column verification is pending the separate game compatibility task", image=image_path, level_id=level_id, column_count=selected_columns)
 
     try:
-        result = SupplyOptimizer(rules).run(
+        result = SupplyOptimizer(rules, solver=solver).run(
             image_path,
             seed=seed,
             candidates=candidates,
-            target=target,
             level_id=level_id,
             verify_top=verify_top,
             screen_budget=screen_budget,
@@ -83,6 +96,8 @@ def run_primary_supply_pipeline(
             "disposition": "ERROR",
             "level_id": level_id,
             "image_path": str(image_path),
+            "column_count": selected_columns,
+            "visible_preview_depth": 3,
             "reason": str(exc)[:512],
             "authority": rules.authority,
             "screening": {"role": "RANKING_ONLY", "acceptance_authority": "ScrubBots game solver"},
@@ -95,6 +110,8 @@ def run_primary_supply_pipeline(
         "disposition": "READY",
         "level_id": level_id,
         "image_path": str(image_path),
+        "column_count": selected_columns,
+        "visible_preview_depth": 3,
         "output": str(output_path),
         "files": files,
         "authority": rules.authority,

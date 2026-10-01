@@ -23,7 +23,8 @@ class ScrubBotsSolver:
         """level: {id,width,height,palette:[#RRGGBBAA local],cells:[local or -1]}
         candidates: [{id, columns:[[{color,count}]*3]} or {..., replay_trace:[...]}]"""
         work = Path(tempfile.mkdtemp(prefix="sb_bridge_"))
-        req = {"level": level, "candidates": candidates, "stop_after_solved": stop_after,
+        req = {"level": level, "candidates": candidates, "column_count": self.rules.column_count,
+               "visible_preview_depth": self.rules.preview_depth, "stop_after_solved": stop_after,
                "analyze": analyze, "level_number": level_number,
                "game_authority": dict(self.rules.authority)}
         if max_visited:
@@ -44,4 +45,3 @@ class ScrubBotsSolver:
         if p.returncode != 0 or not out.exists():
             raise RuntimeError("solver bridge failed:\n" + "\n".join(tail))
         return json.loads(out.read_text(encoding="utf-8"))
-
