@@ -5,11 +5,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: MAINT-SUPPLY-PIPELINE-V01 — Owner-approved primary supply/solver/difficulty pipeline integration
-- Current Task: MAINT-SUPPLY-PIPELINE-V01 — Integrate owner ZIP pipeline as Level Factory primary supply/solve/difficulty path
-- Current Task Status: AUTHORIZED / OWNER_APPROVED / GAME_UNCAPPED_PREREQUISITE + LEVEL_FACTORY_IMPLEMENT_THEN_AUDIT
-- Next Task/Action: First apply the owner-approved uncapped batch-count correction in `Sekiph82/Scrubbots` from its MAINT-SUPPLY-UNCAPPED-C001 prompt. Then Codex executes `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_PROMPT.md` with the owner ZIP attached/provided and exact SHA-256 verified. SB-LF09-004 telemetry work is paused, not cancelled, until this urgent primary-pipeline integration is independently audited.
-- Required Actor: OWNER/CLAUDE prerequisite, then CODEX
+- Current Sprint: MAINT-SUPPLY-MASTER-C001 — Uncapped game supply + primary ZIP pipeline integration
+- Current Task: MAINT-SUPPLY-MASTER-C001 — Execute game uncapped supply correction then integrate owner ZIP as Level Factory primary supply/solve/difficulty path
+- Current Task Status: AUTHORIZED / OWNER_APPROVED / IMPLEMENT_ALL_THEN_AUDIT
+- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md` in strict order: first MAINT-SUPPLY-UNCAPPED-C001 in `Sekiph82/Scrubbots`, then MAINT-SUPPLY-PIPELINE-V01 in `Sekiph82/ScrubBots-Level-Factory`, with mandatory local↔GitHub main sync preflight for both repositories. Stop after both builder logs + master log are pushed for independent audit.
+- Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`
@@ -18,7 +18,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_PROMPT.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -53,6 +53,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - MAINT-SUPPLY-PIPELINE-V01 Authorization: `OWNER_APPROVED / IMPLEMENT_THEN_AUDIT`.
 - MAINT-SUPPLY-PIPELINE-V01 Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_PROMPT.md`.
 - MAINT-SUPPLY-PIPELINE-V01 Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_AUDIT_CRITERIA.md`.
+- MAINT-SUPPLY-MASTER-C001 Authorization: `IMPLEMENT_ALL_THEN_AUDIT`.
+- MAINT-SUPPLY-MASTER-C001 Prompt: `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md`.
+- MAINT-SUPPLY-MASTER-C001 Execution Order: `MAINT-SUPPLY-UNCAPPED-C001 -> MAINT-SUPPLY-PIPELINE-V01`.
 - Cross-Repo Prerequisite: `Sekiph82/Scrubbots/coordination/OWNER_UNCAPPED_BATCH_ROBOT_COUNT_DECISION_V01.md`; global 30 robot/batch ceiling is retired.
 - SB-LF09-004 Telemetry Status: `PAUSED_BY_OWNER_PRIORITY` until MAINT-SUPPLY-PIPELINE-V01 closes; approved analytics policy remains valid and work resumes afterward.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
