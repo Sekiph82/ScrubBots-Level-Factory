@@ -83,3 +83,10 @@ Document role: CODEX BUILDER LOG
 - Full suite command: `python -m pytest -q` completed `1117 passed, 3 skipped, 15 failed` in `459.48s`. The failures are the old Studio/runtime/static tests that require the removed owner-facing Difficulty control or retired M03/M04 wording, the owner-controlled current-task parser mismatch already present in synchronized TASKS state, and stateful legacy source/pipeline expectations. Root `TASKS.md` and legacy tests were not rewritten to conceal these superseded expectations.
 - Added the explicit Studio ZIP column selector with exactly 3/4/5 choices and preview depth fixed at 3; source, candidate, and primary-image Studio requests now carry the selected column count.
 - Post-change smoke: `godot --headless --path level_factory --quit`, `python -m compileall -q src level_factory/scripts`, and the LF-only/review/preset focused suite passed (`15 passed`, one pre-existing cache-permission warning).
+
+## Commit and publication
+
+- Staged only the LF-only implementation, focused regression test, and this matching builder log. Root `TASKS.md`, `.hiveai/audits/**`, `.hiveai/HANDOFF.md`, and all pre-existing untracked owner items remained untouched.
+- Commit created on canonical local `main`: `8bf28292fa77b09016289ebe81fd6150ef516562` (`MAINT-ZIP-CORE-V02-C001 canonical ZIP core cutover`).
+- `git push origin main`: passed; remote advanced from `52462786254c2a24c52de9f46391870f7adf733a` to `8bf28292fa77b09016289ebe81fd6150ef516562`.
+- Independent audit remains pending; no audit acceptance or final milestone acceptance is declared by this builder log.
