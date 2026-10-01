@@ -90,3 +90,4 @@ Document role: CODEX BUILDER LOG
 - Commit created on canonical local `main`: `8bf28292fa77b09016289ebe81fd6150ef516562` (`MAINT-ZIP-CORE-V02-C001 canonical ZIP core cutover`).
 - `git push origin main`: passed; remote advanced from `52462786254c2a24c52de9f46391870f7adf733a` to `8bf28292fa77b09016289ebe81fd6150ef516562`.
 - Independent audit remains pending; no audit acceptance or final milestone acceptance is declared by this builder log.
+- Final post-publication verification: local `HEAD` and `origin/main` both equal `3221de09b146968903fdd762e2716dfd627f9d4d`; `git rev-list --left-right --count HEAD...origin/main` returned `0 0`. Only the pre-existing untracked owner/workspace items remain in `git status`.
