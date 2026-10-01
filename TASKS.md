@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: MAINT-SUPPLY-PIPELINE-V01-R01 — Strict primary-pipeline closure remediation
-- Current Task: MAINT-SUPPLY-PIPELINE-V01-R01 — Close authentic runtime/load/candidate-route/capability/authority/full-size evidence gaps
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`. Preserve the owner ZIP-derived optimizer and completed uncapped game contract; close audit findings F01..F10, complete authentic 37x37 and 59x59 end-to-end runs, publish the R01 builder log, and stop for independent re-audit.
+- Current Sprint: MAINT-ZIP-CORE-V02-C001 — Canonical ZIP core cutover
+- Current Task: MAINT-ZIP-CORE-V02-C001 — Make the owner ZIP the single production supply/solve/difficulty backend with 3/4/5-column support and no requested difficulty
+- Current Task Status: OWNER_V02_APPROVED / IMPLEMENT_THEN_AUDIT
+- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`. First apply the narrow 3/4/5-column, preview-depth-3 game compatibility change, then cut Level Factory over to the owner ZIP as its single production supply/solve/difficulty backend, remove requested difficulty from Level Factory, preserve the locked ZIP parameters, keep external artwork import, and stop after both repo logs + master log are pushed for independent audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -41,7 +41,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF09-003 C001 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`.
 - SB-LF09-003 C001 Implementation Commit: `e404b5d35da96f4334506098fdb39ccbe44f0f0e`.
 - SB-LF09-003 C001 Final Builder Publication: `bcf520dcf407c53c7629bb725f4c25c3d2daf151`.
-- SB-LF09-004 Owner Policy: `APPROVED 2026-09-30` by `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`.
+- SB-LF09-004 Owner Policy: `APPROVED 2026-10-01` by `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`.
 - SB-LF09-004 C001 Authorization: `SB-LF09-004-C001 — IMPLEMENT_THEN_AUDIT`.
 - SB-LF09-004 C001 Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
 - SB-LF09-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
@@ -63,6 +63,15 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - MAINT-SUPPLY-PIPELINE-V01-R01 Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`.
 - MAINT-SUPPLY-PIPELINE-V01-R01 Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_AUDIT_CRITERIA.md`.
 - MAINT-SUPPLY-PIPELINE-V01-R01 Required Closures: authentic production-runtime WON gate; executed shipping load-check before READY; official Difficulty V1 mandatory for production READY; canonical candidate/logical-grid primary route; truthful Gateway Solve/Analyze availability; clean/fingerprinted game authority; no literal 3/3 bridge seam; completed authentic 37x37 + 59x59 pipelines; 12/12 adapted ZIP tests; final full regressions green.
+- MAINT-SUPPLY-PIPELINE-V01-R01 Status: `SUPERSEDED_BY_OWNER_V02`; its added ProductionGameplayHost/runtime-WON requirement is not owner-authorized and must not be implemented.
+- Owner Primary Supply Pipeline V02: `docs/decisions/OWNER_PRIMARY_SUPPLY_PIPELINE_V02.md`.
+- Game Supply Columns Owner Decision: `Sekiph82/Scrubbots/coordination/OWNER_SUPPLY_COLUMNS_3_4_5_PREVIEW3_V01.md`.
+- MAINT-ZIP-CORE-V02-C001 Authorization: `OWNER_V02_APPROVED / IMPLEMENT_THEN_AUDIT`.
+- MAINT-ZIP-CORE-V02-C001 Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`.
+- MAINT-ZIP-CORE-V02-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_AUDIT_CRITERIA.md`.
+- Owner-Locked ZIP Parameters: candidates=300; original+max3 mutations; screening=3000; viability=3000; real solver budget uses ZIP/game default; SupplyScorer weights unchanged; mean-batch seeds unchanged.
+- Owner-Locked Product Changes: supply columns 3/4/5 with default 3; visible preview depth exactly 3; baseline five-slot generation only; requested difficulty removed from Level Factory; generated + externally uploaded artwork share one canonical ZIP path; background intent preserved; owner ACCEPT auto-publishes; progression position derives after official Difficulty V1.
+- EXE Inspection Status: `NO_PRODUCT_ACTION`; the inspected EXE is not part of the Level Factory implementation.
 - Cross-Repo Prerequisite: `Sekiph82/Scrubbots/coordination/OWNER_UNCAPPED_BATCH_ROBOT_COUNT_DECISION_V01.md`; global 30 robot/batch ceiling is retired.
 - SB-LF09-004 Telemetry Status: `PAUSED_BY_OWNER_PRIORITY` until MAINT-SUPPLY-PIPELINE-V01 closes; approved analytics policy remains valid and work resumes afterward.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
