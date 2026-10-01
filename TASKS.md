@@ -6,9 +6,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
 - Current Sprint: MAINT-ZIP-CORE-V02-C001 — Canonical ZIP core cutover
-- Current Task: MAINT-ZIP-CORE-V02-C001 — Make the owner ZIP the single production supply/solve/difficulty backend with 3/4/5-column support and no requested difficulty
-- Current Task Status: OWNER_V02_APPROVED / IMPLEMENT_THEN_AUDIT
-- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`. First apply the narrow 3/4/5-column, preview-depth-3 game compatibility change, then cut Level Factory over to the owner ZIP as its single production supply/solve/difficulty backend, remove requested difficulty from Level Factory, preserve the locked ZIP parameters, keep external artwork import, and stop after both repo logs + master log are pushed for independent audit.
+- Current Task: MAINT-ZIP-CORE-V02-C001 — Make the owner ZIP the single Level Factory production supply/solve/difficulty backend with 3/4/5-column artifact support and no requested difficulty
+- Current Task Status: OWNER_V02_APPROVED / LF_ONLY_IMPLEMENT_THEN_AUDIT
+- Next Task/Action: Codex executes only `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-LF_ONLY_CANONICAL_CUTOVER_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Codex must not modify `Sekiph82/Scrubbots`. Game-side 3/4/5-column compatibility is a separate Claude task `MAINT-SUPPLY-COLUMNS-C001`; lack of an authorized game checkout is not a blocker for Level Factory implementation.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-LF_ONLY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-LF_ONLY_CANONICAL_CUTOVER_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -68,6 +68,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Game Supply Columns Owner Decision: `Sekiph82/Scrubbots/coordination/OWNER_SUPPLY_COLUMNS_3_4_5_PREVIEW3_V01.md`.
 - MAINT-ZIP-CORE-V02-C001 Authorization: `OWNER_V02_APPROVED / IMPLEMENT_THEN_AUDIT`.
 - MAINT-ZIP-CORE-V02-C001 Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_MASTER_PROMPT.md`.
+- MAINT-ZIP-CORE-V02-C001 Cross-Repo Prompt Status: `SUPERSEDED / DO_NOT_EXECUTE`; the game write package was incorrectly coupled to Codex.
+- MAINT-ZIP-CORE-V02-C001 LF-Only Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-LF_ONLY_CANONICAL_CUTOVER_PROMPT.md`.
+- MAINT-ZIP-CORE-V02-C001 LF-Only Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-LF_ONLY_AUDIT_CRITERIA.md`.
+- MAINT-SUPPLY-COLUMNS-C001 Claude Prompt: `https://github.com/Sekiph82/Scrubbots/blob/main/coordination/sessions/MAINT-SUPPLY-COLUMNS-C001/task_prompts/CHATGPT_PROMPT_V01.md`.
+- MAINT-SUPPLY-COLUMNS-C001 Scope: Scrubbots-only 3/4/5 supply-plan compatibility; preview depth fixed at 3; no Level Factory writes.
 - MAINT-ZIP-CORE-V02-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_AUDIT_CRITERIA.md`.
 - Owner-Locked ZIP Parameters: candidates=300; original+max3 mutations; screening=3000; viability=3000; real solver budget uses ZIP/game default; SupplyScorer weights unchanged; mean-batch seeds unchanged.
 - Owner-Locked Product Changes: supply columns 3/4/5 with default 3; visible preview depth exactly 3; baseline five-slot generation only; requested difficulty removed from Level Factory; generated + externally uploaded artwork share one canonical ZIP path; background intent preserved; owner ACCEPT auto-publishes; progression position derives after official Difficulty V1.
