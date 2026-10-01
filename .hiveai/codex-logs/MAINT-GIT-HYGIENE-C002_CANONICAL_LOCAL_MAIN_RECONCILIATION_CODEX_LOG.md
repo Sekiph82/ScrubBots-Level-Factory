@@ -55,3 +55,26 @@ After that preservation commit, `origin/main` will be fetched with prune and int
 - Fetch again and prove local HEAD equals `origin/main`, ahead/behind is `0/0`, branch is `main`, only remote branch is `main`, and no new Desktop folder/worktree was created.
 - Confirm the M09-004 policy, criteria, prompt, and authorized root `TASKS.md` are present on synchronized local `main`.
 - Do not implement SB-LF09-004 during this maintenance task.
+
+## Verification results and tracker readiness
+
+- `git diff --check` after the merge produced no working-tree errors.
+- `python -m compileall -q src tests` passed.
+- Full `python -m pytest -q -p no:cacheprovider` completed with `1101 passed, 2 skipped, 1 failed` in `365.56s`.
+- The single failure was `tests/unit/test_sb_lf00_007_governance_authority.py::test_project_status_and_active_task_contract_are_exact`: the current GitHub `TASKS.md` declares `Current Sprint: MAINT-GIT-HYGIENE-C002` while its current task is `SB-LF09-004`, so the governance test correctly rejected the sprint/task mismatch.
+- The two skips were the existing unavailable canonical-ScrubBots bridge capabilities; no provider or network workaround was used.
+- `TASKS.md` task-state fields were not edited to hide or bypass this failure.
+- Because the authoritative tracker currently reflects the maintenance sprint rather than an M09-004 sprint, `SB-LF09-004` is **NOT_READY** to resume from this maintenance run.
+- `godot --headless --path level_factory --editor --quit` passed with Godot `4.7.2.stable.official.ed1daf0bf` and exit code 0.
+- Readiness files were present: the M09-004 policy, audit criteria, prompt, and root `TASKS.md`.
+- The remote branch listing contains only `origin/main` (plus the symbolic `origin/HEAD`); no new branch was created.
+
+## Merge and publication records
+
+- Preservation commit: `e38cdedb9d5c371eef788016c86ea82b08857a48`.
+- Refreshed remote before merge: `origin/main=9faedf08c53e8d54298ddffc97f08e1b3754b7a4`.
+- Normal merge commit: `2cac282aff8343e6105a35dc6dabe71a03867baf`.
+- Merge conflicts: 12; all were resolved by selecting current GitHub (`origin/main`) content. Local versions remain recoverable from the preservation commit.
+- The merge staged one pre-existing remote whitespace warning in `.hiveai/codex-logs/SB-LF08-C001_MASTER_BATCH_CODEX_LOG.md`; the immutable remote record was not edited. Post-merge working-tree `git diff --check` was clean.
+- Verification-log append commit: pending before publication.
+- Push and final equality proof: pending before publication.
