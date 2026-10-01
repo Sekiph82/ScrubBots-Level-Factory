@@ -1,4 +1,4 @@
-# SB-LF09-003-C001 — Deterministic Semantic Art Helper Boundary
+# SB-LF09-003-C001 â€” Deterministic Semantic Art Helper Boundary
 
 Document role: STRICT AUDIT CRITERIA
 

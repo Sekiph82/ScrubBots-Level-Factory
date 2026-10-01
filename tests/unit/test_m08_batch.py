@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
+import hashlib
+
 import pytest
 
 from scrubbots_pixel_factory import (
+    AttemptRecord,
     BatchPlan,
     CandidateEvidence,
     LaneRequest,
@@ -10,37 +14,82 @@ from scrubbots_pixel_factory import (
     build_handoff,
     review_summary,
     run_batch,
+    verify_artifact_set,
 )
 from scrubbots_pixel_factory.difficulty_analysis import LaneClass
+from scrubbots_pixel_factory.m08_batch import digest, lineage_digest_for
+from scrubbots_pixel_factory.studio_extensions import REVIEW_SCHEMA, _digest as studio_digest
 
 
 def _evidence(candidate: str, lane: LaneClass = LaneClass.EASY) -> CandidateEvidence:
-    values = {
-        "m03_digest": "a" * 64, "m04_digest": "b" * 64, "m04_lane_digest": "c" * 64,
-        "m05_digest": "d" * 64, "level_data_digest": "e" * 64, "logical_art_digest": "f" * 64,
-        "source_provenance_digest": "1" * 64, "generation_request_digest": "2" * 64,
-        "generation_result_digest": "3" * 64, "bundle_digest": "4" * 64,
+    raw = {
+        "m03_digest": f"m03:{candidate}".encode(),
+        "m04_digest": f"m04:{candidate}".encode(),
+        "m04_lane_digest": f"lane:{candidate}".encode(),
+        "m05_digest": f"m05:{candidate}".encode(),
+        "level_data_digest": f"level:{candidate}".encode(),
+        "logical_art_digest": f"art:{candidate}".encode(),
+        "grid_hash": f"grid:{candidate}".encode(),
+        "source_provenance_digest": f"source:{candidate}".encode(),
+        "generation_request_digest": f"request:{candidate}".encode(),
+        "generation_result_digest": f"result:{candidate}".encode(),
+        "generation_metadata_digest": f"generation:{candidate}".encode(),
+        "bundle_digest": f"bundle:{candidate}".encode(),
     }
+    values = {
+        **{key: hashlib.sha256(value).hexdigest() for key, value in raw.items()},
+        "level_data_ref": "level-data/" + candidate + ".json",
+        "logical_art_ref": "art/" + candidate + ".png",
+        "bundle_ref": "bundles/" + candidate,
+        "source_provenance_ref": "provenance/" + candidate + ".json",
+        "m03_ref": "evidence/m03-" + candidate + ".json",
+        "m04_ref": "evidence/m04-" + candidate + ".json",
+        "m05_ref": "evidence/m05-" + candidate + ".json",
+        "generation_request_ref": "generation/request-" + candidate + ".json",
+        "generation_result_ref": "generation/result-" + candidate + ".json",
+        "generation_metadata_ref": "generation/metadata-" + candidate + ".json",
+        "preview_digest": None,
+        "preview_ref": None,
+        "mutation_digest": None,
+        "mutation_ref": None,
+    }
+    values["lineage_digest"] = lineage_digest_for({"candidate_id": candidate, "lane": lane.value, "m03_disposition": "ACCEPT", "m04_disposition": "ACCEPT", "m05_disposition": "ACCEPT", **values})
     return CandidateEvidence(candidate, lane, "ACCEPT", m04_disposition="ACCEPT", m05_disposition="ACCEPT", **values)
 
 
-def test_deterministic_lane_cadence_counts_only_bound_evidence() -> None:
+def _artifact_map(evidence: CandidateEvidence) -> dict[str, bytes]:
+    candidate = evidence.candidate_id
+    return {
+        evidence.level_data_ref: f"level:{candidate}".encode(),
+        evidence.logical_art_ref: f"art:{candidate}".encode(),
+        evidence.bundle_ref: f"bundle:{candidate}".encode(),
+        evidence.source_provenance_ref: f"source:{candidate}".encode(),
+        evidence.m03_ref: f"m03:{candidate}".encode(),
+        evidence.m04_ref: f"m04:{candidate}".encode(),
+        evidence.m05_ref: f"m05:{candidate}".encode(),
+        evidence.generation_request_ref: f"request:{candidate}".encode(),
+        evidence.generation_result_ref: f"result:{candidate}".encode(),
+        evidence.generation_metadata_ref: f"generation:{candidate}".encode(),
+    }
+
+
+def test_deterministic_ordered_lane_cadence_counts_only_bound_evidence() -> None:
     plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 3), LaneRequest(LaneClass.HARD, 1, 2)), 11, "test")
 
-    def produce(lane, ordinal, seed):
-        if lane is LaneClass.EASY and ordinal == 0:
-            return {"disposition": "ACCEPT", "evidence": _evidence("easy", lane)}
-        if lane is LaneClass.HARD and ordinal == 0:
-            return {"disposition": "ACCEPT", "evidence": _evidence("hard", lane)}
+    def produce(lane: LaneClass, ordinal: int, seed: int):
+        if ordinal == 0:
+            return {"disposition": "ACCEPT", "evidence": _evidence(lane.value.lower(), lane)}
         return {"disposition": "REJECT"}
 
     first = run_batch(plan, produce)
     second = run_batch(plan, produce)
-    assert first.status == "COMPLETE" and first.digest() == second.digest()
-    assert first.statistics["accepted"] == 2
+    assert first.status == "COMPLETE"
+    assert first.digest() == second.digest()
+    assert first.statistics == {"accepted": 2, "duplicate": 0, "error": 0, "generated": 2, "inconclusive": 0, "rejected": 0, "unavailable": 0}
+    assert list(first.attempted) == [LaneClass.EASY, LaneClass.HARD]
 
 
-def test_wrong_lane_and_unavailable_never_increment_acceptance() -> None:
+def test_wrong_lane_and_missing_m03_m05_evidence_fail_closed() -> None:
     plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 3),), 1, "x")
     calls = iter([
         {"disposition": "ACCEPT", "evidence": _evidence("wrong", LaneClass.HARD)},
@@ -50,34 +99,368 @@ def test_wrong_lane_and_unavailable_never_increment_acceptance() -> None:
     result = run_batch(plan, lambda *_: next(calls))
     assert result.status == "EXHAUSTED"
     assert result.statistics["accepted"] == 0
+    assert result.statistics["rejected"] == 1
     assert result.statistics["unavailable"] == 1 and result.statistics["inconclusive"] == 1
+    with pytest.raises(M08ContractError):
+        replace(_evidence("bad"), m05_disposition="UNAVAILABLE")
 
 
-def test_duplicate_and_resume_plan_tamper_fail_closed() -> None:
-    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 2, "x")
-    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("same")})
-    assert result.statistics["accepted"] == 1
-    resumed = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("other")}, history=result.entries)
+def test_duplicate_ids_and_exact_resume_do_not_redo_accepted_work() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 2, 4),), 2, "x")
+    result = run_batch(plan, lambda _lane, ordinal, _seed: {"disposition": "ACCEPT", "evidence": _evidence("same" if ordinal < 2 else f"other-{ordinal}")})
+    assert result.status == "COMPLETE"
+    assert result.statistics["duplicate"] == 1
+    calls: list[int] = []
+    resumed = run_batch(plan, lambda _lane, ordinal, _seed: calls.append(ordinal) or {"disposition": "REJECT"}, history=result.attempts)
+    assert calls == []
     assert resumed.digest() == result.digest()
+
+
+def test_resume_plan_seed_budget_or_history_tamper_fails_closed() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 2, "x")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("candidate")})
     other = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 3, "x")
     with pytest.raises(M08ContractError):
         run_batch(other, lambda *_: None, history=result.entries)
+    with pytest.raises(M08ContractError):
+        run_batch(plan, lambda *_: None, history=(AttemptRecord(LaneClass.EASY, 1, "REJECT"),))
+    tampered = result.as_dict()
+    tampered["plan"]["root_seed"] = 9
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
 
 
-def test_owner_review_is_separate_and_handoff_requires_owner_accept() -> None:
+def test_artifact_contract_requires_safe_refs_and_optional_pairing() -> None:
+    with pytest.raises(M08ContractError):
+        replace(_evidence("unsafe"), bundle_ref="../escape")
+    with pytest.raises(M08ContractError):
+        replace(_evidence("unpaired"), preview_digest="a" * 64)
+
+
+def test_artifact_set_verifies_exact_canonical_bytes_without_reencoding() -> None:
+    evidence = _evidence("bytes")
+    artifacts = {
+        evidence.level_data_ref: b"level",
+        evidence.logical_art_ref: b"art",
+        evidence.bundle_ref: b"bundle",
+        evidence.source_provenance_ref: b"source",
+        evidence.m03_ref: b"m03",
+        evidence.m04_ref: b"m04",
+        evidence.m05_ref: b"m05",
+        evidence.generation_request_ref: b"request",
+        evidence.generation_result_ref: b"result",
+        evidence.generation_metadata_ref: b"generation",
+    }
+
+
+def _review(evidence: CandidateEvidence, disposition: str, sequence: int = 1, previous_review_id: str | None = None) -> dict[str, object]:
+    review_id = f"review-{evidence.candidate_id}-{sequence:04d}"
+    return {
+        "schema": REVIEW_SCHEMA,
+        "version": 1,
+        "review_id": review_id,
+        "candidate_id": evidence.candidate_id,
+        "candidate_identity_hash": studio_digest({"candidate_id": evidence.candidate_id, "grid_hash": evidence.grid_hash}),
+        "artwork_sha256": evidence.logical_art_digest,
+        "grid_hash": evidence.grid_hash,
+        "disposition": disposition,
+        "reason": "fixture",
+        "note": "fixture",
+        "sequence": sequence,
+        "created_at": "2026-09-27T00:00:00+00:00",
+        "previous_review_id": previous_review_id,
+    }
+    updated = {**evidence.as_dict(), "level_data_digest": __import__("hashlib").sha256(b"level").hexdigest(), "logical_art_digest": __import__("hashlib").sha256(b"art").hexdigest(), "bundle_digest": __import__("hashlib").sha256(b"bundle").hexdigest(), "source_provenance_digest": __import__("hashlib").sha256(b"source").hexdigest(), "m03_digest": __import__("hashlib").sha256(b"m03").hexdigest(), "m04_digest": __import__("hashlib").sha256(b"m04").hexdigest(), "m05_digest": __import__("hashlib").sha256(b"m05").hexdigest(), "generation_request_digest": __import__("hashlib").sha256(b"request").hexdigest(), "generation_result_digest": __import__("hashlib").sha256(b"result").hexdigest(), "generation_metadata_digest": __import__("hashlib").sha256(b"generation").hexdigest()}
+    updated["lineage_digest"] = lineage_digest_for(updated)
+    evidence = CandidateEvidence.from_dict(updated)
+    checked = verify_artifact_set(evidence, artifacts)
+    assert checked["disposition"] == "ACCEPT" and len(checked["verified_references"]) == 10
+    with pytest.raises(M08ContractError):
+        verify_artifact_set(evidence, {**artifacts, evidence.m05_ref: b"tampered"})
+
+
+def test_generation_identity_bytes_are_all_required_and_lineage_bound() -> None:
+    evidence = _evidence("generation-bound")
+    artifacts = _artifact_map(evidence)
+    for reference in (evidence.generation_request_ref, evidence.generation_result_ref, evidence.generation_metadata_ref):
+        missing = dict(artifacts)
+        del missing[reference]
+        with pytest.raises(M08ContractError):
+            verify_artifact_set(evidence, missing)
+    stale = {**artifacts, evidence.generation_result_ref: b"result-from-another-candidate"}
+    with pytest.raises(M08ContractError):
+        verify_artifact_set(evidence, stale)
+
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 16, "lineage")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": evidence})
+    swapped = result.as_dict()
+    other = _evidence("other-generation")
+    swapped["accepted_entries"][0]["evidence"]["generation_request_ref"] = other.generation_request_ref
+    swapped["accepted_entries"][0]["evidence"]["generation_request_digest"] = other.generation_request_digest
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(swapped)
+
+
+def test_restore_rejects_tampered_deterministic_per_lane_statistics() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2), LaneRequest(LaneClass.HARD, 1, 2)), 17, "lane-stats")
+    result = run_batch(plan, lambda lane, ordinal, _seed: {"disposition": "REJECT"} if lane is LaneClass.EASY or ordinal == 0 else {"disposition": "ACCEPT", "evidence": _evidence("hard", lane)})
+    tampered = result.as_dict()
+    tampered["lanes"][LaneClass.EASY.value]["statistics"]["rejected"] += 1
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
+
+
+def test_manifest_round_trip_and_cross_candidate_tamper_fail_closed() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 4, "x")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("candidate")})
+    assert type(result).from_dict(result.as_dict()).digest() == result.digest()
+    tampered = result.as_dict()
+    tampered["accepted_entries"][0]["evidence"]["logical_art_digest"] = "9" * 64
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
+
+
+def test_owner_review_summary_is_separate_and_handoff_requires_latest_accept() -> None:
     plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 4, "x")
     result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("candidate")})
     pending = build_handoff(result, "candidate", [])
     assert pending["disposition"] == "NOT_OWNER_ACCEPTED"
-    summary = review_summary(result, [{"candidate_id": "candidate", "disposition": "REJECT"}])
-    assert summary["OWNER_REJECTED"] == 1 and result.statistics["accepted"] == 1
-    ready = build_handoff(result, "candidate", [{"candidate_id": "candidate", "disposition": "ACCEPT", "review_id": "r1"}])
+    reject = _review(result.entries[0].evidence, "REJECT")
+    accept = _review(result.entries[0].evidence, "ACCEPT", 2, reject["review_id"])
+    summary = review_summary(result, [reject, accept])
+    assert summary["OWNER_ACCEPTED"] == 1 and result.statistics["accepted"] == 1
+    ready = build_handoff(result, "candidate", [reject, accept], artifacts=_artifact_map(result.entries[0].evidence))
     assert ready["disposition"] == "READY" and "handoff_digest" in ready
+    assert build_handoff(result, "candidate", [reject, accept])["disposition"] == "UNAVAILABLE"
+    assert build_handoff(result, "candidate", [{**accept, "artwork_sha256": "0" * 64}], artifacts=_artifact_map(result.entries[0].evidence))["disposition"] == "INVALID_REVIEW_EVIDENCE"
+    assert review_summary(result, [accept, reject]) == review_summary(result, [reject, accept])
+    assert review_summary(result, [accept, dict(accept)])["INVALID_REVIEW_EVIDENCE"] == 1
 
 
-def test_high_rejection_is_finite_and_terminal() -> None:
+def test_owner_review_gate_rejects_incomplete_or_corrupt_canonical_chain() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 18, "review-chain")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("reviewed")})
+    evidence = result.entries[0].evidence
+    valid = _review(evidence, "ACCEPT")
+
+    missing = dict(valid)
+    del missing["grid_hash"]
+    assert review_summary(result, [missing])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    gap = _review(evidence, "ACCEPT", 2, valid["review_id"])
+    assert review_summary(result, [gap])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    predecessor = _review(evidence, "ACCEPT", 2, "review-wrong-0001")
+    assert review_summary(result, [valid, predecessor])["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    duplicate_id = [valid, dict(valid)]
+    assert review_summary(result, duplicate_id)["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+
+    corrupt_after_accept = _review(evidence, "ACCEPT", 2, valid["review_id"])
+    corrupt_after_accept["grid_hash"] = "f" * 64
+    summary = review_summary(result, [valid, corrupt_after_accept])
+    assert summary["states"][evidence.candidate_id] == "INVALID_REVIEW_EVIDENCE"
+    assert build_handoff(result, evidence.candidate_id, [valid, corrupt_after_accept], artifacts=_artifact_map(evidence))["disposition"] == "INVALID_REVIEW_EVIDENCE"
+
+
+def test_handoff_requires_strict_complete_result_and_is_byte_deterministic() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 19, "handoff")
+    result = run_batch(plan, lambda *_: {"disposition": "ACCEPT", "evidence": _evidence("handoff")})
+    evidence = result.entries[0].evidence
+    review = _review(evidence, "ACCEPT")
+    artifacts = _artifact_map(evidence)
+    first = build_handoff(result.as_dict(), evidence.candidate_id, [review], artifacts=artifacts)
+    second = build_handoff(result.as_dict(), evidence.candidate_id, [review], artifacts=dict(artifacts))
+    assert first == second and first["disposition"] == "READY"
+
+    corrupt_manifest = result.as_dict()
+    corrupt_manifest["history_digest"] = "0" * 64
+    assert build_handoff(corrupt_manifest, evidence.candidate_id, [review], artifacts=artifacts)["disposition"] == "ERROR"
+    assert build_handoff(result.as_dict(), "other-candidate", [review], artifacts=artifacts)["disposition"] == "NOT_FACTORY_ACCEPTED"
+
+    corrupt_review = {**review, "candidate_identity_hash": "0" * 64}
+    assert build_handoff(result, evidence.candidate_id, [corrupt_review], artifacts=artifacts)["disposition"] == "INVALID_REVIEW_EVIDENCE"
+    missing_generation = dict(artifacts)
+    del missing_generation[evidence.generation_request_ref]
+    assert build_handoff(result, evidence.candidate_id, [review], artifacts=missing_generation)["disposition"] == "ERROR"
+
+
+def test_handoff_rejects_candidate_from_non_complete_batch() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1), LaneRequest(LaneClass.HARD, 1, 1)), 20, "handoff-incomplete")
+    result = run_batch(plan, lambda lane, _ordinal, _seed: {"disposition": "ACCEPT", "evidence": _evidence("easy", lane)} if lane is LaneClass.EASY else {"disposition": "REJECT"})
+    evidence = result.entries[0].evidence
+    assert result.status == "EXHAUSTED"
+    assert build_handoff(result, evidence.candidate_id, [_review(evidence, "ACCEPT")], artifacts=_artifact_map(evidence))["disposition"] == "NOT_FACTORY_ACCEPTED"
+
+
+def test_high_rejection_is_finite_one_lane_can_exhaust_while_another_completes() -> None:
     plan = BatchPlan(tuple(LaneRequest(lane, 1, 100) for lane in LaneClass), 9, "stress")
-    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+
+    def produce(lane: LaneClass, ordinal: int, _seed: int):
+        if lane is LaneClass.HARD and ordinal == 99:
+            return {"disposition": "ACCEPT", "evidence": _evidence("late-hard", lane)}
+        return {"disposition": "REJECT"}
+
+    result = run_batch(plan, produce)
     assert result.status == "EXHAUSTED"
     assert sum(result.attempted.values()) == 400
-    assert result.statistics["accepted"] == 0
+    assert result.statistics["accepted"] == 1
+    assert result.statistics["generated"] == sum(result.statistics[key] for key in ("accepted", "rejected", "duplicate", "unavailable", "inconclusive", "error"))
+
+
+def test_high_rejection_stress_matrix_is_offline_bounded_and_terminal_reruns_are_identical() -> None:
+    reject_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 6),), 21, "reject-matrix")
+    exhausted = run_batch(reject_plan, lambda *_: {"disposition": "REJECT"})
+    assert exhausted.status == "EXHAUSTED" and exhausted.statistics["rejected"] == 6
+    assert run_batch(reject_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=exhausted.attempts).digest() == exhausted.digest()
+
+    late_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 20),), 22, "late-matrix")
+
+    def late_producer(_lane: LaneClass, ordinal: int, _seed: int):
+        return {"disposition": "ACCEPT", "evidence": _evidence("late-matrix")} if ordinal == 19 else {"disposition": "REJECT"}
+
+    partial = run_batch(late_plan, late_producer, max_total_attempts=7)
+    complete = run_batch(late_plan, late_producer, history=partial.attempts)
+    assert partial.status == "PARTIAL" and len(partial.attempts) == 7
+    assert complete.status == "COMPLETE" and len(complete.attempts) == 20
+    assert run_batch(late_plan, late_producer, history=complete.attempts).digest() == complete.digest()
+
+    duplicate_plan = BatchPlan((LaneRequest(LaneClass.EASY, 2, 5),), 23, "duplicate-matrix")
+
+    def duplicate_producer(_lane: LaneClass, ordinal: int, _seed: int):
+        return {"disposition": "ACCEPT", "evidence": _evidence("repeat" if ordinal < 2 else "unique")}
+
+    duplicates = run_batch(duplicate_plan, duplicate_producer)
+    assert duplicates.status == "COMPLETE" and duplicates.statistics["duplicate"] == 1
+    assert run_batch(duplicate_plan, duplicate_producer, history=duplicates.attempts).digest() == duplicates.digest()
+
+    unavailable_plan = BatchPlan(tuple(LaneRequest(lane, 1, 2) for lane in (LaneClass.EASY, LaneClass.HARD)), 24, "unavailable-matrix")
+    unavailable = run_batch(unavailable_plan, lambda lane, _ordinal, _seed: {"disposition": "UNAVAILABLE" if lane is LaneClass.EASY else "INCONCLUSIVE"})
+    assert unavailable.status == "UNAVAILABLE" and unavailable.statistics["unavailable"] == 2 and unavailable.statistics["inconclusive"] == 2
+    assert run_batch(unavailable_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=unavailable.attempts).digest() == unavailable.digest()
+
+    asymmetry_plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2), LaneRequest(LaneClass.HARD, 1, 3)), 25, "asymmetry-matrix")
+    asymmetry = run_batch(asymmetry_plan, lambda lane, ordinal, _seed: {"disposition": "ACCEPT", "evidence": _evidence("easy-asymmetry", lane)} if lane is LaneClass.EASY and ordinal == 1 else {"disposition": "REJECT"})
+    assert asymmetry.status == "EXHAUSTED" and asymmetry.attempted[LaneClass.EASY] == 2 and asymmetry.attempted[LaneClass.HARD] == 3
+    assert run_batch(asymmetry_plan, lambda *_: (_ for _ in ()).throw(AssertionError("terminal rerun invoked producer")), history=asymmetry.attempts).digest() == asymmetry.digest()
+
+    source_evidence = _evidence("source-preservation")
+    source_artifacts = _artifact_map(source_evidence)
+    source_snapshot = dict(source_artifacts)
+    assert verify_artifact_set(source_evidence, source_artifacts)["disposition"] == "ACCEPT"
+    assert source_artifacts == source_snapshot
+
+
+def test_terminal_restore_rejects_lane_asymmetry_duplicate_reuse_and_status_forgery() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 26, "corruption-matrix")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+
+    lane_asymmetry = result.as_dict()
+    lane_asymmetry["attempts"][0]["lane"] = LaneClass.HARD.value
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(lane_asymmetry))
+
+    duplicate_reuse = result.as_dict()
+    duplicate_reuse["attempts"][0].update({"disposition": "DUPLICATE", "candidate_id": "ghost", "duplicate_of": "ghost"})
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(duplicate_reuse))
+
+    status_forgery = result.as_dict()
+    status_forgery["status"] = "COMPLETE"
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(status_forgery)
+
+
+def test_interruption_resume_after_rejection_is_bounded_and_deterministic() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 10),), 10, "resume")
+
+    def produce(_lane: LaneClass, ordinal: int, _seed: int):
+        return {"disposition": "ACCEPT", "evidence": _evidence("late", LaneClass.EASY)} if ordinal == 9 else {"disposition": "REJECT"}
+
+    partial = run_batch(plan, produce, max_total_attempts=5)
+    assert partial.status == "PARTIAL" and len(partial.attempts) == 5
+    complete = run_batch(plan, produce, history=partial.attempts)
+    assert complete.status == "COMPLETE" and len(complete.attempts) == 10
+    assert run_batch(plan, produce, history=complete.attempts).digest() == complete.digest()
+
+
+def test_statistics_and_lane_counts_cannot_be_inflated_without_history() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 12, "tamper")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+    tampered = result.as_dict()
+    tampered["statistics"]["accepted"] = 1
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)
+
+
+def _recompute_tampered_history(manifest: dict) -> dict:
+    attempts = manifest["attempts"]
+    statistics = {
+        "generated": len(attempts),
+        "accepted": sum(item["disposition"] == "ACCEPT" for item in attempts),
+        "rejected": sum(item["disposition"] == "REJECT" for item in attempts),
+        "duplicate": sum(item["disposition"] == "DUPLICATE" for item in attempts),
+        "unavailable": sum(item["disposition"] == "UNAVAILABLE" for item in attempts),
+        "inconclusive": sum(item["disposition"] == "INCONCLUSIVE" for item in attempts),
+        "error": sum(item["disposition"] == "ERROR" for item in attempts),
+    }
+    manifest["statistics"] = statistics
+    for lane, values in manifest["lanes"].items():
+        lane_attempts = [item for item in attempts if item["lane"] == lane]
+        values["attempted"] = len(lane_attempts)
+        values["accepted"] = sum(item["disposition"] == "ACCEPT" for item in lane_attempts)
+    manifest["history_digest"] = digest({"plan_digest": manifest["plan_digest"], "attempts": attempts, "statistics": statistics})
+    return manifest
+
+
+def test_restore_rejects_accepted_count_inflation_even_when_history_is_rehashed() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 13, "inflated")
+    result = run_batch(plan, lambda _lane, ordinal, _seed: {"disposition": "REJECT"} if ordinal == 0 else {"disposition": "ACCEPT", "evidence": _evidence("first")})
+    tampered = result.as_dict()
+    extra = _evidence("extra")
+    tampered["attempts"][1] = AttemptRecord(LaneClass.EASY, 1, "ACCEPT", "extra", evidence=extra, plan_digest=plan.digest()).as_dict()
+    tampered["accepted_entries"].append({"plan_digest": plan.digest(), "lane": LaneClass.EASY.value, "attempt": 1, "evidence": extra.as_dict()})
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(tampered))
+
+
+def test_restore_rejects_over_budget_and_non_contiguous_history() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 2),), 14, "bounded")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"}, max_total_attempts=1)
+    over_budget = result.as_dict()
+    over_budget["attempts"].append(AttemptRecord(LaneClass.EASY, 1, "REJECT", plan_digest=plan.digest()).as_dict())
+    over_budget["plan"]["cadence"][0]["attempt_budget"] = 1
+    over_budget["plan_digest"] = BatchPlan.from_dict(over_budget["plan"]).digest()
+    for attempt in over_budget["attempts"]:
+        attempt["plan_digest"] = over_budget["plan_digest"]
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(over_budget))
+
+    non_contiguous = result.as_dict()
+    non_contiguous["attempts"].append(AttemptRecord(LaneClass.EASY, 1, "REJECT", plan_digest=plan.digest()).as_dict())
+    non_contiguous["attempts"].pop(0)
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(_recompute_tampered_history(non_contiguous))
+
+
+def test_restore_recomputes_history_digest_and_requires_exact_attempt_plan_binding() -> None:
+    plan = BatchPlan((LaneRequest(LaneClass.EASY, 1, 1),), 15, "digest")
+    result = run_batch(plan, lambda *_: {"disposition": "REJECT"})
+    arbitrary_digest = result.as_dict()
+    arbitrary_digest["history_digest"] = "0" * 64
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(arbitrary_digest)
+
+    missing_plan = result.as_dict()
+    missing_plan["attempts"][0]["plan_digest"] = None
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(missing_plan)
+
+    wrong_plan = result.as_dict()
+    wrong_plan["attempts"][0]["plan_digest"] = "f" * 64
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(wrong_plan)
+    tampered = result.as_dict()
+    tampered["lanes"]["EASY"]["attempted"] = 0
+    with pytest.raises(M08ContractError):
+        type(result).from_dict(tampered)

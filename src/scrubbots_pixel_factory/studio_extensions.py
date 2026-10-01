@@ -311,41 +311,60 @@ def _validate_review_record(candidate: Mapping[str, Any], value: Mapping[str, An
 
 
 def _validated_review_chain(candidate: Mapping[str, Any]) -> tuple[list[dict[str, Any]], list[str]]:
-    """Return only the contiguous valid review chain; malformed records are excluded."""
-
-    candidate_id = str(candidate["candidate_id"])
-    artwork_sha256 = str(candidate["artwork_sha256"])
+    """Read and validate the canonical append-only review chain for a candidate."""
     raw_records: list[dict[str, Any]] = []
-    invalid: list[str] = []
     if _review_root().exists():
         for path in sorted(_review_root().glob("*.json")):
             try:
                 value = _read_json(path)
             except StudioExtensionError:
-                invalid.append(path.name)
+                raw_records.append({"review_id": path.name, "candidate_id": candidate.get("candidate_id"), "_unreadable": True})
                 continue
-            if value.get("candidate_id") == candidate_id and value.get("artwork_sha256") == artwork_sha256:
+            if value.get("candidate_id") == candidate.get("candidate_id"):
                 raw_records.append(value)
+    return validate_owner_review_chain(candidate, raw_records)
+
+
+def validate_owner_review_chain(candidate: Mapping[str, Any], records: Iterable[Mapping[str, Any]]) -> tuple[list[dict[str, Any]], list[str]]:
+    """Validate a supplied view through the canonical SB-LFX-006 chain rules.
+
+    This is the same record/sequence/predecessor validator used by the durable
+    Studio review surface.  It accepts an in-memory projection so callers such
+    as M08 do not create a second review store.
+    """
+    required_candidate = {"candidate_id", "artwork_sha256", "grid_hash"}
+    if not required_candidate.issubset(candidate):
+        raise StudioExtensionError("review candidate identity is incomplete")
+    candidate_id = candidate["candidate_id"]
+    if type(candidate_id) is not str or type(candidate["artwork_sha256"]) is not str or type(candidate["grid_hash"]) is not str:
+        raise StudioExtensionError("review candidate identity is malformed")
     by_sequence: dict[int, dict[str, Any]] = {}
-    for value in raw_records:
+    invalid: list[str] = []
+    for raw in records:
+        if not isinstance(raw, Mapping) or raw.get("candidate_id") != candidate_id:
+            continue
+        value = dict(raw)
+        review_id = str(value.get("review_id", "unknown"))
         sequence = value.get("sequence")
-        if type(sequence) is not int or sequence in by_sequence:
-            invalid.append(str(value.get("review_id", "unknown")))
-        else:
-            by_sequence[sequence] = value
+        if type(sequence) is not int or sequence < 1 or sequence in by_sequence:
+            invalid.append(review_id)
+            continue
+        by_sequence[sequence] = value
     chain: list[dict[str, Any]] = []
     previous_id: str | None = None
     sequence = 1
     while sequence in by_sequence:
+        value = by_sequence[sequence]
         try:
-            checked = _validate_review_record(candidate, by_sequence[sequence], sequence, previous_id)
+            checked = _validate_review_record(candidate, value, sequence, previous_id)
         except StudioExtensionError:
-            invalid.append(str(by_sequence[sequence].get("review_id", "unknown")))
+            invalid.append(str(value.get("review_id", "unknown")))
             break
         chain.append(checked)
         previous_id = str(checked["review_id"])
         sequence += 1
-    return chain, invalid
+    invalid.extend(str(value.get("review_id", "unknown")) for number, value in by_sequence.items() if number >= sequence)
+    return chain, sorted(set(invalid))
 
 
 def _latest_review(candidate_id: str, artwork_sha256: str | None = None) -> dict[str, Any] | None:
@@ -1162,7 +1181,7 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 
 
 __all__ = [
-    "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source",
+    "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source", "validate_owner_review_chain",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
     "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
 ]

@@ -5,20 +5,46 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: SB-LF09.C001 — Experimental evolutionary selection
-- Current Task: SB-LF09-001 — Prototype evolutionary selection behind experimental flag
-- Current Task Status: READY_FOR_IMPLEMENTATION / M09-001_AUTHORIZED
-- Next Task/Action: Codex implements only `SB-LF09-001` from `.hiveai/prompts/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence, never edits `TASKS.md` or ChatGPT audits, then stops for independent audit.
+- Current Sprint: MAINT-GIT-HYGIENE-C002 — Canonical local main reconciliation before SB-LF09-004
+- Current Task: SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy
+- Current Task Status: BLOCKED / LOCAL_MAIN_RECONCILIATION_REQUIRED
+- Next Task/Action: Codex executes only `.hiveai/prompts/MAINT-GIT-HYGIENE-C002_CANONICAL_LOCAL_MAIN_RECONCILIATION_PROMPT.md` inside `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`; no new branch/worktree/Desktop sibling may be created. After local HEAD == origin/main and ahead/behind = 0/0, resume the existing SB-LF09-004 implementation prompt.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF08-C001-R01_STRICT_AUDIT_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
+- SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
+- SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
+- SB-LF09-001 C001-R02 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_AUDIT_CRITERIA.md`.
+- SB-LF09-001 C001-R02 Strict Audit Result: `PASS/CLOSED` by `.hiveai/audits/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_STRICT_AUDIT.md`; all candidate-specific artifact identities, including optional preview and mutation pairs, are explicitly versioned and collision-safe.
+- SB-LF09-002 C001 Authorization: `SB-LF09-002-C001 — IMPLEMENT_THEN_AUDIT`.
+- SB-LF09-002 C001 Prompt: `.hiveai/prompts/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_PROMPT.md`.
+- SB-LF09-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
+- SB-LF09-002 C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-002-C001_VERSIONED_FITNESS_METRICS_STRICT_AUDIT.md`; the closed deterministic catalog and offline boundary pass, but public result lookup accepts caller-rehashed fitness evidence and duplicate evaluation entries are not rejected.
+- SB-LF09-002 C001-R01 Remediation Authorization: `SB-LF09-002-C001-R01 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF09-002 C001-R01 Prompt: `.hiveai/prompts/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_PROMPT.md`.
+- SB-LF09-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_AUDIT_CRITERIA.md`.
+- SB-LF09-002 C001-R01 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-002-C001-R01_VERSIONED_FITNESS_METRICS_REMEDIATION_STRICT_AUDIT.md`; exact artifact-bound lookup, duplicate-ID/lineage rejection, focused coverage, and retained regression evidence passed.
+- SB-LF09-002 C001-R01 Implementation Commit: `852c71cd9643eadc09125dc385d17a3386756f15`
+- SB-LF09-002 C001-R01 Final Builder Publication: `d5b8211f0ad2cbbeb72d0c600f3050cd85f7bed5`
+- SB-LF09-002 C001-R01 Closing Strict Audit Commit: `dd28b540391538e8ae132478af2396e78cde6565`
+- SB-LF09-003 C001 Authorization: `SB-LF09-003-C001 — IMPLEMENT_THEN_AUDIT`.
+- SB-LF09-003 C001 Prompt: `.hiveai/prompts/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_PROMPT.md`.
+- SB-LF09-003 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_AUDIT_CRITERIA.md`.
+- SB-LF09-003 C001 Strict Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-LF09-003-C001_DETERMINISTIC_SEMANTIC_ART_HELPER_BOUNDARY_STRICT_AUDIT.md`.
+- SB-LF09-003 C001 Implementation Commit: `e404b5d35da96f4334506098fdb39ccbe44f0f0e`.
+- SB-LF09-003 C001 Final Builder Publication: `bcf520dcf407c53c7629bb725f4c25c3d2daf151`.
+- SB-LF09-004 Owner Policy: `APPROVED 2026-09-30` by `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`.
+- SB-LF09-004 C001 Authorization: `SB-LF09-004-C001 — IMPLEMENT_THEN_AUDIT`.
+- SB-LF09-004 C001 Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
+- SB-LF09-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -196,6 +222,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF08 C001-R01 Tracker Policy: Codex remediates all five tasks sequentially without tracker/audit edits; ChatGPT re-audits only after the complete R01 batch.
 - SB-LF08 C001-R01 Re-Audit Result: `PASS/CLOSED = 001,006,007,008,009`; therefore `M08 = COMPLETE / VERIFIED`.
 - SB-LF08 C001-R01 Strict Audit Summary: `.hiveai/audits/SB-LF08-C001-R01_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF09-001 C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001_STRICT_AUDIT.md`; product implementation retained.
+- SB-LF09-001 C001-R01 Remediation Authorization: `SB-LF09-001-C001-R01 — REMEDIATE_THEN_REAUDIT`.
+- SB-LF09-001 C001-R01 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_REMEDIATION_PROMPT.md`.
+- SB-LF09-001 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_AUDIT_CRITERIA.md`.
+- SB-LF09-001 C001-R01 Tracker Policy: Codex remediates only the two bounded audit findings and does not advance task state; ChatGPT independently re-audits after publication.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -272,10 +303,11 @@ Additional inline tags do not replace checkbox state:
 - Canonical LF/CP engineering/migration coverage: **116 / 224 = 51.79%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
-- Unified live task denominator: **244** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions.
-- Unified verified completion: **84 / 244 = 34.43%**.
-- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **216 live tasks**.
-- Conservative verified local completion: **84 / 216 = 38.89%**.
+- Two owner-approved Content Platform integrity extensions are live as `SB-CPX-001..002` and are outside the fixed 224 LF/CP source-requirement denominator.
+- Unified live task denominator: **246** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 2 Content Platform integrity extensions.
+- Unified verified completion: **84 / 246 = 34.15%**.
+- Direct local implementation surface excluding 28 GAME_RUNTIME rows: **218 live tasks**.
+- Conservative verified local completion: **84 / 218 = 38.53%**.
 - Level Factory + unique extension surface: **132 tasks**; **84 / 132 = 63.64% verified**.
 - Content Platform source requirements: **112 tasks**; **0 / 112 verified** at cutover baseline.
 - `PAG-SP06` is PASS/CLOSED.
@@ -595,12 +627,12 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 ### M09.01 - Experimental evolutionary generation
 
-- [~] SB-LF09-001 — Prototype evolutionary selection behind experimental flag.
-- [ ] SB-LF09-002 — Versioned fitness metrics. [PARTIAL]
+- [x] SB-LF09-001 — Prototype evolutionary selection behind experimental flag.
+- [x] SB-LF09-002 — Versioned fitness metrics.
 
 ### M09.02 - Semantic/procedural art helpers
 
-- [ ] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction. [PARTIAL]
+- [x] SB-LF09-003 — Prototype procedural/semantic art helpers without replacing owner-approved art direction.
 
 ### M09.03 - Reference / Style Generation accepted evidence chain
 
@@ -610,7 +642,7 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 ### M09.04 - Telemetry calibration policy
 
-- [ ] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
+- [~] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
 
 ### M09.05 - Runtime prohibition, lineage, cost and promotion audit
 
@@ -703,6 +735,10 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP01-009 — Deterministic bytes where container permits. [PARTIAL]
 - [ ] SB-CP01-010 — Reject unsupported versions safely. [PARTIAL]
 
+### M12.04 - Solver-proven supply identity extension
+
+- [ ] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
+
 ---
 
 # M13 - Remote Manifest & Content Versioning
@@ -756,6 +792,10 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 - [ ] SB-CP03-010 — No silent live overwrite.
 - [ ] SB-CP03-011 — One-command publish only after stages individually testable.
 - [ ] SB-CP03-012 — Publish report.
+
+### M14.04 - Current-main supply replay promotion gate
+
+- [ ] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
 
 ---
 
@@ -927,6 +967,7 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
 - PAG-SP11/PAG-SP12/PAG-SP13 are the three legacy unique extension tasks retained under M09.06.
 - `SB-LFX-001..017` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
+- `SB-CPX-001..002` are owner-approved Content Platform integrity extensions for exact solver-proven supply-plan packaging and current-main promotion replay; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
 - Windows Factory Studio v1.3.6 is retained as M06 migration evidence; its operator/provider/job/accounting layers are reusable, while its legacy compiler is not canonical.
 

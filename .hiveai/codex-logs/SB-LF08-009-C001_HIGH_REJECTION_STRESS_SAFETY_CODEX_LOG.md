@@ -3,13 +3,33 @@ Document role: CODEX BUILDER LOG
 
 ## Start record
 
-- Starting timestamp: 2026-09-27T00:00:00+03:00.
-- Repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`.
-- Branch: `main`; implementation begins from synchronized `a6ac0141dc1c816f6820bacae76849cf2c9c7611`.
-- This log was created before product edits.
+- Start timestamp: 2026-09-27T19:05:00+03:00.
+- Canonical repository: `https://github.com/Sekiph82/ScrubBots-Level-Factory`; canonical mirror remains preserved at `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
+- Temporary isolated worktree: `%TEMP%\ScrubBots-Level-Factory\SB-LF08-C001-20260927`.
+- Required actor is CODEX; live `TASKS.md` authorizes SB-LF08-009 after SB-LF08-008.
+- Synchronization: `git fetch origin --prune`; isolated HEAD and `origin/main` equal at `4aaf362df3ce12a088f94d942c28aae9d644dc01`; status clean.
 
-## Verified partial execution / blocker
+## Authorized source set
 
-- Finite high-rejection stress coverage passed in the focused suite (`5 passed` total, including 400 bounded reject attempts).
-- Compileall and `git diff --check` passed. Full pytest was interrupted at approximately 47% after synchronization safety re-check identified dirty/in-progress work, pre-existing untracked owner/worktree artifacts, and a one-commit-ahead `origin/main`.
-- No commit or push was made. Final handoff marker: `BLOCKED_SYNC_PRESERVATION_REQUIRED`.
+- Root `TASKS.md`, `AGENTS.md`, `README.md`, `GOVERNANCE.md`, `CLAUDE.md`.
+- Live SB-LF08 master prompt/index, SB-LF08-009 implementation prompt and strict criteria.
+- Accepted PAG-M09 bounded batch/resume semantics and M08-001/006/007/008 contracts.
+
+## Scope
+
+This log records only deterministic offline high-rejection, duplicate, unavailable, interruption/resume and terminal-idempotence safety. No acceptance threshold or retry bound may be relaxed.
+
+## Implementation and verification
+
+- Enforced exact reconciliation of immutable attempt history with generated/accepted/rejected/duplicate/unavailable/inconclusive/error statistics and per-lane attempted counts. Tampered counters now fail closed during manifest restore.
+- Focused command: `python -m pytest -q tests/unit/test_m08_batch.py tests/unit/test_sb_lfx_006_candidate_review.py tests/unit/test_sb_lfx_007_comparison.py` — `13 passed`.
+- Full regression: `python -m pytest -q -p no:cacheprovider` — `1055 passed, 2 skipped` in `513.21s`; skips were the accepted unavailable canonical-main-game capability gates.
+- `python -m compileall -q src tests` — PASS.
+- `godot_console.exe --headless --path level_factory --editor --quit` — exit `0` (Godot 4.7.2).
+- `git diff --check` — PASS; protected `git diff --exit-code -- TASKS.md` — zero diff.
+- The headless Godot scan generated pre-existing-style untracked `.uid` files in the isolated worktree; they remain unstaged and unpublished. No source-art or accepted artifact was changed.
+- Product commit: `4c1279dcc8356da3750a9976442243f78ca5452d`.
+
+## Publication
+
+- Terminal log commit and push result will be appended after this entry is finalized.

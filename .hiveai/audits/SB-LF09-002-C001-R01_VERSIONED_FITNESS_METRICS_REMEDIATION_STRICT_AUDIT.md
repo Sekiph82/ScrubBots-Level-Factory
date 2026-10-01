@@ -1,10 +1,10 @@
-# SB-LF09-002-C001-R01 — Fitness Result Integrity Remediation
+# SB-LF09-002-C001-R01 â€” Fitness Result Integrity Remediation
 
 Document role: INDEPENDENT CHATGPT STRICT AUDIT
 
 ## 1. VERDICT
 
-**PASS** — the bounded R01 remediation closes both findings from the prior
+**PASS** â€” the bounded R01 remediation closes both findings from the prior
 LF09-002 audit. Forged caller-rehashed results now fail through the public
 candidate lookup after exact artifact-bound recomputation, and duplicate
 candidate or lineage identities are rejected during direct construction and
@@ -168,7 +168,7 @@ medium for broad gates not rerun from the intentionally preserved owner mirror.
 
 ## 19. FINAL VERDICT
 
-**PASS** — `SB-LF09-002-C001-R01` is accepted and `SB-LF09-002` may advance to
+**PASS** â€” `SB-LF09-002-C001-R01` is accepted and `SB-LF09-002` may advance to
 the next ordered task. No owner-only or unavailable bridge acceptance is
 claimed.
 

@@ -35,9 +35,13 @@ Before implementation:
 
 1. Read the authoritative cycle prompt from the full GitHub URL supplied in the handoff.
 2. Verify the repository identity is `Sekiph82/ScrubBots-Level-Factory` and branch is `main`.
-3. If the prompt requires synchronizing the owner's local mirror, synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` with this GitHub repository using non-destructive Git operations.
-4. Never reset, automatically rebase, force-push, discard user changes, or search sibling local repositories to discover work.
-5. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
+3. **Every implementation/remediation/maintenance prompt begins with a mandatory local↔GitHub synchronization preflight.** Synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` against `origin/main` using non-destructive Git operations before product work starts.
+4. The mandatory preflight must fetch/prune, verify exact repository/root/branch/origin identity, inspect dirty state, compare local HEAD vs `origin/main`, inspect stashes/worktrees, and reach a truthful synchronization disposition before implementation.
+5. If local `main` is clean and only behind, fast-forward it. If legitimate local work exists, preserve it without data loss and reconcile by a normal merge when safe. Never overwrite owner work merely to synchronize.
+6. If safe synchronization cannot be completed, stop the task before product edits and report the blocker. Do not bypass the preflight.
+7. Never reset, automatically rebase, force-push, discard user changes, auto-stash, clean, or search sibling local repositories to discover work.
+8. Never create a sibling Desktop clone/worktree/copy for synchronization. If an explicitly authorized temporary worktree is ever required, it must live under `%TEMP%\ScrubBots-Level-Factory\...`, never beside the canonical Desktop project.
+9. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
 6. Read completely from the authorized GitHub-first source set:
    - root `TASKS.md`
    - `AGENTS.md`
