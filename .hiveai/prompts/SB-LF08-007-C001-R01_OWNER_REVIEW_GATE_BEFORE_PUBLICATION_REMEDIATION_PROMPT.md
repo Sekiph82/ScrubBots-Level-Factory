@@ -1,0 +1,3 @@
+# SB-LF08-007-C001-R01 — Owner Review Gate Remediation
+
+Close the C001 findings for M08-007 only. Invoke the existing SB-LFX-006 canonical review record and append-only chain validator; require schema/version, deterministic review ID, candidate identity hash, artwork/grid identity, disposition, contiguous sequence and predecessor. Any invalid candidate evidence must yield INVALID_REVIEW_EVIDENCE and block publication even if an earlier record was ACCEPT. Add missing-field, sequence-gap, predecessor-tamper, duplicate-ID and valid-ACCEPT-plus-corrupt-evidence tests. Do not create a second review store.

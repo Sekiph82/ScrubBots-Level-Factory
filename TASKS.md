@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M08 — Batch Factory & Weekly Production
-- Current Sprint: SB-LF08.C001 — M08 open-task master implementation batch
-- Current Task: SB-LF08-001 — Generate requested accepted counts by lane/class cadence
-- Current Task Status: AUTHORIZED / IMPLEMENT_ALL_THEN_AUDIT
-- Next Task/Action: Codex executes `SB-LF08-001,006,007,008,009-C001` sequentially from `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`, creates one builder log per task plus a master log, preserves accepted `SB-LF08-002,003,004,005,010` and `SB-LFX-013,014,015`, never edits `TASKS.md` or ChatGPT audits, then stops for independent per-task audit.
+- Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
+- Current Sprint: SB-LF09.C001 — Experimental evolutionary selection
+- Current Task: SB-LF09-001 — Prototype evolutionary selection behind experimental flag
+- Current Task Status: READY_FOR_IMPLEMENTATION / M09-001_AUTHORIZED
+- Next Task/Action: Codex implements only `SB-LF09-001` from `.hiveai/prompts/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_PROMPT.md`, creates the matching builder log before edits, preserves accepted M00-M08 evidence, never edits `TASKS.md` or ChatGPT audits, then stops for independent audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LF07-C001_FINAL_STRICT_CLOSURE_SUMMARY.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LF08-C001-R01_STRICT_AUDIT_SUMMARY.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md` indexes the five dedicated strict criteria for `SB-LF08-001,006,007,008,009`.
-- Current Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-001-C001_EXPERIMENTAL_EVOLUTIONARY_SELECTION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
@@ -188,6 +188,14 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF08 C001 Implementation/Audit Index: `.hiveai/prompts/SB-LF08-C001_IMPLEMENTATION_AND_AUDIT_INDEX.md`.
 - SB-LF08 C001 Master Prompt: `.hiveai/prompts/SB-LF08-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`.
 - SB-LF08 C001 Tracker Policy: accepted `002,003,004,005,010` and `SB-LFX-013,014,015` remain frozen; Codex implements only `001,006,007,008,009`; ChatGPT audits those five individually after the complete batch.
+- SB-LF08 C001 Strict Audit Result: `CHANGES_REQUIRED = 001,006,007,008,009`; no M08 C001 task is PASS/CLOSED.
+- SB-LF08 C001 Strict Audit Summary: `.hiveai/audits/SB-LF08-C001_STRICT_AUDIT_SUMMARY.md`.
+- SB-LF08 C001-R01 Remediation Authorization: `SB-LF08-001,006,007,008,009-C001-R01 — REMEDIATE_ALL_THEN_REAUDIT`.
+- SB-LF08 C001-R01 Remediation Index: `.hiveai/prompts/SB-LF08-C001-R01_REMEDIATION_INDEX.md`.
+- SB-LF08 C001-R01 Master Prompt: `.hiveai/prompts/SB-LF08-C001-R01_MASTER_REMEDIATION_PROMPT.md`.
+- SB-LF08 C001-R01 Tracker Policy: Codex remediates all five tasks sequentially without tracker/audit edits; ChatGPT re-audits only after the complete R01 batch.
+- SB-LF08 C001-R01 Re-Audit Result: `PASS/CLOSED = 001,006,007,008,009`; therefore `M08 = COMPLETE / VERIFIED`.
+- SB-LF08 C001-R01 Strict Audit Summary: `.hiveai/audits/SB-LF08-C001-R01_STRICT_AUDIT_SUMMARY.md`.
 - SB-LF04-001 C001-R01 Authoritative Reconciliation Handoff: `.hiveai/prompts/SB-LF04-001-C001-R01_AUTHORITATIVE_RECONCILIATION_HANDOFF_PROMPT.md`.
 - Tracker Authority Rule: only repository-root `/TASKS.md` on current `origin/main` is live authority; `docs/migration/legacy-task-trackers/TASKS.md` is historical evidence only and must never authorize work.
 - Migration Cutover Date: 2026-09-14
@@ -215,8 +223,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M05: Unified Factory Validation & Level QA — COMPLETE / VERIFIED
 - M06: ScrubBots Factory Studio — COMPLETE / VERIFIED
 - M07: Mutation & Automatic Difficulty Targeting — COMPLETE / VERIFIED
-- M08: Batch Factory & Weekly Production — ACTIVE
-- M09: Advanced Generation Research & Semantic Provider Evolution — PLANNED / PARTIALLY EVIDENCED
+- M08: Batch Factory & Weekly Production — COMPLETE / VERIFIED
+- M09: Advanced Generation Research & Semantic Provider Evolution — ACTIVE
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
 - M12: .scrubpack Format & Packager — PLANNED / PARTIALLY EVIDENCED
@@ -554,7 +562,7 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan plus
 
 ### M08.01 - Batch counts, rejection statistics and resumability
 
-- [~] SB-LF08-001 — Generate requested accepted counts by lane/class cadence. [PARTIAL]
+- [x] SB-LF08-001 — Generate requested accepted counts by lane/class cadence. [PARTIAL]
 - [x] SB-LF08-002 — Separate generated from accepted count.
 - [x] SB-LF08-003 — Rejection statistics.
 - [x] SB-LF08-004 — Deterministic/resumable batch jobs.
@@ -562,13 +570,13 @@ Capability source family: `SB-LF08-xxx` from the main Scrubbots master plan plus
 
 ### M08.02 - Accepted outputs, owner review and pipeline handoff
 
-- [ ] SB-LF08-006 — Accepted LevelData/previews/metadata/QA reports as batch result. [PARTIAL]
-- [ ] SB-LF08-007 — Owner review/approval queue before publication. [PARTIAL]
-- [ ] SB-LF08-008 — Production-ready handoff to Content Pipeline.
+- [x] SB-LF08-006 — Accepted LevelData/previews/metadata/QA reports as batch result. [PARTIAL]
+- [x] SB-LF08-007 — Owner review/approval queue before publication. [PARTIAL]
+- [x] SB-LF08-008 — Production-ready handoff to Content Pipeline.
 
 ### M08.03 - Stress and idempotence
 
-- [ ] SB-LF08-009 — Stress high rejection rates safely. [PARTIAL]
+- [x] SB-LF08-009 — Stress high rejection rates safely. [PARTIAL]
 - [x] SB-LF08-010 — Reruns create no meaningless diffs.
 
 ### M08.04 - Owner-approved failure, batch-import and recovery extensions
@@ -587,7 +595,7 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 ### M09.01 - Experimental evolutionary generation
 
-- [ ] SB-LF09-001 — Prototype evolutionary selection behind experimental flag.
+- [~] SB-LF09-001 — Prototype evolutionary selection behind experimental flag.
 - [ ] SB-LF09-002 — Versioned fitness metrics. [PARTIAL]
 
 ### M09.02 - Semantic/procedural art helpers
@@ -942,9 +950,9 @@ Owner-approved post-cutover product specification:
 4. M04 Difficulty Intelligence is COMPLETE / VERIFIED; `SB-LF04-001..012 = PASS/CLOSED`.
 5. M05 Unified Factory Validation & Level QA is COMPLETE / VERIFIED; `SB-LF05-001..010 = PASS/CLOSED`.
 6. Owner-directed `MAINT-PALETTE-V3-001` cross-repository Palette V3 synchronization is PASS/CLOSED by `.hiveai/audits/MAINT-PALETTE-V3-C001_STRICT_AUDIT.md`.
-7. M07 mutation/difficulty targeting is the active frontier, beginning with `SB-LF07-001` mutation interface/immutable lineage.
-8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions.
-9. Continue M09 advanced generation only as justified, including `SB-LFX-016..017` similarity/provider-accounting extensions when their dependencies are real.
+7. M07 mutation/difficulty targeting is COMPLETE / VERIFIED.
+8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions are COMPLETE / VERIFIED.
+9. M09 advanced generation continues only as authorized, beginning with `SB-LF09-001` and preserving the experimental/offline boundary.
 10. M10 Campaign Intelligence.
 11. M11-M14 Content Platform architecture/pack/manifest/publisher.
 12. M18-M20 storage/operations/security.
