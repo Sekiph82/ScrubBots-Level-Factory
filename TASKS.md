@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: SB-LF09.C001 — Telemetry calibration policy implementation
+- Current Sprint: MAINT-GIT-HYGIENE-C002 — Canonical local main reconciliation before SB-LF09-004
 - Current Task: SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy
-- Current Task Status: AUTHORIZED / OWNER_POLICY_APPROVED / IMPLEMENT_THEN_AUDIT
-- Next Task/Action: Codex executes `SB-LF09-004-C001` from `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md` under owner-approved `docs/policies/SB_LF09_004_ANALYTICS_DATA_POLICY_V01.md`, creates the dedicated builder log, never edits `TASKS.md` or ChatGPT audits, then stops for independent audit.
+- Current Task Status: BLOCKED / LOCAL_MAIN_RECONCILIATION_REQUIRED
+- Next Task/Action: Codex executes only `.hiveai/prompts/MAINT-GIT-HYGIENE-C002_CANONICAL_LOCAL_MAIN_RECONCILIATION_PROMPT.md` inside `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`; no new branch/worktree/Desktop sibling may be created. After local HEAD == origin/main and ahead/behind = 0/0, resume the existing SB-LF09-004 implementation prompt.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
