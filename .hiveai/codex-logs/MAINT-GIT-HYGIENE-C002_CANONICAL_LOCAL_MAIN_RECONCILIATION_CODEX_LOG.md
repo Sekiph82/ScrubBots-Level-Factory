@@ -78,3 +78,13 @@ After that preservation commit, `origin/main` will be fetched with prune and int
 - The merge staged one pre-existing remote whitespace warning in `.hiveai/codex-logs/SB-LF08-C001_MASTER_BATCH_CODEX_LOG.md`; the immutable remote record was not edited. Post-merge working-tree `git diff --check` was clean.
 - Verification-log append commit: pending before publication.
 - Push and final equality proof: pending before publication.
+
+## Final publication state
+
+- Reconciliation payload HEAD before this final log-only publication: `bdb3b0b0642a10c057386d3e41fb2472e593d138`.
+- Normal push of the preservation, merge, and verification-log commits succeeded: `9faedf0..bdb3b0b main -> main`.
+- Immediate post-push fetch proved `local HEAD=bdb3b0b0642a10c057386d3e41fb2472e593d138`, `origin/main=bdb3b0b0642a10c057386d3e41fb2472e593d138`, and ahead/behind `0 0`.
+- The final log-only publication commit will be pushed and equality rechecked after this append.
+- Final local state intentionally retains the 51 generated `.uid` files and three pre-existing nested Desktop worktree residues as untracked; none was deleted or newly created.
+- `LOCAL_MAIN` is **SYNCHRONIZED**.
+- `SB-LF09-004` is **NOT_READY**: the synchronized authoritative tracker still says `BLOCKED / LOCAL_MAIN_RECONCILIATION_REQUIRED`, and the full governance suite reports the maintenance-sprint/current-task mismatch. This maintenance run does not edit tracker state or implement M09-004.
