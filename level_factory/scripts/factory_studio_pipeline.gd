@@ -5,6 +5,7 @@ extends VBoxContainer
 var _gateway: RefCounted
 var _source_control: LineEdit
 var _candidate_control: LineEdit
+var _primary_image_control: LineEdit
 var _state_label: Label
 var _timeline_label: Label
 var _projection: Dictionary = {}
@@ -21,11 +22,23 @@ func configure_gateway(gateway: RefCounted) -> void: _gateway = gateway
 func run_pipeline(source_id: String = "", candidate_id: String = "") -> void:
 	var source := source_id if not source_id.is_empty() else (_source_control.text.strip_edges() if _source_control != null else "")
 	var candidate := candidate_id if not candidate_id.is_empty() else (_candidate_control.text.strip_edges() if _candidate_control != null else "")
+	if source.is_empty() and candidate.is_empty() and _primary_image_control != null and not _primary_image_control.text.strip_edges().is_empty():
+		run_primary_pipeline()
+		return
 	var request := {"source_id": source} if not source.is_empty() else {"candidate_id": candidate}
 	if _gateway == null or (source.is_empty() and candidate.is_empty()):
 		_projection = {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — choose one canonical source or candidate identity."}
 	else:
 		_projection = _gateway.call("run_studio_extension", "pipeline", request)
+	_render()
+
+
+func run_primary_pipeline(image_path: String = "", output_dir: String = "") -> void:
+	var image := image_path if not image_path.is_empty() else (_primary_image_control.text.strip_edges() if _primary_image_control != null else "")
+	if _gateway == null or image.is_empty():
+		_projection = {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — choose a local logical-grid image for the primary supply route."}
+	else:
+		_projection = _gateway.call("run_studio_extension", "pipeline", {"image_path": image, "output_dir": output_dir})
 	_render()
 
 
@@ -42,6 +55,9 @@ func _build_controls() -> void:
 	_source_control = LineEdit.new(); _source_control.name = "PipelineSourceId"; _source_control.placeholder_text = "OWNER_UPLOAD source ID"; _source_control.size_flags_horizontal = Control.SIZE_EXPAND_FILL; row.add_child(_source_control)
 	_candidate_control = LineEdit.new(); _candidate_control.name = "PipelineCandidateId"; _candidate_control.placeholder_text = "or candidate ID"; _candidate_control.size_flags_horizontal = Control.SIZE_EXPAND_FILL; row.add_child(_candidate_control)
 	var button := Button.new(); button.name = "RunPipeline"; button.text = "Run Pipeline"; button.pressed.connect(run_pipeline); row.add_child(button); add_child(row)
+	var primary_row := HBoxContainer.new()
+	_primary_image_control = LineEdit.new(); _primary_image_control.name = "PrimarySupplyImage"; _primary_image_control.placeholder_text = "local logical-grid PNG — primary ZIP supply route"; _primary_image_control.size_flags_horizontal = Control.SIZE_EXPAND_FILL; primary_row.add_child(_primary_image_control)
+	var primary_button := Button.new(); primary_button.name = "RunPrimarySupplyPipeline"; primary_button.text = "Run Primary Supply"; primary_button.pressed.connect(run_primary_pipeline); primary_row.add_child(primary_button); add_child(primary_row)
 	_state_label = Label.new(); _state_label.name = "PipelineState"; _state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_state_label)
 	_timeline_label = Label.new(); _timeline_label.name = "PipelineTimeline"; _timeline_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_timeline_label)
 

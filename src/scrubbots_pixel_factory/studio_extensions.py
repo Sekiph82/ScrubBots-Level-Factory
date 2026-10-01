@@ -481,6 +481,46 @@ def _pipeline_stage(
 
 
 def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = None, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    request_data = dict(request or {})
+    primary_image = request_data.get("image_path") or request_data.get("primary_image_path")
+    if primary_image is not None:
+        from .supply_pipeline.primary import run_primary_supply_pipeline
+
+        image_path = Path(str(primary_image)).expanduser().resolve()
+        output_dir = Path(str(request_data.get("output_dir") or (extensions_root() / "primary-supply"))).expanduser().resolve()
+        primary = run_primary_supply_pipeline(
+            image_path,
+            output=output_dir,
+            level_id=str(request_data.get("level_id", "pixelart_level")),
+            seed=int(request_data.get("seed", 0)),
+            candidates=int(request_data.get("candidates", 300)),
+            target=request_data.get("target"),
+            verify_top=int(request_data.get("verify_top", 1)),
+        )
+        state = str(primary.get("state", "ERROR"))
+        solve_state = "PASS" if primary.get("acceptance", {}).get("solver_status") == "SOLVED" else state
+        replay_state = "PASS" if primary.get("acceptance", {}).get("replay") == "WIN" else state
+        difficulty_state = "PASS" if primary.get("difficulty", {}).get("basis", "").startswith("ScrubBots Difficulty V1") else state
+        final_state = "READY" if state == "READY" else state
+        stages = [
+            _pipeline_stage("SOURCE", "PASS" if image_path.is_file() else "UNAVAILABLE", inputs=[str(image_path)], outputs=[str(image_path)] if image_path.is_file() else (), evidence=str(image_path), reason="Local logical-grid image accepted without a PNG round-trip." if image_path.is_file() else "Local image input is unavailable."),
+            _pipeline_stage("ANALYZE/PLAN", "PASS" if state == "READY" else state, inputs=[str(image_path)], outputs=[str(output_dir)], reason="ZIP-derived PixelAnalyzer and DifficultyModel produced dynamic supply sizing." if state == "READY" else str(primary.get("reason", "Primary supply analysis unavailable."))),
+            _pipeline_stage("SCREEN", "RANKED" if state == "READY" else state, inputs=[str(output_dir)], outputs=[str(output_dir)], reason="ScreeningSimulator is ranking-only; it never grants acceptance."),
+            _pipeline_stage("SOLVE", solve_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if solve_state == "PASS" else (), reason="Canonical ScrubBots SolvabilitySolver is the acceptance authority." if solve_state == "PASS" else str(primary.get("reason", "Canonical game solver unavailable."))),
+            _pipeline_stage("REPLAY", replay_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if replay_state == "PASS" else (), reason="Canonical solver replay reached WIN on a fresh proof state." if replay_state == "PASS" else "Replay evidence unavailable."),
+            _pipeline_stage("DIFFICULTY", difficulty_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if difficulty_state == "PASS" else (), reason=str(primary.get("difficulty", {}).get("basis", "Difficulty V1 unavailable."))),
+            _pipeline_stage("QA", "PASS" if state == "READY" else state, inputs=[str(output_dir)], outputs=[str(output_dir)] if state == "READY" else (), reason="Supply conservation, positive per-plan bound, solver status and replay were verified." if state == "READY" else "Primary pipeline did not produce a QA-ready result."),
+            _pipeline_stage("REVIEW", "NOT_AVAILABLE", inputs=[str(output_dir)], evidence=None, reason="Owner acceptance remains an independent review boundary; builder evidence is not acceptance."),
+        ]
+        run_id = f"pipeline-{_digest({'primary_image': str(image_path), 'request': request_data, 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
+        payload = {
+            "schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id,
+            "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": None, "candidate_id": None,
+            "request": request_data, "stages": stages, "disposition": final_state,
+            "primary": primary, "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+        _write_json(_pipeline_path(run_id), payload, immutable=True)
+        return payload
     if (source_id is None) == (candidate_id is None):
         raise StudioExtensionError("pipeline requires exactly one source or candidate identity")
     stages: list[dict[str, Any]] = []

@@ -90,6 +90,28 @@ class CLIError(ValueError):
         self.code = code
 
 
+def _supply_optimize(args: argparse.Namespace) -> ExitCode:
+    from ..supply_pipeline.primary import run_primary_supply_pipeline
+
+    payload = run_primary_supply_pipeline(
+        args.image, output=args.output, level_id=args.level_id, seed=args.seed,
+        candidates=args.candidates, target=args.target, verify_top=args.verify_top,
+        screen_budget=args.screen_budget, metric_top=args.metric_top,
+        viability_budget=args.viability_budget, real_max_visited=args.real_max_visited,
+        level_number=args.level_number,
+    )
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return ExitCode.SUCCESS if payload.get("state") == "READY" else ExitCode.INVALID_REQUEST
+
+
+def _supply_verify(args: argparse.Namespace) -> ExitCode:
+    from ..supply_pipeline.verify import verify_exported_supply
+
+    payload = verify_exported_supply(args.level, args.plan)
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return ExitCode.SUCCESS if payload.get("state") == "READY" else ExitCode.INVALID_REQUEST
+
+
 def _json_load(path: Path, label: str) -> object:
     if not _is_local_path(path):
         raise CLIError(f"{label} must be a local filesystem path")
@@ -927,6 +949,26 @@ def _parser() -> argparse.ArgumentParser:
     normalize.add_argument("--palette-policy", choices=(ASSET_PALETTE_POLICY, "SCRUBBOTS_C01_C16"), default=ASSET_PALETTE_POLICY)
     normalize.add_argument("--output", type=Path)
     normalize.set_defaults(handler=_semantic_normalize)
+
+    supply_optimize = sub.add_parser("supply-optimize", help="run the primary offline ZIP-derived supply/solve/difficulty pipeline")
+    supply_optimize.add_argument("--image", type=Path, required=True, help="local palette-exact logical PNG")
+    supply_optimize.add_argument("--output", type=Path, required=True)
+    supply_optimize.add_argument("--level-id", default="pixelart_level")
+    supply_optimize.add_argument("--seed", type=int, default=0)
+    supply_optimize.add_argument("--candidates", type=int, default=300)
+    supply_optimize.add_argument("--target", choices=("EASY", "MEDIUM", "HARD", "VERY_HARD"))
+    supply_optimize.add_argument("--verify-top", type=int, default=1)
+    supply_optimize.add_argument("--screen-budget", type=int, default=3000)
+    supply_optimize.add_argument("--metric-top", type=int, default=12)
+    supply_optimize.add_argument("--viability-budget", type=int, default=3000)
+    supply_optimize.add_argument("--real-max-visited", type=int)
+    supply_optimize.add_argument("--level-number", type=int, default=1)
+    supply_optimize.set_defaults(handler=_supply_optimize)
+
+    supply_verify = sub.add_parser("supply-verify", help="verify an exported level and supply plan through the current game")
+    supply_verify.add_argument("--level", type=Path, required=True)
+    supply_verify.add_argument("--plan", type=Path, required=True)
+    supply_verify.set_defaults(handler=_supply_verify)
     return parser
 
 

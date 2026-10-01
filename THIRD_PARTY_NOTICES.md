@@ -1,5 +1,18 @@
 # Third-Party Notices and Provenance
 
+The primary supply pipeline uses bounded runtime dependencies for local image
+decoding and array analysis:
+
+## Runtime dependencies
+
+- `numpy>=2,<3`: array/grid analysis; BSD-3-Clause license, package metadata
+  and license are supplied by the installed distribution.
+- `Pillow>=10,<13`: local PNG decoding; HPND license, package metadata and
+  license are supplied by the installed distribution.
+
+Neither package is vendored or used for network access. The pipeline accepts
+only local files and does not silently quantize off-palette pixels.
+
 This M00 foundation copies no third-party source code and includes no
 third-party artwork, example images, or runtime algorithm package. The
 repositories below are reference material approved by the authoritative task

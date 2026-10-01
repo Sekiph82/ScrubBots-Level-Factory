@@ -409,6 +409,44 @@ def _studio_revalidate_main(arguments: Sequence[str]) -> int:
         return 2
 
 
+def _primary_supply_main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scrubbots-pixel-factory supply-optimize")
+    parser.add_argument("--image", required=True)
+    parser.add_argument("--output", required=True)
+    parser.add_argument("--level-id", default="pixelart_level")
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--candidates", type=int, default=300)
+    parser.add_argument("--target", choices=("EASY", "MEDIUM", "HARD", "VERY_HARD"))
+    parser.add_argument("--verify-top", type=int, default=1)
+    parser.add_argument("--screen-budget", type=int, default=3000)
+    parser.add_argument("--metric-top", type=int, default=12)
+    parser.add_argument("--viability-budget", type=int, default=3000)
+    parser.add_argument("--real-max-visited", type=int)
+    parser.add_argument("--level-number", type=int, default=1)
+    args = parser.parse_args(list(arguments))
+    from scrubbots_pixel_factory.supply_pipeline.primary import run_primary_supply_pipeline
+    payload = run_primary_supply_pipeline(
+        args.image, output=args.output, level_id=args.level_id, seed=args.seed,
+        candidates=args.candidates, target=args.target, verify_top=args.verify_top,
+        screen_budget=args.screen_budget, metric_top=args.metric_top,
+        viability_budget=args.viability_budget, real_max_visited=args.real_max_visited,
+        level_number=args.level_number,
+    )
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return 0 if payload.get("state") == "READY" else 2
+
+
+def _primary_supply_verify_main(arguments: Sequence[str]) -> int:
+    parser = argparse.ArgumentParser(prog="scrubbots-pixel-factory supply-verify")
+    parser.add_argument("--level", required=True)
+    parser.add_argument("--plan", required=True)
+    args = parser.parse_args(list(arguments))
+    from scrubbots_pixel_factory.supply_pipeline.verify import verify_exported_supply
+    payload = verify_exported_supply(args.level, args.plan)
+    print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+    return 0 if payload.get("state") == "READY" else 2
+
+
 def _main() -> int:
     repository_root = _repository_root()
     sys.path.insert(0, str(repository_root / "src"))
@@ -420,6 +458,10 @@ def _main() -> int:
         return _owner_upload_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "studio-extension":
         return _studio_extension_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "supply-optimize":
+        return _primary_supply_main(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "supply-verify":
+        return _primary_supply_verify_main(sys.argv[2:])
     from scrubbots_pixel_factory.cli.main import main as canonical_main
 
     return canonical_main()
