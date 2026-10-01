@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: MAINT-SUPPLY-MASTER-C001 — Uncapped game supply + primary ZIP pipeline integration
-- Current Task: MAINT-SUPPLY-MASTER-C001 — Execute game uncapped supply correction then integrate owner ZIP as Level Factory primary supply/solve/difficulty path
-- Current Task Status: AUTHORIZED / OWNER_APPROVED / IMPLEMENT_ALL_THEN_AUDIT
-- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md` in strict order: first MAINT-SUPPLY-UNCAPPED-C001 in `Sekiph82/Scrubbots`, then MAINT-SUPPLY-PIPELINE-V01 in `Sekiph82/ScrubBots-Level-Factory`, with mandatory local↔GitHub main sync preflight for both repositories. Stop after both builder logs + master log are pushed for independent audit.
+- Current Sprint: MAINT-SUPPLY-PIPELINE-V01-R01 — Strict primary-pipeline closure remediation
+- Current Task: MAINT-SUPPLY-PIPELINE-V01-R01 — Close authentic runtime/load/candidate-route/capability/authority/full-size evidence gaps
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: Codex executes `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`. Preserve the owner ZIP-derived optimizer and completed uncapped game contract; close audit findings F01..F10, complete authentic 37x37 and 59x59 end-to-end runs, publish the R01 builder log, and stop for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01_PRIMARY_SUPPLY_SOLVER_DIFFICULTY_PIPELINE_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -56,6 +56,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - MAINT-SUPPLY-MASTER-C001 Authorization: `IMPLEMENT_ALL_THEN_AUDIT`.
 - MAINT-SUPPLY-MASTER-C001 Prompt: `.hiveai/prompts/MAINT-SUPPLY-MASTER-C001_UNCAPPED_GAME_AND_PRIMARY_PIPELINE_MASTER_PROMPT.md`.
 - MAINT-SUPPLY-MASTER-C001 Execution Order: `MAINT-SUPPLY-UNCAPPED-C001 -> MAINT-SUPPLY-PIPELINE-V01`.
+- MAINT-SUPPLY-UNCAPPED-C001 Independent Audit Result: `PASS / CLOSED`; game implementation commit `e1a36d317ef79d2e877aa1402d7bbca3f00606b1` removes the global 30-robot cap while preserving positive per-plan metadata bounds and exact conservation.
+- MAINT-SUPPLY-PIPELINE-V01 Independent Audit Result: `CHANGES_REQUIRED`.
+- MAINT-SUPPLY-MASTER-C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/MAINT-SUPPLY-MASTER-C001_PRIMARY_PIPELINE_STRICT_AUDIT.md`.
+- MAINT-SUPPLY-PIPELINE-V01-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- MAINT-SUPPLY-PIPELINE-V01-R01 Prompt: `.hiveai/prompts/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_REMEDIATION_PROMPT.md`.
+- MAINT-SUPPLY-PIPELINE-V01-R01 Audit Criteria: `.hiveai/audit-criteria/MAINT-SUPPLY-PIPELINE-V01-R01_STRICT_CLOSURE_AUDIT_CRITERIA.md`.
+- MAINT-SUPPLY-PIPELINE-V01-R01 Required Closures: authentic production-runtime WON gate; executed shipping load-check before READY; official Difficulty V1 mandatory for production READY; canonical candidate/logical-grid primary route; truthful Gateway Solve/Analyze availability; clean/fingerprinted game authority; no literal 3/3 bridge seam; completed authentic 37x37 + 59x59 pipelines; 12/12 adapted ZIP tests; final full regressions green.
 - Cross-Repo Prerequisite: `Sekiph82/Scrubbots/coordination/OWNER_UNCAPPED_BATCH_ROBOT_COUNT_DECISION_V01.md`; global 30 robot/batch ceiling is retired.
 - SB-LF09-004 Telemetry Status: `PAUSED_BY_OWNER_PRIORITY` until MAINT-SUPPLY-PIPELINE-V01 closes; approved analytics policy remains valid and work resumes afterward.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
