@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: MAINT-GIT-HYGIENE-C002 — Canonical local main reconciliation before SB-LF09-004
+- Current Sprint: SB-LF09.C001 — Telemetry calibration policy implementation
 - Current Task: SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy
-- Current Task Status: BLOCKED / LOCAL_MAIN_RECONCILIATION_REQUIRED
-- Next Task/Action: Codex executes only `.hiveai/prompts/MAINT-GIT-HYGIENE-C002_CANONICAL_LOCAL_MAIN_RECONCILIATION_PROMPT.md` inside `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`; no new branch/worktree/Desktop sibling may be created. After local HEAD == origin/main and ahead/behind = 0/0, resume the existing SB-LF09-004 implementation prompt.
+- Current Task Status: AUTHORIZED / LOCAL_MAIN_SYNCHRONIZED / IMPLEMENT_THEN_AUDIT
+- Next Task/Action: Codex executes `.hiveai/prompts/SB-LF09-004-C001_SYNCED_IMPLEMENTATION_CONTINUATION_PROMPT.md`; the prompt begins with mandatory local↔GitHub main sync preflight, then implements only SB-LF09-004 under the approved V01 analytics policy, publishes the dedicated builder log, and stops for independent audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -18,7 +18,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
+- Current Prompt: `.hiveai/prompts/SB-LF09-004-C001_SYNCED_IMPLEMENTATION_CONTINUATION_PROMPT.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -45,6 +45,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LF09-004 C001 Authorization: `SB-LF09-004-C001 — IMPLEMENT_THEN_AUDIT`.
 - SB-LF09-004 C001 Prompt: `.hiveai/prompts/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_PROMPT.md`.
 - SB-LF09-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-LF09-004-C001_TELEMETRY_CALIBRATION_POLICY_AUDIT_CRITERIA.md`.
+- MAINT-GIT-HYGIENE-C002 Result: `LOCAL_MAIN: SYNCHRONIZED`; canonical local `main` was reconciled to `origin/main` with non-destructive preservation/merge, remote branches reduced to `main` only, and no new Desktop sibling/worktree was created.
+- MAINT-GIT-HYGIENE-C002 Verification: compileall PASS, Godot headless PASS, full pytest `1101 passed, 2 skipped, 1 failed`; the sole failure was the temporary maintenance-sprint/current-task tracker mismatch, now resolved by ChatGPT-owned tracker restoration to `SB-LF09.C001`.
+- SB-LF09-004 Synced Continuation Prompt: `.hiveai/prompts/SB-LF09-004-C001_SYNCED_IMPLEMENTATION_CONTINUATION_PROMPT.md`.
 - SB-LFX Batch Implementation Authorization: `SB-LFX-003..017-C001 — IMPLEMENT_ALL_THEN_AUDIT`
 - SB-LFX Batch Master Prompt: `.hiveai/prompts/SB-LFX-003-017-C001_MASTER_BATCH_IMPLEMENTATION_PROMPT.md`
 - SB-LFX Implementation/Audit Index: `.hiveai/prompts/SB-LFX-001-017_IMPLEMENTATION_AND_AUDIT_INDEX.md`
