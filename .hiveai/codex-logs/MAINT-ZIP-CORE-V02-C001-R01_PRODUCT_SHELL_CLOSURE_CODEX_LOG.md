@@ -95,3 +95,10 @@ Document role: CODEX BUILDER LOG
 - Studio shell: `level_factory/scripts/**` bounded gateway/launcher and current target, import, evidence, readiness, dashboard, editor, and revalidation surfaces; `level_factory/docs/**` implementation documentation.
 - Verification: current Studio headless integration suites and migrated Python unit/integration tests, including `tests/integration/test_m09_cli_integration.py`.
 - This builder log is the only `.hiveai` file created or modified for this task.
+
+### Product commit and first push
+
+- Final staged diff was reviewed with `git diff --cached --stat`; no protected tracker, handoff, audit, prompt, or root `TASKS.md` path was staged.
+- Product commit: `97e2810` (`MAINT-ZIP-CORE-V02-C001-R01 product shell closure`).
+- `git push origin main`: succeeded; remote advanced `45ae81b..97e2810`.
+- The final log/equality proof is intentionally being published as a subsequent log-only commit so the log records the exact remote result.
