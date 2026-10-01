@@ -227,6 +227,26 @@ This is validation work, not permission for Codex to edit Scrubbots source.
 
 **Disposition: REQUIRED CLOSURE.**
 
+### F10 — External OWNER_UPLOAD cannot currently complete owner-review -> publish
+
+Current exact OWNER_UPLOAD artwork can enter the ZIP route, but:
+- pipeline records it as `source_id`;
+- `record_owner_review()` accepts only a canonical `candidate_id` returned by `list_candidates()`;
+- the upload source is explicitly not automatically a candidate.
+
+Therefore the owner-approved external-artwork path cannot currently reach:
+`ZIP -> owner ACCEPT -> automatic publish`.
+
+Required:
+- preserve immutable uploaded source bytes;
+- create a derived canonical candidate/bundle identity for an exact valid uploaded artwork;
+- bind it to source provenance;
+- send that candidate through the same ZIP/review/publish path as generated artwork.
+
+Transparent/non-publishable upload may remain an artwork asset/candidate with publish unavailable; do not silently fill it.
+
+**Disposition: BLOCKER.**
+
 ## Non-blocking positives retained
 
 ### ZIP locked parameters — PASS
@@ -277,4 +297,5 @@ R01 must fix only the remaining Level Factory product-shell/cutover defects:
 6. require shipping load-check before publish;
 7. remove/decommission the competing legacy production solver/difficulty path;
 8. make full tests green;
-9. re-run live 3/4/5 cross-repo validation against the now-passing game contract.
+9. re-run live 3/4/5 cross-repo validation against the now-passing game contract;
+10. make exact external OWNER_UPLOAD artwork derive a reviewable canonical candidate without mutating source bytes.
