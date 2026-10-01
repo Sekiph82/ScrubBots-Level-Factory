@@ -15,7 +15,7 @@ const QUALITY_BINDING_VERSION := 1
 const QUALITY_SCHEMA := "scrubbots-quality"
 const QUALITY_VERSION := 1
 const GENERATION_REQUEST_SCHEMA := "scrubbots-generation-request"
-const SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS: Array[int] = [1, 2]
+const SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS: Array[int] = [1, 2, 3]
 
 var _state := EMPTY
 var _source_action := ""
@@ -31,7 +31,7 @@ var _generator_id := ""
 var _generator_version := ""
 var _request_schema := ""
 var _request_schema_version := 0
-var _request_difficulty := ""
+var _request_background_intent := "BACKGROUND"
 var _quality_schema := ""
 var _quality_schema_version := 0
 var _quality_policy_version := ""
@@ -109,7 +109,7 @@ func snapshot() -> Dictionary:
 		"generator_version": _generator_version,
 		"request_schema": _request_schema,
 		"request_schema_version": _request_schema_version,
-		"request_difficulty": _request_difficulty,
+		"request_background_intent": _request_background_intent,
 		"quality_schema": _quality_schema,
 		"quality_schema_version": _quality_schema_version,
 		"quality_policy_version": _quality_policy_version,
@@ -262,7 +262,7 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 	_generator_version = generator_version
 	_request_schema = str(request_data.get("schema", ""))
 	_request_schema_version = int(request_data.get("schema_version", 0))
-	_request_difficulty = str(request_data.get("difficulty", ""))
+	_request_background_intent = str(request_data.get("background_intent", "BACKGROUND"))
 	_quality_schema = str(report_data.get("schema", ""))
 	_quality_schema_version = int(report_data.get("version", 0))
 	_quality_policy_version = str(policy.get("version", ""))
@@ -304,7 +304,7 @@ func _refresh_labels() -> void:
 			_state_label.text = "Evidence panel: ERROR — %s%s" % [_error_message, " Prior evidence is retained/stale." if _retained_after_failure else ""]
 		else:
 			_state_label.text = "Evidence panel: READY%s" % retention
-		_identity_label.text = "Identity / provenance\nCandidate=%s | grid_hash=%s | dimensions=%sx%s | action=%s\nGenerator=%s %s (%s) | canonical request=%s v%s | official difficulty evidence=%s\nBundle=%s\nMetadata=%s" % [
+		_identity_label.text = "Identity / provenance\nCandidate=%s | grid_hash=%s | dimensions=%sx%s | action=%s\nGenerator=%s %s (%s) | canonical request=%s v%s | background intent=%s | official difficulty evidence=%s\nBundle=%s\nMetadata=%s" % [
 			_candidate_id,
 			_grid_hash,
 			_logical_width,
@@ -315,7 +315,8 @@ func _refresh_labels() -> void:
 			_generation_mode,
 			_request_schema,
 			_request_schema_version,
-			_request_difficulty,
+			_request_background_intent,
+			_difficulty_disposition,
 			_source_bundle_path,
 			_metadata_path,
 		]
@@ -328,5 +329,5 @@ func _refresh_labels() -> void:
 			str(_structural_metrics),
 		]
 	_solution_label.text = "Solution: %s" % _solution_disposition
-	_difficulty_label.text = "Difficulty analysis: %s\nTarget/request difficulty is context only: %s" % [_difficulty_disposition, _request_difficulty if not _request_difficulty.is_empty() else "not loaded"]
+	_difficulty_label.text = "Difficulty analysis: %s\nDifficulty is measured from canonical ZIP solve/replay; request intent is difficulty-free." % _difficulty_disposition
 	_load_risk_label.text = "Load / risk: %s" % _load_risk_disposition

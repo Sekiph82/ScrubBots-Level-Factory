@@ -71,8 +71,6 @@ def test_lf06_012_gate_runs_real_studio_smoke_and_canonical_core_reproduction() 
         reproduced_root = temporary_root / "reproduced"
         generated = _run_core(
             "generate",
-            "--difficulty",
-            "MEDIUM",
             "--mode",
             "RULES",
             "--width",
@@ -96,7 +94,8 @@ def test_lf06_012_gate_runs_real_studio_smoke_and_canonical_core_reproduction() 
         source_bundle = read_bundle(source_bundle_root)
         request = source_bundle.metadata["generation"]["request"]
         assert request["schema"] == "scrubbots-generation-request"
-        assert request["schema_version"] in (1, 2)
+        assert request["schema_version"] in (1, 2, 3)
+        assert "difficulty" not in request
         assert request["width"] == 20
         assert request["height"] == 21
         assert request["seed"] == {"type": "int", "value": 12012}

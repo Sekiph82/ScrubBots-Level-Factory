@@ -51,6 +51,18 @@ def validate_used_color_count(difficulty: Difficulty | str, cells: object) -> tu
     return used
 
 
+def validate_current_used_color_count(cells: object) -> tuple[str, ...]:
+    """Validate used colors without introducing a requested difficulty."""
+
+    used = actual_used_palette_ids(cells)
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
+    if not minimum <= len(used) <= maximum:
+        raise ColorUsageContractError(
+            f"V1 used-color envelope requires {minimum}..{maximum} distinct used colors; received {len(used)}"
+        )
+    return used
+
+
 def validate_palette_subset(difficulty: Difficulty | str, subset: Iterable[str]) -> tuple[str, ...]:
     parse_difficulty(difficulty)
     if isinstance(subset, str):
@@ -93,6 +105,17 @@ def select_palette_subset(difficulty: Difficulty | str, seed: int | str) -> tupl
     return tuple(sorted(chosen, key=lambda value: int(value[1:])))
 
 
+def select_current_palette_subset(seed: int | str) -> tuple[str, ...]:
+    validate_seed(seed)
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
+    size = minimum + stable_index("palette-subset.size", seed, maximum - minimum + 1)
+    ranked = sorted(
+        CANONICAL_PALETTE.ids,
+        key=lambda value: (stable_digest("palette-subset.member", seed, value), value),
+    )
+    return tuple(sorted(ranked[:size], key=lambda value: int(value[1:])))
+
+
 def resolve_palette_subset(
     difficulty: Difficulty | str,
     *,
@@ -104,3 +127,30 @@ def resolve_palette_subset(
     if seed is None:
         raise ColorUsageContractError("seed is required when palette subset is not supplied")
     return select_palette_subset(difficulty, seed)
+
+
+def resolve_current_palette_subset(
+    *, seed: int | str | None = None, subset: Iterable[str] | None = None,
+) -> tuple[str, ...]:
+    if subset is not None:
+        return validate_palette_subset_without_difficulty(subset)
+    if seed is None:
+        raise ColorUsageContractError("seed is required when palette subset is not supplied")
+    return select_current_palette_subset(seed)
+
+
+def validate_palette_subset_without_difficulty(subset: Iterable[str]) -> tuple[str, ...]:
+    if isinstance(subset, str):
+        raise ColorUsageContractError("explicit palette subset must be an iterable of C-ID strings")
+    try:
+        values = tuple(subset)
+        if len(set(values)) != len(values):
+            raise ColorUsageContractError("explicit palette subset contains duplicate IDs")
+        for value in values:
+            CANONICAL_PALETTE.validate_logical_id(value)
+    except (TypeError, PaletteContractError) as exc:
+        raise ColorUsageContractError(str(exc)) from exc
+    minimum, maximum = CANONICAL_PALETTE.used_color_envelope
+    if not minimum <= len(values) <= maximum:
+        raise ColorUsageContractError(f"explicit palette subset must contain {minimum}..{maximum} IDs; received {len(values)}")
+    return tuple(sorted(values, key=lambda value: int(value[1:])))

@@ -28,7 +28,7 @@ func show_readiness() -> void: _render()
 func _render() -> void:
 	if _result == null: return
 	var rows: Array[String] = []
-	for key in ["SOURCE", "PALETTE", "STRUCTURE", "SOLVER", "DIFFICULTY", "QA", "OWNER", "EXPORT"]:
+	for key in ["SOURCE", "PALETTE", "STRUCTURE", "SOLVER", "DIFFICULTY", "QA", "LOAD_CHECK", "OWNER", "EXPORT"]:
 		var gate: Dictionary = _projection.get("gates", {}).get(key, {"disposition": "NOT AVAILABLE", "reason": "No card loaded."})
 		rows.append("%s=%s" % [key, gate.get("disposition", "NOT AVAILABLE")])
 	_result.text = "Overall: %s | %s\n%s" % [_projection.get("overall", "NOT AVAILABLE"), _projection.get("reason", ""), " | ".join(rows)]

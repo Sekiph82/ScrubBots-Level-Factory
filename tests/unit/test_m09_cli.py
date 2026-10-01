@@ -9,7 +9,7 @@ cli_module = importlib.import_module("scrubbots_pixel_factory.cli.main")
 
 def test_omitted_generate_seed_is_controlled_and_recorded(tmp_path, monkeypatch, capsys) -> None:
     monkeypatch.setattr(cli_module.secrets, "randbits", lambda bits: 4242)
-    assert cli_main(["generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--output", str(tmp_path)]) == 0
+    assert cli_main(["generate", "--mode", "MASK", "--width", "20", "--height", "20", "--output", str(tmp_path)]) == 0
     output = capsys.readouterr().out
     assert 'seed_selected={"type":"int","value":4242}' in output
     metadata = next(tmp_path.rglob("metadata.json"))

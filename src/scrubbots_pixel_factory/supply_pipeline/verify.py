@@ -19,7 +19,7 @@ def _hex(value: str) -> str:
     return text_value
 
 
-def verify_exported_supply(level_path: str | Path, plan_path: str | Path) -> dict[str, Any]:
+def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_project: str | Path | None = None) -> dict[str, Any]:
     level_file = Path(level_path).expanduser().resolve()
     plan_file = Path(plan_path).expanduser().resolve()
     try:
@@ -39,7 +39,7 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path) -> dic
         selected_columns = validate_column_count(plan.get("columnCount"))
         if plan.get("visiblePreviewDepth") != 3:
             return {"state": "ERROR", "disposition": "ERROR", "reason": "visiblePreviewDepth must be exactly 3"}
-        rules = GameRules(column_count=selected_columns)
+        rules = GameRules(game_project, column_count=selected_columns)
     except FileNotFoundError as exc:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": str(exc)}
     if find_godot() is None:

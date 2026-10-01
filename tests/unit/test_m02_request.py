@@ -56,7 +56,7 @@ def test_generator_options_reject_non_canonical_values(bad) -> None:
     {"width": 19},
     {"height": 60},
     {"palette_subset": ["C01", "C02"]},
-    {"schema_version": 3},
+    {"schema_version": 4},
     {"style": "   "},
 ])
 def test_request_validation_is_strict(kwargs) -> None:

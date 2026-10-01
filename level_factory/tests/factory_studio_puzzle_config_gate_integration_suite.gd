@@ -72,7 +72,7 @@ func _run_suite() -> void:
 	var draft_before: Dictionary = target.call("draft_snapshot")
 	_check(not draft_before.is_empty(), "Generate draft snapshot was unavailable for separation proof")
 	_check(gate.call("snapshot") == initial_gate, "Gate state changed without an approved config action")
-	_check(target.get_node_or_null("DifficultyRow/Difficulty") != null, "Existing Generate target controls disappeared")
+	_check(target.get_node_or_null("WidthRow/Width") != null, "Existing Generate target controls disappeared")
 	_check(gate.get_node_or_null("CandidatePresentation") == null, "Gate incorrectly exposed a candidate presentation editor")
 
 	instance.queue_free()

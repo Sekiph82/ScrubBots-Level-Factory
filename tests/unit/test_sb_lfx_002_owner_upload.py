@@ -104,7 +104,7 @@ def test_owner_upload_operation_and_import_surface_are_bounded() -> None:
     assert '"owner-upload"' in launcher and "import_owner_upload" in launcher
     assert "run_owner_import" in gateway and "owner-upload" in gateway
     assert "filedialog" in import_source and "set_source_path" in import_source
-    assert "source only" in import_source and "sb-lfx-004" in import_source
+    assert "source only" in import_source and "canonical validation" in import_source
     assert "operationsimport" in workspace
     assert INTEGRATION.is_file()
 

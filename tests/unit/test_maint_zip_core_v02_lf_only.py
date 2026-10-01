@@ -28,8 +28,8 @@ def test_supply_cli_exposes_column_count_and_not_target() -> None:
 
 
 def test_new_generate_preset_settings_have_no_requested_difficulty() -> None:
-    settings = _validate_generate_preset_settings({"width": 20, "height": 20, "seed": 7, "mode": "MASK"})
-    assert settings == {"width": 20, "height": 20, "seed": 7, "mode": "MASK"}
+    settings = _validate_generate_preset_settings({"width": 20, "height": 20, "seed": 7, "mode": "MASK", "background_intent": "BACKGROUND"})
+    assert settings == {"width": 20, "height": 20, "seed": 7, "mode": "MASK", "background_intent": "BACKGROUND"}
 
 
 def test_progression_tie_break_is_immutable_level_id() -> None:

@@ -14,7 +14,7 @@ const UNAVAILABLE := "UNAVAILABLE"
 const SCOPE := "STRUCTURAL ART QA ONLY — NOT FULL GAMEPLAY VALIDATION"
 const SOLVER_LIMITATION := "Solver: UNAVAILABLE until the canonical ZIP pipeline is executed."
 const DIFFICULTY_LIMITATION := "Measured difficulty: UNAVAILABLE until official Difficulty V1 evidence exists."
-const UNIFIED_LIMITATION := "Unified validation: UNAVAILABLE pending M05."
+const UNIFIED_LIMITATION := "Unified ZIP/load validation: UNAVAILABLE until a canonical ZIP pipeline run is available."
 const OWNER_LIMITATION := "QA PASS != OWNER ACCEPT; structural ACCEPT does not promote the edited working copy."
 const REQUEST_SCHEMA := "scrubbots-studio-manual-art-revalidation"
 const REQUEST_VERSION := 1

@@ -32,18 +32,18 @@ def _run(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedP
 
 
 def test_single_generate_reproduce_and_invalid_request_are_windows_module_friendly(tmp_path: Path) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "RULES", "--width", "20", "--height", "21", "--seed", "77", "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "RULES", "--width", "20", "--height", "21", "--seed", "77", "--output", str(tmp_path))
     assert generated.returncode == 0, generated.stderr
     metadata = next(tmp_path.rglob("metadata.json"))
     reproduced = _run("reproduce", str(metadata))
     assert reproduced.returncode == 0 and "MATCH" in reproduced.stdout
-    invalid = _run("generate", "--difficulty", "EASY", "--mode", "RULES", "--width", "19", "--height", "20", "--seed", "77", "--output", str(tmp_path / "bad"))
+    invalid = _run("generate", "--mode", "RULES", "--width", "19", "--height", "20", "--seed", "77", "--output", str(tmp_path / "bad"))
     assert invalid.returncode != 0
     assert "Traceback" not in invalid.stderr
 
 
 def test_reproduce_uses_recorded_request_and_rejects_tampered_bundle(tmp_path: Path) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "81", "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "81", "--output", str(tmp_path))
     assert generated.returncode == 0
     metadata = next(tmp_path.rglob("metadata.json"))
     value = json.loads(metadata.read_text(encoding="utf-8"))
@@ -55,7 +55,7 @@ def test_reproduce_uses_recorded_request_and_rejects_tampered_bundle(tmp_path: P
 
 
 def test_wfc_generation_and_reproduction_require_the_matching_local_exemplar(tmp_path: Path) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "WFC", "--width", "20", "--height", "20", "--style", "wfc-synthetic-easy-3", "--palette", "C01,C02,C03", "--seed", "41", "--exemplar-json", str(FIXTURE), "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "WFC", "--width", "20", "--height", "20", "--style", "wfc-synthetic-easy-3", "--palette", "C01,C02,C03", "--seed", "41", "--exemplar-json", str(FIXTURE), "--output", str(tmp_path))
     assert generated.returncode == 0, generated.stderr
     metadata = next(tmp_path.rglob("metadata.json"))
     missing = _run("reproduce", str(metadata))
@@ -69,8 +69,8 @@ def test_wfc_generation_and_reproduction_require_the_matching_local_exemplar(tmp
 def test_batch_manifest_and_completed_resume_are_byte_stable(tmp_path: Path) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
-    first = _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(first_root))
-    second = _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(second_root))
+    first = _run("batch", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(first_root))
+    second = _run("batch", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(second_root))
     assert first.returncode == second.returncode == 0, (first.stderr, second.stderr)
     first_manifest = first_root / "batch-manifest.json"
     second_manifest = second_root / "batch-manifest.json"
@@ -88,12 +88,12 @@ def test_batch_manifest_and_completed_resume_are_byte_stable(tmp_path: Path) -> 
 
 def test_current_v2_batch_manifest_is_explicit_and_replayable(tmp_path: Path) -> None:
     root = tmp_path / "current-v2"
-    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "1001", "--max-attempts", "2", "--width", "20", "--height", "59", "--output", str(root))
+    generated = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "1001", "--max-attempts", "2", "--width", "20", "--height", "59", "--output", str(root))
     assert generated.returncode == 0, generated.stderr
     manifest_path = root / "batch-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["version"] == 2
-    assert manifest["request_template"]["schema_version"] == 2
+    assert manifest["request_template"]["schema_version"] == 3
     resumed = _run("batch", "--resume", str(manifest_path))
     assert resumed.returncode == 0 and "COMPLETE" in resumed.stdout
 
@@ -101,7 +101,7 @@ def test_current_v2_batch_manifest_is_explicit_and_replayable(tmp_path: Path) ->
 @pytest.mark.parametrize("version", (True, False, 1.0, "1", None, 3, 99))
 def test_resume_rejects_non_strict_or_unsupported_manifest_versions(tmp_path: Path, version: object) -> None:
     root = tmp_path / f"version-{str(version).lower().replace('.', '-')}"
-    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "1002", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    generated = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "1002", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
     assert generated.returncode == 0, generated.stderr
     manifest_path = root / "batch-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -126,11 +126,11 @@ def test_interrupted_batch_resume_converges_to_uninterrupted_bytes(tmp_path: Pat
 
     monkeypatch.setattr(cli_module, "_atomic_manifest_write", interrupt_after_first_attempt)
     with pytest.raises(KeyboardInterrupt):
-        cli_main(["batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(interrupted_root)])
+        cli_main(["batch", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(interrupted_root)])
     monkeypatch.setattr(cli_module, "_atomic_manifest_write", original_write)
     resumed = cli_main(["batch", "--resume", str(interrupted_root / "batch-manifest.json")])
     assert resumed == 0
-    clean = _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(clean_root))
+    clean = _run("batch", "--count", "2", "--mode", "MASK", "--seed", "1000", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(clean_root))
     assert clean.returncode == 0, clean.stderr
     files = sorted(path.relative_to(interrupted_root).as_posix() for path in interrupted_root.rglob("*") if path.is_file())
     clean_files = sorted(path.relative_to(clean_root).as_posix() for path in clean_root.rglob("*") if path.is_file())
@@ -140,14 +140,14 @@ def test_interrupted_batch_resume_converges_to_uninterrupted_bytes(tmp_path: Pat
 
 
 def test_batch_requires_explicit_finite_configuration(tmp_path: Path) -> None:
-    missing_seed = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--max-attempts", "1", "--output", str(tmp_path / "missing"))
-    missing_bound = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "1", "--output", str(tmp_path / "bound"))
+    missing_seed = _run("batch", "--count", "1", "--mode", "MASK", "--max-attempts", "1", "--output", str(tmp_path / "missing"))
+    missing_bound = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "1", "--output", str(tmp_path / "bound"))
     assert missing_seed.returncode != 0 and missing_bound.returncode != 0
     assert "Traceback" not in missing_seed.stderr + missing_bound.stderr
 
 
 def test_batch_generator_failure_is_distinct_and_bounded(tmp_path: Path) -> None:
-    exhausted = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "WFC", "--seed", "9", "--max-attempts", "1", "--width", "20", "--height", "20", "--output", str(tmp_path))
+    exhausted = _run("batch", "--count", "1", "--mode", "WFC", "--seed", "9", "--max-attempts", "1", "--width", "20", "--height", "20", "--output", str(tmp_path))
     assert exhausted.returncode == 7
     manifest = json.loads((tmp_path / "batch-manifest.json").read_text(encoding="utf-8"))
     assert manifest["terminal_state"] == "EXHAUSTED"
@@ -167,7 +167,7 @@ def test_batch_duplicate_record_is_exact_and_does_not_mutate_grid(tmp_path: Path
             )
 
     monkeypatch.setattr(cli_module, "_router", lambda registry: ConstantRouter())
-    assert cli_main(["batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "9", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(tmp_path)]) == 7
+    assert cli_main(["batch", "--count", "2", "--mode", "MASK", "--seed", "9", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(tmp_path)]) == 7
     manifest = json.loads((tmp_path / "batch-manifest.json").read_text(encoding="utf-8"))
     assert manifest["attempts"][0]["status"] == "ACCEPTED"
     assert manifest["attempts"][1]["status"] == "DUPLICATE"
@@ -184,14 +184,14 @@ def test_cross_process_module_help_is_stable() -> None:
 
 def test_cli_generation_succeeds_inside_network_blocked_boundary(tmp_path: Path) -> None:
     with offline_runtime():
-        result = cli_main(["generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "55", "--output", str(tmp_path)])
+        result = cli_main(["generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "55", "--output", str(tmp_path)])
     assert result == 0
 
 
 def test_batch_outputs_are_identical_across_processes_and_hash_seeds(tmp_path: Path) -> None:
     roots = [tmp_path / "hash-one", tmp_path / "hash-two"]
     results = [
-        _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "hash-seed", "--max-attempts", "4", "--width", "20", "--height", "21", "--output", str(root), env={"PYTHONHASHSEED": value})
+        _run("batch", "--count", "2", "--mode", "MASK", "--seed", "hash-seed", "--max-attempts", "4", "--width", "20", "--height", "21", "--output", str(root), env={"PYTHONHASHSEED": value})
         for root, value in zip(roots, ("1", "random"), strict=True)
     ]
     assert all(result.returncode == 0 for result in results), [result.stderr for result in results]
@@ -203,8 +203,8 @@ def test_batch_outputs_are_identical_across_processes_and_hash_seeds(tmp_path: P
 def test_batch_identity_and_candidate_ids_bind_exemplar_environment(tmp_path: Path) -> None:
     plain_root = tmp_path / "plain"
     exemplar_root = tmp_path / "exemplar"
-    plain = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(plain_root))
-    with_exemplar = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--exemplar-json", str(FIXTURE), "--output", str(exemplar_root))
+    plain = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(plain_root))
+    with_exemplar = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "901", "--max-attempts", "2", "--width", "20", "--height", "20", "--exemplar-json", str(FIXTURE), "--output", str(exemplar_root))
     assert plain.returncode == with_exemplar.returncode == 0
     first = json.loads((plain_root / "batch-manifest.json").read_text(encoding="utf-8"))
     second = json.loads((exemplar_root / "batch-manifest.json").read_text(encoding="utf-8"))
@@ -216,8 +216,8 @@ def test_batch_identity_and_candidate_ids_bind_exemplar_environment(tmp_path: Pa
 def test_batch_autodimensions_and_rectangular_manifest_bindings(tmp_path: Path) -> None:
     auto_root = tmp_path / "auto"
     rectangular_root = tmp_path / "rectangular"
-    auto = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "902", "--max-attempts", "2", "--output", str(auto_root))
-    rectangular = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "RULES", "--seed", "903", "--max-attempts", "2", "--width", "20", "--height", "21", "--output", str(rectangular_root))
+    auto = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "902", "--max-attempts", "2", "--output", str(auto_root))
+    rectangular = _run("batch", "--count", "1", "--mode", "RULES", "--seed", "903", "--max-attempts", "2", "--width", "20", "--height", "21", "--output", str(rectangular_root))
     assert auto.returncode == rectangular.returncode == 0
     auto_manifest = json.loads((auto_root / "batch-manifest.json").read_text(encoding="utf-8"))
     rect_manifest = json.loads((rectangular_root / "batch-manifest.json").read_text(encoding="utf-8"))
@@ -228,9 +228,9 @@ def test_batch_autodimensions_and_rectangular_manifest_bindings(tmp_path: Path) 
 
 def test_reproduce_uses_non_default_recorded_quality_policy(tmp_path: Path) -> None:
     policy_path = tmp_path / "policy.json"
-    policy = QualityPolicy(difficulty="EASY", max_isolated_ratio=0.31)
+    policy = QualityPolicy(difficulty=None, max_isolated_ratio=0.31)
     policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "904", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "bundle"))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "904", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "bundle"))
     assert generated.returncode == 0, generated.stderr
     metadata = next((tmp_path / "bundle").rglob("metadata.json"))
     value = json.loads(metadata.read_text(encoding="utf-8"))
@@ -241,9 +241,9 @@ def test_reproduce_uses_non_default_recorded_quality_policy(tmp_path: Path) -> N
 
 def test_quality_policy_can_produce_a_truthful_rejected_batch_attempt(tmp_path: Path) -> None:
     policy_path = tmp_path / "reject-policy.json"
-    policy = QualityPolicy(difficulty="EASY", max_largest_region_ratio=0.0)
+    policy = QualityPolicy(difficulty=None, max_largest_region_ratio=0.0)
     policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
-    result = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "905", "--max-attempts", "1", "--width", "20", "--height", "20", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "rejected"))
+    result = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "905", "--max-attempts", "1", "--width", "20", "--height", "20", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "rejected"))
     assert result.returncode == 7
     manifest = json.loads((tmp_path / "rejected" / "batch-manifest.json").read_text(encoding="utf-8"))
     attempt = manifest["attempts"][0]
@@ -268,7 +268,7 @@ def test_quality_policy_can_produce_a_truthful_rejected_batch_attempt(tmp_path: 
 )
 def test_resume_rejects_semantically_tampered_manifest_history(tmp_path: Path, mutation) -> None:
     root = tmp_path / "batch"
-    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "906", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    generated = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "906", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
     assert generated.returncode == 0, generated.stderr
     manifest_path = root / "batch-manifest.json"
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -291,7 +291,7 @@ def test_resume_rejects_semantically_tampered_manifest_history(tmp_path: Path, m
     ),
 )
 def test_reproduce_rejects_each_metadata_corruption_class(tmp_path: Path, mutation) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "907", "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "907", "--output", str(tmp_path))
     assert generated.returncode == 0
     metadata = next(tmp_path.rglob("metadata.json"))
     original = json.loads(metadata.read_text(encoding="utf-8"))
@@ -305,7 +305,7 @@ def test_reproduce_rejects_each_metadata_corruption_class(tmp_path: Path, mutati
 def test_mask_reproduce_is_byte_exact_and_candidate_path_is_local(tmp_path: Path) -> None:
     first_root = tmp_path / "first"
     second_root = tmp_path / "second"
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "21", "--seed", "908", "--output", str(first_root))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "21", "--seed", "908", "--output", str(first_root))
     assert generated.returncode == 0
     metadata = next(first_root.rglob("metadata.json"))
     reproduced = _run("reproduce", str(metadata), "--output", str(second_root))
@@ -314,13 +314,13 @@ def test_mask_reproduce_is_byte_exact_and_candidate_path_is_local(tmp_path: Path
     second_files = sorted(path.relative_to(second_root).as_posix() for path in second_root.rglob("*") if path.is_file())
     assert first_files == second_files
     assert all((first_root / relative).read_bytes() == (second_root / relative).read_bytes() for relative in first_files)
-    traversal = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "909", "--candidate-id", "../escape", "--output", str(tmp_path / "traversal"))
+    traversal = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "909", "--candidate-id", "../escape", "--output", str(tmp_path / "traversal"))
     assert traversal.returncode != 0
 
 
 def test_single_explicit_request_has_default_id_and_byte_identical_bundles(tmp_path: Path) -> None:
     roots = (tmp_path / "one", tmp_path / "two")
-    results = [_run("generate", "--difficulty", "EASY", "--mode", "RULES", "--width", "20", "--height", "20", "--seed", "910", "--output", str(root), env={"PYTHONHASHSEED": seed}) for root, seed in zip(roots, ("1", "random"), strict=True)]
+    results = [_run("generate", "--mode", "RULES", "--width", "20", "--height", "20", "--seed", "910", "--output", str(root), env={"PYTHONHASHSEED": seed}) for root, seed in zip(roots, ("1", "random"), strict=True)]
     assert all(result.returncode == 0 for result in results), [result.stderr for result in results]
     bundles = [next(root.rglob("metadata.json")).parent for root in roots]
     assert bundles[0].name == bundles[1].name
@@ -330,7 +330,7 @@ def test_single_explicit_request_has_default_id_and_byte_identical_bundles(tmp_p
 
 
 def test_single_auto_dimensions_record_exact_legal_resolution(tmp_path: Path) -> None:
-    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--seed", "911", "--output", str(tmp_path))
+    result = _run("generate", "--mode", "MASK", "--seed", "911", "--output", str(tmp_path))
     assert result.returncode == 0, result.stderr
     bundle = read_bundle(next(tmp_path.rglob("metadata.json")).parent)
     request = bundle.metadata["generation"]["request"]
@@ -338,7 +338,7 @@ def test_single_auto_dimensions_record_exact_legal_resolution(tmp_path: Path) ->
     assert request["width"] is None and request["height"] is None
     assert resolved == {"width": bundle.artwork.width, "height": bundle.artwork.height}
     assert 20 <= bundle.artwork.width <= 59 and 20 <= bundle.artwork.height <= 59
-    assert request["schema_version"] == 2
+    assert request["schema_version"] == 3
 
 
 def test_historical_v1_omitted_request_reproduces_without_current_dimension_re_resolution(tmp_path: Path) -> None:
@@ -394,12 +394,12 @@ def test_invalid_mode_and_options_are_stable_nonzero_without_traceback(tmp_path:
         options = tmp_path / f"{kind}.json"
         options.write_text("{malformed}" if kind == "malformed-options" else json.dumps({"namespace": "unsupported", "version": 99, "values": {}}), encoding="utf-8")
         args = ("--options-json", str(options))
-    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--seed", "912", *args, "--output", str(tmp_path / "bad"))
+    result = _run("generate", "--mode", "MASK", "--seed", "912", *args, "--output", str(tmp_path / "bad"))
     assert result.returncode != 0 and "Traceback" not in result.stderr
 
 
 def test_every_attempt_seed_and_candidate_id_use_the_canonical_helpers(tmp_path: Path) -> None:
-    result = _run("batch", "--difficulty", "EASY", "--count", "3", "--mode", "MASK", "--seed", "913", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(tmp_path))
+    result = _run("batch", "--count", "3", "--mode", "MASK", "--seed", "913", "--max-attempts", "4", "--width", "20", "--height", "20", "--output", str(tmp_path))
     assert result.returncode == 0, result.stderr
     manifest = json.loads((tmp_path / "batch-manifest.json").read_text(encoding="utf-8"))
     from scrubbots_pixel_factory.cli.main import _batch_candidate_id
@@ -415,7 +415,7 @@ def test_every_attempt_seed_and_candidate_id_use_the_canonical_helpers(tmp_path:
 def test_two_known_root_seeds_produce_different_accepted_sets(tmp_path: Path) -> None:
     roots = (tmp_path / "seed-a", tmp_path / "seed-b")
     for root, seed in zip(roots, ("1", "2"), strict=True):
-        result = _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", seed, "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root))
+        result = _run("batch", "--count", "2", "--mode", "MASK", "--seed", seed, "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root))
         assert result.returncode == 0, result.stderr
     accepted_sets = [
         {record["grid_hash"] for record in json.loads((root / "batch-manifest.json").read_text(encoding="utf-8"))["accepted"]}
@@ -425,17 +425,17 @@ def test_two_known_root_seeds_produce_different_accepted_sets(tmp_path: Path) ->
 
 
 def test_single_quality_rejection_has_exact_exit_and_stable_codes(tmp_path: Path) -> None:
-    policy = QualityPolicy(difficulty="EASY", max_largest_region_ratio=0.0)
+    policy = QualityPolicy(difficulty=None, max_largest_region_ratio=0.0)
     policy_path = tmp_path / "policy.json"
     policy_path.write_text(json.dumps(policy.as_dict()), encoding="utf-8")
-    result = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "916", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "output"))
+    result = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "916", "--quality-policy-json", str(policy_path), "--output", str(tmp_path / "output"))
     assert result.returncode == 5
     assert "QUALITY_REJECTED" in result.stderr and "DOMINANCE_VIOLATION" in result.stderr
     assert not (tmp_path / "output").exists() or not list((tmp_path / "output").rglob("metadata.json"))
 
 
 def test_direct_reproduce_negative_matrix_includes_remaining_m08_cases(tmp_path: Path) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "10", "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "10", "--output", str(tmp_path))
     assert generated.returncode == 0
     metadata = next(tmp_path.rglob("metadata.json"))
     original = metadata.read_bytes()
@@ -468,7 +468,7 @@ def test_direct_reproduce_negative_matrix_includes_remaining_m08_cases(tmp_path:
 
 
 def test_controlled_regeneration_with_different_grid_returns_reproduce_mismatch(tmp_path: Path, monkeypatch) -> None:
-    generated = _run("generate", "--difficulty", "EASY", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "918", "--output", str(tmp_path))
+    generated = _run("generate", "--mode", "MASK", "--width", "20", "--height", "20", "--seed", "918", "--output", str(tmp_path))
     assert generated.returncode == 0
     metadata = next(tmp_path.rglob("metadata.json"))
     bundle = read_bundle(metadata.parent)
@@ -487,7 +487,7 @@ def test_controlled_regeneration_with_different_grid_returns_reproduce_mismatch(
 
 def test_coordinated_candidate_id_path_and_m08_binding_rewrite_is_rejected(tmp_path: Path) -> None:
     root = tmp_path / "batch"
-    generated = _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "919", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
+    generated = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "919", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root))
     assert generated.returncode == 0
     manifest_path = root / "batch-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -519,7 +519,7 @@ def test_coordinated_candidate_id_path_and_m08_binding_rewrite_is_rejected(tmp_p
 @pytest.mark.parametrize("relative_path", ("C:/absolute/path", "candidates\\unsafe"))
 def test_resume_rejects_absolute_and_nonportable_accepted_paths(tmp_path: Path, relative_path: str) -> None:
     root = tmp_path / "batch"
-    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "920", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    assert _run("batch", "--count", "1", "--mode", "MASK", "--seed", "920", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
     manifest_path = root / "batch-manifest.json"
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
     value["accepted"][0]["relative_path"] = relative_path
@@ -530,7 +530,7 @@ def test_resume_rejects_absolute_and_nonportable_accepted_paths(tmp_path: Path, 
 @pytest.mark.parametrize("tamper", ("bundle-hash", "embedded-seed"))
 def test_resume_rejects_accepted_bundle_cross_binding_tamper(tmp_path: Path, tamper: str) -> None:
     root = tmp_path / tamper
-    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "921", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    assert _run("batch", "--count", "1", "--mode", "MASK", "--seed", "921", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
     manifest = json.loads((root / "batch-manifest.json").read_text(encoding="utf-8"))
     bundle_dir = root / manifest["accepted"][0]["relative_path"]
     if tamper == "bundle-hash":
@@ -548,7 +548,7 @@ def test_resume_rejects_accepted_bundle_cross_binding_tamper(tmp_path: Path, tam
 @pytest.mark.parametrize("state", ("COMPLETE", "IN_PROGRESS"))
 def test_resume_rejects_forged_terminal_states_on_exhausted_history(tmp_path: Path, state: str) -> None:
     root = tmp_path / state
-    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "WFC", "--seed", "922", "--max-attempts", "1", "--width", "20", "--height", "20", "--output", str(root)).returncode == 7
+    assert _run("batch", "--count", "1", "--mode", "WFC", "--seed", "922", "--max-attempts", "1", "--width", "20", "--height", "20", "--output", str(root)).returncode == 7
     manifest_path = root / "batch-manifest.json"
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
     value["terminal_state"] = state
@@ -558,7 +558,7 @@ def test_resume_rejects_forged_terminal_states_on_exhausted_history(tmp_path: Pa
 
 def test_resume_rejects_forged_exhausted_state_on_complete_history(tmp_path: Path) -> None:
     root = tmp_path / "complete"
-    assert _run("batch", "--difficulty", "EASY", "--count", "1", "--mode", "MASK", "--seed", "923", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    assert _run("batch", "--count", "1", "--mode", "MASK", "--seed", "923", "--max-attempts", "2", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
     manifest_path = root / "batch-manifest.json"
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
     value["terminal_state"] = "EXHAUSTED"
@@ -569,7 +569,7 @@ def test_resume_rejects_forged_exhausted_state_on_complete_history(tmp_path: Pat
 @pytest.mark.parametrize("field", ("candidate_id", "relative_path"))
 def test_resume_rejects_duplicate_accepted_identity_or_path(tmp_path: Path, field: str) -> None:
     root = tmp_path / field
-    assert _run("batch", "--difficulty", "EASY", "--count", "2", "--mode", "MASK", "--seed", "924", "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
+    assert _run("batch", "--count", "2", "--mode", "MASK", "--seed", "924", "--max-attempts", "3", "--width", "20", "--height", "20", "--output", str(root)).returncode == 0
     manifest_path = root / "batch-manifest.json"
     value = json.loads(manifest_path.read_text(encoding="utf-8"))
     value["accepted"][1][field] = value["accepted"][0][field]

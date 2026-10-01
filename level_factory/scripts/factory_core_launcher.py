@@ -153,10 +153,10 @@ def _dashboard_projection(manifest_path: Path) -> dict[str, object]:
         "next_attempt_index": manifest["next_attempt_index"],
         "accepted_count": manifest["accepted_count"],
         "request_context": {
-            "difficulty": request_template["difficulty"],
             "width": request_template["width"],
             "height": request_template["height"],
             "generator_mode": request_template["generator_mode"],
+            "background_intent": request_template.get("background_intent", "BACKGROUND"),
         },
         "source_classification": "CANONICAL_BATCH / PROCEDURAL",
         "disposition_counts": disposition_counts,

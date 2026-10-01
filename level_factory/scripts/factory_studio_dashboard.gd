@@ -179,7 +179,7 @@ func _render() -> void:
 			_projection.get("batch_id", ""), _projection.get("terminal_state", ""), _projection.get("requested_count", ""), _projection.get("max_attempts", ""), _projection.get("attempt_count", ""), _projection.get("next_attempt_index", ""), _projection.get("accepted_count", ""), _projection.get("source_classification", ""),
 		]
 		var request_context: Dictionary = _projection.get("request_context", {})
-		_request_label.text = "Request context: difficulty=%s | dimensions=%sx%s | generator_mode=%s" % [request_context.get("difficulty", ""), request_context.get("width", ""), request_context.get("height", ""), request_context.get("generator_mode", "")]
+		_request_label.text = "Request context: difficulty-free | dimensions=%sx%s | generator_mode=%s | background=%s" % [request_context.get("width", ""), request_context.get("height", ""), request_context.get("generator_mode", ""), request_context.get("background_intent", "BACKGROUND")]
 		_disposition_label.text = "Attempt dispositions: %s" % JSON.stringify(_projection.get("disposition_counts", {}), "  ")
 		_rejection_label.text = "Rejection codes: %s" % JSON.stringify(_projection.get("rejection_code_counts", {}), "  ")
 		_latest_label.text = "Latest attempt: %s" % JSON.stringify(_projection.get("latest_attempt", {}), "  ")

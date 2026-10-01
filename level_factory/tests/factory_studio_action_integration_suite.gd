@@ -92,14 +92,13 @@ func _run_suite() -> void:
 	_check("invalid choice" in invalid_reason or "invalid generation request" in invalid_reason, "Canonical stderr diagnostic was not preserved in the failed action reason")
 	_check("success candidate_id=" not in str(invalid_request.get("captured_output", "")).to_lower(), "Unrelated output was allowed to promote a failed action")
 
-	var difficulty := target.get_node_or_null("DifficultyRow/Difficulty") as OptionButton
 	var width := target.get_node_or_null("WidthRow/Width") as SpinBox
 	var height := target.get_node_or_null("HeightRow/Height") as SpinBox
 	var seed := target.get_node_or_null("SeedRow/Seed") as LineEdit
 	var mode := target.get_node_or_null("ModeRow/Mode") as OptionButton
 	var candidate := target.get_node_or_null("CandidatepresentationlabelRow/CandidatePresentation") as LineEdit
-	_check(difficulty != null and width != null and height != null and seed != null and mode != null and candidate != null, "Action integration controls are incomplete")
-	if difficulty == null or width == null or height == null or seed == null or mode == null or candidate == null:
+	_check(width != null and height != null and seed != null and mode != null and candidate != null, "Action integration controls are incomplete")
+	if width == null or height == null or seed == null or mode == null or candidate == null:
 		instance.queue_free()
 		_finish()
 		return
@@ -184,7 +183,7 @@ func _run_suite() -> void:
 	_check(editor_clean.get("source_bundle_path") == generated.get("output_path"), "Editor source bundle path was not bound to canonical Generate output")
 	_check(editor_clean.get("source_artwork_path") == str(generated.get("output_path")).path_join("artwork.png"), "Editor source artwork path was not derived from canonical output")
 	_check(editor_clean.get("logical_width") == 20 and editor_clean.get("logical_height") == 21, "Editor did not preserve the real rectangular artwork dimensions")
-	_check(editor_clean.get("validation_disposition") == "UNVALIDATED — revalidation pending SB-LF06-008", "Editor did not expose the required UNVALIDATED disposition")
+	_check(editor_clean.get("validation_disposition") == "UNVALIDATED — canonical structural revalidation has not been run.", "Editor did not expose the required UNVALIDATED disposition")
 	var editor_source_image: Image = editor.call("source_image_snapshot")
 	var editor_working_image: Image = editor.call("working_image_snapshot")
 	_check(editor_source_image != null and editor_working_image != null, "Editor did not create source and working image buffers")
@@ -209,7 +208,7 @@ func _run_suite() -> void:
 	_check(editor_dirty.get("state") == "DIRTY", "One-cell edit did not produce DIRTY state")
 	_check(editor_dirty.get("dirty_cell_count") == 1, "One-cell edit did not produce exactly one dirty cell")
 	_check(editor_dirty.get("working_buffer_differs") == true, "Dirty editor did not expose working-buffer difference")
-	_check(editor_dirty.get("validation_disposition") == "UNVALIDATED — revalidation pending SB-LF06-008", "Dirty editor did not remain explicitly UNVALIDATED")
+	_check(editor_dirty.get("validation_disposition") == "UNVALIDATED — canonical structural revalidation has not been run.", "Dirty editor did not remain explicitly UNVALIDATED")
 	var editor_working_after_edit: Image = editor.call("working_image_snapshot")
 	_check(editor_working_after_edit != null, "Dirty editor did not expose a working image")
 	if editor_source_image != null and editor_working_after_edit != null:
@@ -291,8 +290,8 @@ func _run_suite() -> void:
 	_check(evidence_after_generate.get("logical_width") == 20 and evidence_after_generate.get("logical_height") == 21, "Evidence dimensions were not read from canonical metadata")
 	_check(evidence_after_generate.get("quality_schema") == "scrubbots-quality" and evidence_after_generate.get("quality_schema_version") == 1, "Evidence quality schema/version is not canonical")
 	_check(evidence_after_generate.get("quality_decision") in ["ACCEPT", "REJECT"], "Evidence quality decision is not a canonical structural decision")
-	_check(not str(evidence_after_generate.get("solution", "")).is_empty() and "UNAVAILABLE" in str(evidence_after_generate.get("solution", "")), "Solution did not remain unavailable pending M03")
-	_check("UNAVAILABLE" in str(evidence_after_generate.get("difficulty_analysis", "")), "Difficulty analysis did not remain unavailable pending M04")
+	_check(not str(evidence_after_generate.get("solution", "")).is_empty() and "UNAVAILABLE" in str(evidence_after_generate.get("solution", "")), "Solution remained unavailable without a ZIP pipeline action")
+	_check("UNAVAILABLE" in str(evidence_after_generate.get("difficulty_analysis", "")), "Difficulty analysis remained unavailable without a ZIP pipeline action")
 	_check("UNAVAILABLE" in str(evidence_after_generate.get("load_risk", "")), "Load/risk did not remain unavailable without canonical models")
 	_check("Structural QA ACCEPT != OWNER ACCEPT" in str(evidence.get_node_or_null("StructuralArtQA").text), "Evidence panel did not preserve QA versus owner acceptance truth")
 	var metadata_value: Variant = JSON.parse_string(FileAccess.get_file_as_string(str(generated.get("metadata_path", ""))))

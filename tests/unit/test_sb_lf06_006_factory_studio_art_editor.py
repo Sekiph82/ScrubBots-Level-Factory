@@ -24,7 +24,7 @@ def test_editor_is_local_memory_only_and_has_no_scope_creep() -> None:
     assert 'const clean := "clean"' in lowered
     assert 'const dirty := "dirty"' in lowered
     assert 'const error := "error"' in lowered
-    assert 'unvalidated — revalidation pending sb-lf06-008' in lowered
+    assert 'unvalidated — canonical structural revalidation has not been run.' in lowered
     assert 'image.load_from_file' in lowered
     assert 'fileaccess.get_file_as_bytes' in lowered
     assert 'func load_current_canonical_artwork' in lowered

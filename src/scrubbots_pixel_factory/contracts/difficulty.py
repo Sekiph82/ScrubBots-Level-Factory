@@ -26,12 +26,17 @@ class DimensionBand:
     minimum: int
     maximum: int
 
+    @property
+    def span(self) -> int:
+        return self.maximum - self.minimum + 1
+
     def contains(self, value: object) -> bool:
         return isinstance(value, int) and not isinstance(value, bool) and self.minimum <= value <= self.maximum
 
 
 CURRENT_DIMENSION_SCHEMA_VERSION = 2
 LEGACY_DIMENSION_SCHEMA_VERSION = 1
+CURRENT_ARTWORK_REQUEST_SCHEMA_VERSION = 3
 SUPPORTED_DIMENSION_SCHEMA_VERSIONS = (LEGACY_DIMENSION_SCHEMA_VERSION, CURRENT_DIMENSION_SCHEMA_VERSION)
 _CURRENT_BAND = DimensionBand(PRODUCTION_DIMENSION_ENVELOPE.minimum, PRODUCTION_DIMENSION_ENVELOPE.maximum)
 _LEGACY_DIFFICULTY_BANDS = MappingProxyType(
@@ -90,6 +95,14 @@ def validate_width(
     return width
 
 
+def validate_current_width(width: int) -> int:
+    if isinstance(width, bool) or not isinstance(width, int) or not _CURRENT_BAND.contains(width):
+        raise DimensionContractError(
+            f"production width must be in {_CURRENT_BAND.minimum}..{_CURRENT_BAND.maximum}; received {width!r}"
+        )
+    return width
+
+
 def validate_height(
     difficulty: Difficulty | str,
     height: int,
@@ -101,6 +114,14 @@ def validate_height(
     if isinstance(height, bool) or not isinstance(height, int) or not band.contains(height):
         raise DimensionContractError(
             f"{axis} height must be in {band.minimum}..{band.maximum}; received {height!r}"
+        )
+    return height
+
+
+def validate_current_height(height: int) -> int:
+    if isinstance(height, bool) or not isinstance(height, int) or not _CURRENT_BAND.contains(height):
+        raise DimensionContractError(
+            f"production height must be in {_CURRENT_BAND.minimum}..{_CURRENT_BAND.maximum}; received {height!r}"
         )
     return height
 
@@ -118,6 +139,10 @@ def validate_dimensions(
         validate_width(difficulty, width, schema_version=schema_version),
         validate_height(difficulty, height, schema_version=schema_version),
     )
+
+
+def validate_current_dimensions(width: int, height: int) -> tuple[int, int]:
+    return validate_current_width(width), validate_current_height(height)
 
 
 def is_legal_dimensions(
@@ -149,6 +174,13 @@ def select_dimensions(
     return width, height
 
 
+def select_current_dimensions(seed: int | str) -> tuple[int, int]:
+    validate_seed(seed)
+    width = _CURRENT_BAND.minimum + stable_index("dimensions.width", seed, _CURRENT_BAND.span)
+    height = _CURRENT_BAND.minimum + stable_index("dimensions.height", seed, _CURRENT_BAND.span)
+    return width, height
+
+
 def resolve_dimensions(
     difficulty: Difficulty | str,
     width: int | None = None,
@@ -171,8 +203,24 @@ def resolve_dimensions(
     return validate_dimensions(difficulty, width, height, schema_version=schema_version)
 
 
+def resolve_current_dimensions(
+    width: int | None = None,
+    height: int | None = None,
+    *,
+    seed: int | str | None = None,
+) -> tuple[int, int]:
+    if width is None or height is None:
+        if seed is None:
+            raise DimensionContractError("seed is required when width or height is omitted")
+        automatic_width, automatic_height = select_current_dimensions(seed)
+        width = automatic_width if width is None else width
+        height = automatic_height if height is None else height
+    return validate_current_dimensions(width, height)
+
+
 __all__ = [
     "CURRENT_DIMENSION_SCHEMA_VERSION",
+    "CURRENT_ARTWORK_REQUEST_SCHEMA_VERSION",
     "DimensionBand",
     "DimensionContractError",
     "Difficulty",
@@ -182,8 +230,13 @@ __all__ = [
     "is_legal_dimensions",
     "parse_difficulty",
     "resolve_dimensions",
+    "resolve_current_dimensions",
     "select_dimensions",
+    "select_current_dimensions",
     "validate_dimensions",
+    "validate_current_dimensions",
+    "validate_current_height",
+    "validate_current_width",
     "validate_height",
     "validate_width",
 ]

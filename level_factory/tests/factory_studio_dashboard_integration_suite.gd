@@ -45,7 +45,6 @@ func _run() -> void:
 	var batch_exit := OS.execute(python_executable, PackedStringArray([
 		launcher,
 		"batch",
-		"--difficulty", "EASY",
 		"--count", "1",
 		"--max-attempts", "1",
 		"--mode", "MASK",
@@ -55,7 +54,7 @@ func _run() -> void:
 		"--quality-policy-json", policy_path,
 		"--output", output_root,
 	]), captured, true, false)
-	_require(batch_exit == 7, "canonical rejected batch must exit 7, got %s (%s)" % [batch_exit, " ".join(captured)])
+	_require(batch_exit == 7, "canonical bounded batch must exit 7 when exhausted, got %s (%s)" % [batch_exit, " ".join(captured)])
 	var manifest_path := ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_MANIFEST)
 	_require(FileAccess.file_exists(manifest_path), "canonical rejected batch did not create batch-manifest.json")
 	if not _errors.is_empty():
@@ -79,7 +78,7 @@ func _run() -> void:
 	_require(str(projection.get("source_classification", "")) == "CANONICAL_BATCH / PROCEDURAL", "dashboard source classification is not truthful: %s" % projection)
 	var request_template: Dictionary = manifest.get("request_template", {})
 	var request_context: Dictionary = projection.get("request_context", {})
-	for key in ["difficulty", "width", "height", "generator_mode"]:
+	for key in ["width", "height", "generator_mode", "background_intent"]:
 		_require(request_context.get(key) == request_template.get(key), "dashboard request context mismatch for %s" % key)
 	var expected_dispositions := {"ACCEPTED": 0.0, "QUALITY_REJECTED": 0.0, "GENERATOR_FAILURE": 0.0, "DUPLICATE": 0.0}
 	var expected_rejections := {}
@@ -126,7 +125,7 @@ func _write_quality_policy(path: String) -> void:
 	DirAccess.make_dir_recursive_absolute(path.get_base_dir())
 	var policy := {
 		"version": "m07-quality-policy-v1",
-		"difficulty": "EASY",
+		"difficulty": null,
 		"tiny_region_max_size": 3,
 		"max_isolated_ratio": 0.2,
 		"max_tiny_cell_ratio": 0.35,

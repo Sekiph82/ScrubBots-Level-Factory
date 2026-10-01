@@ -55,7 +55,6 @@ func _run_suite() -> void:
 		return
 	gateway.call("set_output_root", TEST_OUTPUT_PATH)
 
-	var difficulty := target.get_node_or_null("DifficultyRow/Difficulty") as OptionButton
 	var width := target.get_node_or_null("WidthRow/Width") as SpinBox
 	var height := target.get_node_or_null("HeightRow/Height") as SpinBox
 	var seed := target.get_node_or_null("SeedRow/Seed") as LineEdit
@@ -64,9 +63,9 @@ func _run_suite() -> void:
 	var generate_button := target.get_node_or_null("ActionArea/GenerateAction") as Button
 	var reproduce_button := target.get_node_or_null("ActionArea/ReproduceAction") as Button
 	var validate_button := target.get_node_or_null("ActionArea/ValidateAction") as Button
-	_check(difficulty != null and width != null and height != null and seed != null and mode != null and candidate_label != null, "Reproduce draft controls are incomplete")
+	_check(width != null and height != null and seed != null and mode != null and candidate_label != null, "Reproduce draft controls are incomplete")
 	_check(generate_button != null and reproduce_button != null and validate_button != null, "Reproduce action controls are incomplete")
-	if difficulty == null or width == null or height == null or seed == null or mode == null or candidate_label == null or generate_button == null or reproduce_button == null or validate_button == null:
+	if width == null or height == null or seed == null or mode == null or candidate_label == null or generate_button == null or reproduce_button == null or validate_button == null:
 		instance.queue_free()
 		_finish()
 		return
@@ -78,7 +77,7 @@ func _run_suite() -> void:
 	_check(pre_source_reproduce.get("state") == "UNAVAILABLE", "Pre-source Reproduce did not remain unavailable")
 
 	# Source A
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, 1, 20, 21, SOURCE_SEED_A, 1, A_PRESENTATION_LABEL)
+	_set_draft(width, height, seed, mode, candidate_label, 20, 21, SOURCE_SEED_A, 1, A_PRESENTATION_LABEL)
 	await process_frame
 	generate_button.pressed.emit()
 	await process_frame
@@ -93,10 +92,10 @@ func _run_suite() -> void:
 	var source_a_metadata: Dictionary = _read_metadata(source_a_metadata_path)
 	var source_a_request: Dictionary = _generation_request(source_a_metadata)
 	_check(source_a_request.get("schema") == "scrubbots-generation-request", "Source A request schema was not canonical")
-	_check(int(source_a_request.get("schema_version", 0)) in [1, 2], "Source A request schema version was not canonical")
+	_check(int(source_a_request.get("schema_version", 0)) in [1, 2, 3], "Source A request schema version was not canonical")
 	_check(source_a_request.get("seed") is Dictionary, "Source A request did not preserve typed seed")
 	_check(source_a_request.get("seed", {}).get("type") == "int" and source_a_request.get("seed", {}).get("value") == 77, "Source A typed seed was not recorded canonically")
-	_check(source_a_request.get("difficulty") == "MEDIUM", "Source A recorded difficulty did not match the configured request")
+	_check(not source_a_request.has("difficulty") and source_a_request.get("background_intent") == "BACKGROUND", "Source A request did not remain difficulty-free with explicit background intent")
 	_check(source_a_request.get("width") == 20 and source_a_request.get("height") == 21, "Source A recorded rectangular dimensions did not match the configured request")
 	_check(source_a_request.get("generator_mode") == "RULES", "Source A recorded mode did not match the configured request")
 	var source_a_bytes := _artifact_bytes(source_a_bundle_path)
@@ -104,7 +103,7 @@ func _run_suite() -> void:
 	_check(not reproduce_button.disabled, "Reproduce did not become available after successful source A")
 
 	# Draft divergence before reproducing A.
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, 2, 23, 24, "draft-changed-seed", 4, CHANGED_DRAFT_LABEL)
+	_set_draft(width, height, seed, mode, candidate_label, 23, 24, "draft-changed-seed", 4, CHANGED_DRAFT_LABEL)
 	await process_frame
 	_check(gateway.call("last_successful_metadata_path") == source_a_metadata_path, "Draft-only mutation changed retained source A metadata path")
 	_check(str(target.call("action_result_snapshot").get("candidate_id", "")) == str(generated_a.get("candidate_id", "")), "Draft-only mutation changed latest action identity")
@@ -128,7 +127,7 @@ func _run_suite() -> void:
 	_check(str(reproduced_a.get("candidate_id", "")) != CHANGED_DRAFT_LABEL, "Changed draft presentation label became Reproduce A identity")
 
 	# Source B transition
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, 2, 22, 20, SOURCE_SEED_B, 4, "source-b-presentation-only")
+	_set_draft(width, height, seed, mode, candidate_label, 22, 20, SOURCE_SEED_B, 4, "source-b-presentation-only")
 	await process_frame
 	generate_button.pressed.emit()
 	await process_frame
@@ -144,7 +143,7 @@ func _run_suite() -> void:
 	_check(source_b_request.get("seed", {}).get("value") == 78, "Source B recorded seed was not the canonical B seed")
 
 	# Draft divergence after B and exact B reproduction.
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, 3, 25, 26, "another-draft-seed", 3, B_CHANGED_DRAFT_LABEL)
+	_set_draft(width, height, seed, mode, candidate_label, 25, 26, "another-draft-seed", 3, B_CHANGED_DRAFT_LABEL)
 	await process_frame
 	_check(gateway.call("last_successful_metadata_path") == source_b_metadata_path, "Draft-only mutation redirected retained source B metadata path")
 	reproduce_button.pressed.emit()
@@ -176,9 +175,7 @@ func _run_suite() -> void:
 	_finish()
 
 
-func _set_draft(difficulty: OptionButton, width: SpinBox, height: SpinBox, seed: LineEdit, mode: OptionButton, label: LineEdit, difficulty_index: int, width_value: int, height_value: int, seed_value: String, mode_index: int, label_value: String) -> void:
-	difficulty.select(difficulty_index)
-	difficulty.item_selected.emit(difficulty_index)
+func _set_draft(width: SpinBox, height: SpinBox, seed: LineEdit, mode: OptionButton, label: LineEdit, width_value: int, height_value: int, seed_value: String, mode_index: int, label_value: String) -> void:
 	width.value = width_value
 	height.value = height_value
 	seed.text = seed_value

@@ -162,10 +162,10 @@ def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
             "operation": OWNER_UPLOAD_OPERATION,
             "state": state,
             "disposition": state,
-            "source_only_notice": "SOURCE ONLY — validation/candidate creation pending SB-LFX-004",
+            "source_only_notice": "SOURCE ONLY — validation and candidate derivation are explicit downstream pipeline stages.",
             "claims": {
                 "candidate": "NOT AVAILABLE — this task stores source bytes only.",
-                "quality": "NOT AVAILABLE — validation is pending SB-LFX-004.",
+                "quality": "NOT AVAILABLE — canonical validation has not been run.",
                 "solver": "NOT AVAILABLE — canonical ZIP solver evidence is not connected.",
                 "difficulty": "NOT AVAILABLE — official Difficulty V1 evidence is not connected.",
                 "owner_acceptance": "NOT AVAILABLE — owner acceptance is not performed by source ingestion.",

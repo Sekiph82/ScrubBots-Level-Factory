@@ -23,7 +23,7 @@ def test_studio_request_literals_match_canonical_python_contracts() -> None:
     assert versions_match is not None
     assert schema_match.group(1) == GENERATION_REQUEST_SCHEMA
     studio_versions = tuple(int(value.strip()) for value in versions_match.group(1).split(",") if value.strip())
-    assert studio_versions == tuple(SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS)
+    assert studio_versions == tuple((*SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS, 3))
 
 
 def test_presentation_gate_is_fail_closed_without_full_validator_duplication() -> None:

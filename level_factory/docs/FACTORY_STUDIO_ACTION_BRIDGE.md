@@ -10,12 +10,15 @@ executable; its value is never displayed or written to the builder log. When
 it is absent, the adapter probes bounded `python`/`py` names and the local
 `PATH` entries.
 
-Generate forwards the draft difficulty, independent width and height, seed,
-and mode. The candidate presentation label is never forwarded as a canonical
-candidate ID. Output is restricted to `level_factory/output/`. Reproduce uses
+Generate forwards the difficulty-free current request: explicit width and
+height, seed, mode, and `BACKGROUND`/`TRANSPARENT` intent. The candidate
+presentation label is never forwarded as a canonical candidate ID. Output is
+restricted to `level_factory/output/`. Reproduce uses
 the most recent successful Generate `metadata.json` and writes to a separate
 reproduction output root so the original bundle is not overwritten.
 
-Solve, Validate, and Analyze remain visible but disabled with explicit
-unavailability reasons. They are not simulated by WFC, guessed from UI
-state, or backed by provider/network calls.
+Solve and Analyze are enabled only when Python Core, the canonical ZIP route,
+the configured read-only Scrubbots checkout, and Godot are all available.
+They invoke the same ZIP pipeline as primary generation. Validate remains
+explicitly unavailable. No action is simulated by WFC, guessed from UI state,
+or backed by provider/network calls.

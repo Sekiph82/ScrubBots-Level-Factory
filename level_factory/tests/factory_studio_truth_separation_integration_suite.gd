@@ -56,7 +56,6 @@ func _run_suite() -> void:
 		return
 	gateway.call("set_output_root", TEST_OUTPUT_PATH)
 
-	var difficulty := target.get_node_or_null("DifficultyRow/Difficulty") as OptionButton
 	var width := target.get_node_or_null("WidthRow/Width") as SpinBox
 	var height := target.get_node_or_null("HeightRow/Height") as SpinBox
 	var seed := target.get_node_or_null("SeedRow/Seed") as LineEdit
@@ -69,15 +68,15 @@ func _run_suite() -> void:
 	var evidence := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
 	var editor := target.get_node_or_null("ActionArea/CanonicalArtEditor")
 	var revalidation := target.get_node_or_null("ActionArea/ManualArtStructuralRevalidation")
-	_check(difficulty != null and width != null and height != null and seed != null and mode != null and candidate_label != null, "Draft controls are incomplete")
+	_check(width != null and height != null and seed != null and mode != null and candidate_label != null, "Draft controls are incomplete")
 	_check(generate_button != null and reproduce_button != null and validate_button != null, "Action controls are incomplete")
 	_check(preview != null and evidence != null and editor != null and revalidation != null, "Truth-domain components are incomplete")
-	if difficulty == null or width == null or height == null or seed == null or mode == null or candidate_label == null or generate_button == null or reproduce_button == null or validate_button == null or preview == null or evidence == null or editor == null or revalidation == null:
+	if width == null or height == null or seed == null or mode == null or candidate_label == null or generate_button == null or reproduce_button == null or validate_button == null or preview == null or evidence == null or editor == null or revalidation == null:
 		instance.queue_free()
 		_finish()
 		return
 
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, SEED_A, PRESENTATION_LABEL)
+	_set_draft(width, height, seed, mode, candidate_label, SEED_A, PRESENTATION_LABEL)
 	await process_frame
 	# Candidate A
 	generate_button.pressed.emit()
@@ -110,14 +109,14 @@ func _run_suite() -> void:
 	var editor_a_dirty: Dictionary = editor.call("snapshot")
 	var dirty_a_cells: Array = editor.call("working_logical_cells_snapshot")
 	_check(editor_a_dirty.get("state") == "DIRTY" and editor_a_dirty.get("dirty_cell_count") == 1, "Canonical A editor did not expose exact DIRTY state")
-	_check(editor_a_dirty.get("validation_disposition") == "UNVALIDATED — revalidation pending SB-LF06-008", "DIRTY editor did not remain UNVALIDATED")
+	_check(editor_a_dirty.get("validation_disposition") == "UNVALIDATED — canonical structural revalidation has not been run.", "DIRTY editor did not remain UNVALIDATED")
 
 	# Draft-only mutation
 	var action_before_draft: Dictionary = target.call("action_result_snapshot")
 	var preview_before_draft: Dictionary = preview.call("snapshot")
 	var evidence_before_draft: Dictionary = evidence.call("snapshot")
 	var editor_source_before_draft: Dictionary = editor.call("snapshot")
-	_set_draft(difficulty, width, height, seed, mode, candidate_label, SEED_B, "changed-draft-label")
+	_set_draft(width, height, seed, mode, candidate_label, SEED_B, "changed-draft-label")
 	await process_frame
 	_check(target.call("action_result_snapshot") == action_before_draft, "Draft-only mutation changed latest action truth")
 	_check(target.call("last_successful_core_evidence_snapshot") == last_success_a, "Draft-only mutation changed retained successful Core evidence")
@@ -214,9 +213,7 @@ func _run_suite() -> void:
 	_finish()
 
 
-func _set_draft(difficulty: OptionButton, width: SpinBox, height: SpinBox, seed: LineEdit, mode: OptionButton, label: LineEdit, seed_value: String, label_value: String) -> void:
-	difficulty.select(0)
-	difficulty.item_selected.emit(0)
+func _set_draft(width: SpinBox, height: SpinBox, seed: LineEdit, mode: OptionButton, label: LineEdit, seed_value: String, label_value: String) -> void:
 	width.value = 20
 	height.value = 21
 	seed.text = seed_value

@@ -102,7 +102,6 @@ def test_gateway_is_a_truthful_local_canonical_core_bridge() -> None:
         "HTTPClient",
         "WebSocket",
         "FileAccess",
-        "DirAccess",
         "api_key",
         "credential",
         "http://",

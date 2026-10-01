@@ -27,12 +27,13 @@ dispositions, provider calls, import operations, or persistent Studio state.
 
 The Python Factory Core at the repository root remains canonical. This Godot
 project does not copy its algorithms, compile a second representation, or
-silently invoke a subprocess. `FactoryCoreGateway` currently exposes truthful
-status-only values: `AVAILABLE`, `UNAVAILABLE`, and `ERROR`, with the current
-foundation status fixed to `UNAVAILABLE`. A later audited integration may add a
-local invocation adapter and capability-specific status source, but it must
-preserve canonical Core ownership, explicit failure states, provenance, and
-the offline boundary.
+silently duplicate the algorithms. `FactoryCoreGateway` exposes truthful
+`AVAILABLE`, `UNAVAILABLE`, and `ERROR` states. Generate/Reproduce use the
+local canonical Python Core; Solve/Analyze use the canonical ZIP pipeline only
+when Python, ZIP, the configured read-only Scrubbots checkout, and Godot are
+available. Publication uses an explicit configured game project and an
+isolated transactional publisher while preserving canonical Core ownership,
+provenance, and the offline boundary.
 
 No credentials, environment-secret values, provider services, runtime HTTP, or
 network dependency are used by this workspace.

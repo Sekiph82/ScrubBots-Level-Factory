@@ -6,7 +6,12 @@ from enum import Enum
 import hashlib
 import json
 import re
-from ..contracts import validate_dimensions, validate_used_color_count
+from ..contracts import (
+    validate_current_dimensions,
+    validate_current_used_color_count,
+    validate_dimensions,
+    validate_used_color_count,
+)
 from .request import (
     GenerationRequest,
     GeneratorMode,
@@ -142,14 +147,14 @@ class GenerationResult:
                 raise ResultContractError("logical_grid must be an iterable of C-ID cells")
             try:
                 cells = tuple(logical_grid)  # type: ignore[arg-type]
-                validate_dimensions(request.difficulty, width, height)
+                (validate_current_dimensions(width, height) if request.difficulty is None else validate_dimensions(request.difficulty, width, height))
                 if request.width is not None and width != request.width:
                     raise ResultContractError("result width does not match explicit request width")
                 if request.height is not None and height != request.height:
                     raise ResultContractError("result height does not match explicit request height")
                 if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                     raise ResultContractError("logical_grid length must equal width multiplied by height")
-                actual_used = validate_used_color_count(request.difficulty, cells)
+                actual_used = validate_current_used_color_count(cells) if request.difficulty is None else validate_used_color_count(request.difficulty, cells)
                 supplied_palette = tuple(used_palette)  # type: ignore[arg-type]
             except ResultContractError:
                 raise
@@ -256,14 +261,14 @@ class GenerationResult:
         except TypeError as exc:
             raise ResultContractError("logical_grid must be an iterable of C-ID cells") from exc
         try:
-            validate_dimensions(request.difficulty, width, height)
+            (validate_current_dimensions(width, height) if request.difficulty is None else validate_dimensions(request.difficulty, width, height))
             if request.width is not None and width != request.width:
                 raise ResultContractError("result width does not match explicit request width")
             if request.height is not None and height != request.height:
                 raise ResultContractError("result height does not match explicit request height")
             if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                 raise ResultContractError("logical_grid length must equal width multiplied by height")
-            used = validate_used_color_count(request.difficulty, cells)
+            used = validate_current_used_color_count(cells) if request.difficulty is None else validate_used_color_count(request.difficulty, cells)
         except ResultContractError:
             raise
         except (TypeError, ValueError) as exc:

@@ -274,12 +274,18 @@ def list_candidates() -> list[dict[str, Any]]:
             metadata = bundle.metadata
             quality = metadata.get("quality", {}) if isinstance(metadata.get("quality", {}), Mapping) else {}
             generation = metadata.get("generation", {}) if isinstance(metadata.get("generation", {}), Mapping) else {}
+            generator_metadata = metadata.get("generator_metadata", {}) if isinstance(metadata.get("generator_metadata", {}), Mapping) else {}
+            generator_payload = generator_metadata.get("payload", {}) if isinstance(generator_metadata.get("payload", {}), Mapping) else {}
+            generator_data = generator_payload.get("data", {}) if isinstance(generator_payload.get("data", {}), Mapping) else {}
+            request_payload = generation.get("request", {}) if isinstance(generation.get("request", {}), Mapping) else {}
             candidates.append({
                 "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
                 "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
                 "used_colors": sorted(set(bundle.artwork.cells), key=lambda value: int(value[1:])), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
                 "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
                 "quality": dict(quality), "metadata": metadata,
+                "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
+                "background_intent": request_payload.get("background_intent", "BACKGROUND"),
             })
         except Exception:
             continue
@@ -406,42 +412,18 @@ def _auto_publish_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
     if not runs:
         return {"disposition": "NOT_PUBLISHED", "reason": "ACCEPT recorded, but no READY canonical ZIP run with official Difficulty V1 evidence exists."}
     run = max(runs, key=lambda value: str(value.get("created_at", "")))
-    primary = run["primary"]
-    files = primary.get("files", {})
-    destination = (extensions_root() / "published" / str(candidate["candidate_id"])).resolve()
-    root = extensions_root().resolve()
-    if root not in destination.parents:
-        return {"disposition": "NOT_PUBLISHED", "reason": "Publish destination escaped the isolated Studio extension area."}
-    destination.mkdir(parents=True, exist_ok=True)
-    copied: dict[str, str] = {}
-    for name, raw_path in files.items():
-        source = Path(str(raw_path)).resolve()
-        if not source.is_file() or root not in source.parents:
-            return {"disposition": "NOT_PUBLISHED", "reason": f"Canonical export file is unavailable or outside the isolated area: {name}"}
-        target = destination / source.name
-        shutil.copy2(source, target)
-        copied[str(name)] = _relative(target)
-    manifest = {
-        "schema": "scrubbots-level-published-v1", "version": 1,
-        "candidate_id": candidate["candidate_id"], "level_id": primary.get("level_id", candidate["candidate_id"]),
-        "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"],
-        "difficulty": primary.get("difficulty", {}).get("class"), "difficulty_score": primary.get("difficulty", {}).get("score"),
-        "pipeline_run_id": run["run_id"], "files": copied, "publication": "OWNER_ACCEPT_AUTO_PUBLISH",
-    }
-    manifest_path = destination / "publication.json"
-    _write_json(manifest_path, manifest, immutable=False)
-    from .supply_pipeline.progression import build_progression
-    entries = []
-    for path in (extensions_root() / "published").glob("*/publication.json"):
-        try:
-            value = _read_json(path)
-        except StudioExtensionError:
-            continue
-        entries.append({key: value.get(key) for key in ("candidate_id", "level_id", "difficulty", "difficulty_score", "grid_hash", "pipeline_run_id")})
-    progression = build_progression(entries)
-    progression_path = extensions_root() / "published" / "progression.json"
-    _write_json(progression_path, progression)
-    return {"disposition": "PUBLISHED", "manifest": _relative(manifest_path), "progression": _relative(progression_path), "pipeline_run_id": run["run_id"]}
+    from .supply_pipeline.game_publisher import PublicationError, publish_level
+    request = run.get("request", {}) if isinstance(run.get("request", {}), Mapping) else {}
+    try:
+        published = publish_level(
+            game_project=request.get("game_project") or None,
+            candidate=candidate,
+            pipeline=run,
+            source_bundle=(_repository_root() / candidate["source_path"]).resolve(),
+        )
+    except (PublicationError, OSError, ValueError) as exc:
+        return {"disposition": "NOT_PUBLISHED", "reason": str(exc)[:512], "pipeline_run_id": run["run_id"]}
+    return {**published, "pipeline_run_id": run["run_id"], "publication": "OWNER_ACCEPT_AUTO_PUBLISH"}
 
 
 def _latest_ready_pipeline(candidate_id: str) -> dict[str, Any] | None:
@@ -562,6 +544,36 @@ def _canonical_cells_to_grid(cells: Sequence[str], width: int, height: int, rule
     return np.asarray(compact, dtype=np.int16).reshape((height, width)), used
 
 
+def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], source_png: Path) -> tuple[str, Path]:
+    """Materialize a reviewable candidate while retaining immutable source lineage."""
+
+    from .core.request import GenerationRequest
+    from .core.result import GenerationResult
+    from .core.rng import RNG_ALGORITHM, DeterministicRNG
+    from .output.bundle import export_result
+
+    width, height, pixels = _validation_pixels(source_png.read_bytes())
+    cells: list[str] = []
+    for index in range(width * height):
+        red, green, blue, alpha = pixels[index * 4 : index * 4 + 4]
+        if alpha != 255:
+            raise StudioExtensionError("transparent OWNER_UPLOAD remains a valid source but cannot form a publishable logical candidate")
+        cells.append(CANONICAL_PALETTE.id_for_rgb((red, green, blue)))
+    candidate_id = f"candidate-owner-{validation['source_sha256'][:48]}"
+    request = GenerationRequest(seed=str(validation["source_sha256"]), generator_mode="MASK", width=width, height=height, background_intent="BACKGROUND")
+    rng = DeterministicRNG(request.seed)
+    result = GenerationResult.success(
+        request=request, width=width, height=height, logical_grid=cells,
+        generator_id="owner-upload-canonical-derive", generator_version="1",
+        generator_mode="MASK", seed=request.seed, rng_algorithm=RNG_ALGORITHM,
+        provenance={"stage_seeds": rng.stage_seeds()},
+    )
+    quality = evaluate_grid(width, height, cells, policy=QualityPolicy())
+    lineage = {"source_id": source_id, "source_sha256": validation["source_sha256"], "source_record": validation.get("record_path"), "source_bytes_unchanged": True, "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"}
+    bundle_path = export_result(result, candidate_id, _repository_root() / "level_factory" / "output" / "studio-derived-candidates", quality_report=quality, generator_metadata={"namespace": "owner-upload", "data": {"source_lineage": lineage}})
+    return candidate_id, bundle_path
+
+
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
                                  evidence: str, request: Mapping[str, Any], source_kind: str) -> dict[str, Any]:
     """Run generated and OWNER_UPLOAD logical grids through the identical ZIP backend."""
@@ -582,7 +594,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         _pipeline_stage("CANDIDATE", "PASS", inputs=[identity], outputs=[level_id], evidence=evidence, reason="Generated artwork and external OWNER_UPLOAD artwork use the same candidate identity path."),
     ]
     try:
-        rules = GameRules(column_count=selected)
+        rules = GameRules(request_data.get("game_project"), column_count=selected)
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
@@ -592,6 +604,10 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             real_max_visited=request_data.get("real_max_visited"), level_number=int(request_data.get("level_number", 1)),
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
+        from .supply_pipeline.verify import verify_exported_supply
+        load_check = verify_exported_supply(files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project")) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
+        if load_check.get("state") != "READY":
+            raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")
         solve = "PASS" if result.get("solver_status") == "SOLVED" else "FAIL"
         replay = "PASS" if result.get("solution_final") == "WIN" else "FAIL"
         difficulty = "PASS" if result.get("difficulty") is not None and str(result.get("difficulty_basis", "")).startswith("ScrubBots Difficulty V1") else "FAIL"
@@ -606,7 +622,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             "schema": "scrubbots-primary-supply-pipeline/v1", "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "state": "READY", "disposition": "READY",
             "level_id": level_id, "column_count": selected, "visible_preview_depth": 3, "output": str(output_dir), "files": files,
             "authority": rules.authority, "acceptance": {"solver": "ScrubBots SolvabilitySolver", "replay": result["solution_final"], "difficulty": result["difficulty_basis"], "solver_status": result["solver_status"]},
-            "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "result": {key: value for key, value in result.items() if not key.startswith("_")},
+            "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "load_check": load_check, "result": {key: value for key, value in result.items() if not key.startswith("_")},
         }
         disposition = "READY"
     except (FileNotFoundError, NoValidSupply, OSError, RuntimeError, ValueError, StudioExtensionError) as exc:
@@ -690,12 +706,17 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
         ])
     if source_id is not None and validation["exact_logical_source"] and validation["structural"]["disposition"] == "PASS":
         _source_record, source_png = _source_record_paths(source_id)
-        width, height, pixels = _validation_pixels(source_png.read_bytes())
-        source_cells = []
-        for index in range(width * height):
-            red, green, blue, _alpha = pixels[index * 4 : index * 4 + 4]
-            source_cells.append(CANONICAL_PALETTE.id_for_rgb((red, green, blue)))
-        return _run_canonical_artwork_route(identity=source_id, cells=source_cells, width=width, height=height, evidence=validation.get("evidence_path", source_id), request=request or {}, source_kind="OWNER_UPLOAD")
+        derived_candidate_id, derived_bundle = _derive_owner_candidate(source_id, validation, source_png)
+        bundle = read_bundle(derived_bundle)
+        derived_request = dict(request or {})
+        derived_request["source_id"] = source_id
+        derived_request["source_lineage"] = bundle.metadata.get("generator_metadata", {})
+        payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE")
+        payload["source_id"] = source_id
+        payload["candidate_id"] = derived_candidate_id
+        payload["derived_candidate_id"] = derived_candidate_id
+        payload["source_lineage"] = derived_request["source_lineage"]
+        return payload
     if candidate_id is not None and candidate is not None and quality_disposition == "PASS":
         return _run_canonical_artwork_route(identity=candidate_id, cells=candidate_bundle.artwork.cells, width=candidate_bundle.artwork.width, height=candidate_bundle.artwork.height, evidence=candidate["source_path"], request=request or {}, source_kind="CANDIDATE")
     requested_interrupt = request.get("interrupt_after") if isinstance(request, Mapping) else None
@@ -757,26 +778,20 @@ def expand_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) ->
 
 
 def _validate_generate_preset_settings(settings: Mapping[str, Any]) -> dict[str, Any]:
-    allowed = {"width", "height", "seed", "mode"}
-    legacy_allowed = allowed | {"difficulty"}
-    if not isinstance(settings, Mapping) or set(settings) not in (allowed, legacy_allowed):
-        raise StudioExtensionError("Generate preset must contain exactly width, height, seed and mode; requested difficulty is not a production setting")
+    allowed = {"width", "height", "seed", "mode", "background_intent"}
+    if not isinstance(settings, Mapping) or set(settings) != allowed:
+        raise StudioExtensionError("Generate preset must contain exactly width, height, seed, mode, and background_intent; requested difficulty is not a production setting")
     normalized = json.loads(json.dumps(dict(settings), sort_keys=True, separators=(",", ":")))
-    normalized.pop("difficulty", None)
     if type(normalized["width"]) is not int or type(normalized["height"]) is not int or not 20 <= normalized["width"] <= 59 or not 20 <= normalized["height"] <= 59:
         raise StudioExtensionError("preset dimensions must be integers from 20 through 59")
     if type(normalized["seed"]) not in {int, str} or (type(normalized["seed"]) is str and not normalized["seed"].strip()):
         raise StudioExtensionError("preset seed must be a typed integer or non-empty string")
     if type(normalized["mode"]) is not str or normalized["mode"] not in {"MASK", "RULES", "WFC", "HYBRID", "AUTO"}:
         raise StudioExtensionError("preset generator mode is invalid")
+    if normalized.get("background_intent", "BACKGROUND") not in {"BACKGROUND", "TRANSPARENT"}:
+        raise StudioExtensionError("preset background_intent is invalid")
+    normalized.setdefault("background_intent", "BACKGROUND")
     return normalized
-
-
-def _internal_generation_band(width: int, height: int, seed: int | str) -> str:
-    """Choose a legacy generator band internally from the explicit geometry/seed."""
-
-    index = int(hashlib.sha256(f"{width}:{height}:{seed}".encode("utf-8")).hexdigest()[:8], 16) % 4
-    return ("EASY", "MEDIUM", "HARD", "VERY_HARD")[index]
 
 
 def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -789,7 +804,7 @@ def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> 
     from .output.bundle import export_candidate
 
     try:
-        request = GenerationRequest(_internal_generation_band(settings["width"], settings["height"], settings["seed"]), settings["seed"], settings["mode"], width=settings["width"], height=settings["height"])
+        request = GenerationRequest(None, settings["seed"], settings["mode"], width=settings["width"], height=settings["height"], background_intent=settings.get("background_intent", "BACKGROUND"))
         candidate = GeneratorRouter().generate_candidate(request)
         if not hasattr(candidate, "result") and not hasattr(candidate, "canonical_dict"):
             raise StudioExtensionError("canonical Generate did not return a candidate")
@@ -824,6 +839,7 @@ def readiness_card(candidate_id: str) -> dict[str, Any]:
         "SOLVER": {"disposition": "PASS" if ready_run else "NOT_AVAILABLE", "reason": "Canonical ScrubBots solver evidence is bound to the latest ZIP run." if ready_run else "Canonical ZIP pipeline not executed.", "evidence": ready_run.get("run_id") if ready_run else None},
         "DIFFICULTY": {"disposition": "PASS" if ready_run and primary.get("difficulty", {}).get("basis", "").startswith("ScrubBots Difficulty V1") else "NOT_AVAILABLE", "reason": "Official Difficulty V1 evidence is bound to the latest ZIP run." if ready_run else "Official Difficulty V1 evidence not available.", "evidence": ready_run.get("run_id") if ready_run else None},
         "QA": {"disposition": "PASS" if ready_run else "NOT_AVAILABLE", "reason": "Canonical ZIP conservation, replay, and export QA evidence is present." if ready_run else "Canonical ZIP QA evidence is not available.", "evidence": ready_run.get("run_id") if ready_run else None},
+        "LOAD_CHECK": {"disposition": "PASS" if ready_run and isinstance(primary.get("load_check"), Mapping) and primary.get("load_check", {}).get("state") == "READY" and primary.get("load_check", {}).get("disposition") == "READY" else "NOT_AVAILABLE", "reason": "Shipping load-check passed against the configured game authority." if ready_run and isinstance(primary.get("load_check"), Mapping) and primary.get("load_check", {}).get("state") == "READY" and primary.get("load_check", {}).get("disposition") == "READY" else "Shipping load-check is required before publication.", "evidence": primary.get("load_check") if isinstance(primary, Mapping) else None},
         "OWNER": {"disposition": "PASS" if review and review["disposition"] == "ACCEPT" else "FAIL" if review and review["disposition"] == "REJECT" else "STALE" if invalid_reviews else "PENDING", "reason": "Latest validated append-only owner review evidence." if review else "Mismatched/corrupt review evidence is excluded." if invalid_reviews else "No valid owner review exists.", "evidence": review.get("review_id") if review else None, "invalid_evidence": invalid_reviews},
         "EXPORT": {"disposition": "PASS" if ready_run and export_files else "NOT_AVAILABLE", "reason": "Canonical ZIP export evidence is present." if ready_run and export_files else "Canonical ZIP export evidence is not available.", "evidence": next(iter(export_files.values()), None) if isinstance(export_files, Mapping) else None},
     }

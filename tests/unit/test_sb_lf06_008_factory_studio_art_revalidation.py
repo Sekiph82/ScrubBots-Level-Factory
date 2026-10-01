@@ -65,9 +65,9 @@ def test_revalidation_component_is_bounded_and_scope_qualified() -> None:
     lowered = source.lower()
     assert 'class_name factorystudioartrevalidation' in lowered
     assert 'structural art qa only — not full gameplay validation' in lowered
-    assert 'solver: unavailable pending m03' in lowered
-    assert 'measured difficulty: unavailable pending m04' in lowered
-    assert 'unified validation: unavailable pending m05' in lowered
+    assert 'solver: unavailable until the canonical zip pipeline is executed.' in lowered
+    assert 'measured difficulty: unavailable until official difficulty v1 evidence exists.' in lowered
+    assert 'unified zip/load validation: unavailable until a canonical zip pipeline run is available.' in lowered
     assert 'qa pass != owner accept' in lowered
     assert 'func configure_editor' in lowered
     assert 'func snapshot' in lowered

@@ -13,7 +13,7 @@ def test_readiness_card_exposes_all_gates_and_never_falsely_returns_ready() -> N
     path = export_candidate(candidate, "lfx010-ready", destination)
     try:
         card = readiness_card("lfx010-ready")
-        assert set(card["gates"]) == {"SOURCE", "PALETTE", "STRUCTURE", "SOLVER", "DIFFICULTY", "QA", "OWNER", "EXPORT"}
+        assert set(card["gates"]) == {"SOURCE", "PALETTE", "STRUCTURE", "SOLVER", "DIFFICULTY", "QA", "LOAD_CHECK", "OWNER", "EXPORT"}
         assert card["gates"]["SOLVER"]["disposition"] == "NOT_AVAILABLE"
         assert card["gates"]["DIFFICULTY"]["disposition"] == "NOT_AVAILABLE"
         assert card["overall"] == "NOT READY"

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from scrubbots_pixel_factory import Difficulty, GeneratorMode
+from scrubbots_pixel_factory import GeneratorMode
 from scrubbots_pixel_factory.contracts import PRODUCTION_DIMENSION_ENVELOPE
 
 
@@ -28,8 +28,9 @@ def _constant_int(source: str, name: str) -> int:
 def test_target_controls_bind_to_canonical_python_choices_and_dimensions() -> None:
     source = TARGET_CONTROLS.read_text(encoding="utf-8")
 
-    assert _constant_strings(source, "CANONICAL_DIFFICULTIES") == [difficulty.value for difficulty in Difficulty]
     assert _constant_strings(source, "CANONICAL_MODES") == [mode.value for mode in GeneratorMode]
+    assert 'background_control' in source
+    assert '"background_intent"' in source
     assert _constant_int(source, "MIN_DIMENSION") == PRODUCTION_DIMENSION_ENVELOPE.minimum
     assert _constant_int(source, "MAX_DIMENSION") == PRODUCTION_DIMENSION_ENVELOPE.maximum
 

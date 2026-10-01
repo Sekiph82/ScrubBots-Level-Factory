@@ -5,14 +5,12 @@ const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Naviga
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const FOOTER_STATUS_PATH := NodePath("Frame/Layout/Footer/Status")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
-const DIFFICULTY_PATH := NodePath("DifficultyRow/Difficulty")
 const WIDTH_PATH := NodePath("WidthRow/Width")
 const HEIGHT_PATH := NodePath("HeightRow/Height")
 const SEED_PATH := NodePath("SeedRow/Seed")
 const MODE_PATH := NodePath("ModeRow/Mode")
 const CANDIDATE_PATH := NodePath("CandidatepresentationlabelRow/CandidatePresentation")
 
-const EXPECTED_DIFFICULTIES: Array[String] = ["EASY", "MEDIUM", "HARD", "VERY_HARD"]
 const EXPECTED_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
 const SCENE_LOADER_METHOD := "load"
 
@@ -76,24 +74,21 @@ func _run_suite() -> void:
 		quit(1)
 		return
 
-	var difficulty := target.get_node_or_null(DIFFICULTY_PATH) as OptionButton
 	var width := target.get_node_or_null(WIDTH_PATH) as SpinBox
 	var height := target.get_node_or_null(HEIGHT_PATH) as SpinBox
 	var seed := target.get_node_or_null(SEED_PATH) as LineEdit
 	var mode := target.get_node_or_null(MODE_PATH) as OptionButton
 	var candidate := target.get_node_or_null(CANDIDATE_PATH) as LineEdit
-	_check(difficulty != null, "Difficulty control path is missing")
 	_check(width != null, "Width control path is missing")
 	_check(height != null, "Height control path is missing")
 	_check(seed != null, "Seed control path is missing")
 	_check(mode != null, "Mode control path is missing")
 	_check(candidate != null, "Candidate presentation control path is missing")
-	if difficulty == null or width == null or height == null or seed == null or mode == null or candidate == null:
+	if width == null or height == null or seed == null or mode == null or candidate == null:
 		instance.queue_free()
 		quit(1)
 		return
 
-	_check(_option_values(difficulty) == EXPECTED_DIFFICULTIES, "Difficulty choices drifted from the accepted contract")
 	_check(_option_values(mode) == EXPECTED_MODES, "Mode choices drifted from the accepted contract")
 	_check(width.min_value == 20.0 and width.max_value == 59.0, "Width bounds are not 20..59")
 	_check(height.min_value == 20.0 and height.max_value == 59.0, "Height bounds are not 20..59")
@@ -109,8 +104,6 @@ func _run_suite() -> void:
 	_check(initial_snapshot["core_validation"] == "UNAVAILABLE", "Initial Core state is not UNAVAILABLE")
 	_check(initial_snapshot["generation_state"] == "NOT EXECUTED — presentation draft only", "Initial draft claims an operation")
 
-	difficulty.select(3)
-	difficulty.item_selected.emit(3)
 	width.value = 23
 	height.value = 47
 	seed.text = "operator-seed"
@@ -124,18 +117,14 @@ func _run_suite() -> void:
 	var edited_snapshot = target.call("draft_snapshot")
 	_check(edited_snapshot is Dictionary, "Edited draft snapshot is not a dictionary")
 	if edited_snapshot is Dictionary:
-		_check(edited_snapshot["difficulty"] == "VERY_HARD", "Difficulty draft did not update")
 		_check(edited_snapshot["width"] == 23 and edited_snapshot["height"] == 47, "Independent rectangle did not update")
 		_check(edited_snapshot["seed"] == "operator-seed", "Seed draft did not update")
 		_check(edited_snapshot["mode"] == "HYBRID", "Mode draft did not update")
 		_check(edited_snapshot["candidate_presentation"] == "preview-label", "Candidate presentation draft did not update")
 		_check(target.call("draft_snapshot") == edited_snapshot, "Draft snapshot is not deterministic")
 
-	for difficulty_index in range(EXPECTED_DIFFICULTIES.size()):
-		difficulty.select(difficulty_index)
-		difficulty.item_selected.emit(difficulty_index)
-		_check(width.min_value == 20.0 and width.max_value == 59.0, "Difficulty changed width bounds")
-		_check(height.min_value == 20.0 and height.max_value == 59.0, "Difficulty changed height bounds")
+	_check(width.min_value == 20.0 and width.max_value == 59.0, "Width bounds changed unexpectedly")
+	_check(height.min_value == 20.0 and height.max_value == 59.0, "Height bounds changed unexpectedly")
 	_check(_contains_action_buttons(target), "Factory Studio action controls are missing")
 
 	navigation.emit_signal("surface_selected", "Import")

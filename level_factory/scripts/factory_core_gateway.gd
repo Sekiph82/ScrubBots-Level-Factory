@@ -22,18 +22,16 @@ const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
 const OWNER_UPLOAD_OPERATION := "owner-upload-import"
 const STUDIO_EXTENSION_OPERATION := "studio-extension"
+const SCRUBBOTS_PROJECT_ENVIRONMENT_NAME := "SCRUBBOTS_PROJECT"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
-const FUTURE_ACTION_REASONS := {
-	"Solve": "UNAVAILABLE — use the canonical ZIP pipeline; WFC is not the gameplay solver.",
-	"Validate": "UNAVAILABLE — no standalone canonical validation capability is connected.",
-	"Analyze": "UNAVAILABLE — official Difficulty V1 analysis is not connected.",
-}
+const FUTURE_ACTION_REASONS := {"Validate": "UNAVAILABLE — no standalone canonical validation capability is connected."}
 
 var python_executable := ""
 var _connection_status: ConnectionStatus = ConnectionStatus.UNAVAILABLE
 var _connection_detail := ""
 var _last_successful_metadata_path := ""
+var _last_successful_candidate_id := ""
 var _last_result: Dictionary = {}
 var _default_output_root := ""
 var _probe_launcher_path := LAUNCHER_PATH
@@ -58,9 +56,11 @@ func status_message() -> String:
 
 func capability_summary() -> String:
 	var matrix := capability_matrix()
-	return "Generate=%s, Reproduce=%s, Solve=UNAVAILABLE, Validate=UNAVAILABLE, Analyze=UNAVAILABLE" % [
+	return "Generate=%s, Reproduce=%s, Solve=%s, Validate=UNAVAILABLE, Analyze=%s" % [
 	"AVAILABLE" if matrix["Generate"]["available"] else "UNAVAILABLE",
 	"AVAILABLE" if matrix["Reproduce"]["available"] else "UNAVAILABLE",
+	"AVAILABLE" if matrix["Solve"]["available"] else "UNAVAILABLE",
+	"AVAILABLE" if matrix["Analyze"]["available"] else "UNAVAILABLE",
 	]
 
 
@@ -70,12 +70,14 @@ func capability_matrix() -> Dictionary:
 	var reproduce_reason := "AVAILABLE — a successful Generate metadata.json is ready for canonical Reproduce." if reproduce_available else "UNAVAILABLE — run a successful canonical Generate first."
 	if not core_available:
 		reproduce_reason = "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."
+	var zip_available := core_available and _canonical_game_checkout_available()
+	var zip_reason := "AVAILABLE — canonical ZIP solve/replay/Difficulty V1 route is executable." if zip_available else "UNAVAILABLE — Python Core, canonical ZIP route, read-only Scrubbots checkout, and Godot are all required."
 	return {
 		"Generate": {"available": core_available, "reason": _connection_detail},
 		"Reproduce": {"available": reproduce_available, "reason": reproduce_reason},
-		"Solve": {"available": false, "reason": FUTURE_ACTION_REASONS["Solve"]},
+		"Solve": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_reason if zip_available else zip_reason},
 		"Validate": {"available": false, "reason": FUTURE_ACTION_REASONS["Validate"]},
-		"Analyze": {"available": false, "reason": FUTURE_ACTION_REASONS["Analyze"]},
+		"Analyze": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_reason if zip_available else zip_reason},
 	}
 
 
@@ -101,12 +103,16 @@ func run_action(action: String, draft: Dictionary, requested_output_root: String
 		return _unavailable_result(normalized_action, str(capability.get("reason", "UNAVAILABLE")))
 	if normalized_action == "Generate" and str(draft.get("seed", "")).strip_edges().is_empty():
 		return _unavailable_result(normalized_action, "UNAVAILABLE — enter a seed for a deterministic canonical Generate request.")
+	if normalized_action == "Generate" and draft.has("difficulty"):
+		return _failed_result(normalized_action, -1, "FAILED — invalid generation request: requested difficulty is not accepted by the current difficulty-free artwork contract.")
 	if normalized_action == "Reproduce" and _last_successful_metadata_path.is_empty():
 		return _unavailable_result(normalized_action, "UNAVAILABLE — no successful Generate metadata.json is available.")
 
 	var output_root := _safe_output_root(requested_output_root, normalized_action)
 	if output_root.is_empty():
 		return _failed_result(normalized_action, -1, "FAILED — requested output is outside the approved Factory Studio output area.")
+	if normalized_action in ["Solve", "Analyze"]:
+		return _run_zip_action(normalized_action, draft, output_root)
 	var arguments := PackedStringArray()
 	if normalized_action == "Generate":
 		arguments = _generate_arguments(draft, output_root)
@@ -313,11 +319,11 @@ func _generate_arguments(draft: Dictionary, output_root: String) -> PackedString
 	return PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"generate",
-		"--difficulty", str(draft.get("difficulty", "EASY")),
 		"--width", str(int(draft.get("width", 20))),
 		"--height", str(int(draft.get("height", 20))),
 		"--seed", str(draft.get("seed", "")),
 		"--mode", str(draft.get("mode", "MASK")),
+		"--background-intent", str(draft.get("background_intent", "BACKGROUND")),
 		"--output", output_root,
 	])
 
@@ -369,6 +375,7 @@ func _execute_core(action: String, arguments: PackedStringArray) -> Dictionary:
 	}
 	if action == "Generate":
 		_last_successful_metadata_path = str(result["metadata_path"])
+		_last_successful_candidate_id = str(result["candidate_id"])
 	_last_result = result
 	return result
 
@@ -487,10 +494,39 @@ func _unavailable_result(action: String, reason: String) -> Dictionary:
 		"state": "UNAVAILABLE",
 		"disposition": "UNAVAILABLE",
 		"exit_code": -1,
-		"reason": reason,
+	"reason": reason,
 	}
 	_last_result = result
 	return result
+
+
+func _run_zip_action(action: String, draft: Dictionary, output_root: String) -> Dictionary:
+	var request := draft.duplicate(true)
+	if str(request.get("candidate_id", "")).strip_edges().is_empty():
+		request["candidate_id"] = _last_successful_candidate_id
+	request["output_dir"] = output_root
+	request["analysis_only"] = action == "Analyze"
+	var payload := run_studio_extension("pipeline", request)
+	payload["action"] = action
+	if str(payload.get("disposition", "")) == "READY":
+		payload["state"] = "SUCCESS"
+	return payload
+
+
+func _canonical_game_checkout_available() -> bool:
+	var configured := OS.get_environment(SCRUBBOTS_PROJECT_ENVIRONMENT_NAME).strip_edges()
+	if configured.is_empty():
+		return false
+	var root := ProjectSettings.globalize_path(configured) if configured.begins_with("res://") else configured
+	var project_file := root.path_join("project.godot")
+	var progression := root.path_join("data/config/level_progression_v1.json")
+	var catalog := root.path_join("data/levels/catalog/production_catalog_v1.json")
+	var project_directory := DirAccess.open(root)
+	if project_directory == null or not project_directory.file_exists(project_file) or not project_directory.file_exists(progression) or not project_directory.file_exists(catalog):
+		return false
+	var captured: Array[String] = []
+	var godot_exit := _execute_process("godot", PackedStringArray(["--version"]), captured)
+	return godot_exit == 0
 
 
 func _failed_result(action: String, exit_code: int, reason: String) -> Dictionary:

@@ -34,6 +34,7 @@ from .contracts import (
 )
 from .core import (
     DeterministicRNG,
+    BackgroundIntent,
     FailureCode,
     GenerationFailureCode,
     GenerationRequest,
@@ -611,6 +612,7 @@ from .semantic import (
 
 __all__ = [
     "OfflinePolicyError",
+    "BackgroundIntent",
     "guarded_network_request",
     "offline_runtime",
     "deterministic_digest",

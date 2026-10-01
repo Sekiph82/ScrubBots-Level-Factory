@@ -7,7 +7,14 @@ from dataclasses import dataclass
 import hashlib
 import json
 
-from ..contracts import Difficulty, parse_difficulty, validate_dimensions, validate_used_color_count
+from ..contracts import (
+    Difficulty,
+    parse_difficulty,
+    validate_current_dimensions,
+    validate_current_used_color_count,
+    validate_dimensions,
+    validate_used_color_count,
+)
 from ..quality import logical_grid_hash
 
 
@@ -50,11 +57,11 @@ def _validate_artwork_fields(
     cells: object,
     palette: object | None = None,
     grid_hash: object | None = None,
-) -> tuple[str, Difficulty, int, int, tuple[str, ...], tuple[str, ...], str]:
+) -> tuple[str, Difficulty | None, int, int, tuple[str, ...], tuple[str, ...], str]:
     identifier = _require_candidate_id(candidate_id)
     try:
-        selected = parse_difficulty(difficulty)  # type: ignore[arg-type]
-        checked_width, checked_height = validate_dimensions(selected, width, height)  # type: ignore[arg-type]
+        selected = None if difficulty is None else parse_difficulty(difficulty)  # type: ignore[arg-type]
+        checked_width, checked_height = (validate_current_dimensions(width, height) if selected is None else validate_dimensions(selected, width, height))  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:
         raise ArtworkContractError(str(exc)) from exc
     if isinstance(cells, (str, bytes, bytearray)) or not isinstance(cells, Iterable):
@@ -65,7 +72,7 @@ def _validate_artwork_fields(
     if any(type(cell) is not str for cell in normalized):
         raise ArtworkContractError("cells must contain only canonical C-ID strings")
     try:
-        actual_palette = validate_used_color_count(selected, normalized)
+        actual_palette = validate_current_used_color_count(normalized) if selected is None else validate_used_color_count(selected, normalized)
     except (TypeError, ValueError) as exc:
         raise ArtworkContractError(str(exc)) from exc
     if palette is not None:
@@ -82,7 +89,7 @@ class ArtworkArtifact:
     """Immutable logical artwork; quality state is intentionally not a field."""
 
     candidate_id: str
-    difficulty: Difficulty
+    difficulty: Difficulty | None
     width: int
     height: int
     palette: tuple[str, ...]
@@ -133,7 +140,7 @@ class ArtworkArtifact:
             "schema": ARTWORK_SCHEMA,
             "schema_version": ARTWORK_SCHEMA_VERSION,
             "candidate_id": self.candidate_id,
-            "difficulty": self.difficulty.value,
+            "difficulty": self.difficulty.value if self.difficulty is not None else None,
             "width": self.width,
             "height": self.height,
             "palette": list(self.palette),

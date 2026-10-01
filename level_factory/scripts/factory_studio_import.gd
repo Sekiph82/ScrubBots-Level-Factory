@@ -6,7 +6,7 @@ extends VBoxContainer
 ## This node never normalizes, validates, promotes, or edits source bytes.
 
 const OWNER_UPLOAD_OPERATION := "owner-upload-import"
-const SOURCE_ONLY_NOTICE := "SOURCE ONLY — validation/candidate creation pending SB-LFX-004"
+const SOURCE_ONLY_NOTICE := "SOURCE ONLY — run canonical validation and candidate derivation explicitly."
 
 var _core_gateway: RefCounted
 var _file_dialog: FileDialog

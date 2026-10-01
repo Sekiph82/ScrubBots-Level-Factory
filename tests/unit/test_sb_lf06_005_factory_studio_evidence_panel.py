@@ -59,10 +59,10 @@ def test_evidence_panel_keeps_semantic_gates_and_truth_separation() -> None:
         'if state == "SUCCESS"',
         'output_path", ""',
         'path_join("metadata.json")',
-        'UNAVAILABLE — gameplay solver pending M03.',
-        'UNAVAILABLE — Difficulty Intelligence pending M04.',
+        'UNAVAILABLE — canonical ZIP solver evidence is not connected.',
+        'UNAVAILABLE — official Difficulty V1 evidence is not connected.',
         'UNAVAILABLE — no canonical gameplay load/risk model exists yet.',
-        "target/request difficulty",
+        "request intent is difficulty-free",
         "Structural QA ACCEPT != OWNER ACCEPT",
         "retained_after_failure",
     ):

@@ -18,10 +18,11 @@ def test_pipeline_records_truthful_owner_upload_stop_and_preserves_source(tmp_pa
         assert run["schema"] == "scrubbots-studio-pipeline-run"
         dispositions = {stage["stage"]: stage["disposition"] for stage in run["stages"]}
         assert dispositions["SOURCE"] == "PASS"
-        assert dispositions["CANDIDATE"] == "NOT_AVAILABLE"
-        assert dispositions["SOLVE"] == "NOT_AVAILABLE"
-        assert dispositions["DIFFICULTY"] == "NOT_AVAILABLE"
-        assert dispositions["REVIEW"] == "NOT_AVAILABLE"
+        assert run["disposition"] == "READY"
+        assert dispositions["CANDIDATE"] == "PASS"
+        assert dispositions["SOLVE"] == "PASS"
+        assert dispositions["DIFFICULTY"] == "PASS"
+        assert dispositions["QA"] == "PASS"
         assert (owner_upload_root() / source_id / "source.png").read_bytes() == source_bytes
     finally:
         root = owner_upload_root() / source_id

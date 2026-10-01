@@ -5,6 +5,7 @@ from .request import (
     GENERATION_REQUEST_SCHEMA,
     GENERATION_REQUEST_SCHEMA_VERSION,
     SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS,
+    BackgroundIntent,
     GenerationRequest,
     GeneratorMode,
     GeneratorOptions,
@@ -28,6 +29,7 @@ from .rng import (
 
 __all__ = [
     "DeterministicRNG",
+    "BackgroundIntent",
     "FailureCode",
     "GenerationFailureCode",
     "GenerationRequest",

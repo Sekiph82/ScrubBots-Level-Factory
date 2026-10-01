@@ -20,6 +20,7 @@ var width_control: SpinBox
 var height_control: SpinBox
 var seed_control: LineEdit
 var mode_control: OptionButton
+var background_control: OptionButton
 var candidate_label_control: LineEdit
 var draft_readout: Label
 var action_result_readout: Label
@@ -59,7 +60,7 @@ func _build_controls() -> void:
 	add_child(heading)
 
 	var explanation := Label.new()
-	explanation.text = "Edit target values locally. Generate and Reproduce use the canonical Python Core; other actions remain unavailable until their governing capability exists."
+	explanation.text = "Edit current difficulty-free artwork values locally. Generate and Reproduce use the canonical Python Core; ZIP Solve/Analyze require the configured game authority."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(explanation)
 
@@ -87,6 +88,14 @@ func _build_controls() -> void:
 	mode_control.select(0)
 	mode_control.item_selected.connect(_on_control_changed)
 	add_child(_make_row("Mode", mode_control))
+
+	background_control = OptionButton.new()
+	background_control.name = "BackgroundIntent"
+	background_control.add_item("BACKGROUND")
+	background_control.add_item("TRANSPARENT")
+	background_control.select(0)
+	background_control.item_selected.connect(_on_control_changed)
+	add_child(_make_row("Artwork background", background_control))
 
 	candidate_label_control = LineEdit.new()
 	candidate_label_control.name = "CandidatePresentation"
@@ -187,6 +196,7 @@ func draft_snapshot() -> Dictionary:
 		"height": int(height_control.value) if height_control != null else MIN_DIMENSION,
 		"seed": seed_control.text if seed_control != null else "",
 		"mode": _selected_option(mode_control, CANONICAL_MODES[0]),
+		"background_intent": _selected_option(background_control, "BACKGROUND"),
 		"candidate_presentation": candidate_label_control.text if candidate_label_control != null else "",
 	}
 
@@ -209,14 +219,15 @@ func _refresh_draft_readout() -> void:
 	if draft_readout == null:
 		return
 	var snapshot := draft_snapshot()
-	draft_readout.text = "State: %s | Core validation: %s | %s\nDraft: %s × %s, %s, %s, seed=%s, candidate=%s" % [
+	draft_readout.text = "State: %s | Core validation: %s | %s\nDraft: %s × %s, %s, mode=%s, background=%s, seed=%s, candidate=%s" % [
 		snapshot["state"],
 		snapshot["core_validation"],
 		snapshot["generation_state"],
 		snapshot["width"],
 		snapshot["height"],
-		 "automatic gameplay band after ZIP Difficulty V1",
+		"official Difficulty V1 measurement follows ZIP solve/replay",
 		snapshot["mode"],
+		snapshot["background_intent"],
 		snapshot["seed"],
 		snapshot["candidate_presentation"],
 	]

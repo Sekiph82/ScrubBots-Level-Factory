@@ -10,10 +10,10 @@ from scrubbots_pixel_factory.studio_extensions import StudioExtensionError, dele
 def test_presets_expand_full_request_and_history_survives_update_delete() -> None:
     preset_id = "lfx008-test"
     try:
-        first = save_preset(preset_id, "First recipe", "Generate", {"difficulty": "EASY", "width": 20, "height": 21, "seed": 7, "mode": "MASK"})
+        first = save_preset(preset_id, "First recipe", "Generate", {"width": 20, "height": 21, "seed": 7, "mode": "MASK", "background_intent": "BACKGROUND"})
         expanded = expand_preset(preset_id)
         assert expanded["settings"] == first["settings"]
-        save_preset(preset_id, "Updated recipe", "Generate", {"difficulty": "HARD", "width": 22, "height": 23, "seed": 9, "mode": "RULES"})
+        save_preset(preset_id, "Updated recipe", "Generate", {"width": 22, "height": 23, "seed": 9, "mode": "RULES", "background_intent": "BACKGROUND"})
         assert expanded["settings"]["seed"] == 7
         delete_preset(preset_id)
         assert expanded["settings"]["width"] == 20
