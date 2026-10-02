@@ -131,3 +131,21 @@ Required:
 - git diff --check PASS.
 
 Builder must not edit root `TASKS.md` or `.hiveai/audits/**`.
+
+
+# J. Co-current P2 Route A Release PR
+
+P2 is owner-provided and authorized after P1-M10 PASS/CLOSED.
+
+Canonical P2 prompt:
+`.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`
+
+Canonical P2 audit criteria:
+`.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`
+
+The combined R02 builder cycle is not PASS unless:
+- R02 independently satisfies sections A-I of this file; and
+- P2 independently satisfies every criterion in the P2 audit-criteria file.
+
+P2 must not weaken, bypass, or replace R02/P1 publication gates.
+A real remote push/PR is not required for implementation audit; tests must use a temporary local bare remote. Real Route A execution requires an actual owner-approved current CampaignBuilder plan.
