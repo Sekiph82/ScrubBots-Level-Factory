@@ -23,8 +23,9 @@ func _ready() -> void:
 	_candidate = LineEdit.new(); _candidate.placeholder_text = "Accepted candidate ID"; controls.add_child(_candidate)
 	var lock := Button.new(); lock.text = "Lock / Swap"; lock.pressed.connect(_lock_candidate); controls.add_child(lock)
 	_rows = RichTextLabel.new(); _rows.fit_content = true; _rows.scroll_active = true; _rows.custom_minimum_size.y = 340; add_child(_rows)
+	var public_warning := Label.new(); public_warning.text = "PUBLIC REPOSITORY: unreleased levels become publicly visible when the release branch is pushed."; public_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; public_warning.add_theme_color_override("font_color", Color(1.0, 0.72, 0.3)); add_child(public_warning)
 	_status = Label.new(); _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_status)
-	var approve := Button.new(); approve.text = "APPROVE and Publish Batch"; approve.pressed.connect(_approve); add_child(approve)
+	var approve := Button.new(); approve.text = "APPROVE and Open Release PR"; approve.pressed.connect(_approve); add_child(approve)
 	refresh_pool()
 
 
@@ -60,7 +61,11 @@ func _lock_candidate() -> void:
 func _approve() -> void:
 	if _projection.is_empty() or str(_projection.get("plan_hash", "")).is_empty(): _status.text = "Build a valid plan before approval."; return
 	var result: Dictionary = _gateway.call("run_studio_extension", "campaign-approve", {"plan_hash": _projection["plan_hash"]})
-	_status.text = "%s — %s" % [str(result.get("disposition", result.get("state", "ERROR"))), str(result.get("reason", result.get("error", result.get("orders", []))))]
+	var receipt: Dictionary = result.get("receipt", {})
+	if not receipt.is_empty():
+		_status.text = "Release PR opened: %s\nBranch: %s | commit: %s\nReceipt saved: %s\nPUBLIC: unreleased levels are visible on GitHub." % [str(receipt.get("pr_url", "")), str(receipt.get("branch", "")), str(receipt.get("game_commit_sha", "")), str(result.get("receipt_path", ""))]
+	else:
+		_status.text = "%s — %s" % [str(result.get("disposition", result.get("state", "ERROR"))), str(result.get("reason", result.get("error", result.get("orders", []))))]
 	refresh_pool()
 
 

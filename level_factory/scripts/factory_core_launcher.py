@@ -280,8 +280,13 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
             payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
         elif operation == "campaign-approve":
-            from scrubbots_pixel_factory.supply_pipeline.release_pool import approve_release_plan
-            payload = approve_release_plan(plan_hash=str(request["plan_hash"]))
+            from scrubbots_pixel_factory.supply_pipeline.release_route_a import release_approved_campaign
+            from scrubbots_pixel_factory import studio_extensions as extensions
+            import os
+            game_project = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
+            if not game_project:
+                raise ValueError("SCRUBBOTS_PROJECT must identify the configured Sekiph82/Scrubbots checkout")
+            payload = release_approved_campaign(plan_hash=str(request["plan_hash"]), game_project=game_project, studio_approval=True)
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

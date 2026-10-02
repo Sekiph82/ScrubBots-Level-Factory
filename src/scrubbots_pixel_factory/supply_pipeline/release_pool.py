@@ -257,7 +257,8 @@ def build_release_plan(*, game_project: str | Path | None = None, k: int = 100, 
     return plan
 
 
-def approve_release_plan(*, plan_hash: str, game_project: str | Path | None = None) -> dict[str, Any]:
+def validate_release_plan(*, plan_hash: str, game_project: str | Path | None = None) -> dict[str, Any]:
+    """Read-only revalidation of the exact current CampaignBuilder plan and inputs."""
     game = discover_game_project(game_project)
     from .. import studio_extensions as studio
     plan_path = studio.extensions_root() / "release" / "campaign_plan.json"
@@ -270,6 +271,8 @@ def approve_release_plan(*, plan_hash: str, game_project: str | Path | None = No
         if not row.get("chosen_id"): break
         prefix.append(row)
     if not prefix: raise ReleaseError("campaign plan has no publishable contiguous prefix")
+    numbers = [int(row["n"]) for row in prefix]
+    if numbers != list(range(numbers[0], numbers[0] + len(numbers))): raise ReleaseError("campaign plan prefix is not contiguous")
     catalog, authority = _game_authority(game)
     locks = {int(row["n"]): str(row["chosen_id"]) for row in prefix}
     rebuilt = build_campaign_plan(catalog=catalog, authority=authority, pool=list(entries.values()), k=int(plan["K"]), locks=locks)
@@ -279,11 +282,17 @@ def approve_release_plan(*, plan_hash: str, game_project: str | Path | None = No
         entry = entries[str(row["chosen_id"])]
         bundle = (studio._repository_root() / str(entry["source_bundle"])).resolve()
         items.append({"candidate": entry["candidate"], "pipeline": entry["pipeline"], "source_bundle": bundle, "level_number": int(row["n"])})
+    return {"game_project": game, "plan": plan, "prefix": prefix, "items": items}
+
+
+def approve_release_plan(*, plan_hash: str, game_project: str | Path | None = None) -> dict[str, Any]:
+    validated = validate_release_plan(plan_hash=plan_hash, game_project=game_project)
     try:
-        result = publish_batch(game_project=game, items=items)
+        result = publish_batch(game_project=validated["game_project"], items=validated["items"])
     except (PublicationError, OSError, ValueError) as exc:
         raise ReleaseError(str(exc)) from exc
+    prefix = validated["prefix"]
     return {**result, "plan_hash": plan_hash, "approved_orders": [row["n"] for row in prefix]}
 
 
-__all__ = ["ReleaseError", "approve_release_plan", "build_release_plan", "enter_release_pool", "release_entries"]
+__all__ = ["ReleaseError", "approve_release_plan", "build_release_plan", "enter_release_pool", "release_entries", "validate_release_plan"]
