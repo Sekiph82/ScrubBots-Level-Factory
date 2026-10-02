@@ -131,6 +131,12 @@ func _run_suite() -> void:
 	await process_frame
 	_check(title.text == "Factory Studio — Import", "Inert Import surface is unstable")
 	_check(not target.visible, "Target controls remained visible on an inert surface")
+	navigation.emit_signal("surface_selected", "Release")
+	await process_frame
+	var release_surface := workspace.get_node_or_null("Padding/Content/CampaignRelease")
+	_check(title.text == "Factory Studio — Release", "Release navigation did not reach the workspace")
+	_check(release_surface != null and release_surface.visible, "Release Pool surface did not instantiate/show")
+	_check(release_surface != null and release_surface.get_child_count() >= 6, "Release Pool plan/lock/approval controls are missing")
 	navigation.emit_signal("surface_selected", "Generate")
 	await process_frame
 	_check(target.visible, "Generate target controls did not return")

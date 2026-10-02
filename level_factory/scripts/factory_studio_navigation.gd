@@ -26,6 +26,7 @@ const NAVIGATION_SURFACES: Array[String] = [
 	"Session Recovery",
 	"Similarity",
 	"Cost Center",
+	"Release",
 	"QA",
 	"Providers",
 	"Outputs",

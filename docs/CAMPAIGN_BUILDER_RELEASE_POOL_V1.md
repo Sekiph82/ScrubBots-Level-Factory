@@ -1,0 +1,13 @@
+# CampaignBuilder and Release Pool V1
+
+Owner ACCEPT now records a canonical review and admits a READY candidate with official Difficulty V1 evidence to the immutable Release Pool. ACCEPT does not write game files or assign a catalog order. REJECT removes the candidate from the current pool projection because only the latest identity-bound ACCEPT is eligible.
+
+Factory Studio's **Release** surface reads the configured Scrubbots project at runtime. It derives progression targets and hard tolerance from the live progression configuration, and hashes the live catalog, analyzer configuration, and CampaignBuilder architecture document into the plan authority digest. The planner writes `campaign_plan.json` under Studio evidence. Its default K is 100. A slot lock re-runs global assignment and all sequence checks; APPROVE verifies the reviewed plan hash and current pool/catalog inputs before submitting its contiguous prefix to batch publication.
+
+The assignment uses a deterministic rectangular Hungarian algorithm. Candidate eligibility requires exact difficulty-class agreement and the current hard challenge tolerance. The cost minimizes challenge error with penalties for leaving the preferred and default tolerance tiers. Stable candidate identity orders ties. A sequential rule conflict removes that slot/candidate edge and recomputes the global assignment. The plan stops at its first empty slot and includes deterministic shortage reasons.
+
+Batch publication builds every level in a temporary project using the existing single-level validator, verifies the assigned catalog orders form one contiguous range, stages all new level/supply/metadata/preview files, and replaces the production catalog last as the visibility commit point. If a staged write fails, new files are removed and the original catalog bytes are restored. Existing catalog entries are not rewritten semantically.
+
+The current game source does not configure a maximum consecutive similarity value; the plan reports the game analyzer's multi-field similarity and records that it could not be used as a hard rejection limit. The current Difficulty V1 record also does not provide a supported scalar Frustration Risk, so high-F adjacency cannot be enforced. The planner enforces the documented two-level dominant-profile run limit, measures high W/B relative to the current accepted pool median, applies recovery B/U median checks, and applies every configured recovery guard to adjacent official scores. It does not generate or mutate candidates.
+
+`docs/examples/campaign_plan_k100_synthetic.json` is a deterministic synthetic K=100 example. Its data is fabricated for contract demonstration and is not a production recommendation or game catalog input.

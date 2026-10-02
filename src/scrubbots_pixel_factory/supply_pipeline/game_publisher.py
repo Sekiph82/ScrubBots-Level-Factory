@@ -48,7 +48,10 @@ def _load(path: Path) -> object:
 
 
 def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, object], pipeline: Mapping[str, object], source_bundle: str | Path, level_number: int | None = None) -> dict[str, object]:
-    """Publish all canonical game files atomically after every gate passes."""
+    """Publish one validated batch member at its explicitly assigned catalog order."""
+
+    if type(level_number) is not int or level_number < 1:
+        raise PublicationError("CampaignBuilder must provide an explicit positive level_number")
 
     root = discover_game_project(game_project)
     candidate_id = str(candidate.get("candidate_id", ""))
@@ -84,29 +87,21 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         raise PublicationError("production catalog authority is malformed")
     if any(isinstance(entry, Mapping) and entry.get("id") == level_id for entry in catalog["entries"]):
         raise PublicationError("catalog collision: stable level ID already exists")
-    first_order = max((int(entry.get("order", 0)) for entry in catalog["entries"] if isinstance(entry, Mapping) and type(entry.get("order")) is int), default=0) + 1
     authority = load_progression_authority(root)
     score = primary.get("difficulty", {}).get("score") if isinstance(primary.get("difficulty"), Mapping) else None
     if type(score) not in {int, float}:
         raise PublicationError("official Difficulty V1 score is missing")
     tolerance = float(authority.get("challengeTolerance", {}).get("neverForceLabelOutsidePlusMinus", 5.0))
-    requested_order = first_order if level_number is None else int(level_number)
-    if level_number is not None:
-        orders = [requested_order]
-    else:
-        orders = list(range(first_order, first_order + int(authority["cadenceLength"]) * 10))
-    order = None
-    progression = None
-    for candidate_order in orders:
-        try:
-            candidate_progression = describe_target(candidate_order, authority)
-        except ProgressionAuthorityError:
-            continue
-        if abs(float(score) - float(candidate_progression["target_challenge"])) <= tolerance:
-            order, progression = candidate_order, candidate_progression
-            break
-    if order is None or progression is None:
-        raise PublicationError("official Difficulty V1 score does not fit any current cadence target")
+    order = level_number
+    try:
+        progression = describe_target(order, authority)
+    except ProgressionAuthorityError as exc:
+        raise PublicationError(f"explicit campaign order is not valid under current progression authority: {exc}") from exc
+    if abs(float(score) - float(progression["target_challenge"])) > tolerance:
+        raise PublicationError("official Difficulty V1 score does not fit its explicit CampaignBuilder target")
+    difficulty_class = primary.get("difficulty", {}).get("class") if isinstance(primary.get("difficulty"), Mapping) else None
+    if difficulty_class != progression["class"]:
+        raise PublicationError("official Difficulty V1 class does not match the explicit CampaignBuilder cadence class")
     metadata = {
         "schema": "scrubbots.level.metadata.v1", "version": 1, "builderVersion": "LevelFactory-ZIP-V02-R01/v1",
         "id": level_id, "width": level.get("width"), "height": level.get("height"), "cellCount": len(level.get("cells", [])),
@@ -117,6 +112,15 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         "pipelineRunId": pipeline.get("run_id"), "loadCheck": load_check,
         "progression": progression, "fileDigests": {},
     }
+    solver_metrics = primary.get("solver_metrics", {}) if isinstance(primary.get("solver_metrics", {}), Mapping) else {}
+    official = solver_metrics.get("official_difficulty_v1", {}) if isinstance(solver_metrics.get("official_difficulty_v1", {}), Mapping) else {}
+    metadata.update({
+        "challengeVector": official.get("vector", official.get("challengeVector")),
+        "sessionLoad": official.get("sessionLoad"),
+        "dominantProfile": official.get("dominantProfile"),
+        "frustrationRisk": official.get("frustrationRisk"),
+        "noveltySignature": {"dimensions": [level.get("width"), level.get("height")], "paletteSet": candidate.get("used_colors", []), "silhouetteHash": candidate.get("grid_hash")},
+    })
     paths = {
         "level": root / "data" / "levels" / f"{level_id}.json",
         "supply_plan": root / "data" / "levels" / "supply" / f"{level_id}_supply_v1.json",
@@ -151,4 +155,55 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
     return {"disposition": "PUBLISHED", "game_project": str(root), "level_id": level_id, "order": order, "paths": {name: str(path) for name, path in paths.items()}, "file_digests": {name: _sha256(path) for name, path in paths.items()}, "progression": progression}
 
 
-__all__ = ["PublicationError", "discover_game_project", "publish_level"]
+def publish_batch(*, game_project: str | Path | None, items: list[Mapping[str, object]]) -> dict[str, object]:
+    """Stage a contiguous campaign batch and expose it through one catalog commit."""
+    root = discover_game_project(game_project)
+    if not items:
+        raise PublicationError("release batch must contain at least one level")
+    numbers = [item.get("level_number") for item in items]
+    if any(type(n) is not int for n in numbers) or numbers != list(range(int(numbers[0]), int(numbers[0]) + len(numbers))):
+        raise PublicationError("release batch catalog orders must be a contiguous prefix")
+    catalog_path = root / "data" / "levels" / "catalog" / "production_catalog_v1.json"
+    original_catalog = catalog_path.read_bytes()
+    with tempfile.TemporaryDirectory(prefix=".lfx-batch-", dir=root) as temporary:
+        stage = Path(temporary) / "project"
+        stage.mkdir()
+        for relative in ("project.godot", "data/config/level_progression_v1.json", "data/levels/catalog/production_catalog_v1.json"):
+            source = root / relative; target = stage / relative
+            target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(source, target)
+        staged_results = []
+        for item in items:
+            staged_results.append(publish_level(game_project=stage, candidate=item["candidate"], pipeline=item["pipeline"], source_bundle=item["source_bundle"], level_number=int(item["level_number"])))
+        base_catalog = _load(catalog_path)
+        final_catalog = _load(stage / "data/levels/catalog/production_catalog_v1.json")
+        base_ids = {entry.get("id") for entry in base_catalog["entries"] if isinstance(entry, Mapping)}
+        added = [entry for entry in final_catalog["entries"] if entry.get("id") not in base_ids]
+        if [entry.get("order") for entry in added] != numbers:
+            raise PublicationError("staged catalog did not retain the requested contiguous batch order")
+        relatives = []
+        for entry in added:
+            for key in ("level_path", "metadata_path", "preview_path", "supply_plan_path"):
+                relatives.append(str(entry[key]).removeprefix("res://"))
+        written: list[Path] = []
+        try:
+            for relative in relatives:
+                source = stage / relative
+                target = root / relative
+                if target.exists(): raise PublicationError(f"batch publication path collision: {relative}")
+                target.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(source, target); written.append(target)
+            # The catalog is the batch visibility/commit point.
+            staged_catalog = stage / "data/levels/catalog/production_catalog_v1.json"
+            os.replace(staged_catalog, catalog_path); written.append(catalog_path)
+        except Exception as exc:
+            for target in written:
+                if target != catalog_path: target.unlink(missing_ok=True)
+            if catalog_path.read_bytes() != original_catalog:
+                restore = root / ".lfx-catalog-rollback.tmp"
+                restore.write_bytes(original_catalog); os.replace(restore, catalog_path)
+            if isinstance(exc, PublicationError): raise
+            raise PublicationError(f"batch transaction rolled back: {exc}") from exc
+    return {"disposition": "PUBLISHED", "game_project": str(root), "orders": numbers, "levels": staged_results, "catalog_sha256": _sha256(catalog_path)}
+
+
+__all__ = ["PublicationError", "discover_game_project", "publish_level", "publish_batch"]

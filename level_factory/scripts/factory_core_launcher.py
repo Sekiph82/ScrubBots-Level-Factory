@@ -273,6 +273,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.readiness_card(str(request["candidate_id"]))
         elif operation == "cost-center":
             payload = extensions.canonical_cost_center(request.get("scope"), request.get("provider"))
+        elif operation == "release-pool":
+            from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
+            payload = {"state": "READY", "pool_size": len(release_entries()), "entries": release_entries()}
+        elif operation == "campaign-build":
+            from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
+            payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
+        elif operation == "campaign-approve":
+            from scrubbots_pixel_factory.supply_pipeline.release_pool import approve_release_plan
+            payload = approve_release_plan(plan_hash=str(request["plan_hash"]))
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

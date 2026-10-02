@@ -177,6 +177,7 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_session.gd",
             "factory_studio_similarity.gd",
             "factory_studio_cost.gd",
+            "factory_studio_release.gd",
             "factory_studio_library_integration_suite.gd",
             "factory_studio_import_validation_integration_suite.gd",
             "factory_studio_pipeline_integration_suite.gd",
