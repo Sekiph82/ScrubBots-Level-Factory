@@ -112,6 +112,19 @@ def _supply_verify(args: argparse.Namespace) -> ExitCode:
     return ExitCode.SUCCESS if payload.get("state") == "READY" else ExitCode.INVALID_REQUEST
 
 
+def _headless_pipeline(args: argparse.Namespace) -> ExitCode:
+    from ..headless_pipeline import HeadlessPipelineError, run_job, status_job
+
+    try:
+        if args.pipeline_action == "run":
+            summary = run_job(args.job)
+            return ExitCode.GENERATION_FAILURE if summary.get("FAILED", 0) or summary.get("PENDING", 0) else ExitCode.SUCCESS
+        summary = status_job(args.job)
+        return ExitCode.SUCCESS if summary.get("state") in {"COMPLETE", "IN_PROGRESS"} else ExitCode.FILESYSTEM
+    except HeadlessPipelineError as exc:
+        raise CLIError(str(exc)) from exc
+
+
 def _json_load(path: Path, label: str) -> object:
     if not _is_local_path(path):
         raise CLIError(f"{label} must be a local filesystem path")
@@ -984,6 +997,15 @@ def _parser() -> argparse.ArgumentParser:
     supply_verify.add_argument("--level", type=Path, required=True)
     supply_verify.add_argument("--plan", type=Path, required=True)
     supply_verify.set_defaults(handler=_supply_verify)
+
+    pipeline = sub.add_parser("pipeline", help="run or inspect a resumable imported-art producer job")
+    pipeline_actions = pipeline.add_subparsers(dest="pipeline_action", required=True)
+    pipeline_run = pipeline_actions.add_parser("run", help="run or resume a read-only producer manifest")
+    pipeline_run.add_argument("--job", type=Path, required=True)
+    pipeline_run.set_defaults(handler=_headless_pipeline)
+    pipeline_status = pipeline_actions.add_parser("status", help="read durable producer job progress without executing work")
+    pipeline_status.add_argument("--job", type=Path, required=True)
+    pipeline_status.set_defaults(handler=_headless_pipeline)
     return parser
 
 
