@@ -19,6 +19,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
 - Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
+- P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
+- P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
+- P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
+- P3 Status: `OWNER_AUTHORIZED / READY_FOR_CODEX / PROMPT_PRESERVED_UNCHANGED`.
+- P3 Required Actor: `CODEX`.
+- P3 Builder Log Target: `.hiveai/codex-logs/P3_HEADLESS_BATCH_PIPELINE_CODEX_LOG.md`.
+- P3 Boundary: headless CLI reaches the same canonical Review Queue as Studio, with resumable/idempotent per-source execution; it never owner-ACCEPTs and never publishes.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
