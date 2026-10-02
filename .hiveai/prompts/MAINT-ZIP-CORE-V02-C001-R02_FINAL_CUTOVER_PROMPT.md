@@ -235,6 +235,38 @@ Final gates:
 - live read-only 3/4/5 validation retained;
 - git diff --check PASS.
 
+# P2 — Route A game-repo PR release workstream (OWNER ADDED AFTER P1 CLOSE)
+
+P1-M10 is now PASS/CLOSED. Execute P2 in the SAME builder cycle as R02 as a separate audited workstream.
+
+Canonical P2 owner prompt:
+`.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`
+
+P2 strict audit criteria:
+`.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`
+
+Tracker:
+`SB-CPX-003 — Route A Game-Repo Release PR`.
+
+Execution rules:
+- Preserve every R02 contract above.
+- P2 implementation may build/test the release-PR capability now because its P1 dependency is closed.
+- Do not require a real owner production batch to exist in order to implement/test the capability.
+- Tests MUST use a temporary local bare remote and MUST NOT push/open a PR against the real `Sekiph82/Scrubbots` remote.
+- A real release branch/PR may be created only when an actual owner-approved, current CampaignBuilder `campaign_plan.json` is explicitly supplied for release execution.
+- Never push to game `main`; never force-push; never rewrite game history.
+- P2 must reuse P1 explicit contiguous batch orders and the accepted publication transaction rather than reimplement campaign ordering.
+- Game verification before commit/push/PR must use current game LevelCatalog, LevelLoader, SupplyPlanLoader, SolvabilitySolver replay/solve, and LevelDifficultyAnalyzerV1 score parity.
+- Only the P2 owner allow-list may change in the game checkout; any other diff aborts.
+- Studio must warn that the public Scrubbots repo exposes unreleased levels once the release branch is pushed.
+- Successful Route A creates a Level Factory `release_receipt.json` and surfaces it in Studio.
+- Failure restores the target checkout to the exact preflight state and preserves evidence.
+
+Create the P2 builder log BEFORE P2 product edits:
+`.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`
+
+Keep R02 and P2 evidence/logs separate. Neither workstream may claim independent acceptance.
+
 ## Builder governance
 
 Do not edit:
@@ -255,6 +287,7 @@ STOP for independent ChatGPT audit.
 
 ## Final response
 
-Return only:
+Return only these two lines:
 
 https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_CODEX_LOG.md
+https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md
