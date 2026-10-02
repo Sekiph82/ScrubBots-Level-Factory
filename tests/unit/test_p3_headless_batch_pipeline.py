@@ -119,15 +119,14 @@ def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, obje
     }
 
 
-def _interrupt_after(target: str):
+def _interrupt_after(target: str, occurrence: int = 1):
     occurrences = 0
 
     def callback(_row_id: str, stage: str) -> None:
         nonlocal occurrences
         if stage == target:
             occurrences += 1
-            completed_checkpoint = 1 if target in {"QA", "REVIEW"} else 2
-            if occurrences == completed_checkpoint:
+            if occurrences == occurrence:
                 raise PipelineInterruption(target)
 
     return callback
@@ -162,6 +161,12 @@ def test_pipeline_resume_reuses_every_completed_stage_and_is_idempotent(monkeypa
         run_job(fixture["job_path"], after_checkpoint=_interrupt_after(interrupt_stage))
     interrupted_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
     assert interrupted_events, "the interrupted stage should already have durable event evidence"
+    interrupted_stage_events = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in interrupted_events
+        if json.loads(path.read_text(encoding="utf-8")).get("stage") == interrupt_stage
+    ]
+    assert interrupted_stage_events[-1]["disposition"] == "RUNNING"
 
     resumed = run_job(fixture["job_path"])
     assert resumed["state"] == "COMPLETE"
@@ -179,6 +184,53 @@ def test_pipeline_resume_reuses_every_completed_stage_and_is_idempotent(monkeypa
     assert source_png.read_bytes() == fixture["source_bytes"]
     assert fixture["job_path"].read_bytes() == fixture["job_bytes"]
     assert all(json.loads(path.read_text(encoding="utf-8"))["schema"] == EVENT_SCHEMA for path in completed_events)
+    event_values = [json.loads(path.read_text(encoding="utf-8")) for path in completed_events]
+    for prior in ("IMPORT", "NORMALIZE", "VALIDATE", "CANDIDATE", "ZIP_SUPPLY_SOLVE_DIFFICULTY", "QA", "REVIEW"):
+        dispositions = [event["disposition"] for event in event_values if event["stage"] == prior]
+        if prior == interrupt_stage:
+            assert dispositions.count("RUNNING") == 2
+            assert sum(value != "RUNNING" for value in dispositions) == 1
+        else:
+            assert sum(value != "RUNNING" for value in dispositions) == 1
+            assert dispositions.count("RUNNING") <= 1
+
+
+def test_zip_resume_reuses_canonical_run_after_record_before_job_checkpoint(monkeypatch, tmp_path: Path) -> None:
+    fixture = _install_fake_canonical_route(monkeypatch, tmp_path)
+    import scrubbots_pixel_factory.headless_pipeline as headless
+    append_event = headless._append_event
+    interrupted = False
+
+    def crash_before_zip_checkpoint(job, events, **kwargs):
+        nonlocal interrupted
+        if not interrupted and kwargs.get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY" and kwargs.get("disposition") == "PASS":
+            interrupted = True
+            raise PipelineInterruption("canonical pipeline record written before P3 checkpoint")
+        return append_event(job, events, **kwargs)
+
+    monkeypatch.setattr(headless, "_append_event", crash_before_zip_checkpoint)
+    with pytest.raises(PipelineInterruption):
+        run_job(fixture["job_path"])
+    assert interrupted
+    assert len(fixture["route_calls"]) == 1
+    pipeline_records = list((studio.extensions_root() / "pipelines").glob("pipeline-*.json"))
+    assert len(pipeline_records) == 1
+    pipeline_bytes = pipeline_records[0].read_bytes()
+    interrupted_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    zip_events = [json.loads(path.read_text(encoding="utf-8")) for path in interrupted_events if json.loads(path.read_text(encoding="utf-8")).get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY"]
+    assert zip_events[-1]["disposition"] == "RUNNING"
+
+    resumed = run_job(fixture["job_path"])
+    assert resumed["state"] == "COMPLETE"
+    assert len(fixture["route_calls"]) == 1
+    assert list((studio.extensions_root() / "pipelines").glob("pipeline-*.json")) == pipeline_records
+    assert pipeline_records[0].read_bytes() == pipeline_bytes
+    assert fixture["job_path"].read_bytes() == fixture["job_bytes"]
+    assert (fixture["source_root"] / fixture["source_id"] / "source.png").read_bytes() == fixture["source_bytes"]
+    completed_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    final_zip_event = [json.loads(path.read_text(encoding="utf-8")) for path in completed_events if json.loads(path.read_text(encoding="utf-8")).get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY"][-1]
+    assert final_zip_event["disposition"] == "PASS"
+    assert final_zip_event["identities"]["pipeline_run_id"] == "pipeline-test-1"
 
 
 def test_pipeline_cli_exposes_run_and_read_only_status(monkeypatch, tmp_path: Path, capsys) -> None:

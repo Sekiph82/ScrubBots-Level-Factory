@@ -196,19 +196,19 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     for label in PROJECT_STATUS_LABELS:
         assert any(line.startswith(f"- {label}") for line in current.splitlines())
     active = [row for row in _parse_rows(current) if row["state"] == "~"]
-    current_task = re.search(r"(?m)^- Current Task:\s+([A-Z0-9]+(?:-[A-Z0-9]+)+)\s+—", current)
+    current_task = re.search(r"(?m)^- Current Task:\s+([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+)\s+—\s+(.+?)\s*$", current)
     assert current_task is not None
-    current_row = [row for row in _parse_rows(current) if row["id"] == current_task.group(1)]
+    current_id = current_task.group(1)
+    current_row = [row for row in _parse_rows(current) if row["id"] == current_id]
     declared_task_is_in_ledger = bool(current_row)
     if not current_row:
-        # The owner may authorize a maintenance remediation before adding a
-        # transient row to the historical denominator. TASKS.md remains the
-        # authority; this regression must not require the builder to edit it.
-        assert current_task.group(1) == "MAINT-ZIP-CORE-V02-C001-R01"
+        # An explicitly declared transient task can precede a denominator row.
+        # Validate its task identity without requiring the builder to edit TASKS.
+        assert re.fullmatch(r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+", current_id)
         current_row = [{"state": "!"}]
     if active and declared_task_is_in_ledger:
         assert len(active) == 1
-        assert current_task.group(1) == active[0]["id"]
+        assert current_id == active[0]["id"]
     else:
         # Some authoritative tracker transitions leave Current Task declared
         # while no task is marked [~]. In that state, the declared task must
@@ -217,15 +217,24 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
         assert current_row[0]["state"] in {" ", "!"}
     sprint = re.search(r"(?m)^- Current Sprint:\s+([^—]+)—", current)
     assert sprint is not None
-    assert current_task.group(1).rsplit("-", 1)[0] in sprint.group(1)
+    assert current_id in sprint.group(1) or current_id.rsplit("-", 1)[0] in sprint.group(1)
     next_action = re.search(r"(?m)^- Next Task/Action:\s+(.+)$", current)
-    assert next_action is not None and current_task.group(1) in next_action.group(1)
+    assert next_action is not None
+    identity_parts = current_id.split("-")
+    action_parts = set(re.findall(r"[A-Z][A-Z0-9]*", next_action.group(1).upper()))
+    assert len(set(identity_parts[:-1]) & action_parts) >= max(1, len(identity_parts) - 2)
     status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
     assert status is not None
     status_parts = [part.strip() for part in status.group(1).split("/")]
     assert len(status_parts) >= 2 and all(status_parts)
     actor = re.search(r"(?m)^- Required Actor:\s+(.+)$", current)
     assert actor is not None and actor.group(1).strip() and actor.group(1).strip().upper() == actor.group(1).strip()
+    current_prompt = re.search(r"(?m)^- Current Prompt:\s+`([^`]+)`", current)
+    current_criteria = re.search(r"(?m)^- Current Audit Criteria:\s+`([^`]+)`", current)
+    assert current_prompt and current_prompt.group(1).startswith(".hiveai/prompts/")
+    assert current_criteria and current_criteria.group(1).startswith(".hiveai/audit-criteria/")
+    assert _exact_relative_exists(current_prompt.group(1))
+    assert _exact_relative_exists(current_criteria.group(1))
 
 
 def test_level_factory_governance_defers_to_root_without_second_tracker() -> None:

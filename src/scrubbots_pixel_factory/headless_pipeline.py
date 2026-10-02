@@ -477,6 +477,7 @@ def _process_source(
     qa_stage = next((item for item in stages if item.get("stage") == "QA"), {})
     qa_event = _completed_stage(events, source_id, "QA")
     if qa_event is None:
+        _append_stage_start(job, events, source, "QA", after_checkpoint)
         qa_ok = qa_stage.get("disposition") == "PASS" and pipeline.get("disposition") == "READY"
         qa_event = _append_event(
             job, events, source=source, stage="QA", disposition="PASS" if qa_ok else "NOT_AVAILABLE",
@@ -487,6 +488,7 @@ def _process_source(
 
     review_event = _completed_stage(events, source_id, "REVIEW")
     if review_event is None:
+        _append_stage_start(job, events, source, "REVIEW", after_checkpoint)
         queued = _candidate_in_review_queue(candidate_id) if qa_event["disposition"] == "PASS" else False
         review_event = _append_event(
             job, events, source=source, stage="REVIEW", disposition="READY_FOR_OWNER_REVIEW" if queued else "NOT_AVAILABLE",
