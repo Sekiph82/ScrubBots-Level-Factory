@@ -17,39 +17,6 @@ Parent strict audit:
 R01 audit criteria:
 `https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`
 
-## Why this continuation exists
-
-The first R01 handoff stopped before implementation because the persistent Desktop checkout
-`C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
-was dirty and behind `origin/main`.
-
-That stop preserved owner work correctly.
-
-The reported task-state mismatch was caused by the stale local `TASKS.md`. GitHub `main` is the sole task authority. The live GitHub tracker authorizes:
-
-- Current Task: `SB-CPX-003`
-- Current Sprint: `P2-ROUTE-A-C001-R01`
-- Current status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT`
-
-Do not use the stale Desktop `TASKS.md` to override GitHub task state.
-
-## Explicit temporary-worktree authorization
-
-Governance permits an explicitly authorized temporary worktree only under:
-`%TEMP%\ScrubBots-Level-Factory\...`
-
-This prompt grants that authorization for this R01 cycle because the persistent Desktop checkout contains legitimate dirty owner work that must not be touched.
-
-Use exactly one temporary execution worktree under a path such as:
-
-`%TEMP%\ScrubBots-Level-Factory\P2-ROUTE-A-C001-R01`
-
-Do NOT create:
-- another Desktop clone;
-- another Desktop worktree;
-- another persistent repository copy;
-- any sibling of the canonical Desktop repository.
-
 ## Mandatory synchronization / recovery procedure
 
 Before product work:
@@ -92,6 +59,40 @@ Before product work:
    - otherwise stop and report.
 
 The temporary worktree is the only implementation workspace for this continuation.
+
+## Why this continuation exists
+
+The first R01 handoff stopped before implementation because the persistent Desktop checkout
+`C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+was dirty and behind `origin/main`.
+
+That stop preserved owner work correctly.
+
+The reported task-state mismatch was caused by the stale local `TASKS.md`. GitHub `main` is the sole task authority. The live GitHub tracker authorizes:
+
+- Current Task: `SB-CPX-003`
+- Current Sprint: `P2-ROUTE-A-C001-R01`
+- Current status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT`
+
+Do not use the stale Desktop `TASKS.md` to override GitHub task state.
+
+## Explicit temporary-worktree authorization
+
+Governance permits an explicitly authorized temporary worktree only under:
+`%TEMP%\ScrubBots-Level-Factory\...`
+
+This prompt grants that authorization for this R01 cycle because the persistent Desktop checkout contains legitimate dirty owner work that must not be touched.
+
+Use exactly one temporary execution worktree under a path such as:
+
+`%TEMP%\ScrubBots-Level-Factory\P2-ROUTE-A-C001-R01`
+
+Do NOT create:
+- another Desktop clone;
+- another Desktop worktree;
+- another persistent repository copy;
+- any sibling of the canonical Desktop repository.
+
 
 ## Implementation scope
 
