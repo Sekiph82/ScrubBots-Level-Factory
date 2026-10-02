@@ -33,3 +33,9 @@ Pending. Append P2-only design, commands, failures/corrections, tests, and publi
 - Final fetch/prune preflight confirmed canonical repository root and exact origin, branch `main`, current HEAD `0ac1bc70606bf2b74c87147d18c254a52f3dfc10`, `origin/main` `7a4b2e887ae8fbc6e4c0db87b9f9990dc69d9d7a`, divergence 2 ahead / 0 behind. Existing 18 stashes and worktrees were inspected and left unchanged.
 - Preserved the preexisting untracked SB-LF04 directories and Godot `.uid` sidecars; none are included in the Route A or R02 commits. Git reported line-ending-related modified status markers for committed test fixtures while `git diff` showed no content diff and their hashes matched HEAD; these were not re-staged or overwritten.
 - The final publication work is limited to the Level Factory `main` branch. Route A was tested against temporary local repos only; it did not push to Scrubbots or open a game PR.
+
+## Publication result — 2026-10-02
+
+- `git push origin main` succeeded after final fetch/prune and exact branch/origin/divergence checks. Published range: `7a4b2e887ae8fbc6e4c0db87b9f9990dc69d9d7a..59294b4b6a9ad37cdcd3f81c4b4b25e27ff73a46`, including both implementation commits and the first combined builder-log commit.
+- Immediately after publication, local `main` and `origin/main` both resolved to `59294b4b6a9ad37cdcd3f81c4b4b25e27ff73a46`. This log-only publication note will itself be pushed as a final append; exact equality will be checked again.
+- There was no supplied live campaign plan, so no actual Scrubbots branch, commit, push, or PR was created. Route A remains implemented and locally verified with a temporary remote.
