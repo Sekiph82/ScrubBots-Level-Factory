@@ -144,6 +144,43 @@ Add targeted fixtures where W/B/U medians differ and prove the correct axis is u
 
 Do not invent a scalar F. Current game `level_difficulty_analysis_v1.json` explicitly states no supported scalar Frustration Risk is claimed. The existing warning for unavailable high-F sequencing is truthful and may remain.
 
+## F04 — Existing catalog-tail profile history is insufficient and official profile authority is re-derived
+
+The current game Difficulty V1 analyzer already returns:
+
+`profile: { dominant, scores, runnerUp }`
+
+inside the official difficulty record.
+
+Current Release Pool admission does not consume `official_difficulty_v1.profile.dominant`.
+Instead it looks for non-canonical top-level keys and, when absent, re-computes the profile formula in Level Factory.
+
+That duplicates current game profile authority and can drift.
+
+Separately, `_game_authority()` records only ONE existing production-catalog tail entry.
+
+The owner rule:
+`no same dominant profile more than 2 consecutive`
+
+requires two prior production profiles at the campaign boundary. Example:
+
+- existing order 9 = FLOW
+- existing order 10 = FLOW
+- new order 11 = FLOW
+
+Current CampaignBuilder sees only order 10 and can allow the third FLOW.
+
+**Disposition: MAJOR.**
+
+### Required closure
+
+- Release Pool must consume the official current-game `official_difficulty_v1.profile.dominant` when present.
+- Do not recompute the current official profile formula in Level Factory for new evidence.
+- If required current official profile evidence is absent/malformed, fail closed for CampaignBuilder eligibility or explicitly mark the entry unavailable; do not silently manufacture current authority.
+- Load sufficient immutable catalog-tail history to enforce cross-boundary sequence rules. At minimum retain the last two existing production entries' official profile/vector/signature evidence when available.
+- Apply the same profile-run rule across the existing-catalog -> new-batch boundary as inside the new batch.
+- Add a regression fixture where the last two existing catalog levels are FLOW and the first candidate is FLOW; the candidate must be rejected/reassigned so three consecutive FLOW levels cannot be published.
+
 ## Independently accepted P1 behavior
 
 ### Release Pool — PASS
@@ -244,6 +281,7 @@ The current-game LevelCatalog timeout skip is NOT accepted for P1 because it is 
 Preserve the implementation and remediate only:
 1. real current-game LevelCatalog PASS evidence;
 2. fail-closed runtime tolerance/recovery authority consumption;
-3. correct W/B/U axis-specific profile comparisons.
+3. correct W/B/U axis-specific profile comparisons;
+4. consume official Difficulty V1 profile authority and enforce the profile-run rule across the existing-catalog/new-batch boundary.
 
 No CampaignBuilder redesign is authorized.
