@@ -6,7 +6,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: MAINT-ZIP-CORE-V02 — Canonical cutover final closure
 - Current Sprint: MAINT-ZIP-CORE-V02-C001-R02 + P2-ROUTE-A-C001 — Final cutover + game-repo PR release
-- Current Task: MAINT-ZIP-CORE-V02-C001-R02 + SB-CPX-003 — Close final ZIP cutover and implement Route A branch+PR release for owner-approved CampaignBuilder batches
+- Current Task: MAINT-ZIP-CORE-V02-C001-R02 — Close final ZIP cutover with co-current SB-CPX-003 Route A branch+PR release for owner-approved CampaignBuilder batches
 - Current Task Status: REMEDIATION_AUTHORIZED / RESUMED_AFTER_P1_M10_PASS
 - Next Task/Action: Codex executes only the reconciled `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`, which now includes co-current P2 Route A. Preserve P1-M10 PASS/CLOSED authority; produce separate R02 and P2 builder logs; stop for independent re-audit.
 - Required Actor: CODEX
@@ -393,7 +393,7 @@ Additional inline tags do not replace checkbox state:
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Two owner-approved Content Platform integrity extensions are live as `SB-CPX-001..002` and are outside the fixed 224 LF/CP source-requirement denominator.
-- Unified live task denominator: **246** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 2 Content Platform integrity extensions.
+- Unified live task denominator: **247** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 2 Content Platform integrity extensions.
 - Unified verified completion: **84 / 246 = 34.15%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **218 live tasks**.
 - Conservative verified local completion: **84 / 218 = 38.53%**.
