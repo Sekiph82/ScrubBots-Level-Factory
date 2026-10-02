@@ -162,7 +162,7 @@ Matching filenames:
 - Local folders must never be searched to infer the active project or task.
 - `C:\Users\sekip\Desktop\ScrubBots` is the separate main-game repository and is off-limits unless an authoritative prompt names a narrowly scoped read-only or recovery action.
 - The only persistent local root for this repository is `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
-- **Standing owner rule:** every new ChatGPT-authored Codex implementation, remediation, continuation, or maintenance prompt must begin with a mandatory local↔GitHub `main` synchronization preflight before any product work.
+- **Standing owner rule:** every new ChatGPT-authored Codex implementation, remediation, continuation, or maintenance prompt must place a mandatory local↔GitHub `main` synchronization preflight as the **first operational section**, before any implementation analysis, product edits, tests, or builder-log work.
 - That preflight must verify canonical path/repository/branch/origin, fetch/prune, inspect dirty state/stashes/worktrees, compare local HEAD with `origin/main`, and either synchronize non-destructively or stop before implementation.
 - Clean local-behind state should fast-forward. Legitimate local work must be preserved and reconciled without reset/rebase/stash/clean/force operations. Ambiguous or unsafe divergence stops the task.
 - No prompt may create a sibling Desktop clone/worktree/copy as a synchronization shortcut. Explicitly authorized temporary worktrees, if ever needed, belong only under `%TEMP%\ScrubBots-Level-Factory\...`.
