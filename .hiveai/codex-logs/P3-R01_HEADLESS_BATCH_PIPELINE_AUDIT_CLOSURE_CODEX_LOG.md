@@ -98,3 +98,12 @@ This appended record supersedes the initial `Pending` implementation placeholder
 - Studio Release headless runtime suite: `SB-LF06-002-C001-R01 committed runtime suite PASS`.
 - The game repository remained read-only. No runtime network dependency, API key, or product dependency was added. This work adds test isolation only; source art was not resampled.
 - Final implementation diff consists of the P3 checkpoint/resume and governance regression changes plus the isolated P3 pipeline test fixture. P1 files and evidence are committed separately.
+
+## Publication Record — 2026-10-02
+
+- P3-R01 implementation and builder log commit: `78d3240561863fb3682584d905b68afc87aa226c` (`P3-R01: harden headless checkpoint recovery`).
+- P1-M10 implementation and builder log commit: `e935264a7ff5ae9b7eb3fe1538760b36c9d04fba` (`P1-M10: add campaign builder and release pool`).
+- `git push origin main` succeeded: `780cd6e..e935264 main -> main`.
+- After `git fetch --prune origin`, local `HEAD` and `origin/main` both resolved to `e935264a7ff5ae9b7eb3fe1538760b36c9d04fba`; ahead/behind was `0/0`.
+- Final status before log finalization contained only the preexisting owner directories and Godot-generated `.uid` sidecars as untracked items. They remain preserved and unstaged. The 18 stashes and registered worktrees remain untouched.
+- Builder handoff is complete. Independent audits and owner acceptance remain outside this builder log.

@@ -100,3 +100,12 @@ This appended record supersedes the initial `Pending` implementation placeholder
 - Focused campaign/publication/release-review tests: 14 passed. Focused P3/P1 test set before the last approval case was added: 32 passed. P3 focused cases passed after correcting the ZIP-B crash seam. Boundary/clean-checkout checks: 15 passed. Isolated pipeline test: 1 passed. Full final suite: **1160 passed, 4 skipped**, with the skip and cache-warning details recorded in the P3 log.
 - `python -m compileall -q src tests level_factory/scripts/factory_core_launcher.py`: PASS. `git diff --check`: PASS with LF-to-CRLF conversion warnings only. Studio Release headless runtime suite: `SB-LF06-002-C001-R01 committed runtime suite PASS`.
 - No new runtime dependencies, remote API calls, API keys, or edits to accepted game level data were introduced. Game-repository changes were not made.
+
+## Publication Record — 2026-10-02
+
+- P3-R01 implementation and builder log commit: `78d3240561863fb3682584d905b68afc87aa226c` (`P3-R01: harden headless checkpoint recovery`).
+- P1-M10 implementation and builder log commit: `e935264a7ff5ae9b7eb3fe1538760b36c9d04fba` (`P1-M10: add campaign builder and release pool`).
+- `git push origin main` succeeded: `780cd6e..e935264 main -> main`.
+- After `git fetch --prune origin`, local `HEAD` and `origin/main` both resolved to `e935264a7ff5ae9b7eb3fe1538760b36c9d04fba`; ahead/behind was `0/0`.
+- Final status before log finalization contained only the preexisting owner directories and Godot-generated `.uid` sidecars as untracked items. They remain preserved and unstaged. The 18 stashes and registered worktrees remain untouched.
+- Builder handoff is complete. Independent audits and owner acceptance remain outside this builder log.
