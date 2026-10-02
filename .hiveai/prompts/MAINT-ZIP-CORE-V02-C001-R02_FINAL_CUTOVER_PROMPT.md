@@ -134,7 +134,7 @@ ZIP remains the sole production supply/solve/difficulty backend.
 
 # R02.4 — Proposed catalog validation using CURRENT GAME AUTHORITY
 
-Before live game publication transaction:
+Before the CampaignBuilder-approved live batch publication transaction:
 
 1. build/stage exact proposed:
    - level;
@@ -164,39 +164,48 @@ Tests must use %TEMP% game fixtures and prove:
 - malformed catalog entry fails;
 - valid candidate passes.
 
-# R02.5 — Prevent progression gaps
+# R02.5 — Preserve Release Pool / CampaignBuilder contiguous publication authority
 
-Current publisher must never scan forward and publish to a later empty order.
+`OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01` supersedes the older ACCEPT-auto-publish behavior.
 
-Algorithm:
+Required current flow:
+1. owner ACCEPT performs zero game writes and enters an otherwise eligible READY level into the Release Pool only;
+2. CampaignBuilder assigns Release Pool entries to the next contiguous catalog orders;
+3. owner APPROVE authorizes publication of the CampaignBuilder publishable prefix;
+4. publication is one all-or-nothing batch transaction.
+
+For the approved batch:
 
 ```
 next_order = max(existing catalog order) + 1
-target = current DifficultyProgressionV1.describe(next_order)
-if official Difficulty V1 score/class fits target under current owner tolerance:
-    eligible order = next_order
-else:
-    fail closed: PROGRESSION_SLOT_MISMATCH
-    zero game writes
+orders = CampaignBuilder-approved explicit level_number values
+require orders == [next_order, next_order + 1, ..., next_order + M - 1]
+for each item:
+    target = current DifficultyProgressionV1.describe(item.level_number)
+    require official Difficulty V1 score/class fits that exact target
+validate the complete staged proposed batch through current LevelCatalog
+validate the complete staged proposed batch through current DifficultyV1CatalogCheck
+only then commit production files + catalog
 ```
 
-You may compute later compatible slots as advisory UI/evidence only.
+The publisher must consume the current runtime `challengeTolerance.neverForceLabelOutsidePlusMinus` authority and fail closed if it is missing/malformed. Do not retain or introduce a copied numeric tolerance fallback.
 
 Do NOT:
+- publish from owner ACCEPT;
+- scan forward and silently choose a later compatible order;
 - write order next+2 or later while next is absent;
+- publish a non-contiguous subset of an approved batch;
 - renumber existing orders;
 - change immutable IDs;
 - change save progression;
 - invent a new cadence.
 
-This is required by current Scrubbots `GameplayLaunchResolver`, which resolves the frontier by exact catalog order.
+This preserves current Scrubbots `GameplayLaunchResolver` frontier continuity while keeping CampaignBuilder as the catalog-order authority.
 
-Owner ACCEPT auto-publishes only when every gate, including contiguous progression compatibility, passes.
-
-If mismatch:
-- preserve owner ACCEPT evidence in Level Factory;
-- publication result = NOT_PUBLISHED / PROGRESSION_SLOT_MISMATCH;
-- no game writes.
+If any assigned order, difficulty target, staged catalog validation, or batch-contiguity check fails:
+- preserve owner review / Release Pool / CampaignBuilder evidence;
+- publication disposition is fail-closed;
+- zero production game writes for the whole batch.
 
 # R02.6 — Regression
 
@@ -212,11 +221,12 @@ Add focused tests proving:
 8. Proposed catalog is validated by current game LevelCatalog.
 9. Proposed catalog is validated by DifficultyV1CatalogCheck.
 10. Invalid proposed game content causes zero production writes.
-11. If next order is 11 and candidate only fits slot 13, publication fails closed and order 13 is NOT written.
-12. If candidate fits next order 11, publication writes order 11.
-13. Existing catalog remains contiguous.
-14. Owner REJECT still zero writes.
-15. Existing R01 external-upload/load-check/Solve/Analyze/3-4-5 tests remain green.
+11. Owner ACCEPT enters Release Pool only and causes zero game writes.
+12. An approved batch must start at the exact next catalog order; a later-only compatible candidate cannot be published across a hole.
+13. A valid approved batch writes only its exact contiguous CampaignBuilder-assigned orders and preserves all existing catalog entries.
+14. Any item/order/validation failure rolls back the whole batch; existing catalog remains contiguous.
+15. Owner REJECT still causes zero game writes.
+16. Existing R01 external-upload/load-check/Solve/Analyze/3-4-5 tests remain green.
 
 Final gates:
 - full pytest green except truthful capability skips;
