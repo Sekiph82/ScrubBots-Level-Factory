@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M10 — Campaign Intelligence / Sequencing Adapter
-- Current Sprint: P1-M10-R01 — CampaignBuilder strict closure
-- Current Task: P1-M10-R01 — Close current-game LevelCatalog proof, runtime policy authority, axis-correct W/U/B checks, and catalog-boundary official profile history
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: Codex executes only `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Preserve the accepted Release Pool/Hungarian/contiguous-batch architecture, close only P1 audit findings F01..F04, and stop after `.hiveai/codex-logs/P1_M10_CAMPAIGN_BUILDER_R01_CODEX_LOG.md` is pushed for independent re-audit.
+- Current Milestone: MAINT-ZIP-CORE-V02 — Canonical cutover final closure
+- Current Sprint: MAINT-ZIP-CORE-V02-C001-R02 — Final cutover
+- Current Task: MAINT-ZIP-CORE-V02-C001-R02 — Close final Level Factory ZIP product-shell/cutover findings under the current Release Pool + CampaignBuilder publication contract
+- Current Task Status: REMEDIATION_AUTHORIZED / RESUMED_AFTER_P1_M10_PASS
+- Next Task/Action: Codex executes only the reconciled `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`. Preserve P1-M10 PASS/CLOSED Release Pool + CampaignBuilder authority; close only R02 final-cutover findings; stop after the R02 builder log is pushed for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/MAINT-ZIP-CORE-V02-C001-R01_PRODUCT_SHELL_CLOSURE_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_R01_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -36,7 +36,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P1 Owner Prompt SHA-256: `09de3ed5f15edf47a56f0135299467abacda2560c1381ec9ec888ef2fbc0afe1`.
 - P1 Owner Decision: `docs/decisions/OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.md`.
 - P1 Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_AUDIT_CRITERIA.md`.
-- P1 Status: `OWNER_AUTHORIZED / CO_CURRENT_WITH_P3-R01 / IMPLEMENT_THEN_AUDIT`.
+- P1 Status: `PASS / CLOSED`.
 - Combined Master Prompt: `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md`.
 - Combined Audit Criteria: `.hiveai/audit-criteria/P3-R01_P1-M10_COMBINED_AUDIT_CRITERIA.md`.
 - Combined Execution Rule: P3-R01 and P1-M10 proceed in the same builder cycle; neither blocks the other; each keeps its own builder log and independent audit boundary.
@@ -47,9 +47,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P1-M10-R01 Prompt: `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md`.
 - P1-M10-R01 Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_R01_AUDIT_CRITERIA.md`.
 - P1-M10-R01 Required Closures: real current-game LevelCatalog PASS; fail-closed runtime tolerance/recovery authority; separate W/U/B medians; official Difficulty V1 profile consumption; two-level catalog-tail profile history across the existing/new batch boundary.
+- P1-M10-R01 Implementation Commit: `b6c904cdc6693f6adbc4def570334a0f081bdc63`.
+- P1-M10-R01 Builder Log Publication: `f831f38772bffbe15b8f50d4149de3379126b9dc`.
+- P1-M10-R01 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`.
+- M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
 - P2 Route A Status: `NOT_YET_PROVIDED`; do not invent branch/PR/store-update automation beyond P1.
-- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P1-M10-R01_AUDIT`; before resuming, reconcile any old ACCEPT-auto-publish wording with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.
+- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `RESUMED / AUTHORIZED_AFTER_P1-M10-R01_PASS`; prompt and audit criteria reconciled with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01 before execution.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
@@ -751,20 +755,20 @@ Capability source family: `SB-LF10-xxx` from the main Scrubbots master plan.
 
 ### M10.01 - Campaign interface and Difficulty V1 rules
 
-- [ ] SB-LF10-001 — Define CampaignBuilder interface.
-- [ ] SB-LF10-002 — Consume owner-locked Difficulty V1 rhythm/progression/retention rules.
-- [ ] SB-LF10-003 — Select accepted production levels without modifying their data.
+- [x] SB-LF10-001 — Define CampaignBuilder interface.
+- [x] SB-LF10-002 — Consume owner-locked Difficulty V1 rhythm/progression/retention rules.
+- [x] SB-LF10-003 — Select accepted production levels without modifying their data.
 
 ### M10.02 - Selection, availability and deterministic provenance
 
-- [ ] SB-LF10-004 — Prevent duplicate/unavailable/disabled selection.
-- [ ] SB-LF10-005 — Preserve deterministic campaign-build provenance.
-- [ ] SB-LF10-006 — Rebuild campaign ordering without regenerating levels.
+- [x] SB-LF10-004 — Prevent duplicate/unavailable/disabled selection.
+- [x] SB-LF10-005 — Preserve deterministic campaign-build provenance.
+- [x] SB-LF10-006 — Rebuild campaign ordering without regenerating levels.
 
 ### M10.03 - Events and campaign validation
 
-- [ ] SB-LF10-007 — Future events/featured selection as data, not code.
-- [ ] SB-LF10-008 — Campaign validation against challenge/load/frustration/similarity constraints.
+- [x] SB-LF10-007 — Future events/featured selection as data, not code.
+- [x] SB-LF10-008 — Campaign validation against challenge/load/frustration/similarity constraints.
 
 ---
 
@@ -1075,7 +1079,7 @@ Owner-approved post-cutover product specification:
 7. M07 mutation/difficulty targeting is COMPLETE / VERIFIED.
 8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions are COMPLETE / VERIFIED.
 9. M09 advanced generation continues only as authorized, beginning with `SB-LF09-001` and preserving the experimental/offline boundary.
-10. M10 Campaign Intelligence.
+10. M10 Campaign Intelligence is COMPLETE / VERIFIED; `SB-LF10-001..008 = PASS/CLOSED`.
 11. M11-M14 Content Platform architecture/pack/manifest/publisher.
 12. M18-M20 storage/operations/security.
 13. M17 rollback/scheduling once manifest/publisher/storage are real.
