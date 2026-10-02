@@ -35,7 +35,7 @@ Before implementation:
 
 1. Read the authoritative cycle prompt from the full GitHub URL supplied in the handoff.
 2. Verify the repository identity is `Sekiph82/ScrubBots-Level-Factory` and branch is `main`.
-3. **Every implementation/remediation/maintenance prompt begins with a mandatory local↔GitHub synchronization preflight.** Synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` against `origin/main` using non-destructive Git operations before product work starts.
+3. **Every implementation/remediation/continuation/maintenance prompt begins with a mandatory local↔GitHub synchronization preflight as its first operational section.** Synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` against `origin/main` using non-destructive Git operations before any implementation analysis, builder-log work, tests, or product edits.
 4. The mandatory preflight must fetch/prune, verify exact repository/root/branch/origin identity, inspect dirty state, compare local HEAD vs `origin/main`, inspect stashes/worktrees, and reach a truthful synchronization disposition before implementation.
 5. If local `main` is clean and only behind, fast-forward it. If legitimate local work exists, preserve it without data loss and reconcile by a normal merge when safe. Never overwrite owner work merely to synchronize.
 6. If safe synchronization cannot be completed, stop the task before product edits and report the blocker. Do not bypass the preflight.
