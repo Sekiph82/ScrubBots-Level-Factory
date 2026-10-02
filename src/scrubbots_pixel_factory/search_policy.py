@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Versioned, deterministic, provider-only search ordering and pruning policy."""
 
 from __future__ import annotations

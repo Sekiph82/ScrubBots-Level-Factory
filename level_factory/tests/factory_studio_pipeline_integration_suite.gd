@@ -54,7 +54,7 @@ func _run_suite() -> void:
 	_require(failed_dispositions.get("NORMALIZE/DERIVE") == "BLOCKED", "validation failure did not block derivation")
 	_require(failed_dispositions.get("CANDIDATE") == "BLOCKED", "validation failure exposed a candidate")
 	var gateway: RefCounted = instance.get("core_gateway")
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "55005", "mode": "MASK"}, "res://output/.lfx005-studio-runs")
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "55005", "mode": "MASK"}, "res://output/.lfx005-studio-runs")
 	_require(generated.get("state") == "SUCCESS", "canonical Generate path did not produce a candidate: %s" % generated)
 	_generated_candidate_id = str(generated.get("candidate_id", ""))
 	var candidate_bundle_root := ProjectSettings.globalize_path(str(generated.get("output_path", "")))

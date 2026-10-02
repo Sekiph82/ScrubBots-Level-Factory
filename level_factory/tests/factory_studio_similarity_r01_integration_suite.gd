@@ -14,8 +14,8 @@ func _run_suite() -> void:
 	_require(gateway != null and surface != null and candidates_surface != null and comparison_surface != null and search_surface != null, "similarity/candidate/comparison/search surfaces did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx016-similarity-a")); _remove_tree(ProjectSettings.globalize_path("res://output/.lfx016-similarity-b")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var first: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "16016", "mode": "MASK"}, "res://output/.lfx016-similarity-a")
-	var second: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "16017", "mode": "RULES"}, "res://output/.lfx016-similarity-b")
+	var first: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "16016", "mode": "MASK"}, "res://output/.lfx016-similarity-a")
+	var second: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "16017", "mode": "RULES"}, "res://output/.lfx016-similarity-b")
 	_require(first.get("state") == "SUCCESS" and second.get("state") == "SUCCESS", "similarity fixtures failed")
 	var left_id := str(first.get("candidate_id", "")); var right_id := str(second.get("candidate_id", "")); var exact: Dictionary = gateway.call("run_studio_extension", "similarity", {"left_id": left_id, "right_id": left_id, "threshold": 0.92})
 	_require(exact.get("disposition") == "EXACT_DUPLICATE" and exact.get("left_identity") == left_id and exact.get("policy") == "SIMILARITY_POLICY_V1", "canonical exact identity was not stronger than advisory similarity: %s" % exact)

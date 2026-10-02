@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Opaque canonical state-key and deterministic visited-set contracts."""
 
 from __future__ import annotations

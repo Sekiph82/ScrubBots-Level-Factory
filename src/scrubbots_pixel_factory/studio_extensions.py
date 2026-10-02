@@ -802,7 +802,7 @@ def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> 
     from .output.bundle import export_candidate
 
     try:
-        request = GenerationRequest(None, settings["seed"], settings["mode"], width=settings["width"], height=settings["height"], background_intent=settings.get("background_intent", "BACKGROUND"))
+        request = GenerationRequest(seed=settings["seed"], generator_mode=settings["mode"], width=settings["width"], height=settings["height"], background_intent=settings.get("background_intent", "BACKGROUND"))
         candidate = GeneratorRouter().generate_candidate(request)
         if not hasattr(candidate, "result") and not hasattr(candidate, "canonical_dict"):
             raise StudioExtensionError("canonical Generate did not return a candidate")
@@ -861,7 +861,11 @@ def _reproduction_contract(candidate: Mapping[str, Any]) -> tuple[Path, Any]:
     if hashlib.sha256(bundle.artwork_png).hexdigest() != candidate["artwork_sha256"] or bundle.artwork.grid_hash != candidate["grid_hash"]:
         raise StudioExtensionError("recorded artwork identity is inconsistent")
     request = generation["request"]
-    required_request = {"schema", "schema_version", "difficulty", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options", "seed"}
+    required_request = {"schema", "schema_version", "width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options", "seed"}
+    if "difficulty" in request:
+        required_request.add("difficulty")
+    else:
+        required_request.add("background_intent")
     if set(request) != required_request or request.get("schema") != "scrubbots-generation-request":
         raise StudioExtensionError("recorded generation request schema is invalid")
     if type(request.get("schema_version")) is not int or type(request.get("width")) is not int or type(request.get("height")) is not int:

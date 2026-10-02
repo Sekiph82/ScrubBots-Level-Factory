@@ -15,8 +15,8 @@ func _run_suite() -> void:
 	_require(readiness != null and gateway != null, "readiness surface or gateway did not instantiate")
 	if readiness == null or gateway == null: _cleanup(instance); return
 	var output_root := "res://output/.lfx010-readiness"; _remove_tree(ProjectSettings.globalize_path(output_root)); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var first: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "101010", "mode": "RULES"}, output_root)
-	var second: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 21, "height": 20, "seed": "101011", "mode": "RULES"}, output_root)
+	var first: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "101010", "mode": "RULES"}, output_root)
+	var second: Dictionary = gateway.call("run_action", "Generate", {"width": 21, "height": 20, "seed": "101011", "mode": "RULES"}, output_root)
 	var first_id := str(first.get("candidate_id", "")); var second_id := str(second.get("candidate_id", "")); _require(first.get("state") == "SUCCESS" and second.get("state") == "SUCCESS", "readiness candidates did not generate")
 	var first_bytes := _bundle_bytes(str(first.get("output_path", ""))); var second_bytes := _bundle_bytes(str(second.get("output_path", "")))
 	var accept: Dictionary = gateway.call("run_studio_extension", "owner-review", {"candidate_id": first_id, "disposition": "ACCEPT", "reason": "ready review"})

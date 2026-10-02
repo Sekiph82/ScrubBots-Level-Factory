@@ -6,6 +6,7 @@ import json
 
 from .mutation_base import MutationCandidate, MutationDisposition, MutationEngine, MutationRequest
 from .core import GenerationRequest
+from .core.request import LegacyGenerationRequest
 from .mutation_evidence import provenance_from_authentic_validation
 from .m07_services import (
     AttemptBudget, AttemptDisposition, AttemptProvenance, AttemptRecord, AttemptReport,
@@ -64,7 +65,7 @@ def _source_entry_guard(parent: MutationCandidate, source_context):
         return source_context, f"source-linked M05 pre-check failed before operation: {type(exc).__name__}: {exc}"
 
 
-def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None, generation_request: GenerationRequest | None = None) -> AttemptReport:
+def run_authentic_bounded_mutations(parent: MutationCandidate, *, base_seed: int, budget: AttemptBudget, request_factory: Callable[[MutationCandidate, int, int], MutationRequest], engine: MutationEngine, validator: Callable[[MutationResult], AuthenticTargetCandidate], target: TypedChallengeTarget, source_context=None, generation_request: GenerationRequest | LegacyGenerationRequest | None = None) -> AttemptReport:
     from .m07_services import derive_attempt_seed
     records: list[AttemptRecord] = []
     current = parent

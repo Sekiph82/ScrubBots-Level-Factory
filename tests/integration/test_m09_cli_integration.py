@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import hashlib
 import importlib
 import json
@@ -213,16 +215,17 @@ def test_batch_identity_and_candidate_ids_bind_exemplar_environment(tmp_path: Pa
     assert second["exemplar_identities"][0]["provenance_description"]
 
 
-def test_batch_autodimensions_and_rectangular_manifest_bindings(tmp_path: Path) -> None:
-    auto_root = tmp_path / "auto"
+def test_batch_requires_explicit_dimensions_and_rectangular_manifest_bindings(tmp_path: Path) -> None:
+    missing_root = tmp_path / "missing-dimensions"
     rectangular_root = tmp_path / "rectangular"
-    auto = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "902", "--max-attempts", "2", "--output", str(auto_root))
+    missing = _run("batch", "--count", "1", "--mode", "MASK", "--seed", "902", "--max-attempts", "2", "--output", str(missing_root))
     rectangular = _run("batch", "--count", "1", "--mode", "RULES", "--seed", "903", "--max-attempts", "2", "--width", "20", "--height", "21", "--output", str(rectangular_root))
-    assert auto.returncode == rectangular.returncode == 0
-    auto_manifest = json.loads((auto_root / "batch-manifest.json").read_text(encoding="utf-8"))
+    assert missing.returncode != 0 and not (missing_root / "batch-manifest.json").exists()
+    assert rectangular.returncode == 0, rectangular.stderr
     rect_manifest = json.loads((rectangular_root / "batch-manifest.json").read_text(encoding="utf-8"))
-    assert auto_manifest["request_template"]["width"] is None and auto_manifest["request_template"]["height"] is None
-    assert auto_manifest["accepted"][0]["width"] > 0 and auto_manifest["accepted"][0]["height"] > 0
+    assert (rect_manifest["request_template"]["width"], rect_manifest["request_template"]["height"]) == (20, 21)
+    assert rect_manifest["request_template"]["schema_version"] == 3
+    assert "difficulty" not in rect_manifest["request_template"]
     assert (rect_manifest["accepted"][0]["width"], rect_manifest["accepted"][0]["height"]) == (20, 21)
 
 
@@ -329,16 +332,11 @@ def test_single_explicit_request_has_default_id_and_byte_identical_bundles(tmp_p
     assert all((bundles[0] / name).read_bytes() == (bundles[1] / name).read_bytes() for name in files)
 
 
-def test_single_auto_dimensions_record_exact_legal_resolution(tmp_path: Path) -> None:
+def test_single_generate_requires_explicit_dimensions(tmp_path: Path) -> None:
     result = _run("generate", "--mode", "MASK", "--seed", "911", "--output", str(tmp_path))
-    assert result.returncode == 0, result.stderr
-    bundle = read_bundle(next(tmp_path.rglob("metadata.json")).parent)
-    request = bundle.metadata["generation"]["request"]
-    resolved = bundle.metadata["generation"]["result"]["resolved_dimensions"]
-    assert request["width"] is None and request["height"] is None
-    assert resolved == {"width": bundle.artwork.width, "height": bundle.artwork.height}
-    assert 20 <= bundle.artwork.width <= 59 and 20 <= bundle.artwork.height <= 59
-    assert request["schema_version"] == 3
+    assert result.returncode != 0
+    assert "--width" in result.stderr and "--height" in result.stderr
+    assert not list(tmp_path.rglob("metadata.json"))
 
 
 def test_historical_v1_omitted_request_reproduces_without_current_dimension_re_resolution(tmp_path: Path) -> None:
@@ -356,7 +354,7 @@ def test_historical_v1_omitted_request_reproduces_without_current_dimension_re_r
     assert reproduced.returncode == 0 and "MATCH" in reproduced.stdout
 
 
-def test_version1_batch_manifest_replays_legacy_omitted_dimension_semantics(tmp_path: Path) -> None:
+def test_legacy_v1_batch_manifest_is_refused_by_current_resume_path(tmp_path: Path) -> None:
     root = tmp_path / "legacy-batch"
     policy = QualityPolicy(difficulty="EASY").as_dict()
     seed = "historical-v1-batch"
@@ -376,13 +374,9 @@ def test_version1_batch_manifest_replays_legacy_omitted_dimension_semantics(tmp_
     manifest_path = root / "batch-manifest.json"
     manifest_path.parent.mkdir(parents=True)
     manifest_path.write_bytes(cli_module._manifest_bytes(manifest))
-    assert cli_module.main(["batch", "--resume", str(manifest_path)]) == 0
-    generated = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert generated["version"] == 1
-    accepted = generated["accepted"][0]
-    bundle = read_bundle(root / accepted["relative_path"])
-    assert bundle.metadata["generation"]["request"]["schema_version"] == 1
-    assert cli_module.main(["batch", "--resume", str(manifest_path)]) == 0
+    original = manifest_path.read_bytes()
+    assert cli_module.main(["batch", "--resume", str(manifest_path)]) != 0
+    assert manifest_path.read_bytes() == original
 
 
 @pytest.mark.parametrize("kind", ("invalid-mode", "malformed-options", "unsupported-options"))
@@ -575,3 +569,6 @@ def test_resume_rejects_duplicate_accepted_identity_or_path(tmp_path: Path, fiel
     value["accepted"][1][field] = value["accepted"][0][field]
     manifest_path.write_bytes(canonical_json_bytes(value))
     assert _run("batch", "--resume", str(manifest_path)).returncode != 0
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

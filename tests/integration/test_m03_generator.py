@@ -1,3 +1,5 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import hashlib
 
 import pytest
@@ -144,3 +146,6 @@ def test_fixed_acceptance_batch_has_120_accepted_candidates_and_zero_contract_vi
 def test_review_candidate_digest_inputs_are_stable() -> None:
     result = _generator().generate(request(style="FACE_EMBLEM"))
     assert hashlib.sha256(result.canonical_bytes()).hexdigest() == result.digest()
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

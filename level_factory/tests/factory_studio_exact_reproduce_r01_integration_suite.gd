@@ -16,7 +16,7 @@ func _run_suite() -> void:
 	_require(gateway != null and target != null and reproduce_surface != null, "target, reproduce surface, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx011-reproduce")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-reproductions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "11011", "mode": "MASK"}, "res://output/.lfx011-reproduce")
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "11011", "mode": "MASK"}, "res://output/.lfx011-reproduce")
 	_require(generated.get("state") == "SUCCESS", "canonical Generate fixture failed: %s" % generated)
 	var candidate_id := str(generated.get("candidate_id", ""))
 	var metadata_path := str(generated.get("metadata_path", ""))

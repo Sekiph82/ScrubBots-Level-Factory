@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import hashlib
 import json
 from pathlib import Path
@@ -186,3 +188,6 @@ def test_committed_real_godot_revalidation_integration_passes() -> None:
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-008-C001 manual artwork structural revalidation integration PASS" in output
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

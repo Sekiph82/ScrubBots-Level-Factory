@@ -1,3 +1,5 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import pytest
 
 from scrubbots_pixel_factory import DeterministicRNG, FailureCode, GenerationRequest, GeneratorMode, PixelGenerator, offline_runtime
@@ -88,3 +90,6 @@ def test_rules_acceptance_batch_has_140_successes_and_zero_contract_violations()
                     violations.append((recipe, difficulty, seed, "contract"))
     assert accepted == 140
     assert violations == []
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

@@ -12,6 +12,14 @@ class ProgressionAuthorityError(ValueError):
     """Raised when current game progression authority cannot be trusted."""
 
 
+def challenge_tolerance(authority: Mapping[str, object]) -> float:
+    tolerance = authority.get("challengeTolerance")
+    value = tolerance.get("neverForceLabelOutsidePlusMinus") if isinstance(tolerance, Mapping) else None
+    if type(value) not in {int, float} or not math.isfinite(float(value)) or float(value) < 0:
+        raise ProgressionAuthorityError("current challengeTolerance.neverForceLabelOutsidePlusMinus is missing or malformed")
+    return float(value)
+
+
 def load_progression_authority(game_project: str | Path) -> dict[str, object]:
     path = Path(game_project).expanduser().resolve() / "data" / "config" / "level_progression_v1.json"
     try:
@@ -63,8 +71,7 @@ def build_progression(entries: Iterable[Mapping[str, object]], *, authority: Map
             score = entry.get("difficulty_score")
             if type(score) not in {int, float} or not math.isfinite(float(score)):
                 raise ProgressionAuthorityError("published entry requires an official finite difficulty score")
-            tolerance = authority.get("challengeTolerance", {})
-            allowed = float(tolerance.get("neverForceLabelOutsidePlusMinus", 5.0)) if isinstance(tolerance, Mapping) else 5.0
+            allowed = challenge_tolerance(authority)
             if abs(float(score) - float(target["target_challenge"])) > allowed:
                 raise ProgressionAuthorityError(f"difficulty score is outside the current cadence target for order {entry['order']}")
             entry["progression"] = target
@@ -77,4 +84,4 @@ def build_progression(entries: Iterable[Mapping[str, object]], *, authority: Map
     return {"schema": "scrubbots-level-progression-v1", "version": 1, "authority": authority_name, "ordering": ordering, "levels": normalized}
 
 
-__all__ = ["ProgressionAuthorityError", "build_progression", "describe_target", "load_progression_authority"]
+__all__ = ["ProgressionAuthorityError", "build_progression", "challenge_tolerance", "describe_target", "load_progression_authority"]

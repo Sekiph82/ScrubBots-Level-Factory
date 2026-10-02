@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Pure/headless boundary for the canonical SCRUBBOTS gameplay proof kernel.
 
 This module deliberately transports opaque canonical input bytes.  It does not

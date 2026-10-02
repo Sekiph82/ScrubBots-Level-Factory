@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Immutable data contract for the canonical SCRUBBOTS ProofState shape.
 
 This module intentionally contains no gameplay transitions.  It validates and

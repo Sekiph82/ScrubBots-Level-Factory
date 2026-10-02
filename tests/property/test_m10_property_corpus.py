@@ -1,3 +1,5 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 from pathlib import Path
 
@@ -56,3 +58,6 @@ def test_m10_invalid_request_corpus_fails_closed() -> None:
         GenerationRequest("EASY", "bad", "NOPE", width=20, height=20)
     with pytest.raises(RequestContractError):
         GenerationRequest("EASY", True, "MASK", width=20, height=20)
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

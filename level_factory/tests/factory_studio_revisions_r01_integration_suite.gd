@@ -16,7 +16,7 @@ func _run_suite() -> void:
 	_require(gateway != null and surface != null and target != null, "revision surface, editor target, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx012-revisions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "12012", "mode": "MASK"}, "res://output/.lfx012-revisions")
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "12012", "mode": "MASK"}, "res://output/.lfx012-revisions")
 	_require(generated.get("state") == "SUCCESS", "canonical revision fixture failed: %s" % generated)
 	var candidate_id := str(generated.get("candidate_id", "")); var bundle := str(generated.get("output_path", "")); var artwork := JSON.parse_string(FileAccess.get_file_as_string(bundle.path_join("artwork.json"))) as Dictionary
 	var source_bytes := FileAccess.get_file_as_bytes(bundle.path_join("artwork.png"))

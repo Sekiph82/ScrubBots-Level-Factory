@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from dataclasses import replace
 import hashlib
 import json
@@ -119,3 +121,6 @@ def test_r07_wrong_result_and_parent_binding_are_rejected() -> None:
     unrelated = MutationCandidate.root("unrelated-parent", dict(parent.payload))
     with pytest.raises(MutationContractError):
         replace(unrelated, generation_provenance=bound_to_other.generation_provenance)
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 from ...core import DeterministicRNG, FailureCode, GenerationRequest, GenerationResult, GeneratorMode
+from ...core.request import LegacyGenerationRequest
 from ..mask import MaskCandidate, MaskSpriteGenerator
 from ..rules import RuleCandidate, RuleShapeGenerator
 from ..wfc import WFCCandidate, WFCGenerator
@@ -154,7 +155,7 @@ class GeneratorRouter:
         return self._failure(FailureCode.RETRY_EXHAUSTED, f"AUTO candidates exhausted: {','.join(attempt.mode + ':' + (attempt.failure_code or 'FAILED') for attempt in attempts)}", request)
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None):
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             return self._failure(FailureCode.INVALID_REQUEST, "router requires a GenerationRequest", None)
         stream = DeterministicRNG(request.seed) if rng is None else rng
         if not isinstance(stream, DeterministicRNG) or stream.domain != "root" or stream.stage_seeds() != DeterministicRNG(request.seed).stage_seeds():

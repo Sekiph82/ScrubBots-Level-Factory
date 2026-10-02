@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from pathlib import Path
 
 from scrubbots_pixel_factory import GenerationRequest, GeneratorRouter, export_candidate, read_bundle
@@ -28,3 +30,6 @@ def test_revision_lineage_compare_and_branch_are_immutable() -> None:
         if revision_root.exists():
             for child in revision_root.iterdir(): child.unlink()
             revision_root.rmdir()
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

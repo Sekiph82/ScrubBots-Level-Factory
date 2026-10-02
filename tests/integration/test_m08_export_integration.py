@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 import hashlib
 import os
@@ -10,7 +12,8 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
 from scrubbots_pixel_factory.generators.rules import RuleShapeGenerator
 from scrubbots_pixel_factory.generators.router import GeneratorRouter, HybridGenerator
@@ -256,9 +259,15 @@ def test_m08_all_difficulty_bands_and_59x59_round_trip() -> None:
 
 
 def test_m08_cross_process_hash_seed_json_and_png_bytes_are_stable() -> None:
-    code = """import hashlib\nfrom scrubbots_pixel_factory import GenerationRequest\nfrom scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator\nfrom scrubbots_pixel_factory.output import build_export_bundle\nr=MaskSpriteGenerator().generate(GenerationRequest('EASY',11,'MASK',width=20,height=20,style='ROBOT'))\nb=build_export_bundle(r,'cross-process')\nprint(hashlib.sha256(b.artwork_json+b.metadata_json+b.artwork_png).hexdigest())\n"""
+    code = """import hashlib
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
+from scrubbots_pixel_factory.output import build_export_bundle\nr=MaskSpriteGenerator().generate(GenerationRequest('EASY',11,'MASK',width=20,height=20,style='ROBOT'))\nb=build_export_bundle(r,'cross-process')\nprint(hashlib.sha256(b.artwork_json+b.metadata_json+b.artwork_png).hexdigest())\n"""
     outputs = []
     for hash_seed in ("1", "random"):
         env = dict(os.environ, PYTHONHASHSEED=hash_seed, PYTHONPATH=str(ROOT / "src"))
         outputs.append(subprocess.check_output([sys.executable, "-c", code], text=True, env=env).strip())
     assert outputs[0] == outputs[1]
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

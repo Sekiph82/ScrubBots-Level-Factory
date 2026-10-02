@@ -14,6 +14,7 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
+from ...core.request import LegacyGenerationRequest
 from .colorize import ColorRole, ColorRoleAssignment, colorize_with_roles
 from .engine import MaskContractError, resolve_mask
 from .model import MaskConfig, ResolvedMask, SymmetryMode
@@ -78,7 +79,7 @@ class MaskSpriteGenerator:
             raise MaskContractError("style must be one of the ten supported MASK families") from exc
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> MaskCandidate | GenerationResult:
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             return self._failure(FailureCode.INVALID_REQUEST, "MASK generation requires a GenerationRequest", None)
         if request.generator_mode != GeneratorMode.MASK.value:
             return self._failure(FailureCode.INVALID_REQUEST, "mask-sprite accepts only MASK mode", request)

@@ -1,8 +1,10 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 
 import pytest
 
-from scrubbots_pixel_factory.core import GenerationRequest, GeneratorOptions, RequestContractError
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest, GeneratorOptions, RequestContractError
 
 
 def make_request(**overrides):
@@ -85,3 +87,6 @@ def test_current_request_allows_cross_band_rectangles_for_every_difficulty() -> 
     for difficulty in ("EASY", "MEDIUM", "HARD", "VERY_HARD"):
         request = make_request(difficulty=difficulty, width=20, height=59)
         assert request.resolve_dimensions() == (20, 59)
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

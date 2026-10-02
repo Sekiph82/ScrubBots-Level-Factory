@@ -14,6 +14,7 @@ from ..contracts import (
 )
 from .request import (
     GenerationRequest,
+    LegacyGenerationRequest,
     GeneratorMode,
     RequestContractError,
     _freeze_json_value,
@@ -103,7 +104,7 @@ class GenerationResult:
     schema: str
     schema_version: int
     status: ResultStatus
-    request: GenerationRequest | None
+    request: GenerationRequest | LegacyGenerationRequest | None
     width: int | None
     height: int | None
     logical_grid: tuple[str, ...] | None
@@ -121,7 +122,7 @@ class GenerationResult:
         self,
         *,
         status: ResultStatus,
-        request: GenerationRequest | None,
+        request: GenerationRequest | LegacyGenerationRequest | None,
         width: int | None,
         height: int | None,
         logical_grid: object,
@@ -141,20 +142,20 @@ class GenerationResult:
             raise ResultContractError("result status must be SUCCESS or FAILURE") from exc
 
         if normalized_status is ResultStatus.SUCCESS:
-            if not isinstance(request, GenerationRequest):
+            if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
                 raise ResultContractError("successful result requires a GenerationRequest")
             if isinstance(logical_grid, (str, bytes, bytearray)):
                 raise ResultContractError("logical_grid must be an iterable of C-ID cells")
             try:
                 cells = tuple(logical_grid)  # type: ignore[arg-type]
-                (validate_current_dimensions(width, height) if request.difficulty is None else validate_dimensions(request.difficulty, width, height))
+                (validate_dimensions(request.difficulty, width, height) if isinstance(request, LegacyGenerationRequest) else validate_current_dimensions(width, height))
                 if request.width is not None and width != request.width:
                     raise ResultContractError("result width does not match explicit request width")
                 if request.height is not None and height != request.height:
                     raise ResultContractError("result height does not match explicit request height")
                 if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                     raise ResultContractError("logical_grid length must equal width multiplied by height")
-                actual_used = validate_current_used_color_count(cells) if request.difficulty is None else validate_used_color_count(request.difficulty, cells)
+                actual_used = validate_used_color_count(request.difficulty, cells) if isinstance(request, LegacyGenerationRequest) else validate_current_used_color_count(cells)
                 supplied_palette = tuple(used_palette)  # type: ignore[arg-type]
             except ResultContractError:
                 raise
@@ -201,7 +202,7 @@ class GenerationResult:
             except (TypeError, ValueError) as exc:
                 raise ResultContractError("failure code must be a stable M02 failure code") from exc
             failure_message = _nonblank(failure_reason, "failure reason")
-            if request is not None and not isinstance(request, GenerationRequest):
+            if request is not None and not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
                 raise ResultContractError("failure request must be a GenerationRequest or None")
             try:
                 supplied_palette = tuple(used_palette)
@@ -241,7 +242,7 @@ class GenerationResult:
     def success(
         cls,
         *,
-        request: GenerationRequest,
+        request: GenerationRequest | LegacyGenerationRequest,
         width: int,
         height: int,
         logical_grid: object,
@@ -252,7 +253,7 @@ class GenerationResult:
         rng_algorithm: str,
         provenance: Mapping[str, object],
     ) -> "GenerationResult":
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             raise ResultContractError("successful result requires a GenerationRequest")
         if isinstance(logical_grid, (str, bytes, bytearray)):
             raise ResultContractError("logical_grid must be an iterable of C-ID cells")
@@ -261,14 +262,14 @@ class GenerationResult:
         except TypeError as exc:
             raise ResultContractError("logical_grid must be an iterable of C-ID cells") from exc
         try:
-            (validate_current_dimensions(width, height) if request.difficulty is None else validate_dimensions(request.difficulty, width, height))
+            (validate_dimensions(request.difficulty, width, height) if isinstance(request, LegacyGenerationRequest) else validate_current_dimensions(width, height))
             if request.width is not None and width != request.width:
                 raise ResultContractError("result width does not match explicit request width")
             if request.height is not None and height != request.height:
                 raise ResultContractError("result height does not match explicit request height")
             if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                 raise ResultContractError("logical_grid length must equal width multiplied by height")
-            used = validate_current_used_color_count(cells) if request.difficulty is None else validate_used_color_count(request.difficulty, cells)
+            used = validate_used_color_count(request.difficulty, cells) if isinstance(request, LegacyGenerationRequest) else validate_current_used_color_count(cells)
         except ResultContractError:
             raise
         except (TypeError, ValueError) as exc:
@@ -309,15 +310,15 @@ class GenerationResult:
         *,
         code: FailureCode | str,
         reason: str,
-        request: GenerationRequest | None = None,
+        request: GenerationRequest | LegacyGenerationRequest | None = None,
     ) -> "GenerationResult":
         try:
             failure_code = code if isinstance(code, FailureCode) else FailureCode(code)
         except ValueError as exc:
             raise ResultContractError("failure code must be a stable M02 failure code") from exc
         failure_reason = _nonblank(reason, "failure reason")
-        if request is not None and not isinstance(request, GenerationRequest):
-            raise ResultContractError("failure request must be a GenerationRequest or None")
+        if request is not None and not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
+            raise ResultContractError("failure request must be a current or explicit legacy GenerationRequest, or None")
         return cls(
             status=ResultStatus.FAILURE,
             request=request,

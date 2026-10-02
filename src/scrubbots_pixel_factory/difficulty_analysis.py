@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Deterministic, provenance-bound M04 difficulty analysis contracts."""
 
 from __future__ import annotations

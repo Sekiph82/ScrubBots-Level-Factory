@@ -103,6 +103,8 @@ func run_action(action: String, draft: Dictionary, requested_output_root: String
 		return _unavailable_result(normalized_action, str(capability.get("reason", "UNAVAILABLE")))
 	if normalized_action == "Generate" and str(draft.get("seed", "")).strip_edges().is_empty():
 		return _unavailable_result(normalized_action, "UNAVAILABLE — enter a seed for a deterministic canonical Generate request.")
+	if normalized_action == "Generate" and (typeof(draft.get("width")) != TYPE_INT or typeof(draft.get("height")) != TYPE_INT):
+		return _failed_result(normalized_action, -1, "FAILED — invalid generation request: width and height must be explicitly supplied as integers.")
 	if normalized_action == "Generate" and draft.has("difficulty"):
 		return _failed_result(normalized_action, -1, "FAILED — invalid generation request: requested difficulty is not accepted by the current difficulty-free artwork contract.")
 	if normalized_action == "Reproduce" and _last_successful_metadata_path.is_empty():

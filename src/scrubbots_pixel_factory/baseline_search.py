@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Deterministic generic search orchestration for canonical provider boundaries."""
 
 from __future__ import annotations

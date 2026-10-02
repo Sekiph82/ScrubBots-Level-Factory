@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Strict external adapter for the canonical ScrubBots headless authority.
 
 The adapter transports envelopes and invokes a caller-supplied runner only

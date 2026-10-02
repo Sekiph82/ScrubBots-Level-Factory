@@ -20,6 +20,7 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
+from ...core.request import LegacyGenerationRequest
 from ..mask import MaskCandidate, MaskSpriteGenerator, SymmetryMode
 from ..mask.engine import symmetry_orbits
 from ..rules import RuleShapeGenerator
@@ -95,18 +96,14 @@ def _child_request(
     theme: str | None,
     options: Mapping[str, object] | None,
 ) -> GenerationRequest:
-    return GenerationRequest(
-        outer.difficulty,
-        seed,
-        mode,
-        width=width,
-        height=height,
-        style=style,
-        theme=theme,
-        palette_subset=palette,
-        generator_options=options,
-        schema_version=outer.schema_version,
-    )
+    common = {"seed": seed, "width": width, "height": height, "generator_mode": mode,
+              "style": style, "theme": theme, "palette_subset": palette,
+              "generator_options": options}
+    if isinstance(outer, LegacyGenerationRequest):
+        return LegacyGenerationRequest(outer.difficulty, seed, mode, width=width, height=height,
+                                       style=style, theme=theme, palette_subset=palette,
+                                       generator_options=options, schema_version=outer.schema_version)
+    return GenerationRequest(**common)
 
 
 def _result_digest(result: GenerationResult) -> str:
@@ -224,13 +221,17 @@ def _request_from_canonical(value: object) -> GenerationRequest:
         options = value["generator_options"]
         if not isinstance(options, Mapping):
             raise ValueError
-        return GenerationRequest(
-            value["difficulty"], typed_seed["value"], value["generator_mode"],
-            width=value.get("width"), height=value.get("height"), style=value.get("style"),
-            theme=value.get("theme"), palette_subset=value.get("palette_subset"),
-            generator_options=GeneratorOptions(options["namespace"], options["version"], options["values"]),
-            schema_version=value.get("schema_version", 1),
-        )
+        option_value = GeneratorOptions(options["namespace"], options["version"], options["values"])
+        common = {"seed": typed_seed["value"], "generator_mode": value["generator_mode"],
+                  "width": value.get("width"), "height": value.get("height"), "style": value.get("style"),
+                  "theme": value.get("theme"), "palette_subset": value.get("palette_subset"),
+                  "generator_options": option_value}
+        if "difficulty" in value:
+            return LegacyGenerationRequest(value["difficulty"], typed_seed["value"], value["generator_mode"],
+                width=value.get("width"), height=value.get("height"), style=value.get("style"),
+                theme=value.get("theme"), palette_subset=value.get("palette_subset"),
+                generator_options=option_value, schema_version=value.get("schema_version", 1))
+        return GenerationRequest(**common, background_intent=value.get("background_intent", "BACKGROUND"))
     except (KeyError, TypeError, ValueError) as exc:
         raise ValueError("INVALID_STAGE_METADATA: child request cannot be reconstructed") from exc
 
@@ -424,7 +425,7 @@ class HybridGenerator:
             canvas = _canvas_from_occupied(width, height, occupied, "MASK_FOREGROUND")
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(_stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")))
             stage_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/RULE_COLOR_REGIONS")
-            synthetic = GenerationRequest(request.difficulty, stage_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options, schema_version=request.schema_version)
+            synthetic = _child_request(request, GeneratorMode.RULES.value, stage_seed, width, height, palette, style=None, theme=None, options=rules_options)
             stages.append(HybridStageMetadata(1, "RULE_COLOR_REGIONS", "COMPOSITION", stage_seed, synthetic.digest(), synthetic.canonical_dict(), "rule-colorize", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"canvas_digest": canvas.geometry_digest()}))
             return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": occupied, "after": occupied, "final": occupied}
         if strategy == HybridStrategy.RULE_GEOMETRY_MASK_SYMMETRY:
@@ -444,7 +445,7 @@ class HybridGenerator:
             canvas = _canvas_from_occupied(width, height, occupied, "MASK_SYMMETRY")
             color_seed = _stage_seed(root, f"hybrid/{strategy}/{attempt}/1/MASK_SYMMETRY_COLOR_REGIONS")
             colors = _colorize_geometry(canvas, palette, DeterministicRNG(color_seed))
-            synthetic = GenerationRequest(request.difficulty, color_seed, GeneratorMode.RULES.value, width=width, height=height, palette_subset=palette, generator_options=rules_options, schema_version=request.schema_version)
+            synthetic = _child_request(request, GeneratorMode.RULES.value, color_seed, width, height, palette, style=None, theme=None, options=rules_options)
             stages.append(HybridStageMetadata(1, "MASK_SYMMETRY_COLOR_REGIONS", "COMPOSITION", color_seed, synthetic.digest(), synthetic.canonical_dict(), "mask-symmetry-compose", "1.0.0", _grid_digest(colors), None, canvas.geometry_digest(), {"symmetry": symmetry.value, "before_topology_digest": _topology_digest(raw, width, height), "after_topology_digest": _topology_digest(occupied, width, height)}))
             return colors, occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": raw, "after": occupied, "final": occupied}
         base_mode = GeneratorMode.RULES.value if strategy == HybridStrategy.RULE_BASE_WFC_DETAIL else GeneratorMode.MASK.value
@@ -481,7 +482,7 @@ class HybridGenerator:
         return tuple(final), occupied, tuple(stages), _topology_digest(occupied, width, height), {"before": occupied, "after": occupied, "final": occupied}
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> HybridCandidate | GenerationResult:
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             return self._failure(FailureCode.INVALID_REQUEST, "HYBRID generation requires a GenerationRequest", None)
         if request.generator_mode != GeneratorMode.HYBRID.value:
             return self._failure(FailureCode.INVALID_REQUEST, "hybrid-compose accepts only HYBRID mode", request)
@@ -528,7 +529,7 @@ class HybridGenerator:
 
     def replay_candidate(self, request: GenerationRequest, candidate: HybridCandidate) -> HybridCandidate:
         """Replay every recorded engine/helper stage and verify its evidence."""
-        if not isinstance(request, GenerationRequest) or not isinstance(candidate, HybridCandidate):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)) or not isinstance(candidate, HybridCandidate):
             raise ValueError("INVALID_STAGE_METADATA: replay requires a request and HybridCandidate")
         if request.generator_mode != GeneratorMode.HYBRID.value:
             raise ValueError("INVALID_STAGE_METADATA: replay requires HYBRID mode")

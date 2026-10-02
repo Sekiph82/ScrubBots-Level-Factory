@@ -16,6 +16,7 @@ from ..contracts import (
     validate_used_color_count,
 )
 from ..quality import logical_grid_hash
+from ..core.request import LegacyGenerationRequest
 
 
 ARTWORK_SCHEMA = "scrubbots-logical-artwork"
@@ -133,7 +134,8 @@ class ArtworkArtifact:
         request = getattr(result, "request", None)
         if request is None:
             raise ArtworkContractError("successful GenerationResult must retain its request")
-        return cls.from_cells(candidate_id, request.difficulty, result.width, result.height, result.logical_grid)
+        difficulty = request.difficulty if isinstance(request, LegacyGenerationRequest) else None
+        return cls.from_cells(candidate_id, difficulty, result.width, result.height, result.logical_grid)
 
     def as_dict(self) -> dict[str, object]:
         return {

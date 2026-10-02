@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from pathlib import Path
 
 from scrubbots_pixel_factory import GenerationRequest, GeneratorRouter, export_candidate
@@ -21,3 +23,6 @@ def test_readiness_card_exposes_all_gates_and_never_falsely_returns_ready() -> N
         for child in path.iterdir(): child.unlink()
         path.rmdir()
         destination.rmdir()
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

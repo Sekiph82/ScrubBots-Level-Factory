@@ -1,7 +1,10 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.mask import MaskSpriteGenerator
 from scrubbots_pixel_factory.generators.rules import RuleShapeGenerator
 from scrubbots_pixel_factory.generators.router import HybridGenerator, GeneratorRouter
@@ -61,3 +64,6 @@ def test_m05_wfc_and_m06_auto_results_are_compatible_with_grid_only_quality() ->
     auto_report = evaluate_grid(auto_result.width, auto_result.height, auto_result.logical_grid, policy=QualityPolicy(max_isolated_ratio=0.35, max_tiny_cell_ratio=0.60, max_color_dominance_ratio=1.0))
     assert auto_report.analysis is not None
     assert auto_report.accepted is True
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

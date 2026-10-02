@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from dataclasses import replace
 
 import pytest
@@ -146,3 +148,6 @@ def test_efficiency_accounting_is_unavailable_and_caller_identity_cannot_be_supp
         EfficiencyCounters(-1, 0, 0, 0, 0, 0)
     with pytest.raises(MutationContractError):
         EfficiencyWorkload("a" * 64, "b" * 64, "c" * 64, "d" * 64, "FORGED")
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

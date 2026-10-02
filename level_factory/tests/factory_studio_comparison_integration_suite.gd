@@ -16,8 +16,8 @@ func _run_suite() -> void:
 	if comparison == null or gateway == null: _cleanup(instance); return
 	var output_root := "res://output/.lfx007-comparison"
 	_remove_tree(ProjectSettings.globalize_path(output_root))
-	var left: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "77007", "mode": "MASK"}, output_root)
-	var right: Dictionary = gateway.call("run_action", "Generate", {"difficulty": "EASY", "width": 20, "height": 20, "seed": "77008", "mode": "RULES"}, output_root)
+	var left: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "77007", "mode": "MASK"}, output_root)
+	var right: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "77008", "mode": "RULES"}, output_root)
 	_require(left.get("state") == "SUCCESS" and right.get("state") == "SUCCESS", "two candidates did not generate")
 	var left_id := str(left.get("candidate_id", "")); var right_id := str(right.get("candidate_id", ""))
 	var left_bytes := _bundle_bytes(str(left.get("output_path", ""))); var right_bytes := _bundle_bytes(str(right.get("output_path", "")))

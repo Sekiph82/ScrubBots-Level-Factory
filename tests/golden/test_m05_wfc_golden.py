@@ -2,7 +2,8 @@ import json
 import hashlib
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator, WFCCandidate
 
 
@@ -32,3 +33,7 @@ def test_m05_golden_outputs_and_pattern_tables_are_stable() -> None:
         assert candidate.wfc_metadata["unique_pattern_count"] == entry["unique_pattern_count"]
         assert candidate.wfc_metadata["attempt"] == entry["attempt"]
         assert candidate.wfc_metadata["contradiction_history"] == entry["contradiction_history"]
+
+
+# Historical generator fixtures use the explicit non-production request adapter.
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest

@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Closed, provenance-bound LevelMetrics V1 data contract.
 
 This module records accepted M03 identities and reserves typed M04 metric

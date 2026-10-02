@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Deterministic search evidence with separate non-canonical timing telemetry."""
 
 from __future__ import annotations

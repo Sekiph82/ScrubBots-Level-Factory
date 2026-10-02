@@ -155,8 +155,8 @@ def _coerce_options(value: GeneratorOptions | Mapping[str, object] | None) -> Ge
 
 
 @dataclass(frozen=True, slots=True)
-class GenerationRequest:
-    """A validated request whose nested configuration cannot be mutated."""
+class LegacyGenerationRequest:
+    """LEGACY_NON_PRODUCTION: explicit adapter for historical v1/v2 bytes."""
 
     difficulty: Difficulty | str | None = None
     seed: int | str | None = None
@@ -171,32 +171,31 @@ class GenerationRequest:
     background_intent: str = BackgroundIntent.BACKGROUND.value
 
     def __post_init__(self) -> None:
-        current = self.difficulty is None
         try:
-            difficulty = None if current else parse_difficulty(self.difficulty)
+            if self.difficulty is None:
+                raise RequestContractError("legacy reproduction requires a historical requested difficulty")
+            difficulty = parse_difficulty(self.difficulty)
         except (TypeError, ValueError) as exc:
             raise RequestContractError(str(exc)) from exc
         if isinstance(self.seed, bool) or not isinstance(self.seed, (int, str)):
             raise RequestContractError("seed must be an integer or string, excluding bool")
         mode = GeneratorMode.parse(self.generator_mode)
-        schema_version = (CURRENT_ARTWORK_REQUEST_SCHEMA_VERSION if current else CURRENT_DIMENSION_SCHEMA_VERSION) if self.schema_version is None else self.schema_version
-        if type(schema_version) is not int or schema_version not in SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS + (CURRENT_ARTWORK_REQUEST_SCHEMA_VERSION,):
-            raise RequestContractError("unsupported generation request schema version")
+        schema_version = CURRENT_DIMENSION_SCHEMA_VERSION if self.schema_version is None else self.schema_version
+        if type(schema_version) is not int or schema_version not in SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS:
+            raise RequestContractError("unsupported legacy generation request schema version")
         background_intent = BackgroundIntent.parse(self.background_intent)
         for label, value in (("style", self.style), ("theme", self.theme)):
             if value is not None:
                 _require_nonblank_string(value, label)
         try:
             if self.width is not None and self.height is not None:
-                (resolve_current_dimensions(self.width, self.height) if current else resolve_dimensions(difficulty, self.width, self.height, schema_version=schema_version))
+                resolve_dimensions(difficulty, self.width, self.height, schema_version=schema_version)
             elif self.width is not None:
-                (resolve_current_dimensions(self.width, None, seed=self.seed) if current else resolve_dimensions(difficulty, self.width, None, seed=self.seed, schema_version=schema_version))
+                resolve_dimensions(difficulty, self.width, None, seed=self.seed, schema_version=schema_version)
             elif self.height is not None:
-                (resolve_current_dimensions(None, self.height, seed=self.seed) if current else resolve_dimensions(difficulty, None, self.height, seed=self.seed, schema_version=schema_version))
+                resolve_dimensions(difficulty, None, self.height, seed=self.seed, schema_version=schema_version)
             normalized_subset = (
-                None
-                if self.palette_subset is None
-                else (resolve_current_palette_subset(subset=self.palette_subset) if current else validate_palette_subset(difficulty, self.palette_subset))
+                None if self.palette_subset is None else validate_palette_subset(difficulty, self.palette_subset)
             )
         except (TypeError, ValueError) as exc:
             raise RequestContractError(str(exc)) from exc
@@ -221,15 +220,11 @@ class GenerationRequest:
         return DeterministicRNG(self.seed).stage_seed(stage)
 
     def resolve_dimensions(self) -> tuple[int, int]:
-        if self.difficulty is None:
-            return resolve_current_dimensions(self.width, self.height, seed=self.stage_seed("dimension"))
         return resolve_dimensions(self.difficulty, self.width, self.height, seed=self.stage_seed("dimension"), schema_version=self.schema_version)
 
     def resolve_palette_subset(self) -> tuple[str, ...]:
         if self.palette_subset is not None:
             return self.palette_subset
-        if self.difficulty is None:
-            return resolve_current_palette_subset(seed=self.stage_seed("palette"), subset=self.palette_subset)
         return resolve_palette_subset(self.difficulty, seed=self.stage_seed("palette"))
 
     def canonical_dict(self) -> dict[str, object]:
@@ -245,10 +240,7 @@ class GenerationRequest:
             "palette_subset": list(self.palette_subset) if self.palette_subset is not None else None,
             "generator_options": self.generator_options.canonical_dict(),
         }
-        if self.difficulty is None:
-            payload["background_intent"] = self.background_intent
-        else:
-            payload["difficulty"] = self.difficulty.value
+        payload["difficulty"] = self.difficulty.value
         return payload
 
     def canonical_bytes(self) -> bytes:
@@ -259,6 +251,83 @@ class GenerationRequest:
             sort_keys=True,
             separators=(",", ":"),
         ).encode("utf-8")
+
+    def canonical_json(self) -> str:
+        return self.canonical_bytes().decode("utf-8")
+
+    def digest(self) -> str:
+        return hashlib.sha256(self.canonical_bytes()).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class GenerationRequest:
+    """Current difficulty-free request with explicit production dimensions."""
+
+    seed: int | str
+    width: int
+    height: int
+    generator_mode: str = GeneratorMode.MASK.value
+    style: str | None = None
+    theme: str | None = None
+    palette_subset: tuple[str, ...] | list[str] | None = None
+    generator_options: GeneratorOptions | Mapping[str, object] | None = None
+    background_intent: str = BackgroundIntent.BACKGROUND.value
+
+    schema_version: int = field(default=CURRENT_ARTWORK_REQUEST_SCHEMA_VERSION, init=False)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.seed, bool) or not isinstance(self.seed, (int, str)):
+            raise RequestContractError("seed must be an integer or string, excluding bool")
+        mode = GeneratorMode.parse(self.generator_mode)
+        try:
+            resolve_current_dimensions(self.width, self.height)
+            normalized_subset = None if self.palette_subset is None else resolve_current_palette_subset(subset=self.palette_subset)
+        except (TypeError, ValueError) as exc:
+            raise RequestContractError(str(exc)) from exc
+        for label, value in (("style", self.style), ("theme", self.theme)):
+            if value is not None:
+                _require_nonblank_string(value, label)
+        object.__setattr__(self, "generator_mode", mode)
+        object.__setattr__(self, "palette_subset", normalized_subset)
+        object.__setattr__(self, "generator_options", _coerce_options(self.generator_options))
+        object.__setattr__(self, "background_intent", BackgroundIntent.parse(self.background_intent))
+
+    @property
+    def options(self) -> GeneratorOptions:
+        return self.generator_options  # type: ignore[return-value]
+
+    @property
+    def requested_palette_subset(self) -> tuple[str, ...] | None:
+        return self.palette_subset  # type: ignore[return-value]
+
+    def stage_seed(self, stage: str) -> str:
+        from .rng import DeterministicRNG
+
+        return DeterministicRNG(self.seed).stage_seed(stage)
+
+    def resolve_dimensions(self) -> tuple[int, int]:
+        return resolve_current_dimensions(self.width, self.height)
+
+    def resolve_palette_subset(self) -> tuple[str, ...]:
+        return resolve_current_palette_subset(seed=self.stage_seed("palette"), subset=self.palette_subset)
+
+    def canonical_dict(self) -> dict[str, object]:
+        return {
+            "schema": GENERATION_REQUEST_SCHEMA,
+            "schema_version": self.schema_version,
+            "width": self.width,
+            "height": self.height,
+            "seed": _typed_seed(self.seed),
+            "generator_mode": self.generator_mode,
+            "style": self.style,
+            "theme": self.theme,
+            "palette_subset": list(self.palette_subset) if self.palette_subset is not None else None,
+            "generator_options": self.generator_options.canonical_dict(),
+            "background_intent": self.background_intent,
+        }
+
+    def canonical_bytes(self) -> bytes:
+        return json.dumps(self.canonical_dict(), ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
     def canonical_json(self) -> str:
         return self.canonical_bytes().decode("utf-8")

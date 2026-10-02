@@ -1,3 +1,5 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import hashlib
 import json
 import os
@@ -5,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from scrubbots_pixel_factory.core import GenerationRequest
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
 from tests.support.deterministic_probe import DeterministicContractProbeGenerator
 
 
@@ -31,7 +33,7 @@ def test_different_seed_changes_fixed_probe_output() -> None:
 
 def test_canonical_bytes_are_stable_across_python_hash_seeds() -> None:
     code = """
-from scrubbots_pixel_factory.core import GenerationRequest
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
 from tests.support.deterministic_probe import DeterministicContractProbeGenerator
 request = GenerationRequest(difficulty='HARD', seed='cross-process', generator_mode='WFC', generator_options={'namespace':'probe','version':1,'values':{'b':2,'a':[3,1]}})
 print(DeterministicContractProbeGenerator().generate(request).digest())
@@ -49,7 +51,8 @@ print(DeterministicContractProbeGenerator().generate(request).canonical_json())
 
 def test_empty_string_seed_is_stable_across_processes() -> None:
     code = """
-from scrubbots_pixel_factory.core import DeterministicRNG, GenerationRequest
+from scrubbots_pixel_factory.core import DeterministicRNG
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
 request = GenerationRequest(difficulty='EASY', seed='', generator_mode='MASK')
 print(request.canonical_json())
 print(DeterministicRNG('').stage_seed('geometry'))
@@ -61,3 +64,6 @@ print(DeterministicRNG('').stage_seed('geometry'))
     env["PYTHONHASHSEED"] = "42"
     second = subprocess.run([sys.executable, "-c", code], cwd=REPO_ROOT, env=env, capture_output=True, text=True, check=True).stdout
     assert first == second
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

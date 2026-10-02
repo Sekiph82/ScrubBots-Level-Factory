@@ -1,7 +1,8 @@
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator, WFCCandidate
 
 
@@ -51,3 +52,7 @@ def test_120_candidate_acceptance_matrix_has_at_least_100_accepted() -> None:
                 assert candidate.wfc_metadata["raw_extracted_window_count"] == expected_raw
     assert total == 120
     assert accepted >= 100
+
+
+# Historical generator fixtures use the explicit non-production request adapter.
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest

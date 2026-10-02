@@ -91,5 +91,5 @@ func _initialize():
     try:
         loaded = subprocess.run([godot, "--headless", "--path", str(project), "--script", "res://tests/campaign_catalog_load_check.gd"], capture_output=True, text=True, timeout=300)
     except subprocess.TimeoutExpired as exc:
-        pytest.fail(f"current-game LevelCatalog timed out after 300 seconds (Godot capability existed; authority origin/main={authority_commit}); stdout={exc.stdout!r}; stderr={exc.stderr!r}")
+        pytest.fail(f"current-game LevelCatalog/validate_all/DifficultyV1CatalogCheck timed out after 300 seconds (Godot capability existed; authority origin/main={authority_commit}); stdout={exc.stdout!r}; stderr={exc.stderr!r}")
     assert loaded.returncode == 0 and "CAMPAIGN_LEVEL_CATALOG_PASS" in loaded.stdout, f"authority origin/main={authority_commit}; stdout={loaded.stdout}\nstderr={loaded.stderr}"

@@ -1,6 +1,9 @@
+
 """Focused PAG-M06 router, AUTO, composition, and provenance coverage."""
 
 from __future__ import annotations
+
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
 
 import os
 import subprocess
@@ -356,7 +359,8 @@ def test_hybrid_quality_gate_rejects_topology_and_singleton_drift() -> None:
 
 
 def test_hybrid_cross_process_and_offline_digest_is_stable() -> None:
-    code = """from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+    code = """from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.router import HybridGenerator
 q=GenerationRequest('EASY','cross-process','HYBRID',width=20,height=27,generator_options=GeneratorOptions('hybrid',1,{'strategy':'MASK_GEOMETRY_RULE_COLOR_REGIONS','mask_style':'ROBOT','rules_style':'ORGANIC'}))
 print(HybridGenerator().generate(q).digest())
@@ -370,3 +374,6 @@ print(HybridGenerator().generate(q).digest())
     with offline_runtime():
         result = HybridGenerator().generate(request)
     assert result.is_success
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

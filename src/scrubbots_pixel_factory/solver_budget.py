@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Versioned deterministic solver budgets and outcome mapping."""
 
 from __future__ import annotations

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from pathlib import Path
 
 from scrubbots_pixel_factory import GenerationRequest, GeneratorRouter, export_candidate
@@ -31,3 +33,6 @@ def test_comparison_is_identity_bound_and_read_only(tmp_path: Path) -> None:
         destination.rmdir()
         for path in Path("level_factory/output/studio-extensions/owner-review").glob("review-lfx007-*.json"):
             path.unlink()
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

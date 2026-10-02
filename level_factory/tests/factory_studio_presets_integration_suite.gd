@@ -15,7 +15,7 @@ func _run_suite() -> void:
 	_require(presets != null and gateway != null, "preset surface or gateway did not instantiate")
 	if presets == null or gateway == null: _cleanup(instance); return
 	_remove_tree(ProjectSettings.globalize_path("res://output/studio-preset-runs")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var settings_a := {"difficulty": "EASY", "width": 20, "height": 20, "seed": 88008, "mode": "MASK"}
+	var settings_a := {"width": 20, "height": 20, "seed": 88008, "mode": "MASK"}
 	var saved: Dictionary = gateway.call("run_studio_extension", "preset-save", {"preset_id": "lfx008-runtime", "name": "Runtime recipe", "operation": "Generate", "settings": settings_a})
 	_require(_request_equal(saved.get("settings", {}), settings_a), "preset did not persist canonical settings: %s" % saved)
 	var applied: Dictionary = gateway.call("run_studio_extension", "preset-apply", {"preset_id": "lfx008-runtime"})
@@ -36,7 +36,7 @@ func _run_suite() -> void:
 	_require(FileAccess.get_file_as_bytes(execution_path) == execution_before, "updating preset changed prior execution evidence")
 	gateway.call("run_studio_extension", "preset-delete", {"preset_id": "lfx008-runtime"})
 	_require(FileAccess.get_file_as_bytes(execution_path) == execution_before, "deleting preset invalidated prior execution evidence")
-	var invalid: Dictionary = gateway.call("run_studio_extension", "preset-save", {"preset_id": "lfx008-invalid-runtime", "name": "Invalid", "operation": "Generate", "settings": {"difficulty": "EASY", "width": 20, "height": 20, "seed": 1, "mode": "MASK", "unknown": true}})
+	var invalid: Dictionary = gateway.call("run_studio_extension", "preset-save", {"preset_id": "lfx008-invalid-runtime", "name": "Invalid", "operation": "Generate", "settings": {"width": 20, "height": 20, "seed": 1, "mode": "MASK", "unknown": true}})
 	_require(invalid.get("state") == "ERROR", "unknown preset field did not fail closed")
 	presets.call("show_presets"); await process_frame
 	_cleanup(instance)

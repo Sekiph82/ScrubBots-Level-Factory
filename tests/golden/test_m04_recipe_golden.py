@@ -1,8 +1,10 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import hashlib
 import json
 from pathlib import Path
 
-from scrubbots_pixel_factory import GenerationRequest
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
 from scrubbots_pixel_factory.generators.rules import RuleCandidate, RuleShapeGenerator, color_component_sizes
 
 
@@ -23,3 +25,6 @@ def test_all_m04_recipe_goldens_are_byte_stable() -> None:
         assert candidate.result.digest() == fixture["result_sha256"]
         assert len(candidate.canvas.occupied) == fixture["occupancy"]
         assert {key: list(value) for key, value in color_component_sizes(candidate.logical_grid, width, height).items()} == fixture["color_components"]
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

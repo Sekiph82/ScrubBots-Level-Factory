@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Bounded, provider-only solution-count and entropy evidence."""
 
 from __future__ import annotations

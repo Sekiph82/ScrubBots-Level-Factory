@@ -1,6 +1,7 @@
 """Deterministic M06 acceptance matrix for both robust strategies."""
 
-from scrubbots_pixel_factory import GenerationRequest, GeneratorOptions
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions
 from scrubbots_pixel_factory.generators.router import HybridCandidate, HybridGenerator
 
 

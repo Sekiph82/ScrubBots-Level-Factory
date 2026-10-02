@@ -1,4 +1,4 @@
-"""Offline, advisory-only telemetry calibration contracts for SB-LF09-004.
+"""LEGACY_NON_PRODUCTION: offline advisory-only telemetry calibration contracts for SB-LF09-004.
 
 This module accepts already-produced gameplay evidence.  It does not collect
 telemetry, contact a provider, mutate LevelData, or change the M04 result.

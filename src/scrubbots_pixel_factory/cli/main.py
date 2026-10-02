@@ -260,7 +260,7 @@ def _candidate_id(request: GenerationRequest, explicit: str | None = None) -> st
 
 
 def _quality_policy(request: GenerationRequest) -> QualityPolicy:
-    return QualityPolicy(difficulty=request.difficulty)
+    return QualityPolicy()
 
 
 def _quality_policy_from_json(path: Path | None, request: GenerationRequest) -> QualityPolicy:
@@ -275,33 +275,41 @@ def _quality_policy_from_json(path: Path | None, request: GenerationRequest) -> 
         raise CLIError(f"invalid quality policy: {exc}") from exc
     if policy.as_dict() != dict(value):
         raise CLIError("quality policy JSON is not the canonical versioned policy")
-    if request.difficulty is None:
-        if policy.difficulty is not None:
-            raise CLIError("current production quality policy must not carry requested difficulty")
-    elif policy.difficulty is None or policy.difficulty.value != request.difficulty.value:
-        raise CLIError("quality policy difficulty must match the generation request")
+    if policy.difficulty is not None:
+        raise CLIError("current production quality policy must not carry requested difficulty")
     return policy
 
 
-def _request_from_canonical(value: object, path: str = "request") -> GenerationRequest:
+def _request_from_canonical(value: object, path: str = "request", *, allow_legacy: bool = False) -> GenerationRequest:
     if not isinstance(value, Mapping):
         raise CLIError(f"{path} must be an object")
     required = {"schema", "schema_version", "width", "height", "seed", "generator_mode", "style", "theme", "palette_subset", "generator_options"}
-    required.add("difficulty" if value.get("difficulty") is not None else "background_intent")
-    if set(value) != required or value.get("schema") != "scrubbots-generation-request" or type(value.get("schema_version")) is not int or value.get("schema_version") not in {1, 2, 3}:
+    legacy = "difficulty" in value
+    if legacy and not allow_legacy:
+        raise CLIError(f"{path} uses a legacy requested-difficulty schema outside exact reproduction")
+    required.add("difficulty" if legacy else "background_intent")
+    allowed_versions = {1, 2} if legacy else {3}
+    if set(value) != required or value.get("schema") != "scrubbots-generation-request" or type(value.get("schema_version")) is not int or value.get("schema_version") not in allowed_versions:
         raise CLIError(f"{path} schema/version or fields are unsupported")
     seed = _parse_typed_seed(value.get("seed"), f"{path}.seed")
     options = value.get("generator_options")
     if not isinstance(options, Mapping) or set(options) != {"namespace", "version", "values"}:
         raise CLIError(f"{path}.generator_options is not the accepted versioned contract")
     try:
-        return GenerationRequest(
-            value.get("difficulty"), seed, value["generator_mode"],
-            width=value["width"], height=value["height"], style=value["style"], theme=value["theme"],
-            palette_subset=value["palette_subset"], generator_options=GeneratorOptions(options["namespace"], options["version"], options["values"]),
-            schema_version=value["schema_version"],
-            background_intent=value.get("background_intent", "BACKGROUND"),
-        )  # type: ignore[arg-type]
+        arguments = {
+            "seed": seed,
+            "generator_mode": value["generator_mode"],
+            "width": value["width"],
+            "height": value["height"],
+            "style": value["style"],
+            "theme": value["theme"],
+            "palette_subset": value["palette_subset"],
+            "generator_options": GeneratorOptions(options["namespace"], options["version"], options["values"]),
+        }
+        if legacy:
+            from ..core.request import LegacyGenerationRequest
+            return LegacyGenerationRequest(value["difficulty"], seed, value["generator_mode"], width=value["width"], height=value["height"], style=value["style"], theme=value["theme"], palette_subset=value["palette_subset"], generator_options=arguments["generator_options"], schema_version=value["schema_version"])
+        return GenerationRequest(**arguments, background_intent=value["background_intent"])  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:
         raise CLIError(f"{path} violates the request contract: {exc}") from exc
 
@@ -315,7 +323,7 @@ def _request_from_args(args: argparse.Namespace, *, seed: int | str | None = Non
         chosen_seed = secrets.randbits(128)
     try:
         return GenerationRequest(
-            None, chosen_seed, mode, width=args.width, height=args.height,
+            seed=chosen_seed, width=args.width, height=args.height, generator_mode=mode,
             style=args.style, theme=args.theme, palette_subset=_palette_from_text(args.palette),
             generator_options=_options_from_json(args.options_json, mode),
             background_intent=getattr(args, "background_intent", "BACKGROUND"),
@@ -392,7 +400,7 @@ def _bundle_from_metadata_path(path: Path):
 
 def _reproduce(args: argparse.Namespace) -> ExitCode:
     bundle = _bundle_from_metadata_path(args.metadata)
-    request = _request_from_canonical(bundle.metadata.get("generation", {}).get("request"), "metadata.generation.request")  # type: ignore[union-attr]
+    request = _request_from_canonical(bundle.metadata.get("generation", {}).get("request"), "metadata.generation.request", allow_legacy=True)  # type: ignore[union-attr]
     registry = _load_exemplars(args.exemplar_json)
     candidate = _router(registry).generate_candidate(request)
     result = _candidate_result(candidate)
@@ -475,10 +483,7 @@ def _request_template(request: GenerationRequest, *, include_schema_version: boo
         "palette_subset": list(request.palette_subset) if request.palette_subset is not None else None,
         "generator_options": request.options.canonical_dict(),
     }
-    if request.difficulty is not None:
-        config["difficulty"] = request.difficulty.value
-    else:
-        config["background_intent"] = request.background_intent
+    config["background_intent"] = request.background_intent
     if include_schema_version:
         config["schema_version"] = request.schema_version
     return config
@@ -543,11 +548,9 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
     expected_template_fields = {"width", "height", "generator_mode", "style", "theme", "palette_subset", "generator_options"}
     if manifest_version == _MANIFEST_VERSION:
         expected_template_fields |= {"schema_version", "background_intent"}
-    else:
-        expected_template_fields.add("difficulty")
     if not isinstance(template, Mapping) or set(template) != expected_template_fields:
         raise CLIError("batch manifest request template is malformed")
-    if manifest_version == _MANIFEST_VERSION and template.get("schema_version") not in {2, 3}:
+    if manifest_version == _MANIFEST_VERSION and template.get("schema_version") != 3:
         raise CLIError("batch manifest request template schema version is unsupported")
     if not isinstance(template["generator_options"], Mapping) or set(template["generator_options"]) != {"namespace", "version", "values"}:
         raise CLIError("batch manifest generator options are malformed")
@@ -560,7 +563,7 @@ def _validate_manifest(value: object, path: Path) -> dict[str, object]:
         if not isinstance(policy_data, Mapping):
             raise CLIError("batch manifest quality policy is malformed")
         policy = QualityPolicy(**policy_data)  # type: ignore[arg-type]
-        if policy.as_dict() != dict(policy_data) or (first_request.difficulty is not None and (policy.difficulty is None or policy.difficulty.value != first_request.difficulty.value)) or (first_request.difficulty is None and policy.difficulty is not None):
+        if policy.as_dict() != dict(policy_data) or policy.difficulty is not None:
             raise CLIError("batch manifest quality policy is not the exact request policy")
     except (TypeError, ValueError) as exc:
         raise CLIError(f"batch manifest contains an invalid immutable contract: {exc}") from exc
@@ -692,11 +695,12 @@ def _request_from_manifest(manifest: Mapping[str, object], attempt_seed: int | s
     if not isinstance(template, Mapping):
         raise CLIError("manifest request_template is malformed")
     try:
+        if "difficulty" in template:
+            raise CLIError("legacy difficulty-bearing batch manifests cannot be resumed by current Batch")
         return GenerationRequest(
-            template.get("difficulty"), attempt_seed, template["generator_mode"], width=template["width"], height=template["height"],
+            seed=attempt_seed, width=template["width"], height=template["height"], generator_mode=template["generator_mode"],
             style=template["style"], theme=template["theme"], palette_subset=template["palette_subset"],
             generator_options=GeneratorOptions(**template["generator_options"]),  # type: ignore[arg-type]
-            schema_version=template.get("schema_version", 1),
             background_intent=template.get("background_intent", "BACKGROUND"),
         )
     except (KeyError, TypeError, ValueError) as exc:
@@ -1011,8 +1015,8 @@ def _parser() -> argparse.ArgumentParser:
 
 def _add_request_flags(parser: argparse.ArgumentParser, *, required: bool) -> None:
     parser.add_argument("--mode", required=required, choices=tuple(sorted(_BATCH_MODES)))
-    parser.add_argument("--width", type=int)
-    parser.add_argument("--height", type=int)
+    parser.add_argument("--width", type=int, required=required)
+    parser.add_argument("--height", type=int, required=required)
     parser.add_argument("--style")
     parser.add_argument("--theme")
     parser.add_argument("--palette", help="comma-separated requested logical C-ID subset")

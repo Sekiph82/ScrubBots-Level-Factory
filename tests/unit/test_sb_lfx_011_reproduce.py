@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 from pathlib import Path
 
 from scrubbots_pixel_factory import GenerationRequest, GeneratorRouter, export_candidate
@@ -18,3 +20,6 @@ def test_reproduce_capability_distinguishes_deterministic_candidate() -> None:
     finally:
         for child in path.iterdir(): child.unlink()
         path.rmdir(); destination.rmdir()
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

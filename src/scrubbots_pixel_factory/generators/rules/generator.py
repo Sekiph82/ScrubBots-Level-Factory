@@ -11,6 +11,7 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
+from ...core.request import LegacyGenerationRequest
 from .colorize import colorize_canvas
 from .model import RuleCandidate, RuleContractError
 from .recipes import RECIPE_NAMES, recipe_for, render_recipe
@@ -50,7 +51,7 @@ class RuleShapeGenerator:
         return minimum, maximum
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> RuleCandidate | GenerationResult:
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             return self._failure(FailureCode.INVALID_REQUEST, "RULES generation requires a GenerationRequest", None)
         if request.generator_mode != GeneratorMode.RULES.value:
             return self._failure(FailureCode.INVALID_REQUEST, "rule-shape accepts only RULES mode", request)

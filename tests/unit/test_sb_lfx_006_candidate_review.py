@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 from pathlib import Path
 
@@ -88,3 +90,6 @@ def test_ready_owner_accept_without_official_nested_profile_fails_closed(tmp_pat
     accepted = studio.record_owner_review(candidate["candidate_id"], "ACCEPT", "approved", "")
     assert accepted["publication"]["disposition"] == "NOT_ENTERED"
     assert "profile.dominant" in accepted["publication"]["reason"]
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

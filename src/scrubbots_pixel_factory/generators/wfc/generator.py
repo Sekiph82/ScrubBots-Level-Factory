@@ -12,6 +12,7 @@ from ...core import (
     RNG_ALGORITHM,
     ResultContractError,
 )
+from ...core.request import LegacyGenerationRequest
 from .exemplar import canonical_palette_mapping
 from .model import Exemplar, ExemplarRegistry, WFCAttemptRecord, WFCConfig, WFCCandidate, WFCContractError
 from .patterns import extract_pattern_table
@@ -80,7 +81,7 @@ class WFCGenerator:
         return exemplar
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> WFCCandidate | GenerationResult:
-        if not isinstance(request, GenerationRequest):
+        if not isinstance(request, (GenerationRequest, LegacyGenerationRequest)):
             return self._failure(FailureCode.INVALID_REQUEST, "WFC generation requires a GenerationRequest", None)
         if request.generator_mode != GeneratorMode.WFC.value:
             return self._failure(FailureCode.INVALID_REQUEST, "wfc-overlap accepts only WFC mode", request)

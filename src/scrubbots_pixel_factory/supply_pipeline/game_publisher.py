@@ -8,10 +8,11 @@ import os
 from pathlib import Path
 import re
 import shutil
+import subprocess
 import tempfile
 from collections.abc import Mapping
 
-from .progression import ProgressionAuthorityError, describe_target, load_progression_authority
+from .progression import ProgressionAuthorityError, challenge_tolerance, describe_target, load_progression_authority
 
 
 class PublicationError(ValueError):
@@ -91,7 +92,10 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
     score = primary.get("difficulty", {}).get("score") if isinstance(primary.get("difficulty"), Mapping) else None
     if type(score) not in {int, float}:
         raise PublicationError("official Difficulty V1 score is missing")
-    tolerance = float(authority.get("challengeTolerance", {}).get("neverForceLabelOutsidePlusMinus", 5.0))
+    try:
+        tolerance = challenge_tolerance(authority)
+    except ProgressionAuthorityError as exc:
+        raise PublicationError(str(exc)) from exc
     order = level_number
     try:
         progression = describe_target(order, authority)
@@ -167,12 +171,20 @@ def publish_batch(*, game_project: str | Path | None, items: list[Mapping[str, o
         raise PublicationError("release batch catalog orders must be a contiguous prefix")
     catalog_path = root / "data" / "levels" / "catalog" / "production_catalog_v1.json"
     original_catalog = catalog_path.read_bytes()
-    with tempfile.TemporaryDirectory(prefix=".lfx-batch-", dir=root) as temporary:
+    catalog = _load(catalog_path)
+    if not isinstance(catalog, Mapping) or not isinstance(catalog.get("entries"), list):
+        raise PublicationError("production catalog authority is malformed")
+    existing_orders = [entry.get("order") for entry in catalog["entries"] if isinstance(entry, Mapping)]
+    if len(existing_orders) != len(catalog["entries"]) or any(type(order) is not int or order < 1 for order in existing_orders) or len(existing_orders) != len(set(existing_orders)):
+        raise PublicationError("existing production catalog order authority is malformed")
+    next_order = max(existing_orders, default=0) + 1
+    expected_orders = list(range(next_order, next_order + len(items)))
+    if numbers != expected_orders:
+        raise PublicationError(f"release batch must start at the exact next catalog order {next_order}; scan-forward and gaps are forbidden")
+    with tempfile.TemporaryDirectory(prefix="scrubbots-proposed-catalog-") as temporary:
         stage = Path(temporary) / "project"
         stage.mkdir()
-        for relative in ("project.godot", "data/config/level_progression_v1.json", "data/levels/catalog/production_catalog_v1.json"):
-            source = root / relative; target = stage / relative
-            target.parent.mkdir(parents=True, exist_ok=True); shutil.copy2(source, target)
+        _stage_current_game_authority(root, stage, catalog)
         staged_results = []
         for item in items:
             staged_results.append(publish_level(game_project=stage, candidate=item["candidate"], pipeline=item["pipeline"], source_bundle=item["source_bundle"], level_number=int(item["level_number"])))
@@ -182,6 +194,7 @@ def publish_batch(*, game_project: str | Path | None, items: list[Mapping[str, o
         added = [entry for entry in final_catalog["entries"] if entry.get("id") not in base_ids]
         if [entry.get("order") for entry in added] != numbers:
             raise PublicationError("staged catalog did not retain the requested contiguous batch order")
+        _validate_proposed_catalog(stage)
         relatives = []
         for entry in added:
             for key in ("level_path", "metadata_path", "preview_path", "supply_plan_path"):
@@ -206,6 +219,89 @@ def publish_batch(*, game_project: str | Path | None, items: list[Mapping[str, o
             if isinstance(exc, PublicationError): raise
             raise PublicationError(f"batch transaction rolled back: {exc}") from exc
     return {"disposition": "PUBLISHED", "game_project": str(root), "orders": numbers, "levels": staged_results, "catalog_sha256": _sha256(catalog_path)}
+
+
+def _stage_current_game_authority(root: Path, stage: Path, catalog: Mapping[str, object]) -> None:
+    """Copy current validation scripts and only catalog-referenced content to an isolated project."""
+    for relative in ("project.godot", "data/config", "data/palettes", "scripts"):
+        source = root / relative
+        if not source.exists():
+            raise PublicationError(f"current game validation authority is missing: {relative}")
+        target = stage / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.is_dir():
+            shutil.copytree(source, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(source, target)
+    catalog_target = stage / "data/levels/catalog/production_catalog_v1.json"
+    catalog_target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(root / "data/levels/catalog/production_catalog_v1.json", catalog_target)
+    entries = catalog.get("entries")
+    assert isinstance(entries, list)
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise PublicationError("production catalog contains a malformed entry")
+        for key in ("level_path", "metadata_path", "preview_path", "supply_plan_path"):
+            ref = entry.get(key)
+            if key == "supply_plan_path" and ref in (None, ""):
+                continue  # The original M23 level is intentionally served by the game's legacy supply path.
+            if not isinstance(ref, str) or not ref.startswith("res://"):
+                if key == "preview_path" and ref is None:
+                    continue
+                raise PublicationError(f"catalog entry {entry.get('id')} has an invalid {key}")
+            relative = Path(ref.removeprefix("res://"))
+            if relative.is_absolute() or ".." in relative.parts:
+                raise PublicationError(f"catalog entry {entry.get('id')} escapes the current game project")
+            source = root / relative
+            if not source.is_file():
+                continue  # The current game LevelCatalog must report missing referenced content.
+            target = stage / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, target)
+
+
+def _validate_proposed_catalog(project: Path) -> None:
+    from .game_rules import find_godot
+
+    godot = find_godot()
+    if godot is None:
+        raise PublicationError("Godot is required to validate the staged catalog with current Scrubbots authority")
+    executable = Path(godot)
+    if executable.name.casefold() == "godot.exe":
+        console = executable.with_name("godot_console.exe")
+        if console.is_file():
+            godot = str(console)
+    runner = project / "tests" / "factory_proposed_catalog_check.gd"
+    runner.parent.mkdir(parents=True, exist_ok=True)
+    runner.write_text('''extends SceneTree
+func _initialize():
+\tvar catalog = load("res://scripts/data/level_catalog.gd").new()
+\tvar loaded = catalog.load_manifest()
+\tif not loaded.ok:
+\t\tfor err in loaded.errors: push_error(str(err))
+\t\tquit(1)
+\t\treturn
+\tvar all_result = catalog.validate_all()
+\tif not all_result.ok:
+\t\tpush_error(all_result.summary())
+\t\tquit(1)
+\t\treturn
+\tvar checker = load("res://scripts/difficulty/difficulty_v1_catalog_check.gd").new()
+\tvar difficulty_result = checker.validate_catalog(catalog)
+\tif not difficulty_result.ok:
+\t\tfor err in difficulty_result.errors: push_error(str(err))
+\t\tquit(1)
+\t\treturn
+\tprint("FACTORY_PROPOSED_CATALOG_PASS")
+\tquit(0)
+''', encoding="utf-8")
+    try:
+        result = subprocess.run([godot, "--headless", "--path", str(project), "--script", "res://tests/factory_proposed_catalog_check.gd"], capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired as exc:
+        raise PublicationError(f"current-game proposed catalog validation timed out; no production files were written: {exc}") from exc
+    if result.returncode != 0 or "FACTORY_PROPOSED_CATALOG_PASS" not in result.stdout:
+        details = (result.stdout + "\n" + result.stderr).strip()[:4000]
+        raise PublicationError(f"current-game LevelCatalog/DifficultyV1CatalogCheck rejected the staged proposed catalog; no production files were written: {details}")
 
 
 __all__ = ["PublicationError", "discover_game_project", "publish_level", "publish_batch"]

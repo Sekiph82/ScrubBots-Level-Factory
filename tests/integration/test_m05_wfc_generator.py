@@ -1,3 +1,5 @@
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as _LegacyGenerationRequest  # explicit legacy/research fixture
+
 import json
 import os
 import subprocess
@@ -80,7 +82,10 @@ def test_wfc_n3_and_experimental_n4_are_explicit() -> None:
 
 
 def test_wfc_cross_process_digest_is_stable() -> None:
-    code = """import json\nfrom pathlib import Path\nfrom scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator\nfrom scrubbots_pixel_factory import GenerationRequest, GeneratorOptions\nr=json.loads(Path('tests/fixtures/wfc/wfc-synthetic-easy-3.json').read_text())\ne=Exemplar(r['schema'],r['version'],r['exemplar_id'],r['role'],r['width'],r['height'],tuple(r['pixels']),r['provenance_type'],r['provenance_description'],r['ownership'])\nq=GenerationRequest('EASY','cross','WFC',width=20,height=20,style=e.exemplar_id,palette_subset=e.source_palette,generator_options=GeneratorOptions('wfc',1,{'pattern_size':2,'input_periodic':True}))\nprint(WFCGenerator(ExemplarRegistry((e,))).generate(q).digest())\n"""
+    code = """import json\nfrom pathlib import Path
+from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory import GeneratorOptions\nr=json.loads(Path('tests/fixtures/wfc/wfc-synthetic-easy-3.json').read_text())\ne=Exemplar(r['schema'],r['version'],r['exemplar_id'],r['role'],r['width'],r['height'],tuple(r['pixels']),r['provenance_type'],r['provenance_description'],r['ownership'])\nq=GenerationRequest('EASY','cross','WFC',width=20,height=20,style=e.exemplar_id,palette_subset=e.source_palette,generator_options=GeneratorOptions('wfc',1,{'pattern_size':2,'input_periodic':True}))\nprint(WFCGenerator(ExemplarRegistry((e,))).generate(q).digest())\n"""
     outputs = []
     for hash_seed in ("1", "random"):
         env = dict(os.environ, PYTHONHASHSEED=hash_seed)
@@ -148,3 +153,6 @@ def test_retry_stream_is_independent_of_previous_attempt_consumption() -> None:
     consumed.next_bytes(4096)
     actual = DeterministicRNG("retry").retry_rng(1).next_u64()
     assert actual == expected
+
+# These tests exercise explicit historical/research behavior, not the current production request.
+GenerationRequest = _LegacyGenerationRequest

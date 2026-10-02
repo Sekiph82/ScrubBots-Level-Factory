@@ -1,3 +1,4 @@
+# LEGACY_NON_PRODUCTION: retained for explicit historical/research consumers only.
 """Canonical legal-move transport contracts for the LF03 solver boundary.
 
 This module transports decisions returned by a verified canonical provider. It

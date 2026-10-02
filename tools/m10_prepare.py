@@ -1,4 +1,4 @@
-"""Execute and publish the deterministic M10-C002 evidence."""
+"""LEGACY_NON_PRODUCTION: execute and publish the historical M10-C002 research corpus."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ import time
 import tracemalloc
 
 from scrubbots_pixel_factory import (
-    CANONICAL_PALETTE, DeterministicRNG, GenerationRequest, GeneratorOptions,
+    CANONICAL_PALETTE, DeterministicRNG, GeneratorOptions,
     GeneratorRouter, QualityPolicy, actual_used_palette_ids, evaluate_grid,
     logical_grid_hash, select_palette_subset, validate_dimensions,
     validate_used_color_count,
@@ -29,6 +29,8 @@ from scrubbots_pixel_factory.generators.rules.generator import recipe_names
 from scrubbots_pixel_factory.generators.router import HybridStrategy
 from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCGenerator
 from scrubbots_pixel_factory.quality import GridInput, compare_grids, diversity_report
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
+from scrubbots_pixel_factory.core.request import LegacyGenerationRequest as GenerationRequest
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "review" / "m10"
