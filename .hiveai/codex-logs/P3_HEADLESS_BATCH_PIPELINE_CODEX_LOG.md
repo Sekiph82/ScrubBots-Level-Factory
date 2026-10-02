@@ -84,7 +84,7 @@ Document role: CODEX BUILDER LOG
 - git rev-parse --show-toplevel, branch, origin, status, git fetch --prune origin, git rev-list --left-right --count HEAD...origin/main, stash and worktree inspection completed. No reset/rebase/stash/clean operation was used.
 - Read P3 requirements: exact Studio pipeline parity; read-only producer job manifest; canonical stores; owner Review Queue stop; durable per-source stage resume; default concurrency 1; structured progress/status; preserve rejection truth; offline core; idempotent reruns; required focused/regression/full verification.
 - Existing architecture inspection located src/scrubbots_pixel_factory/cli/main.py, owner_upload.py, m08_batch.py, supply_pipeline/, Studio launcher/orchestrator and relevant test suites. No product file edited yet.
-- One exploratory g invocation named absent root paths (setup.py, setup.cfg, scrubbots_pixel_factory) and emitted path errors; corrected by searching actual src/scrubbots_pixel_factory and pyproject.toml locations.
+- One exploratory rg invocation named absent root paths (setup.py, setup.cfg, scrubbots_pixel_factory) and emitted path errors; corrected by searching actual src/scrubbots_pixel_factory and pyproject.toml locations.
 - One audit read initially used a nonexistent shortened R02 filename; corrected to the tracked SB-LFX-005-C001-R02_RUNTIME_EVIDENCE_IMMUTABILITY_REMEDIATION_STRICT_AUDIT.md.
 
 ## Implementation and Verification
