@@ -47,7 +47,7 @@ Required:
 
 ## D. Real game catalog validation before publication
 
-Before any production publish:
+Before any CampaignBuilder-approved production batch publish:
 - stage proposed level/supply/metadata/preview + proposed catalog safely;
 - run current Scrubbots `LevelCatalog` validation against the proposed content;
 - run current `DifficultyV1CatalogCheck`;
@@ -57,23 +57,36 @@ Before any production publish:
 
 Tests use temporary game fixtures only.
 
-## E. Contiguous difficulty placement
+## E. Release Pool / CampaignBuilder contiguous batch placement
+
+`OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01` is authoritative:
+- owner ACCEPT performs zero game writes and enters Release Pool only;
+- CampaignBuilder assigns exact catalog orders;
+- owner APPROVE authorizes publication of the contiguous publishable prefix.
 
 Let:
 `next_order = max(existing catalog order) + 1`.
 
-Publication may write the new level only if official Difficulty V1 is compatible with the current game DifficultyProgressionV1 target for exactly `next_order`.
+The approved publication orders must equal:
+`[next_order, next_order + 1, ..., next_order + M - 1]`.
+
+For every batch member:
+- official Difficulty V1 must match the current game DifficultyProgressionV1 target for its exact explicit assigned order;
+- current `challengeTolerance.neverForceLabelOutsidePlusMinus` must be consumed fail-closed from runtime authority, with no copied numeric fallback.
 
 Must NOT:
-- skip to order next+2/next+N;
+- publish from owner ACCEPT;
+- scan forward to a later compatible order;
+- skip to order next+2/next+N while an earlier order is absent;
+- publish a non-contiguous subset;
 - create catalog gaps;
 - renumber existing immutable content;
 - invent a new cadence.
 
-If difficulty does not fit:
-- disposition is fail-closed `PROGRESSION_SLOT_MISMATCH` or equivalent;
-- zero game writes;
-- optional future-slot suggestions are advisory only.
+If any batch member, exact-order target, proposed-catalog validation, or batch-contiguity check fails:
+- disposition is fail-closed;
+- the entire batch performs zero production writes / rolls back;
+- owner review, Release Pool, and CampaignBuilder evidence remain preserved.
 
 This preserves GameplayLaunchResolver frontier continuity.
 
