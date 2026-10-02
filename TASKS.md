@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: MAINT-ZIP-CORE-V02 — Canonical cutover final closure
-- Current Sprint: MAINT-ZIP-CORE-V02-C001-R02 + P2-ROUTE-A-C001 — Final cutover + game-repo PR release
-- Current Task: MAINT-ZIP-CORE-V02-C001-R02 — Close final ZIP cutover with co-current SB-CPX-003 Route A branch+PR release for owner-approved CampaignBuilder batches
-- Current Task Status: REMEDIATION_AUTHORIZED / RESUMED_AFTER_P1_M10_PASS
-- Next Task/Action: Codex executes only the reconciled `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`, which now includes co-current P2 Route A. Preserve P1-M10 PASS/CLOSED authority; produce separate R02 and P2 builder logs; stop for independent re-audit.
+- Current Milestone: M14 — Publisher / Route A game-repository release
+- Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Route A strict closure
+- Current Task: SB-CPX-003 — Close Route A exact rollback, canonical remote authority, and authentic current-game verifier execution
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: Codex executes only `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_PROMPT.md`; preserve accepted Route A architecture; close only P2 findings F01..F03; stop after `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_R01_CODEX_LOG.md` is pushed for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -52,14 +52,22 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P1-M10-R01 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`.
 - M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
-- P2 Route A Status: `OWNER_PROVIDED / AUTHORIZED / CO_CURRENT_WITH_R02`; implement branch+PR release capability under `SB-CPX-003`, with real remote untouched in tests.
+- P2 Route A Status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT` under `SB-CPX-003`; real remote remains untouched in tests.
 - P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
 - P2 Route A Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`.
-- P2 Route A Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
+- P2 Route A Builder Log: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
+- P2 Route A Implementation Commit: `0ac1bc70606bf2b74c87147d18c254a52f3dfc10`.
+- P2 Route A Independent Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_STRICT_AUDIT.md`.
+- P2 Route A R01 Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_PROMPT.md`.
+- P2 Route A R01 Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
+- P2 Route A R01 Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_R01_CODEX_LOG.md`.
 - P2 Route A Boundary: owner-approved CampaignBuilder plan -> deterministic release branch -> current-game verification -> one release commit -> branch push + PR -> release receipt; owner/store submission remains out of scope.
-- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `RESUMED / AUTHORIZED_AFTER_P1-M10-R01_PASS`; prompt and audit criteria reconciled with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01 before execution.
+- MAINT-ZIP-CORE-V02-C001-R02 Status: `PASS / CLOSED`; final cutover independently accepted after owner-publication reconciliation.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
+- MAINT-ZIP-CORE-V02-C001-R02 Implementation Commit: `5f4e30a6929d89ae6aa3545304c062122cf244bf`.
+- MAINT-ZIP-CORE-V02-C001-R02 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_STRICT_AUDIT.md`.
+- MAINT-ZIP-CORE-V02-C001 Final Result: `PASS / CLOSED`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
 - SB-LF09-001 C001-R02 Remediation Authorization: `SB-LF09-001-C001-R02 — REMEDIATE_THEN_REAUDIT`.
 - SB-LF09-001 C001-R02 Prompt: `.hiveai/prompts/SB-LF09-001-C001-R02_COMPLETE_CROSS_CANDIDATE_ARTIFACT_IDENTITY_REMEDIATION_PROMPT.md`.
@@ -731,7 +739,7 @@ Accepted legacy implementation/evidence chain: `PAG-SP07-C001` product implement
 
 ### M09.04 - Telemetry calibration policy
 
-- [~] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
+- [ ] SB-LF09-004 — Telemetry-calibrated difficulty only after approved analytics/data policy.
 
 ### M09.05 - Runtime prohibition, lineage, cost and promotion audit
 
@@ -888,7 +896,7 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 ### M14.05 - Route A game-repository release PR
 
-- [ ] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
+- [~] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
 
 ---
 
