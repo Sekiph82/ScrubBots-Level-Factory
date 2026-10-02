@@ -4,11 +4,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: P3-R01 — Headless batch pipeline audit closure
-- Current Task: P3-R01 — Close true in-flight interruption coverage and generic transient-task governance regression
-- Current Task Status: CONDITIONAL / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: Codex executes only `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Preserve the original P3 prompt and accepted product behavior unchanged; close only P3-F01 interruption evidence and P3-F02 governance regression, then stop after the R01 builder log is pushed for independent re-audit.
+- Current Milestone: M10 — Campaign Intelligence / Sequencing Adapter + P3 audit closure
+- Current Sprint: P3-R01-P1-M10 — Concurrent remediation and CampaignBuilder
+- Current Task: P3-R01-P1-M10-C001 — Execute P3-R01 audit closure and P1 M10 CampaignBuilder concurrently
+- Current Task Status: OWNER_AUTHORIZED / IMPLEMENT_BOTH_THEN_AUDIT
+- Next Task/Action: Codex executes only `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Complete both co-current workstreams: P3-R01 true interruption/governance closure and P1 M10 CampaignBuilder/Release Pool/batch publication. Preserve both authoritative prompts unchanged and stop after both builder logs are pushed for independent audits.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,12 +17,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/P3-R01_P1-M10_COMBINED_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
-- P3 Status: `CURRENT / OWNER_AUTHORIZED / IMPLEMENT_THEN_AUDIT / PROMPT_PRESERVED_UNCHANGED`.
+- P3 Status: `IMPLEMENTED / CONDITIONAL_AUDIT / P3-R01_CO_CURRENT / PROMPT_PRESERVED_UNCHANGED`.
 - P3 Required Actor: `CODEX`.
 - P3 Builder Log Target: `.hiveai/codex-logs/P3_HEADLESS_BATCH_PIPELINE_CODEX_LOG.md`.
 - P3 Boundary: headless CLI reaches the same canonical Review Queue as Studio, with resumable/idempotent per-source execution; it never owner-ACCEPTs and never publishes.
@@ -32,7 +32,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P3-R01 Prompt: `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md`.
 - P3-R01 Audit Criteria: `.hiveai/audit-criteria/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_CRITERIA.md`.
 - P3-R01 Required Closures: true RUNNING-stage interruption/resume evidence for every canonical stage, ZIP pre/post canonical-record crash windows, and generic transient-current-task governance regression support without changing the 224-row denominator.
-- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P3-R01_AUDIT`.
+- P1 M10 CampaignBuilder Owner Prompt: `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER.md`.
+- P1 Owner Prompt SHA-256: `09de3ed5f15edf47a56f0135299467abacda2560c1381ec9ec888ef2fbc0afe1`.
+- P1 Owner Decision: `docs/decisions/OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.md`.
+- P1 Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_AUDIT_CRITERIA.md`.
+- P1 Status: `OWNER_AUTHORIZED / CO_CURRENT_WITH_P3-R01 / IMPLEMENT_THEN_AUDIT`.
+- Combined Master Prompt: `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md`.
+- Combined Audit Criteria: `.hiveai/audit-criteria/P3-R01_P1-M10_COMBINED_AUDIT_CRITERIA.md`.
+- Combined Execution Rule: P3-R01 and P1-M10 proceed in the same builder cycle; neither blocks the other; each keeps its own builder log and independent audit boundary.
+- Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
+- P2 Route A Status: `NOT_YET_PROVIDED`; do not invent branch/PR/store-update automation beyond P1.
+- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P3-R01_AND_P1-M10_AUDITS`; before resuming, reconcile any old ACCEPT-auto-publish wording with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
@@ -105,7 +115,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - MAINT-ZIP-CORE-V02-C001-R02 Required Closures: current GenerationRequest has no requested-difficulty field; current width+height are explicit; retired M03/M04 solver/difficulty authorities are removed from the current public production API; proposed publication passes current game LevelCatalog + DifficultyV1CatalogCheck; publication never creates a catalog-order gap.
 - MAINT-ZIP-CORE-V02-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001_CANONICAL_CUTOVER_AUDIT_CRITERIA.md`.
 - Owner-Locked ZIP Parameters: candidates=300; original+max3 mutations; screening=3000; viability=3000; real solver budget uses ZIP/game default; SupplyScorer weights unchanged; mean-batch seeds unchanged.
-- Owner-Locked Product Changes: supply columns 3/4/5 with default 3; visible preview depth exactly 3; baseline five-slot generation only; requested difficulty removed from Level Factory; generated + externally uploaded artwork share one canonical ZIP path; background intent preserved; owner ACCEPT auto-publishes; progression position derives after official Difficulty V1.
+- Owner-Locked Product Changes: supply columns 3/4/5 with default 3; visible preview depth exactly 3; baseline five-slot generation only; requested difficulty removed from Level Factory; generated + externally uploaded artwork share one canonical ZIP path; background intent preserved. `OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01` supersedes the older ACCEPT-auto-publish rule: owner ACCEPT enters Release Pool only; CampaignBuilder plan APPROVE controls contiguous batch publication.
 - EXE Inspection Status: `NO_PRODUCT_ACTION`; the inspected EXE is not part of the Level Factory implementation.
 - Cross-Repo Prerequisite: `Sekiph82/Scrubbots/coordination/OWNER_UNCAPPED_BATCH_ROBOT_COUNT_DECISION_V01.md`; global 30 robot/batch ceiling is retired.
 - SB-LF09-004 Telemetry Status: `PAUSED_BY_OWNER_PRIORITY` until MAINT-SUPPLY-PIPELINE-V01 closes; approved analytics policy remains valid and work resumes afterward.
