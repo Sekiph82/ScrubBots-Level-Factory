@@ -5,7 +5,7 @@
     "catalog_digest": "5c8922e29c4719566d1852f4c0a13486798b55d941f6f1d19c7f585175db82f0",
     "pool_digest": "e3a37eb6d333503c0d3996d7c62788d2bc66036507605135659ec5b1fab63d26"
   },
-  "plan_hash": "06c13f7b8a4b20b25ba5151f48a35062b092c682ce8513a4193962bde4157bbd",
+  "plan_hash": "e6d192cfac9948065f0ee56f73a3931ed54158c1c46510dd9fa1b0de857d9612",
   "publishable_prefix": [
     1,
     2,
@@ -114,11 +114,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 1.0,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.0,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -135,11 +146,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -156,11 +178,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -177,11 +210,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -198,11 +242,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -219,11 +274,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -240,11 +306,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -261,11 +338,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -282,11 +370,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -303,11 +402,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -324,11 +434,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -345,11 +466,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -366,11 +498,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -387,11 +530,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -408,11 +562,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -429,11 +594,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -450,11 +626,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -471,11 +658,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -492,11 +690,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -513,11 +722,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -534,11 +754,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -555,11 +786,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -576,11 +818,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -597,11 +850,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -618,11 +882,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -639,11 +914,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -660,11 +946,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -681,11 +978,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -702,11 +1010,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -723,11 +1042,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -744,11 +1074,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -765,11 +1106,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -786,11 +1138,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -807,11 +1170,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -828,11 +1202,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -849,11 +1234,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -870,11 +1266,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -891,11 +1298,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -912,11 +1330,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -933,11 +1362,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -954,11 +1394,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -975,11 +1426,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -996,11 +1458,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1017,11 +1490,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1038,11 +1522,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1059,11 +1554,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1080,11 +1586,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1101,11 +1618,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1122,11 +1650,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1143,11 +1682,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1164,11 +1714,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1185,11 +1746,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1206,11 +1778,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1227,11 +1810,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1248,11 +1842,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1269,11 +1874,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1290,11 +1906,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1311,11 +1938,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1332,11 +1970,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1353,11 +2002,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1374,11 +2034,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1395,11 +2066,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1416,11 +2098,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1437,11 +2130,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1458,11 +2162,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1479,11 +2194,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1500,11 +2226,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1521,11 +2258,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1542,11 +2290,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1563,11 +2322,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1584,11 +2354,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1605,11 +2386,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1626,11 +2418,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1647,11 +2450,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1668,11 +2482,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1689,11 +2514,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1710,11 +2546,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1731,11 +2578,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1752,11 +2610,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1773,11 +2642,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1794,11 +2674,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1815,11 +2706,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1836,11 +2738,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1857,11 +2770,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1878,11 +2802,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1899,11 +2834,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1920,11 +2866,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1941,11 +2898,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1962,11 +2930,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -1983,11 +2962,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2004,11 +2994,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2025,11 +3026,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2046,11 +3058,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2067,11 +3090,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2088,11 +3122,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2109,11 +3154,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2130,11 +3186,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2151,11 +3218,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2172,11 +3250,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true
@@ -2193,11 +3282,22 @@
     {
       "D": 50,
       "checks": {
+        "high_b_adjacency_ok": true,
+        "high_w_adjacency_ok": true,
+        "low_b_recovery_ok": true,
+        "low_u_recovery_ok": true,
         "novelty_ok": true,
         "novelty_score": 0.9616968304127167,
         "novelty_target": 0.75,
         "profile": true,
+        "profile_medians": {
+          "B": 1.0,
+          "U": 1.0,
+          "W": 1.0
+        },
+        "profile_run_ok": true,
         "recovery_guard": true,
+        "recovery_profile_target_slot": false,
         "similarity": 0.03830316958728335,
         "similarity_limit_configured": false,
         "similarity_ok": true

@@ -114,11 +114,13 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
     }
     solver_metrics = primary.get("solver_metrics", {}) if isinstance(primary.get("solver_metrics", {}), Mapping) else {}
     official = solver_metrics.get("official_difficulty_v1", {}) if isinstance(solver_metrics.get("official_difficulty_v1", {}), Mapping) else {}
+    official_profile = official.get("profile", {}) if isinstance(official.get("profile", {}), Mapping) else {}
     metadata.update({
         "challengeVector": official.get("vector", official.get("challengeVector")),
         "sessionLoad": official.get("sessionLoad"),
-        "dominantProfile": official.get("dominantProfile"),
+        "dominantProfile": official_profile.get("dominant"),
         "frustrationRisk": official.get("frustrationRisk"),
+        "official_difficulty_v1": dict(official),
         "noveltySignature": {"dimensions": [level.get("width"), level.get("height")], "paletteSet": candidate.get("used_colors", []), "silhouetteHash": candidate.get("grid_hash")},
     })
     paths = {

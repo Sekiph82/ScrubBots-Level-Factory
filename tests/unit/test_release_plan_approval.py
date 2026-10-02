@@ -14,7 +14,7 @@ def _authority():
 
 
 def _pool():
-    return [{"candidate_id": f"release-{i}", "challenge_score": 50.0, "difficulty_class": "EASY", "dominant_profile": f"PROFILE-{i}", "challenge_vector": [float(i % 2)] * 7, "width": 20 if i == 0 else 59, "height": 20 if i == 0 else 59, "used_colors": [f"C{n:02d}" for n in range(1, 4)] if i == 0 else [f"C{n:02d}" for n in range(4, 7)], "signature": {"dimensions": [20 if i == 0 else 59, 20 if i == 0 else 59], "paletteSet": [f"C{n:02d}" for n in range(1, 4)] if i == 0 else [f"C{n:02d}" for n in range(4, 7)], "challengeVector": [float(i % 2)] * 7}, "pipeline": {"run_id": f"run-{i}"}, "source_bundle": f"bundle-{i}", "candidate": {"candidate_id": f"release-{i}"}} for i in range(2)]
+    return [{"candidate_id": f"release-{i}", "challenge_score": 50.0, "difficulty_class": "EASY", "dominant_profile": ("FLOW", "COLOR")[i], "challenge_vector": [float(i % 2)] * 7, "width": 20 if i == 0 else 59, "height": 20 if i == 0 else 59, "used_colors": [f"C{n:02d}" for n in range(1, 4)] if i == 0 else [f"C{n:02d}" for n in range(4, 7)], "signature": {"dimensions": [20 if i == 0 else 59, 20 if i == 0 else 59], "paletteSet": [f"C{n:02d}" for n in range(1, 4)] if i == 0 else [f"C{n:02d}" for n in range(4, 7)], "challengeVector": [float(i % 2)] * 7}, "pipeline": {"run_id": f"run-{i}"}, "source_bundle": f"bundle-{i}", "candidate": {"candidate_id": f"release-{i}"}} for i in range(2)]
 
 
 def test_approve_revalidates_current_plan_and_submits_only_contiguous_prefix(tmp_path: Path, monkeypatch):

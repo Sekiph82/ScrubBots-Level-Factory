@@ -49,7 +49,7 @@ def test_ready_owner_accept_enters_release_pool_without_publication(tmp_path: Pa
     level_file = tmp_path / "level.json"; level_file.write_text("{}", encoding="utf-8")
     supply_file = tmp_path / "supply.json"; supply_file.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(studio, "list_candidates", lambda: [candidate])
-    pipeline = {"schema": studio.PIPELINE_SCHEMA, "version": 2, "run_id": "pipeline-ready", "candidate_id": candidate["candidate_id"], "request": {}, "disposition": "READY", "primary": {"state": "READY", "difficulty": {"score": 50.0, "class": "EASY"}, "files": {"level": str(level_file), "supply_plan": str(supply_file)}, "solver_metrics": {"official_difficulty_v1": {"ok": True, "vector": [0.1] * 7, "sessionLoad": 20}}}}
+    pipeline = {"schema": studio.PIPELINE_SCHEMA, "version": 2, "run_id": "pipeline-ready", "candidate_id": candidate["candidate_id"], "request": {}, "disposition": "READY", "primary": {"state": "READY", "difficulty": {"score": 50.0, "class": "EASY"}, "files": {"level": str(level_file), "supply_plan": str(supply_file)}, "solver_metrics": {"official_difficulty_v1": {"ok": True, "vector": [0.1] * 7, "challengeScore": 50.0, "sessionLoad": 20, "profile": {"dominant": "FLOW", "scores": {"FLOW": 0.8}, "runnerUp": "COLOR"}}}}}
     pipeline_path = studio._pipeline_path(pipeline["run_id"])
     pipeline_path.parent.mkdir(parents=True, exist_ok=True)
     pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
@@ -62,3 +62,29 @@ def test_ready_owner_accept_enters_release_pool_without_publication(tmp_path: Pa
     assert len(pool) == 1
     assert pool[0]["candidate_id"] == candidate["candidate_id"]
     assert pool[0]["challenge_vector"] == [0.1] * 7
+    assert pool[0]["dominant_profile"] == "FLOW"
+    assert pool[0]["official_profile"] == pipeline["primary"]["solver_metrics"]["official_difficulty_v1"]["profile"]
+
+
+def test_ready_owner_accept_without_official_nested_profile_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    from scrubbots_pixel_factory import studio_extensions as studio
+
+    evidence_root = tmp_path / "extensions"
+    monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path)
+    candidate = {"candidate_id": "accepted-candidate", "artwork_sha256": "a" * 64, "grid_hash": "b" * 64, "width": 20, "height": 20, "used_colors": ["C01", "C02", "C03"], "source_path": "bundle", "source_lineage": {"source_sha256": "c" * 64}, "background_intent": "BACKGROUND"}
+    bundle = tmp_path / "bundle"
+    bundle.mkdir()
+    (bundle / "artwork.png").write_bytes(b"pixels")
+    level_file = tmp_path / "level.json"
+    level_file.write_text("{}", encoding="utf-8")
+    supply_file = tmp_path / "supply.json"
+    supply_file.write_text("{}", encoding="utf-8")
+    pipeline = {"schema": studio.PIPELINE_SCHEMA, "version": 2, "run_id": "pipeline-ready", "candidate_id": candidate["candidate_id"], "request": {}, "disposition": "READY", "primary": {"state": "READY", "difficulty": {"score": 50.0, "class": "EASY"}, "files": {"level": str(level_file), "supply_plan": str(supply_file)}, "solver_metrics": {"official_difficulty_v1": {"ok": True, "vector": [0.1] * 7, "challengeScore": 50.0}}}}
+    pipeline_path = studio._pipeline_path(pipeline["run_id"])
+    pipeline_path.parent.mkdir(parents=True, exist_ok=True)
+    pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
+    monkeypatch.setattr(studio, "list_candidates", lambda: [candidate])
+    accepted = studio.record_owner_review(candidate["candidate_id"], "ACCEPT", "approved", "")
+    assert accepted["publication"]["disposition"] == "NOT_ENTERED"
+    assert "profile.dominant" in accepted["publication"]["reason"]

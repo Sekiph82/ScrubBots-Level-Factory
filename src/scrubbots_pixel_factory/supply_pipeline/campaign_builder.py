@@ -16,6 +16,45 @@ class CampaignError(ValueError):
     pass
 
 
+_DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALANCED"}
+
+
+def _tolerance_policy(authority: Mapping[str, Any]) -> tuple[float, float, float]:
+    values = authority.get("challengeTolerance")
+    if not isinstance(values, Mapping):
+        raise CampaignError("current challengeTolerance authority is missing or malformed")
+    names = ("preferredWhenPoolIsLarge", "defaultPlusMinus", "neverForceLabelOutsidePlusMinus")
+    parsed: list[float] = []
+    for name in names:
+        value = values.get(name)
+        if type(value) not in {int, float} or not math.isfinite(float(value)) or float(value) < 0:
+            raise CampaignError(f"current challengeTolerance.{name} must be a finite nonnegative number")
+        parsed.append(float(value))
+    preferred, default, hard = parsed
+    if not preferred <= default <= hard:
+        raise CampaignError("current challengeTolerance values must satisfy preferred <= default <= hard")
+    return preferred, default, hard
+
+
+def _recovery_target_slots(authority: Mapping[str, Any]) -> set[int]:
+    guards = authority.get("recoveryGuards")
+    if not isinstance(guards, list):
+        raise CampaignError("current recoveryGuards authority is missing or malformed")
+    targets: set[int] = set()
+    for index, guard in enumerate(guards):
+        if not isinstance(guard, Mapping):
+            raise CampaignError(f"current recoveryGuards[{index}] is malformed")
+        from_slot = guard.get("fromSlot")
+        drop = guard.get("minimumChallengeDrop")
+        if type(from_slot) is not int or from_slot < 1 or type(drop) not in {int, float} or not math.isfinite(float(drop)) or float(drop) < 0:
+            raise CampaignError(f"current recoveryGuards[{index}] has malformed source slot or challenge drop")
+        destinations = [guard[key] for key in ("toSlot", "toNextCycleSlot") if key in guard]
+        if not destinations or any(type(slot) is not int or slot < 1 for slot in destinations):
+            raise CampaignError(f"current recoveryGuards[{index}] has no valid target slot")
+        targets.update(destinations)
+    return targets
+
+
 def _bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False) + "\n").encode()
 
@@ -85,21 +124,49 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
     if not isinstance(entries, list): raise CampaignError("production catalog is malformed")
     orders = [item.get("order") for item in entries if isinstance(item, Mapping)]
     start = max((int(n) for n in orders if type(n) is int), default=0) + 1
-    tolerance_data = authority.get("challengeTolerance", {})
-    hard = float(tolerance_data.get("neverForceLabelOutsidePlusMinus", 5.0)) if isinstance(tolerance_data, Mapping) else 5.0
+    preferred, default, hard = _tolerance_policy(authority)
+    recovery_targets = _recovery_target_slots(authority)
     envelope = authority.get("_production_envelope")
     if not isinstance(envelope, Mapping) or set(envelope) != {"min_dimension", "max_dimension", "min_colors", "max_colors"}:
         raise CampaignError("current game production envelope is unavailable")
-    preferred = float(tolerance_data.get("preferredWhenPoolIsLarge", 2.0)) if isinstance(tolerance_data, Mapping) else 2.0
-    default = float(tolerance_data.get("defaultPlusMinus", 3.5)) if isinstance(tolerance_data, Mapping) else 3.5
     slots = [describe_target(n, authority) for n in range(start, start + k)]
     candidates = sorted((dict(item) for item in pool), key=lambda x: str(x.get("candidate_id", "")))
     ids = [str(x.get("candidate_id", "")) for x in candidates]
     if len(ids) != len(set(ids)): raise CampaignError("Release Pool contains duplicate candidate identities")
-    if any(not x or type(item.get("challenge_score")) not in {int, float} for x, item in zip(ids, candidates)): raise CampaignError("Release Pool identity or official challenge score is invalid")
+    for identity, item in zip(ids, candidates):
+        if not identity or type(item.get("challenge_score")) not in {int, float} or not math.isfinite(float(item["challenge_score"])):
+            raise CampaignError("Release Pool identity or official challenge score is invalid")
+        if item.get("dominant_profile") not in _DIFFICULTY_PROFILES:
+            raise CampaignError("Release Pool official Difficulty V1 profile is missing or malformed")
+        vector = item.get("challenge_vector")
+        if not isinstance(vector, Sequence) or len(vector) != 7 or any(type(value) not in {int, float} or not math.isfinite(float(value)) for value in vector):
+            raise CampaignError("Release Pool official Difficulty V1 challenge vector is missing or malformed")
     blocked: set[tuple[int, str]] = set()
     tail = authority.get("_catalog_tail")
-    previous_catalog = dict(tail) if isinstance(tail, Mapping) and type(tail.get("challenge_score")) in {int, float} else None
+    if tail is None:
+        catalog_history: list[dict[str, Any]] = []
+    elif isinstance(tail, Mapping):
+        catalog_history = [dict(tail)]
+    elif isinstance(tail, Sequence) and not isinstance(tail, (str, bytes)) and all(isinstance(record, Mapping) for record in tail):
+        catalog_history = [dict(record) for record in tail]
+    else:
+        raise CampaignError("current catalog tail Difficulty V1 evidence is malformed")
+    if len(catalog_history) > 2:
+        catalog_history = catalog_history[-2:]
+    existing_count = len(entries)
+    required_history = min(existing_count, 2)
+    if len(catalog_history) < required_history:
+        raise CampaignError("CATALOG_TAIL_DIFFICULTY_EVIDENCE_UNAVAILABLE: official history for the final existing catalog levels is incomplete")
+    for record in catalog_history:
+        if (record.get("dominant_profile") not in _DIFFICULTY_PROFILES
+            or type(record.get("challenge_score")) not in {int, float}
+            or not math.isfinite(float(record["challenge_score"]))
+            or not isinstance(record.get("challenge_vector"), Sequence)
+            or len(record["challenge_vector"]) != 7
+            or any(type(value) not in {int, float} or not math.isfinite(float(value)) for value in record["challenge_vector"])
+            or not isinstance(record.get("signature"), Mapping)):
+            raise CampaignError("CATALOG_TAIL_DIFFICULTY_EVIDENCE_UNAVAILABLE: official profile, score, vector, or signature is missing")
+    previous_catalog = catalog_history[-1] if catalog_history else None
     lock_map = dict(locks or {})
     slot_indices = {int(slot["level"]): i for i, slot in enumerate(slots)}
     if any(type(number) is not int or number not in slot_indices for number in lock_map): raise CampaignError("locked slot is outside the requested campaign range")
@@ -130,36 +197,41 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
         for i, (slot, item) in enumerate(zip(slots, chosen)):
             if item is None: continue
             prev = chosen[i - 1] if i else previous_catalog
-            profile = str(item.get("dominant_profile", "BALANCED"))
-            recent = [chosen[j] for j in range(max(0, i - 2), i) if chosen[j]]
-            if i < 2 and previous_catalog: recent.append(previous_catalog)
-            same_run = 1 + sum(1 for prior_item in recent if prior_item.get("dominant_profile") == profile)
-            recovery = int(slot["slot"]) in {4, 6, 9, 1}
+            profile = str(item["dominant_profile"])
+            prior_sequence = catalog_history + [entry for entry in chosen[:i]]
+            same_run = 1
+            for prior_item in reversed(prior_sequence):
+                if prior_item is None or prior_item.get("dominant_profile") != profile:
+                    break
+                same_run += 1
+            recovery = int(slot["slot"]) in recovery_targets
             guard_ok = True
             guards = authority.get("recoveryGuards", [])
-            for guard in guards if isinstance(guards, list) else []:
-                to_slot = guard.get("toSlot", 1 if guard.get("toNextCycleSlot") == 1 else None)
+            for guard in guards:
                 from_slot = guard.get("fromSlot")
                 previous_slot = slots[i - 1]["slot"] if i > 0 else (previous_catalog.get("slot") if previous_catalog else None)
-                if slot["slot"] == to_slot and previous_slot == from_slot and prev is not None:
+                destinations = [guard[key] for key in ("toSlot", "toNextCycleSlot") if key in guard]
+                if slot["slot"] in destinations and previous_slot == from_slot and prev is not None:
                     guard_ok &= float(prev["challenge_score"]) - float(item["challenge_score"]) >= float(guard["minimumChallengeDrop"])
             # Profile rotation/recovery use measured pool medians, not copied score bands.
             vector = item.get("challenge_vector", [0] * 7)
             def metric(candidate: Mapping[str, Any], index: int) -> float:
                 values = candidate.get("challenge_vector", [])
                 return float(values[index]) if isinstance(values, Sequence) and len(values) > index else 0.0
-            median = sorted(metric(c, 4) for c in candidates)[len(candidates)//2] if candidates else 0.0
-            profile_ok = same_run <= 2
-            if recovery and (metric(item, 4) > median or metric(item, 3) > median): profile_ok = False
-            if prev is not None and metric(item, 0) > median and metric(prev, 0) > median: profile_ok = False
-            profile_median = lambda index: sorted(metric(c, index) for c in candidates)[len(candidates)//2] if candidates else 0.0
-            if prev is not None and metric(item, 4) > profile_median(4) and metric(prev, 4) > profile_median(4): profile_ok = False
+            w_median = sorted(metric(c, 0) for c in candidates)[len(candidates)//2] if candidates else 0.0
+            u_median = sorted(metric(c, 3) for c in candidates)[len(candidates)//2] if candidates else 0.0
+            b_median = sorted(metric(c, 4) for c in candidates)[len(candidates)//2] if candidates else 0.0
+            low_b_recovery_ok = not recovery or metric(item, 4) <= b_median
+            low_u_recovery_ok = not recovery or metric(item, 3) <= u_median
+            high_w_adjacency_ok = prev is None or not (metric(item, 0) > w_median and metric(prev, 0) > w_median)
+            high_b_adjacency_ok = prev is None or not (metric(item, 4) > b_median and metric(prev, 4) > b_median)
+            profile_ok = same_run <= 2 and low_b_recovery_ok and low_u_recovery_ok and high_w_adjacency_ok and high_b_adjacency_ok
             similarity = _similarity(prev, item) if prev else 0.0
             novelty = 1.0 - similarity
             novelty_ok = novelty + 1e-12 >= float(slot.get("novelty_target", 0.0))
             limit = authority.get("campaignBuilder", {}).get("maxConsecutiveSimilarity") if isinstance(authority.get("campaignBuilder"), Mapping) else None
             similarity_ok = True if limit is None else similarity < float(limit)
-            checks[i] = {"recovery_guard": guard_ok, "profile": profile_ok, "similarity": similarity, "novelty_score": novelty, "novelty_target": float(slot.get("novelty_target", 0.0)), "novelty_ok": novelty_ok, "similarity_ok": similarity_ok, "similarity_limit_configured": limit is not None}
+            checks[i] = {"recovery_guard": guard_ok, "recovery_profile_target_slot": recovery, "profile": profile_ok, "profile_run_ok": same_run <= 2, "high_w_adjacency_ok": high_w_adjacency_ok, "high_b_adjacency_ok": high_b_adjacency_ok, "low_u_recovery_ok": low_u_recovery_ok, "low_b_recovery_ok": low_b_recovery_ok, "profile_medians": {"W": w_median, "U": u_median, "B": b_median}, "similarity": similarity, "novelty_score": novelty, "novelty_target": float(slot.get("novelty_target", 0.0)), "novelty_ok": novelty_ok, "similarity_ok": similarity_ok, "similarity_limit_configured": limit is not None}
             if not guard_ok or not profile_ok or not similarity_ok or not novelty_ok:
                 if int(slot["level"]) in lock_map: raise CampaignError("locked candidate violates a current sequence constraint")
                 violation = (i, str(item["candidate_id"])); break

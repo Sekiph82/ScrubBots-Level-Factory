@@ -25,6 +25,16 @@ def _pool(scores, *, profiles=None):
     return [{"candidate_id": f"level-{i:03d}", "challenge_score": score, "difficulty_class": "EASY", "dominant_profile": profiles[i], "challenge_vector": [0.1] * 7, "width": 20 + i % 40, "height": 20, "used_colors": ["C01", "C02", "C03"], "palette": ["C01", "C02", "C03"], "signature": {"paletteSet": ["C01", "C02", "C03"], "dimensions": [20 + i % 40, 20], "challengeVector": [0.1] * 7}} for i, score in enumerate(scores)]
 
 
+def _tail(order, profile, vector=None, *, slot=1, score=50):
+    vector = vector or [0.1] * 7
+    return {"order": order, "candidate_id": f"existing-{order}", "challenge_score": score, "dominant_profile": profile, "official_profile": {"dominant": profile}, "challenge_vector": vector, "slot": slot, "width": 20, "height": 20, "palette": ["C01", "C02", "C03"], "signature": {"dimensions": [20, 20], "paletteSet": ["C01", "C02", "C03"], "challengeVector": vector, "dominantProfile": profile}}
+
+
+def _set_vector(candidate, vector):
+    candidate["challenge_vector"] = vector
+    candidate["signature"]["challengeVector"] = vector
+
+
 def test_hungarian_global_assignment_matches_bruteforce_small_pool():
     costs = [[4, 1, 3, 99], [2, 0, 5, 99], [3, 2, 2, 99]]
     assignment = _assignment(costs)
@@ -62,6 +72,44 @@ def test_default_tolerance_tier_is_reported():
     assert plan["slots"][0]["tier"] == 1
 
 
+@pytest.mark.parametrize("field,value", [
+    ("preferredWhenPoolIsLarge", None), ("preferredWhenPoolIsLarge", True),
+    ("defaultPlusMinus", "3.5"), ("neverForceLabelOutsidePlusMinus", float("nan")),
+    ("neverForceLabelOutsidePlusMinus", -1),
+])
+def test_missing_or_malformed_runtime_tolerance_fails_closed(field, value):
+    authority = _authority()
+    if value is None:
+        authority["challengeTolerance"].pop(field)
+    else:
+        authority["challengeTolerance"][field] = value
+    with pytest.raises(CampaignError, match="challengeTolerance"):
+        build_campaign_plan(catalog={"entries": []}, authority=authority, pool=_pool([50]), k=1)
+
+
+def test_runtime_tolerance_order_must_be_preferred_default_hard():
+    authority = _authority()
+    authority["challengeTolerance"] = {"preferredWhenPoolIsLarge": 4, "defaultPlusMinus": 3.5, "neverForceLabelOutsidePlusMinus": 5}
+    with pytest.raises(CampaignError, match="preferred <= default <= hard"):
+        build_campaign_plan(catalog={"entries": []}, authority=authority, pool=_pool([50]), k=1)
+
+
+@pytest.mark.parametrize("guard,order,history", [
+    ({"fromSlot": 1, "toSlot": 2, "minimumChallengeDrop": 10}, 1, [_tail(1, "COLOR", slot=1, score=80)]),
+    ({"fromSlot": 2, "toNextCycleSlot": 1, "minimumChallengeDrop": 10}, 2, [_tail(1, "COLOR", slot=1, score=50), _tail(2, "ROUTE", slot=2, score=100)]),
+])
+def test_recovery_profile_targets_are_derived_from_runtime_guard_fields(guard, order, history):
+    authority = _authority()
+    authority["cadenceLength"] = 2
+    authority["cadence"] = [{"slot": 1, "class": "EASY", "role": "regular", "modifier": 30, "noveltyTarget": 0}, {"slot": 2, "class": "EASY", "role": "recovery", "modifier": -30, "noveltyTarget": 0}]
+    authority["recoveryGuards"] = [guard]
+    catalog = {"entries": [{"order": n, "id": f"existing-{n}"} for n in range(1, order + 1)]}
+    candidate = _pool([20 if order == 1 else 80])[0]
+    plan = build_campaign_plan(catalog=catalog, authority={**authority, "_catalog_tail": history}, pool=[candidate], k=1)
+    assert plan["slots"][0]["slot"] == (2 if order == 1 else 1)
+    assert plan["slots"][0]["checks"]["recovery_profile_target_slot"] is True
+
+
 def test_profile_limit_and_manual_lock_revalidation():
     authority = _authority()
     profiles = ["FLOW", "FLOW", "FLOW"]
@@ -70,6 +118,76 @@ def test_profile_limit_and_manual_lock_revalidation():
     assert plan["slots"][2]["chosen_id"] is None
     with pytest.raises(CampaignError, match="sequence constraint"):
         build_campaign_plan(catalog={"entries": []}, authority=authority, pool=pool, k=3, locks={3: "level-002"})
+
+
+def test_existing_two_level_profile_run_forces_first_new_level_to_reassign():
+    authority = _authority()
+    authority["_catalog_tail"] = [_tail(9, "FLOW"), _tail(10, "FLOW")]
+    catalog = {"entries": [{"order": 9, "id": "existing-9"}, {"order": 10, "id": "existing-10"}]}
+    pool = _pool([50, 50], profiles=["FLOW", "COLOR"])
+    plan = build_campaign_plan(catalog=catalog, authority=authority, pool=pool, k=1)
+    assert plan["slots"][0]["chosen_id"] == "level-001"
+    assert plan["slots"][0]["checks"]["profile_run_ok"] is True
+
+
+def test_profile_two_positions_back_does_not_break_a_nonconsecutive_flow_history():
+    authority = _authority()
+    authority["_catalog_tail"] = [_tail(9, "FLOW"), _tail(10, "COLOR")]
+    catalog = {"entries": [{"order": 9, "id": "existing-9"}, {"order": 10, "id": "existing-10"}]}
+    plan = build_campaign_plan(catalog=catalog, authority=authority, pool=_pool([50], profiles=["FLOW"]), k=1)
+    assert plan["slots"][0]["chosen_id"] == "level-000"
+
+
+def test_nonempty_catalog_without_two_level_official_history_fails_closed():
+    with pytest.raises(CampaignError, match="CATALOG_TAIL_DIFFICULTY_EVIDENCE_UNAVAILABLE"):
+        build_campaign_plan(catalog={"entries": [{"order": 1, "id": "existing-1"}]}, authority=_authority(), pool=_pool([50]), k=1)
+
+
+def test_each_profile_rule_compares_its_own_axis_median():
+    # W, U, and B distributions have different medians. A candidate that is high
+    # on exactly one axis must be rejected by that axis's rule.
+    catalog = {"entries": [{"order": 1, "id": "existing-1"}]}
+    cases = [
+        ("high_w_adjacency_ok", [0.1, 0.2, 0.3, 0.8, 0.9], [0.1] * 5, [0.95, 0.95, 0.95, 0.1, 0.1], _tail(1, "COLOR", [0.85, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]), False),
+        ("low_u_recovery_ok", [0.1] * 5, [0.1, 0.2, 0.3, 0.8, 0.9], [0.9, 0.9, 0.9, 0.1, 0.1], _tail(1, "COLOR", [0.1] * 7, slot=1, score=80), True),
+        ("low_b_recovery_ok", [0.1] * 5, [0.9, 0.9, 0.9, 0.1, 0.1], [0.1, 0.2, 0.3, 0.8, 0.9], _tail(1, "COLOR", [0.1] * 7, slot=1, score=80), True),
+        ("high_b_adjacency_ok", [0.1, 0.2, 0.25, 0.8, 0.9], [0.6] * 5, [0.1, 0.2, 0.3, 0.8, 0.9], _tail(1, "COLOR", [0.1, 0.1, 0.1, 0.1, 0.8, 0.1, 0.1]), False),
+    ]
+    for rule, w_values, u_values, b_values, tail, recovery in cases:
+        authority = _authority()
+        authority["_catalog_tail"] = [tail]
+        if recovery:
+            authority["cadenceLength"] = 2
+            authority["cadence"] = [{"slot": 1, "class": "EASY", "role": "regular", "modifier": 30, "noveltyTarget": 0}, {"slot": 2, "class": "EASY", "role": "recovery", "modifier": -30, "noveltyTarget": 0}]
+            authority["recoveryGuards"] = [{"fromSlot": 1, "toSlot": 2, "minimumChallengeDrop": 10}]
+        catalog = {"entries": [{"order": 1, "id": "existing-1"}]}
+        pool = _pool([50] * 5, profiles=["FLOW", "COLOR", "ROUTE", "FORTRESS", "MARATHON"])
+        if recovery:
+            for candidate in pool:
+                candidate["challenge_score"] = 20
+        for index, candidate in enumerate(pool):
+            vector = [0.1] * 7
+            vector[0], vector[3], vector[4] = w_values[index], u_values[index], b_values[index]
+            _set_vector(candidate, vector)
+        medians = (sorted(w_values)[len(w_values)//2], sorted(u_values)[len(u_values)//2], sorted(b_values)[len(b_values)//2])
+        target_vector = pool[3]["challenge_vector"]
+        previous_vector = tail["challenge_vector"]
+        assert len(set(medians)) == 3
+        if rule == "high_w_adjacency_ok":
+            assert target_vector[0] > medians[0] and previous_vector[0] > medians[0]
+            assert target_vector[4] <= medians[2] and previous_vector[4] <= medians[2]
+        elif rule == "low_u_recovery_ok":
+            assert target_vector[3] > medians[1] and target_vector[4] <= medians[2]
+        elif rule == "low_b_recovery_ok":
+            assert target_vector[4] > medians[2] and target_vector[3] <= medians[1]
+        else:
+            assert target_vector[4] > medians[2] and previous_vector[4] > medians[2]
+            assert target_vector[0] > medians[0] and previous_vector[0] <= medians[0]
+        authority["_catalog_tail"][-1]["slot"] = 1
+        # Lock level-003, whose relevant axis is above its own median while the
+        # other axis used by the former shared-median bug is below that median.
+        with pytest.raises(CampaignError, match="sequence constraint"):
+            build_campaign_plan(catalog=catalog, authority=authority, pool=pool, k=1, locks={2: "level-003"})
 
 
 def test_each_current_recovery_guard_uses_actual_adjacent_challenge_scores():
