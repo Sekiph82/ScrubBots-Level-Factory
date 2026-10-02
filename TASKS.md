@@ -4,11 +4,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M10 — Campaign Intelligence / Sequencing Adapter + P3 audit closure
-- Current Sprint: P3-R01-P1-M10 — Concurrent remediation and CampaignBuilder
-- Current Task: P3-R01-P1-M10-C001 — Execute P3-R01 audit closure and P1 M10 CampaignBuilder concurrently
-- Current Task Status: OWNER_AUTHORIZED / IMPLEMENT_BOTH_THEN_AUDIT
-- Next Task/Action: Codex executes only `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Complete both co-current workstreams: P3-R01 true interruption/governance closure and P1 M10 CampaignBuilder/Release Pool/batch publication. Preserve both authoritative prompts unchanged and stop after both builder logs are pushed for independent audits.
+- Current Milestone: M10 — Campaign Intelligence / Sequencing Adapter
+- Current Sprint: P1-M10-R01 — CampaignBuilder strict closure
+- Current Task: P1-M10-R01 — Close current-game LevelCatalog proof, runtime policy authority, axis-correct W/U/B checks, and catalog-boundary official profile history
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: Codex executes only `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Preserve the accepted Release Pool/Hungarian/contiguous-batch architecture, close only P1 audit findings F01..F04, and stop after `.hiveai/codex-logs/P1_M10_CAMPAIGN_BUILDER_R01_CODEX_LOG.md` is pushed for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P3-R01_P1-M10_COMBINED_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_R01_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -40,9 +40,16 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Combined Master Prompt: `.hiveai/prompts/P3-R01_P1-M10_COMBINED_MASTER_PROMPT.md`.
 - Combined Audit Criteria: `.hiveai/audit-criteria/P3-R01_P1-M10_COMBINED_AUDIT_CRITERIA.md`.
 - Combined Execution Rule: P3-R01 and P1-M10 proceed in the same builder cycle; neither blocks the other; each keeps its own builder log and independent audit boundary.
+- P3-R01 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_STRICT_AUDIT.md`; P3 headless batch pipeline is closed and no longer blocks M10.
+- P1-M10 Implementation Commit: `e935264a7ff5ae9b7eb3fe1538760b36c9d04fba`.
+- P1-M10 Independent Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_STRICT_AUDIT.md`.
+- P1-M10-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- P1-M10-R01 Prompt: `.hiveai/prompts/P1_M10_CAMPAIGN_BUILDER_R01_PROMPT.md`.
+- P1-M10-R01 Audit Criteria: `.hiveai/audit-criteria/P1_M10_CAMPAIGN_BUILDER_R01_AUDIT_CRITERIA.md`.
+- P1-M10-R01 Required Closures: real current-game LevelCatalog PASS; fail-closed runtime tolerance/recovery authority; separate W/U/B medians; official Difficulty V1 profile consumption; two-level catalog-tail profile history across the existing/new batch boundary.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
 - P2 Route A Status: `NOT_YET_PROVIDED`; do not invent branch/PR/store-update automation beyond P1.
-- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P3-R01_AND_P1-M10_AUDITS`; before resuming, reconcile any old ACCEPT-auto-publish wording with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.
+- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P1-M10-R01_AUDIT`; before resuming, reconcile any old ACCEPT-auto-publish wording with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
