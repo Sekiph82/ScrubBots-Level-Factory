@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M09 — Advanced Generation Research & Semantic Provider Evolution
-- Current Sprint: P3 — Headless, resumable batch processing of imported art
-- Current Task: P3 — Headless, resumable batch processing of imported art (unattended runs)
-- Current Task Status: OWNER_AUTHORIZED / IMPLEMENT_THEN_AUDIT
-- Next Task/Action: Codex executes only `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md` in `Sekiph82/ScrubBots-Level-Factory`, preserving the prompt unchanged. Implement the same canonical Import → Normalize → Validate → Candidate → ZIP supply/solve/Difficulty V1 → QA → Review chain headlessly, with resumable/idempotent per-source execution, bounded concurrency 1 by default, machine-readable progress, and no owner ACCEPT or publication. Stop after `.hiveai/codex-logs/P3_HEADLESS_BATCH_PIPELINE_CODEX_LOG.md` is pushed for independent audit.
+- Current Sprint: P3-R01 — Headless batch pipeline audit closure
+- Current Task: P3-R01 — Close true in-flight interruption coverage and generic transient-task governance regression
+- Current Task Status: CONDITIONAL / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: Codex executes only `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md` in `Sekiph82/ScrubBots-Level-Factory`. Preserve the original P3 prompt and accepted product behavior unchanged; close only P3-F01 interruption evidence and P3-F02 governance regression, then stop after the R01 builder log is pushed for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -26,7 +26,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P3 Required Actor: `CODEX`.
 - P3 Builder Log Target: `.hiveai/codex-logs/P3_HEADLESS_BATCH_PIPELINE_CODEX_LOG.md`.
 - P3 Boundary: headless CLI reaches the same canonical Review Queue as Studio, with resumable/idempotent per-source execution; it never owner-ACCEPTs and never publishes.
-- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P3_AUDIT`.
+- P3 Implementation Commit: `b9c2d844eefc0bc84a9002caa797a9fab1fb7c6e`.
+- P3 Independent Audit Result: `CONDITIONAL` by `.hiveai/audits/P3_HEADLESS_BATCH_PIPELINE_STRICT_AUDIT.md`.
+- P3-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- P3-R01 Prompt: `.hiveai/prompts/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_PROMPT.md`.
+- P3-R01 Audit Criteria: `.hiveai/audit-criteria/P3-R01_HEADLESS_BATCH_PIPELINE_AUDIT_CLOSURE_CRITERIA.md`.
+- P3-R01 Required Closures: true RUNNING-stage interruption/resume evidence for every canonical stage, ZIP pre/post canonical-record crash windows, and generic transient-current-task governance regression support without changing the 224-row denominator.
+- MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `PAUSED / NOT_CANCELLED / RESUME_AFTER_P3-R01_AUDIT`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
 - SB-LF09-001 C001-R01 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-LF09-001-C001-R01_EVIDENCE_AVAILABILITY_AND_CROSS_CANDIDATE_STRICT_AUDIT.md`; required-byte verification passed, but optional artifact identities remained implicitly shareable.
