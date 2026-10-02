@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: MAINT-ZIP-CORE-V02 — Canonical cutover final closure
-- Current Sprint: MAINT-ZIP-CORE-V02-C001-R02 — Final cutover
-- Current Task: MAINT-ZIP-CORE-V02-C001-R02 — Close final Level Factory ZIP product-shell/cutover findings under the current Release Pool + CampaignBuilder publication contract
+- Current Sprint: MAINT-ZIP-CORE-V02-C001-R02 + P2-ROUTE-A-C001 — Final cutover + game-repo PR release
+- Current Task: MAINT-ZIP-CORE-V02-C001-R02 + SB-CPX-003 — Close final ZIP cutover and implement Route A branch+PR release for owner-approved CampaignBuilder batches
 - Current Task Status: REMEDIATION_AUTHORIZED / RESUMED_AFTER_P1_M10_PASS
-- Next Task/Action: Codex executes only the reconciled `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`. Preserve P1-M10 PASS/CLOSED Release Pool + CampaignBuilder authority; close only R02 final-cutover findings; stop after the R02 builder log is pushed for independent re-audit.
+- Next Task/Action: Codex executes only the reconciled `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`, which now includes co-current P2 Route A. Preserve P1-M10 PASS/CLOSED authority; produce separate R02 and P2 builder logs; stop for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -52,7 +52,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P1-M10-R01 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`.
 - M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
-- P2 Route A Status: `NOT_YET_PROVIDED`; do not invent branch/PR/store-update automation beyond P1.
+- P2 Route A Status: `OWNER_PROVIDED / AUTHORIZED / CO_CURRENT_WITH_R02`; implement branch+PR release capability under `SB-CPX-003`, with real remote untouched in tests.
+- P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
+- P2 Route A Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`.
+- P2 Route A Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
+- P2 Route A Boundary: owner-approved CampaignBuilder plan -> deterministic release branch -> current-game verification -> one release commit -> branch push + PR -> release receipt; owner/store submission remains out of scope.
 - MAINT-ZIP-CORE-V02-C001-R02 Pause Status: `RESUMED / AUTHORIZED_AFTER_P1-M10-R01_PASS`; prompt and audit criteria reconciled with OWNER_RELEASE_POOL_BATCH_PUBLICATION_V01 before execution.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Audit Criteria: `.hiveai/audit-criteria/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_AUDIT_CRITERIA.md`.
@@ -882,6 +886,10 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 - [ ] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
 
+### M14.05 - Route A game-repository release PR
+
+- [ ] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
+
 ---
 
 # M15 - Godot Remote Content Runtime
@@ -1052,7 +1060,7 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
 - PAG-SP11/PAG-SP12/PAG-SP13 are the three legacy unique extension tasks retained under M09.06.
 - `SB-LFX-001..017` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
-- `SB-CPX-001..002` are owner-approved Content Platform integrity extensions for exact solver-proven supply-plan packaging and current-main promotion replay; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
+- `SB-CPX-001..003` are owner-approved Content Platform/release integrity extensions: exact solver-proven supply-plan packaging, current-main promotion replay, and Route A game-repository branch+PR release; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
 - Windows Factory Studio v1.3.6 is retained as M06 migration evidence; its operator/provider/job/accounting layers are reusable, while its legacy compiler is not canonical.
 
