@@ -26,11 +26,28 @@ present. Reports describe local validation only.
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.
 The local `classify_content()` API accepts only an explicit allow-list of
-versioned JSON descriptors for level data, supply-plan data, and approved
-metadata. It returns `REMOTE_DECLARATIVE`, `APP_OWNED`, or `REJECTED` with the
-boundary version and stable reason codes. The classifier examines descriptor
-values only; it never opens, imports, evaluates, or executes the referenced
-payload.
+versioned JSON descriptors for Level Data V1, supply-plan V1, and current
+publisher metadata V1. Each `descriptor_contract_id` names this package's
+normalized descriptor contract; it is not a field claimed to exist inside the
+payload. `payload_contract` separately records the production authority and
+version. Supply plans bind to the emitted/loaded
+`scrubbots.level_supply_plan.v1`, and publisher metadata binds to
+`scrubbots.level.metadata.v1`.
+Descriptor attributes are normalized projections of production fields: `id`
+maps to `level_id`, `columnCount` maps to `columns`, and
+`visiblePreviewDepth` maps to `preview_depth`. They do not claim those renamed
+attributes are embedded in the production payload.
+
+Level Data V1 has no embedded schema string. Its descriptor therefore uses the
+boundary-owned `scrubbots.content-pipeline.level-data.v1` identity and records
+`payload_contract.authority = "Level Data Specification"` with version `1`;
+the Level Data payload itself remains `version: 1` with its current `id`,
+`name`, `difficulty`, dimensions, palette, and cells fields. Cross-authority
+tests inspect the current Level Factory exporter/publisher source and a
+commit-pinned read-only fixture of current Scrubbots loader/spec authority.
+The classifier returns `REMOTE_DECLARATIVE`, `APP_OWNED`, or `REJECTED` with
+the boundary version and stable reason codes. It never opens, imports,
+evaluates, or executes the referenced payload.
 
 Examples under `schemas/v1/examples/` show the three eligible data families.
 Scripts, Python, native binaries, plugins/addons, scenes/resources, shaders,

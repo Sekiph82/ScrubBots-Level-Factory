@@ -1,12 +1,19 @@
 {
   "attributes": {
-    "display_name": "First Steps",
+    "columns": 3,
+    "height": 20,
     "level_id": "level-001",
-    "locale": "en"
+    "payload_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "preview_depth": 3,
+    "width": 20
   },
   "boundary_version": "1.0",
   "content_type": "approved_metadata",
   "logical_path": "metadata/level-001.json",
   "media_type": "application/vnd.scrubbots.approved-metadata+json",
-  "schema_id": "scrubbots.approved-metadata.v1"
+  "descriptor_contract_id": "scrubbots.content-pipeline.publisher-metadata.v1",
+  "payload_contract": {
+    "schema": "scrubbots.level.metadata.v1",
+    "version": 1
+  }
 }

@@ -28,6 +28,7 @@ class ReasonCode(StrEnum):
     PATH_TRAVERSAL = "PATH_TRAVERSAL"
     NON_CANONICAL_PATH = "NON_CANONICAL_PATH"
     INVALID_DESCRIPTOR = "INVALID_DESCRIPTOR"
+    PAYLOAD_CONTRACT_MISMATCH = "PAYLOAD_CONTRACT_MISMATCH"
     EXECUTABLE_FIELD = "EXECUTABLE_FIELD"
     EXECUTABLE_REFERENCE = "EXECUTABLE_REFERENCE"
     UNKNOWN_EXTENSION = "UNKNOWN_EXTENSION"
@@ -63,29 +64,46 @@ def serialize_result(result: ClassificationResult) -> str:
     return json.dumps(result.to_dict(), sort_keys=True, separators=(",", ":")) + "\n"
 
 
-_CONTRACTS: dict[str, tuple[str, str, frozenset[str], frozenset[str]]] = {
+_CONTRACTS: dict[
+    str,
+    tuple[str, str, dict[str, str | int], frozenset[str], frozenset[str]],
+] = {
     "level_data": (
         "application/vnd.scrubbots.level+json",
-        "scrubbots.level.v1",
+        "scrubbots.content-pipeline.level-data.v1",
+        {"authority": "Level Data Specification", "version": 1},
         frozenset({"level_id", "payload_sha256", "width", "height"}),
         frozenset({"level_id", "payload_sha256", "width", "height"}),
     ),
     "supply_plan_data": (
         "application/vnd.scrubbots.supply-plan+json",
-        "scrubbots.supply-plan.v1",
+        "scrubbots.content-pipeline.supply-plan.v1",
+        {"schema": "scrubbots.level_supply_plan.v1", "version": 1},
         frozenset({"level_id", "supply_plan_sha256", "columns", "preview_depth"}),
         frozenset({"level_id", "supply_plan_sha256", "columns", "preview_depth"}),
     ),
     "approved_metadata": (
         "application/vnd.scrubbots.approved-metadata+json",
-        "scrubbots.approved-metadata.v1",
-        frozenset({"level_id", "locale", "display_name"}),
-        frozenset({"level_id", "locale", "display_name"}),
+        "scrubbots.content-pipeline.publisher-metadata.v1",
+        {"schema": "scrubbots.level.metadata.v1", "version": 1},
+        frozenset({"level_id", "payload_sha256", "width", "height", "columns", "preview_depth"}),
+        frozenset({"level_id", "payload_sha256", "width", "height", "columns", "preview_depth"}),
     ),
 }
-_SCHEMA_TO_TYPE = {schema_id: content_type for content_type, (_, schema_id, _, _) in _CONTRACTS.items()}
+_DESCRIPTOR_CONTRACT_TO_TYPE = {
+    descriptor_contract_id: content_type
+    for content_type, (_, descriptor_contract_id, _, _, _) in _CONTRACTS.items()
+}
 _ROOT_FIELDS = frozenset(
-    {"boundary_version", "content_type", "logical_path", "media_type", "schema_id", "attributes"}
+    {
+        "boundary_version",
+        "content_type",
+        "logical_path",
+        "media_type",
+        "descriptor_contract_id",
+        "payload_contract",
+        "attributes",
+    }
 )
 _APP_CODE_EXTENSIONS = frozenset(
     {
@@ -99,6 +117,7 @@ _EXECUTABLE_KEY_PARTS = (
     "script", "expression", "bytecode", "eval", "exec", "plugin", "addon", "shader",
     "resource", "autoload", "nativecode", "modulepath",
 )
+_EXECUTABLE_COMPOUND_MARKERS = ("nativecode", "modulepath")
 _EXECUTABLE_REFERENCE = re.compile(
     r"(?i)(?:\b(?:eval|exec|__import__|compile|load|preload)\s*\(|"
     r"(?:res|user)://|\$\{|\{\{.*\}\}|"
@@ -106,7 +125,6 @@ _EXECUTABLE_REFERENCE = re.compile(
 )
 _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
-_LOCALE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 
 
 def _result(disposition: ContentDisposition, reason: ReasonCode) -> ClassificationResult:
@@ -138,8 +156,12 @@ def _has_executable_marker(value: object, seen: set[int] | None = None) -> Reaso
         seen.add(identity)
         for key, nested in value.items():
             if isinstance(key, str):
-                normalized = re.sub(r"[^a-z0-9]", "", key.casefold())
-                if any(part in normalized for part in _EXECUTABLE_KEY_PARTS):
+                split_camel_case = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", key)
+                key_tokens = set(re.findall(r"[a-z0-9]+", split_camel_case.casefold()))
+                compact_key = re.sub(r"[^a-z0-9]", "", key.casefold())
+                if (key_tokens & (set(_EXECUTABLE_KEY_PARTS) - set(_EXECUTABLE_COMPOUND_MARKERS))) or any(
+                    marker in compact_key for marker in _EXECUTABLE_COMPOUND_MARKERS
+                ):
                     return ReasonCode.EXECUTABLE_FIELD
             marker = _has_executable_marker(nested, seen)
             if marker is not None:
@@ -160,7 +182,7 @@ def _has_executable_marker(value: object, seen: set[int] | None = None) -> Reaso
 def _attributes_are_valid(content_type: str, attributes: object) -> ReasonCode | None:
     if not isinstance(attributes, Mapping):
         return ReasonCode.INVALID_ATTRIBUTES
-    _, _, required, allowed = _CONTRACTS[content_type]
+    _, _, _, required, allowed = _CONTRACTS[content_type]
     if not all(isinstance(key, str) for key in attributes):
         return ReasonCode.INVALID_ATTRIBUTES
     keys = frozenset(attributes)
@@ -193,11 +215,20 @@ def _attributes_are_valid(content_type: str, attributes: object) -> ReasonCode |
         if type(preview_depth) is not int or preview_depth != 3:
             return ReasonCode.INVALID_ATTRIBUTE_VALUE
     else:
-        locale = attributes.get("locale")
-        display_name = attributes.get("display_name")
-        if not isinstance(locale, str) or not _LOCALE.fullmatch(locale):
+        digest = attributes.get("payload_sha256")
+        width = attributes.get("width")
+        height = attributes.get("height")
+        columns = attributes.get("columns")
+        preview_depth = attributes.get("preview_depth")
+        if not isinstance(digest, str) or not _SHA256.fullmatch(digest):
             return ReasonCode.INVALID_ATTRIBUTE_VALUE
-        if not isinstance(display_name, str) or not 1 <= len(display_name) <= 100:
+        if type(width) is not int or not 1 <= width <= 256:
+            return ReasonCode.INVALID_ATTRIBUTE_VALUE
+        if type(height) is not int or not 1 <= height <= 256:
+            return ReasonCode.INVALID_ATTRIBUTE_VALUE
+        if type(columns) is not int or columns not in {3, 4, 5}:
+            return ReasonCode.INVALID_ATTRIBUTE_VALUE
+        if type(preview_depth) is not int or preview_depth != 3:
             return ReasonCode.INVALID_ATTRIBUTE_VALUE
     return None
 
@@ -250,14 +281,22 @@ def classify_content(descriptor: object) -> ClassificationResult:
     content_type = descriptor.get("content_type")
     if not isinstance(content_type, str) or content_type not in _CONTRACTS:
         return _result(ContentDisposition.REJECTED, ReasonCode.UNKNOWN_CONTENT_TYPE)
-    schema_id = descriptor.get("schema_id")
-    if not isinstance(schema_id, str) or schema_id not in _SCHEMA_TO_TYPE:
+    descriptor_contract_id = descriptor.get("descriptor_contract_id")
+    if (
+        not isinstance(descriptor_contract_id, str)
+        or descriptor_contract_id not in _DESCRIPTOR_CONTRACT_TO_TYPE
+    ):
         return _result(ContentDisposition.REJECTED, ReasonCode.UNKNOWN_SCHEMA)
-    if _SCHEMA_TO_TYPE[schema_id] != content_type:
+    if _DESCRIPTOR_CONTRACT_TO_TYPE[descriptor_contract_id] != content_type:
         return _result(ContentDisposition.REJECTED, ReasonCode.SCHEMA_TYPE_MISMATCH)
-    expected_media_type, expected_schema_id, _, _ = _CONTRACTS[content_type]
-    if schema_id != expected_schema_id:
+    expected_media_type, expected_contract_id, expected_payload_contract, _, _ = _CONTRACTS[
+        content_type
+    ]
+    if descriptor_contract_id != expected_contract_id:
         return _result(ContentDisposition.REJECTED, ReasonCode.SCHEMA_TYPE_MISMATCH)
+    payload_contract = descriptor.get("payload_contract")
+    if not isinstance(payload_contract, Mapping) or dict(payload_contract) != expected_payload_contract:
+        return _result(ContentDisposition.REJECTED, ReasonCode.PAYLOAD_CONTRACT_MISMATCH)
     if descriptor.get("media_type") != expected_media_type:
         return _result(ContentDisposition.REJECTED, ReasonCode.MEDIA_TYPE_MISMATCH)
 

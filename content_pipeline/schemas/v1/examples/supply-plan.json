@@ -9,5 +9,9 @@
   "content_type": "supply_plan_data",
   "logical_path": "supply/level-001.json",
   "media_type": "application/vnd.scrubbots.supply-plan+json",
-  "schema_id": "scrubbots.supply-plan.v1"
+  "descriptor_contract_id": "scrubbots.content-pipeline.supply-plan.v1",
+  "payload_contract": {
+    "schema": "scrubbots.level_supply_plan.v1",
+    "version": 1
+  }
 }

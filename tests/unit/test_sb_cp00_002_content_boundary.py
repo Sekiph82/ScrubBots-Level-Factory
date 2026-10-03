@@ -98,11 +98,12 @@ def test_absolute_noncanonical_and_traversal_paths_fail_closed(path: str, reason
 @pytest.mark.parametrize(
     ("changes", "reason"),
     (
-        ({"schema_id": "scrubbots.level.v999"}, ReasonCode.UNKNOWN_SCHEMA),
+        ({"descriptor_contract_id": "scrubbots.content-pipeline.level-data.v999"}, ReasonCode.UNKNOWN_SCHEMA),
         ({"content_type": "script"}, ReasonCode.UNKNOWN_CONTENT_TYPE),
         ({"media_type": "application/octet-stream"}, ReasonCode.MEDIA_TYPE_MISMATCH),
         ({"logical_path": "levels/level-001.unknown"}, ReasonCode.UNKNOWN_EXTENSION),
         ({"content_type": "supply_plan_data"}, ReasonCode.SCHEMA_TYPE_MISMATCH),
+        ({"payload_contract": {"schema": "scrubbots.supply-plan.v1", "version": 1}}, ReasonCode.PAYLOAD_CONTRACT_MISMATCH),
         ({"extra": "unknown"}, ReasonCode.UNKNOWN_DESCRIPTOR_FIELD),
     ),
 )
@@ -158,6 +159,9 @@ def test_contract_schema_documents_the_narrow_versioned_allow_list() -> None:
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     assert schema["properties"]["boundary_version"]["const"] == "1.0"
     assert schema["additionalProperties"] is False
+    assert "schema_id" not in schema["properties"]
+    assert "descriptor_contract_id" in schema["properties"]
+    assert "payload_contract" in schema["properties"]
     assert set(schema["properties"]["content_type"]["enum"]) == {
         "level_data",
         "supply_plan_data",

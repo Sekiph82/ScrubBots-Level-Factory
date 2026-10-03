@@ -1,0 +1,29 @@
+{
+  "authority_repository": "Sekiph82/Scrubbots",
+  "authority_commit": "5881a68eefdb8a25f28f15f4fc3047e19fbc64df",
+  "level_data": {
+    "source_path": "docs/03_LEVEL_DATA_SPEC.md",
+    "runtime_authority_path": "scripts/data/level_data.gd",
+    "authority": "Level Data Specification",
+    "version_field": "version",
+    "version": 1,
+    "embedded_schema_field": null,
+    "required_fields": [
+      "cells",
+      "difficulty",
+      "height",
+      "id",
+      "name",
+      "palette",
+      "version",
+      "width"
+    ]
+  },
+  "supply_plan": {
+    "runtime_authority_path": "scripts/gameplay/supply/supply_plan_loader.gd",
+    "schema_field": "schema",
+    "schema": "scrubbots.level_supply_plan.v1",
+    "version_field": "version",
+    "version": 1
+  }
+}
