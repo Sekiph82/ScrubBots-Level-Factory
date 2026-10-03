@@ -43,7 +43,12 @@ Document role: CODEX BUILDER LOG
 - No dependency, license, network, or credential changes were made.
 - A first log-writing wrapper attempt failed before shell execution due embedded backtick quoting. It was corrected; no source files were changed by the failed attempt.
 - Initial staged `git diff --cached --check` found one extra blank line at EOF in the new test module. Removed the blank line; the corrected staged diff check passed.
-- Initial staged `git diff --cached --check` for the builder log also found an extra blank line at EOF. Removed it; the corrected check is being run before the log commit.
+- Initial staged `git diff --cached --check` for the builder log also found an extra blank line at EOF. Removed it; the corrected check passed.
 - Implementation commit: `e255b936732271a2ef2257849bd654133e6ea732` (`feat(content-pipeline): classify app and remote content`). It contains the classifier, schema/examples, package export, README contract, and focused tests; the builder log is separate.
 - Pre-publication state after implementation commit: clean implementation index/worktree except this builder log; detached at the implementation commit, whose parent is the verified origin/main base `84f2763b88e46379f54e848452be6eb398eb58c3`.
-- Implementation, test, documentation, and publication decisions and evidence will be appended chronologically below.
+- Builder-log commit: `7b5a534af9032717791b8f79ce4786a35ddbbfb1` (`docs(log): record SB-CP00-002-C001 builder evidence`).
+- Pre-push `git fetch --prune origin` verified origin/main still at `84f2763b88e46379f54e848452be6eb398eb58c3`; local HEAD was 2 commits ahead, 0 behind, and a descendant of origin/main.
+- `git push origin HEAD:main` succeeded as a normal fast-forward: `84f2763..7b5a534 HEAD -> main`.
+- Post-push `git fetch --prune origin` verified local HEAD and origin/main both at `7b5a534af9032717791b8f79ce4786a35ddbbfb1`, with 0 ahead / 0 behind and a clean worktree.
+- Final changed-file summary: 8 implementation files added/updated (626 insertions) plus this builder log. No root TASKS.md, prompt, audit, credential, provider, or runtime networking changes.
+- Builder stop point: implementation and builder evidence are published; awaiting independent ChatGPT audit. No audit or acceptance claim is made by Codex.
