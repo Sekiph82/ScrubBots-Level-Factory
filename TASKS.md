@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M11 — Content Platform Architecture & Security Boundary
-- Current Sprint: SB-CP00-002-C001 — App code vs remote content boundary
-- Current Task: SB-CP00-002 — Define app code vs remote content boundary
-- Current Task Status: IMPLEMENT_THEN_AUDIT / AUTHORIZED
-- Next Task/Action: SB-CP00-002 executes only `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`; first synchronize local/GitHub authority, implement the versioned fail-closed app-vs-remote declarative boundary, publish the builder log, then stop for independent audit.
+- Current Sprint: SB-CP00-002-C001-R01 — Bind remote-content allow-list to current production contracts
+- Current Task: SB-CP00-002 — Correct current LevelData/supply/metadata contract binding while preserving fail-closed security
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: SB-CP00-002 executes only `.hiveai/prompts/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_PROMPT.md`; first synchronize local/GitHub authority, close only production-contract binding and cross-authority drift findings F01/F02, preserve all passing security behavior, publish the R01 builder log, then stop for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -85,6 +85,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP00-002 C001 Authorization: `IMPLEMENT_THEN_AUDIT`.
 - SB-CP00-002 C001 Prompt: `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`.
 - SB-CP00-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_AUDIT_CRITERIA.md`.
+- SB-CP00-002 C001 Implementation Commit: `e255b936732271a2ef2257849bd654133e6ea732`.
+- SB-CP00-002 C001 Final Builder Publication: `4d827949c848f8c5a51d6b115b165cfb46f8e717`.
+- SB-CP00-002 C001 Strict Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_STRICT_AUDIT.md`.
+- SB-CP00-002 C001-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- SB-CP00-002 C001-R01 Prompt: `.hiveai/prompts/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_PROMPT.md`.
+- SB-CP00-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_AUDIT_CRITERIA.md`.
 - P2 Route A Boundary: owner-approved CampaignBuilder plan -> deterministic release branch -> current-game verification -> one release commit -> branch push + PR -> release receipt; owner/store submission remains out of scope.
 - MAINT-ZIP-CORE-V02-C001-R02 Status: `PASS / CLOSED`; final cutover independently accepted after owner-publication reconciliation.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
