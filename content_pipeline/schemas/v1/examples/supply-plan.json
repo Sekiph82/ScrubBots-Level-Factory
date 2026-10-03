@@ -1,0 +1,13 @@
+{
+  "attributes": {
+    "columns": 3,
+    "level_id": "level-001",
+    "preview_depth": 3,
+    "supply_plan_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "boundary_version": "1.0",
+  "content_type": "supply_plan_data",
+  "logical_path": "supply/level-001.json",
+  "media_type": "application/vnd.scrubbots.supply-plan+json",
+  "schema_id": "scrubbots.supply-plan.v1"
+}

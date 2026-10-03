@@ -1,0 +1,13 @@
+{
+  "attributes": {
+    "height": 20,
+    "level_id": "level-001",
+    "payload_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "width": 20
+  },
+  "boundary_version": "1.0",
+  "content_type": "level_data",
+  "logical_path": "levels/level-001.json",
+  "media_type": "application/vnd.scrubbots.level+json",
+  "schema_id": "scrubbots.level.v1"
+}

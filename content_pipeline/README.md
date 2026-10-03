@@ -22,6 +22,29 @@ provider protocols, and publish/promote/rollback interfaces are placeholders.
 No provider implementation, remote operation, credential, or network client is
 present. Reports describe local validation only.
 
+## App code and remote content boundary
+
+The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.
+The local `classify_content()` API accepts only an explicit allow-list of
+versioned JSON descriptors for level data, supply-plan data, and approved
+metadata. It returns `REMOTE_DECLARATIVE`, `APP_OWNED`, or `REJECTED` with the
+boundary version and stable reason codes. The classifier examines descriptor
+values only; it never opens, imports, evaluates, or executes the referenced
+payload.
+
+Examples under `schemas/v1/examples/` show the three eligible data families.
+Scripts, Python, native binaries, plugins/addons, scenes/resources, shaders,
+absolute paths, traversal, unknown types/extensions/schemas, and descriptors
+that include executable fields or script references fail closed as
+`APP_OWNED` or `REJECTED`. A future content family is ineligible until its
+versioned contract and classification rules are explicitly added.
+
+Executable-capable content remains app-owned because shipping it remotely
+would change application behavior and expand the runtime attack surface. Level
+Factory remains the producer of accepted data; this package owns the
+classification contract. Runtime enforcement and cross-version compatibility
+remain deferred to separately authorized pack/runtime milestones.
+
 ## Ownership and dependency direction
 
 - Root `TASKS.md` remains the sole task ledger, owned by ChatGPT. This project

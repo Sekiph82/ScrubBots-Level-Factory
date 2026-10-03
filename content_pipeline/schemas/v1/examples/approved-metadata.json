@@ -1,0 +1,12 @@
+{
+  "attributes": {
+    "display_name": "First Steps",
+    "level_id": "level-001",
+    "locale": "en"
+  },
+  "boundary_version": "1.0",
+  "content_type": "approved_metadata",
+  "logical_path": "metadata/level-001.json",
+  "media_type": "application/vnd.scrubbots.approved-metadata+json",
+  "schema_id": "scrubbots.approved-metadata.v1"
+}
