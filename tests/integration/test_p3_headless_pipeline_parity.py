@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -12,7 +13,8 @@ from scrubbots_pixel_factory.supply_pipeline.game_rules import DEFAULT_PROJECT, 
 
 
 def test_headless_job_uses_the_same_canonical_route_and_review_queue(tmp_path: Path, monkeypatch) -> None:
-    if find_godot() is None or not (DEFAULT_PROJECT / "project.godot").is_file():
+    configured_project = Path(os.environ.get("SCRUBBOTS_PROJECT") or DEFAULT_PROJECT)
+    if find_godot() is None or not (configured_project / "project.godot").is_file():
         pytest.skip("local Godot or configured read-only ScrubBots authority is unavailable")
 
     repository = tmp_path / "level-factory"

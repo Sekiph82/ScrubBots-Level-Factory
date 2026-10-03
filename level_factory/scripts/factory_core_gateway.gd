@@ -72,12 +72,15 @@ func capability_matrix() -> Dictionary:
 		reproduce_reason = "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."
 	var zip_available := core_available and _canonical_game_checkout_available()
 	var zip_reason := "AVAILABLE — canonical ZIP solve/replay/Difficulty V1 route is executable." if zip_available else "UNAVAILABLE — Python Core, canonical ZIP route, read-only Scrubbots checkout, and Godot are all required."
+	var zip_action_reason := zip_reason
+	if zip_available and _last_successful_candidate_id.is_empty():
+		zip_action_reason = "UNAVAILABLE — run a successful canonical Generate first to select a candidate for ZIP Solve or Analyze."
 	return {
 		"Generate": {"available": core_available, "reason": _connection_detail},
 		"Reproduce": {"available": reproduce_available, "reason": reproduce_reason},
-		"Solve": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_reason if zip_available else zip_reason},
+		"Solve": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_action_reason},
 		"Validate": {"available": false, "reason": FUTURE_ACTION_REASONS["Validate"]},
-		"Analyze": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_reason if zip_available else zip_reason},
+		"Analyze": {"available": zip_available and not _last_successful_candidate_id.is_empty(), "reason": zip_action_reason},
 	}
 
 

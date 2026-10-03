@@ -19,6 +19,10 @@ STATE_SHA = hashlib.sha256(b"fixture-compact-state").hexdigest()
 LEVEL_SOURCE = {"version": 1, "id": "bridge-fixture", "name": "Bridge Fixture", "difficulty": "TEST", "width": 2, "height": 2, "palette": ["C01", "C02"], "cells": [0, 0, 0, 0]}
 
 
+def _canonical_project() -> Path:
+    return Path(os.environ.get("SCRUBBOTS_PROJECT") or r"C:\Users\sekip\Desktop\ScrubBots")
+
+
 def level_source_bytes(source: dict[str, object] | None = None) -> bytes:
     return json.dumps(source or LEVEL_SOURCE, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
@@ -79,7 +83,7 @@ def test_malformed_authority_and_payload_fail_closed() -> None:
 
 
 def _clean_authority_checkout(tmp_path: Path) -> Path:
-    source = Path(r"C:\Users\sekip\Desktop\ScrubBots")
+    source = _canonical_project()
     checkout = tmp_path / "scrubbots-canonical"
     subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "--local", "--no-hardlinks", str(source), str(checkout)], check=True, capture_output=True, text=True)
     subprocess.run(["git", "-C", str(checkout), "config", "core.autocrlf", "false"], check=True, capture_output=True, text=True)
@@ -87,7 +91,7 @@ def _clean_authority_checkout(tmp_path: Path) -> Path:
     return checkout
 
 
-@pytest.mark.skipif(not Path(r"C:\Users\sekip\Desktop\ScrubBots").is_dir() or shutil.which("godot_console.exe") is None, reason="canonical owner repository or Godot executable is unavailable")
+@pytest.mark.skipif(not _canonical_project().is_dir() or shutil.which("godot_console.exe") is None, reason="canonical owner repository or Godot executable is unavailable")
 def test_real_canonical_capability_and_runner_are_capability_gated(tmp_path: Path) -> None:
     checkout = _clean_authority_checkout(tmp_path)
     runner = (Path(__file__).resolve().parents[2] / "tools" / "scrubbots_canonical_bridge_runner.gd").resolve()

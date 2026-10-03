@@ -6,7 +6,6 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
-import shutil
 import subprocess
 from typing import Any, Callable, Mapping
 
@@ -15,6 +14,10 @@ from .release_pool import ReleaseError, _json, approve_release_plan, validate_re
 
 class RouteAError(RuntimeError):
     pass
+
+
+class RouteARollbackError(RouteAError):
+    """A failed release whose preflight checkout restoration was not verified."""
 
 
 _GAME_REMOTE = "https://github.com/Sekiph82/Scrubbots.git"
@@ -31,6 +34,105 @@ def _run(args: list[str], cwd: Path, *, check: bool = True, timeout: int = 120) 
 
 def _git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
     return _run(["git", *args], root, check=check)
+
+
+def _snapshot_checkout(root: Path) -> dict[str, Any]:
+    """Capture the clean preflight identity needed to prove an exact rollback."""
+    branch = _git(root, "branch", "--show-current").stdout.strip()
+    head = _git(root, "rev-parse", "HEAD").stdout.strip()
+    status = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all").stdout
+    if branch != "main" or status:
+        raise RouteAError("Route A rollback snapshot requires a clean main checkout")
+    refs = _git(root, "for-each-ref", "--format=%(refname)%00%(objectname)").stdout
+    tracked_index = _git(root, "ls-files", "--stage", "-z").stdout
+    tracked = _git(root, "ls-files", "-z").stdout.split("\0")
+    tracked_hashes: dict[str, str] = {}
+    for rel in filter(None, tracked):
+        path = root / rel
+        if path.is_file():
+            tracked_hashes[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+        elif path.is_symlink():
+            tracked_hashes[rel] = "symlink:" + os.readlink(path)
+        else:
+            tracked_hashes[rel] = "missing"
+    files, directories = _snapshot_inventory(root)
+    return {
+        "branch": branch,
+        "head": head,
+        "status": status,
+        "refs": refs,
+        "tracked_index": tracked_index,
+        "tracked_hashes": tracked_hashes,
+        "files": files,
+        "directories": directories,
+    }
+
+
+def _remove_new_paths(root: Path, snapshot: Mapping[str, Any]) -> None:
+    current_files: set[str] = set()
+    current_dirs: set[str] = set()
+    for directory, dirs, names in os.walk(root, topdown=True, followlinks=False):
+        current = Path(directory)
+        dirs[:] = [name for name in dirs if not (current == root and name == ".git")]
+        for name in dirs:
+            path = current / name
+            rel = path.relative_to(root).as_posix()
+            if path.is_symlink():
+                current_files.add(rel)
+            else:
+                current_dirs.add(rel)
+        for name in names:
+            current_files.add((current / name).relative_to(root).as_posix())
+    for rel in sorted(current_files - set(snapshot["files"]), key=lambda value: value.count("/"), reverse=True):
+        path = root / PurePosixPath(rel)
+        if path.is_symlink() or path.is_file():
+            path.unlink()
+    for rel in sorted(current_dirs - set(snapshot["directories"]), key=lambda value: value.count("/"), reverse=True):
+        path = root / PurePosixPath(rel)
+        try:
+            path.rmdir()
+        except OSError:
+            pass
+
+
+def _verify_checkout_snapshot(root: Path, snapshot: Mapping[str, Any]) -> list[str]:
+    problems: list[str] = []
+    branch = _git(root, "branch", "--show-current", check=False).stdout.strip()
+    head = _git(root, "rev-parse", "HEAD", check=False).stdout.strip()
+    status = _git(root, "status", "--porcelain=v1", "-z", "--untracked-files=all", check=False).stdout
+    refs = _git(root, "for-each-ref", "--format=%(refname)%00%(objectname)", check=False).stdout
+    staged = _git(root, "ls-files", "--stage", "-z", check=False).stdout
+    if branch != snapshot["branch"]: problems.append(f"branch {branch!r} != {snapshot['branch']!r}")
+    if head != snapshot["head"]: problems.append(f"HEAD {head!r} != {snapshot['head']!r}")
+    if status != snapshot["status"]: problems.append("porcelain status differs from preflight")
+    if refs != snapshot["refs"]: problems.append("Git refs differ from preflight")
+    if staged != snapshot["tracked_index"]: problems.append("tracked index entries differ from preflight")
+    for rel, expected in snapshot["tracked_hashes"].items():
+        path = root / rel
+        actual = "symlink:" + os.readlink(path) if path.is_symlink() else hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else "missing"
+        if actual != expected: problems.append(f"tracked bytes differ: {rel}")
+    current = _snapshot_inventory(root)
+    if current[0] != snapshot["files"]: problems.append("file/symlink inventory differs from preflight")
+    if current[1] != snapshot["directories"]: problems.append("directory inventory differs from preflight")
+    return problems
+
+
+def _snapshot_inventory(root: Path) -> tuple[dict[str, str], set[str]]:
+    files: dict[str, str] = {}
+    directories: set[str] = set()
+    for directory, dirs, names in os.walk(root, topdown=True, followlinks=False):
+        current = Path(directory)
+        dirs[:] = [name for name in dirs if not (current == root and name == ".git")]
+        for name in dirs:
+            path = current / name
+            rel = path.relative_to(root).as_posix()
+            if path.is_symlink(): files[rel] = "symlink:" + os.readlink(path)
+            else: directories.add(rel)
+        for name in names:
+            path = current / name
+            rel = path.relative_to(root).as_posix()
+            files[rel] = "symlink:" + os.readlink(path) if path.is_symlink() else hashlib.sha256(path.read_bytes()).hexdigest()
+    return files, directories
 
 
 def _normalize_remote(value: str) -> str:
@@ -99,24 +201,6 @@ def _check_allowlist(root: Path, original_catalog: bytes, expected_ids: list[str
     return sorted(changed)
 
 
-def _restore(root: Path, original_catalog: bytes, created_paths: set[str]) -> None:
-    for rel in created_paths:
-        path = root / PurePosixPath(rel)
-        if path.is_file():
-            path.unlink()
-    catalog = root / _ALLOWED_FIXED
-    catalog.write_bytes(original_catalog)
-    # Remove only empty directories created inside the allow-list tree.
-    for rel in ("data/levels/metadata", "data/levels/supply", "assets/art/levels/previews"):
-        base = root / rel
-        if base.is_dir():
-            for directory, _dirs, _files in os.walk(base, topdown=False):
-                candidate = Path(directory)
-                if candidate != base:
-                    try: candidate.rmdir()
-                    except OSError: pass
-
-
 def _verify_game(project: Path, plan_rows: list[dict[str, Any]], orders: list[int]) -> dict[str, Any]:
     """Run game-owned validators, solver/replay and official Difficulty V1 in Godot."""
     from .game_rules import find_godot
@@ -172,11 +256,12 @@ func _initialize():
 		for action in solved.trace: columns.append(int(action["column"]))
 		var measured = analyzer.measure(level, built["engine"], columns, solved.trace)
 		if not measured.get("ok", false): _fail("Difficulty V1 measure " + id + ": " + str(measured.get("error", "failed"))); return
-		var score = analyzer.score(measured, int(orders[i]))
 		var metadata = JSON.parse_string(FileAccess.get_file_as_string(entry.metadata_path))
-		var expected = float(metadata.get("challengeScore", -1.0))
-		var actual = float(score.get("challengeScore", -2.0))
-		if absf(actual - expected) > 0.000001: _fail("Difficulty V1 metadata parity " + id + ": expected " + str(expected) + " actual " + str(actual)); return
+		if typeof(metadata) != TYPE_DICTIONARY: _fail("Difficulty V1 metadata parity " + id + ": metadata is not an object"); return
+		if str(metadata.get("difficulty", "")) != str(entry.difficulty): _fail("Difficulty V1 metadata parity " + id + ": difficulty metadata differs from catalog"); return
+		if int(metadata.get("width", -1)) != int(entry.width) or int(metadata.get("height", -1)) != int(entry.height): _fail("Difficulty V1 metadata parity " + id + ": dimensions differ from catalog"); return
+		var score = analyzer.score(measured, int(orders[i]))
+		if not score.has("challengeScore"): _fail("Difficulty V1 score missing challengeScore " + id); return
 	print("FACTORY_ROUTE_A_VERIFY_PASS")
 	quit(0)
 func _fail(message: String):
@@ -194,7 +279,7 @@ func _fail(message: String):
         runner.unlink(missing_ok=True)
     if result.returncode != 0 or "FACTORY_ROUTE_A_VERIFY_PASS" not in result.stdout:
         raise RouteAError("current-game verification failed: " + (result.stdout + "\n" + result.stderr)[-6000:])
-    return {"state": "PASS", "summary": f"LevelCatalog, LevelLoader, SupplyPlanLoader, solver/replay and Difficulty V1 parity passed for {len(ids)} levels."}
+    return {"state": "PASS", "summary": f"LevelCatalog, LevelLoader, SupplyPlanLoader, solver/replay and Difficulty V1 parity passed for {len(ids)} levels.", "output": result.stdout}
 
 
 def _campaign_table(rows: list[dict[str, Any]], entries: list[dict[str, Any]]) -> str:
@@ -216,7 +301,7 @@ def _campaign_table(rows: list[dict[str, Any]], entries: list[dict[str, Any]]) -
     return "\n".join(lines)
 
 
-def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path, factory_commit_sha: str | None, studio_approval: bool, command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None, verifier: Callable[..., dict[str, Any]] | None = None, publisher: Callable[..., dict[str, Any]] | None = None, expected_remote: str = _GAME_REMOTE) -> dict[str, Any]:
+def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path, factory_commit_sha: str | None, studio_approval: bool, command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None, verifier: Callable[..., dict[str, Any]] | None = None, publisher: Callable[..., dict[str, Any]] | None = None) -> dict[str, Any]:
     """Prepare, verify, commit, push and PR one owner-approved contiguous batch."""
     if not studio_approval:
         raise RouteAError("Route A requires the explicit CampaignBuilder APPROVE action")
@@ -240,7 +325,7 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
         raise RouteAError("CampaignBuilder plan hash is stale; rebuild and review the plan")
     # Fetch without touching working files, then require the exact owner target and clean main.
     remote = _git(root, "remote", "get-url", "origin").stdout.strip()
-    if _normalize_remote(remote) != _normalize_remote(expected_remote):
+    if _normalize_remote(remote) != _normalize_remote(_GAME_REMOTE):
         raise RouteAError("configured game origin is not Sekiph82/Scrubbots")
     branch = _git(root, "branch", "--show-current").stdout.strip()
     if branch != "main": raise RouteAError("game checkout must be on main before Route A preflight")
@@ -265,12 +350,11 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
         validate_release_plan(plan_hash=plan_hash, game_project=root)
     except (ReleaseError, OSError, ValueError) as exc:
         raise RouteAError(f"approved campaign plan is stale or mismatched: {exc}") from exc
-    created_paths = {f"data/levels/{identity}.json" for identity in ids} | {f"data/levels/supply/{identity}_supply_v1.json" for identity in ids} | {f"data/levels/metadata/{identity}.metadata.json" for identity in ids} | {f"assets/art/levels/previews/{identity}.png" for identity in ids}
-    pushed = False
+    snapshot = _snapshot_checkout(root)
+    initial_head = str(snapshot["head"])
     pr_url = ""
-    local_branch = False
     try:
-        _git(root, "switch", "-c", branch_name); local_branch = True
+        _git(root, "switch", "-c", branch_name)
         publish_call = publisher or approve_release_plan
         publish_result = publish_call(plan_hash=plan_hash, game_project=root)
         orders = publish_result.get("approved_orders", publish_result.get("orders", []))
@@ -285,7 +369,7 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
         message = f"levels: release {start_order}..{end_order} ({count} levels)\n\nPlan-Hash: {plan_hash}"
         _git(root, "-c", "user.name=Level Factory", "-c", "user.email=level-factory@users.noreply.github.com", "commit", "-m", message)
         commit_sha = _git(root, "rev-parse", "HEAD").stdout.strip()
-        _git(root, "push", "origin", branch_name); pushed = True
+        _git(root, "push", "origin", branch_name)
         entries_after = json.loads((root / _ALLOWED_FIXED).read_text(encoding="utf-8"))["entries"][-count:]
         for entry in entries_after: entry["_root"] = str(root)
         shortage_summary = json.dumps(plan.get("shortages", []), ensure_ascii=False, sort_keys=True)
@@ -293,7 +377,6 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
         pr = run(["gh", "pr", "create", "--base", "main", "--head", branch_name, "--title", f"levels: release {start_order}..{end_order} ({count} levels)", "--body", body], check=True)
         pr_url = pr.stdout.strip().splitlines()[-1]
         run(["gh", "pr", "edit", pr_url, "--add-label", "levels-release"], check=True)
-        pushed = True
         digests = {rel: hashlib.sha256((root / rel).read_bytes()).hexdigest() for rel in changed}
         receipt = {"schema": "scrubbots-release-receipt/v1", "plan_hash": plan_hash, "branch": branch_name, "game_commit_sha": commit_sha, "pr_url": pr_url, "file_digests": digests}
         receipt_path = Path(__import__("scrubbots_pixel_factory.studio_extensions", fromlist=["extensions_root"]).extensions_root()) / "release/release_receipt.json"
@@ -301,46 +384,68 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
         receipt_path.write_text(json.dumps(receipt, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
         return {"disposition": "RELEASE_PR_OPENED", "warning": "Public repository: pushing the branch makes unreleased levels publicly visible.", "receipt_path": str(receipt_path), "receipt": receipt, "verification": verification, **receipt}
     except Exception as exc:
-        # Only undo paths admitted by the fixed publication transaction; preserve any unexpected path as evidence.
-        status = _git(root, "status", "--porcelain", "-z", "--untracked-files=all", check=False).stdout if local_branch else ""
-        unexpected = set()
-        for record in status.split("\0"):
-            if record:
-                rel = record[3:].replace("\\", "/")
-                if rel != _ALLOWED_FIXED and not any(rel.endswith(suffix) for suffix in (".json", ".png")):
-                    unexpected.add(rel)
-        if local_branch:
-            current_head = _git(root, "rev-parse", "HEAD", check=False).stdout.strip()
-            # A committed release is ours: switch to untouched main first so its tree
-            # restores exactly, then remove only the deterministic branch we created.
-            if current_head and 'initial_head' in locals() and current_head != initial_head:
-                try: _git(root, "switch", "main")
-                except Exception: pass
-            else:
-                try: _restore(root, original_catalog, created_paths)
-                except OSError: pass
-                try: _git(root, "restore", "--staged", "--", _ALLOWED_FIXED, *sorted(created_paths), check=False)
-                except Exception: pass
-                try: _git(root, "switch", "main")
-                except Exception: pass
-        if pushed:
+        failures: list[str] = []
+        if snapshot:
+            if not pr_url:
+                try:
+                    listed = run(["gh", "pr", "list", "--head", branch_name, "--state", "open", "--json", "url", "--jq", ".[0].url"], check=False)
+                    if listed.returncode != 0:
+                        failures.append("could not determine whether a Route A PR was created")
+                    elif listed.stdout.strip():
+                        pr_url = listed.stdout.strip()
+                except Exception as cleanup_exc:
+                    failures.append(f"PR discovery failed: {cleanup_exc}")
+            if pr_url:
+                try:
+                    closed = run(["gh", "pr", "close", pr_url], check=False)
+                    if closed.returncode != 0: failures.append("created PR could not be confirmed closed")
+                except Exception as cleanup_exc:
+                    failures.append(f"PR close failed: {cleanup_exc}")
             try:
-                if pr_url: run(["gh", "pr", "close", pr_url], check=False)
-                _git(root, "push", "origin", "--delete", branch_name, check=False)
-            except Exception: pass
-        if local_branch:
+                remote_ref = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
+                if remote_ref.returncode != 0:
+                    failures.append("could not inspect remote release branch")
+                elif remote_ref.stdout.strip():
+                    deleted = _git(root, "push", "origin", "--delete", branch_name, check=False)
+                    if deleted.returncode != 0: failures.append("remote release branch deletion failed")
+                    else:
+                        remaining = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
+                        if remaining.returncode != 0 or remaining.stdout.strip(): failures.append("remote release branch remains after deletion")
+            except Exception as cleanup_exc:
+                failures.append(f"remote branch cleanup failed: {cleanup_exc}")
             try:
-                _git(root, "switch", "main")
-                _git(root, "branch", "-D", branch_name)
-            except Exception: pass
-        if isinstance(exc, RouteAError): raise
-        raise RouteAError(f"Route A failed and rollback was attempted: {exc}") from exc
+                main_head = _git(root, "rev-parse", f"refs/heads/{snapshot['branch']}", check=False)
+                if main_head.returncode != 0 or main_head.stdout.strip() != snapshot["head"]:
+                    failures.append("original branch ref changed during Route A; refusing to overwrite it")
+                else:
+                    switched = _git(root, "switch", "--force", str(snapshot["branch"]), check=False)
+                    if switched.returncode != 0: failures.append("could not return to the original branch")
+                    else:
+                        reset = _git(root, "reset", "--hard", str(snapshot["head"]), check=False)
+                        if reset.returncode != 0: failures.append("tracked/index reset to preflight HEAD failed")
+                        try: _remove_new_paths(root, snapshot)
+                        except Exception as cleanup_exc: failures.append(f"created-path cleanup failed: {cleanup_exc}")
+                        branch_ref = _git(root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}", check=False)
+                        if branch_ref.returncode == 0:
+                            removed = _git(root, "branch", "-D", branch_name, check=False)
+                            if removed.returncode != 0: failures.append("deterministic local release branch deletion failed")
+            except Exception as cleanup_exc:
+                failures.append(f"local checkout cleanup failed: {cleanup_exc}")
+            failures.extend(_verify_checkout_snapshot(root, snapshot))
+        if failures:
+            raise RouteARollbackError(f"Route A failed ({exc}); rollback could not be verified: " + "; ".join(failures)) from exc
+        if isinstance(exc, RouteAError):
+            exc.rollback_verified = True
+            raise
+        wrapped = RouteAError(f"Route A failed and the preflight checkout was restored: {exc}")
+        wrapped.rollback_verified = True
+        raise wrapped from exc
 
 
-def release_approved_campaign(*, plan_hash: str, game_project: str | Path, factory_commit_sha: str | None = None, studio_approval: bool, command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None, verifier: Callable[..., dict[str, Any]] | None = None, publisher: Callable[..., dict[str, Any]] | None = None, expected_remote: str = _GAME_REMOTE) -> dict[str, Any]:
+def release_approved_campaign(*, plan_hash: str, game_project: str | Path, factory_commit_sha: str | None = None, studio_approval: bool, command_runner: Callable[..., subprocess.CompletedProcess[str]] | None = None, verifier: Callable[..., dict[str, Any]] | None = None, publisher: Callable[..., dict[str, Any]] | None = None) -> dict[str, Any]:
     """Run Route A and persist factory-side evidence for every refusal or failure."""
     try:
-        return _release_approved_campaign_impl(plan_hash=plan_hash, game_project=game_project, factory_commit_sha=factory_commit_sha, studio_approval=studio_approval, command_runner=command_runner, verifier=verifier, publisher=publisher, expected_remote=expected_remote)
+        return _release_approved_campaign_impl(plan_hash=plan_hash, game_project=game_project, factory_commit_sha=factory_commit_sha, studio_approval=studio_approval, command_runner=command_runner, verifier=verifier, publisher=publisher)
     except Exception as exc:
         try:
             from .. import studio_extensions as studio
@@ -348,7 +453,8 @@ def release_approved_campaign(*, plan_hash: str, game_project: str | Path, facto
             evidence_root = studio.extensions_root() / "release/failures"
             evidence_root.mkdir(parents=True, exist_ok=True)
             suffix = str(time.time_ns())
-            evidence = {"schema": "scrubbots-route-a-failure/v1", "plan_hash": plan_hash, "game_project": str(Path(game_project).expanduser().resolve()), "reason": str(exc), "state": "ROLLED_BACK_OR_PREFLIGHT_REFUSED"}
+            disposition = "ROLLBACK_FAILED" if isinstance(exc, RouteARollbackError) else "ROLLED_BACK" if getattr(exc, "rollback_verified", False) else "PREFLIGHT_REFUSED"
+            evidence = {"schema": "scrubbots-route-a-failure/v1", "plan_hash": plan_hash, "game_project": str(Path(game_project).expanduser().resolve()), "reason": str(exc), "state": disposition}
             (evidence_root / f"{plan_hash}-{suffix}.json").write_text(json.dumps(evidence, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
         except Exception:
             pass

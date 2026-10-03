@@ -226,7 +226,8 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
     assert status is not None
     status_parts = [part.strip() for part in status.group(1).split("/")]
-    assert len(status_parts) >= 2 and all(status_parts)
+    assert all(status_parts)
+    assert len(status_parts) >= 2 or re.fullmatch(r"(?:[A-Z0-9]+_)+AUTHORIZED", status_parts[0])
     actor = re.search(r"(?m)^- Required Actor:\s+(.+)$", current)
     assert actor is not None and actor.group(1).strip() and actor.group(1).strip().upper() == actor.group(1).strip()
     current_prompt = re.search(r"(?m)^- Current Prompt:\s+`([^`]+)`", current)
