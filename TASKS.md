@@ -4,11 +4,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M14 — Publisher / Route A game-repository release
-- Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Route A strict closure
-- Current Task: SB-CPX-003 — Close Route A exact rollback, canonical remote authority, and authentic current-game verifier execution
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: SB-CPX-003 continues only through `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`. First synchronize with current GitHub authority, then replace the empty verifier proof with a non-empty canonical current-game production-row verifier PASS; retain P1/R02 publication regressions and publish only after the full R01 suite is green.
+- Current Milestone: MAINT-LOCAL-HYGIENE — Owner-authorized Desktop repository cleanup
+- Current Sprint: MAINT-LOCAL-HYGIENE-C003 — SB-LF04 orphan project-folder inspection/removal
+- Current Task: MAINT-LOCAL-HYGIENE-C003 — Inspect three exact SB-LF04 project folders and delete only those proven redundant
+- Current Task Status: OWNER_AUTHORIZED / INSPECT_THEN_DELETE_IF_SAFE
+- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 executes only `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`; inspect the three exact Desktop subfolders, delete only DELETE-SAFE folders, preserve anything with unique state, publish the builder log, then return to ChatGPT for review and P2 resume.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -53,6 +53,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
 - P2 Route A Status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT` under `SB-CPX-003`; real remote remains untouched in tests.
+- MAINT-LOCAL-HYGIENE-C003 Pause/Resume: P2-R01 is temporarily parked only for this owner-authorized local cleanup; after cleanup review, restore `SB-CPX-003 / P2-ROUTE-A-C001-R01` as Current Task without changing its remediation state.
 - P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
 - P2 Route A Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`.
 - P2 Route A Builder Log: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
