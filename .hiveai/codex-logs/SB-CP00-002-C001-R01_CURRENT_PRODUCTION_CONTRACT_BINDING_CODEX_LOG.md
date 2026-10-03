@@ -34,6 +34,11 @@ Document role: CODEX BUILDER LOG
 - No runtime network/provider operation, game/runtime import, Level Factory reverse dependency, credentials, dependency/license change, or root tracker/audit/prompt/prior-log edit was introduced. Classifier and cross-authority verification are local/static and offline.
 - Implementation commit: `23b4af21cec49efde150722d343c5bbe0b836eef` (`fix(content-pipeline): bind allowlist to production contracts`), 9 files changed, 360 insertions, 43 deletions.
 - After implementation commit, worktree status is clean except for this new R01 builder log; HEAD is detached at the implementation commit, based directly on synchronized `origin/main` `e737c98acfcaef9c8568151d4b0d89ebbead813a`.
+- Builder-log commit: `21e8c4f6331c91472204616207c438659605782e` (`docs(log): record SB-CP00-002-C001-R01 builder evidence`), separate from the implementation commit.
+- Pre-push `git fetch --prune origin` kept `origin/main` at `e737c98acfcaef9c8568151d4b0d89ebbead813a`; local HEAD was 0 behind / 2 ahead and a descendant of the fetched tip.
+- `git push origin HEAD:main` succeeded as a normal fast-forward: `e737c98..21e8c4f HEAD -> main`.
+- Post-push `git fetch --prune origin` verified local HEAD and `origin/main` both at `21e8c4f6331c91472204616207c438659605782e`, 0 ahead / 0 behind, with clean worktree status.
+- Builder stop point: R01 implementation and separate builder evidence are published; awaiting independent ChatGPT re-audit. Codex has not audited or accepted the work.
 - First focused run `python -m pytest tests/unit/test_sb_cp00_002_content_boundary.py tests/unit/test_sb_cp00_002_r01_contract_binding.py -q` failed with 23 failures and 15 passes. Root cause: the existing executable-field scanner treated `descriptor_contract_id` as executable because `descriptor` contains the substring `script`. I am narrowing marker detection to whole normalized key tokens; the failed result is retained here.
 - Corrected focused rerun: `python -m pytest tests/unit/test_sb_cp00_002_content_boundary.py tests/unit/test_sb_cp00_002_r01_contract_binding.py -q` — PASS, 38 tests.
 - Schema/example/authority fixture JSON parsing with `python -m json.tool` — PASS.
