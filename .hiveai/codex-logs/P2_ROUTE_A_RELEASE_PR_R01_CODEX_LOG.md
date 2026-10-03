@@ -367,3 +367,12 @@ Document role: CODEX BUILDER LOG
 - Implementation commit: c64345844f095159e619f51fe3ce6b8dc2cd3418 (8 files, 356 insertions, 94 deletions). It contains no log, tracker, prompt, audit, or isolated game-authority files.
 - No dependency/license changes. Runtime network behavior remains unchanged; game-repository access is limited to explicit Route A release invocation and test-time authority resolution already covered by tests.
 - Final Level Factory origin fetch before commit found no incoming commits; fetched task authority still authorizes SB-CPX-003 / P2-ROUTE-A-C001-R01. Persistent Desktop checkout remains untouched.
+
+
+### Publication result (2026-10-03 19:56:49 +03:00, Europe/Istanbul)
+
+- Implementation commit SHA: c64345844f095159e619f51fe3ce6b8dc2cd3418.
+- Builder-log publication commit SHA: f41a0234800eaa311bb91f636e47f9f6a55d4cf1.
+- The first pre-push guard attempt stopped without pushing because its diff direction listed our own R01 changes as incoming. Corrected the guard to count commits reachable from origin/main but absent from HEAD; result was zero incoming commits. No remote product/test overlap existed.
+- Normal non-force publication command `git push origin HEAD:main` succeeded: e00648a..f41a023, `HEAD -> main`. Follow-up `git fetch --prune origin main` verified local HEAD == origin/main == f41a0234800eaa311bb91f636e47f9f6a55d4cf1 and divergence `0 0`.
+- The log is being given this post-push evidence in a separate log-only receipt commit. Product implementation and required builder log have already been published; no branch or PR was created.
