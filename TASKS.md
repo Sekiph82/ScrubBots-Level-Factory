@@ -8,7 +8,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Route A strict closure
 - Current Task: SB-CPX-003 — Close Route A exact rollback, canonical remote authority, and authentic current-game verifier execution
 - Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: SB-CPX-003 continues only through `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_ORDER11_FIXTURE_CLOSURE_CONTINUATION_PROMPT.md`. First synchronize with current GitHub authority, then close the sole remaining F03 blocker by staging a valid order-11 production row and passing the authentic Route A verifier; publish only after the full R01 suite is green.
+- Next Task/Action: SB-CPX-003 continues only through `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`. First synchronize with current GitHub authority, then replace the empty verifier proof with a non-empty canonical current-game production-row verifier PASS; retain P1/R02 publication regressions and publish only after the full R01 suite is green.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -18,7 +18,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_ORDER11_FIXTURE_CLOSURE_CONTINUATION_PROMPT.md`.
+- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -62,7 +62,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P2 Route A R01 Sync Continuation: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_DIRTY_SYNC_CONTINUATION_PROMPT.md`.
 - P2 Route A R01 Evidence Closure Continuation: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_EVIDENCE_CLOSURE_CONTINUATION_PROMPT.md`.
 - P2 Route A R01 Order-11 Fixture Closure: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_ORDER11_FIXTURE_CLOSURE_CONTINUATION_PROMPT.md`.
-- P2 Route A R01 Current Blocker: F03 only — authentic verifier still lacks a valid staged P1 order-11 production row. Factory Studio action/runtime checks now pass; ChatGPT repaired the tracker wording guard.
+- P2 Route A R01 Verifier Boundary Correction: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`.
+- P2 Route A R01 Order-11 Negative Evidence: eight targeted valid 20x20 candidates all missed the live Order-11 window; best official D1 ≈ 29.47 vs hard ceiling ≈ 24.18. Existing production First-10 EASY levels are also far above early targets, so this is tracked as a calibration/content-availability issue rather than verifier integration failure.
+- P2 Route A R01 Current Blocker: F03 only — replace the empty verifier proof with a non-empty canonical current-game production-row verifier PASS. Order-11 candidate availability is retained as separate Difficulty V1/progression calibration evidence, not a P2 verifier gate.
 - P2 Route A R01 Sync Disposition: persistent Desktop checkout has legitimate dirty owner work and remains untouched; one detached temp worktree under `%TEMP%\\ScrubBots-Level-Factory\\...` is explicitly authorized from current `origin/main`.
 - P2 Route A R01 Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
 - P2 Route A R01 Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_R01_CODEX_LOG.md`.
