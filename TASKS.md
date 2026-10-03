@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: MAINT-LOCAL-HYGIENE — Owner-authorized Desktop repository cleanup
-- Current Sprint: MAINT-LOCAL-HYGIENE-C003 — SB-LF04 orphan project-folder inspection/removal
-- Current Task: MAINT-LOCAL-HYGIENE-C003 — Preserve/merge any unique SB-LF04 work into canonical main, then delete all three exact orphan project folders
-- Current Task Status: CONDITIONAL / OWNER_LOCAL_ABSENCE_VERIFICATION_REQUIRED
-- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 requires only OWNER confirmation that the three exact SB-LF04 target folders are absent from the canonical Desktop root. No Codex remediation is required. After owner confirmation, ChatGPT closes C003 and resumes `SB-CPX-003 / P2-ROUTE-A-C001-R01`.
-- Required Actor: OWNER
+- Current Milestone: M14 — Publisher / Route A game-repository release
+- Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Final publication closure
+- Current Task: SB-CPX-003 — Complete three previously excluded game-authority tests, unfiltered full pytest, final R01 publication, then independent re-audit
+- Current Task Status: R01_FINAL_PUBLICATION_AUTHORIZED
+- Next Task/Action: SB-CPX-003 executes only `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_FINAL_PUBLICATION_CLOSURE_PROMPT.md`; first synchronize local/GitHub authority, run the exact three previously excluded tests against an isolated git-backed current Scrubbots authority, then unfiltered full pytest, final commit/push, and stop for independent audit.
+- Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_FINAL_PUBLICATION_CLOSURE_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -53,8 +53,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
 - P2 Route A Status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT` under `SB-CPX-003`; real remote remains untouched in tests.
-- MAINT-LOCAL-HYGIENE-C003 Pause/Resume: P2-R01 is temporarily parked only for this owner-authorized local cleanup; after cleanup review, restore `SB-CPX-003 / P2-ROUTE-A-C001-R01` as Current Task without changing its remediation state.
-- MAINT-LOCAL-HYGIENE-C003 Independent Audit Result: `CONDITIONAL` by `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_STRICT_AUDIT.md`; only owner/local visual confirmation of final folder absence remains.
+- MAINT-LOCAL-HYGIENE-C003 Pause/Resume: `PASS / CLOSED`; P2-R01 resumed after owner-confirmed local cleanup.
+- MAINT-LOCAL-HYGIENE-C003 Independent Audit Result: `PASS / CLOSED`; owner confirmed all three exact SB-LF04 folders are absent, closing the parent CONDITIONAL audit through `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_OWNER_CONFIRMATION_CLOSURE_AUDIT.md`.
 - P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
 - P2 Route A Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`.
 - P2 Route A Builder Log: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
@@ -65,10 +65,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P2 Route A R01 Evidence Closure Continuation: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_EVIDENCE_CLOSURE_CONTINUATION_PROMPT.md`.
 - P2 Route A R01 Order-11 Fixture Closure: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_ORDER11_FIXTURE_CLOSURE_CONTINUATION_PROMPT.md`.
 - P2 Route A R01 Verifier Boundary Correction: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_VERIFIER_BOUNDARY_CORRECTION_CONTINUATION_PROMPT.md`.
+- P2 Route A R01 Final Publication Closure: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_FINAL_PUBLICATION_CLOSURE_PROMPT.md`.
 - P2 Route A R01 Order-11 Negative Evidence: eight targeted valid 20x20 candidates all missed the live Order-11 window; best official D1 ≈ 29.47 vs hard ceiling ≈ 24.18. Existing production First-10 EASY levels are also far above early targets, so this is tracked as a calibration/content-availability issue rather than verifier integration failure.
 - P2 Route A R01 Interim Builder Evidence: F03 non-empty authentic verifier now PASS at current Scrubbots `origin/main` `236c5b93d3ae95ca785eda799a7f72e0816cb199` using existing production order 2; `FACTORY_ROUTE_A_VERIFY_PASS` emitted and game catalog/level/metadata/supply files remained byte-identical. This is builder evidence pending independent audit after publication.
-- P2 Route A R01 Remaining Publication Gate: safe broad suite passed `1151 passed, 3 skipped`, but three tests that can access/clone the prohibited sibling game checkout were excluded, so the continuation's full-pytest gate is not yet satisfied. No R01 commit/push exists yet.
-- P2 Route A R01 Parking Rule: keep R01 preserved in the authorized temp worktree while `MAINT-LOCAL-HYGIENE-C003` is active; after cleanup review, resume only for final full-pytest/publication closure and independent re-audit.
+- P2 Route A R01 Remaining Publication Gate: execute the exact three previously excluded game-authority tests against an isolated git-backed current Scrubbots authority, then run unfiltered full pytest with zero exclusions; if green, publish R01 implementation + final builder log and stop for independent audit.
+- P2 Route A R01 Parking Rule: `RESUMED`; cleanup is PASS/CLOSED. Current execution is final full-pytest/publication closure only.
 - P2 Route A R01 Sync Disposition: persistent Desktop checkout has legitimate dirty owner work and remains untouched; one detached temp worktree under `%TEMP%\\ScrubBots-Level-Factory\\...` is explicitly authorized from current `origin/main`.
 - P2 Route A R01 Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
 - P2 Route A R01 Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_R01_CODEX_LOG.md`.
