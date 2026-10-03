@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scrubbots-content-pipeline"
+version = "0.1.0"
+description = "Isolated validation and content publication control-plane boundary for SCRUBBOTS."
+requires-python = ">=3.12,<3.13"
+license = { text = "Proprietary project code" }
+dependencies = []
+
+[project.scripts]
+scrubbots-content-pipeline = "scrubbots_content_pipeline.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,6 @@
+{
+  "environment": "staging",
+  "input_contract": "scrubbots.level_factory.accepted-content.v1",
+  "require_owner_approval": true,
+  "schema_version": "1.0"
+}
