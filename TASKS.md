@@ -7,12 +7,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: MAINT-LOCAL-HYGIENE — Owner-authorized Desktop repository cleanup
 - Current Sprint: MAINT-LOCAL-HYGIENE-C003 — SB-LF04 orphan project-folder inspection/removal
 - Current Task: MAINT-LOCAL-HYGIENE-C003 — Preserve/merge any unique SB-LF04 work into canonical main, then delete all three exact orphan project folders
-- Current Task Status: OWNER_AUTHORIZED / PRESERVE_MERGE_THEN_DELETE_ALL_THREE
-- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 executes only `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`; first synchronize local/GitHub authority, then preserve and publish any legitimate unique work from the three exact folders, and finally delete all three folders with final absence verification.
-- Required Actor: CODEX
+- Current Task Status: CONDITIONAL / OWNER_LOCAL_ABSENCE_VERIFICATION_REQUIRED
+- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 requires only OWNER confirmation that the three exact SB-LF04 target folders are absent from the canonical Desktop root. No Codex remediation is required. After owner confirmation, ChatGPT closes C003 and resumes `SB-CPX-003 / P2-ROUTE-A-C001-R01`.
+- Required Actor: OWNER
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
@@ -54,6 +54,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
 - P2 Route A Status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT` under `SB-CPX-003`; real remote remains untouched in tests.
 - MAINT-LOCAL-HYGIENE-C003 Pause/Resume: P2-R01 is temporarily parked only for this owner-authorized local cleanup; after cleanup review, restore `SB-CPX-003 / P2-ROUTE-A-C001-R01` as Current Task without changing its remediation state.
+- MAINT-LOCAL-HYGIENE-C003 Independent Audit Result: `CONDITIONAL` by `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_STRICT_AUDIT.md`; only owner/local visual confirmation of final folder absence remains.
 - P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
 - P2 Route A Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_AUDIT_CRITERIA.md`.
 - P2 Route A Builder Log: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_CODEX_LOG.md`.
