@@ -8,7 +8,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Route A strict closure
 - Current Task: SB-CPX-003 — Close Route A exact rollback, canonical remote authority, and authentic current-game verifier execution
 - Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: Codex executes only `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_EVIDENCE_CLOSURE_CONTINUATION_PROMPT.md`. First synchronize local workspaces with current GitHub authority without losing owner/R01 work; then close the staged-P1-row authentic verifier gate, five Factory Studio action failures, and tracker recheck; publish only after the full R01 suite is green.
+- Next Task/Action: SB-CPX-003 continues only through `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_EVIDENCE_CLOSURE_CONTINUATION_PROMPT.md`. First synchronize local workspaces with current GitHub authority without losing owner/R01 work; then close the staged-P1-row authentic verifier gate and tracker recheck; publish only after the full R01 suite is green.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
