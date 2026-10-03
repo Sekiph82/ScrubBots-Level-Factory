@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M11 — Content Platform Architecture & Security Boundary
-- Current Sprint: SB-CP00-001-C001 — Content Platform control-plane boundary
-- Current Task: SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project
+- Current Sprint: SB-CP00-002-C001 — App code vs remote content boundary
+- Current Task: SB-CP00-002 — Define app code vs remote content boundary
 - Current Task Status: IMPLEMENT_THEN_AUDIT / AUTHORIZED
-- Next Task/Action: SB-CP00-001 executes only `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`; first synchronize local/GitHub authority, implement only the M11 control-plane boundary skeleton, publish the builder log, then stop for independent audit.
+- Next Task/Action: SB-CP00-002 executes only `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`; first synchronize local/GitHub authority, implement the versioned fail-closed app-vs-remote declarative boundary, publish the builder log, then stop for independent audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_R01_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -79,6 +79,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP00-001 C001 Authorization: `IMPLEMENT_THEN_AUDIT`.
 - SB-CP00-001 C001 Prompt: `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`.
 - SB-CP00-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_AUDIT_CRITERIA.md`.
+- SB-CP00-001 C001 Implementation Commit: `6fc4c2f4a643b83fb79e32745e8c8a0a7def2ebf`.
+- SB-CP00-001 C001 Final Builder Publication: `768969ee67c83869d291c97123fc54f9763fb3c5`.
+- SB-CP00-001 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_STRICT_AUDIT.md`.
+- SB-CP00-002 C001 Authorization: `IMPLEMENT_THEN_AUDIT`.
+- SB-CP00-002 C001 Prompt: `.hiveai/prompts/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_PROMPT.md`.
+- SB-CP00-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-002-C001_APP_VS_REMOTE_CONTENT_BOUNDARY_AUDIT_CRITERIA.md`.
 - P2 Route A Boundary: owner-approved CampaignBuilder plan -> deterministic release branch -> current-game verification -> one release commit -> branch push + PR -> release receipt; owner/store submission remains out of scope.
 - MAINT-ZIP-CORE-V02-C001-R02 Status: `PASS / CLOSED`; final cutover independently accepted after owner-publication reconciliation.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
@@ -808,8 +814,8 @@ Capability source family: `SB-CP00-xxx` from the main Scrubbots master plan.
 
 ### M11.01 - App/content and declarative-content boundary
 
-- [~] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project. [MIGRATION]
-- [ ] SB-CP00-002 — Define app code vs remote content boundary. [PARTIAL]
+- [x] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project. [MIGRATION]
+- [~] SB-CP00-002 — Define app code vs remote content boundary. [PARTIAL]
 - [ ] SB-CP00-003 — Remote content declarative only; forbid executable payloads. [PARTIAL]
 
 ### M11.02 - Staging, audit state, secrets and dry-run
