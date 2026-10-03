@@ -6,9 +6,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: MAINT-LOCAL-HYGIENE — Owner-authorized Desktop repository cleanup
 - Current Sprint: MAINT-LOCAL-HYGIENE-C003 — SB-LF04 orphan project-folder inspection/removal
-- Current Task: MAINT-LOCAL-HYGIENE-C003 — Inspect three exact SB-LF04 project folders and delete only those proven redundant
-- Current Task Status: OWNER_AUTHORIZED / INSPECT_THEN_DELETE_IF_SAFE
-- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 executes only `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`; inspect the three exact Desktop subfolders, delete only DELETE-SAFE folders, preserve anything with unique state, publish the builder log, then return to ChatGPT for review and P2 resume.
+- Current Task: MAINT-LOCAL-HYGIENE-C003 — Preserve/merge any unique SB-LF04 work into canonical main, then delete all three exact orphan project folders
+- Current Task Status: OWNER_AUTHORIZED / PRESERVE_MERGE_THEN_DELETE_ALL_THREE
+- Next Task/Action: MAINT-LOCAL-HYGIENE-C003 executes only `.hiveai/prompts/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_PROMPT.md`; first synchronize local/GitHub authority, then preserve and publish any legitimate unique work from the three exact folders, and finally delete all three folders with final absence verification.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
