@@ -1,4 +1,4 @@
-# MAINT-LOCAL-HYGIENE-C003 — Inspect and Remove SB-LF04 Orphan Project Folders
+# MAINT-LOCAL-HYGIENE-C003 — Preserve, Merge and Remove SB-LF04 Orphan Project Folders
 
 Document role: CODEX MAINTENANCE PROMPT
 
@@ -10,123 +10,147 @@ Persistent local root:
 
 ## FIRST OPERATION — mandatory local ↔ GitHub synchronization preflight
 
-Before inspecting or deleting anything:
+Before inspecting, merging, or deleting anything:
 
 1. Verify the persistent root is exactly the expected Level Factory repository.
 2. Verify branch, origin, local HEAD, `origin/main`, ahead/behind, dirty tracked/untracked state, stashes, and registered worktrees.
-3. Run fetch/prune against the canonical GitHub origin.
+3. Fetch/prune the canonical GitHub origin.
 4. Read current task authority from fetched GitHub/`origin/main:TASKS.md`; require `MAINT-LOCAL-HYGIENE-C003`.
-5. The persistent checkout currently contains legitimate owner work. Do not reset, clean, stash, rebase, restore, switch, overwrite, or otherwise reconcile that work.
-6. Use current `origin/main` as the comparison authority. If a clean execution/evidence workspace is needed, one temporary worktree under `%TEMP%\ScrubBots-Level-Factory\MAINT-LOCAL-HYGIENE-C003` is explicitly authorized. No Desktop sibling clone/worktree is allowed.
-7. Snapshot the persistent root's git status outside the three target folders before any deletion so collateral changes can be detected afterward.
+5. Preserve all legitimate owner work in the persistent checkout. Do not reset, clean, rebase, force-push, or discard owner state.
+6. If a clean integration workspace is needed, use only one temp worktree under `%TEMP%\ScrubBots-Level-Factory\MAINT-LOCAL-HYGIENE-C003`.
+7. Snapshot repository/worktree status before any merge or deletion.
 
-Do not proceed if repository identity or target paths are ambiguous.
+Do not proceed if repository identity is ambiguous.
 
 ## Owner-authorized target paths
 
-Inspect ONLY these exact directories:
+These THREE exact directories must be removed by the end of this task:
 
 1. `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Scrubbots - Pixel Art Generator-SB-LF04-001`
 2. `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Scrubbots - Pixel Art Generator-SB-LF04-001-R01`
 3. `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Scrubbots - Pixel Art Generator-SB-LF04-001-R01-VERIFY`
 
-The owner suspects these are obsolete SB-LF04 task copies because each contains its own `project.godot`.
+There is NO `KEEP_REVIEW_REQUIRED` outcome.
+
+If unique legitimate work exists, preserve and integrate it first. Then delete the folder.
 
 No other path is authorized for deletion.
 
-## Per-folder forensic inspection
+## Phase A — inspect and classify every target
 
-For EACH target independently, record:
+For each target record:
 
-- exists / missing;
 - normal directory vs symlink/junction/reparse point;
-- whether the parent Level Factory repository tracks any path underneath it;
-- whether it has its own `.git` directory/file;
-- whether it is a registered Git worktree;
-- repository identity and origin if it is Git-backed;
-- branch and HEAD;
-- working-tree status including untracked files;
+- nested Git repo/worktree identity;
+- origin, branch, HEAD;
+- tracked/untracked changes;
 - stashes;
-- local commits not reachable from canonical Level Factory `origin/main`;
-- local branches containing commits not preserved by canonical GitHub authority;
-- whether any meaningful file exists only in this target or differs from the canonical project.
+- local branches;
+- commits not reachable from canonical `origin/main`;
+- meaningful source/config/docs/tests/data files;
+- generated/cache/build/environment-only content.
 
-Meaningful files include at least:
-- `project.godot`;
-- `.gd`, `.py`, `.json`, `.md`, `.tscn`, `.tres`, `.cfg`, `.ini`, `.toml`, `.yaml`, `.yml`;
-- scripts/tools/tests/source/data/docs;
-- any other non-generated file.
+Meaningful includes at least:
+`.gd`, `.py`, `.json`, `.md`, `.tscn`, `.tres`, `.cfg`, `.ini`, `.toml`, `.yaml`, `.yml`, `project.godot`, scripts, tests, tools, docs, data and source assets.
 
-Known generated/cache/environment folders may be classified separately, but never use that classification to ignore a potentially unique source/config file.
+## Phase B — preserve everything legitimate before deletion
 
-## DELETE-SAFE gate
+For EACH target, compare unique state against current canonical `origin/main`.
 
-A target may be deleted ONLY when ALL of the following are proven:
+### If no unique legitimate state exists
+Mark it `REDUNDANT_READY_TO_DELETE`.
 
-1. It is one of the three exact owner-authorized target paths.
-2. It is not a symlink/junction/reparse-point surprise.
-3. The parent repository does not track files beneath that target.
-4. It contains no stash or uncommitted meaningful work that exists only there.
-5. It contains no commit/branch state not already reachable/preserved by canonical GitHub authority.
-6. Every meaningful file is either:
-   - byte-equivalent to canonical repository content, or
-   - obsolete/generated evidence with no unique product/source/config value.
-7. It is not required by any current registered worktree.
-8. Deleting it will not alter files outside that exact target.
+### If unique commits/branches exist
+- identify the exact commits and changed paths;
+- determine whether that work is already superseded by canonical main;
+- if not superseded, integrate the legitimate changes into a clean temp integration worktree based on current `origin/main`;
+- resolve conflicts against current canonical behavior, preserving newer accepted contracts;
+- run relevant focused regressions;
+- commit the preserved integration with clear provenance noting the source target folder.
 
-If ANY condition is uncertain or false, DO NOT DELETE that target. Mark it `KEEP_REVIEW_REQUIRED` and explain exactly why.
+### If unique uncommitted meaningful files exist
+- diff them against canonical files;
+- port only the legitimate product/source/config/test/doc changes into the clean temp integration worktree;
+- do not copy generated caches/build artifacts/environments;
+- preserve behavior, not stale folder structure;
+- resolve conflicts in favor of current accepted authority unless the unique change is clearly newer and compatible;
+- run relevant focused regressions;
+- commit the preserved integration with provenance.
 
-## Deletion procedure
+### If unique evidence/log files exist
+- preserve only meaningful evidence not already present in GitHub;
+- place it in the correct canonical evidence/log location when appropriate;
+- do not revive obsolete tracker/control-plane files.
 
-For a target that passes the DELETE-SAFE gate:
+## Phase C — publish preserved work to canonical main
 
-- if it is a registered worktree, remove it using the repository's normal Git worktree mechanism only after proving it has no unique state;
-- otherwise remove only that exact directory;
-- never use a broad wildcard;
-- never delete the persistent root;
-- never delete `.hiveai`, `src`, `tests`, `tools`, `level_factory`, `data`, `docs`, or any other sibling directory.
+If any legitimate unique work was integrated:
 
-After each deletion verify the exact target no longer exists.
+1. Run focused tests for affected code.
+2. Run governance/tracker tests.
+3. Run compileall and `git diff --check`.
+4. Run any relevant Godot/Factory Studio regression needed by the touched scope.
+5. Fetch current `origin/main` again.
+6. Integrate/publish with a normal non-force update to Level Factory `main`.
+7. Fetch again and verify the preserved commits/files are reachable from `origin/main`.
+8. Verify no legitimate unique file/commit remains only inside the three target folders.
 
-## Collateral-damage verification
+Do not claim preservation until GitHub main contains it.
 
-After all three decisions:
+## Phase D — mandatory deletion of all three targets
 
-- verify the persistent canonical root still exists and remains the same repository;
-- compare git status outside the three targets against the pre-delete snapshot;
-- require zero new tracked/untracked changes outside those targets caused by this maintenance;
-- verify all non-target registered worktrees/stashes are unchanged;
-- verify canonical files were not modified.
+After preservation verification, delete ALL THREE exact target directories.
 
-If collateral state changed, stop and report it immediately.
+Rules:
+- if a target is a registered worktree, detach/remove it cleanly from Git worktree registration first, preserving any already-integrated commits;
+- remove only the exact target path;
+- no wildcard deletion;
+- do not delete any canonical sibling directory;
+- do not delete the persistent root.
 
-## Evidence / result
+After deletion verify:
+- target 1 does not exist;
+- target 2 does not exist;
+- target 3 does not exist;
+- no stale worktree registration points to any of them.
 
-Create a builder log:
+Final disposition for every target must be:
+`PRESERVED_IF_NEEDED_AND_DELETED`
+or
+`REDUNDANT_AND_DELETED`.
+
+No target may remain.
+
+## Phase E — collateral verification
+
+After deletion:
+
+- persistent canonical root still exists and identifies as `Sekiph82/ScrubBots-Level-Factory`;
+- GitHub `main` contains any legitimate preserved work;
+- repository state outside the three targets has no accidental deletion;
+- unrelated stashes/worktrees are unchanged;
+- canonical project still opens/tests as required;
+- the three target folders are absent.
+
+## Builder log
+
+Create/update:
 
 `.hiveai/codex-logs/MAINT-LOCAL-HYGIENE-C003_SB-LF04_ORPHAN_PROJECT_FOLDERS_CODEX_LOG.md`
 
-For each target record exactly one disposition:
-- `DELETED_REDUNDANT`
-- `KEEP_REVIEW_REQUIRED`
-- `NOT_FOUND`
+For each folder include:
+- original repo/worktree/HEAD status;
+- unique commits/files found;
+- exact preservation mapping into canonical repo;
+- integration commit SHA if any;
+- GitHub verification;
+- deletion mechanism;
+- final absence proof.
 
-Include:
-- Git/worktree findings;
-- unique-state checks;
-- file comparison summary;
-- deletion command/mechanism if deleted;
-- post-delete verification;
-- final persistent-root status comparison.
+Do not edit root `TASKS.md`.
+Do not edit prior audits/prompts/logs.
 
-Do not modify root `TASKS.md`.
-Do not modify prior prompts/audits/logs.
-
-This is local hygiene only. Do not make product-code changes.
-
-## Publication of evidence
-
-If a clean temporary Level Factory worktree was needed for the log, publish only the builder log to Level Factory `main` with a normal non-force update after fetching current authority again. Do not use the dirty persistent checkout to make a repository commit.
+This task is complete only when all three target folders are gone.
 
 ## Final response
 
