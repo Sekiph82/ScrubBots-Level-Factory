@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M14 — Publisher / Route A game-repository release
-- Current Sprint: P2-ROUTE-A-C001-R01 / SB-CPX-003 — Final publication closure
-- Current Task: SB-CPX-003 — Complete three previously excluded game-authority tests, unfiltered full pytest, final R01 publication, then independent re-audit
-- Current Task Status: R01_FINAL_PUBLICATION_AUTHORIZED
-- Next Task/Action: SB-CPX-003 executes only `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_FINAL_PUBLICATION_CLOSURE_PROMPT.md`; first synchronize local/GitHub authority, run the exact three previously excluded tests against an isolated git-backed current Scrubbots authority, then unfiltered full pytest, final commit/push, and stop for independent audit.
+- Current Milestone: M11 — Content Platform Architecture & Security Boundary
+- Current Sprint: SB-CP00-001-C001 — Content Platform control-plane boundary
+- Current Task: SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project
+- Current Task Status: IMPLEMENT_THEN_AUDIT / AUTHORIZED
+- Next Task/Action: SB-CP00-001 executes only `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`; first synchronize local/GitHub authority, implement only the M11 control-plane boundary skeleton, publish the builder log, then stop for independent audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_R01_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR_R01_FINAL_PUBLICATION_CLOSURE_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -52,7 +52,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P1-M10-R01 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P1_M10_CAMPAIGN_BUILDER_R01_STRICT_AUDIT.md`.
 - M10 Campaign Intelligence Result: `PASS / CLOSED`; `SB-LF10-001..008` are complete.
 - Release Publication Owner Rule V01: owner ACCEPT moves READY level to Release Pool only; it does not publish or choose catalog order. CampaignBuilder creates the contiguous release-batch plan, owner APPROVE authorizes one all-or-nothing batch publication transaction.
-- P2 Route A Status: `CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT` under `SB-CPX-003`; real remote remains untouched in tests.
+- P2 Route A Status: `PASS / CLOSED` under `SB-CPX-003` by `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_R01_STRICT_REAUDIT.md`.
 - MAINT-LOCAL-HYGIENE-C003 Pause/Resume: `PASS / CLOSED`; P2-R01 resumed after owner-confirmed local cleanup.
 - MAINT-LOCAL-HYGIENE-C003 Independent Audit Result: `PASS / CLOSED`; owner confirmed all three exact SB-LF04 folders are absent, closing the parent CONDITIONAL audit through `.hiveai/audits/MAINT-LOCAL-HYGIENE-C003_OWNER_CONFIRMATION_CLOSURE_AUDIT.md`.
 - P2 Route A Prompt: `.hiveai/prompts/P2_ROUTE_A_RELEASE_PR.md`.
@@ -73,6 +73,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - P2 Route A R01 Sync Disposition: persistent Desktop checkout has legitimate dirty owner work and remains untouched; one detached temp worktree under `%TEMP%\\ScrubBots-Level-Factory\\...` is explicitly authorized from current `origin/main`.
 - P2 Route A R01 Audit Criteria: `.hiveai/audit-criteria/P2_ROUTE_A_RELEASE_PR_R01_AUDIT_CRITERIA.md`.
 - P2 Route A R01 Builder Log Target: `.hiveai/codex-logs/P2_ROUTE_A_RELEASE_PR_R01_CODEX_LOG.md`.
+- P2 Route A R01 Final Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/P2_ROUTE_A_RELEASE_PR_R01_STRICT_REAUDIT.md`.
+- P2 Route A R01 Implementation Commit: `c64345844f095159e619f51fe3ce6b8dc2cd3418`.
+- P2 Route A R01 Final Builder Publication: `8550f9b21c541363dff34a730930ba6170affc64`.
+- SB-CP00-001 C001 Authorization: `IMPLEMENT_THEN_AUDIT`.
+- SB-CP00-001 C001 Prompt: `.hiveai/prompts/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_PROMPT.md`.
+- SB-CP00-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-001-C001_CONTENT_PLATFORM_CONTROL_PLANE_BOUNDARY_AUDIT_CRITERIA.md`.
 - P2 Route A Boundary: owner-approved CampaignBuilder plan -> deterministic release branch -> current-game verification -> one release commit -> branch push + PR -> release receipt; owner/store submission remains out of scope.
 - MAINT-ZIP-CORE-V02-C001-R02 Status: `PASS / CLOSED`; final cutover independently accepted after owner-publication reconciliation.
 - MAINT-ZIP-CORE-V02-C001-R02 Preserved Prompt: `.hiveai/prompts/MAINT-ZIP-CORE-V02-C001-R02_FINAL_CUTOVER_PROMPT.md`.
@@ -802,7 +808,7 @@ Capability source family: `SB-CP00-xxx` from the main Scrubbots master plan.
 
 ### M11.01 - App/content and declarative-content boundary
 
-- [ ] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project. [MIGRATION]
+- [~] SB-CP00-001 — Establish `content_pipeline/` separate publisher/control-plane project. [MIGRATION]
 - [ ] SB-CP00-002 — Define app code vs remote content boundary. [PARTIAL]
 - [ ] SB-CP00-003 — Remote content declarative only; forbid executable payloads. [PARTIAL]
 
@@ -908,7 +914,7 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 ### M14.05 - Route A game-repository release PR
 
-- [~] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
+- [x] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
 
 ---
 
