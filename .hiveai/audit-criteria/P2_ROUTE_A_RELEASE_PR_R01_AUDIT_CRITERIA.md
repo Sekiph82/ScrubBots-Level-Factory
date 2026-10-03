@@ -42,7 +42,15 @@ Regression must prove an arbitrary production origin is refused and cannot be au
 
 ## C. Authentic current-game verifier execution
 
-An integration test must execute the real default verifier against a full isolated current Scrubbots archive/temp project.
+An integration test must execute the real default verifier against a full isolated current Scrubbots archive/temp project with a **non-empty real current-game production row**.
+
+This verifier proof is intentionally separated from CampaignBuilder frontier eligibility. Current Scrubbots Difficulty V1 evidence shows the existing production EASY population is materially above early progression targets, so requiring a newly generated Order-11 row inside the current live tolerance would conflate verifier integration with a separate calibration/content-availability problem.
+
+Required verifier input:
+- use at least one existing canonical production-catalog row from current Scrubbots authority, or an exact isolated copy of such a row bound to its real level/supply/metadata files;
+- the row set must be non-empty;
+- do not use an empty plan;
+- do not fake metadata or analyzer output.
 
 Require authentic execution of:
 - LevelCatalog load + validate_all;
@@ -52,8 +60,10 @@ Require authentic execution of:
 - ProofState;
 - SolvabilitySolver solve + replay;
 - LevelDifficultyAnalyzerV1 measurement/score;
-- metadata score parity <= 1e-6;
+- metadata score parity <= 1e-6 where the current row carries official Difficulty V1 metadata;
 - explicit `FACTORY_ROUTE_A_VERIFY_PASS`.
+
+The accepted P1/R02 publication transaction remains independently required by section D/E regressions. This verifier integration test does not need to invent a currently unavailable Order-11 candidate merely to exercise the real game verifier.
 
 If Godot + canonical game authority exist, timeout/nonzero/API mismatch/missing marker is failure, not skip.
 
