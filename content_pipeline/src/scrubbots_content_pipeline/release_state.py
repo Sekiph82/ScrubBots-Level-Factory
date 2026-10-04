@@ -137,7 +137,9 @@ def _event_payload(event: ReleaseEvent) -> dict[str, object]:
 
 
 def _canonical(value: object) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+    from .secret_refs import redact_for_evidence
+
+    return json.dumps(redact_for_evidence(value), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
 
 
 def make_release_event(
@@ -181,6 +183,10 @@ def _valid_event(event: object) -> bool:
     if event.event_version != RELEASE_STATE_VERSION or type(event.sequence) is not int or event.sequence < 1:
         return False
     if not all(isinstance(value, str) and value for value in (event.event_id, event.transition_id, event.record_id, event.content_id)):
+        return False
+    from .secret_refs import _contains_obvious_secret
+
+    if any(_contains_obvious_secret(value) for value in (event.event_id, event.transition_id, event.record_id, event.content_id)):
         return False
     if not isinstance(event.environment, Environment) or not isinstance(event.to_state, ReleaseState):
         return False

@@ -175,6 +175,8 @@ class PipelineConfig:
 def serialize_config(config: PipelineConfig) -> str:
     """Serialize configuration to stable UTF-8-compatible JSON text."""
 
+    from .secret_refs import redact_for_evidence
+
     environment = config.environment.value if isinstance(config.environment, Environment) else config.environment
     target = config.resolved_target
     value = {
@@ -185,7 +187,7 @@ def serialize_config(config: PipelineConfig) -> str:
         "target": target.to_dict() if target is not None else None,
     }
     return json.dumps(
-        value,
+        redact_for_evidence(value),
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),

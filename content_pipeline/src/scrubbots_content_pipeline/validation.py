@@ -25,6 +25,8 @@ class DryRunReport:
 def validate_only(config: PipelineConfig) -> DryRunReport:
     """Validate control-plane configuration without I/O or remote mutation."""
 
+    from .secret_refs import redact_for_evidence
+
     target = config.resolved_target
     environment = config.environment.value if hasattr(config.environment, "value") else config.environment
     if not isinstance(environment, str):
@@ -39,8 +41,8 @@ def validate_only(config: PipelineConfig) -> DryRunReport:
     )
     actions = ("validate_config", "emit_local_report") if accepted else ()
     return DryRunReport(
-        schema_version=config.schema_version,
-        environment=environment,
+        schema_version=redact_for_evidence(config.schema_version),
+        environment=redact_for_evidence(environment),
         target_version=target.target_version if target is not None else None,
         target_id=target.logical_target_id if target is not None else None,
         state_namespace=target.state_namespace if target is not None else None,

@@ -40,6 +40,16 @@ rollback appends a new event that references a previously promoted record.
 Serialization is deterministic; the state machine does not read clocks, use
 random IDs, access storage, or contact providers.
 
+The versioned secret-reference contract in `schemas/v1/` stores only an opaque
+reference ID, purpose, environment, and optional non-secret version label. It
+has no secret-value field and rejects mappings with credential-bearing fields.
+Staging and production references must match the requested environment.
+Evidence serializers redact recognized secret field names, credential
+assignments, private-key blocks, common token formats, and URI credentials.
+These redaction and repository scans catch known obvious forms; they do not
+prove that arbitrary opaque text is not a secret. No secret-manager or OS
+credential retrieval is implemented.
+
 ## App code and remote content boundary
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.

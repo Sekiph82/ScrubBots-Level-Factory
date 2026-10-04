@@ -54,6 +54,15 @@ from .release_state import (
     serialize_release_snapshot,
     serialize_transition_result,
 )
+from .secret_refs import (
+    SECRET_REFERENCE_VERSION,
+    SecretReference,
+    SecretReferenceReasonCode,
+    SecretReferenceValidationResult,
+    redact_for_evidence,
+    serialize_secret_reference,
+    validate_secret_reference,
+)
 from .validation import DryRunReport, validate_only
 
 __all__ = [
@@ -94,6 +103,13 @@ __all__ = [
     "serialize_release_event",
     "serialize_release_snapshot",
     "serialize_transition_result",
+    "SECRET_REFERENCE_VERSION",
+    "SecretReference",
+    "SecretReferenceReasonCode",
+    "SecretReferenceValidationResult",
+    "redact_for_evidence",
+    "serialize_secret_reference",
+    "validate_secret_reference",
     "validate_only",
     "target_for",
     "validate_environment_pair",
