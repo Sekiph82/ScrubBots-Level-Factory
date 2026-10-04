@@ -14,7 +14,7 @@ Before implementation, tests, or builder-log work:
 
 1. Verify the canonical persistent Level Factory path, repository identity, branch, origin, HEAD, dirty state, stashes, and registered worktrees.
 2. Fetch/prune current `origin/main`.
-3. Read task authority from GitHub/`origin/main:TASKS.md`; require `SB-CP00-003 / SB-CP00-003-C001`.
+3. Read task authority from GitHub/`origin/main:TASKS.md`. Accept either standalone authority for `SB-CP00-003 / SB-CP00-003-C001`, or the explicit M11 master authority `.hiveai/prompts/M11_CP00_003_009_MASTER_IMPLEMENTATION_PROMPT.md` that lists this child first.
 4. Preserve legitimate owner-local dirty work. Do not reset, clean, stash, rebase, force, overwrite, restore, or discard it.
 5. If the persistent checkout cannot be safely synchronized, use only an explicitly authorized temp worktree under `%TEMP%\ScrubBots-Level-Factory\SB-CP00-003-C001`, based on current `origin/main`.
 6. Do not create a Desktop sibling clone/worktree.
@@ -164,11 +164,16 @@ After all gates pass:
 - commit builder log separately;
 - fetch/prune;
 - normal non-force update to Level Factory `main`;
-- verify local/remote 0/0;
-- stop for independent ChatGPT audit.
+- verify local/remote 0/0.
+
+Standalone mode: stop for independent ChatGPT audit.
+
+M11 master mode: do NOT stop for audit and do NOT edit `TASKS.md`; return control to the master prompt and continue directly to `SB-CP00-004-C001`.
 
 ## Final response
 
-Return only:
+Standalone mode: return only the child builder-log URL below.
+
+M11 master mode: do not produce a user handoff here. Record the child result in its builder log and return control to the master.
 
 https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_CODEX_LOG.md
