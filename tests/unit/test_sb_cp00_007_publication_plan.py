@@ -18,6 +18,7 @@ from scrubbots_content_pipeline import (  # noqa: E402
     PayloadReasonCode,
     PlanReasonCode,
     ProviderCapability,
+    ProviderFeature,
     ReleaseState,
     build_publication_plan,
     make_release_event,
@@ -68,7 +69,13 @@ def _draft_history(content_id: str, digest: str) -> object:
 
 
 def _capability() -> ProviderCapability:
-    return ProviderCapability("local-capability-v1", "1.0", True, True)
+    features = tuple(sorted((
+        ProviderFeature.STAGING_PUBLISH, ProviderFeature.PRODUCTION_PROMOTION,
+        ProviderFeature.OBJECT_WRITE, ProviderFeature.INTEGRITY_VERIFY,
+        ProviderFeature.CONDITIONAL_WRITE, ProviderFeature.ATOMIC_MANIFEST_PUBLISH,
+    ), key=lambda feature: feature.value))
+    environments = tuple(sorted((Environment.STAGING, Environment.PRODUCTION), key=lambda item: item.value))
+    return ProviderCapability("local-capability-v1", "1.0", environments, features)
 
 
 def test_plan_bytes_and_operation_order_are_deterministic_and_secret_free() -> None:

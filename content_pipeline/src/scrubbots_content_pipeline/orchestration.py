@@ -4,7 +4,22 @@ from __future__ import annotations
 
 from typing import Protocol
 
+from .config import Environment
+from .provider import ProviderResult, ReadOnlyProvider
 from .validation import DryRunReport
+
+
+class ReadOnlyProviderOrchestrator(Protocol):
+    """Future inspection coordinator typed only to the read-only provider surface."""
+
+    def inspect(
+        self,
+        provider: ReadOnlyProvider,
+        environment: Environment,
+        logical_object_id: str,
+        expected_digest: str,
+    ) -> ProviderResult:
+        ...
 
 
 class PublishOrchestrator(Protocol):

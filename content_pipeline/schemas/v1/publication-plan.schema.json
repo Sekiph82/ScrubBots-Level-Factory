@@ -19,12 +19,14 @@
     "target_id": { "type": "string", "minLength": 1 },
     "provider_capability": {
       "type": "object", "additionalProperties": false,
-      "required": ["capability_id", "capability_version", "supports_staging_publish", "supports_production_promotion"],
+      "required": ["capability_id", "capability_version", "supports_staging_publish", "supports_production_promotion", "environments", "features"],
       "properties": {
         "capability_id": { "type": ["string", "null"] },
         "capability_version": { "type": ["string", "null"] },
         "supports_staging_publish": { "type": "boolean" },
-        "supports_production_promotion": { "type": "boolean" }
+        "supports_production_promotion": { "type": "boolean" },
+        "environments": { "type": "array", "items": { "enum": ["staging", "production"] } },
+        "features": { "type": "array", "items": { "enum": ["STAGING_PUBLISH", "PRODUCTION_PROMOTION", "OBJECT_WRITE", "OBJECT_DELETE", "INTEGRITY_VERIFY", "ATOMIC_MANIFEST_PUBLISH", "CONDITIONAL_WRITE", "ROLLBACK"] } }
       }
     },
     "content_id": { "type": "string", "minLength": 1 },

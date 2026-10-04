@@ -17,10 +17,14 @@ python -m pip install -e .\content_pipeline
 scrubbots-content-pipeline --validate-only --environment staging
 ```
 
-The versioned configuration schema is in `schemas/v1/`. Environment labels,
-provider protocols, and publish/promote/rollback interfaces are placeholders.
-No provider implementation, remote operation, credential, or network client is
-present. Reports describe local validation only.
+The versioned configuration and provider-neutral schemas are in `schemas/v1/`.
+The versioned provider boundary separates read-only inspection from future
+object write/delete/verify interfaces. Capabilities are explicit environment
+and feature declarations; missing required features reject a plan. Results use
+fixed provider-neutral categories without free-form error text. Only protocol
+definitions and deterministic fake adapters in tests exist: no provider
+implementation, remote operation, credential, or network client is present.
+Reports describe local validation only.
 
 The versioned `EnvironmentTarget` model gives staging and production distinct
 logical target IDs, state namespaces, and content namespaces. Production targets
@@ -61,6 +65,16 @@ schema in `schemas/v1/publication-plan.schema.json`. Production plans require
 an exact staged source record and represent promotion only. The API exposes no
 provider object or mutation callback. `validate_plan_current()` checks the
 plan again against the current target, replayed state, and exact digest.
+
+The versioned `provider.py` contract records provider identity separately from
+capability declarations. Negotiation requires an explicit supported
+environment and the full feature set required by each proposed operation.
+`ReadOnlyProvider` exposes inspection and validation only;
+`MutatingProvider` is a separate future interface for object write, delete,
+and integrity verification. Core plans omit provider identity, so equal
+capability declarations produce identical provider-neutral plan bytes across
+adapters. Provider results use fixed categories and have no free-form message
+field.
 
 The CLI's `--dry-run` option is deliberately fail-closed because this milestone
 does not define a CLI format for trusted release-event evidence. It prints a

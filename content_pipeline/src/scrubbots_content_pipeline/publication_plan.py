@@ -12,6 +12,7 @@ from typing import Any
 from .config import Environment, EnvironmentTarget, validate_target_binding
 from .content_boundary import ContentDisposition, classify_content
 from .payload_validation import PayloadReasonCode, PayloadValidationResult, validate_remote_payload
+from .provider import ProviderCapability, ProviderFeature, negotiate_capabilities, validate_provider_capability
 from .release_state import ReleaseReplayResult, ReleaseState, ReleaseStateSnapshot
 from .secret_refs import _contains_obvious_secret, redact_for_evidence
 
@@ -33,16 +34,6 @@ class PlanReasonCode(StrEnum):
     INVALID_CAPABILITY = "INVALID_CAPABILITY"
     SECRET_BEARING_INPUT = "SECRET_BEARING_INPUT"
     STALE_PLAN = "STALE_PLAN"
-
-
-@dataclass(frozen=True, slots=True)
-class ProviderCapability:
-    """Non-secret declarative capability; deliberately contains no endpoint or credential."""
-
-    capability_id: str
-    capability_version: str
-    supports_staging_publish: bool
-    supports_production_promotion: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +74,8 @@ class PublicationPlan:
     capability_version: str | None
     capability_supports_staging_publish: bool
     capability_supports_production_promotion: bool
+    capability_environments: tuple[str, ...]
+    capability_features: tuple[str, ...]
     content_id: str
     content_digest: str
     operations: tuple[PublicationOperation, ...]
@@ -104,6 +97,8 @@ class PublicationPlan:
                 "capability_version": self.capability_version,
                 "supports_staging_publish": self.capability_supports_staging_publish,
                 "supports_production_promotion": self.capability_supports_production_promotion,
+                "environments": list(self.capability_environments),
+                "features": list(self.capability_features),
             },
             "content_id": self.content_id,
             "content_digest": self.content_digest,
@@ -221,14 +216,21 @@ def build_publication_plan(
     check("content_binding", content_matches, PlanReasonCode.ACCEPTED if content_matches else PlanReasonCode.CONTENT_MISMATCH)
     check("release_state", state_matches, PlanReasonCode.ACCEPTED if state_matches else PlanReasonCode.STATE_MISMATCH)
 
-    capability_ok = (
-        isinstance(capability, ProviderCapability)
-        and _safe_identifier(capability.capability_id)
-        and capability.capability_version == "1.0"
-        and type(capability.supports_staging_publish) is bool
-        and type(capability.supports_production_promotion) is bool
-    )
+    capability_ok = validate_provider_capability(capability)
     check("provider_capability", capability_ok, PlanReasonCode.ACCEPTED if capability_ok else PlanReasonCode.INVALID_CAPABILITY)
+    if valid_target:
+        required_features = (
+            (ProviderFeature.PRODUCTION_PROMOTION, ProviderFeature.INTEGRITY_VERIFY,
+             ProviderFeature.CONDITIONAL_WRITE, ProviderFeature.ATOMIC_MANIFEST_PUBLISH)
+            if target.environment is Environment.PRODUCTION
+            else (ProviderFeature.STAGING_PUBLISH, ProviderFeature.OBJECT_WRITE,
+                  ProviderFeature.INTEGRITY_VERIFY, ProviderFeature.CONDITIONAL_WRITE)
+        )
+        capability_negotiation = negotiate_capabilities(capability, target.environment, required_features) if capability_ok else None
+    else:
+        capability_negotiation = None
+    capability_negotiated = capability_ok and capability_negotiation is not None and capability_negotiation.accepted
+    check("capability_negotiation", capability_negotiated, PlanReasonCode.ACCEPTED if capability_negotiated else PlanReasonCode.INVALID_CAPABILITY)
     approval_ok = type(owner_approved) is bool and owner_approved is True
     check("owner_approval", approval_ok, PlanReasonCode.ACCEPTED if approval_ok else PlanReasonCode.OWNER_APPROVAL_REQUIRED)
 
@@ -256,7 +258,7 @@ def build_publication_plan(
             and source.environment is Environment.STAGING
             and source.state is ReleaseState.STAGED
             and source.content_id == content_id and source.content_digest == content_digest
-            and isinstance(capability, ProviderCapability) and capability.supports_production_promotion is True
+            and capability_ok and capability_negotiated and capability.supports_production_promotion is True
             and validation_ok and replay_ok and snapshot_member
         )
         if promotion_ok:
@@ -265,7 +267,7 @@ def build_publication_plan(
         operation_name = "promote_staged_record"
     else:
         promotion_ok = True
-        capability_stage_ok = isinstance(capability, ProviderCapability) and capability.supports_staging_publish is True
+        capability_stage_ok = capability_ok and capability_negotiated and capability.supports_staging_publish is True
         check("staging_capability", capability_stage_ok, PlanReasonCode.ACCEPTED if capability_stage_ok else PlanReasonCode.INVALID_CAPABILITY)
         operation_name = "publish_to_staging"
 
@@ -280,6 +282,8 @@ def build_publication_plan(
         capability.capability_version if capability_ok else None,
         capability.supports_staging_publish if capability_ok else False,
         capability.supports_production_promotion if capability_ok else False,
+        tuple(environment.value for environment in capability.environments) if capability_ok else (),
+        tuple(feature.value for feature in capability.features) if capability_ok else (),
         content_id, content_digest, (operation,), tuple(checks), expected,
         approval_ok, accepted and approval_ok and promotion_ok, False,
     )
@@ -317,6 +321,6 @@ def validate_plan_current(
 
 __all__ = [
     "PUBLICATION_PLAN_VERSION", "ExpectedReleaseState", "PlanCheck", "PlanReasonCode",
-    "ProviderCapability", "PublicationOperation", "PublicationPlan", "build_publication_plan",
+    "PublicationOperation", "PublicationPlan", "build_publication_plan",
     "serialize_publication_plan", "validate_plan_current",
 ]

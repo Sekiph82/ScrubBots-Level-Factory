@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrubbots.invalid/schemas/content-pipeline/provider-contract.v1.schema.json",
+  "title": "ScrubBots provider-neutral contract",
+  "description": "Provider identity, capability and normalized result records. No endpoint, credential or free-form error text is accepted.",
+  "oneOf": [
+    { "$ref": "#/$defs/identity" },
+    { "$ref": "#/$defs/capability" },
+    { "$ref": "#/$defs/result" },
+    { "$ref": "#/$defs/negotiation" }
+  ],
+  "$defs": {
+    "identity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_version", "provider_id", "provider_version"],
+      "properties": {
+        "contract_version": { "const": "1.0" },
+        "provider_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "provider_version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+      }
+    },
+    "capability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["contract_version", "capability_id", "capability_version", "environments", "features"],
+      "properties": {
+        "contract_version": { "const": "1.0" },
+        "capability_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "capability_version": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "environments": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["staging", "production"] } },
+        "features": { "type": "array", "uniqueItems": true, "items": { "enum": ["STAGING_PUBLISH", "PRODUCTION_PROMOTION", "OBJECT_WRITE", "OBJECT_DELETE", "INTEGRITY_VERIFY", "ATOMIC_MANIFEST_PUBLISH", "CONDITIONAL_WRITE", "ROLLBACK"] } }
+      }
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result_version", "category", "provider_id", "environment", "content_digest"],
+      "properties": {
+        "result_version": { "const": "1.0" },
+        "category": { "enum": ["SUCCESS", "UNAVAILABLE", "UNSUPPORTED_CAPABILITY", "CONFLICT_STALE_PRECONDITION", "INTEGRITY_MISMATCH", "UNAUTHORIZED_REFERENCE", "TRANSIENT_FAILURE", "INVALID_REQUEST"] },
+        "provider_id": { "type": "string", "minLength": 1 },
+        "environment": { "enum": ["staging", "production", "unknown"] },
+        "content_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    "negotiation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["negotiation_version", "accepted", "environment", "required_features", "missing_features", "result_category"],
+      "properties": {
+        "negotiation_version": { "const": "1.0" },
+        "accepted": { "type": "boolean" },
+        "environment": { "enum": ["staging", "production", "unknown"] },
+        "required_features": { "type": "array", "items": { "enum": ["STAGING_PUBLISH", "PRODUCTION_PROMOTION", "OBJECT_WRITE", "OBJECT_DELETE", "INTEGRITY_VERIFY", "ATOMIC_MANIFEST_PUBLISH", "CONDITIONAL_WRITE", "ROLLBACK"] } },
+        "missing_features": { "type": "array", "items": { "enum": ["STAGING_PUBLISH", "PRODUCTION_PROMOTION", "OBJECT_WRITE", "OBJECT_DELETE", "INTEGRITY_VERIFY", "ATOMIC_MANIFEST_PUBLISH", "CONDITIONAL_WRITE", "ROLLBACK"] } },
+        "result_category": { "enum": ["SUCCESS", "UNAVAILABLE", "UNSUPPORTED_CAPABILITY", "CONFLICT_STALE_PRECONDITION", "INTEGRITY_MISMATCH", "UNAUTHORIZED_REFERENCE", "TRANSIENT_FAILURE", "INVALID_REQUEST"] }
+      }
+    }
+  }
+}
