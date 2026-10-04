@@ -19,6 +19,13 @@ from .orchestration import (
     PublishOrchestrator,
     RollbackOrchestrator,
 )
+from .payload_validation import (
+    PAYLOAD_VALIDATION_VERSION,
+    PayloadReasonCode,
+    PayloadValidationResult,
+    serialize_payload_result,
+    validate_remote_payload,
+)
 from .validation import DryRunReport, validate_only
 
 __all__ = [
@@ -36,5 +43,10 @@ __all__ = [
     "classify_content",
     "serialize_config",
     "serialize_result",
+    "PAYLOAD_VALIDATION_VERSION",
+    "PayloadReasonCode",
+    "PayloadValidationResult",
+    "serialize_payload_result",
+    "validate_remote_payload",
     "validate_only",
 ]

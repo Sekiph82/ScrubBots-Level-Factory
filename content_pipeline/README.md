@@ -56,6 +56,20 @@ that include executable fields or script references fail closed as
 `APP_OWNED` or `REJECTED`. A future content family is ineligible until its
 versioned contract and classification rules are explicitly added.
 
+`validate_remote_payload(descriptor, payload)` adds payload-level validation
+for descriptors already classified as `REMOTE_DECLARATIVE`. Prefer UTF-8
+payload bytes so the declared SHA-256 binds to those exact bytes; parsed data is
+rejected when a descriptor carries a digest because its byte provenance cannot
+be established. Results use stable reason codes under validation version
+`1.0`. Parsing does not import, execute, or load payload content.
+
+The deterministic resource limits are 1 MiB per byte payload, nesting depth
+32, 65,536 members per collection, 8,192 characters per string, and 256 cells
+per LevelData dimension. Current LevelData V1, supply-plan V1, and publisher
+metadata V1 each use explicit field allow-lists. Unknown fields, duplicate JSON
+keys, non-finite numbers, executable references, and descriptor/payload
+projection mismatches fail closed.
+
 Executable-capable content remains app-owned because shipping it remotely
 would change application behavior and expand the runtime attack surface. Level
 Factory remains the producer of accepted data; this package owns the
