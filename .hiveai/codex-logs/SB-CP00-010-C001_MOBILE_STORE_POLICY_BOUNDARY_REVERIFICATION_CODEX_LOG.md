@@ -89,3 +89,12 @@ Implementation files are staged separately from this log. Implementation commit,
 - The captured status contained 123 modified tracked test paths: `tests/conftest.py`, 2 golden tests, 12 integration tests, 2 performance tests, 1 property test, 2 test-support files, and 103 unit tests. It contained 53 untracked paths: `level_factory/addons/` and 52 Godot `.uid` sidecars. These path groups were observed both at preflight and in a later read-only status recheck; none was modified by this task.
 - The persistent repository reported 18 existing stashes and 16 registered worktrees, including prior CP/P2/LF worktrees and one prunable Desktop sibling worktree. None was changed, removed, or used. The task-authorized CP010 TEMP path did not exist before creation.
 - The owner checkout Git config was not retained with any local `core.autocrlf` override; the only active value remains the pre-existing system-wide `true` setting.
+
+### Publication result and parity verification — 2026-10-04T20:00:21Z
+
+- Separate builder-log commit: `3233c5a1ab4e6036b46f26d8a2ad053d443fd070`.
+- Immediately before push, `git fetch --prune origin` confirmed the exact CP010 task, prompt, and authorization remained current. `origin/main` was `eb0f581b756392fa962c023e780cbfa50e536512`; the two scoped commits were 2 ahead / 0 behind.
+- Normal non-force `git push origin HEAD:main` succeeded: `eb0f581..3233c5a HEAD -> main`.
+- After `git fetch --prune origin`, execution `HEAD` and `origin/main` both equaled `3233c5a1ab4e6036b46f26d8a2ad053d443fd070`; divergence was 0 ahead / 0 behind; execution worktree was clean.
+- Root `TASKS.md` still authorizes CP010 for independent audit; Codex did not modify `TASKS.md` or `.hiveai/audits/**`. The canonical Desktop checkout and owner-local work remain untouched.
+- This verified publication record is being published in a separate log-only closure update. A normal push and post-push fetch will verify parity again after that update.
