@@ -105,3 +105,10 @@ Work not started at log creation. Subsequent entries will record the pinned exte
 - Normal non-force `git push origin HEAD:main` succeeded: `78b7196..30f5f57 HEAD -> main`.
 - Post-push `git fetch --prune origin` verified execution `HEAD` and `origin/main` both equal `30f5f57fb999c9e5291ada89ec4b4e98607aef91`, divergence `0/0`, with no remaining implementation changes.
 - This chronological log entry is being committed as a separate log-only closure update so the builder record includes the actual push result. After that log-only update is published, a final fetch and local/origin SHA equality check will be performed.
+
+### Final log-publication check correction
+
+- The final separate log-only commit `3c21ebe432cc3efd72b2ad5ca25eafc2ce4ec79b` was pushed normally (`30f5f57..3c21ebe HEAD -> main`).
+- The first post-push parity assertion raised a false failure because PowerShell received `git rev-list --left-right --count` as tab-separated `0<TAB>0`, while that assertion compared a joined value to literal `0 0`. Both printed full commit IDs were already identical; no Git operation was rolled back or repeated.
+- Corrected the assertion to split the result on whitespace, then reran `git fetch --prune origin`: execution `HEAD` and `origin/main` both equaled `3c21ebe432cc3efd72b2ad5ca25eafc2ce4ec79b`, with 0 ahead / 0 behind and a clean worktree. Remote builder-log H1/role were confirmed, and `TASKS.md` plus `.hiveai/audits/**` still had no diff.
+- This correction is being published as a separate log-only closure commit; final equality will be rechecked after its normal non-force push.
