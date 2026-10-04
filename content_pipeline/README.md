@@ -22,6 +22,15 @@ provider protocols, and publish/promote/rollback interfaces are placeholders.
 No provider implementation, remote operation, credential, or network client is
 present. Reports describe local validation only.
 
+The versioned `EnvironmentTarget` model gives staging and production distinct
+logical target IDs, state namespaces, and content namespaces. Production targets
+do not permit direct publication and require an explicit promotion intent.
+`validate_environment_pair()`, `validate_target_binding()`, and
+`validate_target_use()` are pure local checks; they reject collisions,
+environment mismatches, unknown labels, and staging-to-production use without
+promotion intent. Dry-run reports name the environment and target namespaces
+explicitly. The target model contains no provider endpoint or credentials.
+
 ## App code and remote content boundary
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.

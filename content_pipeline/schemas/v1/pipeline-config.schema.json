@@ -8,7 +8,8 @@
     "schema_version",
     "environment",
     "input_contract",
-    "require_owner_approval"
+    "require_owner_approval",
+    "target"
   ],
   "properties": {
     "schema_version": {
@@ -24,6 +25,28 @@
     "require_owner_approval": {
       "type": "boolean",
       "const": true
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_version",
+        "environment",
+        "logical_target_id",
+        "state_namespace",
+        "content_namespace",
+        "direct_publication_permitted",
+        "promotion_required"
+      ],
+      "properties": {
+        "target_version": { "const": "1.0" },
+        "environment": { "enum": ["staging", "production"] },
+        "logical_target_id": { "type": "string", "minLength": 1 },
+        "state_namespace": { "type": "string", "minLength": 1 },
+        "content_namespace": { "type": "string", "minLength": 1 },
+        "direct_publication_permitted": { "type": "boolean" },
+        "promotion_required": { "type": "boolean" }
+      }
     }
   }
 }

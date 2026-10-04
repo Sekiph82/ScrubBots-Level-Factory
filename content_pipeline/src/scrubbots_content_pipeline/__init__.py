@@ -4,7 +4,21 @@ This package defines declarative validation and orchestration contracts only.
 It does not connect to a provider or mutate remote content.
 """
 
-from .config import Environment, PipelineConfig, serialize_config
+from .config import (
+    PRODUCTION_TARGET,
+    STAGING_TARGET,
+    TARGET_MODEL_VERSION,
+    Environment,
+    EnvironmentTarget,
+    PipelineConfig,
+    TargetReasonCode,
+    TargetValidationResult,
+    serialize_config,
+    target_for,
+    validate_environment_pair,
+    validate_target_binding,
+    validate_target_use,
+)
 from .content_boundary import (
     BOUNDARY_VERSION,
     ClassificationResult,
@@ -34,12 +48,18 @@ __all__ = [
     "ClassificationResult",
     "ContentDisposition",
     "Environment",
+    "EnvironmentTarget",
     "EvidenceSink",
     "PipelineConfig",
+    "PRODUCTION_TARGET",
     "PromotionOrchestrator",
     "PublishOrchestrator",
     "RollbackOrchestrator",
     "ReasonCode",
+    "STAGING_TARGET",
+    "TARGET_MODEL_VERSION",
+    "TargetReasonCode",
+    "TargetValidationResult",
     "classify_content",
     "serialize_config",
     "serialize_result",
@@ -49,4 +69,8 @@ __all__ = [
     "serialize_payload_result",
     "validate_remote_payload",
     "validate_only",
+    "target_for",
+    "validate_environment_pair",
+    "validate_target_binding",
+    "validate_target_use",
 ]

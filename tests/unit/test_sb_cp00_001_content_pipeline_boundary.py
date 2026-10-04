@@ -51,7 +51,17 @@ def test_schema_and_config_serialization_are_versioned_and_deterministic() -> No
         "input_contract": "scrubbots.level_factory.accepted-content.v1",
         "require_owner_approval": True,
         "schema_version": "1.0",
+        "target": {
+            "target_version": "1.0",
+            "environment": "production",
+            "logical_target_id": "production:default",
+            "state_namespace": "production:state",
+            "content_namespace": "production:content",
+            "direct_publication_permitted": False,
+            "promotion_required": True,
+        },
     }
+    assert schema["required"] == ["schema_version", "environment", "input_contract", "require_owner_approval", "target"]
 
 
 def test_publish_promote_and_rollback_are_protocol_placeholders_only() -> None:
