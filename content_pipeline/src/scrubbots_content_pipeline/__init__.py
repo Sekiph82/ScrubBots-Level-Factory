@@ -40,6 +40,20 @@ from .payload_validation import (
     serialize_payload_result,
     validate_remote_payload,
 )
+from .release_state import (
+    RELEASE_STATE_VERSION,
+    ReleaseEvent,
+    ReleaseReasonCode,
+    ReleaseReplayResult,
+    ReleaseState,
+    ReleaseStateSnapshot,
+    ReleaseTransitionResult,
+    make_release_event,
+    replay_release_events,
+    serialize_release_event,
+    serialize_release_snapshot,
+    serialize_transition_result,
+)
 from .validation import DryRunReport, validate_only
 
 __all__ = [
@@ -68,6 +82,18 @@ __all__ = [
     "PayloadValidationResult",
     "serialize_payload_result",
     "validate_remote_payload",
+    "RELEASE_STATE_VERSION",
+    "ReleaseEvent",
+    "ReleaseReasonCode",
+    "ReleaseReplayResult",
+    "ReleaseState",
+    "ReleaseStateSnapshot",
+    "ReleaseTransitionResult",
+    "make_release_event",
+    "replay_release_events",
+    "serialize_release_event",
+    "serialize_release_snapshot",
+    "serialize_transition_result",
     "validate_only",
     "target_for",
     "validate_environment_pair",

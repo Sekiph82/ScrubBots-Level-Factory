@@ -31,6 +31,15 @@ environment mismatches, unknown labels, and staging-to-production use without
 promotion intent. Dry-run reports name the environment and target namespaces
 explicitly. The target model contains no provider endpoint or credentials.
 
+`release_state.py` provides a versioned in-memory release ledger. Callers supply
+event IDs, transition IDs, and sequence numbers; events carry the content digest,
+environment, expected state, and previous-event digest. Replay verifies the
+append-only hash chain and transition order before rebuilding each record.
+Promotion creates a separate production record linked to a staged source, and
+rollback appends a new event that references a previously promoted record.
+Serialization is deterministic; the state machine does not read clocks, use
+random IDs, access storage, or contact providers.
+
 ## App code and remote content boundary
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.
