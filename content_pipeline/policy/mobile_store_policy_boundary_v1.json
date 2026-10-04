@@ -1,0 +1,149 @@
+{
+  "architecture_dispositions": {
+    "current_m11_architecture": "CONSISTENT_WITH_DECLARATIVE_DATA_BOUNDARY",
+    "final_release_recheck": "REQUIRED",
+    "forbidden_remote_behavior": "FORBIDDEN",
+    "future_runtime_and_provider_behavior": "NOT_YET_VERIFIED"
+  },
+  "boundary_rules": [
+    {
+      "disposition": "DECLARATIVE_DATA_ONLY",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "level_data_v1",
+      "rule": "LevelData V1 is fixed-schema declarative level data with integer palette-index cells."
+    },
+    {
+      "disposition": "DECLARATIVE_DATA_ONLY",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "supply_plan_v1",
+      "rule": "scrubbots.level_supply_plan.v1 contains fixed-schema declarative supply-plan data."
+    },
+    {
+      "disposition": "DECLARATIVE_DATA_ONLY",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "level_metadata_v1",
+      "rule": "scrubbots.level.metadata.v1 contains fixed-schema declarative publisher metadata."
+    },
+    {
+      "disposition": "FORBIDDEN",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#Forbidden-by-the-current-Content-Platform-boundary",
+      "id": "remote_executable_or_behavior_payloads",
+      "rule": "Executable, interpreted, script, plugin, addon, autoload, native, module, remote resource behavior, eval/exec, hidden activation, review evasion, and behavior-changing feature injection remain outside the current boundary."
+    },
+    {
+      "disposition": "NO_REMOTE_MUTATION",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "publisher_dry_run",
+      "rule": "CP007 dry-run planning is local and records remote_mutation_performed as false."
+    },
+    {
+      "disposition": "NO_CONCRETE_PROVIDER",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "provider_abstraction",
+      "rule": "CP008 defines provider-neutral interfaces but ships no concrete network or storage provider."
+    },
+    {
+      "disposition": "NO_GIT_CREDENTIALS",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#M11-architecture-mapping",
+      "id": "credential_boundary",
+      "rule": "CP006 contains no publishing credential values or project-data credential retrieval."
+    },
+    {
+      "disposition": "NOT_YET_VERIFIED",
+      "evidence_ref": "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md#Scope-and-conclusion",
+      "id": "runtime_and_provider_delivery",
+      "rule": "M15/M16 runtime and M18 provider delivery behavior are not implemented or verified by this snapshot."
+    }
+  ],
+  "checked_at_utc": "2026-10-04T19:15:37Z",
+  "final_recheck_required": true,
+  "m20_ownership": {
+    "milestone": "M20",
+    "required_tasks": [
+      {
+        "action": "Re-fetch current official Google Play policies before production launch.",
+        "id": "SB-CP09-001"
+      },
+      {
+        "action": "Re-fetch current official Apple policies before production launch.",
+        "id": "SB-CP09-002"
+      }
+    ]
+  },
+  "schema": "scrubbots.mobile_store_policy_boundary.v1",
+  "schema_version": 1,
+  "sources": [
+    {
+      "checked_at_utc": "2026-10-04T19:15:37Z",
+      "platform": "GOOGLE_PLAY",
+      "policy_paraphrase": "Bars self-update outside Play and executable-code downloads from outside Play, with stated interpreter or virtual-machine nuances; runtime-loaded interpreted code remains subject to policy.",
+      "relevance": "Supports keeping remote executable content outside the declarative M11 payload boundary.",
+      "sections": [
+        "Device and Network Abuse",
+        "Full Policy: executable-code download restriction",
+        "Runtime-loaded interpreted languages"
+      ],
+      "source_id": "google_play_device_network_abuse",
+      "title": "Device and Network Abuse",
+      "url": "https://support.google.com/googleplay/android-developer/answer/16559646"
+    },
+    {
+      "checked_at_utc": "2026-10-04T19:15:37Z",
+      "platform": "GOOGLE_PLAY",
+      "policy_paraphrase": "Requires accurate functionality and content disclosures, necessary additional resources with a user prompt and download-size disclosure, and bars hidden functionality and review evasion.",
+      "relevance": "Remote level content must remain inside the disclosed game contract; a future resource download flow needs a separate implementation-specific review.",
+      "sections": [
+        "3.1",
+        "3.2",
+        "5 Behavior Transparency"
+      ],
+      "source_id": "google_play_deceptive_behavior",
+      "title": "Deceptive Behavior",
+      "url": "https://support.google.com/googleplay/android-developer/answer/17006354"
+    },
+    {
+      "checked_at_utc": "2026-10-04T19:15:37Z",
+      "platform": "GOOGLE_PLAY",
+      "policy_paraphrase": "States that Play policies are regularly updated and lists dated prior versions; the latest listed archive entry at this check was August 26, 2026.",
+      "relevance": "Provides dated change-history context and supports requiring a fresh release-time policy check.",
+      "sections": [
+        "Past Policy Versions",
+        "Latest listed prior version: August 26, 2026"
+      ],
+      "source_id": "google_play_policy_archive",
+      "title": "Policy Archive",
+      "url": "https://support.google.com/googleplay/android-developer/answer/13386702"
+    },
+    {
+      "checked_at_utc": "2026-10-04T19:15:37Z",
+      "platform": "APPLE",
+      "policy_paraphrase": "Guideline 2.5.2 expects a self-contained app and bars downloaded, installed, or executed code that introduces or changes app features or functionality, subject to a limited educational-code provision. Guideline 4.7 covers specified non-embedded software categories with additional conditions.",
+      "relevance": "The M11 contract uses fixed-schema data and does not rely on the mini-app/software provisions to serve SCRUBBOTS levels.",
+      "sections": [
+        "2.5.2",
+        "4.7",
+        "4.7.1",
+        "4.7.2",
+        "4.7.3",
+        "4.7.4",
+        "4.7.5"
+      ],
+      "source_id": "apple_app_review_guidelines",
+      "title": "App Review Guidelines",
+      "url": "https://developer.apple.com/app-store/review/guidelines/"
+    },
+    {
+      "checked_at_utc": "2026-10-04T19:15:37Z",
+      "platform": "APPLE",
+      "policy_paraphrase": "Section 3.3.1(B) generally bars executable-code downloads or installation and constrains interpreted code; 3.3.1(C) restricts enabling additional functionality through other distribution mechanisms absent prior written approval or an identified exception.",
+      "relevance": "Reinforces the M11 boundary against code, plugins, or remote feature switches; no runtime provider is present for delivery assessment.",
+      "sections": [
+        "3.3.1(B) Executable Code",
+        "3.3.1(C) Additional Features or Functionality"
+      ],
+      "source_id": "apple_developer_program_license",
+      "title": "Apple Developer Program License Agreement",
+      "url": "https://developer.apple.com/support/terms/apple-developer-program-license-agreement/"
+    }
+  ]
+}

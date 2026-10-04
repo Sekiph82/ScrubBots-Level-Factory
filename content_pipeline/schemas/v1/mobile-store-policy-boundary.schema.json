@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "scrubbots.mobile_store_policy_boundary.v1",
+  "title": "Mobile and Store Policy Boundary Snapshot V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "checked_at_utc",
+    "sources",
+    "boundary_rules",
+    "architecture_dispositions",
+    "final_recheck_required",
+    "m20_ownership"
+  ],
+  "properties": {
+    "schema": { "const": "scrubbots.mobile_store_policy_boundary.v1" },
+    "schema_version": { "const": 1 },
+    "checked_at_utc": { "type": "string", "format": "date-time" },
+    "sources": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source_id", "platform", "title", "url", "checked_at_utc", "sections", "policy_paraphrase", "relevance"],
+        "properties": {
+          "source_id": { "type": "string", "minLength": 1 },
+          "platform": { "enum": ["GOOGLE_PLAY", "APPLE"] },
+          "title": { "type": "string", "minLength": 1 },
+          "url": { "type": "string", "format": "uri" },
+          "checked_at_utc": { "type": "string", "format": "date-time" },
+          "sections": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "policy_paraphrase": { "type": "string", "minLength": 1 },
+          "relevance": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "boundary_rules": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "disposition", "rule", "evidence_ref"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "disposition": { "enum": ["DECLARATIVE_DATA_ONLY", "FORBIDDEN", "NO_REMOTE_MUTATION", "NO_CONCRETE_PROVIDER", "NO_GIT_CREDENTIALS", "NOT_YET_VERIFIED"] },
+          "rule": { "type": "string", "minLength": 1 },
+          "evidence_ref": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "architecture_dispositions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["current_m11_architecture", "forbidden_remote_behavior", "future_runtime_and_provider_behavior", "final_release_recheck"],
+      "properties": {
+        "current_m11_architecture": { "const": "CONSISTENT_WITH_DECLARATIVE_DATA_BOUNDARY" },
+        "forbidden_remote_behavior": { "const": "FORBIDDEN" },
+        "future_runtime_and_provider_behavior": { "const": "NOT_YET_VERIFIED" },
+        "final_release_recheck": { "const": "REQUIRED" }
+      }
+    },
+    "final_recheck_required": { "const": true },
+    "m20_ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["milestone", "required_tasks"],
+      "properties": {
+        "milestone": { "const": "M20" },
+        "required_tasks": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "action"],
+            "properties": {
+              "id": { "enum": ["SB-CP09-001", "SB-CP09-002"] },
+              "action": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
