@@ -50,6 +50,25 @@ These redaction and repository scans catch known obvious forms; they do not
 prove that arbitrary opaque text is not a secret. No secret-manager or OS
 credential retrieval is implemented.
 
+## Publication-plan dry run
+
+`publication_plan.py` builds a versioned local plan only when exact payload
+bytes validate against an eligible descriptor, a release-event replay is
+accepted, the explicit target and non-secret capability agree, and owner
+approval is present. Plans bind the content digest and expected release
+snapshot, order their logical operation list, and serialize through a fixed
+schema in `schemas/v1/publication-plan.schema.json`. Production plans require
+an exact staged source record and represent promotion only. The API exposes no
+provider object or mutation callback. `validate_plan_current()` checks the
+plan again against the current target, replayed state, and exact digest.
+
+The CLI's `--dry-run` option is deliberately fail-closed because this milestone
+does not define a CLI format for trusted release-event evidence. It prints a
+stable local report identifying missing plan evidence, marks
+`remote_mutation_performed` false, and exits nonzero. Callers with validated
+in-memory evidence can use the plan API. `--validate-only` remains the
+configuration-only check. No live-publish flag or remote write exists.
+
 ## App code and remote content boundary
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.

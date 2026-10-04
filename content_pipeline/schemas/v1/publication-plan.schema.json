@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrubbots.invalid/schemas/content-pipeline/publication-plan.v1.schema.json",
+  "title": "ScrubBots local publication plan",
+  "description": "Deterministic local-only plan. It carries no secret value and does not perform remote mutation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "plan_version", "accepted", "complete", "target_environment", "target_id",
+    "provider_capability", "content_id", "content_digest", "operations", "checks",
+    "expected_release_state", "owner_approved", "mutation_eligible_in_principle",
+    "remote_mutation_performed"
+  ],
+  "properties": {
+    "plan_version": { "const": "1.0" },
+    "accepted": { "type": "boolean" },
+    "complete": { "type": "boolean" },
+    "target_environment": { "enum": ["staging", "production", "invalid"] },
+    "target_id": { "type": "string", "minLength": 1 },
+    "provider_capability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["capability_id", "capability_version", "supports_staging_publish", "supports_production_promotion"],
+      "properties": {
+        "capability_id": { "type": ["string", "null"] },
+        "capability_version": { "type": ["string", "null"] },
+        "supports_staging_publish": { "type": "boolean" },
+        "supports_production_promotion": { "type": "boolean" }
+      }
+    },
+    "content_id": { "type": "string", "minLength": 1 },
+    "content_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "operations": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["sequence", "operation", "content_id", "content_digest", "source_record_id"],
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1 },
+          "operation": { "enum": ["publish_to_staging", "promote_staged_record"] },
+          "content_id": { "type": "string", "minLength": 1 },
+          "content_digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "source_record_id": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["check_id", "accepted", "reason_code"],
+        "properties": {
+          "check_id": { "type": "string", "minLength": 1 },
+          "accepted": { "type": "boolean" },
+          "reason_code": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "expected_release_state": {
+      "type": "object", "additionalProperties": false,
+      "required": ["record_version", "record_id", "content_id", "content_digest", "environment", "state", "last_sequence"],
+      "properties": {
+        "record_version": { "type": "string" },
+        "record_id": { "type": ["string", "null"] },
+        "content_id": { "type": ["string", "null"] },
+        "content_digest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "environment": { "enum": ["staging", "production", "none", "unknown"] },
+        "state": { "type": ["string", "null"] },
+        "last_sequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "owner_approved": { "type": "boolean" },
+    "mutation_eligible_in_principle": { "type": "boolean" },
+    "remote_mutation_performed": { "const": false }
+  }
+}
