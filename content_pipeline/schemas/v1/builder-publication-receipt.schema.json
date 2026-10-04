@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrubbots.invalid/schemas/content-pipeline/builder-publication-receipt.v1.schema.json",
+  "title": "Content Platform builder publication receipt",
+  "description": "Immutable implementation and publication facts only. This record is not task state or audit acceptance.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "task_id", "prompt_path", "builder_log_path", "repository", "branch",
+    "base_sha", "implementation_sha", "builder_log_sha", "final_sha", "test_summary", "publication_parity"
+  ],
+  "properties": {
+    "schema_version": { "const": "1.0" },
+    "task_id": { "type": "string", "pattern": "^SB-CP00-00[3-9]-C001$" },
+    "prompt_path": { "type": "string", "pattern": "^\\.hiveai/prompts/SB-CP00-00[3-9]-C001_[A-Z0-9_-]+_PROMPT\\.md$" },
+    "builder_log_path": { "type": "string", "pattern": "^\\.hiveai/codex-logs/SB-CP00-00[3-9]-C001_[A-Z0-9_-]+_CODEX_LOG\\.md$" },
+    "repository": {
+      "type": "object", "additionalProperties": false,
+      "required": ["owner", "name"],
+      "properties": {
+        "owner": { "const": "Sekiph82" },
+        "name": { "const": "ScrubBots-Level-Factory" }
+      }
+    },
+    "branch": { "const": "main" },
+    "base_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "implementation_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "builder_log_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "final_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "test_summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["focused_passed", "focused_failed", "focused_skipped", "full_passed", "full_failed", "full_skipped", "compileall_exit_code", "diff_check_exit_code"],
+      "properties": {
+        "focused_passed": { "type": "integer", "minimum": 0 },
+        "focused_failed": { "type": "integer", "minimum": 0 },
+        "focused_skipped": { "type": "integer", "minimum": 0 },
+        "full_passed": { "type": "integer", "minimum": 0 },
+        "full_failed": { "type": "integer", "minimum": 0 },
+        "full_skipped": { "type": "integer", "minimum": 0 },
+        "compileall_exit_code": { "type": "integer", "minimum": 0 },
+        "diff_check_exit_code": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "publication_parity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["result", "execution_sha", "origin_main_sha", "ahead", "behind"],
+      "properties": {
+        "result": { "enum": ["VERIFIED_EQUAL", "DIVERGED", "UNVERIFIED"] },
+        "execution_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "origin_main_sha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "ahead": { "type": "integer", "minimum": 0 },
+        "behind": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

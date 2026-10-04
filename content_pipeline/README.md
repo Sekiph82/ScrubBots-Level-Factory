@@ -76,6 +76,35 @@ capability declarations produce identical provider-neutral plan bytes across
 adapters. Provider results use fixed categories and have no free-form message
 field.
 
+## GitHub coordination and ownership
+
+The canonical LF/CP repository is `Sekiph82/ScrubBots-Level-Factory`. Root
+`TASKS.md` is the only live task tracker for Level Factory and Content Platform
+work. ChatGPT owns prompts, audit criteria, audit results, and lifecycle state;
+Codex owns scoped implementation, tests, and child builder logs. Builder logs
+and versioned publication receipts preserve evidence only: Codex does not author
+audits, mark itself PASS, or change audit results, and these records cannot set
+task status, audit status, or acceptance.
+
+Content Pipeline code does not write root `TASKS.md` or `.hiveai/audits/**`.
+Content Platform implementation work and its builder evidence publish to this
+repository on `main` by a normal non-force update after fetch/prune and
+divergence checks, unless a later owner prompt explicitly authorizes another
+branch or repository. Worktrees are allowed only at a location named by the
+active prompt. Owner-local work is preserved; no reset, automatic rebase,
+force push, or discard is permitted. Game-runtime implementation belongs in
+`Sekiph82/Scrubbots` under its own authority and checkout.
+
+Every implementation prompt begins with its local-to-GitHub synchronization
+preflight, including fetch/prune, identity and status checks, divergence review,
+and a safe synchronization disposition. This repository contains no GitHub API
+mutation automation or GitHub credentials.
+
+`builder-publication-receipt.schema.json` and the matching Python model contain
+only fixed builder facts: task and prompt/log identities, commit SHAs, numeric
+test outcomes, and publication parity. The schema deliberately has no task
+status, audit result, acceptance, or secret-value field.
+
 The CLI's `--dry-run` option is deliberately fail-closed because this milestone
 does not define a CLI format for trusted release-event evidence. It prints a
 stable local report identifying missing plan evidence, marks
