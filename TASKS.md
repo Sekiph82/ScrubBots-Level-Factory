@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M11 — Content Platform Architecture & Security Boundary
-- Current Sprint: SB-CP00-003-M11-MASTER — Execute SB-CP00-003 through SB-CP00-009 continuously, then independent child audits
-- Current Task: SB-CP00-003 — M11 master batch entry point for SB-CP00-003..009
-- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M11_MASTER_BATCH_AUTHORIZED
-- Next Task/Action: SB-CP00-003 starts the authorized M11 master batch `.hiveai/prompts/M11_CP00_003_009_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP00-003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 without inter-child handoff, publishing one separate builder log per child, and stops only after the master finishes or a true blocker occurs.
+- Current Sprint: SB-CP00-003-C001-R01 — Current payload authority remediation and downstream M11 revalidation
+- Current Task: SB-CP00-003 — Correct current LevelData/supply payload validation, then revalidate CP007..009
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: SB-CP00-003 executes only `.hiveai/prompts/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_REMEDIATION_PROMPT.md`; first synchronize GitHub/local authority, close CP003 F01..F04, rerun cumulative M11 CP003..009 regressions, publish the R01 builder log, then stop for independent re-audit. SB-CP00-004..006 remain PASS/CLOSED; SB-CP00-007..009 remain conditional pending this parent fix.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-CP00-002-C001-R01_CURRENT_PRODUCTION_CONTRACT_BINDING_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M11_CP00_003_009_MASTER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M11_CP00_003_009_MASTER_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_REMEDIATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -105,6 +105,18 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M11 Master Inter-Child Rule: after a child is green and its implementation/log commits are published, Codex continues immediately to the next child; no owner/ChatGPT handoff between passing children.
 - M11 Master Blocker Rule: only unsafe repository preservation/divergence or an unsatisfiable child contract may stop the batch; ordinary in-scope test failures must be remediated before continuing.
 - M11 Post-Builder Audit Rule: ChatGPT independently audits each child against its own criteria in sequence and writes one strict audit per child. Any CHANGES_REQUIRED child gets a focused remediation prompt/criteria and M11 remains open. The next milestone is opened only after all seven child audits are PASS/CLOSED.
+- M11 Master Independent Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/M11_CP00_003_009_MASTER_STRICT_AUDIT.md`.
+- SB-CP00-003 C001 Strict Audit Result: `CHANGES_REQUIRED / R01` by `.hiveai/audits/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_STRICT_AUDIT.md`; real current LevelData cells/dimensions and supply structural authority are mismatched.
+- SB-CP00-004 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP00-004-C001_STAGING_PRODUCTION_SEPARATION_STRICT_AUDIT.md`.
+- SB-CP00-005 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP00-005-C001_VERSIONED_AUDITABLE_RELEASE_STATE_STRICT_AUDIT.md`.
+- SB-CP00-006 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP00-006-C001_SECRET_HANDLING_NO_CREDENTIALS_IN_GIT_STRICT_AUDIT.md`.
+- SB-CP00-007 C001 Independent Audit Result: `CONDITIONAL / REAUDIT_AFTER_CP003_R01` by `.hiveai/audits/SB-CP00-007-C001_PUBLISHER_DRY_RUN_VALIDATION_GATE_STRICT_AUDIT.md`; no independent CP007 defect opened.
+- SB-CP00-008 C001 Independent Audit Result: `CONDITIONAL / REAUDIT_AFTER_CP003_R01` by `.hiveai/audits/SB-CP00-008-C001_PROVIDER_ABSTRACTION_STRICT_AUDIT.md`; no independent CP008 defect opened.
+- SB-CP00-009 C001 Independent Audit Result: `CONDITIONAL / REAUDIT_AFTER_CP003_R01` by `.hiveai/audits/SB-CP00-009-C001_CONTENT_PLATFORM_GITHUB_COORDINATION_STRICT_AUDIT.md`; no independent CP009 defect opened.
+- SB-CP00-003 C001-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- SB-CP00-003 C001-R01 Prompt: `.hiveai/prompts/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_REMEDIATION_PROMPT.md`.
+- SB-CP00-003 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_AUDIT_CRITERIA.md`.
+- SB-CP00-003 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CP00-003-C001-R01_CURRENT_PAYLOAD_AUTHORITY_CODEX_LOG.md`.
 - SB-CP00-003 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_CODEX_LOG.md`.
 - SB-CP00-004 C001 Authorization: `IMPLEMENT_THEN_AUDIT / MASTER_CHILD_AUTHORIZED`.
 - SB-CP00-004 C001 Prompt: `.hiveai/prompts/SB-CP00-004-C001_STAGING_PRODUCTION_SEPARATION_PROMPT.md`.
@@ -865,9 +877,9 @@ Capability source family: `SB-CP00-xxx` from the main Scrubbots master plan.
 
 ### M11.02 - Staging, audit state, secrets and dry-run
 
-- [ ] SB-CP00-004 — Separate staging/production.
-- [ ] SB-CP00-005 — Versioned/auditable publish/promotion/rollback state.
-- [ ] SB-CP00-006 — Secret handling; no credentials in Git. [PARTIAL]
+- [x] SB-CP00-004 — Separate staging/production.
+- [x] SB-CP00-005 — Versioned/auditable publish/promotion/rollback state.
+- [x] SB-CP00-006 — Secret handling; no credentials in Git. [PARTIAL]
 - [ ] SB-CP00-007 — Publisher dry-run/validation-only before remote mutation.
 
 ### M11.03 - Provider abstraction, tracker ownership and store-policy gate
