@@ -35,8 +35,8 @@ def _content() -> tuple[dict[str, object], bytes, object]:
     assert isinstance(attrs, dict)
     payload_obj = {
         "version": 1, "id": attrs["level_id"], "name": "Plan Fixture", "difficulty": "EASY",
-        "width": attrs["width"], "height": attrs["height"], "palette": ["C01", "C02"],
-        "cells": ["C01"] * (attrs["width"] * attrs["height"] - 1) + ["C02"],
+        "width": attrs["width"], "height": attrs["height"], "palette": ["#000000FF", "#FFFFFFFF"],
+        "cells": [0] * (attrs["width"] * attrs["height"] - 1) + [1],
     }
     payload = json.dumps(payload_obj, separators=(",", ":")).encode("utf-8")
     attrs["payload_sha256"] = hashlib.sha256(payload).hexdigest()
@@ -217,8 +217,8 @@ def test_secret_value_in_payload_is_rejected_even_when_payload_contract_accepts_
     payload_value = "ghp_" + "R" * 32
     payload = json.dumps({
         "version": 1, "id": attrs["level_id"], "name": payload_value, "difficulty": "EASY",
-        "width": attrs["width"], "height": attrs["height"], "palette": ["C01", "C02"],
-        "cells": ["C01"] * (attrs["width"] * attrs["height"] - 1) + ["C02"],
+        "width": attrs["width"], "height": attrs["height"], "palette": ["#000000FF", "#FFFFFFFF"],
+        "cells": [0] * (attrs["width"] * attrs["height"] - 1) + [1],
     }, separators=(",", ":")).encode("utf-8")
     attrs["payload_sha256"] = hashlib.sha256(payload).hexdigest()
     payload_result = validate_remote_payload(descriptor, payload)

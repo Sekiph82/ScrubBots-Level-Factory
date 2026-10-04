@@ -51,8 +51,8 @@ def _content() -> tuple[dict[str, object], bytes, object]:
     assert isinstance(attrs, dict)
     payload_value = {
         "version": 1, "id": attrs["level_id"], "name": "Provider neutral fixture", "difficulty": "EASY",
-        "width": attrs["width"], "height": attrs["height"], "palette": ["C01", "C02"],
-        "cells": ["C01"] * (attrs["width"] * attrs["height"] - 1) + ["C02"],
+        "width": attrs["width"], "height": attrs["height"], "palette": ["#000000FF", "#FFFFFFFF"],
+        "cells": [0] * (attrs["width"] * attrs["height"] - 1) + [1],
     }
     payload = json.dumps(payload_value, separators=(",", ":")).encode("utf-8")
     attrs["payload_sha256"] = hashlib.sha256(payload).hexdigest()

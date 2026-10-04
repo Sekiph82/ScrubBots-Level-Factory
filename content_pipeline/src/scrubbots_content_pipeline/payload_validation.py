@@ -18,7 +18,9 @@ MAX_PAYLOAD_BYTES = 1_048_576
 MAX_NESTING_DEPTH = 32
 MAX_COLLECTION_ITEMS = 65_536
 MAX_STRING_CHARACTERS = 8_192
-MAX_LEVEL_DIMENSION = 256
+MIN_LEVEL_DIMENSION = 20
+MAX_LEVEL_DIMENSION = 59
+MAX_METADATA_DIMENSION = 256
 
 
 class PayloadReasonCode(StrEnum):
@@ -128,13 +130,13 @@ def _valid_level(value: Mapping[str, Any]) -> bool:
         and isinstance(value["id"], str) and bool(value["id"])
         and isinstance(value["name"], str) and bool(value["name"])
         and isinstance(value["difficulty"], str) and bool(value["difficulty"])
-        and type(width) is int and 1 <= width <= MAX_LEVEL_DIMENSION
-        and type(height) is int and 1 <= height <= MAX_LEVEL_DIMENSION
+        and type(width) is int and MIN_LEVEL_DIMENSION <= width <= MAX_LEVEL_DIMENSION
+        and type(height) is int and MIN_LEVEL_DIMENSION <= height <= MAX_LEVEL_DIMENSION
         and isinstance(palette, list) and 1 <= len(palette) <= 256
         and all(isinstance(color, str) and bool(color) for color in palette)
         and len(set(palette)) == len(palette)
         and isinstance(cells, list) and len(cells) == width * height
-        and all(isinstance(cell, str) and cell in palette for cell in cells)
+        and all(type(cell) is int and 0 <= cell < len(palette) for cell in cells)
     )
 
 
@@ -157,23 +159,28 @@ def _valid_supply_plan(value: Mapping[str, Any]) -> bool:
         and type(count) is int and count in {3, 4, 5}
         and type(value["visiblePreviewDepth"]) is int and value["visiblePreviewDepth"] == 3
         and type(value["maxRobotsPerBatch"]) is int and value["maxRobotsPerBatch"] > 0
-        and isinstance(value["intendedColumnClicks"], list) and bool(value["intendedColumnClicks"])
-        and all(type(index) is int and 0 <= index < count for index in value["intendedColumnClicks"])
+        and isinstance(value["intendedColumnClicks"], list)
+        and all(type(click) is int for click in value["intendedColumnClicks"])
         and isinstance(columns, list) and len(columns) == count
     ):
         return False
+    batch_ids: set[str] = set()
     for column in columns:
         if not isinstance(column, list) or not column:
             return False
         for batch in column:
             if not isinstance(batch, Mapping) or not _keys_are(batch, {"batchId", "cid", "robots"}):
                 return False
+            batch_id = batch["batchId"]
+            cid = batch["cid"]
+            robots = batch["robots"]
             if not (
-                isinstance(batch["batchId"], str) and bool(batch["batchId"])
-                and isinstance(batch["cid"], str) and bool(batch["cid"])
-                and type(batch["robots"]) is int and batch["robots"] > 0
+                isinstance(batch_id, str) and bool(batch_id) and batch_id not in batch_ids
+                and isinstance(cid, str) and re.fullmatch(r"C(?:0[1-9]|1[0-6])", cid)
+                and type(robots) is int and 1 <= robots <= value["maxRobotsPerBatch"]
             ):
                 return False
+            batch_ids.add(batch_id)
     return True
 
 
@@ -194,8 +201,8 @@ def _valid_metadata(value: Mapping[str, Any]) -> bool:
         and type(value["version"]) is int and value["version"] == 1
         and isinstance(value["builderVersion"], str) and bool(value["builderVersion"])
         and isinstance(value["id"], str) and bool(value["id"])
-        and type(value["width"]) is int and 1 <= value["width"] <= MAX_LEVEL_DIMENSION
-        and type(value["height"]) is int and 1 <= value["height"] <= MAX_LEVEL_DIMENSION
+        and type(value["width"]) is int and 1 <= value["width"] <= MAX_METADATA_DIMENSION
+        and type(value["height"]) is int and 1 <= value["height"] <= MAX_METADATA_DIMENSION
         and type(value["cellCount"]) is int and value["cellCount"] == value["width"] * value["height"]
         and isinstance(value["difficulty"], str)
         and type(value["columnCount"]) is int and value["columnCount"] in {3, 4, 5}

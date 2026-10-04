@@ -35,17 +35,20 @@ def _descriptor(kind: str, payload: dict[str, object], *, raw: bytes | None = No
     attrs = descriptor["attributes"]
     assert isinstance(attrs, dict)
     if kind == "supply_plan_data":
-        payload["levelId"] = attrs["level_id"]
-        payload["columnCount"] = attrs["columns"]
-        payload["visiblePreviewDepth"] = attrs["preview_depth"]
+        attrs["level_id"] = payload.setdefault("levelId", attrs["level_id"])
+        attrs["columns"] = payload.setdefault("columnCount", attrs["columns"])
+        attrs["preview_depth"] = payload.setdefault("visiblePreviewDepth", attrs["preview_depth"])
         digest_key = "supply_plan_sha256"
     else:
-        payload["id"] = attrs["level_id"]
+        attrs["level_id"] = payload.setdefault("id", attrs["level_id"])
         if kind == "level_data":
-            payload["width"], payload["height"] = attrs["width"], attrs["height"]
+            attrs["width"] = payload.setdefault("width", attrs["width"])
+            attrs["height"] = payload.setdefault("height", attrs["height"])
         else:
-            payload["width"], payload["height"] = attrs["width"], attrs["height"]
-            payload["columnCount"], payload["visiblePreviewDepth"] = attrs["columns"], attrs["preview_depth"]
+            attrs["width"] = payload.setdefault("width", attrs["width"])
+            attrs["height"] = payload.setdefault("height", attrs["height"])
+            attrs["columns"] = payload.setdefault("columnCount", attrs["columns"])
+            attrs["preview_depth"] = payload.setdefault("visiblePreviewDepth", attrs["preview_depth"])
         digest_key = "payload_sha256"
     raw = raw if raw is not None else json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     attrs[digest_key] = hashlib.sha256(raw).hexdigest()
@@ -56,7 +59,7 @@ def _payloads() -> dict[str, dict[str, object]]:
     return {
         "level_data": {
             "version": 1, "id": "level-001", "name": "Level 001", "difficulty": "EASY",
-            "width": 20, "height": 20, "palette": ["C01", "C02"], "cells": ["C01"] * 399 + ["C02"],
+            "width": 20, "height": 20, "palette": ["#000000FF", "#FFFFFFFF"], "cells": [0] * 399 + [1],
         },
         "supply_plan_data": {
             "schema": "scrubbots.level_supply_plan.v1", "version": 1,
@@ -85,6 +88,46 @@ def test_current_declarative_payload_families_validate_and_bind_exact_bytes(kind
     assert json.loads(serialize_payload_result(result)) == {
         "validation_version": "1.0", "accepted": True, "reason_code": "VALID_PAYLOAD",
     }
+
+
+def test_pinned_current_scrubbots_production_payload_bytes_validate_with_truthful_descriptors() -> None:
+    fixtures = ROOT / "tests" / "fixtures" / "sb_cp00_003_r01"
+    provenance = json.loads((fixtures / "authority.json").read_text(encoding="utf-8"))
+    assert provenance["authority_repository"] == "Sekiph82/Scrubbots"
+    assert provenance["authority_commit"] == "31f8e8f03807cacb00bd7ea0d91a2b727b784f35"
+    expected_sources = {
+        "level_002_apple.json": (
+            "data/levels/level_002_apple.json",
+            "f0cf2a00898582979e9078a00ce2d0935030bc67ba7d7295360cea40ca889486",
+        ),
+        "level_002_apple_supply_v1.json": (
+            "data/levels/supply/level_002_apple_supply_v1.json",
+            "d7207fbc766f9da28b37c4ecab319720fa4b882af79cea5f19961b60abfcb2ec",
+        ),
+    }
+
+    for kind, filename, digest_key in (
+        ("level_data", "level_002_apple.json", "payload_sha256"),
+        ("supply_plan_data", "level_002_apple_supply_v1.json", "supply_plan_sha256"),
+    ):
+        raw = (fixtures / filename).read_bytes()
+        record = provenance["fixtures"][filename]
+        assert record["source_path"] == expected_sources[filename][0]
+        assert record["sha256"] == expected_sources[filename][1] == hashlib.sha256(raw).hexdigest()
+        assert record["size_bytes"] == len(raw)
+        parsed = json.loads(raw)
+        descriptor = _descriptor(kind, parsed, raw=raw)
+        attrs = descriptor["attributes"]
+        assert attrs[digest_key] == hashlib.sha256(raw).hexdigest()
+        result = validate_remote_payload(descriptor, raw)
+        assert result.accepted, (filename, result.reason_code)
+
+    level = json.loads((fixtures / "level_002_apple.json").read_bytes())
+    supply = json.loads((fixtures / "level_002_apple_supply_v1.json").read_bytes())
+    assert level["width"] == level["height"] == 32
+    assert len(level["cells"]) == 32 * 32
+    assert all(type(cell) is int for cell in level["cells"])
+    assert supply["intendedColumnClicks"][:3] == [1, 2, 3]
 
 
 @pytest.mark.parametrize(
@@ -148,9 +191,84 @@ def test_unknown_fields_schema_and_descriptor_projections_fail_closed() -> None:
         candidate[field] = value
         candidate_raw = json.dumps(candidate, separators=(",", ":")).encode()
         candidate_descriptor = _descriptor("level_data", candidate, raw=candidate_raw)
+        candidate_descriptor["attributes"].update(level_id="level-001", width=20, height=20)
         outcome = validate_remote_payload(candidate_descriptor, candidate_raw)
         assert not outcome.accepted
         assert outcome.reason_code in {PayloadReasonCode.CONTRACT_MISMATCH, PayloadReasonCode.DESCRIPTOR_MISMATCH, PayloadReasonCode.INVALID_PAYLOAD}
+
+
+@pytest.mark.parametrize("cell", (True, -1, 2, "C01"))
+def test_level_data_cells_are_integer_palette_indices_and_reject_bool(cell: object) -> None:
+    payload = _payloads()["level_data"]
+    assert isinstance(payload["cells"], list)
+    payload["cells"][0] = cell
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    descriptor = _descriptor("level_data", payload, raw=raw)
+    result = validate_remote_payload(descriptor, raw)
+    assert not result.accepted
+    assert result.reason_code is PayloadReasonCode.INVALID_PAYLOAD
+
+
+@pytest.mark.parametrize("width,height", ((20, 59), (59, 20), (19, 20), (20, 19), (60, 20), (20, 60)))
+def test_level_data_dimensions_use_independent_locked_production_bounds(width: int, height: int) -> None:
+    payload = _payloads()["level_data"]
+    payload["width"], payload["height"] = width, height
+    payload["cells"] = [0] * (width * height)
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    descriptor = _descriptor("level_data", payload, raw=raw)
+    result = validate_remote_payload(descriptor, raw)
+    if 20 <= width <= 59 and 20 <= height <= 59:
+        assert result.accepted
+    else:
+        assert result.reason_code is PayloadReasonCode.INVALID_PAYLOAD
+
+
+@pytest.mark.parametrize(
+    ("mutate",),
+    (
+        (lambda plan: plan["columns"][0][0].update(robots=3),),
+        (lambda plan: plan["columns"][1][0].update(batchId=plan["columns"][0][0]["batchId"]),),
+        (lambda plan: plan["columns"][0][0].update(cid="C17"),),
+        (lambda plan: plan["columns"][0][0].update(extra="ignored"),),
+        (lambda plan: plan["columns"][0][0].update(robots=True),),
+    ),
+)
+def test_supply_plan_enforces_current_structural_authority(mutate: object) -> None:
+    payload = _payloads()["supply_plan_data"]
+    assert callable(mutate)
+    _descriptor("supply_plan_data", payload)
+    mutate(payload)
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    descriptor = _descriptor("supply_plan_data", payload, raw=raw)
+    result = validate_remote_payload(descriptor, raw)
+    assert result.reason_code is PayloadReasonCode.INVALID_PAYLOAD
+
+
+def test_intended_column_clicks_are_validated_as_inert_integer_structure_without_index_rules() -> None:
+    payload = _payloads()["supply_plan_data"]
+    _descriptor("supply_plan_data", payload)
+    payload["intendedColumnClicks"] = [1, 2, 3]
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    descriptor = _descriptor("supply_plan_data", payload, raw=raw)
+    assert validate_remote_payload(descriptor, raw).accepted
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    (
+        ("maxRobotsPerBatch", 0),
+        ("maxRobotsPerBatch", True),
+        ("intendedColumnClicks", [True]),
+        ("intendedColumnClicks", "1,2,3"),
+    ),
+)
+def test_supply_plan_integer_bounds_exclude_nonpositive_and_bool_values(field: str, value: object) -> None:
+    payload = _payloads()["supply_plan_data"]
+    _descriptor("supply_plan_data", payload)
+    payload[field] = value
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    descriptor = _descriptor("supply_plan_data", payload, raw=raw)
+    assert validate_remote_payload(descriptor, raw).reason_code is PayloadReasonCode.INVALID_PAYLOAD
 
 
 def test_digest_mismatch_and_payload_size_limit_fail_closed() -> None:

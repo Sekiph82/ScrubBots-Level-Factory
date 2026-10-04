@@ -1,0 +1,35 @@
+{
+  "authority_repository": "Sekiph82/Scrubbots",
+  "authority_branch": "main",
+  "authority_commit": "31f8e8f03807cacb00bd7ea0d91a2b727b784f35",
+  "production_catalog_path": "data/levels/catalog/production_catalog_v1.json",
+  "production_catalog_git_blob_sha1": "7e5a0cd7d699751d2c5ec52b7c6b903e2b847105",
+  "fixtures": {
+    "level_002_apple.json": {
+      "source_path": "data/levels/level_002_apple.json",
+      "git_blob_sha1": "c9fad1d7b0c46e13c7c00b3d35129f02a8fbe331",
+      "sha256": "f0cf2a00898582979e9078a00ce2d0935030bc67ba7d7295360cea40ca889486",
+      "size_bytes": 5341
+    },
+    "level_002_apple_supply_v1.json": {
+      "source_path": "data/levels/supply/level_002_apple_supply_v1.json",
+      "git_blob_sha1": "d47328643fa9afaaaa6284ecabf10f477628d5f4",
+      "sha256": "d7207fbc766f9da28b37c4ecab319720fa4b882af79cea5f19961b60abfcb2ec",
+      "size_bytes": 3313
+    }
+  },
+  "contract_sources": {
+    "level_data": {
+      "source_path": "scripts/data/level_data.gd",
+      "git_blob_sha1": "c27cfe4a1082277521578d134a1e17eb7deb2b7b"
+    },
+    "level_validator": {
+      "source_path": "scripts/data/level_validator.gd",
+      "git_blob_sha1": "eee1ed2c76e442fc81b8175a9fc68a2ab592edd5"
+    },
+    "supply_plan_loader": {
+      "source_path": "scripts/gameplay/supply/supply_plan_loader.gd",
+      "git_blob_sha1": "abf5bffd7bb273b9207b2f4992d8249a222de761"
+    }
+  }
+}

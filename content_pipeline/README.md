@@ -154,11 +154,17 @@ be established. Results use stable reason codes under validation version
 `1.0`. Parsing does not import, execute, or load payload content.
 
 The deterministic resource limits are 1 MiB per byte payload, nesting depth
-32, 65,536 members per collection, 8,192 characters per string, and 256 cells
-per LevelData dimension. Current LevelData V1, supply-plan V1, and publisher
-metadata V1 each use explicit field allow-lists. Unknown fields, duplicate JSON
-keys, non-finite numbers, executable references, and descriptor/payload
-projection mismatches fail closed.
+32, 65,536 members per collection, and 8,192 characters per string. Production
+LevelData V1 dimensions are independently 20..59, and `cells` is a flat,
+row-major array of integer indices into `palette` (booleans and string color
+IDs are not cell indices). Publisher metadata retains its separate 1..256
+dimension bound. Current LevelData V1, supply-plan V1, and publisher metadata
+V1 each use explicit field allow-lists. Supply-plan batches have unique
+non-empty IDs, canonical C01..C16 color IDs, and integer robot counts bounded
+by positive `maxRobotsPerBatch`. `intendedColumnClicks` is checked only as an
+integer list; the current game loader defines no index-base or range rule for
+it. Unknown fields, duplicate JSON keys, non-finite numbers, executable
+references, and descriptor/payload projection mismatches fail closed.
 
 Executable-capable content remains app-owned because shipping it remotely
 would change application behavior and expand the runtime attack surface. Level
