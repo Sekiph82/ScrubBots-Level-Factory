@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import stat
 import zipfile
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -34,6 +35,29 @@ _CONTENT_TYPES = {
     "supply_plan": "supply_plan_data",
     "metadata": "approved_metadata",
 }
+
+_SCRUBPACK_ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
+_SCRUBPACK_ZIP_MODE = (stat.S_IFREG | 0o644) << 16
+
+
+def _canonical_zip_info(member_name: str) -> zipfile.ZipInfo:
+    """Return a ZIP entry with every builder-controlled metadata field fixed."""
+    try:
+        member_name.encode("ascii")
+    except UnicodeEncodeError as exc:
+        raise ScrubpackBuildError("scrubpack member names must be canonical ASCII") from exc
+    info = zipfile.ZipInfo(member_name, date_time=_SCRUBPACK_ZIP_TIMESTAMP)
+    info.compress_type = zipfile.ZIP_STORED
+    info.create_system = 3
+    info.create_version = 20
+    info.extract_version = 20
+    info.flag_bits = 0
+    info.volume = 0
+    info.internal_attr = 0
+    info.external_attr = _SCRUBPACK_ZIP_MODE
+    info.extra = b""
+    info.comment = b""
+    return info
 
 
 class ScrubpackBuildError(ValueError):
@@ -327,10 +351,18 @@ def build_scrubpack(
     except ScrubpackSpecError as exc:
         raise ScrubpackBuildError(str(exc)) from exc
     output = io.BytesIO()
-    with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
-        archive.writestr(PACK_MANIFEST_PATH, manifest_bytes)
+    with zipfile.ZipFile(
+        output,
+        mode="w",
+        compression=zipfile.ZIP_STORED,
+        compresslevel=None,
+        allowZip64=False,
+        strict_timestamps=True,
+    ) as archive:
+        archive.comment = b""
+        archive.writestr(_canonical_zip_info(PACK_MANIFEST_PATH), manifest_bytes)
         for member_path, payload in members:
-            archive.writestr(member_path, payload)
+            archive.writestr(_canonical_zip_info(member_path), payload)
 
     archive_bytes = output.getvalue()
     evidence = ScrubpackBuildEvidence(

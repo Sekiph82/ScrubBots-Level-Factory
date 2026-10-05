@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import ast
+import base64
 import dataclasses
 import hashlib
 import io
 import json
+import os
 import sys
+import subprocess
+import stat
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zipfile import ZipFile
+from zipfile import ZIP_STORED, ZipFile
 
 import pytest
 
@@ -149,6 +153,88 @@ def test_builder_packages_only_validated_payloads_at_fixed_paths() -> None:
     assert result.evidence.validation_report.accepted
     assert all(level.accepted for level in result.evidence.validation_report.levels)
     assert verify_scrubpack_build(result.archive_bytes, result.evidence)
+
+
+def test_builder_normalizes_all_zip_metadata_fields() -> None:
+    result = _build((_level(),))
+    with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
+        assert archive.comment == b""
+        for info in archive.infolist():
+            assert info.date_time == (1980, 1, 1, 0, 0, 0)
+            assert info.compress_type == ZIP_STORED
+            assert info.create_system == 3
+            assert info.create_version == info.extract_version == 20
+            assert info.flag_bits == 0
+            assert info.volume == 0
+            assert info.internal_attr == 0
+            assert info.external_attr == ((stat.S_IFREG | 0o644) << 16)
+            assert info.extra == b""
+            assert info.comment == b""
+            assert info.filename.isascii()
+
+
+def test_identical_inputs_build_identical_bytes_across_processes_and_directories(tmp_path: Path) -> None:
+    level = _level()
+
+    def thaw(value):
+        if hasattr(value, "items"):
+            return {key: thaw(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [thaw(item) for item in value]
+        return value
+
+    specification = {
+        "level_id": level.level_id,
+        "payloads": {
+            "level_data": {
+                "descriptor": thaw(level.level_data.descriptor),
+                "payload": base64.b64encode(level.level_data.payload).decode("ascii"),
+            },
+            "supply_plan": {
+                "descriptor": thaw(level.supply_plan.descriptor),
+                "payload": base64.b64encode(level.supply_plan.payload).decode("ascii"),
+            },
+            "metadata": {
+                "descriptor": thaw(level.metadata.descriptor),
+                "payload": base64.b64encode(level.metadata.payload).decode("ascii"),
+            },
+        },
+    }
+    source = """
+import base64, hashlib, json, sys
+from pathlib import Path
+from scrubbots_content_pipeline import ScrubpackLevelInput, ScrubpackPayloadInput, build_scrubpack
+spec = json.loads(Path(sys.argv[1]).read_text(encoding='utf-8'))
+parts = {name: ScrubpackPayloadInput(value['descriptor'], base64.b64decode(value['payload']))
+         for name, value in spec['payloads'].items()}
+result = build_scrubpack((ScrubpackLevelInput(spec['level_id'], parts['level_data'], parts['supply_plan'], parts['metadata']),),
+                         pack_id='test-pack', pack_version=1, created_at_utc='2026-10-05T10:00:00Z')
+Path('result.scrubpack').write_bytes(result.archive_bytes)
+print(hashlib.sha256(result.archive_bytes).hexdigest())
+"""
+    content_root = CONTENT_PIPELINE / "src"
+    child_environment = os.environ.copy()
+    child_environment["PYTHONPATH"] = str(content_root) + os.pathsep + child_environment.get("PYTHONPATH", "")
+    archives = []
+    reported_hashes = []
+    for directory_name in ("build-a", "build-b"):
+        build_directory = tmp_path / directory_name
+        build_directory.mkdir()
+        spec_path = build_directory / "inputs.json"
+        spec_path.write_text(json.dumps(specification, sort_keys=True), encoding="utf-8")
+        process = subprocess.run(
+            [sys.executable, "-c", source, str(spec_path)],
+            cwd=build_directory,
+            env=child_environment,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        archives.append((build_directory / "result.scrubpack").read_bytes())
+        reported_hashes.append(process.stdout.strip())
+
+    assert archives[0] == archives[1]
+    assert reported_hashes[0] == reported_hashes[1] == hashlib.sha256(archives[0]).hexdigest()
 
 
 def test_build_receipt_detects_exact_archive_tampering_and_identity_mismatch() -> None:
