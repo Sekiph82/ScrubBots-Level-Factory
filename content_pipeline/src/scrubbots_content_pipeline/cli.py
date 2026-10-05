@@ -7,6 +7,7 @@ import json
 from dataclasses import asdict
 
 from .config import Environment, PipelineConfig
+from .scrubpack_inspection import extract_scrubpack, inspect_scrubpack
 from .validation import validate_only
 
 
@@ -27,9 +28,33 @@ def main() -> int:
         choices=[environment.value for environment in Environment],
         default=Environment.STAGING.value,
     )
+    parser.add_argument("--inspect-pack", metavar="PATH", help="inspect one local .scrubpack without writing")
+    parser.add_argument("--extract-pack", metavar="PATH", help="validate and safely extract one local .scrubpack")
+    parser.add_argument("--destination", metavar="DIR", help="new destination directory for --extract-pack")
+    parser.add_argument(
+        "--output-format",
+        choices=("human", "json"),
+        default="human",
+        help="inspect/extract result format",
+    )
     args = parser.parse_args()
-    if args.validate_only and args.dry_run:
-        parser.error("choose either --validate-only or --dry-run")
+    selected_modes = sum(bool(value) for value in (args.validate_only, args.dry_run, args.inspect_pack, args.extract_pack))
+    if selected_modes > 1:
+        parser.error("choose one command mode")
+    if args.inspect_pack and args.destination:
+        parser.error("--destination is only valid with --extract-pack")
+    if args.extract_pack and not args.destination:
+        parser.error("--extract-pack requires --destination")
+    if args.destination and not args.extract_pack:
+        parser.error("--destination requires --extract-pack")
+    if args.inspect_pack:
+        report = inspect_scrubpack(args.inspect_pack)
+        print(json.dumps(report.to_dict(), sort_keys=True, separators=(",", ":")) if args.output_format == "json" else report.render_human())
+        return 0 if report.accepted else 1
+    if args.extract_pack:
+        report = extract_scrubpack(args.extract_pack, args.destination)
+        print(json.dumps(report.to_dict(), sort_keys=True, separators=(",", ":")) if args.output_format == "json" else report.render_human())
+        return 0 if report.accepted else 1
     if args.dry_run:
         report = {
             "plan_version": "1.0",

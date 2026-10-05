@@ -10,12 +10,23 @@ later separately authorized milestones.
 
 The Python package under `src/scrubbots_content_pipeline/` is a standalone
 project with its own `pyproject.toml`. Its only executable path is local
-validation-only/dry-run reporting:
+validation-only/dry-run reporting and local `.scrubpack` inspection/extraction:
 
 ```powershell
 python -m pip install -e .\content_pipeline
 scrubbots-content-pipeline --validate-only --environment staging
+scrubbots-content-pipeline --inspect-pack .\release.scrubpack --output-format json
+scrubbots-content-pipeline --extract-pack .\release.scrubpack --destination .\inspected-pack
 ```
+
+Pack inspection is read-only and checks the ZIP entry metadata, exact V1 member
+layout/order, manifest identity, level triplets, and each member SHA-256. It
+prints either a human report or stable JSON and never loads or executes payload
+content. Extraction first validates the whole pack, accepts only regular
+allow-listed JSON members, and requires a destination directory that does not
+already exist. No archive member can overwrite unrelated files or escape that
+new directory. Inspection and extraction are local-only and have bounded input
+size/member counts; they add no provider, credential, or network dependency.
 
 The versioned configuration and provider-neutral schemas are in `schemas/v1/`.
 The versioned provider boundary separates read-only inspection from future

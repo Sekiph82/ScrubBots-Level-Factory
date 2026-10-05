@@ -56,6 +56,13 @@ from .scrubpack_builder import (
     validate_scrubpack_levels,
     verify_scrubpack_build,
 )
+from .scrubpack_inspection import (
+    MAX_SCRUBPACK_ARCHIVE_BYTES,
+    MAX_SCRUBPACK_MEMBERS,
+    ScrubpackInspectionResult,
+    extract_scrubpack,
+    inspect_scrubpack,
+)
 from .publication_plan import (
     PUBLICATION_PLAN_VERSION,
     ExpectedReleaseState,
@@ -160,6 +167,11 @@ __all__ = [
     "build_scrubpack",
     "validate_scrubpack_levels",
     "verify_scrubpack_build",
+    "MAX_SCRUBPACK_ARCHIVE_BYTES",
+    "MAX_SCRUBPACK_MEMBERS",
+    "ScrubpackInspectionResult",
+    "extract_scrubpack",
+    "inspect_scrubpack",
     "PUBLICATION_PLAN_VERSION",
     "ExpectedReleaseState",
     "PlanCheck",
