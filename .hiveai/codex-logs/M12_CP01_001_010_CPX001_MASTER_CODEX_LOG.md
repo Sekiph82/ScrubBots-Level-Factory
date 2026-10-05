@@ -47,3 +47,13 @@ Child-specific base SHAs, implementation commits, separate log commits, exact te
 - Implementation push for SB-CP01-001: `git fetch --prune origin` showed `4/0`; normal `git push origin HEAD:main` succeeded, moving `main` from `612958f9a5641cb37d386707f26460aaee2e7cd0` to `e59e1bf44ee8d216068e834df902bde163e1029c`; post-push fetch confirmed `HEAD == origin/main`, `0/0`.
 - Full child command history, failures and corrections: `.hiveai/codex-logs/SB-CP01-001-C001_SCRUBPACK_V1_SPEC_CODEX_LOG.md`.
 - Child 1 separate builder-log commit: `22048f523f7e3f7705bf52d7431502d12ffda229`, containing the distinct Child 1 log and master progress log. Fetch after push confirmed `HEAD == origin/main == 22048f523f7e3f7705bf52d7431502d12ffda229`, `0/0`, clean. The final master record below will publish the Child 1 log-commit/parity facts before Child 2 starts.
+
+### SB-CP01-002-C001 implementation and regression record
+
+- Child base SHA: `f13e5c03d2f82d380ec42558a3cdcf7fb64b7cb3`.
+- Implementation commit: `cb44f6632acb067493bcf50528b31b20d49cc08e`.
+- Focused Child 1 + Child 2: 36 passed. Cumulative CP00 + CP01-001 + CP01-002: 199 passed. Governance: 13 passed. Full pytest: 1,368 passed, 3 skipped. Compileall, schema parse, and diff check passed.
+- The first focused run caught an API exception type mismatch for duplicate IDs and was corrected. The first cumulative run saw CP010's no-new-source guard while Child 2 source remained uncommitted; after the implementation commit, the cumulative run passed. Full outcomes and exact commands are in the Child 2 log.
+- Protected `TASKS.md` and audit files remain unchanged; no dependency/license/runtime/provider/game-source changes.
+- Builder log path: `.hiveai/codex-logs/SB-CP01-002-C001_PACKAGE_DECLARATIVE_LEVELS_ONLY_CODEX_LOG.md`. Separate log commit and final parity will be appended after publication.
+- Child 2 implementation push: pre-push fetch showed `1/0`; normal `git push origin HEAD:main` advanced `main` to `cb44f6632acb067493bcf50528b31b20d49cc08e`; post-push fetch confirmed `HEAD == origin/main`, `0/0`.
