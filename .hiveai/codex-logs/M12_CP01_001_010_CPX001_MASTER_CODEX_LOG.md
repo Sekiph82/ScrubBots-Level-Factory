@@ -93,3 +93,13 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 5 log: `.hiveai/codex-logs/SB-CP01-005-C001_DETERMINISTIC_PACK_SERIALIZATION_ORDER_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
 - Child 5 implementation push advanced main to `2689001b538cf56f8004a4c0e26ce84b3e1a3cf4`; post-push fetch confirmed 0/0. Separate builder-log commit and parity are pending.
 - Separate Child 5 builder-log/master-progress commit: `513d1c7aff8dd4ef8d4e8ff722440a2a22bb1259`. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main at this commit, `0/0`, clean. Implementation and log commits are separate; Child 6 starts from the master closure commit below.
+
+### SB-CP01-006-C001 implementation and regression record
+
+- Child base SHA: `f6ff9cce068a82184c23ccacbf2646b9fed121ba`.
+- Implementation commit: `48816e828ec7ab4187952e9172252ed97acbf3a7`.
+- Exact and case-normalized duplicate level ownership/path collisions now fail closed; fixed member layout and exact descriptor family/level binding guarantee one record of each role per declared level before archive output. Full contract and two corrected test-fixture failures are in the Child 6 log.
+- Focused: 60 passed. Cumulative CP00/M11 + prior M12: 223 passed. Governance: 13 passed. Full pytest: 1,392 passed, 3 skipped in 1,099.41 seconds. Compileall, schema parse, and diff check passed.
+- No protected tracker/audit, dependency/license, runtime/provider, credential, or production-game changes. The full-suite verifier stayed in pytest temporary storage.
+- Child 6 log: `.hiveai/codex-logs/SB-CP01-006-C001_DUPLICATE_LEVEL_ID_PREVENTION_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
+- Child 6 implementation push advanced `main` to `48816e828ec7ab4187952e9172252ed97acbf3a7`; post-push fetch confirmed 0/0. Separate log publication is pending.
