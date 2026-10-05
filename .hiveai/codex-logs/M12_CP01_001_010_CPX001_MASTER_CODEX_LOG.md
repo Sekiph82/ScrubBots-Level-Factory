@@ -151,3 +151,23 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 10 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 3f51c51aaaca8405283fceed8ad89157da474897, 0/0. Separate Child 10 builder-log/master-progress commit and closure remain.
 
 - Separate Child 10 builder-log/master-progress commit: 67e4c996b0a3a4becc78c1ce996e7c93d11af3ae. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 10 implementation and builder-log commits are separate. Child 10 is closed; SB-CPX-001 begins from this SHA.
+
+### SB-CPX-001-C001 implementation and regression record
+
+- Child base SHA: `a8842169f1ee88d030a668a77f8691aadee95820`.
+- Implementation commit: `43be43f` (`Bind Scrubpack supply plans to solver evidence`).
+- Added canonical exact-byte solver-state and solver-evidence digests to READY supply pipeline output; added current accepted READY/Release Pool proof resolution and a detached Scrubpack identity artifact binding exact LevelData/plan bytes, FIFO columns/batches/configuration, solver/replay result, and source pipeline/review identity. Pack evidence binds the artifact digest, and final pack verification checks it.
+- Current real Factory READY output has an owner ACCEPT review but the pre-existing Release Pool gate declines it because its Difficulty V1 projection does not meet the separate pool vector/profile contract. The implementation binds that current accepted READY pipeline and files directly, does not fabricate missing profile data, and prefers Release Pool evidence whenever available. The focused integration uses the real Factory solver pipeline and verifies fail-closed mutations.
+- Extended path-safe LevelData IDs from 64 to 128 ASCII characters to preserve exact current Factory candidate IDs; traversal/unsafe characters remain rejected. Updated the contract schemas, tests, and Content Pipeline README.
+- Focused CP01 spec/builder/inspection plus real Factory CPX integration: **83 passed in 17.25s**. Final cumulative CP00/M11 authority/CP01/CPX set: **253 passed in 20.69s**. Governance authority pair: **9 passed in 0.71s**.
+- Child full `python -m pytest -q`: **1,415 passed, 3 skipped in 765.36s (0:12:45)**. Final master-required full rerun: **1,415 passed, 3 skipped in 811.01s (0:13:31)**. Skips were the explicitly opt-in slow supply pipeline and two tests requiring a separate canonical ScrubBots checkout/capability.
+- Final `python -m compileall -q content_pipeline/src src/scrubbots_pixel_factory tests`, both modified JSON Schema parses, and `git diff --check` passed. A first final cumulative harness invocation had a Python `Path` argument construction `TypeError` before tests started; the corrected harness ran all 253 tests successfully.
+- CPX child log: `.hiveai/codex-logs/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_CODEX_LOG.md`. Separate log commits: `ac9edf565c9f59fb16ecefb73cd109815098676c` (initial full evidence) and `c2928e8750b271ae9846e66beb0804078888c15c` (publication parity note). Implementation and builder-log commits are distinct.
+- Pre-push fetch for the initial child publication showed 2 ahead / 0 behind. Normal non-force `HEAD:main` push succeeded; the parity-note push also succeeded. Final post-push fetch confirmed execution HEAD == `origin/main` == `c2928e8750b271ae9846e66beb0804078888c15c`, divergence 0/0, clean.
+
+## Final M12 master verification
+
+- Fetched `origin/main`; all 11 distinct child builder logs were verified present on `origin/main`.
+- Compared the CPX child commit range from `a8842169f1ee88d030a668a77f8691aadee95820` through `c2928e8750b271ae9846e66beb0804078888c15c`: changes are limited to the CPX builder log, Content Pipeline documentation/schema/API, Factory pipeline identity boundary, and focused tests. No root `TASKS.md` or `.hiveai/audits/**` changes; no runtime provider/network, credential, production game checkout/source, or game mutation was introduced.
+- Final cumulative M11/M12/CPX suite: **253 passed in 20.69s**. Final full suite: **1,415 passed, 3 skipped in 811.01s**. Compileall, schema parse, and diff check passed.
+- Persistent Desktop checkout remained untouched due its dirty/behind owner state. The authorized execution worktree was clean and 0/0 with `origin/main` at the final verification fetch; the master-log publication and parity follow below.
