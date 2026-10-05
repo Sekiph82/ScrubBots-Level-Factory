@@ -10,7 +10,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Callable
 from zipfile import ZipFile
 
 from .scrubpack_builder import (
@@ -251,8 +251,19 @@ def build_solver_proven_scrubpack(
     pack_id: str,
     pack_version: int,
     created_at_utc: str,
+    current_authority_check: Callable[
+        [Sequence[ScrubpackLevelInput], Mapping[str, ScrubpackSolverProof]], bool
+    ],
 ) -> ScrubpackBuildResult:
-    """Build a V1 pack plus a detached content-addressed artifact bound to live READY evidence."""
+    """Build a pack only after its injected Factory authority seam confirms freshness.
+
+    The callback must re-read the current owner review, READY/Release Pool projection,
+    pipeline bytes, and source level/supply files. This module does not import Factory
+    implementation. The callback runs after cryptographic and pack construction checks,
+    immediately before any pack bytes or success evidence are returned.
+    """
+    if not callable(current_authority_check):
+        raise ScrubpackSolverIdentityError("a current Factory authority verifier is required")
     level_inputs = tuple(levels)
     level_ids = tuple(level.level_id for level in level_inputs if isinstance(level, ScrubpackLevelInput))
     if len(level_ids) != len(level_inputs) or set(proofs) != set(level_ids) or len(set(level_ids)) != len(level_ids):
@@ -270,11 +281,14 @@ def build_solver_proven_scrubpack(
     artifact_bytes = _canonical_bytes(artifact) + b"\n"
     artifact_sha256 = _sha256(artifact_bytes)
     evidence = replace(pack_result.evidence, solver_identity_artifact_sha256=artifact_sha256)
-    return ScrubpackBuildResult(
+    result = ScrubpackBuildResult(
         archive_bytes=pack_result.archive_bytes,
         evidence=evidence,
         solver_identity_artifact_bytes=artifact_bytes,
     )
+    if current_authority_check(level_inputs, proofs) is not True:
+        raise ScrubpackSolverIdentityError("current Factory owner/review/READY authority verification failed")
+    return result
 
 
 def verify_solver_proven_scrubpack(

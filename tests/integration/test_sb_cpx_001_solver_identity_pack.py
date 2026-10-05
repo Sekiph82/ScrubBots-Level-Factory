@@ -22,9 +22,10 @@ from scrubbots_content_pipeline import (  # noqa: E402
 from scrubbots_content_pipeline.scrubpack_builder import ScrubpackBuildError  # noqa: E402
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio  # noqa: E402
 from scrubbots_pixel_factory.output.png import encode_logical_png  # noqa: E402
-from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries  # noqa: E402
+from scrubbots_pixel_factory.supply_pipeline import release_pool  # noqa: E402
 from scrubbots_pixel_factory.supply_pipeline.scrubpack_identity import (  # noqa: E402
     current_solver_proof_for_candidate,
+    revalidate_current_solver_proofs,
 )
 
 
@@ -83,6 +84,49 @@ def _pack_level(level_raw: bytes, plan_raw: bytes) -> ScrubpackLevelInput:
     )
 
 
+def _build_current_authorized_scrubpack(
+    levels: tuple[ScrubpackLevelInput, ...],
+    *,
+    proofs: dict[str, ScrubpackSolverProof],
+    pack_id: str,
+    pack_version: int = 1,
+    created_at_utc: str = "2026-10-05T10:00:00Z",
+) -> object:
+    return build_solver_proven_scrubpack(
+        levels,
+        proofs=proofs,
+        pack_id=pack_id,
+        pack_version=pack_version,
+        created_at_utc=created_at_utc,
+        current_authority_check=revalidate_current_solver_proofs,
+    )
+
+
+def _release_pool_entry_fixture(
+    candidate_id: str,
+    review_id: str,
+    pipeline: dict[str, object],
+    pipeline_bytes: bytes,
+    level_bytes: bytes,
+    plan_bytes: bytes,
+) -> dict[str, object]:
+    files = pipeline["primary"]["files"]  # type: ignore[index]
+    body: dict[str, object] = {
+        "schema": "scrubbots-release-pool-entry/v1",
+        "candidate_id": candidate_id,
+        "pipeline_run_id": pipeline["run_id"],
+        "pipeline_sha256": hashlib.sha256(pipeline_bytes).hexdigest(),
+        "pipeline": pipeline,
+        "review_id": review_id,
+        "files": {
+            "level": {"path": files["level"], "sha256": hashlib.sha256(level_bytes).hexdigest()},  # type: ignore[index]
+            "supply_plan": {"path": files["supply_plan"], "sha256": hashlib.sha256(plan_bytes).hexdigest()},  # type: ignore[index]
+        },
+    }
+    body["entry_digest"] = hashlib.sha256(_json_bytes(body)).hexdigest()
+    return body
+
+
 def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_drift(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -112,13 +156,13 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
 
     pipeline_bytes, release_entry = current_solver_proof_for_candidate(candidate_id)
     assert release_entry["schema"] == "scrubbots.factory.accepted-ready-proof/v1"
-    assert release_entry not in release_entries()
+    assert release_entry not in release_pool.release_entries()
     proof = ScrubpackSolverProof(pipeline_bytes, release_entry)
     level_path = Path(run["primary"]["files"]["level"])
     plan_path = Path(run["primary"]["files"]["supply_plan"])
     level_bytes, plan_bytes = level_path.read_bytes(), plan_path.read_bytes()
     level_input = _pack_level(level_bytes, plan_bytes)
-    result = build_solver_proven_scrubpack(
+    result = _build_current_authorized_scrubpack(
         (level_input,),
         proofs={level_input.level_id: proof},
         pack_id="cpx001-identity-test",
@@ -158,7 +202,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     first_batch = next(batch for column in changed_count["columns"] for batch in column)
     first_batch["robots"] += 1
     with pytest.raises(ScrubpackBuildError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (rebuild_with_plan(changed_count),), proofs={level_input.level_id: proof},
             pack_id="cpx001-drift", pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
@@ -167,7 +211,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     reorderable = next(column for column in changed_order["columns"] if len(column) > 1)
     reorderable[0], reorderable[1] = reorderable[1], reorderable[0]
     with pytest.raises(ScrubpackBuildError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (rebuild_with_plan(changed_order),), proofs={level_input.level_id: proof},
             pack_id="cpx001-drift", pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
@@ -175,13 +219,13 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     changed_cid = json.loads(json.dumps(plan))
     changed_cid["columns"][0][0]["cid"] = "C16" if changed_cid["columns"][0][0]["cid"] != "C16" else "C15"
     with pytest.raises(ScrubpackBuildError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (rebuild_with_plan(changed_cid),), proofs={level_input.level_id: proof},
             pack_id="cpx001-drift", pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
 
     with pytest.raises(ScrubpackBuildError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (rebuild_with_plan(plan, level_id=f"{level_input.level_id}-other"),),
             proofs={f"{level_input.level_id}-other": proof}, pack_id="cpx001-drift", pack_version=1,
             created_at_utc="2026-10-05T10:00:00Z",
@@ -197,7 +241,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
         level_input.metadata,
     )
     with pytest.raises(ScrubpackSolverIdentityError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (whitespace_plan,), proofs={level_input.level_id: proof}, pack_id="cpx001-drift",
             pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
@@ -207,7 +251,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     changed_state["primary"]["result"]["solver_supply_identity"]["solver_state_sha256"] = "0" * 64
     changed_pipeline_proof = ScrubpackSolverProof(_json_bytes(changed_state), release_entry)
     with pytest.raises(ScrubpackSolverIdentityError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (level_input,), proofs={level_input.level_id: changed_pipeline_proof}, pack_id="cpx001-drift",
             pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
@@ -217,7 +261,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     changed_evidence["primary"]["result"]["solver_supply_identity"]["solver_evidence_sha256"] = "f" * 64
     changed_evidence_proof = ScrubpackSolverProof(_json_bytes(changed_evidence), release_entry)
     with pytest.raises(ScrubpackSolverIdentityError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (level_input,), proofs={level_input.level_id: changed_evidence_proof}, pack_id="cpx001-drift",
             pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
@@ -225,11 +269,88 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     stale_review = dict(release_entry)
     stale_review["candidate_id"] = "another-candidate"
     with pytest.raises(ScrubpackSolverIdentityError):
-        build_solver_proven_scrubpack(
+        _build_current_authorized_scrubpack(
             (level_input,), proofs={level_input.level_id: ScrubpackSolverProof(pipeline_bytes, stale_review)},
             pack_id="cpx001-drift", pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
         )
 
     studio.record_owner_review(candidate_id, "REJECT", "stale proof check", "")
+    stale_reject_result = None
+    with pytest.raises(ValueError, match="no current owner-accepted READY pipeline"):
+        stale_reject_result = _build_current_authorized_scrubpack(
+            (level_input,), proofs={level_input.level_id: proof}, pack_id="cpx001-race-reject"
+        )
+    assert stale_reject_result is None
     with pytest.raises(ValueError, match="no current owner-accepted READY pipeline"):
         current_solver_proof_for_candidate(candidate_id)
+
+    review_a = studio.record_owner_review(candidate_id, "ACCEPT", "race B accept A", "")
+    pipeline_a_bytes, proof_a_source = current_solver_proof_for_candidate(candidate_id)
+    proof_a = ScrubpackSolverProof(pipeline_a_bytes, proof_a_source)
+    review_b = studio.record_owner_review(candidate_id, "ACCEPT", "race B accept B", "")
+    assert review_a["review_id"] != review_b["review_id"]
+    stale_accept_result = None
+    with pytest.raises(ValueError, match="proof changed"):
+        stale_accept_result = _build_current_authorized_scrubpack(
+            (level_input,), proofs={level_input.level_id: proof_a}, pack_id="cpx001-race-accept"
+        )
+    assert stale_accept_result is None
+
+    _, proof_b_source = current_solver_proof_for_candidate(candidate_id)
+    pipeline_b_bytes, _ = current_solver_proof_for_candidate(candidate_id)
+    proof_b = ScrubpackSolverProof(pipeline_b_bytes, proof_b_source)
+    ready_b = studio.run_pipeline(source_id=source_id)
+    assert ready_b["disposition"] == "READY"
+    assert ready_b["run_id"] != proof_b_source["pipeline_run_id"]
+    stale_ready_result = None
+    with pytest.raises(ValueError, match="proof changed"):
+        stale_ready_result = _build_current_authorized_scrubpack(
+            (level_input,), proofs={level_input.level_id: proof_b}, pack_id="cpx001-race-ready"
+        )
+    assert stale_ready_result is None
+
+    # Release Pool authority uses a real current READY pipeline and owner review,
+    # with only its projection admitted by this focused fixture.
+    current_pipeline_bytes, _ = current_solver_proof_for_candidate(candidate_id)
+    current_pipeline = json.loads(current_pipeline_bytes)
+    current_level_bytes = Path(current_pipeline["primary"]["files"]["level"]).read_bytes()
+    current_plan_bytes = Path(current_pipeline["primary"]["files"]["supply_plan"]).read_bytes()
+    current_level_input = _pack_level(current_level_bytes, current_plan_bytes)
+    pool_entry = _release_pool_entry_fixture(
+        candidate_id,
+        str(review_b["review_id"]),
+        current_pipeline,
+        current_pipeline_bytes,
+        current_level_bytes,
+        current_plan_bytes,
+    )
+    projection = [pool_entry]
+    monkeypatch.setattr(release_pool, "release_entries", lambda: list(projection))
+    pool_pipeline_bytes, pool_source = current_solver_proof_for_candidate(candidate_id)
+    assert pool_source["schema"] == "scrubbots-release-pool-entry/v1"
+    pool_proof = ScrubpackSolverProof(pool_pipeline_bytes, pool_source)
+    pool_result = _build_current_authorized_scrubpack(
+        (current_level_input,),
+        proofs={current_level_input.level_id: pool_proof},
+        pack_id="cpx001-current-pool-control",
+    )
+    assert pool_result.archive_bytes
+    projection.clear()
+    stale_pool_result = None
+    with pytest.raises(ValueError, match="proof changed"):
+        stale_pool_result = _build_current_authorized_scrubpack(
+            (current_level_input,),
+            proofs={current_level_input.level_id: pool_proof},
+            pack_id="cpx001-race-pool-revoked",
+        )
+    assert stale_pool_result is None
+    projection.append(pool_entry)
+    studio.record_owner_review(candidate_id, "REJECT", "revoke current Release Pool owner authority", "")
+    stale_pool_review_result = None
+    with pytest.raises(ValueError, match="current owner review or READY pipeline identity changed"):
+        stale_pool_review_result = _build_current_authorized_scrubpack(
+            (current_level_input,),
+            proofs={current_level_input.level_id: pool_proof},
+            pack_id="cpx001-race-pool-review-revoked",
+        )
+    assert stale_pool_review_result is None

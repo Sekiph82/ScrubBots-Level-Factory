@@ -167,13 +167,23 @@ solver PASS/replay digest, and source READY pipeline/review authority. Its
 digest is carried in `ScrubpackBuildEvidence`; callers can verify the archive
 and artifact together with `verify_solver_proven_scrubpack()`.
 
+Final packaging requires a `current_authority_check` callback. The Factory
+orchestration passes `revalidate_current_solver_proofs()`, which re-reads the
+latest owner ACCEPT, READY pipeline identity and bytes, live Release Pool
+projection when applicable, and exact level/supply source files at the final
+build boundary. A frozen proof remains a cryptographic receipt; it is not
+current authorization by itself. A missing or stale current-authority check
+fails the build without returning archive or success evidence. The standalone
+Content Pipeline does not import Factory internals.
+
 Proof resolution reads current canonical Factory evidence. It prefers a live
 owner-accepted Release Pool entry; when a READY candidate has a current owner
 ACCEPT review but the separate Release Pool gate does not admit it, it binds
 the current READY pipeline and exact source files directly. It never reruns or
 reimplements the solver. Proof resolution rejects stale owner reviews and
-pipeline evidence; packaging then rejects changed level, plan, FIFO order,
-state digest, or solver result before returning a pack. The artifact stays
+pipeline evidence; final packaging rechecks that the exact review and READY
+run are still current and rejects changed level, plan, FIFO order, state digest,
+or solver result before returning a pack. The artifact stays
 separate from the V1 archive so existing archive members and pack inspection
 compatibility stay unchanged.
 

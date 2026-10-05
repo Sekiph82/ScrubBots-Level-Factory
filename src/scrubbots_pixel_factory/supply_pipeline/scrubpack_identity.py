@@ -5,7 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 
@@ -216,6 +217,92 @@ def current_solver_proof_for_candidate(candidate_id: str) -> tuple[bytes, dict[s
     return pipeline_bytes, entry
 
 
+def revalidate_current_solver_proofs(levels: Sequence[Any], proofs: Mapping[str, Any]) -> bool:
+    """Callback for the final Content Pipeline build boundary; re-read live Factory authority.
+
+    This function deliberately accepts the Content Pipeline's small proof/level shape
+    by protocol, so the Factory does not import the publisher project. It must be passed
+    as ``current_authority_check`` to the final solver-proven pack build.
+    """
+    if not isinstance(levels, Sequence) or not isinstance(proofs, Mapping):
+        raise SolverSupplyIdentityError("current solver proof verification inputs are malformed")
+    from .. import studio_extensions as studio
+
+    for level in levels:
+        level_id = getattr(level, "level_id", None)
+        proof = proofs.get(level_id) if isinstance(level_id, str) else None
+        if proof is None:
+            raise SolverSupplyIdentityError("current solver proof is missing for a packaged level")
+        proof_bytes = getattr(proof, "pipeline_bytes", None)
+        source = getattr(proof, "release_pool_entry", None)
+        if type(proof_bytes) is not bytes or not isinstance(source, Mapping):
+            raise SolverSupplyIdentityError("current solver proof snapshot is malformed")
+        source = dict(source)
+        candidate_id = source.get("candidate_id")
+        if not isinstance(candidate_id, str) or not candidate_id:
+            raise SolverSupplyIdentityError("current solver proof has no candidate identity")
+        current_bytes, current_source = current_solver_proof_for_candidate(candidate_id)
+        if current_bytes != proof_bytes or current_source != source:
+            raise SolverSupplyIdentityError("current owner review, READY pipeline, or Release Pool proof changed")
+        try:
+            pipeline = json.loads(current_bytes.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise SolverSupplyIdentityError("current READY pipeline evidence is malformed") from exc
+        primary = pipeline.get("primary") if isinstance(pipeline, Mapping) else None
+        files = primary.get("files") if isinstance(primary, Mapping) else None
+        if not isinstance(files, Mapping) or pipeline.get("run_id") != source.get("pipeline_run_id"):
+            raise SolverSupplyIdentityError("current READY pipeline identity does not match the proof")
+        pool_files = source.get("files") if source.get("schema") == "scrubbots-release-pool-entry/v1" else None
+        for member_name, pipeline_key, payload_attr in (
+            ("level", "level", "level_data"),
+            ("supply_plan", "supply_plan", "supply_plan"),
+        ):
+            payload_container = getattr(level, payload_attr, None)
+            expected_bytes = getattr(payload_container, "payload", None)
+            source_path = files.get(pipeline_key)
+            if type(expected_bytes) is not bytes or not isinstance(source_path, str) or not source_path:
+                raise SolverSupplyIdentityError(f"current READY {member_name} source binding is missing")
+            try:
+                current_file_bytes = Path(source_path).read_bytes()
+            except OSError as exc:
+                raise SolverSupplyIdentityError(f"current READY {member_name} source file is unavailable") from exc
+            if current_file_bytes != expected_bytes:
+                raise SolverSupplyIdentityError(f"current READY {member_name} source bytes changed")
+            if pool_files is not None:
+                record = pool_files.get(member_name)
+                if (
+                    not isinstance(record, Mapping)
+                    or str(record.get("path", "")) != source_path
+                    or record.get("sha256") != hashlib.sha256(current_file_bytes).hexdigest()
+                ):
+                    raise SolverSupplyIdentityError(f"current Release Pool {member_name} binding changed")
+        if source.get("schema") == "scrubbots-release-pool-entry/v1":
+            entry_digest = source.get("entry_digest")
+            body = {key: value for key, value in source.items() if key != "entry_digest"}
+            if not isinstance(entry_digest, str) or canonical_sha256(body) != entry_digest:
+                raise SolverSupplyIdentityError("current Release Pool entry digest is invalid")
+        # Re-read the selected authority last, then verify its owner and READY
+        # identities. This catches changes made after the frozen proof was issued.
+        final_bytes, final_source = current_solver_proof_for_candidate(candidate_id)
+        candidate_exists = any(
+            item.get("candidate_id") == candidate_id for item in studio.list_candidates()
+        )
+        latest_review = studio._latest_review(candidate_id)
+        latest_ready = studio._latest_ready_pipeline(candidate_id)
+        if (
+            final_bytes != proof_bytes
+            or final_source != source
+            or not candidate_exists
+            or not isinstance(latest_review, Mapping)
+            or latest_review.get("disposition") != "ACCEPT"
+            or latest_review.get("review_id") != source.get("review_id")
+            or not isinstance(latest_ready, Mapping)
+            or latest_ready.get("run_id") != source.get("pipeline_run_id")
+        ):
+            raise SolverSupplyIdentityError("current owner review or READY pipeline identity changed")
+    return True
+
+
 __all__ = [
     "IDENTITY_SCHEMA",
     "SolverSupplyIdentityError",
@@ -223,5 +310,6 @@ __all__ = [
     "canonical_sha256",
     "current_solver_proof_for_candidate",
     "derive_solver_supply_identity",
+    "revalidate_current_solver_proofs",
     "solver_evidence_body",
 ]
