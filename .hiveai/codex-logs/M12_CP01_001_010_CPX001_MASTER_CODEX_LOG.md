@@ -129,3 +129,12 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 8 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 4734932b5c8d9b268a1f4a7e561b97ef1e86243d, 0/0. Separate Child 8 builder-log/master-progress commit and closure are pending.
 
 - Separate Child 8 builder-log/master-progress commit: 52e5685c274bbe33bae55be89e37779df1b58df2. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 8 implementation and log are published in separate commits. Child 8 is closed; Child 9 begins from this SHA.
+
+### SB-CP01-009-C001 implementation and regression record
+
+- Child base SHA: `8547a654c9cd11ad784a3f78cc05237b7023c8f1`.
+- Implementation commits: `6f018438ec692003a4770f6b30ae1353852f4721` (canonical ZIP writer metadata and cross-process deterministic byte test) and `e55fabe03dea56c092e6768167b8eeb0ba39b5c0` (document the fixed ZIP metadata policy).
+- The builder now explicitly normalizes timestamps, compression (stored/no compression), ASCII names, creator/version fields, mode, flags, volume/internal attributes, comments, extras, ZIP64 policy, and entry order. Added exact metadata assertions and two separate-process/separate-directory identical-build verification.
+- Focused pack suite: 69 passed. Cumulative CP00/M11 + prior M12: 232 passed. Governance: 13 passed. Full pytest: 1,401 passed, 3 skipped in 1,123.79 seconds. Post-documentation pack+governance rerun: 82 passed; compileall and diff check passed.
+- No dependency/license, provider/network/runtime, credentials, production-game, tracker, or audit changes. Implementation push and separate log publication are pending.
+- Child 9 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 55fabe03dea56c092e6768167b8eeb0ba39b5c0, 0/0. Separate Child 9 builder-log/master-progress publication and closure remain.
