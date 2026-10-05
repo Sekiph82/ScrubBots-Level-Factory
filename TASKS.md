@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M12 — .scrubpack Format & Packager
-- Current Sprint: M12-MASTER — Execute SB-CP01-001..010 + SB-CPX-001 continuously, then independent child audits
-- Current Task: SB-CP01-001 — M12 master batch entry point
-- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M12_MASTER_BATCH_AUTHORIZED
-- Next Task/Action: execute only `.hiveai/prompts/M12_CP01_001_010_CPX001_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP01-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-001 without inter-child handoff, writing one separate builder log per child, and stops only after master completion or a true blocker.
+- Current Sprint: SB-CPX-001-C001-R01 — Current proof freshness remediation
+- Current Task: SB-CPX-001 — Revalidate owner/review/READY/Release Pool authority at final solver-proven pack emission
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: execute only `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`; first synchronize GitHub/local authority, close the stale-proof race without redesigning SB-CP01-001..010, rerun cumulative M11+M12+CPX regressions, publish the R01 builder log, then stop for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M12_CP01_001_010_CPX001_MASTER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M12_CP01_001_010_CPX001_MASTER_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -160,6 +160,22 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP01-010 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-010-C001_UNSUPPORTED_PACK_VERSION_REJECTION_AUDIT_CRITERIA.md`.
 - SB-CPX-001 C001 Prompt: `.hiveai/prompts/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_PROMPT.md`.
 - SB-CPX-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_AUDIT_CRITERIA.md`.
+- M12 Master Independent Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/M12_CP01_001_010_CPX001_MASTER_STRICT_AUDIT.md`.
+- SB-CP01-001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-001-C001_SCRUBPACK_V1_SPEC_STRICT_AUDIT.md`.
+- SB-CP01-002 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-002-C001_PACKAGE_DECLARATIVE_LEVELS_ONLY_STRICT_AUDIT.md`.
+- SB-CP01-003 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-003-C001_PACK_ID_VERSION_TIME_LEVELS_STRICT_AUDIT.md`.
+- SB-CP01-004 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-004-C001_PER_PACK_SHA256_STRICT_AUDIT.md`.
+- SB-CP01-005 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-005-C001_DETERMINISTIC_PACK_SERIALIZATION_ORDER_STRICT_AUDIT.md`.
+- SB-CP01-006 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-006-C001_DUPLICATE_LEVEL_ID_PREVENTION_STRICT_AUDIT.md`.
+- SB-CP01-007 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-007-C001_VALIDATE_EVERY_LEVEL_BEFORE_PACK_STRICT_AUDIT.md`.
+- SB-CP01-008 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-008-C001_SAFE_UNPACK_INSPECT_TOOLING_STRICT_AUDIT.md`.
+- SB-CP01-009 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-009-C001_DETERMINISTIC_SCRUBPACK_BYTES_STRICT_AUDIT.md`.
+- SB-CP01-010 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP01-010-C001_UNSUPPORTED_PACK_VERSION_REJECTION_STRICT_AUDIT.md`.
+- SB-CPX-001 C001 Strict Audit Result: `CHANGES_REQUIRED / R01` by `.hiveai/audits/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_STRICT_AUDIT.md`.
+- SB-CPX-001 C001-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- SB-CPX-001 C001-R01 Prompt: `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`.
+- SB-CPX-001 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_AUDIT_CRITERIA.md`.
+- SB-CPX-001 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_CODEX_LOG.md`.
 - SB-CP00-003 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_CODEX_LOG.md`.
 - SB-CP00-004 C001 Authorization: `IMPLEMENT_THEN_AUDIT / MASTER_CHILD_AUTHORIZED`.
 - SB-CP00-004 C001 Prompt: `.hiveai/prompts/SB-CP00-004-C001_STAGING_PRODUCTION_SEPARATION_PROMPT.md`.
@@ -939,26 +955,26 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 
 ### M12.01 - Pack spec, declarative payload and metadata
 
-- [~] SB-CP01-001 — Define versioned .scrubpack spec.
-- [ ] SB-CP01-002 — Package declarative levels only. [PARTIAL]
-- [ ] SB-CP01-003 — Record pack ID/version/time/levels. [PARTIAL]
+- [x] SB-CP01-001 — Define versioned .scrubpack spec.
+- [x] SB-CP01-002 — Package declarative levels only. [PARTIAL]
+- [x] SB-CP01-003 — Record pack ID/version/time/levels. [PARTIAL]
 
 ### M12.02 - Integrity, deterministic serialization and duplicate prevention
 
-- [ ] SB-CP01-004 — Per-pack SHA-256. [PARTIAL]
-- [ ] SB-CP01-005 — Deterministic pack serialization/order. [PARTIAL]
-- [ ] SB-CP01-006 — Prevent duplicate level IDs. [PARTIAL]
+- [x] SB-CP01-004 — Per-pack SHA-256. [PARTIAL]
+- [x] SB-CP01-005 — Deterministic pack serialization/order. [PARTIAL]
+- [x] SB-CP01-006 — Prevent duplicate level IDs. [PARTIAL]
 
 ### M12.03 - Validation, inspection and compatibility
 
-- [ ] SB-CP01-007 — Validate every level before pack. [PARTIAL]
-- [ ] SB-CP01-008 — Unpack/inspect tooling.
-- [ ] SB-CP01-009 — Deterministic bytes where container permits. [PARTIAL]
-- [ ] SB-CP01-010 — Reject unsupported versions safely. [PARTIAL]
+- [x] SB-CP01-007 — Validate every level before pack. [PARTIAL]
+- [x] SB-CP01-008 — Unpack/inspect tooling.
+- [x] SB-CP01-009 — Deterministic bytes where container permits. [PARTIAL]
+- [x] SB-CP01-010 — Reject unsupported versions safely. [PARTIAL]
 
 ### M12.04 - Solver-proven supply identity extension
 
-- [ ] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
+- [~] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
 
 ---
 
