@@ -38,7 +38,7 @@ levels/{level_id}/metadata.json
 
 ## Path and entry rules
 
-Reject an archive with an absolute path, drive prefix, UNC path, backslash, empty or dot segment, `..` traversal, non-canonical separator, duplicate member name, undeclared member, unsupported extension, or a path not matching the fixed layout. Reject duplicate level IDs. No first-wins or last-wins interpretation is defined for duplicate names.
+Reject an archive with an absolute path, drive prefix, UNC path, backslash, empty or dot segment, `..` traversal, non-canonical separator, duplicate member name, undeclared member, unsupported extension, or a path not matching the fixed layout. Reject exact duplicate level IDs and case-normalized ID/member-path collisions so archives cannot alias two owners on case-insensitive filesystems. No first-wins or last-wins interpretation is defined for duplicate names. Each declared ID has exactly one LevelData, one supply plan, and one metadata member, and all three descriptors must bind to that same exact level ID and expected content family.
 
 Every permitted entry is a regular JSON data file. Symlinks, encrypted or special files, Unix executable permissions, and any entry whose ZIP metadata does not describe a regular non-executable file are forbidden. A safe reader must inspect ZIP metadata and enforce these checks before reading or extracting bytes. No member may be imported, evaluated, executed, or used as an application resource.
 

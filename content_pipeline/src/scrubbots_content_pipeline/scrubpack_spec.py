@@ -5,8 +5,8 @@ This module describes the container contract. It does not read or write ZIPs.
 
 from __future__ import annotations
 
-import re
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -53,6 +53,19 @@ def canonical_json_bytes(value: object) -> bytes:
         ).encode("utf-8")
     except (TypeError, ValueError) as exc:
         raise ScrubpackSpecError("value cannot be represented as canonical JSON") from exc
+
+
+def _validate_unique_level_ids(level_ids: Iterable[str]) -> None:
+    seen: set[str] = set()
+    folded: set[str] = set()
+    for level_id in level_ids:
+        if level_id in seen:
+            raise ScrubpackSpecError("duplicate level ID")
+        normalized = level_id.casefold()
+        if normalized in folded:
+            raise ScrubpackSpecError("case-normalized level ID collision")
+        seen.add(level_id)
+        folded.add(normalized)
 
 
 def normalize_created_at_utc(value: str | datetime) -> str:
@@ -124,8 +137,7 @@ class ScrubpackManifestV1:
         if not self.levels:
             raise ScrubpackSpecError("at least one level is required")
         ids = [level.level_id for level in self.levels]
-        if len(ids) != len(set(ids)):
-            raise ScrubpackSpecError("duplicate level ID")
+        _validate_unique_level_ids(ids)
         object.__setattr__(
             self,
             "levels",
@@ -234,10 +246,15 @@ def validate_member_name(name: object) -> bool:
 def validate_member_names(names: Iterable[object]) -> bool:
     """Fail closed on invalid or duplicate V1 member names."""
     seen: set[str] = set()
+    normalized_seen: set[str] = set()
     for name in names:
         if not validate_member_name(name) or name in seen:
             return False
+        normalized = name.casefold().replace("\\", "/")
+        if normalized in normalized_seen:
+            return False
         seen.add(name)
+        normalized_seen.add(normalized)
     return True
 
 
@@ -245,8 +262,7 @@ def expected_member_names(levels: Iterable[ScrubpackLevelV1]) -> tuple[str, ...]
     """Return the fixed member set in caller-provided level order."""
     level_list = tuple(levels)
     ids = [level.level_id for level in level_list]
-    if len(ids) != len(set(ids)):
-        raise ScrubpackSpecError("duplicate level ID")
+    _validate_unique_level_ids(ids)
     if not level_list:
         raise ScrubpackSpecError("at least one level is required")
     level_list = tuple(sorted(level_list, key=lambda level: canonical_level_sort_key(level.level_id)))

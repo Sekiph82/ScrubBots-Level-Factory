@@ -164,6 +164,16 @@ def test_duplicate_archive_names_and_duplicate_level_ids_fail_closed() -> None:
         )
 
 
+def test_case_normalized_ids_and_archive_paths_fail_closed() -> None:
+    with pytest.raises(ScrubpackSpecError, match="case-normalized"):
+        expected_member_names((ScrubpackLevelV1("Level-A"), ScrubpackLevelV1("level-a")))
+    assert not validate_member_names((
+        "pack.json",
+        "levels/Level-A/level.json",
+        "levels/level-a/level.json",
+    ))
+
+
 @pytest.mark.parametrize("level_id", ("../escape", "a/b", "", "x" * 65, "has space"))
 def test_level_id_cannot_escape_or_change_the_path_grammar(level_id: str) -> None:
     with pytest.raises(ScrubpackSpecError, match="invalid level ID"):

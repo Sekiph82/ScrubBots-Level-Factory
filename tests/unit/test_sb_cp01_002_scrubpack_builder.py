@@ -235,6 +235,11 @@ def test_builder_rejects_duplicate_and_implicit_level_inputs() -> None:
         _build(iter((_level(),)))  # type: ignore[arg-type]
 
 
+def test_builder_rejects_case_normalized_duplicate_ownership_before_output() -> None:
+    with pytest.raises(ScrubpackBuildError, match="case-normalized"):
+        _build((_level("Level-A"), _level("level-a")))
+
+
 def test_pack_identity_and_explicit_utc_time_round_trip_in_canonical_level_order() -> None:
     result = _build(
         (_level("level-z"), _level("level-a")),
@@ -259,16 +264,16 @@ def test_pack_identity_and_explicit_utc_time_round_trip_in_canonical_level_order
 
 
 def test_logical_pack_members_are_independent_of_level_input_order() -> None:
-    levels = (_level("level-z"), _level("level-a"), _level("level-Z"))
+    levels = (_level("m-level"), _level("a-level"), _level("Z-level"))
     forward = _build(levels)
     reverse = _build(tuple(reversed(levels)))
-    assert forward.evidence.level_ids == reverse.evidence.level_ids == ("level-Z", "level-a", "level-z")
+    assert forward.evidence.level_ids == reverse.evidence.level_ids == ("Z-level", "a-level", "m-level")
     assert forward.evidence.member_names == reverse.evidence.member_names
     assert forward.evidence.member_names == (
         "pack.json",
-        "levels/level-Z/level.json", "levels/level-Z/supply-plan.json", "levels/level-Z/metadata.json",
-        "levels/level-a/level.json", "levels/level-a/supply-plan.json", "levels/level-a/metadata.json",
-        "levels/level-z/level.json", "levels/level-z/supply-plan.json", "levels/level-z/metadata.json",
+        "levels/Z-level/level.json", "levels/Z-level/supply-plan.json", "levels/Z-level/metadata.json",
+        "levels/a-level/level.json", "levels/a-level/supply-plan.json", "levels/a-level/metadata.json",
+        "levels/m-level/level.json", "levels/m-level/supply-plan.json", "levels/m-level/metadata.json",
     )
     with ZipFile(io.BytesIO(forward.archive_bytes)) as first, ZipFile(io.BytesIO(reverse.archive_bytes)) as second:
         assert first.namelist() == second.namelist()
