@@ -81,3 +81,4 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - No tracker/audit, dependency/license, runtime/provider, credentials, or production-game changes. The required verifier clone and headless Godot run stayed in pytest temporary storage.
 - Child 4 builder log: `.hiveai/codex-logs/SB-CP01-004-C001_PER_PACK_SHA256_CODEX_LOG.md`. Implementation push and separate log commit/parity are pending.
 - Child 4 implementation push advanced `main` to `0a59b432325e8963925e2117fdaed6ec85bad1d8`; post-push fetch confirmed 0/0 parity. Separate child-log publication remains pending.
+- Separate Child 4 builder-log/master-progress commit: `45151900acab507ecfe624b3ebcb17e84e3ff2bb`. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main at this commit, `0/0`, clean. Child 4 implementation and log commits are distinct. Child 5 begins from the master closure commit below.
