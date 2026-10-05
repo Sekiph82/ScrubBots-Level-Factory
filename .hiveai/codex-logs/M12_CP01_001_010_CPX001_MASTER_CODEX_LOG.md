@@ -57,3 +57,4 @@ Child-specific base SHAs, implementation commits, separate log commits, exact te
 - Protected `TASKS.md` and audit files remain unchanged; no dependency/license/runtime/provider/game-source changes.
 - Builder log path: `.hiveai/codex-logs/SB-CP01-002-C001_PACKAGE_DECLARATIVE_LEVELS_ONLY_CODEX_LOG.md`. Separate log commit and final parity will be appended after publication.
 - Child 2 implementation push: pre-push fetch showed `1/0`; normal `git push origin HEAD:main` advanced `main` to `cb44f6632acb067493bcf50528b31b20d49cc08e`; post-push fetch confirmed `HEAD == origin/main`, `0/0`.
+Child 2 log correction: repaired three control characters produced by PowerShell interpreting Markdown backtick escapes in the local draft; this append-only correction is included in the builder-log publication before push.
