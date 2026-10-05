@@ -149,3 +149,5 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Focused pack tests: 81 passed. Cumulative CP00/M11 + prior M12: 244 passed. Governance: 13 passed. Full pytest: 1,413 passed, 3 skipped in 1,132.21 seconds. Compileall and diff check passed.
 - Initial new tests had a missing constant import; fixed and all runs now pass. No dependency/license, runtime/provider/network, credentials, game, tracker, or audit changes. Implementation push and separate log publication are pending.
 - Child 10 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 3f51c51aaaca8405283fceed8ad89157da474897, 0/0. Separate Child 10 builder-log/master-progress commit and closure remain.
+
+- Separate Child 10 builder-log/master-progress commit: 67e4c996b0a3a4becc78c1ce996e7c93d11af3ae. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 10 implementation and builder-log commits are separate. Child 10 is closed; SB-CPX-001 begins from this SHA.
