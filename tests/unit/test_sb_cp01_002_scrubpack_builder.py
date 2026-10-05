@@ -235,7 +235,7 @@ def test_builder_rejects_duplicate_and_implicit_level_inputs() -> None:
         _build(iter((_level(),)))  # type: ignore[arg-type]
 
 
-def test_pack_identity_and_explicit_utc_time_round_trip_in_exact_level_order() -> None:
+def test_pack_identity_and_explicit_utc_time_round_trip_in_canonical_level_order() -> None:
     result = _build(
         (_level("level-z"), _level("level-a")),
         pack_id="release-pack-01",
@@ -246,7 +246,7 @@ def test_pack_identity_and_explicit_utc_time_round_trip_in_exact_level_order() -
     assert result.evidence.pack_version == 7
     assert result.evidence.created_at_utc == "2026-10-05T10:00:00Z"
     assert result.evidence.level_count == 2
-    assert result.evidence.level_ids == ("level-z", "level-a")
+    assert result.evidence.level_ids == ("level-a", "level-z")
     with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
         restored = json.loads(archive.read(PACK_MANIFEST_PATH))
     restored_model = ScrubpackManifestV1.from_dict(restored)
@@ -255,7 +255,26 @@ def test_pack_identity_and_explicit_utc_time_round_trip_in_exact_level_order() -
     assert restored["packVersion"] == 7
     assert restored["createdAtUtc"] == "2026-10-05T10:00:00Z"
     assert restored["levelCount"] == 2
-    assert tuple(level["id"] for level in restored["levels"]) == ("level-z", "level-a")
+    assert tuple(level["id"] for level in restored["levels"]) == ("level-a", "level-z")
+
+
+def test_logical_pack_members_are_independent_of_level_input_order() -> None:
+    levels = (_level("level-z"), _level("level-a"), _level("level-Z"))
+    forward = _build(levels)
+    reverse = _build(tuple(reversed(levels)))
+    assert forward.evidence.level_ids == reverse.evidence.level_ids == ("level-Z", "level-a", "level-z")
+    assert forward.evidence.member_names == reverse.evidence.member_names
+    assert forward.evidence.member_names == (
+        "pack.json",
+        "levels/level-Z/level.json", "levels/level-Z/supply-plan.json", "levels/level-Z/metadata.json",
+        "levels/level-a/level.json", "levels/level-a/supply-plan.json", "levels/level-a/metadata.json",
+        "levels/level-z/level.json", "levels/level-z/supply-plan.json", "levels/level-z/metadata.json",
+    )
+    with ZipFile(io.BytesIO(forward.archive_bytes)) as first, ZipFile(io.BytesIO(reverse.archive_bytes)) as second:
+        assert first.namelist() == second.namelist()
+        assert {name: first.read(name) for name in first.namelist()} == {
+            name: second.read(name) for name in second.namelist()
+        }
 
 
 @pytest.mark.parametrize("pack_id", ("", "../escape", "Uppercase", "has space", "x" * 65))

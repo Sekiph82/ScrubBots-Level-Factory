@@ -21,6 +21,8 @@ from .scrubpack_spec import (
     ScrubpackLevelV1,
     ScrubpackManifestV1,
     ScrubpackSpecError,
+    canonical_json_bytes,
+    canonical_level_sort_key,
     expected_member_names,
     validate_member_names,
 )
@@ -170,6 +172,7 @@ def build_scrubpack(
         raise ScrubpackBuildError("at least one level is required")
     if any(not isinstance(level, ScrubpackLevelInput) for level in level_inputs):
         raise ScrubpackBuildError("every level must be an explicit ScrubpackLevelInput")
+    level_inputs = tuple(sorted(level_inputs, key=lambda level: canonical_level_sort_key(level.level_id)))
 
     level_specs = tuple(ScrubpackLevelV1(level.level_id) for level in level_inputs)
     try:
@@ -209,7 +212,10 @@ def build_scrubpack(
     except ScrubpackSpecError as exc:
         raise ScrubpackBuildError(str(exc)) from exc
 
-    manifest_bytes = json.dumps(manifest.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    try:
+        manifest_bytes = canonical_json_bytes(manifest.to_dict())
+    except ScrubpackSpecError as exc:
+        raise ScrubpackBuildError(str(exc)) from exc
     output = io.BytesIO()
     with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
         archive.writestr(PACK_MANIFEST_PATH, manifest_bytes)

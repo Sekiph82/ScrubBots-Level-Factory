@@ -6,6 +6,7 @@ This module describes the container contract. It does not read or write ZIPs.
 from __future__ import annotations
 
 import re
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -31,6 +32,27 @@ _LEVEL_MEMBER = re.compile(
 
 class ScrubpackSpecError(ValueError):
     """Raised when a logical member name or level identity violates V1."""
+
+
+def canonical_level_sort_key(level_id: str) -> bytes:
+    """Return the V1 case-sensitive ASCII-byte ordering key for a level ID."""
+    if not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id):
+        raise ScrubpackSpecError("invalid level ID")
+    return level_id.encode("ascii")
+
+
+def canonical_json_bytes(value: object) -> bytes:
+    """Serialize canonical JSON as sorted compact UTF-8 bytes."""
+    try:
+        return json.dumps(
+            value,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+    except (TypeError, ValueError) as exc:
+        raise ScrubpackSpecError("value cannot be represented as canonical JSON") from exc
 
 
 def normalize_created_at_utc(value: str | datetime) -> str:
@@ -104,6 +126,11 @@ class ScrubpackManifestV1:
         ids = [level.level_id for level in self.levels]
         if len(ids) != len(set(ids)):
             raise ScrubpackSpecError("duplicate level ID")
+        object.__setattr__(
+            self,
+            "levels",
+            tuple(sorted(self.levels, key=lambda level: canonical_level_sort_key(level.level_id))),
+        )
         if not isinstance(self.member_sha256, Mapping):
             raise ScrubpackSpecError("member SHA-256 values must be a mapping")
         expected_paths = {path for level in self.levels for path in level.member_paths}
@@ -179,6 +206,9 @@ class ScrubpackManifestV1:
             for role, path_key in (("levelData", "levelData"), ("supplyPlan", "supplyPlan"), ("metadata", "metadata")):
                 member_digests[expected[path_key]] = digests[role]
             levels.append(level)
+        ids = [level.level_id for level in levels]
+        if ids != sorted(ids, key=canonical_level_sort_key):
+            raise ScrubpackSpecError("manifest levels are not in canonical order")
         return cls(
             levels=tuple(levels),
             pack_id=value["packId"],
@@ -219,6 +249,7 @@ def expected_member_names(levels: Iterable[ScrubpackLevelV1]) -> tuple[str, ...]
         raise ScrubpackSpecError("duplicate level ID")
     if not level_list:
         raise ScrubpackSpecError("at least one level is required")
+    level_list = tuple(sorted(level_list, key=lambda level: canonical_level_sort_key(level.level_id)))
     return (PACK_MANIFEST_PATH, *(path for level in level_list for path in level.member_paths))
 
 
@@ -232,6 +263,8 @@ __all__ = [
     "ScrubpackLevelV1",
     "ScrubpackManifestV1",
     "ScrubpackSpecError",
+    "canonical_json_bytes",
+    "canonical_level_sort_key",
     "expected_member_names",
     "normalize_created_at_utc",
     "validate_member_name",

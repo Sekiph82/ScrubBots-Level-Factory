@@ -21,6 +21,8 @@ from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
     ScrubpackLevelV1,
     ScrubpackManifestV1,
     ScrubpackSpecError,
+    canonical_json_bytes,
+    canonical_level_sort_key,
     expected_member_names,
     validate_member_name,
     validate_member_names,
@@ -84,6 +86,29 @@ def test_manifest_round_trip_rejects_count_and_path_identity_mismatches() -> Non
     manifest["levels"][0]["files"]["levelData"] = "levels/other/level.json"
     with pytest.raises(ScrubpackSpecError, match="paths do not match"):
         ScrubpackManifestV1.from_dict(manifest)
+
+
+def test_canonical_level_order_uses_case_sensitive_ascii_bytes_and_parser_requires_it() -> None:
+    assert sorted(("level-a", "level-Z", "level-01"), key=canonical_level_sort_key) == [
+        "level-01", "level-Z", "level-a"
+    ]
+    manifest = ScrubpackManifestV1(
+        (ScrubpackLevelV1("level-z"), ScrubpackLevelV1("level-a")),
+        pack_id="pack-001",
+        pack_version=1,
+        created_at_utc="2026-10-05T10:00:00Z",
+        member_sha256={
+            path: "a" * 64
+            for level_id in ("level-a", "level-z")
+            for path in ScrubpackLevelV1(level_id).member_paths
+        },
+    )
+    assert tuple(level.level_id for level in manifest.levels) == ("level-a", "level-z")
+    unordered = manifest.to_dict()
+    unordered["levels"].reverse()
+    with pytest.raises(ScrubpackSpecError, match="canonical order"):
+        ScrubpackManifestV1.from_dict(unordered)
+    assert canonical_json_bytes({"z": "é", "a": 1}) == b'{"a":1,"z":"\xc3\xa9"}'
 
 
 @pytest.mark.parametrize(

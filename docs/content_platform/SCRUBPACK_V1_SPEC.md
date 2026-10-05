@@ -25,7 +25,7 @@ The local `scrubbots_content_pipeline.build_scrubpack()` API accepts an explicit
 
 ## Fixed member layout
 
-Each level ID matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. Its three files have fixed paths derived from that ID:
+Each level ID matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. Levels are serialized in ascending case-sensitive ASCII byte order of the exact level ID (`level_id.encode("ascii")`). This key is independent of caller order, filesystem enumeration, locale, and hash-map order. For each level, the three files use this fixed order and paths:
 
 ```text
 pack.json
@@ -34,7 +34,7 @@ levels/{level_id}/supply-plan.json
 levels/{level_id}/metadata.json
 ```
 
-`pack.json` lists level IDs, their three fixed member paths, and the SHA-256 of each exact payload. It cannot assign arbitrary paths. V1 archive member names are case-sensitive, relative POSIX paths. Only `pack.json` and the three `.json` paths for each declared level are permitted. Directory entries are not needed and are rejected by the member-name contract.
+`pack.json` lists level IDs in the canonical order above, with each level's three fixed member paths and the SHA-256 of each exact payload. Manifest JSON uses UTF-8, sorted object keys, compact separators, and no ASCII escaping. Payload JSON bytes are the exact validated caller-supplied bytes; this child fixes their logical member order without rewriting payload identity. The archive member order is `pack.json` first, followed by each canonical level's `level.json`, `supply-plan.json`, then `metadata.json`. It cannot assign arbitrary paths. V1 archive member names are case-sensitive, relative POSIX paths. Only `pack.json` and the three `.json` paths for each declared level are permitted. Directory entries are not needed and are rejected by the member-name contract.
 
 ## Path and entry rules
 
@@ -44,6 +44,6 @@ Every permitted entry is a regular JSON data file. Symlinks, encrypted or specia
 
 ## Versioning and deterministic extensions
 
-This document fixes the V1 container identity, member paths, payload families, pack identity/version/time, exact ordered level membership, and safety boundary. The builder validates each explicitly supplied payload with its M11 validator and never reads the wall clock. Per-member payload digests are stored in `pack.json`; exact-pack SHA-256 remains external immutable evidence and is never embedded in the bytes it hashes. The verifier checks the receipt against the exact archive bytes, the manifest's pack identity/version, and each payload digest. Deterministic code receives time as explicit input.
+This document fixes the V1 container identity, member paths and order, payload families, pack identity/version/time, canonically ordered level membership, and safety boundary. The builder validates each explicitly supplied payload with its M11 validator and never reads the wall clock. Per-member payload digests are stored in `pack.json`; exact-pack SHA-256 remains external immutable evidence and is never embedded in the bytes it hashes. The verifier checks the receipt against the exact archive bytes, the manifest's pack identity/version, and each payload digest. Deterministic code receives time as explicit input.
 
 The container has no network, provider, upload, CDN, credential, or runtime dependency. It does not authorize publishing or gameplay mutation.
