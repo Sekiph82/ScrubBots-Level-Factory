@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M12 — .scrubpack Format & Packager
-- Current Sprint: SB-CPX-001-C001-R01 — Current proof freshness remediation
-- Current Task: SB-CPX-001 — Revalidate owner/review/READY/Release Pool authority at final solver-proven pack emission
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: execute only `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`; first synchronize GitHub/local authority, close the stale-proof race without redesigning SB-CP01-001..010, rerun cumulative M11+M12+CPX regressions, publish the R01 builder log, then stop for independent re-audit.
+- Current Milestone: M13 — Remote Manifest & Content Versioning
+- Current Sprint: M13-MASTER — Execute SB-CP02-001..012 continuously, then independent child audits
+- Current Task: SB-CP02-001 — M13 master batch entry point
+- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M13_MASTER_BATCH_AUTHORIZED
+- Next Task/Action: execute only `.hiveai/prompts/M13_CP02_001_012_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP02-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff, writing one separate builder log per child, and stops only after master completion or a true blocker.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M12_CP01_001_010_CPX001_FINAL_CLOSURE_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M13_CP02_001_012_MASTER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M13_CP02_001_012_MASTER_IMPLEMENTATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -176,6 +176,42 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CPX-001 C001-R01 Prompt: `.hiveai/prompts/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_REMEDIATION_PROMPT.md`.
 - SB-CPX-001 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_AUDIT_CRITERIA.md`.
 - SB-CPX-001 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_CODEX_LOG.md`.
+- SB-CPX-001 C001-R01 Implementation Commit: `509082677376a5158f2845b5c172e26a525ca18a`.
+- SB-CPX-001 C001-R01 Final Builder Publication: `49178a7ca1e2c0312818af59cf5b5b411814ecde`.
+- SB-CPX-001 C001-R01 Independent Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CPX-001-C001-R01_CURRENT_PROOF_FRESHNESS_STRICT_REAUDIT.md`.
+- M12 Final Result: `PASS / CLOSED` by `.hiveai/audits/M12_CP01_001_010_CPX001_FINAL_CLOSURE_STRICT_REAUDIT.md`; SB-CP01-001..010 + SB-CPX-001 are complete.
+- M13 Master Authorization: `IMPLEMENT_ALL_THEN_AUDIT / M13_MASTER_BATCH_AUTHORIZED`.
+- M13 Master Prompt: `.hiveai/prompts/M13_CP02_001_012_MASTER_IMPLEMENTATION_PROMPT.md`.
+- M13 Master Audit Wrapper: `.hiveai/audit-criteria/M13_CP02_001_012_MASTER_AUDIT_CRITERIA.md`.
+- M13 Master Builder Log Target: `.hiveai/codex-logs/M13_CP02_001_012_MASTER_CODEX_LOG.md`.
+- M13 Master Execution Order: `SB-CP02-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012`.
+- M13 Master Inter-Child Rule: passing child publishes implementation + separate child log and continues immediately; no ChatGPT/owner handoff between passing children.
+- M13 Master Blocker Rule: only unsafe repository preservation/divergence or an unsatisfiable child contract may stop the batch; ordinary in-scope failures must be remediated before continuing.
+- M13 Post-Builder Audit Rule: ChatGPT independently audits every child against its own criteria, writes one strict audit per child, opens focused remediation only where required, and does not open M14 until all 12 child audits are PASS/CLOSED.
+- SB-CP02-001 C001 Prompt: `.hiveai/prompts/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_PROMPT.md`.
+- SB-CP02-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_AUDIT_CRITERIA.md`.
+- SB-CP02-002 C001 Prompt: `.hiveai/prompts/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_PROMPT.md`.
+- SB-CP02-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_AUDIT_CRITERIA.md`.
+- SB-CP02-003 C001 Prompt: `.hiveai/prompts/SB-CP02-003-C001_MINIMUM_GAME_VERSION_COMPATIBILITY_PROMPT.md`.
+- SB-CP02-003 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-003-C001_MINIMUM_GAME_VERSION_COMPATIBILITY_AUDIT_CRITERIA.md`.
+- SB-CP02-004 C001 Prompt: `.hiveai/prompts/SB-CP02-004-C001_PACK_IDS_LOCATIONS_HASHES_PROMPT.md`.
+- SB-CP02-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-004-C001_PACK_IDS_LOCATIONS_HASHES_AUDIT_CRITERIA.md`.
+- SB-CP02-005 C001 Prompt: `.hiveai/prompts/SB-CP02-005-C001_LEVEL_METADATA_NONCONTIGUOUS_IDS_PROMPT.md`.
+- SB-CP02-005 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-005-C001_LEVEL_METADATA_NONCONTIGUOUS_IDS_AUDIT_CRITERIA.md`.
+- SB-CP02-006 C001 Prompt: `.hiveai/prompts/SB-CP02-006-C001_DISABLED_LEVELS_PROMPT.md`.
+- SB-CP02-006 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-006-C001_DISABLED_LEVELS_AUDIT_CRITERIA.md`.
+- SB-CP02-007 C001 Prompt: `.hiveai/prompts/SB-CP02-007-C001_SCHEDULED_ACTIVATION_WINDOWS_PROMPT.md`.
+- SB-CP02-007 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-007-C001_SCHEDULED_ACTIVATION_WINDOWS_AUDIT_CRITERIA.md`.
+- SB-CP02-008 C001 Prompt: `.hiveai/prompts/SB-CP02-008-C001_REJECT_DUPLICATE_PACK_LEVEL_OWNERSHIP_PROMPT.md`.
+- SB-CP02-008 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-008-C001_REJECT_DUPLICATE_PACK_LEVEL_OWNERSHIP_AUDIT_CRITERIA.md`.
+- SB-CP02-009 C001 Prompt: `.hiveai/prompts/SB-CP02-009-C001_VALIDATE_REFERENCES_BEFORE_PUBLISH_PROMPT.md`.
+- SB-CP02-009 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-009-C001_VALIDATE_REFERENCES_BEFORE_PUBLISH_AUDIT_CRITERIA.md`.
+- SB-CP02-010 C001 Prompt: `.hiveai/prompts/SB-CP02-010-C001_MANIFEST_VERSION_HISTORY_PROMPT.md`.
+- SB-CP02-010 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-010-C001_MANIFEST_VERSION_HISTORY_AUDIT_CRITERIA.md`.
+- SB-CP02-011 C001 Prompt: `.hiveai/prompts/SB-CP02-011-C001_APP_CONTENT_SCHEMA_COMPATIBILITY_PROMPT.md`.
+- SB-CP02-011 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-011-C001_APP_CONTENT_SCHEMA_COMPATIBILITY_AUDIT_CRITERIA.md`.
+- SB-CP02-012 C001 Prompt: `.hiveai/prompts/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_PROMPT.md`.
+- SB-CP02-012 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_AUDIT_CRITERIA.md`.
 - SB-CP00-003 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_CODEX_LOG.md`.
 - SB-CP00-004 C001 Authorization: `IMPLEMENT_THEN_AUDIT / MASTER_CHILD_AUTHORIZED`.
 - SB-CP00-004 C001 Prompt: `.hiveai/prompts/SB-CP00-004-C001_STAGING_PRODUCTION_SEPARATION_PROMPT.md`.
@@ -495,8 +531,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M09: Advanced Generation Research & Semantic Provider Evolution — ACTIVE
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
-- M12: .scrubpack Format & Packager — PLANNED / PARTIALLY EVIDENCED
-- M13: Remote Manifest & Content Versioning — PLANNED
+- M12: .scrubpack Format & Packager — COMPLETE / VERIFIED
+- M13: Remote Manifest & Content Versioning — ACTIVE / MASTER_BATCH_AUTHORIZED
 - M14: Publisher, Staging & Production Promotion — PLANNED / PARTIALLY EVIDENCED
 - M15: Godot Remote Content Runtime — PLANNED
 - M16: Offline Cache & Last-Known-Good Recovery — PLANNED
@@ -974,7 +1010,7 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 
 ### M12.04 - Solver-proven supply identity extension
 
-- [~] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
+- [x] SB-CPX-001 — Bind every explicit production supply plan to the exact solver-proven initial supply state: package `scrubbots.level_supply_plan.v1` inside `.scrubpack` or reference it as a content-addressed declarative artifact; bind LevelData identity, supply-plan SHA-256, exact FIFO columns/batch IDs/colors/counts, column/preview configuration, solver-state digest and solver-evidence digest so the packaged plan can be proven to be the same supply state that received Factory solver PASS. Missing, stale, mutated or cross-level supply identity must fail closed. [EXTENSION]
 
 ---
 
@@ -984,7 +1020,7 @@ Capability source family: `SB-CP02-xxx` from the main Scrubbots master plan.
 
 ### M13.01 - Manifest schema and compatibility versioning
 
-- [ ] SB-CP02-001 — Define versioned manifest schema.
+- [~] SB-CP02-001 — Define versioned manifest schema.
 - [ ] SB-CP02-002 — schema_version + monotonic content_version.
 - [ ] SB-CP02-003 — minimum_game_version compatibility.
 
