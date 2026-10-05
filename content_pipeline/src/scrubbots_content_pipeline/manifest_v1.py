@@ -1,0 +1,134 @@
+"""Immutable, declarative remote content manifest V1 model.
+
+This module owns local manifest shape and canonical serialization only. It does
+not resolve references, access the network, or mutate content.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+
+
+CONTENT_MANIFEST_SCHEMA = "scrubbots.content.manifest.v1"
+CONTENT_MANIFEST_SCHEMA_VERSION = 1
+_PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+_LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+
+
+class ContentManifestError(ValueError):
+    """Raised when a manifest does not satisfy the closed V1 contract."""
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestPackV1:
+    """Stable identity for one provider-neutral pack reference."""
+
+    pack_id: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.pack_id, str) or not _PACK_ID.fullmatch(self.pack_id):
+            raise ContentManifestError("invalid pack_id")
+
+    def to_dict(self) -> dict[str, object]:
+        return {"pack_id": self.pack_id}
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestLevelV1:
+    """Stable level identity and its declared pack owner."""
+
+    level_id: str
+    pack_id: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.level_id, str) or not _LEVEL_ID.fullmatch(self.level_id):
+            raise ContentManifestError("invalid level_id")
+        if not isinstance(self.pack_id, str) or not _PACK_ID.fullmatch(self.pack_id):
+            raise ContentManifestError("invalid pack_id")
+
+    def to_dict(self) -> dict[str, object]:
+        return {"level_id": self.level_id, "pack_id": self.pack_id}
+
+
+@dataclass(frozen=True, slots=True)
+class ContentManifestV1:
+    """Closed immutable manifest root with deterministic pack and level order."""
+
+    packs: tuple[ManifestPackV1, ...] = ()
+    levels: tuple[ManifestLevelV1, ...] = ()
+    schema: str = CONTENT_MANIFEST_SCHEMA
+    schema_version: int = CONTENT_MANIFEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema != CONTENT_MANIFEST_SCHEMA:
+            raise ContentManifestError("unsupported manifest schema")
+        if type(self.schema_version) is not int or self.schema_version != CONTENT_MANIFEST_SCHEMA_VERSION:
+            raise ContentManifestError("unsupported manifest schema_version")
+        if not isinstance(self.packs, tuple) or any(not isinstance(pack, ManifestPackV1) for pack in self.packs):
+            raise ContentManifestError("packs must contain ManifestPackV1 values")
+        if not isinstance(self.levels, tuple) or any(not isinstance(level, ManifestLevelV1) for level in self.levels):
+            raise ContentManifestError("levels must contain ManifestLevelV1 values")
+        pack_ids = [pack.pack_id for pack in self.packs]
+        level_ids = [level.level_id for level in self.levels]
+        if len(pack_ids) != len(set(pack_ids)):
+            raise ContentManifestError("duplicate pack_id")
+        if len(level_ids) != len(set(level_ids)):
+            raise ContentManifestError("duplicate level_id")
+        object.__setattr__(self, "packs", tuple(sorted(self.packs, key=lambda pack: pack.pack_id.encode("ascii"))))
+        object.__setattr__(
+            self,
+            "levels",
+            tuple(sorted(self.levels, key=lambda level: (level.level_id.encode("ascii"), level.pack_id.encode("ascii")))),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        """Return fresh JSON-compatible data in the canonical V1 shape."""
+        return {
+            "schema": self.schema,
+            "schema_version": self.schema_version,
+            "packs": [pack.to_dict() for pack in self.packs],
+            "levels": [level.to_dict() for level in self.levels],
+        }
+
+    def to_json_bytes(self) -> bytes:
+        """Serialize a stable UTF-8 representation with canonical object keys."""
+        return json.dumps(
+            self.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
+
+    @classmethod
+    def from_dict(cls, value: object) -> ContentManifestV1:
+        """Parse a mapping only when every root and item field is explicitly known."""
+        required = {"schema", "schema_version", "packs", "levels"}
+        if not isinstance(value, Mapping) or set(value) != required:
+            raise ContentManifestError("invalid manifest fields")
+        if value["schema"] != CONTENT_MANIFEST_SCHEMA:
+            raise ContentManifestError("unsupported manifest schema")
+        if type(value["schema_version"]) is not int or value["schema_version"] != 1:
+            raise ContentManifestError("unsupported manifest schema_version")
+        if not isinstance(value["packs"], list) or not isinstance(value["levels"], list):
+            raise ContentManifestError("packs and levels must be arrays")
+        packs: list[ManifestPackV1] = []
+        for item in value["packs"]:
+            if not isinstance(item, Mapping) or set(item) != {"pack_id"}:
+                raise ContentManifestError("invalid pack fields")
+            packs.append(ManifestPackV1(item["pack_id"]))
+        levels: list[ManifestLevelV1] = []
+        for item in value["levels"]:
+            if not isinstance(item, Mapping) or set(item) != {"level_id", "pack_id"}:
+                raise ContentManifestError("invalid level fields")
+            levels.append(ManifestLevelV1(item["level_id"], item["pack_id"]))
+        return cls(tuple(packs), tuple(levels), value["schema"], value["schema_version"])
+
+
+__all__ = [
+    "CONTENT_MANIFEST_SCHEMA",
+    "CONTENT_MANIFEST_SCHEMA_VERSION",
+    "ContentManifestError",
+    "ContentManifestV1",
+    "ManifestLevelV1",
+    "ManifestPackV1",
+]

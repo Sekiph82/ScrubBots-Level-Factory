@@ -27,6 +27,14 @@ from .content_boundary import (
     classify_content,
     serialize_result,
 )
+from .manifest_v1 import (
+    CONTENT_MANIFEST_SCHEMA,
+    CONTENT_MANIFEST_SCHEMA_VERSION,
+    ContentManifestError,
+    ContentManifestV1,
+    ManifestLevelV1,
+    ManifestPackV1,
+)
 from .orchestration import (
     EvidenceSink,
     PromotionOrchestrator,
@@ -138,6 +146,12 @@ from .validation import DryRunReport, validate_only
 
 __all__ = [
     "DryRunReport",
+    "CONTENT_MANIFEST_SCHEMA",
+    "CONTENT_MANIFEST_SCHEMA_VERSION",
+    "ContentManifestError",
+    "ContentManifestV1",
+    "ManifestLevelV1",
+    "ManifestPackV1",
     "BOUNDARY_VERSION",
     "ClassificationResult",
     "ContentDisposition",

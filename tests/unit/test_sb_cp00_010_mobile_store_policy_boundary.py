@@ -186,7 +186,15 @@ def test_cp010_adds_no_runtime_provider_network_or_tracker_implementation() -> N
         ["git", "ls-files", "--others", "--exclude-standard", "--", "content_pipeline/src"],
         cwd=ROOT, check=True, capture_output=True, text=True,
     ).stdout.splitlines()
-    assert changed == [] and untracked == []
+    # M13 introduces the authorized declarative manifest model. Keep source
+    # changes bounded to those explicit paths; the checks below still scan the
+    # complete package for provider/network/runtime mutation imports.
+    authorized_m13_sources = {
+        "content_pipeline/src/scrubbots_content_pipeline/__init__.py",
+        "content_pipeline/src/scrubbots_content_pipeline/manifest_v1.py",
+    }
+    assert set(changed) <= authorized_m13_sources
+    assert set(untracked) <= authorized_m13_sources
     assert (ROOT / "TASKS.md").is_file()
     tracker_diff = subprocess.run(
         ["git", "diff", "--quiet", "HEAD", "--", "TASKS.md"], cwd=ROOT, check=False,

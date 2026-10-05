@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrubbots.invalid/content-pipeline/schemas/v1/content-manifest.schema.json",
+  "title": "SCRUBBOTS Remote Content Manifest V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "schema_version", "packs", "levels"],
+  "properties": {
+    "schema": { "const": "scrubbots.content.manifest.v1" },
+    "schema_version": { "type": "integer", "const": 1 },
+    "packs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pack_id"],
+        "properties": {
+          "pack_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" }
+        }
+      }
+    },
+    "levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["level_id", "pack_id"],
+        "properties": {
+          "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+          "pack_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" }
+        }
+      }
+    }
+  }
+}
