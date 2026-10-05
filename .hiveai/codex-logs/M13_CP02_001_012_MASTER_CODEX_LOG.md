@@ -19,7 +19,7 @@ Document role: CODEX BUILDER LOG
 
 ### Implementation and verification
 
-- Child execution, implementation decisions, commands, results, and publication SHAs will be appended here in chronological order before completion.
+- Chronological child execution, verification, blocker, and publication records follow.
 
 ### SB-CP02-001-C001 — Define Versioned Remote Manifest V1 Schema
 
@@ -35,3 +35,5 @@ Document role: CODEX BUILDER LOG
 - Pre-push guard initially failed because PowerShell compared the tab-delimited git rev-list --left-right --count output as a literal string. Observed output was 4 ahead / 0 behind; no push was attempted. The guard will split and compare both numeric fields.
 
 - The first post-push guard printed equal HEAD/origin SHA and 0/0 but then failed its literal tab-delimited string comparison. A corrected numeric-field check passed with status clean; no additional push was made by that guard.
+
+- Final child/master log update was published in commit 7e17f0546fe3a68dcab9a97680d3e8576e47a3d3 by normal non-force push. The final fetch after that push verified HEAD == origin/main, 0/0 divergence, and a clean execution worktree. The child 001 builder log remains the latest published child log; no child 002 work began.
