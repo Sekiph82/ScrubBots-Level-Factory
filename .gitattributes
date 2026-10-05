@@ -1,1 +1,4 @@
-tools/scrubbots_canonical_bridge_runner.gd text eol=lf
+# These files are raw-byte provenance evidence; line-ending conversion changes
+# their recorded SHA-256 and invalidates canonical JSON byte comparisons.
+tests/fixtures/sb_cp00_003_r01/*.json -text
+content_pipeline/policy/mobile_store_policy_boundary_v1.json -text
