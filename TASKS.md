@@ -4,21 +4,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M11 — Content Platform Architecture & Security Boundary
-- Current Sprint: SB-CP00-010-C001 — Mobile/store-policy boundary re-verification
-- Current Task: SB-CP00-010 — Re-verify mobile/store-policy boundary before release
-- Current Task Status: IMPLEMENT_THEN_AUDIT / AUTHORIZED
-- Next Task/Action: SB-CP00-010 executes only `.hiveai/prompts/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_PROMPT.md`; first synchronize GitHub/local authority, re-fetch current official Apple/Google policy sources, publish policy-boundary evidence and tests without adding runtime/provider mutation, then stop for independent audit.
+- Current Milestone: M12 — .scrubpack Format & Packager
+- Current Sprint: M12-MASTER — Execute SB-CP01-001..010 + SB-CPX-001 continuously, then independent child audits
+- Current Task: SB-CP01-001 — M12 master batch entry point
+- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M12_MASTER_BATCH_AUTHORIZED
+- Next Task/Action: execute only `.hiveai/prompts/M12_CP01_001_010_CPX001_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP01-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-001 without inter-child handoff, writing one separate builder log per child, and stops only after master completion or a true blocker.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M11_CP00_003_009_FINAL_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M12_CP01_001_010_CPX001_MASTER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M12_CP01_001_010_CPX001_MASTER_IMPLEMENTATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -127,6 +127,39 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP00-010 C001 Prompt: `.hiveai/prompts/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_PROMPT.md`.
 - SB-CP00-010 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_AUDIT_CRITERIA.md`.
 - SB-CP00-010 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_REVERIFICATION_CODEX_LOG.md`.
+- SB-CP00-010 C001 Implementation Commit: `76860f85401240ed5680bdf93d4bbec355d22691`.
+- SB-CP00-010 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP00-010-C001_MOBILE_STORE_POLICY_BOUNDARY_STRICT_AUDIT.md`.
+- M11 Final Result: `PASS / CLOSED`; SB-CP00-001..010 complete. M20 policy re-check remains mandatory before production.
+- M12 Master Authorization: `IMPLEMENT_ALL_THEN_AUDIT / M12_MASTER_BATCH_AUTHORIZED`.
+- M12 Master Prompt: `.hiveai/prompts/M12_CP01_001_010_CPX001_MASTER_IMPLEMENTATION_PROMPT.md`.
+- M12 Master Audit Wrapper: `.hiveai/audit-criteria/M12_CP01_001_010_CPX001_MASTER_AUDIT_CRITERIA.md`.
+- M12 Master Builder Log Target: `.hiveai/codex-logs/M12_CP01_001_010_CPX001_MASTER_CODEX_LOG.md`.
+- M12 Master Execution Order: `SB-CP01-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-001`.
+- M12 Master Inter-Child Rule: passing child publishes implementation + separate builder log and continues immediately; no ChatGPT/owner handoff between passing children.
+- M12 Master Blocker Rule: only unsafe repository preservation/divergence or an unsatisfiable child contract may stop the batch; ordinary in-scope test failures must be remediated before continuing.
+- M12 Post-Builder Audit Rule: ChatGPT independently audits every child against its own criteria, writes one strict audit per child, opens focused remediation only where required, and does not open M13 until all 11 child audits are PASS/CLOSED.
+- SB-CP01-001 C001 Prompt: `.hiveai/prompts/SB-CP01-001-C001_SCRUBPACK_V1_SPEC_PROMPT.md`.
+- SB-CP01-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-001-C001_SCRUBPACK_V1_SPEC_AUDIT_CRITERIA.md`.
+- SB-CP01-002 C001 Prompt: `.hiveai/prompts/SB-CP01-002-C001_PACKAGE_DECLARATIVE_LEVELS_ONLY_PROMPT.md`.
+- SB-CP01-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-002-C001_PACKAGE_DECLARATIVE_LEVELS_ONLY_AUDIT_CRITERIA.md`.
+- SB-CP01-003 C001 Prompt: `.hiveai/prompts/SB-CP01-003-C001_PACK_ID_VERSION_TIME_LEVELS_PROMPT.md`.
+- SB-CP01-003 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-003-C001_PACK_ID_VERSION_TIME_LEVELS_AUDIT_CRITERIA.md`.
+- SB-CP01-004 C001 Prompt: `.hiveai/prompts/SB-CP01-004-C001_PER_PACK_SHA256_PROMPT.md`.
+- SB-CP01-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-004-C001_PER_PACK_SHA256_AUDIT_CRITERIA.md`.
+- SB-CP01-005 C001 Prompt: `.hiveai/prompts/SB-CP01-005-C001_DETERMINISTIC_PACK_SERIALIZATION_ORDER_PROMPT.md`.
+- SB-CP01-005 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-005-C001_DETERMINISTIC_PACK_SERIALIZATION_ORDER_AUDIT_CRITERIA.md`.
+- SB-CP01-006 C001 Prompt: `.hiveai/prompts/SB-CP01-006-C001_DUPLICATE_LEVEL_ID_PREVENTION_PROMPT.md`.
+- SB-CP01-006 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-006-C001_DUPLICATE_LEVEL_ID_PREVENTION_AUDIT_CRITERIA.md`.
+- SB-CP01-007 C001 Prompt: `.hiveai/prompts/SB-CP01-007-C001_VALIDATE_EVERY_LEVEL_BEFORE_PACK_PROMPT.md`.
+- SB-CP01-007 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-007-C001_VALIDATE_EVERY_LEVEL_BEFORE_PACK_AUDIT_CRITERIA.md`.
+- SB-CP01-008 C001 Prompt: `.hiveai/prompts/SB-CP01-008-C001_SAFE_UNPACK_INSPECT_TOOLING_PROMPT.md`.
+- SB-CP01-008 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-008-C001_SAFE_UNPACK_INSPECT_TOOLING_AUDIT_CRITERIA.md`.
+- SB-CP01-009 C001 Prompt: `.hiveai/prompts/SB-CP01-009-C001_DETERMINISTIC_SCRUBPACK_BYTES_PROMPT.md`.
+- SB-CP01-009 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-009-C001_DETERMINISTIC_SCRUBPACK_BYTES_AUDIT_CRITERIA.md`.
+- SB-CP01-010 C001 Prompt: `.hiveai/prompts/SB-CP01-010-C001_UNSUPPORTED_PACK_VERSION_REJECTION_PROMPT.md`.
+- SB-CP01-010 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP01-010-C001_UNSUPPORTED_PACK_VERSION_REJECTION_AUDIT_CRITERIA.md`.
+- SB-CPX-001 C001 Prompt: `.hiveai/prompts/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_PROMPT.md`.
+- SB-CPX-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-001-C001_SOLVER_PROVEN_SUPPLY_IDENTITY_PACK_BINDING_AUDIT_CRITERIA.md`.
 - SB-CP00-003 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP00-003-C001_DECLARATIVE_ONLY_REMOTE_PAYLOAD_POLICY_CODEX_LOG.md`.
 - SB-CP00-004 C001 Authorization: `IMPLEMENT_THEN_AUDIT / MASTER_CHILD_AUTHORIZED`.
 - SB-CP00-004 C001 Prompt: `.hiveai/prompts/SB-CP00-004-C001_STAGING_PRODUCTION_SEPARATION_PROMPT.md`.
@@ -896,7 +929,7 @@ Capability source family: `SB-CP00-xxx` from the main Scrubbots master plan.
 
 - [x] SB-CP00-008 — Provider abstraction. [PARTIAL]
 - [x] SB-CP00-009 — Content Pipeline GitHub coordination under ChatGPT-owned root tracker. [MIGRATION]
-- [~] SB-CP00-010 — Re-verify mobile/store-policy boundary before release.
+- [x] SB-CP00-010 — Re-verify mobile/store-policy boundary before release.
 
 ---
 
@@ -906,7 +939,7 @@ Capability source family: `SB-CP01-xxx` from the main Scrubbots master plan.
 
 ### M12.01 - Pack spec, declarative payload and metadata
 
-- [ ] SB-CP01-001 — Define versioned .scrubpack spec.
+- [~] SB-CP01-001 — Define versioned .scrubpack spec.
 - [ ] SB-CP01-002 — Package declarative levels only. [PARTIAL]
 - [ ] SB-CP01-003 — Record pack ID/version/time/levels. [PARTIAL]
 
