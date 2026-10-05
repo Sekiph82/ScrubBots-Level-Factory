@@ -59,4 +59,7 @@ Continue appending cumulative/regression/full-suite results, commits, publicatio
 
 ## Publication and parity
 
-Append the separate builder-log commit, fetched divergence, normal push result, final local/origin SHAs, and final clean status after publication.
+- Separate builder-log commit before parity entry: `ac9edf565c9f59fb16ecefb73cd109815098676c`.
+- Pre-push `git fetch --prune origin`: execution HEAD `ac9edf565c9f59fb16ecefb73cd109815098676c`, `origin/main` `a8842169f1ee88d030a668a77f8691aadee95820`, 2 ahead / 0 behind, clean worktree.
+- Normal non-force `git push origin HEAD:main` succeeded; origin advanced from Child 10 close `a8842169f1ee88d030a668a77f8691aadee95820` to `ac9edf565c9f59fb16ecefb73cd109815098676c`.
+- Post-push fetch confirmed execution HEAD == `origin/main` == `ac9edf565c9f59fb16ecefb73cd109815098676c`, 0 ahead / 0 behind, clean worktree. A final log-only parity note follows in its own commit.
