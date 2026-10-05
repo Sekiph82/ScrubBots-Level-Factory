@@ -104,3 +104,13 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 6 log: `.hiveai/codex-logs/SB-CP01-006-C001_DUPLICATE_LEVEL_ID_PREVENTION_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
 - Child 6 implementation push advanced `main` to `48816e828ec7ab4187952e9172252ed97acbf3a7`; post-push fetch confirmed 0/0. Separate log publication is pending.
 - Separate Child 6 builder-log/master-progress commit: `005a4052b60af304c613dc2c36c482a372872858`. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, `0/0`, clean. Child 6 implementation and log commits are separate; Child 7 begins after master closure below.
+
+### SB-CP01-007-C001 implementation and regression record
+
+- Child base SHA: `7482a34e7061bca5524f8543aca4814d0c8966fe`.
+- Implementation commit: `72897860d3fb9b6624fa710c319b9e08188da337`.
+- Added mandatory all-level preflight with deterministic per-role diagnostics; failures return no artifact/success evidence, successful evidence retains the accepted validation report. Existing M11 validators remain authoritative; the transaction never runs gameplay solver logic. Details are in the Child 7 builder log.
+- Focused: 62 passed. Cumulative CP00/M11 + prior M12: 225 passed. Governance: 13 passed. Full pytest: 1,394 passed, 3 skipped in 1,153.77 seconds. Compileall, schema parse, and diff check passed.
+- No product-test failures; one read-only `rg` glob failed due to PowerShell path syntax and was corrected. No protected tracker/audit, dependency/license, provider/network, credential, solver/gameplay, or production-game changes.
+- Child 7 log: `.hiveai/codex-logs/SB-CP01-007-C001_VALIDATE_EVERY_LEVEL_BEFORE_PACK_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
+- Child 7 implementation push advanced `main` to `72897860d3fb9b6624fa710c319b9e08188da337`; post-push fetch confirmed 0/0. Separate log publication is pending.
