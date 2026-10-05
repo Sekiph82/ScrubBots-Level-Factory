@@ -82,3 +82,13 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 4 builder log: `.hiveai/codex-logs/SB-CP01-004-C001_PER_PACK_SHA256_CODEX_LOG.md`. Implementation push and separate log commit/parity are pending.
 - Child 4 implementation push advanced `main` to `0a59b432325e8963925e2117fdaed6ec85bad1d8`; post-push fetch confirmed 0/0 parity. Separate child-log publication remains pending.
 - Separate Child 4 builder-log/master-progress commit: `45151900acab507ecfe624b3ebcb17e84e3ff2bb`. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main at this commit, `0/0`, clean. Child 4 implementation and log commits are distinct. Child 5 begins from the master closure commit below.
+
+### SB-CP01-005-C001 implementation and regression record
+
+- Child base SHA: `35941dc53a46d7509d4f5af4e9164e9a334e8ff0`.
+- Implementation commit: `2689001b538cf56f8004a4c0e26ce84b3e1a3cf4`.
+- Canonical JSON encoding and explicit case-sensitive ASCII-byte level/member order make logical pack members independent of caller input order. Strict parsing rejects unordered manifests; payload bytes remain exact and ZIP-header normalization remains Child 9 scope.
+- Focused: 58 passed. Cumulative CP00/M11 + prior M12: 221 passed. Governance: 13 passed. Full pytest: 1,390 passed, 3 skipped in 1,072.83 seconds. Compileall, schema parse, and diff check passed.
+- No failures in this child. No protected tracker/audit, dependency/license, runtime/provider, credential, or production-game changes. Required verifier remained in pytest temporary storage.
+- Child 5 log: `.hiveai/codex-logs/SB-CP01-005-C001_DETERMINISTIC_PACK_SERIALIZATION_ORDER_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
+- Child 5 implementation push advanced main to `2689001b538cf56f8004a4c0e26ce84b3e1a3cf4`; post-push fetch confirmed 0/0. Separate builder-log commit and parity are pending.
