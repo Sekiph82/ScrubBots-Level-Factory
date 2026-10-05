@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scrubbots.invalid/content-pipeline/schemas/v1/scrubpack-manifest.schema.json",
+  "title": "SCRUBBOTS Scrubpack V1 Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "mediaType", "levels"],
+  "properties": {
+    "schema": { "const": "scrubbots.scrubpack.manifest.v1" },
+    "version": { "const": 1 },
+    "mediaType": { "const": "application/vnd.scrubbots.scrubpack+zip" },
+    "levels": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "files"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+          "files": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["levelData", "supplyPlan", "metadata"],
+            "properties": {
+              "levelData": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/level\\.json$" },
+              "supplyPlan": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/supply-plan\\.json$" },
+              "metadata": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/metadata\\.json$" }
+            }
+          }
+        }
+      }
+    }
+  }
+}
