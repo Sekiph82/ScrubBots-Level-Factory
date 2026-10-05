@@ -20,6 +20,8 @@ The format reuses the existing Content Pipeline allow-listed payload families an
 
 The machine-readable manifest contract is `content_pipeline/schemas/v1/scrubpack-manifest.schema.json`; the corresponding minimal Python model and path helpers are in `scrubbots_content_pipeline.scrubpack_spec`.
 
+The local `scrubbots_content_pipeline.build_scrubpack()` API accepts an explicit sequence of level inputs. Each input carries the exact descriptor and bytes for Level Data, supply plan, and metadata; a caller may construct those byte inputs from named local files with `ScrubpackPayloadInput.from_path()`. The builder validates each descriptor and payload with the existing Content Boundary and payload validator before writing any ZIP member. It returns archive bytes and frozen evidence. It does not enumerate directories or contact a remote service.
+
 ## Fixed member layout
 
 Each level ID matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. Its three files have fixed paths derived from that ID:
@@ -41,6 +43,6 @@ Every permitted entry is a regular JSON data file. Symlinks, encrypted or specia
 
 ## Versioning and deterministic extensions
 
-This document fixes the V1 container identity, member paths, payload families, and safety boundary. Pack identity/version/time metadata, digest binding, duplicate prevention, full per-level validation, safe inspection/extraction behavior, and byte-for-byte deterministic ZIP serialization are defined by their separately ordered M12 children. A pack SHA-256 is external evidence and is never embedded in the bytes it hashes. Deterministic code receives time as explicit input.
+This document fixes the V1 container identity, member paths, payload families, and safety boundary. The initial builder validates each explicitly supplied payload with its M11 validator. Pack identity/version/time metadata, pack digest binding, complete cross-payload validation, safe inspection/extraction behavior, and byte-for-byte deterministic ZIP serialization are defined by their separately ordered M12 children. A pack SHA-256 is external evidence and is never embedded in the bytes it hashes. Deterministic code receives time as explicit input.
 
 The container has no network, provider, upload, CDN, credential, or runtime dependency. It does not authorize publishing or gameplay mutation.

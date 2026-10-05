@@ -41,6 +41,16 @@ from .payload_validation import (
     serialize_payload_result,
     validate_remote_payload,
 )
+from .scrubpack_builder import (
+    ScrubpackBuildError,
+    ScrubpackBuildEvidence,
+    ScrubpackBuildResult,
+    ScrubpackLevelEvidence,
+    ScrubpackLevelInput,
+    ScrubpackPayloadEvidence,
+    ScrubpackPayloadInput,
+    build_scrubpack,
+)
 from .publication_plan import (
     PUBLICATION_PLAN_VERSION,
     ExpectedReleaseState,
@@ -132,6 +142,14 @@ __all__ = [
     "PayloadValidationResult",
     "serialize_payload_result",
     "validate_remote_payload",
+    "ScrubpackBuildError",
+    "ScrubpackBuildEvidence",
+    "ScrubpackBuildResult",
+    "ScrubpackLevelEvidence",
+    "ScrubpackLevelInput",
+    "ScrubpackPayloadEvidence",
+    "ScrubpackPayloadInput",
+    "build_scrubpack",
     "PUBLICATION_PLAN_VERSION",
     "ExpectedReleaseState",
     "PlanCheck",
