@@ -140,3 +140,12 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 9 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 55fabe03dea56c092e6768167b8eeb0ba39b5c0, 0/0. Separate Child 9 builder-log/master-progress publication and closure remain.
 
 - Separate Child 9 builder-log/master-progress commit: 747fde42f4092ef9e237d25f2f61a2e54e446d7f. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 9 implementation commits and builder-log commit are separate. Child 9 is closed; Child 10 begins from this SHA.
+
+### SB-CP01-010-C001 implementation and regression record
+
+- Child base SHA: `159270ca785f81665a111f900c7e29ffeaa55be4`.
+- Implementation commit: `3f51c51aaaca8405283fceed8ad89157da474897`.
+- Reader/writer support is explicitly V1 only. Manifest and all three member version/schema identities are checked deterministically before extraction; invalid inputs preserve the source pack and create no destination.
+- Focused pack tests: 81 passed. Cumulative CP00/M11 + prior M12: 244 passed. Governance: 13 passed. Full pytest: 1,413 passed, 3 skipped in 1,132.21 seconds. Compileall and diff check passed.
+- Initial new tests had a missing constant import; fixed and all runs now pass. No dependency/license, runtime/provider/network, credentials, game, tracker, or audit changes. Implementation push and separate log publication are pending.
+- Child 10 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 3f51c51aaaca8405283fceed8ad89157da474897, 0/0. Separate Child 10 builder-log/master-progress commit and closure remain.
