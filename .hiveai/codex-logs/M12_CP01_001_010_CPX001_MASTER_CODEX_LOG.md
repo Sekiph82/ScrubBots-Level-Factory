@@ -115,3 +115,15 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 7 log: `.hiveai/codex-logs/SB-CP01-007-C001_VALIDATE_EVERY_LEVEL_BEFORE_PACK_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
 - Child 7 implementation push advanced `main` to `72897860d3fb9b6624fa710c319b9e08188da337`; post-push fetch confirmed 0/0. Separate log publication is pending.
 - Separate Child 7 builder-log/master-progress commit: `fc189c1700b7e70c1317db20f82c8a91de3611f0`. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, `0/0`, clean. Child 7 implementation/log commits are separate; Child 8 begins after master closure below.
+
+### SB-CP01-008-C001 implementation and regression record
+
+- Child base SHA: `a7af6017adc13bca611fec7db5422b9ddb6f5186`.
+- Implementation commits: `399e4a2b576eb30f75022606ad83bbc25c35a211` (inspect/extract API, CLI, docs, tests) and `4734932b5c8d9b268a1f4a7e561b97ef1e86243d` (filesystem-capable implementation isolated behind the stable API).
+- Added local read-only ZIP/manifest/member integrity inspection and optional transactional extraction to a new explicit destination. Existing destinations, traversal, collisions, special/executable/encrypted/compressed entries, malformed V1 manifests, and SHA mismatches fail closed. Human and JSON output are available; payloads are never executed/imported/loaded. See Child 8 log for details.
+- Focused pack suite: 67 passed. Cumulative CP00/M11 + prior M12 + Child 8: 230 passed. Governance: 13 passed. Full pytest: 1,399 passed, 3 skipped in 1,148.42 seconds. Compileall, schema parse, and diff check passed.
+- Initial inspector defects were corrected. The existing AST check required filesystem-capable code to be in a subpackage; CP010 then required committing source before cumulative success. No governance tests/rules were modified; final runs pass.
+- No protected tracker/audit, dependencies/license, runtime/provider/network, credentials, or production-game changes. Required verifier remained in temporary storage.
+- Child 8 log: `.hiveai/codex-logs/SB-CP01-008-C001_SAFE_UNPACK_INSPECT_TOOLING_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
+
+- Child 8 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 4734932b5c8d9b268a1f4a7e561b97ef1e86243d, 0/0. Separate Child 8 builder-log/master-progress commit and closure are pending.
