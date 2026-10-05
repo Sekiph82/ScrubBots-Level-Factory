@@ -27,7 +27,7 @@ Document role: CODEX BUILDER LOG
 - Implementation files: immutable closed V1 manifest model/schema, canonical empty fixture, documentation, exports, focused tests, and a bounded CP010 source-change guard update.
 - Focused child test: **9 passed** after correcting a canonical-fixture formatting mismatch (initial run: 1 failed, 8 passed).
 - M11/M12 + governance + child 001 regression set: **261 passed** after updating the inherited CP010 guard (initial run: 260 passed, 1 failed because it rejected all source additions).
-- `compileall`: PASS. Content Pipeline schema/policy/example JSON parse: PASS (17 files). `git diff --check`: PASS. Protected tracker/audit paths unchanged.
+- `compileall`: PASS. Content Pipeline schema/policy/example JSON parse: PASS (17 files). `git diff --check`: PASS. Protected tracker/audit paths unchanged. The first staged `git diff --cached --check` found extra blank lines at log EOF; normalized to one final newline and reran successfully.
 - Full `python -m pytest -q`: started, then stopped before completion after the suite launched Godot with `C:\Users\sekip\Desktop\Scrubbots` as project root. This separate checkout is outside the task's authorized scope. No full-suite result is claimed; child 001 cannot be marked green on current evidence.
 - Blocker disposition: stop the master batch before child 002 unless a full-suite route can be run without accessing that separate project. No subsequent children were started.
-- Child implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`. Child log commit, push, and final parity: pending.
+- Child implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`; separate child/master log commit: `55f009b0900dcaf97afadeaf53571ae47937f1dc`. Push and final parity: pending.
