@@ -17,8 +17,10 @@ from typing import Any
 from ..payload_validation import MAX_PAYLOAD_BYTES
 from ..scrubpack_spec import (
     PACK_MANIFEST_PATH,
+    SCRUBPACK_SCHEMA,
     ScrubpackManifestV1,
     ScrubpackSpecError,
+    SUPPORTED_SCRUBPACK_VERSIONS,
     expected_member_names,
     validate_member_names,
 )
@@ -35,6 +37,8 @@ _MESSAGES = {
     "UNSUPPORTED_ZIP_METADATA": "Archive contains unsupported, encrypted, executable, or special entries.",
     "INVALID_MEMBER_LAYOUT": "Archive member paths or order do not match the V1 manifest.",
     "INVALID_MANIFEST": "Root manifest is malformed or unsupported.",
+    "UNSUPPORTED_VERSION": "Archive uses a pack or payload contract version this reader does not support.",
+    "INVALID_MEMBER_VERSION": "A payload version marker or schema identity is missing or malformed.",
     "MEMBER_DIGEST_MISMATCH": "A member's exact bytes do not match its manifest SHA-256.",
     "DESTINATION_INVALID": "Destination parent is unavailable or the destination is not a valid new directory path.",
     "DESTINATION_EXISTS": "Destination already exists; extraction will not overwrite it.",
@@ -92,6 +96,43 @@ def _reject_duplicate_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
 
 def _failure(reason_code: str) -> ScrubpackInspectionResult:
     return ScrubpackInspectionResult(False, reason_code)
+
+
+def _manifest_version_reason(value: object) -> str | None:
+    if not isinstance(value, dict) or "schema" not in value or "version" not in value:
+        return "INVALID_MANIFEST"
+    schema = value["schema"]
+    version = value["version"]
+    if not isinstance(schema, str) or type(version) is not int or version <= 0:
+        return "INVALID_MANIFEST"
+    if schema != SCRUBPACK_SCHEMA or version not in SUPPORTED_SCRUBPACK_VERSIONS:
+        return "UNSUPPORTED_VERSION"
+    return None
+
+
+def _payload_version_reason(name: str, payload: bytes) -> str | None:
+    try:
+        value = json.loads(payload.decode("utf-8"), object_pairs_hook=_reject_duplicate_keys)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError, RecursionError):
+        return "INVALID_MEMBER_VERSION"
+    if not isinstance(value, dict) or "version" not in value:
+        return "INVALID_MEMBER_VERSION"
+    version = value["version"]
+    if type(version) is not int or version <= 0:
+        return "INVALID_MEMBER_VERSION"
+    if version != 1:
+        return "UNSUPPORTED_VERSION"
+    expected_schema = {
+        "level.json": None,
+        "supply-plan.json": "scrubbots.level_supply_plan.v1",
+        "metadata.json": "scrubbots.level.metadata.v1",
+    }[name.rsplit("/", 1)[-1]]
+    if expected_schema is None:
+        if "schema" in value:
+            return "UNSUPPORTED_VERSION" if isinstance(value["schema"], str) else "INVALID_MEMBER_VERSION"
+    elif value.get("schema") != expected_schema:
+        return "UNSUPPORTED_VERSION" if isinstance(value.get("schema"), str) else "INVALID_MEMBER_VERSION"
+    return None
 
 
 def _read_local_archive(path: str | os.PathLike[str]) -> bytes | ScrubpackInspectionResult:
@@ -152,6 +193,9 @@ def _inspect_archive_bytes(raw: bytes) -> ScrubpackInspectionResult:
             try:
                 manifest_bytes = archive.read(PACK_MANIFEST_PATH)
                 manifest_data = json.loads(manifest_bytes, object_pairs_hook=_reject_duplicate_keys)
+                version_reason = _manifest_version_reason(manifest_data)
+                if version_reason is not None:
+                    return _failure(version_reason)
                 manifest = ScrubpackManifestV1.from_dict(manifest_data)
                 expected_names = expected_member_names(manifest.levels)
             except (OSError, ValueError, TypeError, KeyError, ScrubpackSpecError):
@@ -168,6 +212,13 @@ def _inspect_archive_bytes(raw: bytes) -> ScrubpackInspectionResult:
                     return _failure("INVALID_ZIP")
                 if digest.hexdigest() != expected_digest:
                     return _failure("MEMBER_DIGEST_MISMATCH")
+                try:
+                    payload = archive.read(path)
+                except (OSError, RuntimeError, zipfile.BadZipFile, KeyError):
+                    return _failure("INVALID_ZIP")
+                version_reason = _payload_version_reason(path, payload)
+                if version_reason is not None:
+                    return _failure(version_reason)
             return ScrubpackInspectionResult(
                 accepted=True,
                 reason_code="VALID",

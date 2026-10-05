@@ -17,6 +17,7 @@ from typing import Iterable
 SCRUBPACK_EXTENSION = ".scrubpack"
 SCRUBPACK_SCHEMA = "scrubbots.scrubpack.manifest.v1"
 SCRUBPACK_VERSION = 1
+SUPPORTED_SCRUBPACK_VERSIONS = frozenset({SCRUBPACK_VERSION})
 SCRUBPACK_MEDIA_TYPE = "application/vnd.scrubbots.scrubpack+zip"
 PACK_MANIFEST_PATH = "pack.json"
 LEVELS_DIRECTORY = "levels"
@@ -125,7 +126,11 @@ class ScrubpackManifestV1:
     media_type: str = SCRUBPACK_MEDIA_TYPE
 
     def __post_init__(self) -> None:
-        if self.schema != SCRUBPACK_SCHEMA or type(self.version) is not int or self.version != SCRUBPACK_VERSION:
+        if (
+            self.schema != SCRUBPACK_SCHEMA
+            or type(self.version) is not int
+            or self.version not in SUPPORTED_SCRUBPACK_VERSIONS
+        ):
             raise ScrubpackSpecError("unsupported scrubpack manifest contract")
         if self.media_type != SCRUBPACK_MEDIA_TYPE:
             raise ScrubpackSpecError("unsupported scrubpack media type")
@@ -276,6 +281,7 @@ __all__ = [
     "SCRUBPACK_MEDIA_TYPE",
     "SCRUBPACK_SCHEMA",
     "SCRUBPACK_VERSION",
+    "SUPPORTED_SCRUBPACK_VERSIONS",
     "ScrubpackLevelV1",
     "ScrubpackManifestV1",
     "ScrubpackSpecError",

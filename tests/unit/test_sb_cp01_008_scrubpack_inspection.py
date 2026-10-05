@@ -22,6 +22,10 @@ from scrubbots_content_pipeline import (  # noqa: E402
     inspect_scrubpack,
 )
 from scrubbots_content_pipeline.cli import main  # noqa: E402
+from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
+    PACK_MANIFEST_PATH,
+    SUPPORTED_SCRUBPACK_VERSIONS,
+)
 
 
 EXAMPLES = CONTENT_PIPELINE / "schemas" / "v1" / "examples"
@@ -155,7 +159,7 @@ def test_inspection_rejects_corrupt_zip_wrong_layout_manifest_and_digest(tmp_pat
         return info, data
 
     archive_path.write_bytes(_rewrite(valid, mutate_manifest))
-    assert inspect_scrubpack(archive_path).reason_code == "INVALID_MANIFEST"
+    assert inspect_scrubpack(archive_path).reason_code == "UNSUPPORTED_VERSION"
 
     def tamper_payload(info, data):
         if info.filename.endswith("/level.json"):
@@ -164,6 +168,100 @@ def test_inspection_rejects_corrupt_zip_wrong_layout_manifest_and_digest(tmp_pat
 
     archive_path.write_bytes(_rewrite(valid, tamper_payload))
     assert inspect_scrubpack(archive_path).reason_code == "MEMBER_DIGEST_MISMATCH"
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "remove", "expected"),
+    (
+        ("version", None, True, "INVALID_MANIFEST"),
+        ("schema", None, True, "INVALID_MANIFEST"),
+        ("version", True, False, "INVALID_MANIFEST"),
+        ("version", "1", False, "INVALID_MANIFEST"),
+        ("version", 0, False, "INVALID_MANIFEST"),
+        ("version", -1, False, "INVALID_MANIFEST"),
+        ("version", 2, False, "UNSUPPORTED_VERSION"),
+        ("schema", "scrubbots.scrubpack.manifest.v2", False, "UNSUPPORTED_VERSION"),
+    ),
+)
+def test_inspection_and_extraction_reject_malformed_or_unsupported_manifest_version(
+    tmp_path: Path, field: str, value: object, remove: bool, expected: str
+) -> None:
+    archive_path = tmp_path / "versioned.scrubpack"
+    destination = tmp_path / "extract-versioned"
+    raw = _pack_bytes()
+
+    def alter_manifest(info, data):
+        if info.filename == PACK_MANIFEST_PATH:
+            manifest = json.loads(data)
+            if remove:
+                manifest.pop(field)
+            else:
+                manifest[field] = value
+            return info, _json_bytes(manifest)
+        return info, data
+
+    archive_path.write_bytes(_rewrite(raw, alter_manifest))
+    source_before = archive_path.read_bytes()
+    inspected = inspect_scrubpack(archive_path)
+    assert inspected.reason_code == expected
+    extracted = extract_scrubpack(archive_path, destination)
+    assert extracted.reason_code == expected
+    assert archive_path.read_bytes() == source_before
+    assert not destination.exists()
+
+
+@pytest.mark.parametrize(
+    ("member_name", "field", "value", "expected"),
+    (
+        ("levels/inspect-level/level.json", "version", 2, "UNSUPPORTED_VERSION"),
+        (
+            "levels/inspect-level/supply-plan.json",
+            "schema",
+            "scrubbots.level_supply_plan.v2",
+            "UNSUPPORTED_VERSION",
+        ),
+        ("levels/inspect-level/metadata.json", "version", True, "INVALID_MEMBER_VERSION"),
+    ),
+)
+def test_inspection_rejects_mixed_or_malformed_member_contract_versions(
+    tmp_path: Path, member_name: str, field: str, value: object, expected: str
+) -> None:
+    raw = _pack_bytes()
+    with ZipFile(io.BytesIO(raw)) as source:
+        entries = {info.filename: (info, source.read(info.filename)) for info in source.infolist()}
+    member_info, member_bytes = entries[member_name]
+    member_value = json.loads(member_bytes)
+    member_value[field] = value
+    member_bytes = _json_bytes(member_value)
+    entries[member_name] = (member_info, member_bytes)
+    manifest_info, manifest_bytes = entries[PACK_MANIFEST_PATH]
+    manifest = json.loads(manifest_bytes)
+    role = {
+        "levels/inspect-level/level.json": "levelData",
+        "levels/inspect-level/supply-plan.json": "supplyPlan",
+        "levels/inspect-level/metadata.json": "metadata",
+    }[member_name]
+    manifest["levels"][0]["sha256"][role] = hashlib.sha256(member_bytes).hexdigest()
+    entries[PACK_MANIFEST_PATH] = (manifest_info, _json_bytes(manifest))
+    rewritten = io.BytesIO()
+    with ZipFile(rewritten, "w", compression=ZIP_STORED) as target:
+        for info, data in entries.values():
+            target.writestr(info, data)
+
+    archive_path = tmp_path / "mixed-versions.scrubpack"
+    destination = tmp_path / "must-not-extract"
+    archive_path.write_bytes(rewritten.getvalue())
+    source_before = archive_path.read_bytes()
+    inspected = inspect_scrubpack(archive_path)
+    assert inspected.reason_code == expected
+    extracted = extract_scrubpack(archive_path, destination)
+    assert extracted.reason_code == expected
+    assert archive_path.read_bytes() == source_before
+    assert not destination.exists()
+
+
+def test_supported_scrubpack_version_set_is_explicitly_v1_only() -> None:
+    assert SUPPORTED_SCRUBPACK_VERSIONS == frozenset({1})
 
 
 def test_inspection_rejects_duplicate_paths_and_symlinks(tmp_path: Path) -> None:
