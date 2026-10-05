@@ -19,7 +19,7 @@ Document role: CODEX BUILDER LOG
 - M11/M12, governance, and child regression command: `python -m pytest -q` over all `tests/unit/test_sb_cp00_*.py`, `tests/unit/test_sb_cp01_*.py`, `tests/unit/test_sb_lf00_007_governance_authority.py`, and the child 001 test. Initial run had 260 passed / 1 failed on the inherited CP010 source-change guard described above. After the bounded guard update, rerun passed **261**.
 - `python -m compileall -q content_pipeline/src`: passed.
 - PowerShell JSON parse of all Content Pipeline schema/policy JSON plus the new minimal fixture: passed (17 files).
-- `git diff --check`: passed. Protected path check for `TASKS.md` and `.hiveai/audits/**`: no changes.
+- `git diff --check`: passed. Protected path check for `TASKS.md` and `.hiveai/audits/**`: no changes. The first staged `git diff --cached --check` found an extra blank line at each log EOF; both logs were normalized to one final newline and the staged check then passed.
 - `python -m pytest -q` was started as required for the full suite. During the run, the suite launched a Godot integration test whose process command pointed to the separate `C:\Users\sekip\Desktop\Scrubbots` project. That checkout is outside this task's authorized execution scope. I stopped the run before it completed. No full-suite result is claimed; full pytest remains unverified.
 
 ### Scope and safety
