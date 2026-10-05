@@ -29,7 +29,9 @@ from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
 
 def test_versioned_manifest_model_and_fixed_paths_are_explicit() -> None:
     level = ScrubpackLevelV1("level-001")
-    manifest = ScrubpackManifestV1((level,))
+    manifest = ScrubpackManifestV1(
+        (level,), pack_id="pack-001", pack_version=1, created_at_utc="2026-10-05T10:00:00Z"
+    )
     assert SCRUBPACK_EXTENSION == ".scrubpack"
     assert (manifest.schema, manifest.version, manifest.media_type) == (
         SCRUBPACK_SCHEMA,
@@ -40,6 +42,10 @@ def test_versioned_manifest_model_and_fixed_paths_are_explicit() -> None:
         "schema": "scrubbots.scrubpack.manifest.v1",
         "version": 1,
         "mediaType": "application/vnd.scrubbots.scrubpack+zip",
+        "packId": "pack-001",
+        "packVersion": 1,
+        "createdAtUtc": "2026-10-05T10:00:00Z",
+        "levelCount": 1,
         "levels": [
             {
                 "id": "level-001",
@@ -58,6 +64,23 @@ def test_versioned_manifest_model_and_fixed_paths_are_explicit() -> None:
         "levels/level-001/supply-plan.json",
         "levels/level-001/metadata.json",
     )
+    assert ScrubpackManifestV1.from_dict(manifest.to_dict()) == manifest
+
+
+def test_manifest_round_trip_rejects_count_and_path_identity_mismatches() -> None:
+    manifest = ScrubpackManifestV1(
+        (ScrubpackLevelV1("level-001"),),
+        pack_id="pack-001",
+        pack_version=1,
+        created_at_utc="2026-10-05T10:00:00Z",
+    ).to_dict()
+    manifest["levelCount"] = 2
+    with pytest.raises(ScrubpackSpecError, match="level count mismatch"):
+        ScrubpackManifestV1.from_dict(manifest)
+    manifest["levelCount"] = 1
+    manifest["levels"][0]["files"]["levelData"] = "levels/other/level.json"
+    with pytest.raises(ScrubpackSpecError, match="paths do not match"):
+        ScrubpackManifestV1.from_dict(manifest)
 
 
 @pytest.mark.parametrize(
@@ -100,7 +123,12 @@ def test_duplicate_archive_names_and_duplicate_level_ids_fail_closed() -> None:
     name = "levels/level-001/level.json"
     assert not validate_member_names((PACK_MANIFEST_PATH, name, name))
     with pytest.raises(ScrubpackSpecError, match="duplicate level ID"):
-        ScrubpackManifestV1((ScrubpackLevelV1("level-001"), ScrubpackLevelV1("level-001")))
+        ScrubpackManifestV1(
+            (ScrubpackLevelV1("level-001"), ScrubpackLevelV1("level-001")),
+            pack_id="pack-001",
+            pack_version=1,
+            created_at_utc="2026-10-05T10:00:00Z",
+        )
 
 
 @pytest.mark.parametrize("level_id", ("../escape", "a/b", "", "x" * 65, "has space"))
@@ -116,6 +144,11 @@ def test_manifest_schema_is_closed_and_binds_v1_media_identity() -> None:
     assert schema["properties"]["schema"]["const"] == SCRUBPACK_SCHEMA
     assert schema["properties"]["version"]["const"] == SCRUBPACK_VERSION
     assert schema["properties"]["mediaType"]["const"] == SCRUBPACK_MEDIA_TYPE
+    assert schema["properties"]["packVersion"]["minimum"] == 1
+    assert schema["properties"]["levelCount"]["minimum"] == 1
+    assert schema["required"] == [
+        "schema", "version", "mediaType", "packId", "packVersion", "createdAtUtc", "levelCount", "levels"
+    ]
     assert set(schema["properties"]["levels"]["items"]["properties"]["files"]["properties"]) == {
         "levelData",
         "supplyPlan",

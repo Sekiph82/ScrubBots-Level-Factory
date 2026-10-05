@@ -6,7 +6,9 @@ This module describes the container contract. It does not read or write ZIPs.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Iterable
 
 
@@ -18,6 +20,8 @@ PACK_MANIFEST_PATH = "pack.json"
 LEVELS_DIRECTORY = "levels"
 
 _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
+_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$")
 _LEVEL_MEMBER = re.compile(
     r"^levels/([A-Za-z0-9][A-Za-z0-9._-]{0,63})/(level|supply-plan|metadata)\.json$"
 )
@@ -25,6 +29,22 @@ _LEVEL_MEMBER = re.compile(
 
 class ScrubpackSpecError(ValueError):
     """Raised when a logical member name or level identity violates V1."""
+
+
+def normalize_created_at_utc(value: str | datetime) -> str:
+    """Validate explicit timezone-aware time and serialize canonical UTC seconds."""
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str) and _TIMESTAMP.fullmatch(value):
+        try:
+            parsed = datetime.fromisoformat(value[:-1] + "+00:00" if value.endswith("Z") else value)
+        except ValueError as exc:
+            raise ScrubpackSpecError("invalid created_at_utc timestamp") from exc
+    else:
+        raise ScrubpackSpecError("created_at_utc must include an explicit timezone")
+    if parsed.tzinfo is None or parsed.utcoffset() is None or parsed.microsecond != 0:
+        raise ScrubpackSpecError("created_at_utc must be timezone-aware whole seconds")
+    return parsed.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +79,9 @@ class ScrubpackManifestV1:
     """Minimal versioned manifest model for the V1 declarative layout."""
 
     levels: tuple[ScrubpackLevelV1, ...]
+    pack_id: str
+    pack_version: int
+    created_at_utc: str | datetime
     schema: str = SCRUBPACK_SCHEMA
     version: int = SCRUBPACK_VERSION
     media_type: str = SCRUBPACK_MEDIA_TYPE
@@ -68,6 +91,13 @@ class ScrubpackManifestV1:
             raise ScrubpackSpecError("unsupported scrubpack manifest contract")
         if self.media_type != SCRUBPACK_MEDIA_TYPE:
             raise ScrubpackSpecError("unsupported scrubpack media type")
+        if not isinstance(self.pack_id, str) or not _PACK_ID.fullmatch(self.pack_id):
+            raise ScrubpackSpecError("invalid pack ID")
+        if type(self.pack_version) is not int or self.pack_version <= 0:
+            raise ScrubpackSpecError("pack version must be a positive integer")
+        object.__setattr__(self, "created_at_utc", normalize_created_at_utc(self.created_at_utc))
+        if not self.levels:
+            raise ScrubpackSpecError("at least one level is required")
         ids = [level.level_id for level in self.levels]
         if len(ids) != len(set(ids)):
             raise ScrubpackSpecError("duplicate level ID")
@@ -77,6 +107,10 @@ class ScrubpackManifestV1:
             "schema": self.schema,
             "version": self.version,
             "mediaType": self.media_type,
+            "packId": self.pack_id,
+            "packVersion": self.pack_version,
+            "createdAtUtc": self.created_at_utc,
+            "levelCount": len(self.levels),
             "levels": [
                 {
                     "id": level.level_id,
@@ -89,6 +123,46 @@ class ScrubpackManifestV1:
                 for level in self.levels
             ],
         }
+
+    @classmethod
+    def from_dict(cls, value: object) -> ScrubpackManifestV1:
+        """Validate and recover exact V1 identity, count, and ordered membership."""
+        required = {
+            "schema", "version", "mediaType", "packId", "packVersion",
+            "createdAtUtc", "levelCount", "levels",
+        }
+        if not isinstance(value, Mapping) or set(value) != required:
+            raise ScrubpackSpecError("invalid manifest fields")
+        raw_levels = value["levels"]
+        if type(value["levelCount"]) is not int or not isinstance(raw_levels, list):
+            raise ScrubpackSpecError("invalid manifest level count or membership")
+        if value["levelCount"] != len(raw_levels):
+            raise ScrubpackSpecError("manifest level count mismatch")
+        levels: list[ScrubpackLevelV1] = []
+        for raw_level in raw_levels:
+            if not isinstance(raw_level, Mapping) or set(raw_level) != {"id", "files"}:
+                raise ScrubpackSpecError("invalid manifest level entry")
+            level = ScrubpackLevelV1(raw_level["id"])
+            files = raw_level["files"]
+            if not isinstance(files, Mapping) or set(files) != {"levelData", "supplyPlan", "metadata"}:
+                raise ScrubpackSpecError("invalid manifest level file map")
+            expected = {
+                "levelData": level.level_data_path,
+                "supplyPlan": level.supply_plan_path,
+                "metadata": level.metadata_path,
+            }
+            if dict(files) != expected:
+                raise ScrubpackSpecError("manifest level paths do not match level identity")
+            levels.append(level)
+        return cls(
+            levels=tuple(levels),
+            pack_id=value["packId"],
+            pack_version=value["packVersion"],
+            created_at_utc=value["createdAtUtc"],
+            schema=value["schema"],
+            version=value["version"],
+            media_type=value["mediaType"],
+        )
 
 
 def validate_member_name(name: object) -> bool:
@@ -114,8 +188,12 @@ def validate_member_names(names: Iterable[object]) -> bool:
 def expected_member_names(levels: Iterable[ScrubpackLevelV1]) -> tuple[str, ...]:
     """Return the fixed member set in caller-provided level order."""
     level_list = tuple(levels)
-    manifest = ScrubpackManifestV1(level_list)
-    return (PACK_MANIFEST_PATH, *(path for level in manifest.levels for path in level.member_paths))
+    ids = [level.level_id for level in level_list]
+    if len(ids) != len(set(ids)):
+        raise ScrubpackSpecError("duplicate level ID")
+    if not level_list:
+        raise ScrubpackSpecError("at least one level is required")
+    return (PACK_MANIFEST_PATH, *(path for level in level_list for path in level.member_paths))
 
 
 __all__ = [
@@ -129,6 +207,7 @@ __all__ = [
     "ScrubpackManifestV1",
     "ScrubpackSpecError",
     "expected_member_names",
+    "normalize_created_at_utc",
     "validate_member_name",
     "validate_member_names",
 ]

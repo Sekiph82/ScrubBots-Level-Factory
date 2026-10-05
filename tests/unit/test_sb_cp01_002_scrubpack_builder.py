@@ -6,6 +6,7 @@ import io
 import json
 import sys
 from dataclasses import FrozenInstanceError
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -21,7 +22,11 @@ from scrubbots_content_pipeline import (  # noqa: E402
     ScrubpackPayloadInput,
     build_scrubpack,
 )
-from scrubbots_content_pipeline.scrubpack_spec import PACK_MANIFEST_PATH  # noqa: E402
+from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
+    PACK_MANIFEST_PATH,
+    ScrubpackManifestV1,
+    normalize_created_at_utc,
+)
 
 
 EXAMPLES = CONTENT_PIPELINE / "schemas" / "v1" / "examples"
@@ -96,14 +101,33 @@ def _level(level_id: str = "level-001") -> ScrubpackLevelInput:
     )
 
 
+def _build(
+    levels,
+    *,
+    pack_id: str = "test-pack",
+    pack_version: int = 1,
+    created_at_utc: str = "2026-10-05T10:00:00Z",
+) -> object:
+    return build_scrubpack(
+        levels,
+        pack_id=pack_id,
+        pack_version=pack_version,
+        created_at_utc=created_at_utc,
+    )
+
+
 def test_builder_packages_only_validated_payloads_at_fixed_paths() -> None:
     level = _level()
-    result = build_scrubpack((level,))
+    result = _build((level,))
     with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
         assert tuple(archive.namelist()) == result.evidence.member_names
         manifest = json.loads(archive.read(PACK_MANIFEST_PATH))
         assert manifest["schema"] == "scrubbots.scrubpack.manifest.v1"
         assert manifest["version"] == 1
+        assert manifest["packId"] == "test-pack"
+        assert manifest["packVersion"] == 1
+        assert manifest["createdAtUtc"] == "2026-10-05T10:00:00Z"
+        assert manifest["levelCount"] == len(manifest["levels"]) == 1
         assert manifest["levels"][0]["id"] == "level-001"
         assert archive.read("levels/level-001/level.json") == level.level_data.payload
         assert archive.read("levels/level-001/supply-plan.json") == level.supply_plan.payload
@@ -120,7 +144,7 @@ def test_builder_accepts_only_the_three_expected_contract_families() -> None:
     rejected = ScrubpackPayloadInput(descriptor, level.level_data.payload)
     invalid_level = ScrubpackLevelInput("level-001", rejected, level.supply_plan, level.metadata)
     with pytest.raises(ScrubpackBuildError, match="descriptor rejected"):
-        build_scrubpack((invalid_level,))
+        _build((invalid_level,))
 
 
 def test_builder_rejects_arbitrary_input_paths_and_payload_digest_mutation() -> None:
@@ -129,27 +153,93 @@ def test_builder_rejects_arbitrary_input_paths_and_payload_digest_mutation() -> 
     descriptor["logical_path"] = "images/level-001.png"
     invalid_path = ScrubpackPayloadInput(descriptor, level.level_data.payload)
     with pytest.raises(ScrubpackBuildError, match="descriptor rejected"):
-        build_scrubpack((ScrubpackLevelInput("level-001", invalid_path, level.supply_plan, level.metadata),))
+        _build((ScrubpackLevelInput("level-001", invalid_path, level.supply_plan, level.metadata),))
 
     tampered = ScrubpackPayloadInput(level.level_data.descriptor, level.level_data.payload + b" ")
     with pytest.raises(ScrubpackBuildError, match="DIGEST_MISMATCH"):
-        build_scrubpack((ScrubpackLevelInput("level-001", tampered, level.supply_plan, level.metadata),))
+        _build((ScrubpackLevelInput("level-001", tampered, level.supply_plan, level.metadata),))
 
 
 def test_builder_binds_all_three_descriptors_to_the_explicit_level_identity() -> None:
     level = _level()
     other = _payload("metadata", "level-002")
     with pytest.raises(ScrubpackBuildError, match="descriptor level identity mismatch"):
-        build_scrubpack((ScrubpackLevelInput("level-001", level.level_data, level.supply_plan, other),))
+        _build((ScrubpackLevelInput("level-001", level.level_data, level.supply_plan, other),))
 
 
 def test_builder_rejects_duplicate_and_implicit_level_inputs() -> None:
     with pytest.raises(ScrubpackBuildError, match="duplicate level ID"):
-        build_scrubpack((_level(), _level()))
+        _build((_level(), _level()))
     with pytest.raises(ScrubpackBuildError, match="at least one level"):
-        build_scrubpack(())
+        _build(())
     with pytest.raises(ScrubpackBuildError, match="explicit sequence"):
-        build_scrubpack(iter((_level(),)))  # type: ignore[arg-type]
+        _build(iter((_level(),)))  # type: ignore[arg-type]
+
+
+def test_pack_identity_and_explicit_utc_time_round_trip_in_exact_level_order() -> None:
+    result = _build(
+        (_level("level-z"), _level("level-a")),
+        pack_id="release-pack-01",
+        pack_version=7,
+        created_at_utc="2026-10-05T13:00:00+03:00",
+    )
+    assert result.evidence.pack_id == "release-pack-01"
+    assert result.evidence.pack_version == 7
+    assert result.evidence.created_at_utc == "2026-10-05T10:00:00Z"
+    assert result.evidence.level_count == 2
+    assert result.evidence.level_ids == ("level-z", "level-a")
+    with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
+        restored = json.loads(archive.read(PACK_MANIFEST_PATH))
+    restored_model = ScrubpackManifestV1.from_dict(restored)
+    assert restored_model == ScrubpackManifestV1.from_dict(restored_model.to_dict())
+    assert restored["packId"] == "release-pack-01"
+    assert restored["packVersion"] == 7
+    assert restored["createdAtUtc"] == "2026-10-05T10:00:00Z"
+    assert restored["levelCount"] == 2
+    assert tuple(level["id"] for level in restored["levels"]) == ("level-z", "level-a")
+
+
+@pytest.mark.parametrize("pack_id", ("", "../escape", "Uppercase", "has space", "x" * 65))
+def test_malformed_pack_ids_fail_closed(pack_id: str) -> None:
+    with pytest.raises(ScrubpackBuildError, match="invalid pack ID"):
+        _build((_level(),), pack_id=pack_id)
+
+
+@pytest.mark.parametrize("pack_version", (0, -1, True, 1.0))
+def test_nonpositive_or_noninteger_pack_versions_fail_closed(pack_version: object) -> None:
+    with pytest.raises(ScrubpackBuildError, match="positive integer"):
+        _build((_level(),), pack_version=pack_version)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    "created_at_utc",
+    (
+        "",
+        "2026-10-05T10:00:00",
+        "2026-02-30T10:00:00Z",
+        "2026-10-05T10:00:00.500Z",
+        "not-a-timestamp",
+    ),
+)
+def test_invalid_or_ambiguous_timestamps_fail_closed(created_at_utc: str) -> None:
+    with pytest.raises(ScrubpackBuildError, match="created_at_utc"):
+        _build((_level(),), created_at_utc=created_at_utc)
+
+
+def test_builder_has_no_hidden_wall_clock_dependency() -> None:
+    source_path = CONTENT_PIPELINE / "src" / "scrubbots_content_pipeline" / "scrubpack_builder.py"
+    source = source_path.read_text(encoding="utf-8")
+    assert "datetime.now" not in source
+    assert "utcnow" not in source
+    with pytest.raises(TypeError):
+        build_scrubpack((_level(),))  # type: ignore[call-arg]
+
+
+def test_timezone_aware_datetime_is_normalized_and_naive_datetime_is_rejected() -> None:
+    explicit = datetime(2026, 10, 5, 13, 0, tzinfo=timezone(timedelta(hours=3)))
+    assert normalize_created_at_utc(explicit) == "2026-10-05T10:00:00Z"
+    with pytest.raises(ScrubpackBuildError, match="created_at_utc"):
+        _build((_level(),), created_at_utc=datetime(2026, 10, 5, 10, 0))  # type: ignore[arg-type]
 
 
 def test_builder_can_read_only_the_explicit_local_file_and_does_not_discover_neighbors(tmp_path: Path) -> None:
@@ -160,7 +250,7 @@ def test_builder_can_read_only_the_explicit_local_file_and_does_not_discover_nei
     unrelated.write_text("raise RuntimeError('must never be read')", encoding="utf-8")
     source = ScrubpackPayloadInput.from_path(level.level_data.descriptor, explicit)
     file_level = ScrubpackLevelInput("level-001", source, level.supply_plan, level.metadata)
-    result = build_scrubpack((file_level,))
+    result = _build((file_level,))
     with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
         assert tuple(archive.namelist()) == result.evidence.member_names
         assert all("script.py" not in name for name in archive.namelist())
@@ -168,7 +258,7 @@ def test_builder_can_read_only_the_explicit_local_file_and_does_not_discover_nei
 
 
 def test_build_result_and_evidence_are_immutable() -> None:
-    result = build_scrubpack((_level(),))
+    result = _build((_level(),))
     with pytest.raises(FrozenInstanceError):
         result.evidence.version = 2  # type: ignore[misc]
     with pytest.raises(FrozenInstanceError):

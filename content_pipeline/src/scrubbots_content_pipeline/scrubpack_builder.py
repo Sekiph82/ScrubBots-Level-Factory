@@ -8,6 +8,7 @@ import json
 import zipfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from types import MappingProxyType
 from typing import Any
@@ -107,6 +108,10 @@ class ScrubpackLevelEvidence:
 @dataclass(frozen=True, slots=True)
 class ScrubpackBuildEvidence:
     version: int
+    pack_id: str
+    pack_version: int
+    created_at_utc: str
+    level_count: int
     level_ids: tuple[str, ...]
     member_names: tuple[str, ...]
     levels: tuple[ScrubpackLevelEvidence, ...]
@@ -148,8 +153,14 @@ def _validated_payload(
     return source.payload, evidence
 
 
-def build_scrubpack(levels: Sequence[ScrubpackLevelInput]) -> ScrubpackBuildResult:
-    """Build an in-memory V1 ZIP from only the explicit validated level inputs."""
+def build_scrubpack(
+    levels: Sequence[ScrubpackLevelInput],
+    *,
+    pack_id: str,
+    pack_version: int,
+    created_at_utc: str | datetime,
+) -> ScrubpackBuildResult:
+    """Build an in-memory V1 ZIP using explicit immutable identity/time inputs."""
     if isinstance(levels, (str, bytes, bytearray)) or not isinstance(levels, Sequence):
         raise ScrubpackBuildError("levels must be an explicit sequence")
     level_inputs = tuple(levels)
@@ -160,7 +171,12 @@ def build_scrubpack(levels: Sequence[ScrubpackLevelInput]) -> ScrubpackBuildResu
 
     level_specs = tuple(ScrubpackLevelV1(level.level_id) for level in level_inputs)
     try:
-        manifest = ScrubpackManifestV1(level_specs)
+        manifest = ScrubpackManifestV1(
+            levels=level_specs,
+            pack_id=pack_id,
+            pack_version=pack_version,
+            created_at_utc=created_at_utc,
+        )
     except ScrubpackSpecError as exc:
         raise ScrubpackBuildError(str(exc)) from exc
     member_names = expected_member_names(level_specs)
@@ -190,6 +206,10 @@ def build_scrubpack(levels: Sequence[ScrubpackLevelInput]) -> ScrubpackBuildResu
 
     evidence = ScrubpackBuildEvidence(
         version=SCRUBPACK_VERSION,
+        pack_id=manifest.pack_id,
+        pack_version=manifest.pack_version,
+        created_at_utc=manifest.created_at_utc,
+        level_count=len(manifest.levels),
         level_ids=tuple(level.level_id for level in level_inputs),
         member_names=member_names,
         levels=tuple(level_evidence),

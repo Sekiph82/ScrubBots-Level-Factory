@@ -13,12 +13,13 @@ The format reuses the existing Content Pipeline allow-listed payload families an
 - Manifest path: `pack.json` at the archive root.
 - Manifest schema: `scrubbots.scrubpack.manifest.v1`, version `1`.
 - Container media type: `application/vnd.scrubbots.scrubpack+zip`.
+- Each manifest records a lowercase pack ID, positive pack version, explicit timezone-aware creation time normalized to whole-second UTC `Z`, exact ordered level membership, and matching level count.
 - Manifest media type: `application/vnd.scrubbots.scrubpack.manifest+json`.
 - Per-level data media type: `application/vnd.scrubbots.level+json`.
 - Per-level supply-plan media type: `application/vnd.scrubbots.supply-plan+json`.
 - Per-level metadata media type: `application/vnd.scrubbots.approved-metadata+json`.
 
-The machine-readable manifest contract is `content_pipeline/schemas/v1/scrubpack-manifest.schema.json`; the corresponding minimal Python model and path helpers are in `scrubbots_content_pipeline.scrubpack_spec`.
+The machine-readable manifest contract is `content_pipeline/schemas/v1/scrubpack-manifest.schema.json`; the corresponding Python model, path helpers, and strict `from_dict()` round-trip validator are in `scrubbots_content_pipeline.scrubpack_spec`. The model rejects level-count mismatches and paths that do not match their level IDs.
 
 The local `scrubbots_content_pipeline.build_scrubpack()` API accepts an explicit sequence of level inputs. Each input carries the exact descriptor and bytes for Level Data, supply plan, and metadata; a caller may construct those byte inputs from named local files with `ScrubpackPayloadInput.from_path()`. The builder validates each descriptor and payload with the existing Content Boundary and payload validator before writing any ZIP member. It returns archive bytes and frozen evidence. It does not enumerate directories or contact a remote service.
 
@@ -43,6 +44,6 @@ Every permitted entry is a regular JSON data file. Symlinks, encrypted or specia
 
 ## Versioning and deterministic extensions
 
-This document fixes the V1 container identity, member paths, payload families, and safety boundary. The initial builder validates each explicitly supplied payload with its M11 validator. Pack identity/version/time metadata, pack digest binding, complete cross-payload validation, safe inspection/extraction behavior, and byte-for-byte deterministic ZIP serialization are defined by their separately ordered M12 children. A pack SHA-256 is external evidence and is never embedded in the bytes it hashes. Deterministic code receives time as explicit input.
+This document fixes the V1 container identity, member paths, payload families, pack identity/version/time, exact ordered level membership, and safety boundary. The builder validates each explicitly supplied payload with its M11 validator and never reads the wall clock. Pack digest binding, complete cross-payload validation, safe inspection/extraction behavior, and byte-for-byte deterministic ZIP serialization are defined by their separately ordered M12 children. A pack SHA-256 is external evidence and is never embedded in the bytes it hashes. Deterministic code receives time as explicit input.
 
 The container has no network, provider, upload, CDN, credential, or runtime dependency. It does not authorize publishing or gameplay mutation.
