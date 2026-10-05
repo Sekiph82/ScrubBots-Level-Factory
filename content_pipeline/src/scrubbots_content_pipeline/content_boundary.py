@@ -123,7 +123,7 @@ _EXECUTABLE_REFERENCE = re.compile(
     r"(?:res|user)://|\$\{|\{\{.*\}\}|"
     r"\.(?:gd|py|pyc|cs|js|exe|dll|so|dylib|pyd|wasm|jar|class|tscn|tres|res|scn|shader|gdshader)\b)"
 )
-_LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 
 

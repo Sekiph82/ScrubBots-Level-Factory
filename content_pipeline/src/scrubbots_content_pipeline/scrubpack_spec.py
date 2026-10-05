@@ -22,12 +22,12 @@ SCRUBPACK_MEDIA_TYPE = "application/vnd.scrubbots.scrubpack+zip"
 PACK_MANIFEST_PATH = "pack.json"
 LEVELS_DIRECTORY = "levels"
 
-_LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _LEVEL_MEMBER = re.compile(
-    r"^levels/([A-Za-z0-9][A-Za-z0-9._-]{0,63})/(level|supply-plan|metadata)\.json$"
+    r"^levels/([A-Za-z0-9][A-Za-z0-9._-]{0,127})/(level|supply-plan|metadata)\.json$"
 )
 
 

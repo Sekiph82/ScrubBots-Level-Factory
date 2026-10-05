@@ -56,6 +56,14 @@ from .scrubpack_builder import (
     validate_scrubpack_levels,
     verify_scrubpack_build,
 )
+from .scrubpack_solver_identity import (
+    SOLVER_IDENTITY_ARTIFACT_SCHEMA,
+    SOLVER_IDENTITY_SCHEMA,
+    ScrubpackSolverIdentityError,
+    ScrubpackSolverProof,
+    build_solver_proven_scrubpack,
+    verify_solver_proven_scrubpack,
+)
 from .scrubpack_inspection import (
     MAX_SCRUBPACK_ARCHIVE_BYTES,
     MAX_SCRUBPACK_MEMBERS,
@@ -167,6 +175,12 @@ __all__ = [
     "build_scrubpack",
     "validate_scrubpack_levels",
     "verify_scrubpack_build",
+    "SOLVER_IDENTITY_ARTIFACT_SCHEMA",
+    "SOLVER_IDENTITY_SCHEMA",
+    "ScrubpackSolverIdentityError",
+    "ScrubpackSolverProof",
+    "build_solver_proven_scrubpack",
+    "verify_solver_proven_scrubpack",
     "MAX_SCRUBPACK_ARCHIVE_BYTES",
     "MAX_SCRUBPACK_MEMBERS",
     "ScrubpackInspectionResult",

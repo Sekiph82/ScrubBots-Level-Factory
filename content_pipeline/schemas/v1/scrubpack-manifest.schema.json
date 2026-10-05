@@ -21,15 +21,15 @@
         "additionalProperties": false,
         "required": ["id", "files", "sha256"],
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
           "files": {
             "type": "object",
             "additionalProperties": false,
             "required": ["levelData", "supplyPlan", "metadata"],
             "properties": {
-              "levelData": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/level\\.json$" },
-              "supplyPlan": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/supply-plan\\.json$" },
-              "metadata": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/metadata\\.json$" }
+              "levelData": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,127}/level\\.json$" },
+              "supplyPlan": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,127}/supply-plan\\.json$" },
+              "metadata": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,127}/metadata\\.json$" }
             }
           },
           "sha256": {

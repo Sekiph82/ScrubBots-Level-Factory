@@ -65,7 +65,7 @@
           "additionalProperties": false,
           "required": ["level_id", "payload_sha256", "width", "height"],
           "properties": {
-            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
             "payload_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "width": { "type": "integer", "minimum": 1, "maximum": 256 },
             "height": { "type": "integer", "minimum": 1, "maximum": 256 }
@@ -94,7 +94,7 @@
           "additionalProperties": false,
           "required": ["level_id", "supply_plan_sha256", "columns", "preview_depth"],
           "properties": {
-            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
             "supply_plan_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "columns": { "enum": [3, 4, 5] },
             "preview_depth": { "const": 3 }
@@ -130,7 +130,7 @@
             "preview_depth"
           ],
           "properties": {
-            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+            "level_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
             "payload_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "width": { "type": "integer", "minimum": 1, "maximum": 256 },
             "height": { "type": "integer", "minimum": 1, "maximum": 256 },

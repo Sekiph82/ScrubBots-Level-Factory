@@ -606,6 +606,15 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         load_check = verify_exported_supply(files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project")) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
         if load_check.get("state") != "READY":
             raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")
+        from .supply_pipeline.scrubpack_identity import derive_solver_supply_identity
+        level_bytes = Path(str(files["level"])).read_bytes()
+        plan_bytes = Path(str(files["supply_plan"])).read_bytes()
+        solver_supply_identity = derive_solver_supply_identity(level_bytes, plan_bytes, result, rules.authority)
+        result["solver_supply_identity"] = solver_supply_identity
+        Path(str(files["result"])).write_text(
+            json.dumps({key: value for key, value in result.items() if not key.startswith("_")}, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
         solve = "PASS" if result.get("solver_status") == "SOLVED" else "FAIL"
         replay = "PASS" if result.get("solution_final") == "WIN" else "FAIL"
         difficulty = "PASS" if result.get("difficulty") is not None and str(result.get("difficulty_basis", "")).startswith("ScrubBots Difficulty V1") else "FAIL"
@@ -620,7 +629,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             "schema": "scrubbots-primary-supply-pipeline/v1", "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "state": "READY", "disposition": "READY",
             "level_id": level_id, "column_count": selected, "visible_preview_depth": 3, "output": str(output_dir), "files": files,
             "authority": rules.authority, "acceptance": {"solver": "ScrubBots SolvabilitySolver", "replay": result["solution_final"], "difficulty": result["difficulty_basis"], "solver_status": result["solver_status"]},
-            "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "load_check": load_check, "result": {key: value for key, value in result.items() if not key.startswith("_")},
+            "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "load_check": load_check, "solver_supply_identity": solver_supply_identity, "result": {key: value for key, value in result.items() if not key.startswith("_")},
         }
         disposition = "READY"
     except (FileNotFoundError, NoValidSupply, OSError, RuntimeError, ValueError, StudioExtensionError) as exc:

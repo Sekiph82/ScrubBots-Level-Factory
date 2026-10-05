@@ -7,6 +7,7 @@ official Difficulty V1 measurement for a full-canvas level.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Callable
 
@@ -88,6 +89,24 @@ def run_primary_supply_pipeline(
             progress=progress,
         )
         files = SupplyExporter(rules).export(result, output_path, level_id)
+        if files.get("level") and files.get("supply_plan"):
+            from .scrubpack_identity import derive_solver_supply_identity
+
+            identity = derive_solver_supply_identity(
+                Path(files["level"]).read_bytes(),
+                Path(files["supply_plan"]).read_bytes(),
+                result,
+                rules.authority,
+            )
+            result["solver_supply_identity"] = identity
+            Path(files["result"]).write_text(
+                json.dumps(
+                    {key: value for key, value in result.items() if not key.startswith("_")},
+                    indent=2,
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
     except (NoValidSupply, OSError, RuntimeError, ValueError) as exc:
         return {
             "schema": PIPELINE_SCHEMA,
@@ -122,6 +141,7 @@ def run_primary_supply_pipeline(
             "difficulty": result["difficulty_basis"],
             "solver_status": result["solver_status"],
         },
+        "solver_supply_identity": result.get("solver_supply_identity"),
         "difficulty": {
             "class": result["difficulty"],
             "score": result["difficulty_score"],

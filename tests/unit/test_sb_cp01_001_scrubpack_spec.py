@@ -174,10 +174,15 @@ def test_case_normalized_ids_and_archive_paths_fail_closed() -> None:
     ))
 
 
-@pytest.mark.parametrize("level_id", ("../escape", "a/b", "", "x" * 65, "has space"))
+@pytest.mark.parametrize("level_id", ("../escape", "a/b", "", "x" * 129, "has space"))
 def test_level_id_cannot_escape_or_change_the_path_grammar(level_id: str) -> None:
     with pytest.raises(ScrubpackSpecError, match="invalid level ID"):
         ScrubpackLevelV1(level_id)
+
+
+def test_long_canonical_factory_level_id_stays_a_safe_scrubpack_path() -> None:
+    level_id = "candidate-owner-" + "a" * 80
+    assert len(ScrubpackLevelV1(level_id).member_paths[0]) > 64
 
 
 def test_manifest_schema_is_closed_and_binds_v1_media_identity() -> None:

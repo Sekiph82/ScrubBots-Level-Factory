@@ -169,12 +169,14 @@ class ScrubpackBuildEvidence:
     member_names: tuple[str, ...]
     levels: tuple[ScrubpackLevelEvidence, ...]
     validation_report: ScrubpackValidationReport
+    solver_identity_artifact_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class ScrubpackBuildResult:
     archive_bytes: bytes
     evidence: ScrubpackBuildEvidence
+    solver_identity_artifact_bytes: bytes | None = None
 
 
 def _validated_payload(
@@ -381,7 +383,12 @@ def build_scrubpack(
     return ScrubpackBuildResult(archive_bytes=archive_bytes, evidence=evidence)
 
 
-def verify_scrubpack_build(archive_bytes: bytes, evidence: ScrubpackBuildEvidence) -> bool:
+def verify_scrubpack_build(
+    archive_bytes: bytes,
+    evidence: ScrubpackBuildEvidence,
+    *,
+    solver_identity_artifact_bytes: bytes | None = None,
+) -> bool:
     """Verify exact archive bytes, receipt identity, and each manifest member digest."""
     if type(archive_bytes) is not bytes or not isinstance(evidence, ScrubpackBuildEvidence):
         return False
@@ -389,6 +396,13 @@ def verify_scrubpack_build(archive_bytes: bytes, evidence: ScrubpackBuildEvidenc
         return False
     if hashlib.sha256(archive_bytes).hexdigest() != evidence.archive_sha256:
         return False
+    if evidence.solver_identity_artifact_sha256 is not None:
+        if (
+            type(solver_identity_artifact_bytes) is not bytes
+            or hashlib.sha256(solver_identity_artifact_bytes).hexdigest()
+            != evidence.solver_identity_artifact_sha256
+        ):
+            return False
     try:
         with zipfile.ZipFile(io.BytesIO(archive_bytes), mode="r") as archive:
             names = tuple(archive.namelist())

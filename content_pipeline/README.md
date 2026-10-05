@@ -157,6 +157,30 @@ that include executable fields or script references fail closed as
 `APP_OWNED` or `REJECTED`. A future content family is ineligible until its
 versioned contract and classification rules are explicitly added.
 
+## Solver-proven supply identity
+
+`build_solver_proven_scrubpack()` packages the ordinary V1 archive together
+with a detached, content-addressed identity artifact. The artifact binds each
+exact LevelData and `scrubbots.level_supply_plan.v1` byte digest, FIFO batch
+order and identity, supply configuration, canonical initial-state digest,
+solver PASS/replay digest, and source READY pipeline/review authority. Its
+digest is carried in `ScrubpackBuildEvidence`; callers can verify the archive
+and artifact together with `verify_solver_proven_scrubpack()`.
+
+Proof resolution reads current canonical Factory evidence. It prefers a live
+owner-accepted Release Pool entry; when a READY candidate has a current owner
+ACCEPT review but the separate Release Pool gate does not admit it, it binds
+the current READY pipeline and exact source files directly. It never reruns or
+reimplements the solver. Proof resolution rejects stale owner reviews and
+pipeline evidence; packaging then rejects changed level, plan, FIFO order,
+state digest, or solver result before returning a pack. The artifact stays
+separate from the V1 archive so existing archive members and pack inspection
+compatibility stay unchanged.
+
+Level IDs retain their path-safe ASCII character set and are limited to 128
+characters, allowing exact current Factory candidate IDs to remain intact in
+pack manifests and member paths.
+
 `validate_remote_payload(descriptor, payload)` adds payload-level validation
 for descriptors already classified as `REMOTE_DECLARATIVE`. Prefer UTF-8
 payload bytes so the declared SHA-256 binds to those exact bytes; parsed data is
