@@ -6,6 +6,7 @@ import hashlib
 import io
 import json
 import zipfile
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -14,7 +15,7 @@ from types import MappingProxyType
 from typing import Any
 
 from .content_boundary import ContentDisposition, classify_content
-from .payload_validation import PayloadReasonCode, validate_remote_payload
+from .payload_validation import validate_remote_payload
 from .scrubpack_spec import (
     PACK_MANIFEST_PATH,
     SCRUBPACK_VERSION,
@@ -37,6 +38,10 @@ _CONTENT_TYPES = {
 
 class ScrubpackBuildError(ValueError):
     """Raised when an explicit input is not an eligible current data payload."""
+
+    def __init__(self, message: str, *, validation_report: ScrubpackValidationReport | None = None) -> None:
+        super().__init__(message)
+        self.validation_report = validation_report
 
 
 def _freeze(value: Any) -> Any:
@@ -108,6 +113,26 @@ class ScrubpackLevelEvidence:
 
 
 @dataclass(frozen=True, slots=True)
+class ScrubpackRoleDiagnostic:
+    role: str
+    accepted: bool
+    reason_code: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScrubpackLevelDiagnostic:
+    level_id: str
+    accepted: bool
+    roles: tuple[ScrubpackRoleDiagnostic, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScrubpackValidationReport:
+    accepted: bool
+    levels: tuple[ScrubpackLevelDiagnostic, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ScrubpackBuildEvidence:
     version: int
     pack_id: str
@@ -119,6 +144,7 @@ class ScrubpackBuildEvidence:
     level_ids: tuple[str, ...]
     member_names: tuple[str, ...]
     levels: tuple[ScrubpackLevelEvidence, ...]
+    validation_report: ScrubpackValidationReport
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,29 +158,129 @@ def _validated_payload(
     role: str,
     source: ScrubpackPayloadInput,
     member_path: str,
-) -> tuple[bytes, ScrubpackPayloadEvidence]:
+) -> tuple[bytes | None, ScrubpackPayloadEvidence | None, str]:
     expected_type = _CONTENT_TYPES[role]
     classification = classify_content(source.descriptor)
     if classification.disposition is not ContentDisposition.REMOTE_DECLARATIVE:
-        reason = ",".join(code.value for code in classification.reason_codes)
-        raise ScrubpackBuildError(f"{member_path}: descriptor rejected ({reason})")
+        return None, None, "CONTENT_BOUNDARY_REJECTED"
     if source.descriptor.get("content_type") != expected_type:
-        raise ScrubpackBuildError(f"{member_path}: unsupported payload family")
+        return None, None, "PAYLOAD_FAMILY_MISMATCH"
     attributes = source.descriptor.get("attributes")
     if not isinstance(attributes, Mapping) or attributes.get("level_id") != level_id:
-        raise ScrubpackBuildError(f"{member_path}: descriptor level identity mismatch")
+        return None, None, "LEVEL_IDENTITY_MISMATCH"
     validation = validate_remote_payload(source.descriptor, source.payload)
     if not validation.accepted:
-        if validation.reason_code is PayloadReasonCode.EXECUTABLE_CONTENT:
-            raise ScrubpackBuildError(f"{member_path}: executable content rejected")
-        raise ScrubpackBuildError(f"{member_path}: payload rejected ({validation.reason_code.value})")
+        return None, None, validation.reason_code.value
     evidence = ScrubpackPayloadEvidence(
         member_path=member_path,
         payload_sha256=hashlib.sha256(source.payload).hexdigest(),
         byte_length=len(source.payload),
         validation_reason=validation.reason_code.value,
     )
-    return source.payload, evidence
+    return source.payload, evidence, "VALIDATED"
+
+
+def _normalize_level_inputs(levels: Sequence[ScrubpackLevelInput]) -> tuple[ScrubpackLevelInput, ...]:
+    if isinstance(levels, (str, bytes, bytearray)) or not isinstance(levels, Sequence):
+        raise ScrubpackBuildError("levels must be an explicit sequence")
+    level_inputs = tuple(levels)
+    if not level_inputs:
+        raise ScrubpackBuildError("at least one level is required")
+    if any(not isinstance(level, ScrubpackLevelInput) for level in level_inputs):
+        raise ScrubpackBuildError("every level must be an explicit ScrubpackLevelInput")
+    return level_inputs
+
+
+def _preflight_levels(
+    level_inputs: tuple[ScrubpackLevelInput, ...],
+) -> tuple[
+    tuple[ScrubpackLevelInput, ...],
+    ScrubpackValidationReport,
+    list[tuple[str, bytes]],
+    list[ScrubpackLevelEvidence],
+]:
+    ordered_inputs = tuple(sorted(level_inputs, key=lambda level: canonical_level_sort_key(level.level_id)))
+    ids = [level.level_id for level in ordered_inputs]
+    exact_counts = Counter(ids)
+    folded_groups: dict[str, set[str]] = {}
+    for level_id in ids:
+        folded_groups.setdefault(level_id.casefold(), set()).add(level_id)
+    duplicate_codes: dict[str, str] = {}
+    for level_id, count in exact_counts.items():
+        if count > 1:
+            duplicate_codes[level_id] = "DUPLICATE_LEVEL_ID"
+    for group in folded_groups.values():
+        if len(group) > 1:
+            for level_id in group:
+                duplicate_codes[level_id] = "CASE_NORMALIZED_LEVEL_ID_COLLISION"
+    if duplicate_codes:
+        diagnostics = tuple(
+            ScrubpackLevelDiagnostic(
+                level_id=level_id,
+                accepted=False,
+                roles=(ScrubpackRoleDiagnostic("membership", False, duplicate_codes[level_id]),),
+            )
+            for level_id in sorted(duplicate_codes, key=canonical_level_sort_key)
+        )
+        return ordered_inputs, ScrubpackValidationReport(False, diagnostics), [], []
+
+    members: list[tuple[str, bytes]] = []
+    evidence_levels: list[ScrubpackLevelEvidence] = []
+    level_diagnostics: list[ScrubpackLevelDiagnostic] = []
+    for level_input in ordered_inputs:
+        level_spec = ScrubpackLevelV1(level_input.level_id)
+        role_diagnostics: list[ScrubpackRoleDiagnostic] = []
+        payload_evidence: list[ScrubpackPayloadEvidence] = []
+        for role, source, member_path in (
+            ("level_data", level_input.level_data, level_spec.level_data_path),
+            ("supply_plan", level_input.supply_plan, level_spec.supply_plan_path),
+            ("metadata", level_input.metadata, level_spec.metadata_path),
+        ):
+            payload, evidence, reason_code = _validated_payload(
+                level_input.level_id, role, source, member_path
+            )
+            accepted = reason_code == "VALIDATED"
+            role_diagnostics.append(ScrubpackRoleDiagnostic(role, accepted, reason_code))
+            if accepted:
+                assert payload is not None and evidence is not None
+                members.append((member_path, payload))
+                payload_evidence.append(evidence)
+        level_accepted = all(role.accepted for role in role_diagnostics)
+        level_diagnostics.append(
+            ScrubpackLevelDiagnostic(level_input.level_id, level_accepted, tuple(role_diagnostics))
+        )
+        evidence_levels.append(ScrubpackLevelEvidence(level_input.level_id, tuple(payload_evidence)))
+    report = ScrubpackValidationReport(
+        accepted=all(level.accepted for level in level_diagnostics),
+        levels=tuple(level_diagnostics),
+    )
+    if not report.accepted:
+        return ordered_inputs, report, [], []
+    return ordered_inputs, report, members, evidence_levels
+
+
+def validate_scrubpack_levels(levels: Sequence[ScrubpackLevelInput]) -> ScrubpackValidationReport:
+    """Validate every explicit level triplet and return deterministic safe diagnostics."""
+    level_inputs = _normalize_level_inputs(levels)
+    _, report, _, _ = _preflight_levels(level_inputs)
+    return report
+
+
+def _validation_failure_message(report: ScrubpackValidationReport) -> str:
+    for level in report.levels:
+        for role in level.roles:
+            if role.accepted:
+                continue
+            messages = {
+                "DUPLICATE_LEVEL_ID": "duplicate level ID",
+                "CASE_NORMALIZED_LEVEL_ID_COLLISION": "case-normalized level ID collision",
+                "CONTENT_BOUNDARY_REJECTED": "descriptor rejected",
+                "PAYLOAD_FAMILY_MISMATCH": "unsupported payload family",
+                "LEVEL_IDENTITY_MISMATCH": "descriptor level identity mismatch",
+            }
+            detail = messages.get(role.reason_code, role.reason_code)
+            return f"pre-pack validation failed: {detail}"
+    return "pre-pack validation failed"
 
 
 def build_scrubpack(
@@ -165,14 +291,12 @@ def build_scrubpack(
     created_at_utc: str | datetime,
 ) -> ScrubpackBuildResult:
     """Build an in-memory V1 ZIP using explicit immutable identity/time inputs."""
-    if isinstance(levels, (str, bytes, bytearray)) or not isinstance(levels, Sequence):
-        raise ScrubpackBuildError("levels must be an explicit sequence")
-    level_inputs = tuple(levels)
-    if not level_inputs:
-        raise ScrubpackBuildError("at least one level is required")
-    if any(not isinstance(level, ScrubpackLevelInput) for level in level_inputs):
-        raise ScrubpackBuildError("every level must be an explicit ScrubpackLevelInput")
-    level_inputs = tuple(sorted(level_inputs, key=lambda level: canonical_level_sort_key(level.level_id)))
+    level_inputs = _normalize_level_inputs(levels)
+    level_inputs, validation_report, members, level_evidence = _preflight_levels(level_inputs)
+    if not validation_report.accepted:
+        raise ScrubpackBuildError(
+            _validation_failure_message(validation_report), validation_report=validation_report
+        )
 
     level_specs = tuple(ScrubpackLevelV1(level.level_id) for level in level_inputs)
     try:
@@ -181,20 +305,6 @@ def build_scrubpack(
         raise ScrubpackBuildError(str(exc)) from exc
     if not validate_member_names(member_names):
         raise ScrubpackBuildError("generated archive member layout is invalid")
-
-    members: list[tuple[str, bytes]] = []
-    level_evidence: list[ScrubpackLevelEvidence] = []
-    for level_input, level_spec in zip(level_inputs, level_specs, strict=True):
-        payload_evidence: list[ScrubpackPayloadEvidence] = []
-        for role, source, path in (
-            ("level_data", level_input.level_data, level_spec.level_data_path),
-            ("supply_plan", level_input.supply_plan, level_spec.supply_plan_path),
-            ("metadata", level_input.metadata, level_spec.metadata_path),
-        ):
-            payload, evidence = _validated_payload(level_input.level_id, role, source, path)
-            members.append((path, payload))
-            payload_evidence.append(evidence)
-        level_evidence.append(ScrubpackLevelEvidence(level_input.level_id, tuple(payload_evidence)))
 
     member_sha256 = {
         payload.member_path: payload.payload_sha256
@@ -234,6 +344,7 @@ def build_scrubpack(
         level_ids=tuple(level.level_id for level in level_inputs),
         member_names=member_names,
         levels=tuple(level_evidence),
+        validation_report=validation_report,
     )
     return ScrubpackBuildResult(archive_bytes=archive_bytes, evidence=evidence)
 
@@ -259,6 +370,18 @@ def verify_scrubpack_build(archive_bytes: bytes, evidence: ScrubpackBuildEvidenc
                 or manifest.created_at_utc != evidence.created_at_utc
                 or len(manifest.levels) != evidence.level_count
                 or tuple(level.level_id for level in manifest.levels) != evidence.level_ids
+                or not evidence.validation_report.accepted
+                or tuple(level.level_id for level in evidence.validation_report.levels) != evidence.level_ids
+                or any(
+                    not level.accepted
+                    or tuple((role.role, role.reason_code) for role in level.roles)
+                    != (
+                        ("level_data", "VALIDATED"),
+                        ("supply_plan", "VALIDATED"),
+                        ("metadata", "VALIDATED"),
+                    )
+                    for level in evidence.validation_report.levels
+                )
                 or archive.testzip() is not None
             ):
                 return False
@@ -285,6 +408,10 @@ __all__ = [
     "ScrubpackLevelInput",
     "ScrubpackPayloadEvidence",
     "ScrubpackPayloadInput",
+    "ScrubpackLevelDiagnostic",
+    "ScrubpackRoleDiagnostic",
+    "ScrubpackValidationReport",
     "build_scrubpack",
+    "validate_scrubpack_levels",
     "verify_scrubpack_build",
 ]

@@ -23,6 +23,7 @@ from scrubbots_content_pipeline import (  # noqa: E402
     ScrubpackPayloadInput,
     build_scrubpack,
     verify_scrubpack_build,
+    validate_scrubpack_levels,
 )
 from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
     PACK_MANIFEST_PATH,
@@ -145,6 +146,8 @@ def test_builder_packages_only_validated_payloads_at_fixed_paths() -> None:
     assert result.evidence.archive_sha256 == hashlib.sha256(result.archive_bytes).hexdigest()
     assert result.evidence.archive_byte_length == len(result.archive_bytes)
     assert result.evidence.pack_id == "test-pack" and result.evidence.pack_version == 1
+    assert result.evidence.validation_report.accepted
+    assert all(level.accepted for level in result.evidence.validation_report.levels)
     assert verify_scrubpack_build(result.archive_bytes, result.evidence)
 
 
@@ -222,8 +225,45 @@ def test_builder_rejects_arbitrary_input_paths_and_payload_digest_mutation() -> 
 def test_builder_binds_all_three_descriptors_to_the_explicit_level_identity() -> None:
     level = _level()
     other = _payload("metadata", "level-002")
-    with pytest.raises(ScrubpackBuildError, match="descriptor level identity mismatch"):
-        _build((ScrubpackLevelInput("level-001", level.level_data, level.supply_plan, other),))
+    invalid = ScrubpackLevelInput("level-001", level.level_data, level.supply_plan, other)
+    with pytest.raises(ScrubpackBuildError, match="pre-pack validation failed") as caught:
+        _build((invalid,))
+    report = caught.value.validation_report
+    assert report is not None and not report.accepted
+    assert tuple(role.role for role in report.levels[0].roles) == ("level_data", "supply_plan", "metadata")
+    assert tuple(role.reason_code for role in report.levels[0].roles) == (
+        "VALIDATED", "VALIDATED", "LEVEL_IDENTITY_MISMATCH"
+    )
+
+
+def test_validation_transaction_checks_every_level_and_returns_safe_ordered_diagnostics() -> None:
+    first = _level("level-a")
+    second = _level("level-z")
+    invalid_metadata = _payload("metadata", "foreign-level")
+    invalid_first = ScrubpackLevelInput(
+        "level-a", first.level_data, first.supply_plan, invalid_metadata
+    )
+    report = validate_scrubpack_levels((second, invalid_first))
+    assert not report.accepted
+    assert tuple(level.level_id for level in report.levels) == ("level-a", "level-z")
+    assert report.levels[0].accepted is False
+    assert report.levels[1].accepted is True
+    assert all(len(level.roles) == 3 for level in report.levels)
+    assert "owner-source.json" not in repr(report)
+    with pytest.raises(ScrubpackBuildError) as caught:
+        _build((second, invalid_first))
+    assert caught.value.validation_report == report
+
+
+def test_validation_report_is_complete_for_successful_triplets() -> None:
+    report = validate_scrubpack_levels((_level(),))
+    assert report.accepted
+    assert report.levels[0].accepted
+    assert tuple((item.role, item.reason_code) for item in report.levels[0].roles) == (
+        ("level_data", "VALIDATED"),
+        ("supply_plan", "VALIDATED"),
+        ("metadata", "VALIDATED"),
+    )
 
 
 def test_builder_rejects_duplicate_and_implicit_level_inputs() -> None:
