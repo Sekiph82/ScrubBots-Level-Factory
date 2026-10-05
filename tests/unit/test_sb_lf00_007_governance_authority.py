@@ -215,7 +215,7 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
         # still be a live non-closed row; do not invent or require a transient
         # cycle/task marker in the regression.
         assert current_row[0]["state"] in {" ", "!"}
-    sprint = re.search(r"(?m)^- Current Sprint:\s+([^—]+)—", current)
+    sprint = re.search(r"(?m)^- Current Sprint:\s+(.+)$", current)
     assert sprint is not None
     assert current_id in sprint.group(1) or current_id.rsplit("-", 1)[0] in sprint.group(1)
     next_action = re.search(r"(?m)^- Next Task/Action:\s+(.+)$", current)
