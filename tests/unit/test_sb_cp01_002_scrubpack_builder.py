@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
 import hashlib
 import io
 import json
@@ -21,6 +22,7 @@ from scrubbots_content_pipeline import (  # noqa: E402
     ScrubpackLevelInput,
     ScrubpackPayloadInput,
     build_scrubpack,
+    verify_scrubpack_build,
 )
 from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
     PACK_MANIFEST_PATH,
@@ -129,12 +131,69 @@ def test_builder_packages_only_validated_payloads_at_fixed_paths() -> None:
         assert manifest["createdAtUtc"] == "2026-10-05T10:00:00Z"
         assert manifest["levelCount"] == len(manifest["levels"]) == 1
         assert manifest["levels"][0]["id"] == "level-001"
+        assert manifest["levels"][0]["sha256"] == {
+            "levelData": hashlib.sha256(level.level_data.payload).hexdigest(),
+            "supplyPlan": hashlib.sha256(level.supply_plan.payload).hexdigest(),
+            "metadata": hashlib.sha256(level.metadata.payload).hexdigest(),
+        }
         assert archive.read("levels/level-001/level.json") == level.level_data.payload
         assert archive.read("levels/level-001/supply-plan.json") == level.supply_plan.payload
         assert archive.read("levels/level-001/metadata.json") == level.metadata.payload
     assert result.evidence.level_ids == ("level-001",)
     assert len(result.evidence.levels[0].payloads) == 3
     assert result.evidence.levels[0].payloads[0].validation_reason == "VALID_PAYLOAD"
+    assert result.evidence.archive_sha256 == hashlib.sha256(result.archive_bytes).hexdigest()
+    assert result.evidence.archive_byte_length == len(result.archive_bytes)
+    assert result.evidence.pack_id == "test-pack" and result.evidence.pack_version == 1
+    assert verify_scrubpack_build(result.archive_bytes, result.evidence)
+
+
+def test_build_receipt_detects_exact_archive_tampering_and_identity_mismatch() -> None:
+    result = _build((_level(),))
+    changed = result.archive_bytes[:-1] + bytes((result.archive_bytes[-1] ^ 1,))
+    assert not verify_scrubpack_build(changed, result.evidence)
+    assert not verify_scrubpack_build(result.archive_bytes + b"tampered", result.evidence)
+    with ZipFile(io.BytesIO(result.archive_bytes)) as original:
+        members = [(name, original.read(name)) for name in original.namelist()]
+    rewritten = io.BytesIO()
+    with ZipFile(rewritten, "w") as archive:
+        for name, payload in members:
+            if name == "levels/level-001/level.json":
+                payload = payload.replace(b"Test Level", b"Best Level")
+            archive.writestr(name, payload)
+    rewritten_bytes = rewritten.getvalue()
+    rewritten_receipt = dataclasses.replace(
+        result.evidence,
+        archive_sha256=hashlib.sha256(rewritten_bytes).hexdigest(),
+        archive_byte_length=len(rewritten_bytes),
+    )
+    assert not verify_scrubpack_build(rewritten_bytes, rewritten_receipt)
+    forged_identity = dataclasses.replace(result.evidence, pack_id="another-pack")
+    assert not verify_scrubpack_build(result.archive_bytes, forged_identity)
+    payloads = result.evidence.levels[0].payloads
+    forged_payload_evidence = dataclasses.replace(
+        result.evidence,
+        levels=(
+            dataclasses.replace(
+                result.evidence.levels[0],
+                payloads=(dataclasses.replace(payloads[0], payload_sha256="f" * 64), *payloads[1:]),
+            ),
+        ),
+    )
+    assert not verify_scrubpack_build(result.archive_bytes, forged_payload_evidence)
+
+
+def test_manifest_member_digests_are_lowercase_sha256_and_immutable() -> None:
+    result = _build((_level(),))
+    with ZipFile(io.BytesIO(result.archive_bytes)) as archive:
+        manifest = json.loads(archive.read(PACK_MANIFEST_PATH))
+    manifest["levels"][0]["sha256"]["levelData"] = "A" * 64
+    with pytest.raises(ValueError, match="SHA-256"):
+        ScrubpackManifestV1.from_dict(manifest)
+    manifest["levels"][0]["sha256"]["levelData"] = "a" * 64
+    restored = ScrubpackManifestV1.from_dict(manifest)
+    with pytest.raises(TypeError):
+        restored.member_sha256["levels/level-001/level.json"] = "b" * 64  # type: ignore[index]
 
 
 def test_builder_accepts_only_the_three_expected_contract_families() -> None:
@@ -263,6 +322,8 @@ def test_build_result_and_evidence_are_immutable() -> None:
         result.evidence.version = 2  # type: ignore[misc]
     with pytest.raises(FrozenInstanceError):
         result.evidence.levels[0].level_id = "changed"  # type: ignore[misc]
+    with pytest.raises(FrozenInstanceError):
+        result.evidence.archive_sha256 = "0" * 64  # type: ignore[misc]
     with pytest.raises(TypeError):
         result.evidence.level_ids[0] = "changed"  # type: ignore[index]
     assert isinstance(result.archive_bytes, bytes)

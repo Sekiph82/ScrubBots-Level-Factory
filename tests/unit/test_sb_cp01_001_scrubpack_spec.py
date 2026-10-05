@@ -30,7 +30,8 @@ from scrubbots_content_pipeline.scrubpack_spec import (  # noqa: E402
 def test_versioned_manifest_model_and_fixed_paths_are_explicit() -> None:
     level = ScrubpackLevelV1("level-001")
     manifest = ScrubpackManifestV1(
-        (level,), pack_id="pack-001", pack_version=1, created_at_utc="2026-10-05T10:00:00Z"
+        (level,), pack_id="pack-001", pack_version=1, created_at_utc="2026-10-05T10:00:00Z",
+        member_sha256={path: "a" * 64 for path in level.member_paths},
     )
     assert SCRUBPACK_EXTENSION == ".scrubpack"
     assert (manifest.schema, manifest.version, manifest.media_type) == (
@@ -54,6 +55,7 @@ def test_versioned_manifest_model_and_fixed_paths_are_explicit() -> None:
                     "supplyPlan": "levels/level-001/supply-plan.json",
                     "metadata": "levels/level-001/metadata.json",
                 },
+                "sha256": {"levelData": "a" * 64, "supplyPlan": "a" * 64, "metadata": "a" * 64},
             }
         ],
     }
@@ -73,6 +75,7 @@ def test_manifest_round_trip_rejects_count_and_path_identity_mismatches() -> Non
         pack_id="pack-001",
         pack_version=1,
         created_at_utc="2026-10-05T10:00:00Z",
+        member_sha256={path: "a" * 64 for path in ScrubpackLevelV1("level-001").member_paths},
     ).to_dict()
     manifest["levelCount"] = 2
     with pytest.raises(ScrubpackSpecError, match="level count mismatch"):
@@ -128,6 +131,11 @@ def test_duplicate_archive_names_and_duplicate_level_ids_fail_closed() -> None:
             pack_id="pack-001",
             pack_version=1,
             created_at_utc="2026-10-05T10:00:00Z",
+            member_sha256={
+                path: "a" * 64
+                for level in (ScrubpackLevelV1("level-001"), ScrubpackLevelV1("level-001"))
+                for path in level.member_paths
+            },
         )
 
 
@@ -149,10 +157,14 @@ def test_manifest_schema_is_closed_and_binds_v1_media_identity() -> None:
     assert schema["required"] == [
         "schema", "version", "mediaType", "packId", "packVersion", "createdAtUtc", "levelCount", "levels"
     ]
+    assert schema["properties"]["levels"]["items"]["required"] == ["id", "files", "sha256"]
     assert set(schema["properties"]["levels"]["items"]["properties"]["files"]["properties"]) == {
         "levelData",
         "supplyPlan",
         "metadata",
+    }
+    assert set(schema["properties"]["levels"]["items"]["properties"]["sha256"]["properties"]) == {
+        "levelData", "supplyPlan", "metadata"
     }
     file_properties = schema["properties"]["levels"]["items"]["properties"]["files"]["properties"]
     for field, filename in (

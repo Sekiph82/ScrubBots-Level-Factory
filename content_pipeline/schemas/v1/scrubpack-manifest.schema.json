@@ -19,7 +19,7 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "files"],
+        "required": ["id", "files", "sha256"],
         "properties": {
           "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
           "files": {
@@ -30,6 +30,16 @@
               "levelData": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/level\\.json$" },
               "supplyPlan": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/supply-plan\\.json$" },
               "metadata": { "type": "string", "pattern": "^levels/[A-Za-z0-9][A-Za-z0-9._-]{0,63}/metadata\\.json$" }
+            }
+          },
+          "sha256": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["levelData", "supplyPlan", "metadata"],
+            "properties": {
+              "levelData": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "supplyPlan": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "metadata": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
             }
           }
         }

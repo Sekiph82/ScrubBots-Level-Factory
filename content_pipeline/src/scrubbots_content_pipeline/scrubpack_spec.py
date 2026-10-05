@@ -9,6 +9,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from types import MappingProxyType
 from typing import Iterable
 
 
@@ -22,6 +23,7 @@ LEVELS_DIRECTORY = "levels"
 _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 _PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:Z|[+-]\d{2}:\d{2})$")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _LEVEL_MEMBER = re.compile(
     r"^levels/([A-Za-z0-9][A-Za-z0-9._-]{0,63})/(level|supply-plan|metadata)\.json$"
 )
@@ -82,6 +84,7 @@ class ScrubpackManifestV1:
     pack_id: str
     pack_version: int
     created_at_utc: str | datetime
+    member_sha256: Mapping[str, str]
     schema: str = SCRUBPACK_SCHEMA
     version: int = SCRUBPACK_VERSION
     media_type: str = SCRUBPACK_MEDIA_TYPE
@@ -101,6 +104,17 @@ class ScrubpackManifestV1:
         ids = [level.level_id for level in self.levels]
         if len(ids) != len(set(ids)):
             raise ScrubpackSpecError("duplicate level ID")
+        if not isinstance(self.member_sha256, Mapping):
+            raise ScrubpackSpecError("member SHA-256 values must be a mapping")
+        expected_paths = {path for level in self.levels for path in level.member_paths}
+        if set(self.member_sha256) != expected_paths or any(
+            not isinstance(path, str)
+            or not isinstance(digest, str)
+            or not _SHA256.fullmatch(digest)
+            for path, digest in self.member_sha256.items()
+        ):
+            raise ScrubpackSpecError("member SHA-256 values must cover every exact payload path")
+        object.__setattr__(self, "member_sha256", MappingProxyType(dict(self.member_sha256)))
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -118,6 +132,11 @@ class ScrubpackManifestV1:
                         "levelData": level.level_data_path,
                         "supplyPlan": level.supply_plan_path,
                         "metadata": level.metadata_path,
+                    },
+                    "sha256": {
+                        "levelData": self.member_sha256[level.level_data_path],
+                        "supplyPlan": self.member_sha256[level.supply_plan_path],
+                        "metadata": self.member_sha256[level.metadata_path],
                     },
                 }
                 for level in self.levels
@@ -139,8 +158,9 @@ class ScrubpackManifestV1:
         if value["levelCount"] != len(raw_levels):
             raise ScrubpackSpecError("manifest level count mismatch")
         levels: list[ScrubpackLevelV1] = []
+        member_digests: dict[str, str] = {}
         for raw_level in raw_levels:
-            if not isinstance(raw_level, Mapping) or set(raw_level) != {"id", "files"}:
+            if not isinstance(raw_level, Mapping) or set(raw_level) != {"id", "files", "sha256"}:
                 raise ScrubpackSpecError("invalid manifest level entry")
             level = ScrubpackLevelV1(raw_level["id"])
             files = raw_level["files"]
@@ -153,12 +173,18 @@ class ScrubpackManifestV1:
             }
             if dict(files) != expected:
                 raise ScrubpackSpecError("manifest level paths do not match level identity")
+            digests = raw_level["sha256"]
+            if not isinstance(digests, Mapping) or set(digests) != {"levelData", "supplyPlan", "metadata"}:
+                raise ScrubpackSpecError("invalid manifest level SHA-256 map")
+            for role, path_key in (("levelData", "levelData"), ("supplyPlan", "supplyPlan"), ("metadata", "metadata")):
+                member_digests[expected[path_key]] = digests[role]
             levels.append(level)
         return cls(
             levels=tuple(levels),
             pack_id=value["packId"],
             pack_version=value["packVersion"],
             created_at_utc=value["createdAtUtc"],
+            member_sha256=member_digests,
             schema=value["schema"],
             version=value["version"],
             media_type=value["mediaType"],

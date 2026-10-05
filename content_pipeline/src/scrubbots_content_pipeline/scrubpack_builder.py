@@ -111,6 +111,8 @@ class ScrubpackBuildEvidence:
     pack_id: str
     pack_version: int
     created_at_utc: str
+    archive_sha256: str
+    archive_byte_length: int
     level_count: int
     level_ids: tuple[str, ...]
     member_names: tuple[str, ...]
@@ -171,15 +173,9 @@ def build_scrubpack(
 
     level_specs = tuple(ScrubpackLevelV1(level.level_id) for level in level_inputs)
     try:
-        manifest = ScrubpackManifestV1(
-            levels=level_specs,
-            pack_id=pack_id,
-            pack_version=pack_version,
-            created_at_utc=created_at_utc,
-        )
+        member_names = expected_member_names(level_specs)
     except ScrubpackSpecError as exc:
         raise ScrubpackBuildError(str(exc)) from exc
-    member_names = expected_member_names(level_specs)
     if not validate_member_names(member_names):
         raise ScrubpackBuildError("generated archive member layout is invalid")
 
@@ -197,6 +193,22 @@ def build_scrubpack(
             payload_evidence.append(evidence)
         level_evidence.append(ScrubpackLevelEvidence(level_input.level_id, tuple(payload_evidence)))
 
+    member_sha256 = {
+        payload.member_path: payload.payload_sha256
+        for level in level_evidence
+        for payload in level.payloads
+    }
+    try:
+        manifest = ScrubpackManifestV1(
+            levels=level_specs,
+            pack_id=pack_id,
+            pack_version=pack_version,
+            created_at_utc=created_at_utc,
+            member_sha256=member_sha256,
+        )
+    except ScrubpackSpecError as exc:
+        raise ScrubpackBuildError(str(exc)) from exc
+
     manifest_bytes = json.dumps(manifest.to_dict(), sort_keys=True, separators=(",", ":")).encode("utf-8")
     output = io.BytesIO()
     with zipfile.ZipFile(output, mode="w", compression=zipfile.ZIP_STORED, allowZip64=False) as archive:
@@ -204,17 +216,59 @@ def build_scrubpack(
         for member_path, payload in members:
             archive.writestr(member_path, payload)
 
+    archive_bytes = output.getvalue()
     evidence = ScrubpackBuildEvidence(
         version=SCRUBPACK_VERSION,
         pack_id=manifest.pack_id,
         pack_version=manifest.pack_version,
         created_at_utc=manifest.created_at_utc,
+        archive_sha256=hashlib.sha256(archive_bytes).hexdigest(),
+        archive_byte_length=len(archive_bytes),
         level_count=len(manifest.levels),
         level_ids=tuple(level.level_id for level in level_inputs),
         member_names=member_names,
         levels=tuple(level_evidence),
     )
-    return ScrubpackBuildResult(archive_bytes=output.getvalue(), evidence=evidence)
+    return ScrubpackBuildResult(archive_bytes=archive_bytes, evidence=evidence)
+
+
+def verify_scrubpack_build(archive_bytes: bytes, evidence: ScrubpackBuildEvidence) -> bool:
+    """Verify exact archive bytes, receipt identity, and each manifest member digest."""
+    if type(archive_bytes) is not bytes or not isinstance(evidence, ScrubpackBuildEvidence):
+        return False
+    if len(archive_bytes) != evidence.archive_byte_length:
+        return False
+    if hashlib.sha256(archive_bytes).hexdigest() != evidence.archive_sha256:
+        return False
+    try:
+        with zipfile.ZipFile(io.BytesIO(archive_bytes), mode="r") as archive:
+            names = tuple(archive.namelist())
+            if names != evidence.member_names or not validate_member_names(names):
+                return False
+            manifest = ScrubpackManifestV1.from_dict(json.loads(archive.read(PACK_MANIFEST_PATH)))
+            if (
+                manifest.pack_id != evidence.pack_id
+                or manifest.pack_version != evidence.pack_version
+                or manifest.version != evidence.version
+                or manifest.created_at_utc != evidence.created_at_utc
+                or len(manifest.levels) != evidence.level_count
+                or tuple(level.level_id for level in manifest.levels) != evidence.level_ids
+                or archive.testzip() is not None
+            ):
+                return False
+            evidence_member_digests = {
+                payload.member_path: payload.payload_sha256
+                for level in evidence.levels
+                for payload in level.payloads
+            }
+            if evidence_member_digests != dict(manifest.member_sha256):
+                return False
+            return all(
+                hashlib.sha256(archive.read(path)).hexdigest() == digest
+                for path, digest in manifest.member_sha256.items()
+            )
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError, zipfile.BadZipFile):
+        return False
 
 
 __all__ = [
@@ -226,4 +280,5 @@ __all__ = [
     "ScrubpackPayloadEvidence",
     "ScrubpackPayloadInput",
     "build_scrubpack",
+    "verify_scrubpack_build",
 ]

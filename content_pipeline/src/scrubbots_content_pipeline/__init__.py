@@ -50,6 +50,7 @@ from .scrubpack_builder import (
     ScrubpackPayloadEvidence,
     ScrubpackPayloadInput,
     build_scrubpack,
+    verify_scrubpack_build,
 )
 from .publication_plan import (
     PUBLICATION_PLAN_VERSION,
@@ -150,6 +151,7 @@ __all__ = [
     "ScrubpackPayloadEvidence",
     "ScrubpackPayloadInput",
     "build_scrubpack",
+    "verify_scrubpack_build",
     "PUBLICATION_PLAN_VERSION",
     "ExpectedReleaseState",
     "PlanCheck",
