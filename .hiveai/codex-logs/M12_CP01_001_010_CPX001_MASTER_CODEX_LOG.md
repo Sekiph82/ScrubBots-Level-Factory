@@ -138,3 +138,5 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Focused pack suite: 69 passed. Cumulative CP00/M11 + prior M12: 232 passed. Governance: 13 passed. Full pytest: 1,401 passed, 3 skipped in 1,123.79 seconds. Post-documentation pack+governance rerun: 82 passed; compileall and diff check passed.
 - No dependency/license, provider/network/runtime, credentials, production-game, tracker, or audit changes. Implementation push and separate log publication are pending.
 - Child 9 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 55fabe03dea56c092e6768167b8eeb0ba39b5c0, 0/0. Separate Child 9 builder-log/master-progress publication and closure remain.
+
+- Separate Child 9 builder-log/master-progress commit: 747fde42f4092ef9e237d25f2f61a2e54e446d7f. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 9 implementation commits and builder-log commit are separate. Child 9 is closed; Child 10 begins from this SHA.
