@@ -1,0 +1,3 @@
+# SB-CPX-001-C001 — Audit Criteria
+
+PASS only if each packaged explicit supply plan is cryptographically and structurally bound to the exact canonical Factory solver-proven initial state and PASS evidence, using current production authority rather than legacy solver evidence. Any level/supply/FIFO/batch/color/count/state/evidence drift must block pack emission. Full M12 and M11 regressions must stay green.
