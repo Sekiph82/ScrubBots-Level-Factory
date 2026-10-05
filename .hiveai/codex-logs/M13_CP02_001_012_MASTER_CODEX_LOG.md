@@ -30,6 +30,8 @@ Document role: CODEX BUILDER LOG
 - `compileall`: PASS. Content Pipeline schema/policy/example JSON parse: PASS (17 files). `git diff --check`: PASS. Protected tracker/audit paths unchanged. The first staged `git diff --cached --check` found extra blank lines at log EOF; normalized to one final newline and reran successfully.
 - Full `python -m pytest -q`: started, then stopped before completion after the suite launched Godot with `C:\Users\sekip\Desktop\Scrubbots` as project root. This separate checkout is outside the task's authorized scope. No full-suite result is claimed; child 001 cannot be marked green on current evidence.
 - Blocker disposition: stop the master batch before child 002 unless a full-suite route can be run without accessing that separate project. No subsequent children were started.
-- Child implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`; separate child/master log commit: `55f009b0900dcaf97afadeaf53571ae47937f1dc`. Push and final parity: pending.
+- Child implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`; separate child/master log commit: `55f009b0900dcaf97afadeaf53571ae47937f1dc`. The five-commit evidence chain was pushed normally to `main`. Post-push fetch verified `HEAD == origin/main == e56b248e32f1e02dfe748bb7e4830dd3dbd5fef1`, 0/0 divergence, and clean worktree.
 
 - Pre-push guard initially failed because PowerShell compared the tab-delimited git rev-list --left-right --count output as a literal string. Observed output was 4 ahead / 0 behind; no push was attempted. The guard will split and compare both numeric fields.
+
+- The first post-push guard printed equal HEAD/origin SHA and 0/0 but then failed its literal tab-delimited string comparison. A corrected numeric-field check passed with status clean; no additional push was made by that guard.

@@ -32,6 +32,6 @@ Document role: CODEX BUILDER LOG
 ### Publication
 
 - Implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`.
-- Child log commit: pending.
-- Push/parity: pending.
-- Disposition: child 001 is not claimed green because the mandated unfiltered full pytest result is unverified; the M13 batch is stopping at this safety blocker unless an in-scope full-suite route is available.
+- Child log commit: `55f009b0900dcaf97afadeaf53571ae47937f1dc`.
+- Non-force push of the five-commit evidence chain to `main` succeeded. Post-push fetch verified HEAD and `origin/main` at `e56b248e32f1e02dfe748bb7e4830dd3dbd5fef1`, 0/0 divergence, and clean worktree.
+- Disposition: child 001 is not claimed green because the mandated unfiltered full pytest result is unverified; the M13 batch is stopping at this safety blocker because the mandated full suite could not be completed within the authorized repository scope.
