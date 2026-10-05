@@ -1,6 +1,6 @@
-"""Public re-export of the optional local SCRUBPACK tools."""
+"""Optional local-only SCRUBPACK inspection and extraction adapters."""
 
-from .scrubpack_tools.inspection import (
+from .inspection import (
     MAX_SCRUBPACK_ARCHIVE_BYTES,
     MAX_SCRUBPACK_MEMBERS,
     ScrubpackInspectionResult,
