@@ -59,3 +59,13 @@ Child-specific base SHAs, implementation commits, separate log commits, exact te
 - Child 2 implementation push: pre-push fetch showed `1/0`; normal `git push origin HEAD:main` advanced `main` to `cb44f6632acb067493bcf50528b31b20d49cc08e`; post-push fetch confirmed `HEAD == origin/main`, `0/0`.
 Child 2 log correction: repaired three control characters produced by PowerShell interpreting Markdown backtick escapes in the local draft; this append-only correction is included in the builder-log publication before push.
 Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566922974a4865ef9a837aec0836575; log correction commit 9d757bc2304afbed252364b6021ef10e176625c4. Final post-push fetch confirmed HEAD == origin/main == 9d757bc2304afbed252364b6021ef10e176625c4, divergence 0/0, clean. The corrected current Child 2 log is present on main. The master record below will publish these facts before Child 3 starts.
+
+### SB-CP01-003-C001 implementation and regression record
+
+- Child base SHA: `ef397ba4bde4c5904a766e4732e199b9afa28371`.
+- Implementation commit: `d300742aae5204965f2c61e35c721446888b63c6`.
+- The manifest and deterministic builder now require explicit pack ID, positive version, normalized UTC timestamp, and ordered levels/count. Full schema/model/parser/build validation behavior and the initial missing-`Mapping` failure/correction are detailed in the Child 3 log.
+- Focused Child 1 + Child 2 tests: 54 passed. Cumulative CP00 + CP01-001/002: 217 passed. Governance: 13 passed. Full pytest: 1,386 passed, 3 skipped in 1,087.40 seconds. Compileall, JSON schema parse, and final diff check passed.
+- No protected tracker/audit changes, dependency/license changes, runtime provider/network dependency, credential, or production game-source change. The live game verifier's source clone was confined to pytest temporary storage.
+- Child 3 log: `.hiveai/codex-logs/SB-CP01-003-C001_PACK_ID_VERSION_TIME_LEVELS_CODEX_LOG.md`. The source implementation is committed independently; log commit and publication parity are pending.
+- Child 3 implementation push: pre-push fetch showed `1/0`; normal push advanced main to `d300742aae5204965f2c61e35c721446888b63c6`; post-push fetch confirmed HEAD == origin/main, `0/0`. The distinct Child 3 log publication and parity are pending.
