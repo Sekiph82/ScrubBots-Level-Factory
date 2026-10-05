@@ -155,7 +155,7 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 ### SB-CPX-001-C001 implementation and regression record
 
 - Child base SHA: `a8842169f1ee88d030a668a77f8691aadee95820`.
-- Implementation commit: `43be43f` (`Bind Scrubpack supply plans to solver evidence`).
+- Implementation commit: `43be43fa6bfdf5ef92a6e39d05b8758449b2e8f6` (`Bind Scrubpack supply plans to solver evidence`).
 - Added canonical exact-byte solver-state and solver-evidence digests to READY supply pipeline output; added current accepted READY/Release Pool proof resolution and a detached Scrubpack identity artifact binding exact LevelData/plan bytes, FIFO columns/batches/configuration, solver/replay result, and source pipeline/review identity. Pack evidence binds the artifact digest, and final pack verification checks it.
 - Current real Factory READY output has an owner ACCEPT review but the pre-existing Release Pool gate declines it because its Difficulty V1 projection does not meet the separate pool vector/profile contract. The implementation binds that current accepted READY pipeline and files directly, does not fabricate missing profile data, and prefers Release Pool evidence whenever available. The focused integration uses the real Factory solver pipeline and verifies fail-closed mutations.
 - Extended path-safe LevelData IDs from 64 to 128 ASCII characters to preserve exact current Factory candidate IDs; traversal/unsafe characters remain rejected. Updated the contract schemas, tests, and Content Pipeline README.
@@ -170,4 +170,5 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Fetched `origin/main`; all 11 distinct child builder logs were verified present on `origin/main`.
 - Compared the CPX child commit range from `a8842169f1ee88d030a668a77f8691aadee95820` through `c2928e8750b271ae9846e66beb0804078888c15c`: changes are limited to the CPX builder log, Content Pipeline documentation/schema/API, Factory pipeline identity boundary, and focused tests. No root `TASKS.md` or `.hiveai/audits/**` changes; no runtime provider/network, credential, production game checkout/source, or game mutation was introduced.
 - Final cumulative M11/M12/CPX suite: **253 passed in 20.69s**. Final full suite: **1,415 passed, 3 skipped in 811.01s**. Compileall, schema parse, and diff check passed.
-- Persistent Desktop checkout remained untouched due its dirty/behind owner state. The authorized execution worktree was clean and 0/0 with `origin/main` at the final verification fetch; the master-log publication and parity follow below.
+- Persistent Desktop checkout remained untouched due its dirty/behind owner state. The authorized execution worktree was clean and 0/0 with `origin/main` at the final verification fetch.
+- Master log closure commit `f6e57ee775bd01bd5687a9facaeef16fdcdc1796` was pushed normally; post-push fetch confirmed execution HEAD == `origin/main` at that commit, 0/0, clean. The final log-only SHA correction is being published separately.
