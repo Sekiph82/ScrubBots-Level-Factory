@@ -127,3 +127,5 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 8 log: `.hiveai/codex-logs/SB-CP01-008-C001_SAFE_UNPACK_INSPECT_TOOLING_CODEX_LOG.md`. Implementation publication and separate log commit/parity are pending.
 
 - Child 8 implementation push succeeded; post-push fetch confirmed local HEAD == origin/main at 4734932b5c8d9b268a1f4a7e561b97ef1e86243d, 0/0. Separate Child 8 builder-log/master-progress commit and closure are pending.
+
+- Separate Child 8 builder-log/master-progress commit: 52e5685c274bbe33bae55be89e37779df1b58df2. Normal push succeeded; post-push fetch confirmed local HEAD == origin/main, 0/0, clean. Child 8 implementation and log are published in separate commits. Child 8 is closed; Child 9 begins from this SHA.
