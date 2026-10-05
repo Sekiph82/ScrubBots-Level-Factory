@@ -70,3 +70,14 @@ Child 2 separate builder-log publication: initial log/master commit 45d6a17a6566
 - Child 3 log: `.hiveai/codex-logs/SB-CP01-003-C001_PACK_ID_VERSION_TIME_LEVELS_CODEX_LOG.md`. The source implementation is committed independently; log commit and publication parity are pending.
 - Child 3 implementation push: pre-push fetch showed `1/0`; normal push advanced main to `d300742aae5204965f2c61e35c721446888b63c6`; post-push fetch confirmed HEAD == origin/main, `0/0`. The distinct Child 3 log publication and parity are pending.
 - Separate Child 3 builder-log/master-progress commit: `0a75cca1631ef979427c9d8ee6572b73da18df31`. Normal push succeeded. Post-push fetch confirms local HEAD == origin/main == this log commit, `0/0`, clean. The Child 3 implementation commit and its evidence log are published separately. This master-log closure commit follows before Child 4 begins.
+
+### SB-CP01-004-C001 implementation and regression record
+
+- Child base SHA: `155aab9bc9b89c3cc65ea0f23c74fa8858193eb9`.
+- Implementation commit: `0a59b432325e8963925e2117fdaed6ec85bad1d8`.
+- `pack.json` now binds exact payload bytes by member SHA-256; frozen external evidence carries final archive SHA-256/byte length and pack identity, and the verifier checks both archive and member tampering plus receipt identity. No self-referential hash is included. Full details are in the Child 4 builder log.
+- Focused tests: 56 passed. Cumulative CP00/M11 + prior M12 tests: 219 passed. Governance: 13 passed. Full pytest: 1,388 passed, 3 skipped in 1,046.06 seconds. Compileall, schema parse, and diff check passed.
+- The first focused run caught a builder exception translation regression and was corrected. Initial cumulative and governance runs hit the CP010 no-uncommitted-source guard; after the implementation commit, both groups passed. The Child 4 log records each failure and correction.
+- No tracker/audit, dependency/license, runtime/provider, credentials, or production-game changes. The required verifier clone and headless Godot run stayed in pytest temporary storage.
+- Child 4 builder log: `.hiveai/codex-logs/SB-CP01-004-C001_PER_PACK_SHA256_CODEX_LOG.md`. Implementation push and separate log commit/parity are pending.
+- Child 4 implementation push advanced `main` to `0a59b432325e8963925e2117fdaed6ec85bad1d8`; post-push fetch confirmed 0/0 parity. Separate child-log publication remains pending.
