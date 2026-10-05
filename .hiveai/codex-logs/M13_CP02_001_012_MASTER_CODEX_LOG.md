@@ -31,3 +31,5 @@ Document role: CODEX BUILDER LOG
 - Full `python -m pytest -q`: started, then stopped before completion after the suite launched Godot with `C:\Users\sekip\Desktop\Scrubbots` as project root. This separate checkout is outside the task's authorized scope. No full-suite result is claimed; child 001 cannot be marked green on current evidence.
 - Blocker disposition: stop the master batch before child 002 unless a full-suite route can be run without accessing that separate project. No subsequent children were started.
 - Child implementation commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`; separate child/master log commit: `55f009b0900dcaf97afadeaf53571ae47937f1dc`. Push and final parity: pending.
+
+- Pre-push guard initially failed because PowerShell compared the tab-delimited git rev-list --left-right --count output as a literal string. Observed output was 4 ahead / 0 behind; no push was attempted. The guard will split and compare both numeric fields.
