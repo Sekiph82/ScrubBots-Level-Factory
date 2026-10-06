@@ -7,6 +7,14 @@ The canonical local contract is `scrubbots.content.manifest.v1` with integer
 properties and unsupported identity or version values fail closed. Add future
 fields only through an explicit versioned schema evolution.
 
+External input must enter through `parse_content_manifest_v1(raw_bytes)`, which
+accepts strict UTF-8 bytes and constructs the immutable model only after JSON
+and V1 validation. It rejects duplicate keys and non-finite numbers, and uses
+fixed limits of 1 MiB per manifest, 32 nested arrays/objects, 4,096 items per
+collection, and 16,384 Unicode code points per string. It rejects unknown
+fields at the root and every nested record. Callers must not trust pre-parsed
+objects at the external bytes boundary.
+
 Each pack entry owns a canonical lowercase `pack_id`, positive `pack_version`,
 provider-neutral `object_key`, lowercase SHA-256, and positive exact archive
 `byte_length`. Pack IDs use `[a-z0-9][a-z0-9._-]{0,63}` and are compared

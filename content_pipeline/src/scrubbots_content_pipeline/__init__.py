@@ -69,6 +69,15 @@ from .compatibility import (
     AppContentCompatibilityResult,
     check_app_content_compatibility,
 )
+from .manifest_parser import (
+    MAX_MANIFEST_BYTES,
+    MAX_MANIFEST_COLLECTION_ITEMS,
+    MAX_MANIFEST_NESTING_DEPTH,
+    MAX_MANIFEST_STRING_LENGTH,
+    ManifestParseError,
+    ManifestParseReasonCode,
+    parse_content_manifest_v1,
+)
 from .orchestration import (
     EvidenceSink,
     PromotionOrchestrator,
@@ -214,6 +223,13 @@ __all__ = [
     "AppContentCompatibilityReasonCode",
     "AppContentCompatibilityResult",
     "check_app_content_compatibility",
+    "MAX_MANIFEST_BYTES",
+    "MAX_MANIFEST_COLLECTION_ITEMS",
+    "MAX_MANIFEST_NESTING_DEPTH",
+    "MAX_MANIFEST_STRING_LENGTH",
+    "ManifestParseError",
+    "ManifestParseReasonCode",
+    "parse_content_manifest_v1",
     "BOUNDARY_VERSION",
     "ClassificationResult",
     "ContentDisposition",
