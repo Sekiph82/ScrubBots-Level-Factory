@@ -68,3 +68,13 @@ Document role: CODEX BUILDER LOG
 - Child builder log `.hiveai/codex-logs/SB-CP02-010-C001_MANIFEST_VERSION_HISTORY_CODEX_LOG.md`; initial log commit `2b7ac11c9e69a5cac2aba6ad0382393ee2860f4e`, publication addendum `99a186a6348361b8972cea5b8406cbf5969bbdac`.
 - Implementation and log commits pushed normally. Post-push fetch verified HEAD == `origin/main` == `99a186a6348361b8972cea5b8406cbf5969bbdac`, 0/0 divergence, clean worktree.
 - No TASKS/audit edits, dependencies, credentials, network/provider behavior, or game/runtime changes.
+
+### SB-CP02-011-C001 — App / Content Schema Compatibility Behavior
+
+- Child base SHA: `0ba2ddc11693c9b10a850a30f4bbf0f0dad0c6c8`.
+- Implementation commit `199860ab55c5bd6254e18438dce4f5565a3149da`; adds pure explicit-input app/content compatibility, supported schema/version sets or ranges, stable fail-closed outcomes, focused tests, and M15 handoff documentation.
+- Focused child tests: **20 passed in 0.13s**. Cumulative CP02-001/009/010/011 + CP01/M12 + CP00/M11 + governance: **388 passed in 14.56s**.
+- Unfiltered `python -m pytest -q`: **1,546 passed, 19 skipped in 851.86s**. Compileall PASS; all 16 Content Pipeline JSON files parsed; staged/working diff checks PASS.
+- Child log `.hiveai/codex-logs/SB-CP02-011-C001_APP_CONTENT_SCHEMA_COMPATIBILITY_CODEX_LOG.md`; initial log commit `bc82bbc793d950008dfb274631d36d3aa4b726dd`, publication addendum `3cf2fc1f286b471466189f513df2c7022e475664`.
+- Implementation and log commits pushed normally. Post-push fetch verified HEAD == `origin/main` == `3cf2fc1f286b471466189f513df2c7022e475664`, 0/0 divergence, clean worktree.
+- No TASKS/audit edits, dependencies, credentials, provider/network behavior, or game/runtime integration.
