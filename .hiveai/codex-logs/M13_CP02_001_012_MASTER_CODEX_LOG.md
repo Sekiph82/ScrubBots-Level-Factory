@@ -37,3 +37,14 @@ Document role: CODEX BUILDER LOG
 - The first post-push guard printed equal HEAD/origin SHA and 0/0 but then failed its literal tab-delimited string comparison. A corrected numeric-field check passed with status clean; no additional push was made by that guard.
 
 - Final child/master log update was published in commit 7e17f0546fe3a68dcab9a97680d3e8576e47a3d3 by normal non-force push. The final fetch after that push verified HEAD == origin/main, 0/0 divergence, and a clean execution worktree. The child 001 builder log remains the latest published child log; no child 002 work began.
+
+### M13-CONT-001 — Full-Suite Scope Guard + Resume M13
+
+- Continuation base: `1ebb518cf8c2e590b338fbdab07f4f2c9b0c4505`; canonical Desktop checkout remained owner-dirty and 243 commits behind, untouched. One authorized TEMP continuation worktree began clean at 0/0.
+- Child 001 is already `PASS / CLOSED` by ChatGPT audit; no reimplementation or edits to its child log.
+- Continuation authorization and detailed evidence: `.hiveai/codex-logs/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_CODEX_LOG.md`.
+- Test-harness scope repair and full-suite gate are in progress; child 002 will begin only after the safe unfiltered suite completes.
+- Continuation update: first full-suite attempt was stopped under CONT-001.3 after process inspection found Godot using the implicit Desktop project. Exact test harness: `tests/integration/test_maint_supply_pipeline_v01.py`, whose collection-time `GameRules()` call followed the product default. Removed this equivalent test-only auto-discovery; focused harness set passed 31 with 17 expected capability skips. See the continuation log for full command and scope details.
+
+- CONT-001 completion: removed only test-harness implicit checkout discovery and strengthened the nested mobile-policy import guard. Focused harness set: 31 passed, 17 explicit capability skips. Unfiltered `python -m pytest -q`, with `SCRUBBOTS_PROJECT` and `SCRUBBOTS_CANONICAL_CHECKOUT` absent: **1418 passed, 19 skipped in 623.92s**. The process inspection during the suite found only the authorized route verifier clone under pytest TEMP; no Godot access to Desktop ScrubBots occurred.
+- Scope/static checks: content pipeline compileall PASS; JSON parse PASS for 16 scoped files; `git diff --check` PASS; forbidden desktop discovery search found only the expected contract/test text; TASKS/audit diff empty. Harness implementation commit: `7744ff52aa8e7d66b3f7c20cf23c00282e3e89cf`. CONT-001 gate is green; M13 resume is authorized by the live continuation prompt.
