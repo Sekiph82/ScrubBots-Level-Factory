@@ -83,7 +83,7 @@ def test_item_shapes_and_duplicate_identities_are_rejected() -> None:
         ContentManifestV1.from_dict({**ContentManifestV1().to_dict(), "packs": [{"pack_id": "p", "url": "x"}]})
     with pytest.raises(ContentManifestError, match="duplicate pack_id"):
         ContentManifestV1(packs=(pack_record("pack-a"), pack_record("pack-a")))
-    with pytest.raises(ContentManifestError, match="duplicate level_id"):
+    with pytest.raises(ContentManifestError, match="conflicting level ownership"):
         ContentManifestV1(
             levels=(ManifestLevelV1("level-a", "pack-a"), ManifestLevelV1("level-a", "pack-b"))
         )
@@ -393,3 +393,20 @@ def test_schedule_unknown_target_is_syntactically_preserved_for_later_reference_
     schedule = ManifestScheduleV1("pack", "future-pack", "2030-01-01T00:00:00Z")
     parsed = ContentManifestV1.from_dict({**ContentManifestV1().to_dict(), "schedules": [schedule.to_dict()]})
     assert parsed.schedules == (schedule,)
+
+
+def test_different_packs_cannot_claim_the_same_logical_object_key() -> None:
+    shared_key = "packs/shared/v1.scrubpack"
+    pack_a = ManifestPackV1("pack-a", 1, shared_key, "a" * 64, 128)
+    pack_b = ManifestPackV1("pack-b", 1, shared_key, "b" * 64, 256)
+    with pytest.raises(ContentManifestError, match="duplicate pack object_key") as error:
+        ContentManifestV1(packs=(pack_a, pack_b))
+    assert str(error.value) == "duplicate pack object_key"
+
+
+def test_one_logical_level_cannot_be_owned_by_multiple_packs() -> None:
+    with pytest.raises(ContentManifestError, match="conflicting level ownership") as error:
+        ContentManifestV1(
+            levels=(ManifestLevelV1("shared-level", "pack-a"), ManifestLevelV1("shared-level", "pack-b"))
+        )
+    assert str(error.value) == "conflicting level ownership"

@@ -207,11 +207,19 @@ class ContentManifestV1:
             raise ContentManifestError("schedules must contain ManifestScheduleV1 values")
         pack_ids = [pack.pack_id for pack in self.packs]
         normalized_pack_ids = [pack_id.casefold() for pack_id in pack_ids]
+        object_keys = [pack.object_key for pack in self.packs]
         level_ids = [level.level_id for level in self.levels]
         normalized_level_ids = [level_id.casefold() for level_id in level_ids]
+        level_owners: dict[str, set[str]] = {}
+        for level in self.levels:
+            level_owners.setdefault(level.level_id.casefold(), set()).add(level.pack_id.casefold())
         normalized_disabled_ids = [level_id.casefold() for level_id in self.disabled_levels]
         if len(normalized_pack_ids) != len(set(normalized_pack_ids)):
             raise ContentManifestError("duplicate pack_id")
+        if len(object_keys) != len(set(object_keys)):
+            raise ContentManifestError("duplicate pack object_key")
+        if any(len(owners) > 1 for _, owners in sorted(level_owners.items())):
+            raise ContentManifestError("conflicting level ownership")
         if len(normalized_level_ids) != len(set(normalized_level_ids)):
             raise ContentManifestError("duplicate level_id")
         if len(normalized_disabled_ids) != len(set(normalized_disabled_ids)):
