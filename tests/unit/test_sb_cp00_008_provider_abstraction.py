@@ -85,6 +85,7 @@ def test_contracts_are_versioned_and_read_and_mutation_protocols_are_separate() 
     assert validate_provider_capability(capability)
     assert capability.contract_version == "1.0"
     assert "inspect" in ReadOnlyProvider.__dict__ or "inspect" in getattr(ReadOnlyProvider, "__annotations__", {})
+    assert "read_object_bytes" in ReadOnlyProvider.__dict__
     assert "write_object" in MutatingProvider.__dict__
     assert "delete_object" in MutatingProvider.__dict__
     assert "verify_object" in MutatingProvider.__dict__

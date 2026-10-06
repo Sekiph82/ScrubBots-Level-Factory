@@ -16,12 +16,14 @@ from scrubbots_content_pipeline import (  # noqa: E402
     ProviderCapability,
     ProviderFeature,
     ProviderIdentity,
+    ProviderObjectBytesResult,
     ProviderResult,
     ProviderResultCategory,
     ScrubpackLevelInput,
     ScrubpackPayloadInput,
     build_candidate_manifest,
     build_scrubpack,
+    inspect_scrubpack,
     upload_candidate_packs_to_staging,
 )
 
@@ -94,6 +96,7 @@ class MemoryProvider:
         self.calls: list[tuple[str, str, bytes | None]] = []
         self.fail_key = fail_key
         self.omit_integrity = omit_integrity
+        self.read_overrides: dict[str, tuple[str, bytes]] = {}
 
     def write_object_bytes(
         self, environment: Environment, object_key: str, content_digest: str,
@@ -123,6 +126,16 @@ class MemoryProvider:
         return ProviderResult("1.0", ProviderResultCategory.SUCCESS if raw is not None else ProviderResultCategory.UNAVAILABLE,
                               self.identity.provider_id, environment, digest)
 
+    def read_object_bytes(self, environment: Environment, object_key: str) -> ProviderObjectBytesResult:
+        self.calls.append(("read", object_key, None))
+        returned_key, raw = self.read_overrides.get(
+            object_key, (object_key, self.objects.get(object_key, b""))
+        )
+        return ProviderObjectBytesResult(
+            "1.0", ProviderResultCategory.SUCCESS if object_key in self.objects else ProviderResultCategory.UNAVAILABLE,
+            self.identity.provider_id, environment, returned_key, raw,
+        )
+
 
 def test_uploads_exact_packs_in_deterministic_order_then_authorizes_manifest_step() -> None:
     candidate = _candidate()
@@ -136,11 +149,16 @@ def test_uploads_exact_packs_in_deterministic_order_then_authorizes_manifest_ste
     assert report.reason_code.value == "COMPLETE"
     assert [(kind, key) for kind, key, _ in provider.calls] == [
         ("write", "packs/pack-a/v2.scrubpack"), ("verify", "packs/pack-a/v2.scrubpack"),
+        ("read", "packs/pack-a/v2.scrubpack"),
         ("write", "packs/pack-b/v2.scrubpack"), ("verify", "packs/pack-b/v2.scrubpack"),
+        ("read", "packs/pack-b/v2.scrubpack"),
     ]
     for pack in candidate.manifest.packs:
         build = next(item for item in candidate.pack_builds if item.evidence.pack_id == pack.pack_id)
         assert provider.objects[pack.object_key] == build.archive_bytes
+        inspected = inspect_scrubpack(provider.objects[pack.object_key])
+        assert inspected.accepted is True
+        assert inspected.pack_id == pack.pack_id
     assert [item.sequence for item in report.uploaded_packs] == [1, 2]
     assert all(item.idempotent_existing_object is False for item in report.uploaded_packs)
 
@@ -156,7 +174,9 @@ def test_identical_existing_objects_are_idempotent_only_after_digest_verificatio
 
     assert report.accepted and report.manifest_write_authorized
     assert all(item.idempotent_existing_object for item in report.uploaded_packs)
-    assert [kind for kind, _, _ in provider.calls] == ["write", "verify", "write", "verify"]
+    assert [kind for kind, _, _ in provider.calls] == [
+        "write", "verify", "read", "write", "verify", "read"
+    ]
 
 
 def test_conflicting_existing_digest_stops_before_later_packs_and_withholds_manifest_authority() -> None:
@@ -201,3 +221,40 @@ def test_missing_capability_and_invalid_candidate_make_no_provider_calls() -> No
     assert missing.calls == []
     assert invalid.manifest_write_authorized is False
     assert invalid.reason_code.value == "INVALID_CANDIDATE"
+
+
+def test_reported_provider_success_cannot_hide_truncated_mutated_or_swapped_read_bytes() -> None:
+    candidate = _candidate()
+    first, second = candidate.manifest.packs
+    second_build = next(item for item in candidate.pack_builds if item.evidence.pack_id == second.pack_id)
+    first_build = next(item for item in candidate.pack_builds if item.evidence.pack_id == first.pack_id)
+    variants = (
+        (first.object_key, (first.object_key, first_build.archive_bytes[:-1])),
+        (first.object_key, (first.object_key, first_build.archive_bytes[:-1] + b"x")),
+        (first.object_key, (first.object_key, second_build.archive_bytes)),
+        (first.object_key, ("packs/wrong-key/v2.scrubpack", first_build.archive_bytes)),
+    )
+
+    for object_key, override in variants:
+        provider = MemoryProvider()
+        provider.read_overrides[object_key] = override
+        report = upload_candidate_packs_to_staging(candidate, provider)
+        assert report.accepted is False
+        assert report.manifest_write_authorized is False
+        assert report.reason_code.value == "OBJECT_INTEGRITY_FAILED"
+        assert report.failed_object_key == object_key
+
+
+def test_candidate_with_stale_manifest_digest_is_rejected_before_any_object_write() -> None:
+    candidate = _candidate()
+    provider = MemoryProvider()
+    stale = CandidateManifestBuildResult(
+        candidate.manifest, candidate.manifest_bytes, "0" * 64, candidate.pack_builds,
+        candidate.strict_round_trip_valid, candidate.references, candidate.compatibility, candidate.successor,
+    )
+
+    report = upload_candidate_packs_to_staging(stale, provider)
+
+    assert report.manifest_write_authorized is False
+    assert report.reason_code.value == "INVALID_CANDIDATE"
+    assert provider.calls == []

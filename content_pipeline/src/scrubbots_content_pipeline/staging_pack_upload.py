@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Protocol
 
 from .candidate_manifest import CandidateManifestBuildResult
-from .compatibility import AppContentCompatibilityResult
 from .config import Environment
 from .manifest_parser import ManifestParseError, parse_content_manifest_v1
 from .manifest_validation import validate_manifest_references
@@ -20,12 +18,14 @@ from .provider import (
     ProviderCapability,
     ProviderFeature,
     ProviderIdentity,
+    ProviderObjectBytesResult,
     ProviderResult,
     ProviderResultCategory,
     negotiate_capabilities,
     validate_provider_capability,
     validate_provider_identity,
 )
+from .scrubpack_inspection import inspect_scrubpack
 
 
 _REQUIRED_FEATURES = tuple(sorted(
@@ -56,6 +56,10 @@ class StagingByteWriter(Protocol):
     def verify_object(
         self, environment: Environment, object_key: str, expected_digest: str
     ) -> ProviderResult: ...
+
+    def read_object_bytes(
+        self, environment: Environment, object_key: str
+    ) -> ProviderObjectBytesResult: ...
 
 
 class PackUploadReasonCode(StrEnum):
@@ -208,6 +212,36 @@ def upload_candidate_packs_to_staging(
                 False, False, reason, candidate.manifest_sha256,
                 negotiation, tuple(uploaded), pack.object_key, attempted,
             )
+        try:
+            read_result = provider.read_object_bytes(Environment.STAGING, pack.object_key)
+        except Exception:
+            read_result = None
+        if not _valid_provider_bytes_result(read_result, identity, pack.object_key):
+            return StagingPackUploadReport(
+                False, False, PackUploadReasonCode.OBJECT_INTEGRITY_FAILED,
+                candidate.manifest_sha256, negotiation, tuple(uploaded), pack.object_key, attempted,
+            )
+        stored_bytes = read_result.content_bytes
+        build_evidence = build.evidence
+        inspection = inspect_scrubpack(stored_bytes)
+        bytes_match = (
+            len(stored_bytes) == pack.byte_length
+            and hashlib.sha256(stored_bytes).hexdigest() == pack.sha256
+            and stored_bytes == raw
+        )
+        inspection_matches = (
+            inspection is not None
+            and inspection.accepted
+            and inspection.pack_id == pack.pack_id == build_evidence.pack_id
+            and inspection.pack_version == pack.pack_version == build_evidence.pack_version
+            and inspection.level_ids == build_evidence.level_ids
+            and inspection.archive_sha256 == pack.sha256
+        )
+        if not bytes_match or not inspection_matches:
+            return StagingPackUploadReport(
+                False, False, PackUploadReasonCode.OBJECT_INTEGRITY_FAILED,
+                candidate.manifest_sha256, negotiation, tuple(uploaded), pack.object_key, attempted,
+            )
         uploaded.append(UploadedPackEvidence(
             sequence, pack.pack_id, pack.object_key, digest, len(raw), idempotent
         ))
@@ -229,6 +263,20 @@ def _valid_provider_result(result: object, identity: ProviderIdentity) -> bool:
             result.content_digest is None
             or (isinstance(result.content_digest, str) and re.fullmatch(r"[a-f0-9]{64}", result.content_digest))
         )
+    )
+
+
+def _valid_provider_bytes_result(
+    result: object, identity: ProviderIdentity, expected_object_key: str
+) -> bool:
+    return (
+        isinstance(result, ProviderObjectBytesResult)
+        and result.result_version == PROVIDER_CONTRACT_VERSION
+        and result.category is ProviderResultCategory.SUCCESS
+        and result.provider_id == identity.provider_id
+        and result.environment is Environment.STAGING
+        and result.object_key == expected_object_key
+        and type(result.content_bytes) is bytes
     )
 
 

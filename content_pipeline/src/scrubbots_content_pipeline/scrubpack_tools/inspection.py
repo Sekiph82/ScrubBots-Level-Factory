@@ -232,9 +232,9 @@ def _inspect_archive_bytes(raw: bytes) -> ScrubpackInspectionResult:
         return _failure("INVALID_ZIP")
 
 
-def inspect_scrubpack(path: str | os.PathLike[str]) -> ScrubpackInspectionResult:
-    """Inspect one explicit local pack without writing or loading its payloads."""
-    raw = _read_local_archive(path)
+def inspect_scrubpack(path: str | os.PathLike[str] | bytes) -> ScrubpackInspectionResult:
+    """Inspect exact archive bytes or one explicit local pack path without writing payloads."""
+    raw = path if type(path) is bytes else _read_local_archive(path)
     if isinstance(raw, ScrubpackInspectionResult):
         return raw
     return _inspect_archive_bytes(raw)

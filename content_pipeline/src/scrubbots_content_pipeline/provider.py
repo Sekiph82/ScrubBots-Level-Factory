@@ -100,6 +100,18 @@ class ProviderResult:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderObjectBytesResult:
+    """Read-only exact object bytes with explicit key and provider result identity."""
+
+    result_version: str
+    category: ProviderResultCategory
+    provider_id: str
+    environment: Environment
+    object_key: str
+    content_bytes: bytes | None
+
+
+@dataclass(frozen=True, slots=True)
 class CapabilityNegotiationResult:
     negotiation_version: str
     accepted: bool
@@ -228,6 +240,12 @@ class ReadOnlyProvider(Protocol):
         """Inspect provider-neutral object identity and integrity without writes."""
         ...
 
+    def read_object_bytes(
+        self, environment: Environment, logical_object_id: str
+    ) -> ProviderObjectBytesResult:
+        """Read exact stored bytes without changing provider state."""
+        ...
+
     def validate_content(self, environment: Environment, logical_object_id: str, content_digest: str) -> ProviderResult:
         """Validate a future publication precondition without changing state."""
         ...
@@ -281,7 +299,7 @@ class ProviderAdapter(Protocol):
 
 __all__ = [
     "PROVIDER_CONTRACT_VERSION", "CapabilityNegotiationResult", "ProviderAdapter",
-    "ProviderCapability", "ProviderFeature", "ProviderIdentity", "ProviderResult",
+    "ProviderCapability", "ProviderFeature", "ProviderIdentity", "ProviderObjectBytesResult", "ProviderResult",
     "ProviderResultCategory", "ReadOnlyProvider", "MutatingProvider",
     "negotiate_capabilities", "serialize_provider_capability", "serialize_provider_identity", "serialize_provider_result",
     "validate_provider_capability", "validate_provider_identity",
