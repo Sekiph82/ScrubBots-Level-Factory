@@ -40,6 +40,7 @@ from .manifest_v1 import (
     ManifestPackV1,
     check_game_version_compatibility,
     check_manifest_successor,
+    is_level_disabled,
     parse_canonical_game_version,
 )
 from .orchestration import (
@@ -165,6 +166,7 @@ __all__ = [
     "ManifestPackV1",
     "check_game_version_compatibility",
     "check_manifest_successor",
+    "is_level_disabled",
     "parse_canonical_game_version",
     "BOUNDARY_VERSION",
     "ClassificationResult",

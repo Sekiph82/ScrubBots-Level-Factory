@@ -4,12 +4,17 @@
   "title": "SCRUBBOTS Remote Content Manifest V1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "schema_version", "content_version", "minimum_game_version", "packs", "levels"],
+  "required": ["schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"],
   "properties": {
     "schema": { "const": "scrubbots.content.manifest.v1" },
     "schema_version": { "type": "integer", "const": 1 },
     "content_version": { "type": "integer", "minimum": 1 },
     "minimum_game_version": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$" },
+    "disabled_levels": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+    },
     "packs": {
       "type": "array",
       "items": {

@@ -21,6 +21,7 @@ from scrubbots_content_pipeline.manifest_v1 import (  # noqa: E402
     ManifestPackV1,
     check_game_version_compatibility,
     check_manifest_successor,
+    is_level_disabled,
     parse_canonical_game_version,
 )
 
@@ -65,7 +66,7 @@ def test_noncontiguous_level_ids_are_preserved_without_numeric_order_derivation(
         ({"schema": "scrubbots.content.manifest.v2"}, "unsupported manifest schema"),
         ({"schema_version": True}, "unsupported manifest schema_version"),
         ({"schema_version": 2}, "unsupported manifest schema_version"),
-        ({"packs": {"pack_id": "pack-a"}}, "packs and levels must be arrays"),
+        ({"packs": {"pack_id": "pack-a"}}, "packs, levels, and disabled_levels must be arrays"),
     ],
 )
 def test_root_is_closed_and_identity_or_version_fail_closed(change, message: str) -> None:
@@ -93,7 +94,7 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     assert schema["properties"]["schema"]["const"] == CONTENT_MANIFEST_SCHEMA
     assert schema["properties"]["schema_version"] == {"type": "integer", "const": 1}
     assert set(schema["required"]) == {
-        "schema", "schema_version", "content_version", "minimum_game_version", "packs", "levels"
+        "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"
     }
     assert schema["properties"]["content_version"] == {"type": "integer", "minimum": 1}
     assert schema["properties"]["minimum_game_version"]["pattern"] == (
@@ -102,6 +103,8 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     pack_schema = schema["properties"]["packs"]["items"]
     assert set(pack_schema["required"]) == {"pack_id", "pack_version", "object_key", "sha256", "byte_length"}
     assert pack_schema["additionalProperties"] is False
+    disabled_schema = schema["properties"]["disabled_levels"]
+    assert disabled_schema["type"] == "array" and disabled_schema["uniqueItems"] is True
 
 
 @pytest.mark.parametrize("version", [True, False, 0, -1, 1.0, "1", None])
@@ -288,3 +291,46 @@ def test_pack_id_grammar_is_canonical_lowercase_and_blocks_case_collisions() -> 
         pack_record("Pack-A")
     with pytest.raises(ContentManifestError, match="duplicate pack_id"):
         ContentManifestV1(packs=(pack_record("pack-a"), pack_record("pack-a")))
+
+
+def test_disabled_levels_sort_canonically_and_preserve_unrelated_metadata() -> None:
+    pack = pack_record("pack-a")
+    level = ManifestLevelV1("level-004", "pack-a")
+    manifest = ContentManifestV1(
+        packs=(pack,),
+        levels=(level,),
+        disabled_levels=("future-level", "level-004"),
+    )
+    before_pack_bytes = pack.to_json_bytes()
+    parsed = ContentManifestV1.from_dict(manifest.to_dict())
+    assert parsed.disabled_levels == ("future-level", "level-004")
+    assert [item.level_id for item in parsed.levels] == ["level-004"]
+    assert [item.pack_id for item in parsed.packs] == ["pack-a"]
+    assert is_level_disabled(parsed, "future-level")
+    assert is_level_disabled(parsed, "level-004")
+    assert not is_level_disabled(parsed, "another-valid-id")
+    assert pack.to_json_bytes() == before_pack_bytes
+
+
+@pytest.mark.parametrize(
+    "disabled_levels",
+    [
+        ("level-a", "level-a"),
+        ("Level-A", "level-a"),
+        ("../level",),
+        ("level/a",),
+        (True,),
+        ["level-a"],
+    ],
+)
+def test_invalid_disabled_level_ids_and_collisions_fail_closed(disabled_levels: object) -> None:
+    with pytest.raises(ContentManifestError):
+        ContentManifestV1(disabled_levels=disabled_levels)  # type: ignore[arg-type]
+
+
+def test_disabled_level_query_rejects_invalid_inputs() -> None:
+    manifest = ContentManifestV1()
+    with pytest.raises(ContentManifestError, match="invalid level_id"):
+        is_level_disabled(manifest, "../level")
+    with pytest.raises(ContentManifestError, match="manifest must"):
+        is_level_disabled(object(), "level-a")  # type: ignore[arg-type]

@@ -135,6 +135,7 @@ class ContentManifestV1:
     schema_version: int = CONTENT_MANIFEST_SCHEMA_VERSION
     content_version: int = 1
     minimum_game_version: str = "0.0.0"
+    disabled_levels: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if self.schema != CONTENT_MANIFEST_SCHEMA:
@@ -148,15 +149,25 @@ class ContentManifestV1:
             raise ContentManifestError("packs must contain ManifestPackV1 values")
         if not isinstance(self.levels, tuple) or any(not isinstance(level, ManifestLevelV1) for level in self.levels):
             raise ContentManifestError("levels must contain ManifestLevelV1 values")
+        if not isinstance(self.disabled_levels, tuple) or any(
+            not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id) for level_id in self.disabled_levels
+        ):
+            raise ContentManifestError("disabled_levels must contain canonical level IDs")
         pack_ids = [pack.pack_id for pack in self.packs]
         normalized_pack_ids = [pack_id.casefold() for pack_id in pack_ids]
         level_ids = [level.level_id for level in self.levels]
         normalized_level_ids = [level_id.casefold() for level_id in level_ids]
+        normalized_disabled_ids = [level_id.casefold() for level_id in self.disabled_levels]
         if len(normalized_pack_ids) != len(set(normalized_pack_ids)):
             raise ContentManifestError("duplicate pack_id")
         if len(normalized_level_ids) != len(set(normalized_level_ids)):
             raise ContentManifestError("duplicate level_id")
+        if len(normalized_disabled_ids) != len(set(normalized_disabled_ids)):
+            raise ContentManifestError("duplicate disabled level ID")
         object.__setattr__(self, "packs", tuple(sorted(self.packs, key=lambda pack: pack.pack_id.encode("ascii"))))
+        object.__setattr__(
+            self, "disabled_levels", tuple(sorted(self.disabled_levels, key=lambda level_id: level_id.encode("ascii")))
+        )
         # Preserve declared level array order; level identity never implies catalog order.
 
     def to_dict(self) -> dict[str, object]:
@@ -166,6 +177,7 @@ class ContentManifestV1:
             "schema_version": self.schema_version,
             "content_version": self.content_version,
             "minimum_game_version": self.minimum_game_version,
+            "disabled_levels": list(self.disabled_levels),
             "packs": [pack.to_dict() for pack in self.packs],
             "levels": [level.to_dict() for level in self.levels],
         }
@@ -179,7 +191,9 @@ class ContentManifestV1:
     @classmethod
     def from_dict(cls, value: object) -> ContentManifestV1:
         """Parse a mapping only when every root and item field is explicitly known."""
-        required = {"schema", "schema_version", "content_version", "minimum_game_version", "packs", "levels"}
+        required = {
+            "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"
+        }
         if not isinstance(value, Mapping) or set(value) != required:
             raise ContentManifestError("invalid manifest fields")
         if value["schema"] != CONTENT_MANIFEST_SCHEMA:
@@ -189,8 +203,8 @@ class ContentManifestV1:
         if type(value["content_version"]) is not int or value["content_version"] < 1:
             raise ContentManifestError("content_version must be a positive integer")
         parse_canonical_game_version(value["minimum_game_version"])
-        if not isinstance(value["packs"], list) or not isinstance(value["levels"], list):
-            raise ContentManifestError("packs and levels must be arrays")
+        if not isinstance(value["packs"], list) or not isinstance(value["levels"], list) or not isinstance(value["disabled_levels"], list):
+            raise ContentManifestError("packs, levels, and disabled_levels must be arrays")
         packs: list[ManifestPackV1] = []
         for item in value["packs"]:
             if not isinstance(item, Mapping) or set(item) != {
@@ -218,7 +232,17 @@ class ContentManifestV1:
             value["schema_version"],
             value["content_version"],
             value["minimum_game_version"],
+            tuple(value["disabled_levels"]),
         )
+
+
+def is_level_disabled(manifest: ContentManifestV1, level_id: object) -> bool:
+    """Return whether an explicit canonical level ID appears in this manifest's disable list."""
+    if not isinstance(manifest, ContentManifestV1):
+        raise ContentManifestError("manifest must be a ContentManifestV1")
+    if not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id):
+        raise ContentManifestError("invalid level_id")
+    return level_id in manifest.disabled_levels
 
 
 def check_manifest_successor(
@@ -264,6 +288,7 @@ __all__ = [
     "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
+    "is_level_disabled",
     "check_manifest_successor",
     "check_game_version_compatibility",
     "parse_canonical_game_version",

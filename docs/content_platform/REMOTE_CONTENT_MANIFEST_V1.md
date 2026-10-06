@@ -2,9 +2,10 @@
 
 The canonical local contract is `scrubbots.content.manifest.v1` with integer
 `schema_version: 1`. Its root is closed and contains only `schema`,
-`schema_version`, positive integer `content_version`, canonical `minimum_game_version`, `packs`, and `levels`. Unknown properties and unsupported
-identity or version values fail closed. Add future fields only through an
-explicit versioned schema evolution.
+`schema_version`, positive integer `content_version`, canonical
+`minimum_game_version`, `disabled_levels`, `packs`, and `levels`. Unknown
+properties and unsupported identity or version values fail closed. Add future
+fields only through an explicit versioned schema evolution.
 
 Each pack entry owns a canonical lowercase `pack_id`, positive `pack_version`,
 provider-neutral `object_key`, lowercase SHA-256, and positive exact archive
@@ -24,6 +25,12 @@ canonical JSON serialization are deterministic, including per-pack
 `content_pipeline/schemas/v1/examples/content-manifest-minimal.json` is the
 canonical minimal V1 value.
 
+`disabled_levels` is a canonical ASCII-sorted list of unique path-safe level
+IDs. It records declarative state only: it does not delete the level metadata,
+remove pack references, rewrite or mutate `.scrubpack` bytes, or reject an
+unknown level reference at parse time. `is_level_disabled()` is a pure query;
+full reference validation is owned by the later publish-validation child.
+
 `content_version` is a positive integer revision identity. A proposed
 successor is accepted only when its version is numerically greater than the
 previous accepted version; gaps are allowed, while equal or lower versions
@@ -41,6 +48,5 @@ clock, network, or runtime lookup.
 This manifest is declarative local data. It contains no executable payload,
 provider choice, URL, credential, or runtime operation. It does not publish,
 upload, download, resolve references, or change `.scrubpack` identity. Level
-metadata, disabled
-or scheduled state, reference validation, history, and parser workflows are
+metadata, schedules, reference validation, history, and parser workflows are
 defined by later M13 child contracts.
