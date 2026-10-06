@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sys
+import threading
 from dataclasses import replace
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from scrubbots_content_pipeline.production_promotion import (
     OwnerPromotionApproval, ProductionManifestPrecondition, PromotionReasonCode,
     promote_verified_staging_to_production,
 )
-from scrubbots_content_pipeline.release_state import ReleaseState, make_release_event
+from scrubbots_content_pipeline.release_state import ReleaseState, make_release_event, replay_release_events
 from scrubbots_content_pipeline.staging_download_verify import StagingDownloadReasonCode, StagingDownloadVerificationReport
 from scrubbots_content_pipeline.manifest_parser import parse_content_manifest_v1
 from test_sb_cp03_007_staging_download_verify import _setup, MANIFEST_KEY, verify_staged_manifest_download
@@ -37,9 +38,11 @@ class PromotionMemoryProvider:
                      key=lambda item: item.value)),
     )
 
-    def __init__(self, staging: dict[str, bytes]):
+    def __init__(self, staging: dict[str, bytes], release_events=()):
         self.objects = {(Environment.STAGING, key): value for key, value in staging.items()}
         self.calls: list[tuple] = []
+        self.release_events = list(release_events)
+        self._cas_lock = threading.Lock()
         self.bad_production_key = False
         self.fail_manifest = False
         self.corrupt_manifest_after_write = False
@@ -65,34 +68,50 @@ class PromotionMemoryProvider:
         return ProviderObjectBytesResult("1.0", ProviderResultCategory.SUCCESS, self.identity.provider_id,
                                          environment, key, raw)
 
-    def append_release_event(self, event):
+    def read_release_events(self):
+        return tuple(self.release_events)
+
+    def append_release_event(self, event, *, expected_prior_sequence, expected_prior_event_digest):
         self.calls.append(("event", event.to_state, event.event_digest))
+        with self._cas_lock:
+            current_tip = self.release_events[-1].event_digest if self.release_events else "0" * 64
+            if (len(self.release_events) != expected_prior_sequence
+                    or current_tip != expected_prior_event_digest
+                    or not replay_release_events((*self.release_events, event)).accepted):
+                return ProviderResult("1.0", ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                      self.identity.provider_id, Environment.PRODUCTION, current_tip)
+            self.release_events.append(event)
         return ProviderResult("1.0", ProviderResultCategory.SUCCESS, self.identity.provider_id,
                               Environment.PRODUCTION, event.event_digest)
 
     def write_manifest_conditionally(self, environment, target_id, object_key, content_digest, content_bytes,
                                      *, expected_prior_sha256, expected_prior_content_version,
+                                     expected_release_state_sequence, expected_release_state_tip_digest,
                                      promotion_pending_event_digest):
         self.calls.append(("manifest", environment, object_key, promotion_pending_event_digest))
         slot = (environment, object_key)
-        current = self.objects.get(slot)
-        current_digest = hashlib.sha256(current).hexdigest() if current is not None else None
-        current_version = json.loads(current.decode("utf-8")).get("content_version") if current is not None else None
-        if (self.fail_manifest or current_digest != expected_prior_sha256
-                or current_version != expected_prior_content_version):
-            return ProviderResult("1.0", ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
-                                  self.identity.provider_id, environment, current_digest)
-        if hashlib.sha256(content_bytes).hexdigest() != content_digest:
-            return ProviderResult("1.0", ProviderResultCategory.INTEGRITY_MISMATCH,
-                                  self.identity.provider_id, environment, None)
-        if self.corrupt_manifest_after_write:
-            content_bytes = content_bytes + b" "
-        self.objects[(environment, object_key)] = content_bytes
-        if self.corrupt_pack_after_write:
-            pack_slot = next((key for env, key in self.objects if env is Environment.PRODUCTION
-                              and key.startswith("packs/")), None)
-            if pack_slot is not None:
-                self.objects[(Environment.PRODUCTION, pack_slot)] = b"changed-after-manifest-write"
+        with self._cas_lock:
+            current = self.objects.get(slot)
+            current_digest = hashlib.sha256(current).hexdigest() if current is not None else None
+            current_version = json.loads(current.decode("utf-8")).get("content_version") if current is not None else None
+            current_tip = self.release_events[-1].event_digest if self.release_events else "0" * 64
+            if (self.fail_manifest or current_digest != expected_prior_sha256
+                    or current_version != expected_prior_content_version
+                    or len(self.release_events) != expected_release_state_sequence
+                    or current_tip != expected_release_state_tip_digest):
+                return ProviderResult("1.0", ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                      self.identity.provider_id, environment, current_digest)
+            if hashlib.sha256(content_bytes).hexdigest() != content_digest:
+                return ProviderResult("1.0", ProviderResultCategory.INTEGRITY_MISMATCH,
+                                      self.identity.provider_id, environment, None)
+            if self.corrupt_manifest_after_write:
+                content_bytes = content_bytes + b" "
+            self.objects[(environment, object_key)] = content_bytes
+            if self.corrupt_pack_after_write:
+                pack_slot = next((key for env, key in self.objects if env is Environment.PRODUCTION
+                                  and key.startswith("packs/")), None)
+                if pack_slot is not None:
+                    self.objects[(Environment.PRODUCTION, pack_slot)] = b"changed-after-manifest-write"
         return ProviderResult("1.0", ProviderResultCategory.SUCCESS, self.identity.provider_id,
                               environment, content_digest)
 
@@ -130,7 +149,7 @@ def _case():
                                      staging.receipt.content_version, PRODUCTION_TARGET.logical_target_id)
     provider = PromotionMemoryProvider({**{row.object_key: exact[row.pack_id]
                                           for row in staging.receipt.packs},
-                                       MANIFEST_KEY: staging.receipt.manifest_bytes})
+                                       MANIFEST_KEY: staging.receipt.manifest_bytes}, history)
     precondition = ProductionManifestPrecondition(PRODUCTION_TARGET.logical_target_id, MANIFEST_KEY,
                                                    None, None, None)
     current_authority = {"repository": REPOSITORY, "branch": "main", "commit": "a" * 40,

@@ -41,6 +41,7 @@ _GIT = re.compile(r"^[a-f0-9]{40}$")
 
 class ProductionManifestReasonCode(StrEnum):
     ACTIVATED = "ACTIVATED"
+    ALREADY_CURRENT = "ALREADY_CURRENT"
     INVALID_INPUT = "INVALID_INPUT"
     STAGING_NOT_VERIFIED = "STAGING_NOT_VERIFIED"
     PACK_PROMOTION_NOT_ACCEPTED = "PACK_PROMOTION_NOT_ACCEPTED"
@@ -151,6 +152,7 @@ def activate_versioned_production_manifest(
         if not history_check.accepted:
             return _failure(ProductionManifestReasonCode.INVALID_HISTORY)
         last = manifest_history.records[-1] if manifest_history.records else None
+        exact_history_repeat = False
         if last is None:
             if (precondition.expected_prior_sha256 is not None
                     or precondition.expected_prior_content_version is not None
@@ -166,7 +168,10 @@ def activate_versioned_production_manifest(
             prior_manifest = parse_content_manifest_v1(last.manifest_bytes)
             if prior_manifest.to_json_bytes() != last.manifest_bytes or prior_manifest.content_version != prior_version:
                 return _failure(ProductionManifestReasonCode.INVALID_HISTORY)
-            if not check_manifest_successor(prior_version, manifest.to_dict()).accepted:
+            exact_history_repeat = (last.manifest_bytes == manifest_bytes
+                                    and last.manifest_sha256 == manifest_sha
+                                    and last.content_version == manifest.content_version)
+            if not exact_history_repeat and not check_manifest_successor(prior_version, manifest.to_dict()).accepted:
                 return _failure(ProductionManifestReasonCode.VERSION_NOT_INCREASED)
         compatibility = check_app_content_compatibility(
             current_game_version=current_game_version,
@@ -203,6 +208,16 @@ def activate_versioned_production_manifest(
                 or pending_events[0].event_digest != promotion_report.release_events[-1].event_digest):
             return _failure(ProductionManifestReasonCode.PACK_PROMOTION_NOT_ACCEPTED)
         pending = pending_events[0]
+        promoted = make_release_event(
+            sequence=pending.sequence + 1, event_id=f"production-promoted-{manifest_sha[:24]}",
+            transition_id=f"production-promoted-{manifest_sha[:24]}", record_id=pending.record_id,
+            content_id=pending.content_id, content_digest=manifest_sha, environment=Environment.PRODUCTION,
+            from_state=ReleaseState.PROMOTION_PENDING, to_state=ReleaseState.PRODUCTION_PROMOTED,
+            expected_state=ReleaseState.PROMOTION_PENDING, previous_event_digest=pending.event_digest,
+            promotion_intent=True, source_record_id=pending.source_record_id,
+        )
+        if not replay_release_events((*chain, pending, promoted)).accepted:
+            return _failure(ProductionManifestReasonCode.INVALID_HISTORY)
         builds_by_id = {item.evidence.pack_id: item for item in pack_builds}
         readbacks: list[ProductionPackVerification] = []
         for row in staging.packs:
@@ -235,12 +250,49 @@ def activate_versioned_production_manifest(
             return _failure(ProductionManifestReasonCode.OWNER_APPROVAL_LOST)
         if not _fresh_authority(game_authority_check, authority):
             return _failure(ProductionManifestReasonCode.GAME_AUTHORITY_STALE)
+        # The only idempotent success is an exact live object already supported by
+        # both M13 history and the complete, replayable M11 production promotion.
+        try:
+            live_manifest = provider.read_object_bytes(Environment.PRODUCTION, manifest_object_key)
+            live_ledger = tuple(provider.read_release_events())
+        except Exception:
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
+        if _valid_object(live_manifest, identity.provider_id, manifest_object_key, manifest_bytes,
+                         manifest_sha, len(manifest_bytes)):
+            ledger_replay = replay_release_events(live_ledger)
+            if (exact_history_repeat and ledger_replay.accepted
+                    and ledger_replay.current_production_record_id == pending.record_id
+                    and len(live_ledger) >= 2 and live_ledger[-2:] == (pending, promoted)):
+                return ProductionManifestActivationReport(
+                    True, ProductionManifestReasonCode.ALREADY_CURRENT, False, None, promoted)
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
+        if exact_history_repeat and live_manifest.content_bytes is None:
+            return _failure(ProductionManifestReasonCode.VERSION_NOT_INCREASED)
+        if not _live_manifest_matches_precondition(live_manifest, identity.provider_id,
+                                                   manifest_object_key, precondition):
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
+        expected_ledger = (*chain, pending)
+        if (not replay_release_events(live_ledger).accepted or live_ledger != expected_ledger):
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
+        # Re-read both mutable authorities at the mutation boundary. The provider
+        # must atomically compare these exact values inside its conditional write.
+        try:
+            current_manifest = provider.read_object_bytes(Environment.PRODUCTION, manifest_object_key)
+            ledger_events = tuple(provider.read_release_events())
+        except Exception:
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
+        if (not _live_manifest_matches_precondition(current_manifest, identity.provider_id,
+                                                    manifest_object_key, precondition)
+                or ledger_events != expected_ledger or not replay_release_events(ledger_events).accepted):
+            return _failure(ProductionManifestReasonCode.PROVIDER_CONFLICT)
         attempted = True
         try:
             write = provider.write_manifest_conditionally(
                 Environment.PRODUCTION, production_target_id, manifest_object_key, manifest_sha, manifest_bytes,
                 expected_prior_sha256=precondition.expected_prior_sha256,
                 expected_prior_content_version=precondition.expected_prior_content_version,
+                expected_release_state_sequence=len(ledger_events),
+                expected_release_state_tip_digest=_ledger_tip(ledger_events),
                 promotion_pending_event_digest=pending.event_digest,
             )
         except Exception:
@@ -271,18 +323,10 @@ def activate_versioned_production_manifest(
             return _failure(ProductionManifestReasonCode.PRODUCTION_MANIFEST_MISMATCH, attempted=True)
         new_history = append_manifest_history(manifest_history, manifest_bytes, recorded_at_utc=recorded_at_utc)
         record = new_history.records[-1]
-        promoted = make_release_event(
-            sequence=pending.sequence + 1, event_id=f"production-promoted-{manifest_sha[:24]}",
-            transition_id=f"production-promoted-{manifest_sha[:24]}", record_id=pending.record_id,
-            content_id=pending.content_id, content_digest=manifest_sha, environment=Environment.PRODUCTION,
-            from_state=ReleaseState.PROMOTION_PENDING, to_state=ReleaseState.PRODUCTION_PROMOTED,
-            expected_state=ReleaseState.PROMOTION_PENDING, previous_event_digest=pending.event_digest,
-            promotion_intent=True, source_record_id=pending.source_record_id,
-        )
-        if not replay_release_events((*chain, pending, promoted)).accepted:
-            return _failure(ProductionManifestReasonCode.INVALID_HISTORY, attempted=True)
         try:
-            appended = provider.append_release_event(promoted)
+            appended = provider.append_release_event(
+                promoted, expected_prior_sequence=pending.sequence,
+                expected_prior_event_digest=pending.event_digest)
         except Exception:
             appended = None
         if not _provider_success(appended, identity.provider_id, promoted.event_digest):
@@ -376,6 +420,30 @@ def _provider_success(result: object, provider_id: str, digest: str) -> bool:
     return (isinstance(result, ProviderResult) and result.result_version == PROVIDER_CONTRACT_VERSION
             and result.category is ProviderResultCategory.SUCCESS and result.provider_id == provider_id
             and result.environment is Environment.PRODUCTION and result.content_digest == digest)
+
+
+def _ledger_tip(events: Sequence[ReleaseEvent]) -> str:
+    return events[-1].event_digest if events else "0" * 64
+
+
+def _live_manifest_matches_precondition(result: object, provider_id: str, key: str,
+                                        precondition: ProductionManifestPrecondition) -> bool:
+    if (not isinstance(result, ProviderObjectBytesResult)
+            or result.result_version != PROVIDER_CONTRACT_VERSION
+            or result.category is not ProviderResultCategory.SUCCESS
+            or result.provider_id != provider_id or result.environment is not Environment.PRODUCTION
+            or result.object_key != key):
+        return False
+    if precondition.expected_prior_manifest_bytes is None:
+        return (result.content_bytes is None and precondition.expected_prior_sha256 is None
+                and precondition.expected_prior_content_version is None)
+    raw = precondition.expected_prior_manifest_bytes
+    return (type(raw) is bytes and result.content_bytes == raw
+            and hashlib.sha256(raw).hexdigest() == precondition.expected_prior_sha256
+            and precondition.expected_prior_sha256 is not None
+            and precondition.expected_prior_content_version is not None
+            and hashlib.sha256(result.content_bytes).hexdigest() == precondition.expected_prior_sha256
+            and parse_content_manifest_v1(raw).content_version == precondition.expected_prior_content_version)
 
 
 def _failure(reason: ProductionManifestReasonCode, *, attempted: bool = False) -> ProductionManifestActivationReport:

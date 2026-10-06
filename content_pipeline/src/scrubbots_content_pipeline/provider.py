@@ -299,8 +299,14 @@ class ProductionPromotionProvider(Protocol):
         """Read exact bytes in either environment for local verification."""
         ...
 
-    def append_release_event(self, event: object) -> ProviderResult:
-        """Durably append a hash-chained M11 release event."""
+    def read_release_events(self) -> tuple[object, ...]:
+        """Read the current immutable M11 sequence and its exact event chain."""
+        ...
+
+    def append_release_event(
+        self, event: object, *, expected_prior_sequence: int, expected_prior_event_digest: str
+    ) -> ProviderResult:
+        """Append one hash-chained M11 event only at the exact observed ledger tip."""
         ...
 
     def write_manifest_conditionally(
@@ -313,9 +319,11 @@ class ProductionPromotionProvider(Protocol):
         *,
         expected_prior_sha256: str | None,
         expected_prior_content_version: int | None,
+        expected_release_state_sequence: int,
+        expected_release_state_tip_digest: str,
         promotion_pending_event_digest: str,
     ) -> ProviderResult:
-        """Atomically activate a manifest under CAS after durable pending evidence."""
+        """Atomically CAS manifest digest/version and the M11 ledger sequence/tip."""
         ...
 
 

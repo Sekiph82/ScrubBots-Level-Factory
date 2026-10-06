@@ -223,7 +223,8 @@ def promote_verified_staging_to_production(
         if not replay_release_events(pending_history).accepted:
             return _report(PromotionReasonCode.INVALID_HISTORY, target_id, manifest_sha, identity.provider_id, tuple(copied))
         try:
-            persisted_pending = provider.append_release_event(pending)
+            persisted_pending = provider.append_release_event(
+                pending, expected_prior_sequence=sequence - 1, expected_prior_event_digest=last_digest)
         except Exception:
             persisted_pending = None
         if not _success(persisted_pending, identity.provider_id, pending.event_digest, Environment.PRODUCTION):
