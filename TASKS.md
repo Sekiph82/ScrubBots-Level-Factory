@@ -5,7 +5,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
-- Current Sprint: M14-CONT-001 - Resume CP03-001 after authoritative tracker format correction, then continue M14 master batch
+- Current Sprint: SB-CP03-001 / M14-CONT-001 - Resume CP03-001 after authoritative tracker format correction, then continue M14 master batch
 - Current Task: SB-CP03-001 — M14 master batch entry point
 - Current Task Status: BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED / PRESERVE_UNCOMMITTED_CP03_001
 - Next Task/Action: execute only `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`; reuse the existing dirty M14 TEMP worktree, preserve all uncommitted CP03-001 implementation/log work, safely incorporate the authoritative tracker-format fix, rerun the governance/full-suite gates, publish CP03-001 if green, then continue CP03-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff.
@@ -230,6 +230,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Prompt: `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`.
 - M14-CONT-001 Audit Criteria: `.hiveai/audit-criteria/M14-CONT-001_TRACKER_FORMAT_RESUME_AUDIT_CRITERIA.md`.
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
+- M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
+- M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
 - M14 Master Execution Order: `SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012`.
 - M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
 - M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
