@@ -3,19 +3,34 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
 
 import pytest
 
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio
 from scrubbots_pixel_factory.headless_pipeline import JOB_SCHEMA, run_job, _read_events, load_job
 from scrubbots_pixel_factory.output.png import encode_logical_png
-from scrubbots_pixel_factory.supply_pipeline.game_rules import DEFAULT_PROJECT, find_godot
+from scrubbots_pixel_factory.supply_pipeline.game_rules import find_godot
 
 
 def test_headless_job_uses_the_same_canonical_route_and_review_queue(tmp_path: Path, monkeypatch) -> None:
-    configured_project = Path(os.environ.get("SCRUBBOTS_PROJECT") or DEFAULT_PROJECT)
-    if find_godot() is None or not (configured_project / "project.godot").is_file():
-        pytest.skip("local Godot or configured read-only ScrubBots authority is unavailable")
+    configured = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
+    if not configured:
+        pytest.skip("SCRUBBOTS_PROJECT was not explicitly provided for this run")
+    configured_project = Path(configured).expanduser().resolve()
+    if not (configured_project / "project.godot").is_file():
+        pytest.fail("explicit SCRUBBOTS_PROJECT is not a valid Godot project")
+    remote = subprocess.run(
+        ["git", "remote", "get-url", "origin"], cwd=configured_project, capture_output=True, text=True, check=False
+    )
+    normalized_remote = remote.stdout.strip().removesuffix(".git").rstrip("/").casefold()
+    if remote.returncode != 0 or normalized_remote not in {
+        "https://github.com/sekiph82/scrubbots", "git@github.com:sekiph82/scrubbots",
+        "ssh://git@github.com/sekiph82/scrubbots",
+    }:
+        pytest.fail("explicit SCRUBBOTS_PROJECT origin must resolve to Sekiph82/Scrubbots")
+    if find_godot() is None:
+        pytest.skip("Godot executable is unavailable")
 
     repository = tmp_path / "level-factory"
     source_root = repository / "level_factory" / "output" / "owner-uploads"

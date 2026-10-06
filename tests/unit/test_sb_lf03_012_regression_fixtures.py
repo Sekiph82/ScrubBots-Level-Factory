@@ -387,11 +387,11 @@ def test_reproduction_match_diverged_and_authority_tamper_fail_closed() -> None:
         )
 
 
-@pytest.mark.skipif(not Path(os.environ.get("SCRUBBOTS_PROJECT") or r"C:\Users\sekip\Desktop\ScrubBots").is_dir() or shutil.which("godot_console.exe") is None, reason="canonical owner repository or Godot executable is unavailable")
+@pytest.mark.skipif(not os.environ.get("SCRUBBOTS_CANONICAL_CHECKOUT", "").strip() or not Path(os.environ["SCRUBBOTS_CANONICAL_CHECKOUT"]).is_dir() or shutil.which("godot_console.exe") is None, reason="explicit canonical checkout capability or Godot executable is unavailable")
 def test_real_canonical_bridge_fixture_executes_declarative_operations(tmp_path: Path) -> None:
     bridge_fixture = load_corpus()["canonical_bridge_fixture"]
     checkout = tmp_path / "scrubbots-canonical"
-    source = Path(os.environ.get("SCRUBBOTS_PROJECT") or r"C:\Users\sekip\Desktop\ScrubBots")
+    source = Path(os.environ["SCRUBBOTS_CANONICAL_CHECKOUT"]).expanduser().resolve()
     subprocess.run(["git", "-c", "core.autocrlf=false", "clone", "--local", "--no-hardlinks", str(source), str(checkout)], check=True, capture_output=True, text=True)
     subprocess.run(["git", "-C", str(checkout), "config", "core.autocrlf", "false"], check=True, capture_output=True, text=True)
     subprocess.run(["git", "-C", str(checkout), "checkout", "--force", "--detach", AUTHORITY.commit_sha], check=True, capture_output=True, text=True)

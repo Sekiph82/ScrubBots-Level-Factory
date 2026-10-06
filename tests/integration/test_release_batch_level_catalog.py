@@ -14,31 +14,44 @@ from scrubbots_pixel_factory.supply_pipeline.game_rules import find_godot
 from scrubbots_pixel_factory.supply_pipeline.progression import describe_target, load_progression_authority
 
 
-def _game_authority_checkout() -> Path | None:
+def _is_scrubbots_origin(remote_url: str) -> bool:
+    normalized = remote_url.strip().removesuffix(".git").rstrip("/").casefold()
+    return normalized in {
+        "https://github.com/sekiph82/scrubbots",
+        "http://github.com/sekiph82/scrubbots",
+        "git@github.com:sekiph82/scrubbots",
+        "ssh://git@github.com/sekiph82/scrubbots",
+    }
+
+
+def _game_authority_checkout() -> Path:
     configured = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
-    candidates = [Path(configured)] if configured else [Path.home() / "Desktop" / "ScrubBots"]
-    for candidate in candidates:
-        if not candidate.is_dir():
-            continue
-        result = subprocess.run(["git", "remote", "get-url", "origin"], cwd=candidate, capture_output=True, text=True)
-        if result.returncode == 0 and result.stdout.strip().removesuffix(".git").rstrip("/").endswith("Sekiph82/Scrubbots"):
-            return candidate
-    return None
+    if not configured:
+        pytest.skip("SCRUBBOTS_PROJECT was not explicitly provided for this run")
+    candidate = Path(configured).expanduser().resolve()
+    if not candidate.is_dir():
+        pytest.fail("explicit SCRUBBOTS_PROJECT is not an existing directory")
+    result = subprocess.run(
+        ["git", "remote", "get-url", "origin"], cwd=candidate, capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0 or not _is_scrubbots_origin(result.stdout):
+        pytest.fail("explicit SCRUBBOTS_PROJECT origin must resolve to Sekiph82/Scrubbots")
+    return candidate
 
 
 def _godot_executable() -> str | None:
     return find_godot()
 
 
-@pytest.mark.skipif(
-    _godot_executable() is None or _game_authority_checkout() is None,
-    reason="Godot or read-only Sekiph82/Scrubbots Git authority is unavailable before the test starts",
-)
 def test_batch_published_catalog_loads_through_current_level_catalog(tmp_path: Path):
     authority_repo = _game_authority_checkout()
-    assert authority_repo is not None
     godot = _godot_executable()
-    assert godot is not None
+    if godot is None:
+        pytest.skip("Godot executable is unavailable")
+    before_status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=authority_repo, check=True, capture_output=True, text=True,
+    ).stdout
     authority_commit = subprocess.run(["git", "rev-parse", "origin/main"], cwd=authority_repo, check=True, capture_output=True, text=True).stdout.strip()
     archive_path = tmp_path / "scrubbots-authority.tar"
     with archive_path.open("wb") as archive_file:
@@ -93,3 +106,37 @@ func _initialize():
     except subprocess.TimeoutExpired as exc:
         pytest.fail(f"current-game LevelCatalog/validate_all/DifficultyV1CatalogCheck timed out after 300 seconds (Godot capability existed; authority origin/main={authority_commit}); stdout={exc.stdout!r}; stderr={exc.stderr!r}")
     assert loaded.returncode == 0 and "CAMPAIGN_LEVEL_CATALOG_PASS" in loaded.stdout, f"authority origin/main={authority_commit}; stdout={loaded.stdout}\nstderr={loaded.stderr}"
+    after_status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=authority_repo, check=True, capture_output=True, text=True,
+    ).stdout
+    assert after_status == before_status, "explicit game authority checkout must remain read-only"
+
+
+def test_missing_capability_ignores_existing_fake_home_desktop_checkout(monkeypatch, tmp_path: Path) -> None:
+    fake_home = tmp_path / "fake-home"
+    fake_checkout = fake_home / "Desktop" / "ScrubBots"
+    fake_checkout.mkdir(parents=True)
+    (fake_checkout / "project.godot").write_text("fake", encoding="utf-8")
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    monkeypatch.delenv("SCRUBBOTS_PROJECT", raising=False)
+
+    def unexpected_git(*args, **kwargs):
+        pytest.fail("missing capability must skip before any git access")
+
+    monkeypatch.setattr(subprocess, "run", unexpected_git)
+    with pytest.raises(pytest.skip.Exception, match="not explicitly provided"):
+        _game_authority_checkout()
+
+
+@pytest.mark.parametrize(
+    "remote_url, expected",
+    [
+        ("https://github.com/Sekiph82/Scrubbots.git", True),
+        ("git@github.com:Sekiph82/Scrubbots.git", True),
+        ("https://evil.invalid/Sekiph82/Scrubbots.git", False),
+        ("https://github.com/other/Scrubbots.git", False),
+    ],
+)
+def test_game_authority_origin_identity_is_exact(remote_url: str, expected: bool) -> None:
+    assert _is_scrubbots_origin(remote_url) is expected

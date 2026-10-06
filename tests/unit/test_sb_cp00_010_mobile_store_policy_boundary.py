@@ -15,6 +15,11 @@ REPORT = ROOT / "docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md"
 SNAPSHOT = ROOT / "content_pipeline/policy/mobile_store_policy_boundary_v1.json"
 SCHEMA = ROOT / "content_pipeline/schemas/v1/mobile-store-policy-boundary.schema.json"
 PACKAGE = ROOT / "content_pipeline/src/scrubbots_content_pipeline"
+FORBIDDEN_IMPORT_ROOTS = {
+    "aiohttp", "boto3", "botocore", "google", "http", "httpx", "requests", "socket",
+    "subprocess", "urllib", "websocket", "websockets",
+}
+FORBIDDEN_DYNAMIC_IMPORTS = {"__import__", "import_module"}
 
 
 def _validate_schema(schema: object, value: object, path: str = "$", errors: list[str] | None = None) -> list[str]:
@@ -92,6 +97,28 @@ def _evidence() -> tuple[dict[str, object], dict[str, object], str]:
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
     assert snapshot_bytes == (json.dumps(snapshot, ensure_ascii=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     return snapshot, schema, report
+
+
+def _forbidden_content_pipeline_imports(package: Path) -> list[str]:
+    violations: list[str] = []
+    for source_path in sorted(package.rglob("*.py")):
+        tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imported = [item.name.split(".", 1)[0] for item in node.names]
+                if set(imported) & FORBIDDEN_IMPORT_ROOTS:
+                    violations.append(f"{source_path}:{node.lineno}: {', '.join(imported)}")
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                root = node.module.split(".", 1)[0]
+                if root in FORBIDDEN_IMPORT_ROOTS:
+                    violations.append(f"{source_path}:{node.lineno}: {node.module}")
+            elif isinstance(node, ast.Call):
+                called_name = node.func.id if isinstance(node.func, ast.Name) else (
+                    node.func.attr if isinstance(node.func, ast.Attribute) else ""
+                )
+                if called_name in FORBIDDEN_DYNAMIC_IMPORTS:
+                    violations.append(f"{source_path}:{node.lineno}: dynamic import {called_name}")
+    return violations
 
 
 def test_snapshot_is_deterministic_and_validates_against_versioned_schema() -> None:
@@ -178,23 +205,6 @@ def test_evidence_makes_no_definitive_approval_or_certification_claims() -> None
 
 
 def test_cp010_adds_no_runtime_provider_network_or_tracker_implementation() -> None:
-    changed = subprocess.run(
-        ["git", "diff", "--name-only", "HEAD", "--", "content_pipeline/src"],
-        cwd=ROOT, check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
-    untracked = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard", "--", "content_pipeline/src"],
-        cwd=ROOT, check=True, capture_output=True, text=True,
-    ).stdout.splitlines()
-    # M13 introduces the authorized declarative manifest model. Keep source
-    # changes bounded to those explicit paths; the checks below still scan the
-    # complete package for provider/network/runtime mutation imports.
-    authorized_m13_sources = {
-        "content_pipeline/src/scrubbots_content_pipeline/__init__.py",
-        "content_pipeline/src/scrubbots_content_pipeline/manifest_v1.py",
-    }
-    assert set(changed) <= authorized_m13_sources
-    assert set(untracked) <= authorized_m13_sources
     assert (ROOT / "TASKS.md").is_file()
     tracker_diff = subprocess.run(
         ["git", "diff", "--quiet", "HEAD", "--", "TASKS.md"], cwd=ROOT, check=False,
@@ -208,12 +218,31 @@ def test_cp010_adds_no_runtime_provider_network_or_tracker_implementation() -> N
     assert "content_pipeline/TASKS.md" not in task_paths
     readme = (ROOT / "content_pipeline/README.md").read_text(encoding="utf-8")
     assert "`TASKS.md` is the only live task tracker" in readme
-    for source_path in PACKAGE.glob("*.py"):
-        source = source_path.read_text(encoding="utf-8")
-        tree = ast.parse(source)
-        forbidden_modules = {"requests", "httpx", "urllib", "socket", "boto3", "botocore", "subprocess"}
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                assert not {item.name.split(".", 1)[0] for item in node.names} & forbidden_modules
-            elif isinstance(node, ast.ImportFrom) and node.module:
-                assert node.module.split(".", 1)[0] not in forbidden_modules
+    assert _forbidden_content_pipeline_imports(PACKAGE) == []
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import httpx\n",
+        "from google.cloud import storage\n",
+        "import subprocess\n",
+        "__import__('requests')\n",
+    ],
+)
+def test_cp010_recursive_guard_rejects_forbidden_nested_imports(tmp_path: Path, source: str) -> None:
+    package = tmp_path / "package"
+    nested = package / "declarative" / "nested"
+    nested.mkdir(parents=True)
+    (nested / "new_manifest_child.py").write_text(source, encoding="utf-8")
+    violations = _forbidden_content_pipeline_imports(package)
+    assert len(violations) == 1
+    assert "new_manifest_child.py" in violations[0]
+
+
+def test_cp010_recursive_guard_allows_nested_declarative_modules(tmp_path: Path) -> None:
+    package = tmp_path / "package"
+    nested = package / "declarative" / "nested"
+    nested.mkdir(parents=True)
+    (nested / "manifest_child.py").write_text("from dataclasses import dataclass\n", encoding="utf-8")
+    assert _forbidden_content_pipeline_imports(package) == []

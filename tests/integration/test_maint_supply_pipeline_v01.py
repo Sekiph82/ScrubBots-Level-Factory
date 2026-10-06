@@ -8,6 +8,7 @@ import json
 import math
 import os
 import random
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,10 +22,36 @@ from scrubbots_pixel_factory.supply_pipeline.screening import ScreeningSimulator
 from scrubbots_pixel_factory.supply_pipeline.scrubbots_solver import ScrubBotsSolver
 from scrubbots_pixel_factory.supply_pipeline.solution_verifier import SolutionVerifier
 
-try:
-    RULES = GameRules()
-except FileNotFoundError:
-    RULES = None
+def _explicit_game_rules():
+    """Use only a caller-provided game checkout; never discover a Desktop checkout."""
+    configured = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
+    if not configured:
+        return None
+
+    project = Path(configured).expanduser().resolve()
+    if not (project / "project.godot").is_file():
+        raise RuntimeError(f"SCRUBBOTS_PROJECT is not a Godot project: {project}")
+    remote = subprocess.run(
+        ["git", "-C", str(project), "remote", "get-url", "origin"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    allowed_origins = {
+        "https://github.com/sekiph82/scrubbots.git",
+        "https://github.com/sekiph82/scrubbots",
+        "git@github.com:sekiph82/scrubbots.git",
+        "ssh://git@github.com/sekiph82/scrubbots.git",
+    }
+    if remote.returncode != 0 or remote.stdout.strip().lower() not in allowed_origins:
+        raise RuntimeError(f"SCRUBBOTS_PROJECT origin is not the canonical ScrubBots repository: {project}")
+    try:
+        return GameRules(project=project)
+    except FileNotFoundError:
+        return None
+
+
+RULES = _explicit_game_rules()
 HAVE_GAME = RULES is not None and find_godot() is not None
 SLOW = os.environ.get("SCRUBBOTS_SLOW") == "1"
 TMP = Path(tempfile.mkdtemp(prefix="sb_tests_"))
