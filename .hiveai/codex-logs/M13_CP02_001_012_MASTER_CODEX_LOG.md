@@ -48,3 +48,13 @@ Document role: CODEX BUILDER LOG
 
 - CONT-001 completion: removed only test-harness implicit checkout discovery and strengthened the nested mobile-policy import guard. Focused harness set: 31 passed, 17 explicit capability skips. Unfiltered `python -m pytest -q`, with `SCRUBBOTS_PROJECT` and `SCRUBBOTS_CANONICAL_CHECKOUT` absent: **1418 passed, 19 skipped in 623.92s**. The process inspection during the suite found only the authorized route verifier clone under pytest TEMP; no Godot access to Desktop ScrubBots occurred.
 - Scope/static checks: content pipeline compileall PASS; JSON parse PASS for 16 scoped files; `git diff --check` PASS; forbidden desktop discovery search found only the expected contract/test text; TASKS/audit diff empty. Harness implementation commit: `7744ff52aa8e7d66b3f7c20cf23c00282e3e89cf`. CONT-001 gate is green; M13 resume is authorized by the live continuation prompt.
+
+### SB-CP02-009-C001 — Validate Manifest References Before Publish
+
+- Child base SHA: `d4ab34aa0adcc6c020598456997c1b0775b82d24`.
+- Implementation: added the pure local manifest reference gate and authentic M12 evidence tests; implementation commit `6c9a0ecd22e6969ca8a5accec892a127a35038be`.
+- Focused/regression command across CP02-001/009, CP01 spec/builder/inspection, CP00 contracts, and governance: **363 passed in 2.65s** after correcting the archive-integrity reason code (first attempt: 362 passed, 1 failed; correction recorded in the child log).
+- Unfiltered `python -m pytest -q`: **1,521 passed, 19 skipped in 934.95s**. Compileall PASS; all 16 Content Pipeline JSON files parsed; staged/working diff check PASS.
+- Child builder log: `.hiveai/codex-logs/SB-CP02-009-C001_VALIDATE_REFERENCES_BEFORE_PUBLISH_CODEX_LOG.md`; initial log commit `ae75ee9a705f06a1c87f01048d78a624983c6044`, post-publication evidence commit `8ed22f3b44534b4d6c7a4e31a137218fbb6ffd4e`.
+- Both commits pushed normally to `main`; post-push fetch verified HEAD == `origin/main` == `8ed22f3b44534b4d6c7a4e31a137218fbb6ffd4e`, 0/0 divergence, clean worktree.
+- No TASKS/audit edits, dependencies, provider/network implementation, credentials, or game/runtime changes.
