@@ -3,7 +3,7 @@
 The canonical local contract is `scrubbots.content.manifest.v1` with integer
 `schema_version: 1`. Its root is closed and contains only `schema`,
 `schema_version`, positive integer `content_version`, canonical
-`minimum_game_version`, `disabled_levels`, `packs`, and `levels`. Unknown
+`minimum_game_version`, `disabled_levels`, `schedules`, `packs`, and `levels`. Unknown
 properties and unsupported identity or version values fail closed. Add future
 fields only through an explicit versioned schema evolution.
 
@@ -30,6 +30,14 @@ IDs. It records declarative state only: it does not delete the level metadata,
 remove pack references, rewrite or mutate `.scrubpack` bytes, or reject an
 unknown level reference at parse time. `is_level_disabled()` is a pure query;
 full reference validation is owned by the later publish-validation child.
+
+`schedules` contains zero or one canonical UTC window per `(target_kind,
+target_id)`, where the target kind is `pack` or `level`. UTC instants use
+whole-second `YYYY-MM-DDTHH:MM:SSZ` form; a supplied `not_after` must be later
+than `not_before`. Schedule records are sorted by target kind and ID. Target
+existence is checked by the later reference validator. `is_schedule_active()`
+requires an explicit `at_utc`: it is inactive before start, active at start,
+and inactive at or after the optional end. No clock or timezone lookup occurs.
 
 `content_version` is a positive integer revision identity. A proposed
 successor is accepted only when its version is numerically greater than the

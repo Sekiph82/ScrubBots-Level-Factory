@@ -19,9 +19,11 @@ from scrubbots_content_pipeline.manifest_v1 import (  # noqa: E402
     ManifestSuccessorReasonCode,
     ManifestLevelV1,
     ManifestPackV1,
+    ManifestScheduleV1,
     check_game_version_compatibility,
     check_manifest_successor,
     is_level_disabled,
+    is_schedule_active,
     parse_canonical_game_version,
 )
 
@@ -66,7 +68,7 @@ def test_noncontiguous_level_ids_are_preserved_without_numeric_order_derivation(
         ({"schema": "scrubbots.content.manifest.v2"}, "unsupported manifest schema"),
         ({"schema_version": True}, "unsupported manifest schema_version"),
         ({"schema_version": 2}, "unsupported manifest schema_version"),
-        ({"packs": {"pack_id": "pack-a"}}, "packs, levels, and disabled_levels must be arrays"),
+        ({"packs": {"pack_id": "pack-a"}}, "packs, levels, disabled_levels, and schedules must be arrays"),
     ],
 )
 def test_root_is_closed_and_identity_or_version_fail_closed(change, message: str) -> None:
@@ -94,7 +96,8 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     assert schema["properties"]["schema"]["const"] == CONTENT_MANIFEST_SCHEMA
     assert schema["properties"]["schema_version"] == {"type": "integer", "const": 1}
     assert set(schema["required"]) == {
-        "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"
+        "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "schedules",
+        "packs", "levels"
     }
     assert schema["properties"]["content_version"] == {"type": "integer", "minimum": 1}
     assert schema["properties"]["minimum_game_version"]["pattern"] == (
@@ -105,6 +108,7 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     assert pack_schema["additionalProperties"] is False
     disabled_schema = schema["properties"]["disabled_levels"]
     assert disabled_schema["type"] == "array" and disabled_schema["uniqueItems"] is True
+    assert schema["properties"]["schedules"]["type"] == "array"
 
 
 @pytest.mark.parametrize("version", [True, False, 0, -1, 1.0, "1", None])
@@ -334,3 +338,58 @@ def test_disabled_level_query_rejects_invalid_inputs() -> None:
         is_level_disabled(manifest, "../level")
     with pytest.raises(ContentManifestError, match="manifest must"):
         is_level_disabled(object(), "level-a")  # type: ignore[arg-type]
+
+
+def test_schedule_serialization_and_manifest_order_are_deterministic() -> None:
+    later_id = ManifestScheduleV1("level", "level-z", "2030-01-01T00:00:00Z")
+    earlier_id = ManifestScheduleV1("pack", "pack-a", "2030-01-01T00:00:00Z", "2030-01-02T00:00:00Z")
+    manifest = ContentManifestV1(schedules=(later_id, earlier_id))
+    assert [(item.target_kind, item.target_id) for item in manifest.schedules] == [
+        ("level", "level-z"), ("pack", "pack-a")
+    ]
+    assert manifest.schedules[1].to_json_bytes() == (
+        b'{"not_after":"2030-01-02T00:00:00Z","not_before":"2030-01-01T00:00:00Z",'
+        b'"target_id":"pack-a","target_kind":"pack"}'
+    )
+    assert ContentManifestV1.from_dict(manifest.to_dict()) == manifest
+
+
+def test_schedule_explicit_time_boundaries_and_open_ended_window() -> None:
+    window = ManifestScheduleV1("level", "level-a", "2030-01-01T00:00:00Z", "2030-01-02T00:00:00Z")
+    assert not is_schedule_active(window, "2029-12-31T23:59:59Z")
+    assert is_schedule_active(window, "2030-01-01T00:00:00Z")
+    assert is_schedule_active(window, "2030-01-01T23:59:59Z")
+    assert not is_schedule_active(window, "2030-01-02T00:00:00Z")
+    open_window = ManifestScheduleV1("pack", "pack-a", "2030-01-01T00:00:00Z")
+    assert is_schedule_active(open_window, "2040-01-01T00:00:00Z")
+
+
+@pytest.mark.parametrize(
+    "not_before, not_after",
+    [
+        ("2030-01-01T00:00:00.000Z", None),
+        ("2030-01-01T00:00:00+00:00", None),
+        ("2030-01-01 00:00:00Z", None),
+        ("2030-02-30T00:00:00Z", None),
+        ("2030-01-01T00:00:00Z", "2030-01-01T00:00:00Z"),
+        ("2030-01-02T00:00:00Z", "2030-01-01T00:00:00Z"),
+    ],
+)
+def test_schedule_invalid_utc_and_window_endpoints_fail_closed(not_before: str, not_after: str | None) -> None:
+    with pytest.raises(ContentManifestError):
+        ManifestScheduleV1("level", "level-a", not_before, not_after)
+
+
+def test_schedule_target_kind_and_duplicate_target_rules() -> None:
+    with pytest.raises(ContentManifestError, match="target_kind"):
+        ManifestScheduleV1("other", "level-a", "2030-01-01T00:00:00Z")
+    first = ManifestScheduleV1("level", "Level-A", "2030-01-01T00:00:00Z")
+    second = ManifestScheduleV1("level", "level-a", "2030-02-01T00:00:00Z")
+    with pytest.raises(ContentManifestError, match="duplicate schedule target"):
+        ContentManifestV1(schedules=(first, second))
+
+
+def test_schedule_unknown_target_is_syntactically_preserved_for_later_reference_validation() -> None:
+    schedule = ManifestScheduleV1("pack", "future-pack", "2030-01-01T00:00:00Z")
+    parsed = ContentManifestV1.from_dict({**ContentManifestV1().to_dict(), "schedules": [schedule.to_dict()]})
+    assert parsed.schedules == (schedule,)

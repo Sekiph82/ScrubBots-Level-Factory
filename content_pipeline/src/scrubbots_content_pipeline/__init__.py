@@ -38,9 +38,11 @@ from .manifest_v1 import (
     ManifestSuccessorResult,
     ManifestLevelV1,
     ManifestPackV1,
+    ManifestScheduleV1,
     check_game_version_compatibility,
     check_manifest_successor,
     is_level_disabled,
+    is_schedule_active,
     parse_canonical_game_version,
 )
 from .orchestration import (
@@ -164,9 +166,11 @@ __all__ = [
     "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
+    "ManifestScheduleV1",
     "check_game_version_compatibility",
     "check_manifest_successor",
     "is_level_disabled",
+    "is_schedule_active",
     "parse_canonical_game_version",
     "BOUNDARY_VERSION",
     "ClassificationResult",

@@ -10,6 +10,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 
@@ -22,6 +23,7 @@ _PACK_OBJECT_KEY = re.compile(
     r"^packs/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*\.scrubpack$"
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_UTC_TIMESTAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$")
 
 
 class ContentManifestError(ValueError):
@@ -125,6 +127,51 @@ class ManifestLevelV1:
         return {"level_id": self.level_id, "pack_id": self.pack_id}
 
 
+def _parse_utc_timestamp(value: object) -> datetime:
+    if not isinstance(value, str) or not _UTC_TIMESTAMP.fullmatch(value):
+        raise ContentManifestError("timestamp must be whole-second UTC in YYYY-MM-DDTHH:MM:SSZ form")
+    try:
+        parsed = datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError as exc:
+        raise ContentManifestError("timestamp is not a valid UTC instant") from exc
+    if parsed.strftime("%Y-%m-%dT%H:%M:%SZ") != value:
+        raise ContentManifestError("timestamp is not canonical UTC")
+    return parsed
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestScheduleV1:
+    """One explicit UTC activation window for a pack or level target."""
+
+    target_kind: str
+    target_id: str
+    not_before: str
+    not_after: str | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.target_kind, str) or self.target_kind not in {"pack", "level"}:
+            raise ContentManifestError("schedule target_kind must be pack or level")
+        target_pattern = _PACK_ID if self.target_kind == "pack" else _LEVEL_ID
+        if not isinstance(self.target_id, str) or not target_pattern.fullmatch(self.target_id):
+            raise ContentManifestError("invalid schedule target_id")
+        start = _parse_utc_timestamp(self.not_before)
+        if self.not_after is not None:
+            end = _parse_utc_timestamp(self.not_after)
+            if end <= start:
+                raise ContentManifestError("schedule not_after must be later than not_before")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "target_kind": self.target_kind,
+            "target_id": self.target_id,
+            "not_before": self.not_before,
+            "not_after": self.not_after,
+        }
+
+    def to_json_bytes(self) -> bytes:
+        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
 @dataclass(frozen=True, slots=True)
 class ContentManifestV1:
     """Closed immutable manifest root with deterministic pack and level order."""
@@ -136,6 +183,7 @@ class ContentManifestV1:
     content_version: int = 1
     minimum_game_version: str = "0.0.0"
     disabled_levels: tuple[str, ...] = ()
+    schedules: tuple[ManifestScheduleV1, ...] = ()
 
     def __post_init__(self) -> None:
         if self.schema != CONTENT_MANIFEST_SCHEMA:
@@ -153,6 +201,10 @@ class ContentManifestV1:
             not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id) for level_id in self.disabled_levels
         ):
             raise ContentManifestError("disabled_levels must contain canonical level IDs")
+        if not isinstance(self.schedules, tuple) or any(
+            not isinstance(schedule, ManifestScheduleV1) for schedule in self.schedules
+        ):
+            raise ContentManifestError("schedules must contain ManifestScheduleV1 values")
         pack_ids = [pack.pack_id for pack in self.packs]
         normalized_pack_ids = [pack_id.casefold() for pack_id in pack_ids]
         level_ids = [level.level_id for level in self.levels]
@@ -164,9 +216,17 @@ class ContentManifestV1:
             raise ContentManifestError("duplicate level_id")
         if len(normalized_disabled_ids) != len(set(normalized_disabled_ids)):
             raise ContentManifestError("duplicate disabled level ID")
+        schedule_targets = [(schedule.target_kind, schedule.target_id.casefold()) for schedule in self.schedules]
+        if len(schedule_targets) != len(set(schedule_targets)):
+            raise ContentManifestError("duplicate schedule target")
         object.__setattr__(self, "packs", tuple(sorted(self.packs, key=lambda pack: pack.pack_id.encode("ascii"))))
         object.__setattr__(
             self, "disabled_levels", tuple(sorted(self.disabled_levels, key=lambda level_id: level_id.encode("ascii")))
+        )
+        object.__setattr__(
+            self,
+            "schedules",
+            tuple(sorted(self.schedules, key=lambda schedule: (schedule.target_kind, schedule.target_id.encode("ascii")))),
         )
         # Preserve declared level array order; level identity never implies catalog order.
 
@@ -178,6 +238,7 @@ class ContentManifestV1:
             "content_version": self.content_version,
             "minimum_game_version": self.minimum_game_version,
             "disabled_levels": list(self.disabled_levels),
+            "schedules": [schedule.to_dict() for schedule in self.schedules],
             "packs": [pack.to_dict() for pack in self.packs],
             "levels": [level.to_dict() for level in self.levels],
         }
@@ -192,7 +253,8 @@ class ContentManifestV1:
     def from_dict(cls, value: object) -> ContentManifestV1:
         """Parse a mapping only when every root and item field is explicitly known."""
         required = {
-            "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"
+            "schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "schedules",
+            "packs", "levels"
         }
         if not isinstance(value, Mapping) or set(value) != required:
             raise ContentManifestError("invalid manifest fields")
@@ -203,8 +265,8 @@ class ContentManifestV1:
         if type(value["content_version"]) is not int or value["content_version"] < 1:
             raise ContentManifestError("content_version must be a positive integer")
         parse_canonical_game_version(value["minimum_game_version"])
-        if not isinstance(value["packs"], list) or not isinstance(value["levels"], list) or not isinstance(value["disabled_levels"], list):
-            raise ContentManifestError("packs, levels, and disabled_levels must be arrays")
+        if not all(isinstance(value[key], list) for key in ("packs", "levels", "disabled_levels", "schedules")):
+            raise ContentManifestError("packs, levels, disabled_levels, and schedules must be arrays")
         packs: list[ManifestPackV1] = []
         for item in value["packs"]:
             if not isinstance(item, Mapping) or set(item) != {
@@ -225,6 +287,18 @@ class ContentManifestV1:
             if not isinstance(item, Mapping) or set(item) != {"level_id", "pack_id"}:
                 raise ContentManifestError("invalid level fields")
             levels.append(ManifestLevelV1(item["level_id"], item["pack_id"]))
+        schedules: list[ManifestScheduleV1] = []
+        for item in value["schedules"]:
+            if not isinstance(item, Mapping) or set(item) not in (
+                {"target_kind", "target_id", "not_before"},
+                {"target_kind", "target_id", "not_before", "not_after"},
+            ):
+                raise ContentManifestError("invalid schedule fields")
+            schedules.append(
+                ManifestScheduleV1(
+                    item["target_kind"], item["target_id"], item["not_before"], item.get("not_after")
+                )
+            )
         return cls(
             tuple(packs),
             tuple(levels),
@@ -233,6 +307,7 @@ class ContentManifestV1:
             value["content_version"],
             value["minimum_game_version"],
             tuple(value["disabled_levels"]),
+            tuple(schedules),
         )
 
 
@@ -243,6 +318,17 @@ def is_level_disabled(manifest: ContentManifestV1, level_id: object) -> bool:
     if not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id):
         raise ContentManifestError("invalid level_id")
     return level_id in manifest.disabled_levels
+
+
+def is_schedule_active(schedule: ManifestScheduleV1, at_utc: object) -> bool:
+    """Evaluate one UTC window solely against an explicit canonical instant."""
+    if not isinstance(schedule, ManifestScheduleV1):
+        raise ContentManifestError("schedule must be a ManifestScheduleV1")
+    instant = _parse_utc_timestamp(at_utc)
+    start = _parse_utc_timestamp(schedule.not_before)
+    if instant < start:
+        return False
+    return schedule.not_after is None or instant < _parse_utc_timestamp(schedule.not_after)
 
 
 def check_manifest_successor(
@@ -288,7 +374,9 @@ __all__ = [
     "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
+    "ManifestScheduleV1",
     "is_level_disabled",
+    "is_schedule_active",
     "check_manifest_successor",
     "check_game_version_compatibility",
     "parse_canonical_game_version",

@@ -4,7 +4,7 @@
   "title": "SCRUBBOTS Remote Content Manifest V1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "packs", "levels"],
+  "required": ["schema", "schema_version", "content_version", "minimum_game_version", "disabled_levels", "schedules", "packs", "levels"],
   "properties": {
     "schema": { "const": "scrubbots.content.manifest.v1" },
     "schema_version": { "type": "integer", "const": 1 },
@@ -14,6 +14,26 @@
       "type": "array",
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" }
+    },
+    "schedules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target_kind", "target_id", "not_before"],
+        "properties": {
+          "target_kind": { "enum": ["pack", "level"] },
+          "target_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+          "not_before": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" },
+          "not_after": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$" }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "target_kind": { "const": "pack" } }, "required": ["target_kind"] },
+            "then": { "properties": { "target_id": { "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" } } }
+          }
+        ]
+      }
     },
     "packs": {
       "type": "array",
