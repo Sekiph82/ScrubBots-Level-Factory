@@ -41,3 +41,7 @@ Document role: CODEX BUILDER LOG
 - Child log commit and normal push/fetch parity will be recorded after publication.
 - Normal non-force push `git push origin HEAD:main` succeeded; remote advanced from `4d374e7d90da115548e5b180db908e02de5d9498` to `f6db349637308b77180089c5bb671dfc58ff4b8c`.
 - Post-push `git fetch --prune origin` verified local HEAD == `origin/main` == `f6db349637308b77180089c5bb671dfc58ff4b8c`, 0/0 divergence, and clean status. Initial child log commit: `f6db349637308b77180089c5bb671dfc58ff4b8c`.
+
+## Log errata
+- The compileall command path above contains a filename typo (`test_sb_cp02_012_manifest_corpus.py`). The actual child command was `python -m compileall -q content_pipeline/src tests/unit/test_sb_cp02_012_manifest_parser_corpus.py`, which passed; final master verification also passed `python -m compileall -q content_pipeline/src tests`.
+- The corpus description phrase `M10 history` should read `M13 CP02-010 manifest history`; the test verifies tampered CP02-010 manifest-history evidence.
