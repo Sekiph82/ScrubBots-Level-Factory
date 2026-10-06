@@ -62,3 +62,16 @@ Publication entries will be recorded after separate implementation and log commi
 
 - Remediation commit: `826a85e9d447cbf7b3755897bd4bc02813d24ef1` (`Fix disabled level casefold lookup`).
 - Implementation and builder log are being committed separately. Publication entries will include the normal push and final 0/0 clean parity check.
+
+## Publication evidence
+
+- Implementation commit: `826a85e9d447cbf7b3755897bd4bc02813d24ef1` (`Fix disabled level casefold lookup`).
+- Initial builder-log commit: `f776e04132174ca51af4c5ca8df7cd58c74211d5` (`Record CP006 R01 remediation evidence`); it followed the implementation commit as a separate commit.
+- Before publication, `git fetch --prune origin` confirmed execution HEAD `826a85e9d447cbf7b3755897bd4bc02813d24ef1` was 1 ahead / 0 behind `origin/main` `415d186744fdec8c92c61adb07a984b8f6aed1b8`.
+- Normal non-force `git push origin HEAD:main` succeeded: `415d186..f776e04 HEAD -> main`.
+- Post-push fetch verified HEAD == origin/main == `f776e04132174ca51af4c5ca8df7cd58c74211d5`, divergence `0 0`, and empty porcelain status.
+- This separate log-only follow-up records the push result after the initial implementation/log publication; it will also be published normally. The final parity check will be repeated after it is pushed.
+
+## Final boundary
+
+No root `TASKS.md` or `.hiveai/audits/**` files were edited. No owner Desktop files were synchronized or changed. Remediation and builder evidence are published; stop here for ChatGPT independent R01 re-audit. No audit verdict is claimed.
