@@ -1,0 +1,29 @@
+# SB-CP03-011-C001 - One-Command Publish After Individually Testable Stages
+
+Document role: CODEX BUILDER LOG
+
+## Start and synchronization preflight
+
+- Starting timestamp: `2026-10-07T01:45:14+03:00`.
+- Canonical Desktop root verified as `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`; origin is `https://github.com/Sekiph82/ScrubBots-Level-Factory.git`; branch `main`; persistent HEAD `7c6051589d0a95fc785d7f182ccd0d7f8d7013ce`.
+- Ran `git fetch --prune origin`; current persistent `origin/main` is `b72159c84a1cdaddf91a1e7505bb06969cb40283`, divergence 0 ahead / 385 behind. Persistent checkout has 177 dirty paths (123 tracked modifications and 54 untracked), 18 stashes, and 22 registered worktrees. Owner-local data was not modified or synchronized.
+- Reused the single authorized M14 TEMP master worktree `C:\Users\sekip\AppData\Local\Temp\ScrubBots-Level-Factory\M14-CP03-001-012-CPX002-MASTER`; fetched origin and verified clean `HEAD == origin/main == b72159c84a1cdaddf91a1e7505bb06969cb40283`, 0/0.
+- Read current `origin/main:TASKS.md`, `AGENTS.md`, `GOVERNANCE.md`, M14 master prompt, CP03-011 prompt and audit criteria. Live task state is CONT-002/CP03-005 reverify followed by the authorized M14 master sequence; master authority orders CP03-011 now. The master log records CP03-005 reverify gates green and CP03-010 published.
+- Created this exact-title child builder log before CP03-011 tests or product edits.
+
+## Contracts and implementation
+
+- Implemented a typed immutable orchestration API in `content_pipeline/src/scrubbots_content_pipeline/one_command_publisher.py` and exported it from the package. It composes explicit validation-only, STAGING-only, and PRODUCTION modes with Factory pack requests/build adapter, M13 candidate generation, publisher validation, M11 release-ledger preflight, CP03-004/005 staging uploads and integrity, CP03-006 manifest publication, durable staging release events, CP03-007 actual byte-download verification, CPX-002 current-main replay, CP03-008 pack promotion, CP03-009 versioned manifest activation, and CP03-010 state fence in fixed order. Each failure returns the typed evidence already accumulated and halts the next stage.
+- Production requires explicit `OwnerPromotionApproval`, current game-authority checks and game runner, production CAS precondition, and manifest history. Provider and Factory adapter are caller-supplied; no selection, credentials, CLI, deletion, or cleanup behavior was added. Factory outputs are bound to requested pack ID/version and exact candidate IDs in their solver identity artifact. The fixed journal hashes stage name, sequence, result, reason, and stage evidence deterministically.
+- Added focused tests for callable validation-only, full staging-only stage ordering and no production writes, production composition through CPX-002 and conditional fence, missing approval before external work, and first staging failure stopping before production mutation.
+- Initial focused test collection failed because `validate_remote_payload` and `MANIFEST_KEY` were imported from the wrong modules; corrected both imports. The next run had 3 failures / 2 passes because the fixture lacked solver identity artifact bytes; then a run had 1 failure / 4 passes because the provider mock reported an absent production manifest as `UNAVAILABLE`, while the provider contract requires `SUCCESS` with `content_bytes=None` for proven absence. Corrected the fixtures.
+- While tightening Factory output binding, an initial suite run had 3 failures / 2 passes: the newly constructed test artifact was intentionally synthetic and failed candidate manifest reference validation. Mocked the solver artifact verifier only in the isolated orchestration tests (CPX-002 authentic replay remains independently covered by its prior integration suite). Final focused command `python -m pytest -q tests/unit/test_sb_cp03_011_one_command_publisher.py` passed **5 tests in 0.18s**.
+
+## Verification and publication
+
+- `python -m pytest -q tests/unit/test_sb_cp03_011_one_command_publisher.py`: **5 passed in 0.18s**.
+- With `SCRUBBOTS_PROJECT` removed from the environment, `python -m pytest -q tests/unit tests/integration/test_sb_cpx_001_solver_identity_pack.py tests/integration/test_sb_cp03_002_factory_candidate_pack.py`: **1,452 passed, 4 skipped in 176.85s**. The skips are explicit canonical ScrubBots/Godot capability cases.
+- With `SCRUBBOTS_PROJECT` removed, safe unfiltered `python -m pytest -q`: **1,650 passed, 19 skipped in 665.89s**. The skips explicitly report unavailable ScrubBots project/Godot or omitted canonical project capability; no owner Desktop ScrubBots checkout was selected.
+- `python -m compileall -q content_pipeline/src src tests` passed. Public API import printed `STAGING_ONLY`. All **16** Content Pipeline JSON files parsed. `git diff --check` passed; Git emitted only the existing LF-to-CRLF working-copy advisory for the modified package initializer.
+- No dependency or license changes, runtime network/HTTP/telemetry/API-key route, vendor/provider implementation, destructive cleanup, tracker/audit/handoff edits, or active-prompt edits. The production activation path is gated by explicit approval, staging download evidence, CPX-002 result, CP03-008 promotion evidence, and CP03-009/010 CAS/fence. No real production provider was invoked.
+- Product implementation commit `5ec5d9aa056306cd18b9a5fbf1300e0bd4c866a7` (`Add one-command content publisher orchestration`) contains the public typed orchestration API and focused tests. After `git fetch --prune origin`, TEMP was exactly one commit ahead of `origin/main` with no upstream divergence; `git push origin HEAD:main` succeeded normally. The matching child log and M14 master log are the separate evidence-only publication to follow.
