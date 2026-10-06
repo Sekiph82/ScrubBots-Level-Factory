@@ -41,7 +41,7 @@ def test_default_route_a_verifier_runs_against_full_isolated_current_game_archiv
         ["git", "clone", "--depth", "1", "--branch", "main", _GAME_REMOTE, str(source)],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=900,
     )
     assert clone.returncode == 0, f"canonical game clone failed after capability was confirmed: {clone.stdout}\n{clone.stderr}"
     cloned_sha = subprocess.run(

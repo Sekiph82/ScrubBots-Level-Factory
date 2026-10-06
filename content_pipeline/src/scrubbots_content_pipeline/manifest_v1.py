@@ -18,6 +18,10 @@ CONTENT_MANIFEST_SCHEMA_VERSION = 1
 _PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _GAME_VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
+_PACK_OBJECT_KEY = re.compile(
+    r"^packs/[a-z0-9][a-z0-9_-]{0,63}/[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*\.scrubpack$"
+)
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ContentManifestError(ValueError):
@@ -70,16 +74,38 @@ def parse_canonical_game_version(value: object) -> tuple[int, int, int]:
 
 @dataclass(frozen=True, slots=True)
 class ManifestPackV1:
-    """Stable identity for one provider-neutral pack reference."""
+    """Stable identity and provider-neutral immutable archive reference."""
 
     pack_id: str
+    pack_version: int
+    object_key: str
+    sha256: str
+    byte_length: int
 
     def __post_init__(self) -> None:
         if not isinstance(self.pack_id, str) or not _PACK_ID.fullmatch(self.pack_id):
             raise ContentManifestError("invalid pack_id")
+        if type(self.pack_version) is not int or self.pack_version < 1:
+            raise ContentManifestError("pack_version must be a positive integer")
+        if not isinstance(self.object_key, str) or not _PACK_OBJECT_KEY.fullmatch(self.object_key):
+            raise ContentManifestError("invalid provider-neutral pack object_key")
+        if not isinstance(self.sha256, str) or not _SHA256.fullmatch(self.sha256):
+            raise ContentManifestError("sha256 must be lowercase 64-hex")
+        if type(self.byte_length) is not int or self.byte_length < 1:
+            raise ContentManifestError("byte_length must be a positive integer")
 
     def to_dict(self) -> dict[str, object]:
-        return {"pack_id": self.pack_id}
+        return {
+            "pack_id": self.pack_id,
+            "pack_version": self.pack_version,
+            "object_key": self.object_key,
+            "sha256": self.sha256,
+            "byte_length": self.byte_length,
+        }
+
+    def to_json_bytes(self) -> bytes:
+        """Return deterministic UTF-8 bytes for this provider-neutral pack record."""
+        return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,8 +149,9 @@ class ContentManifestV1:
         if not isinstance(self.levels, tuple) or any(not isinstance(level, ManifestLevelV1) for level in self.levels):
             raise ContentManifestError("levels must contain ManifestLevelV1 values")
         pack_ids = [pack.pack_id for pack in self.packs]
+        normalized_pack_ids = [pack_id.casefold() for pack_id in pack_ids]
         level_ids = [level.level_id for level in self.levels]
-        if len(pack_ids) != len(set(pack_ids)):
+        if len(normalized_pack_ids) != len(set(normalized_pack_ids)):
             raise ContentManifestError("duplicate pack_id")
         if len(level_ids) != len(set(level_ids)):
             raise ContentManifestError("duplicate level_id")
@@ -169,9 +196,19 @@ class ContentManifestV1:
             raise ContentManifestError("packs and levels must be arrays")
         packs: list[ManifestPackV1] = []
         for item in value["packs"]:
-            if not isinstance(item, Mapping) or set(item) != {"pack_id"}:
+            if not isinstance(item, Mapping) or set(item) != {
+                "pack_id", "pack_version", "object_key", "sha256", "byte_length"
+            }:
                 raise ContentManifestError("invalid pack fields")
-            packs.append(ManifestPackV1(item["pack_id"]))
+            packs.append(
+                ManifestPackV1(
+                    item["pack_id"],
+                    item["pack_version"],
+                    item["object_key"],
+                    item["sha256"],
+                    item["byte_length"],
+                )
+            )
         levels: list[ManifestLevelV1] = []
         for item in value["levels"]:
             if not isinstance(item, Mapping) or set(item) != {"level_id", "pack_id"}:

@@ -39,7 +39,7 @@ def test_minimal_fixture_round_trips_as_the_canonical_empty_manifest() -> None:
 
 def test_model_owns_explicit_types_and_sorts_collections_deterministically() -> None:
     manifest = ContentManifestV1(
-        packs=(ManifestPackV1("pack-z"), ManifestPackV1("pack-a")),
+        packs=(pack_record("pack-z"), pack_record("pack-a")),
         levels=(ManifestLevelV1("level-z", "pack-z"), ManifestLevelV1("level-a", "pack-a")),
     )
     assert [item.pack_id for item in manifest.packs] == ["pack-a", "pack-z"]
@@ -69,7 +69,7 @@ def test_item_shapes_and_duplicate_identities_are_rejected() -> None:
     with pytest.raises(ContentManifestError, match="invalid pack fields"):
         ContentManifestV1.from_dict({**ContentManifestV1().to_dict(), "packs": [{"pack_id": "p", "url": "x"}]})
     with pytest.raises(ContentManifestError, match="duplicate pack_id"):
-        ContentManifestV1(packs=(ManifestPackV1("pack-a"), ManifestPackV1("pack-a")))
+        ContentManifestV1(packs=(pack_record("pack-a"), pack_record("pack-a")))
     with pytest.raises(ContentManifestError, match="duplicate level_id"):
         ContentManifestV1(
             levels=(ManifestLevelV1("level-a", "pack-a"), ManifestLevelV1("level-a", "pack-b"))
@@ -89,6 +89,9 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     assert schema["properties"]["minimum_game_version"]["pattern"] == (
         r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"
     )
+    pack_schema = schema["properties"]["packs"]["items"]
+    assert set(pack_schema["required"]) == {"pack_id", "pack_version", "object_key", "sha256", "byte_length"}
+    assert pack_schema["additionalProperties"] is False
 
 
 @pytest.mark.parametrize("version", [True, False, 0, -1, 1.0, "1", None])
@@ -147,7 +150,7 @@ def test_successor_check_rejects_malformed_candidate_with_stable_reason() -> Non
 
 def test_changed_bytes_with_same_content_version_are_not_a_successor() -> None:
     previous = ContentManifestV1(content_version=4).to_dict()
-    changed_bytes = {**previous, "packs": [{"pack_id": "new-pack"}]}
+    changed_bytes = {**previous, "packs": [pack_record("new-pack").to_dict()]}
     assert previous != changed_bytes
     result = check_manifest_successor(4, changed_bytes)
     assert not result.accepted
@@ -209,3 +212,69 @@ def test_game_version_compatibility_rejects_malformed_inputs_deterministically()
     assert check_game_version_compatibility("1.2", "1.2.3").reason_code is (
         ManifestCompatibilityReasonCode.INVALID_MINIMUM_GAME_VERSION
     )
+
+
+def pack_record(pack_id: str) -> ManifestPackV1:
+    return ManifestPackV1(pack_id, 1, f"packs/{pack_id}/v1.scrubpack", "a" * 64, 128)
+
+
+def test_pack_record_serialization_is_deterministic_and_provider_neutral() -> None:
+    record = pack_record("pack-a")
+    assert record.to_dict() == {
+        "pack_id": "pack-a",
+        "pack_version": 1,
+        "object_key": "packs/pack-a/v1.scrubpack",
+        "sha256": "a" * 64,
+        "byte_length": 128,
+    }
+    assert record.to_json_bytes() == record.to_json_bytes()
+    assert record.to_json_bytes() == (
+        b'{"byte_length":128,"object_key":"packs/pack-a/v1.scrubpack","pack_id":"pack-a",'
+        b'"pack_version":1,"sha256":"' + b"a" * 64 + b'"}'
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"pack_version": True},
+        {"pack_version": 0},
+        {"pack_version": -1},
+        {"object_key": "https://cdn.example.invalid/packs/a/v1.scrubpack"},
+        {"object_key": "cdn.example.invalid/packs/a/v1.scrubpack"},
+        {"object_key": "/packs/a/v1.scrubpack"},
+        {"object_key": "C:/packs/a/v1.scrubpack"},
+        {"object_key": "//server/share/a.scrubpack"},
+        {"object_key": "packs/a/../b.scrubpack"},
+        {"object_key": "packs/a/%2e%2e/b.scrubpack"},
+        {"object_key": "packs/a\\b/v1.scrubpack"},
+        {"object_key": "packs/a/v1.scrubpack?download=1"},
+        {"object_key": "packs/a/v1.scrubpack#fragment"},
+        {"object_key": "packs/a/user:password@host/v1.scrubpack"},
+        {"object_key": "packs/a/v1.zip"},
+        {"sha256": "A" * 64},
+        {"sha256": "g" * 64},
+        {"sha256": "a" * 63},
+        {"byte_length": True},
+        {"byte_length": 0},
+        {"byte_length": -1},
+    ],
+)
+def test_malformed_pack_reference_fields_fail_closed(kwargs: dict[str, object]) -> None:
+    values: dict[str, object] = {
+        "pack_id": "pack-a",
+        "pack_version": 1,
+        "object_key": "packs/pack-a/v1.scrubpack",
+        "sha256": "a" * 64,
+        "byte_length": 128,
+    }
+    values.update(kwargs)
+    with pytest.raises(ContentManifestError):
+        ManifestPackV1(**values)  # type: ignore[arg-type]
+
+
+def test_pack_id_grammar_is_canonical_lowercase_and_blocks_case_collisions() -> None:
+    with pytest.raises(ContentManifestError, match="invalid pack_id"):
+        pack_record("Pack-A")
+    with pytest.raises(ContentManifestError, match="duplicate pack_id"):
+        ContentManifestV1(packs=(pack_record("pack-a"), pack_record("pack-a")))
