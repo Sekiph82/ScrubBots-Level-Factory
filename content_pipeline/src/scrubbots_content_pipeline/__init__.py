@@ -74,6 +74,13 @@ from .candidate_manifest import (
     CandidateManifestError,
     build_candidate_manifest,
 )
+from .staging_pack_upload import (
+    PackUploadReasonCode,
+    StagingByteWriter,
+    StagingPackUploadReport,
+    UploadedPackEvidence,
+    upload_candidate_packs_to_staging,
+)
 from .manifest_parser import (
     MAX_MANIFEST_BYTES,
     MAX_MANIFEST_COLLECTION_ITEMS,
@@ -238,6 +245,11 @@ __all__ = [
     "CandidateManifestBuildResult",
     "CandidateManifestError",
     "build_candidate_manifest",
+    "PackUploadReasonCode",
+    "StagingByteWriter",
+    "StagingPackUploadReport",
+    "UploadedPackEvidence",
+    "upload_candidate_packs_to_staging",
     "MAX_MANIFEST_BYTES",
     "MAX_MANIFEST_COLLECTION_ITEMS",
     "MAX_MANIFEST_NESTING_DEPTH",
