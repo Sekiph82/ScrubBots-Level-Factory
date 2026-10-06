@@ -4,12 +4,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M14 — Publisher, Staging & Production Promotion
-- Current Sprint: M14-MASTER — Prepare SB-CP03-001..012 + SB-CPX-002 milestone batch
-- Current Task: M14-PREP — Author child prompts/criteria and master batch authority
-- Current Task Status: CHATGPT_PREPARING_M14_MASTER_BATCH
-- Next Task/Action: ChatGPT authors and publishes M14 child prompts/audit criteria for SB-CP03-001..012 plus SB-CPX-002, then updates this tracker to M14_MASTER_BATCH_AUTHORIZED before Codex execution.
-- Required Actor: CHATGPT
+- Current Milestone: M14 - Publisher, Staging & Production Promotion
+- Current Sprint: M14-MASTER - Execute SB-CP03-001..007 -> SB-CPX-002 -> SB-CP03-008..012 continuously, then independent child audits
+- Current Task: SB-CP03-001 - M14 master batch entry point
+- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M14_MASTER_BATCH_AUTHORIZED
+- Next Task/Action: execute only `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff, with one separate builder log per child, stopping only after master completion or a true blocker.
+- Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M14_CP03_001_012_CPX002_MASTER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -221,6 +221,53 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP02-012 Final Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_FINAL_REAUDIT.md`.
 - M13 Final Result: `PASS / CLOSED` by `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`.
 - M14 Preparation Rule: ChatGPT must publish all SB-CP03-001..012 + SB-CPX-002 child prompts/criteria and one sync-first master prompt before Codex receives M14 work; SB-CPX-003 remains historical PASS/CLOSED and is not rerun.
+- M14 Master Authorization: `IMPLEMENT_ALL_THEN_AUDIT / M14_MASTER_BATCH_AUTHORIZED`.
+- M14 Master Prompt: `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`.
+- M14 Master Audit Wrapper: `.hiveai/audit-criteria/M14_CP03_001_012_CPX002_MASTER_AUDIT_CRITERIA.md`.
+- M14 Master Builder Log Target: `.hiveai/codex-logs/M14_CP03_001_012_CPX002_MASTER_CODEX_LOG.md`.
+- M14 Master Execution Order: `SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012`.
+- M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
+- M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
+- M14 Post-Builder Audit Rule: ChatGPT independently audits every active child against its own criteria; M14 does not close until all 13 active children are PASS/CLOSED. SB-CPX-003 remains previously closed.
+- SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
+- SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
+- SB-CP03-001 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_CODEX_LOG.md`.
+- SB-CP03-002 C001 Prompt: `.hiveai/prompts/SB-CP03-002-C001_SERIALIZE_ACCEPTED_FACTORY_OUTPUT_TO_PACKS_PROMPT.md`.
+- SB-CP03-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-002-C001_SERIALIZE_ACCEPTED_FACTORY_OUTPUT_TO_PACKS_AUDIT_CRITERIA.md`.
+- SB-CP03-002 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-002-C001_SERIALIZE_ACCEPTED_FACTORY_OUTPUT_TO_PACKS_CODEX_LOG.md`.
+- SB-CP03-003 C001 Prompt: `.hiveai/prompts/SB-CP03-003-C001_HASHES_CANDIDATE_MANIFEST_PROMPT.md`.
+- SB-CP03-003 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-003-C001_HASHES_CANDIDATE_MANIFEST_AUDIT_CRITERIA.md`.
+- SB-CP03-003 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-003-C001_HASHES_CANDIDATE_MANIFEST_CODEX_LOG.md`.
+- SB-CP03-004 C001 Prompt: `.hiveai/prompts/SB-CP03-004-C001_UPLOAD_PACKS_BEFORE_MANIFEST_PROMPT.md`.
+- SB-CP03-004 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-004-C001_UPLOAD_PACKS_BEFORE_MANIFEST_AUDIT_CRITERIA.md`.
+- SB-CP03-004 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-004-C001_UPLOAD_PACKS_BEFORE_MANIFEST_CODEX_LOG.md`.
+- SB-CP03-005 C001 Prompt: `.hiveai/prompts/SB-CP03-005-C001_VERIFY_REMOTE_OBJECT_INTEGRITY_PROMPT.md`.
+- SB-CP03-005 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-005-C001_VERIFY_REMOTE_OBJECT_INTEGRITY_AUDIT_CRITERIA.md`.
+- SB-CP03-005 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-005-C001_VERIFY_REMOTE_OBJECT_INTEGRITY_CODEX_LOG.md`.
+- SB-CP03-006 C001 Prompt: `.hiveai/prompts/SB-CP03-006-C001_PUBLISH_STAGING_FIRST_PROMPT.md`.
+- SB-CP03-006 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-006-C001_PUBLISH_STAGING_FIRST_AUDIT_CRITERIA.md`.
+- SB-CP03-006 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-006-C001_PUBLISH_STAGING_FIRST_CODEX_LOG.md`.
+- SB-CP03-007 C001 Prompt: `.hiveai/prompts/SB-CP03-007-C001_VERIFY_STAGING_REAL_DOWNLOAD_PROMPT.md`.
+- SB-CP03-007 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-007-C001_VERIFY_STAGING_REAL_DOWNLOAD_AUDIT_CRITERIA.md`.
+- SB-CP03-007 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-007-C001_VERIFY_STAGING_REAL_DOWNLOAD_CODEX_LOG.md`.
+- SB-CPX-002 C001 Prompt: `.hiveai/prompts/SB-CPX-002-C001_CURRENT_MAIN_SUPPLY_REPLAY_PROMOTION_GATE_PROMPT.md`.
+- SB-CPX-002 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-002-C001_CURRENT_MAIN_SUPPLY_REPLAY_PROMOTION_GATE_AUDIT_CRITERIA.md`.
+- SB-CPX-002 C001 Builder Log Target: `.hiveai/codex-logs/SB-CPX-002-C001_CURRENT_MAIN_SUPPLY_REPLAY_PROMOTION_GATE_CODEX_LOG.md`.
+- SB-CP03-008 C001 Prompt: `.hiveai/prompts/SB-CP03-008-C001_EXPLICIT_STAGING_TO_PRODUCTION_PROMOTION_PROMPT.md`.
+- SB-CP03-008 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-008-C001_EXPLICIT_STAGING_TO_PRODUCTION_PROMOTION_AUDIT_CRITERIA.md`.
+- SB-CP03-008 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-008-C001_EXPLICIT_STAGING_TO_PRODUCTION_PROMOTION_CODEX_LOG.md`.
+- SB-CP03-009 C001 Prompt: `.hiveai/prompts/SB-CP03-009-C001_NEW_VERSIONED_PRODUCTION_MANIFEST_PROMPT.md`.
+- SB-CP03-009 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-009-C001_NEW_VERSIONED_PRODUCTION_MANIFEST_AUDIT_CRITERIA.md`.
+- SB-CP03-009 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-009-C001_NEW_VERSIONED_PRODUCTION_MANIFEST_CODEX_LOG.md`.
+- SB-CP03-010 C001 Prompt: `.hiveai/prompts/SB-CP03-010-C001_NO_SILENT_LIVE_OVERWRITE_PROMPT.md`.
+- SB-CP03-010 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-010-C001_NO_SILENT_LIVE_OVERWRITE_AUDIT_CRITERIA.md`.
+- SB-CP03-010 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-010-C001_NO_SILENT_LIVE_OVERWRITE_CODEX_LOG.md`.
+- SB-CP03-011 C001 Prompt: `.hiveai/prompts/SB-CP03-011-C001_ONE_COMMAND_PUBLISH_ORCHESTRATOR_PROMPT.md`.
+- SB-CP03-011 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-011-C001_ONE_COMMAND_PUBLISH_ORCHESTRATOR_AUDIT_CRITERIA.md`.
+- SB-CP03-011 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-011-C001_ONE_COMMAND_PUBLISH_ORCHESTRATOR_CODEX_LOG.md`.
+- SB-CP03-012 C001 Prompt: `.hiveai/prompts/SB-CP03-012-C001_PUBLISH_REPORT_PROMPT.md`.
+- SB-CP03-012 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-012-C001_PUBLISH_REPORT_AUDIT_CRITERIA.md`.
+- SB-CP03-012 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-012-C001_PUBLISH_REPORT_CODEX_LOG.md`.
 - SB-CP02-001 C001 Prompt: `.hiveai/prompts/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_PROMPT.md`.
 - SB-CP02-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_AUDIT_CRITERIA.md`.
 - SB-CP02-002 C001 Prompt: `.hiveai/prompts/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_PROMPT.md`.
@@ -566,7 +613,7 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
 - M12: .scrubpack Format & Packager — COMPLETE / VERIFIED
 - M13: Remote Manifest & Content Versioning — COMPLETE / VERIFIED
-- M14: Publisher, Staging & Production Promotion — PREPARING / CHATGPT / PARTIALLY EVIDENCED
+- M14: Publisher, Staging & Production Promotion — ACTIVE / MASTER_BATCH_AUTHORIZED / PARTIALLY EVIDENCED
 - M15: Godot Remote Content Runtime — PLANNED
 - M16: Offline Cache & Last-Known-Good Recovery — PLANNED
 - M17: Rollback, Disable & Scheduling — PLANNED / PARTIALLY EVIDENCED
@@ -1080,7 +1127,7 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 ### M14.01 - Validation-only packaging and candidate manifest
 
-- [ ] SB-CP03-001 — Publisher validation-only mode.
+- [~] SB-CP03-001 — Publisher validation-only mode.
 - [ ] SB-CP03-002 — Serialize accepted Factory output into packs. [PARTIAL]
 - [ ] SB-CP03-003 — Hashes + candidate manifest. [PARTIAL]
 
