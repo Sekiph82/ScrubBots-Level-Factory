@@ -64,6 +64,11 @@ from .manifest_history import (
     serialize_manifest_history,
     verify_manifest_history,
 )
+from .compatibility import (
+    AppContentCompatibilityReasonCode,
+    AppContentCompatibilityResult,
+    check_app_content_compatibility,
+)
 from .orchestration import (
     EvidenceSink,
     PromotionOrchestrator,
@@ -206,6 +211,9 @@ __all__ = [
     "parse_manifest_history",
     "serialize_manifest_history",
     "verify_manifest_history",
+    "AppContentCompatibilityReasonCode",
+    "AppContentCompatibilityResult",
+    "check_app_content_compatibility",
     "BOUNDARY_VERSION",
     "ClassificationResult",
     "ContentDisposition",

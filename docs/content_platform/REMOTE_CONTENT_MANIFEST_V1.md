@@ -53,6 +53,27 @@ compatibility helper compares numeric triplets: equal/newer current versions
 are compatible and older versions are not. It performs no project, filesystem,
 clock, network, or runtime lookup.
 
+`check_app_content_compatibility()` is the pure app/content gate. The caller
+supplies the current game version, an explicit mapping from supported manifest
+schema identifiers to positive schema-version sets/sequences or ranges, and the
+manifest's schema identifier, schema version, and minimum game version. It
+returns one deterministic reason code and fails closed for malformed app
+versions/capabilities, invalid manifest compatibility fields, unsupported
+schemas, or an app version below the manifest minimum. It does not inspect or
+change `content_version` history and does not parse payloads, resolve pack
+references, apply disabled levels, evaluate schedules, download, activate, or
+mutate content.
+
+M15 runtime integration must later provide its current game version and
+supported schema-version declaration explicitly, read the manifest's schema,
+schema version, and minimum game version, and consume this compatibility result
+before passing the manifest to the matching parser. A `COMPATIBLE` result is
+only permission to continue to the separate parse and content-validation steps:
+M15 must still run reference validation, disabled-level handling, and schedule
+evaluation using their own contracts and explicit inputs. Compatibility PASS
+does not bypass or imply success for those checks. This repository does not
+implement that runtime integration.
+
 This manifest is declarative local data. It contains no executable payload,
 provider choice, URL, credential, or runtime operation. It does not publish,
 upload, download, resolve references, or change `.scrubpack` identity. Level
