@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M13 — Remote Manifest & Content Versioning
-- Current Sprint: M13-MASTER — Execute SB-CP02-001..012 continuously, then independent child audits
-- Current Task: SB-CP02-001 — M13 master batch entry point
-- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M13_MASTER_BATCH_AUTHORIZED
-- Next Task/Action: execute only `.hiveai/prompts/M13_CP02_001_012_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP02-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff, writing one separate builder log per child, and stops only after master completion or a true blocker.
+- Current Sprint: M13-CONT-001 — Safe full-suite scope guard, then resume SB-CP02-002..012
+- Current Task: M13-CONT-001 — Remove implicit Desktop game-checkout discovery, harden historical CP010 guard, then resume M13 batch
+- Current Task Status: CONTINUATION_REQUIRED / AUTHORIZED / RESUME_MASTER_AFTER_SAFE_FULL_SUITE
+- Next Task/Action: execute only `.hiveai/prompts/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_PROMPT.md`; first synchronize GitHub/local authority, remove implicit Desktop Scrubbots test discovery, make the CP010 guard durable, complete a safe unfiltered full pytest gate, then resume SB-CP02-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012 continuously without inter-child handoff.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M12_CP01_001_010_CPX001_FINAL_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_MASTER_INTERIM_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M13_CP02_001_012_MASTER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M13_CP02_001_012_MASTER_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -188,6 +188,16 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M13 Master Inter-Child Rule: passing child publishes implementation + separate child log and continues immediately; no ChatGPT/owner handoff between passing children.
 - M13 Master Blocker Rule: only unsafe repository preservation/divergence or an unsatisfiable child contract may stop the batch; ordinary in-scope failures must be remediated before continuing.
 - M13 Post-Builder Audit Rule: ChatGPT independently audits every child against its own criteria, writes one strict audit per child, opens focused remediation only where required, and does not open M14 until all 12 child audits are PASS/CLOSED.
+- SB-CP02-001 C001 Implementation Commit: `1ed02965620bfbcc7ac39a8c52a97a2c390701a4`.
+- SB-CP02-001 C001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_STRICT_AUDIT.md`.
+- M13 Interim Master Audit Result: `CONTINUATION_REQUIRED` by `.hiveai/audits/M13_CP02_001_012_MASTER_INTERIM_AUDIT.md`; child 001 product semantics pass, but historical full-suite test harness implicitly discovers the owner Desktop Scrubbots checkout.
+- M13-CONT-001 Authorization: `RESUME_MASTER_AFTER_SAFE_FULL_SUITE`.
+- M13-CONT-001 Prompt: `.hiveai/prompts/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_PROMPT.md`.
+- M13-CONT-001 Audit Criteria: `.hiveai/audit-criteria/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_AUDIT_CRITERIA.md`.
+- M13-CONT-001 Builder Log Target: `.hiveai/codex-logs/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_CODEX_LOG.md`.
+- M13-CONT-001 Resume Order: `SB-CP02-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012`.
+- M13-CONT-001 Harness Rule: unfiltered pytest must not infer or access owner Desktop game checkout; external game authority is explicit capability only, otherwise truthful skip.
+- M13-CONT-001 Historical Guard Rule: CP010 retains package-wide forbidden network/provider/runtime behavior checks but must not require per-child declarative source-path whitelisting.
 - SB-CP02-001 C001 Prompt: `.hiveai/prompts/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_PROMPT.md`.
 - SB-CP02-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_AUDIT_CRITERIA.md`.
 - SB-CP02-002 C001 Prompt: `.hiveai/prompts/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_PROMPT.md`.
@@ -1020,7 +1030,7 @@ Capability source family: `SB-CP02-xxx` from the main Scrubbots master plan.
 
 ### M13.01 - Manifest schema and compatibility versioning
 
-- [~] SB-CP02-001 — Define versioned manifest schema.
+- [x] SB-CP02-001 — Define versioned manifest schema.
 - [ ] SB-CP02-002 — schema_version + monotonic content_version.
 - [ ] SB-CP02-003 — minimum_game_version compatibility.
 
