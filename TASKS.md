@@ -4,15 +4,15 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M13 — Remote Manifest & Content Versioning
-- Current Sprint: SB-CP02-006-C001-R01 — Disabled-level logical identity remediation
-- Current Task: SB-CP02-006 — Align disabled-state lookup with casefold logical level identity
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
-- Next Task/Action: execute only `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`; first synchronize GitHub/local authority, fix the mixed-case disabled-level lookup inconsistency, add CP006/CP009/CP012 regressions, run safe full suite, publish the R01 builder log, then stop for independent re-audit.
-- Required Actor: CODEX
+- Current Milestone: M14 — Publisher, Staging & Production Promotion
+- Current Sprint: M14-MASTER — Prepare SB-CP03-001..012 + SB-CPX-002 milestone batch
+- Current Task: M14-PREP — Author child prompts/criteria and master batch authority
+- Current Task Status: CHATGPT_PREPARING_M14_MASTER_BATCH
+- Next Task/Action: ChatGPT authors and publishes M14 child prompts/audit criteria for SB-CP03-001..012 plus SB-CPX-002, then updates this tracker to M14_MASTER_BATCH_AUTHORIZED before Codex execution.
+- Required Actor: CHATGPT
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_MASTER_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
@@ -215,6 +215,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-CP02-006 C001-R01 Prompt: `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`.
 - SB-CP02-006 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_AUDIT_CRITERIA.md`.
 - SB-CP02-006 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_CODEX_LOG.md`.
+- SB-CP02-006 C001-R01 Implementation Commit: `826a85e9d447cbf7b3755897bd4bc02813d24ef1`.
+- SB-CP02-006 C001-R01 Final Builder Publication: `4559faa5fd5ab8529bbe2c553c3283824ca9c1a1`.
+- SB-CP02-006 C001-R01 Independent Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_STRICT_REAUDIT.md`.
+- SB-CP02-012 Final Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_FINAL_REAUDIT.md`.
+- M13 Final Result: `PASS / CLOSED` by `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`.
+- M14 Preparation Rule: ChatGPT must publish all SB-CP03-001..012 + SB-CPX-002 child prompts/criteria and one sync-first master prompt before Codex receives M14 work; SB-CPX-003 remains historical PASS/CLOSED and is not rerun.
 - SB-CP02-001 C001 Prompt: `.hiveai/prompts/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_PROMPT.md`.
 - SB-CP02-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_AUDIT_CRITERIA.md`.
 - SB-CP02-002 C001 Prompt: `.hiveai/prompts/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_PROMPT.md`.
@@ -559,8 +565,8 @@ Do not wrap those labels in Markdown emphasis and do not replace them with alias
 - M10: Campaign Intelligence / Sequencing Adapter — PLANNED
 - M11: Content Platform Architecture & Security Boundary — PLANNED / PARTIALLY EVIDENCED
 - M12: .scrubpack Format & Packager — COMPLETE / VERIFIED
-- M13: Remote Manifest & Content Versioning — ACTIVE / MASTER_BATCH_AUTHORIZED
-- M14: Publisher, Staging & Production Promotion — PLANNED / PARTIALLY EVIDENCED
+- M13: Remote Manifest & Content Versioning — COMPLETE / VERIFIED
+- M14: Publisher, Staging & Production Promotion — PREPARING / CHATGPT / PARTIALLY EVIDENCED
 - M15: Godot Remote Content Runtime — PLANNED
 - M16: Offline Cache & Last-Known-Good Recovery — PLANNED
 - M17: Rollback, Disable & Scheduling — PLANNED / PARTIALLY EVIDENCED
@@ -1055,7 +1061,7 @@ Capability source family: `SB-CP02-xxx` from the main Scrubbots master plan.
 
 - [x] SB-CP02-004 — Pack IDs/locations/hashes.
 - [x] SB-CP02-005 — Level metadata without unnecessary contiguous-ID assumption.
-- [~] SB-CP02-006 — disabled_levels.
+- [x] SB-CP02-006 — disabled_levels.
 - [x] SB-CP02-007 — Scheduled activation windows.
 
 ### M13.03 - Ownership conflicts, reference validation and history
@@ -1064,7 +1070,7 @@ Capability source family: `SB-CP02-xxx` from the main Scrubbots master plan.
 - [x] SB-CP02-009 — Validate references before publish.
 - [x] SB-CP02-010 — Keep prior manifests/version history.
 - [x] SB-CP02-011 — App/content schema compatibility behavior.
-- [ ] SB-CP02-012 — Parser/schema tests.
+- [x] SB-CP02-012 — Parser/schema tests.
 
 ---
 
