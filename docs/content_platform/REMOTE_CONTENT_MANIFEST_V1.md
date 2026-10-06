@@ -14,7 +14,11 @@ keys rooted at `packs/`, with safe lowercase segments and a final
 `.scrubpack` suffix; URLs, hosts, absolute paths, traversal, backslashes,
 query/fragment syntax, and credentials are rejected. Each level entry owns a
 stable `level_id` and its declared `pack_id`. Model types are immutable,
-collections are sorted by case-sensitive ASCII identity, and `to_dict()` and
+pack records are sorted by canonical pack ID, while level entries preserve the
+declared array order. Level IDs use the existing path-safe grammar and are
+casefold-unique. IDs may be nonnumeric or gapped; no catalog order is inferred
+from a numeric suffix or from sorting IDs. V1 has no explicit presentation
+order field, so this contract does not renumber levels. `to_dict()` and
 canonical JSON serialization are deterministic, including per-pack
 `to_json_bytes()`. The empty fixture at
 `content_pipeline/schemas/v1/examples/content-manifest-minimal.json` is the

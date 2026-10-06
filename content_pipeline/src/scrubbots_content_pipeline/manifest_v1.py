@@ -151,16 +151,13 @@ class ContentManifestV1:
         pack_ids = [pack.pack_id for pack in self.packs]
         normalized_pack_ids = [pack_id.casefold() for pack_id in pack_ids]
         level_ids = [level.level_id for level in self.levels]
+        normalized_level_ids = [level_id.casefold() for level_id in level_ids]
         if len(normalized_pack_ids) != len(set(normalized_pack_ids)):
             raise ContentManifestError("duplicate pack_id")
-        if len(level_ids) != len(set(level_ids)):
+        if len(normalized_level_ids) != len(set(normalized_level_ids)):
             raise ContentManifestError("duplicate level_id")
         object.__setattr__(self, "packs", tuple(sorted(self.packs, key=lambda pack: pack.pack_id.encode("ascii"))))
-        object.__setattr__(
-            self,
-            "levels",
-            tuple(sorted(self.levels, key=lambda level: (level.level_id.encode("ascii"), level.pack_id.encode("ascii")))),
-        )
+        # Preserve declared level array order; level identity never implies catalog order.
 
     def to_dict(self) -> dict[str, object]:
         """Return fresh JSON-compatible data in the canonical V1 shape."""

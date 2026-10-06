@@ -37,15 +37,25 @@ def test_minimal_fixture_round_trips_as_the_canonical_empty_manifest() -> None:
     assert manifest.content_version == 1
 
 
-def test_model_owns_explicit_types_and_sorts_collections_deterministically() -> None:
+def test_model_owns_explicit_types_and_preserves_declared_level_order() -> None:
     manifest = ContentManifestV1(
         packs=(pack_record("pack-z"), pack_record("pack-a")),
-        levels=(ManifestLevelV1("level-z", "pack-z"), ManifestLevelV1("level-a", "pack-a")),
+        levels=(ManifestLevelV1("tutorial-alpha", "pack-z"), ManifestLevelV1("level-004", "pack-a")),
     )
     assert [item.pack_id for item in manifest.packs] == ["pack-a", "pack-z"]
-    assert [item.level_id for item in manifest.levels] == ["level-a", "level-z"]
+    assert [item.level_id for item in manifest.levels] == ["tutorial-alpha", "level-004"]
     assert manifest.to_json_bytes() == manifest.to_json_bytes()
     assert ContentManifestV1.from_dict(manifest.to_dict()) == manifest
+
+
+def test_noncontiguous_level_ids_are_preserved_without_numeric_order_derivation() -> None:
+    source_order = ["level-100", "tutorial-alpha", "9", "level-004"]
+    manifest = ContentManifestV1(
+        levels=tuple(ManifestLevelV1(level_id, "pack-a") for level_id in source_order)
+    )
+    parsed = ContentManifestV1.from_dict(manifest.to_dict())
+    assert [item.level_id for item in parsed.levels] == source_order
+    assert [item["level_id"] for item in manifest.to_dict()["levels"]] == source_order
 
 
 @pytest.mark.parametrize(
