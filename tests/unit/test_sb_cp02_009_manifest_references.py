@@ -18,6 +18,7 @@ from scrubbots_content_pipeline import (  # noqa: E402
     ScrubpackLevelInput,
     ScrubpackPayloadInput,
     build_scrubpack,
+    is_level_disabled,
     validate_manifest_references,
 )
 
@@ -54,8 +55,7 @@ def _payload(role: str, level_id: str) -> ScrubpackPayloadInput:
     return ScrubpackPayloadInput(descriptor, raw)
 
 
-def _build():
-    level_id = "level-001"
+def _build(level_id: str = "level-001"):
     level = ScrubpackLevelInput(
         level_id, _payload("level_data", level_id), _payload("supply_plan_data", level_id),
         _payload("metadata", level_id),
@@ -87,6 +87,22 @@ def test_local_m12_build_evidence_binds_every_manifest_reference() -> None:
     assert result.eligible is True
     assert all(check.accepted for check in result.checks)
     assert result.to_dict() == validate_manifest_references(_manifest(build), (build,)).to_dict()
+
+
+def test_case_variant_disabled_reference_and_helper_agree_with_local_m12_evidence() -> None:
+    build = _build("Level-A")
+    manifest = _manifest(
+        build,
+        levels=(ManifestLevelV1("Level-A", "test-pack"),),
+        disabled_levels=("level-a",),
+        schedules=(ManifestScheduleV1("level", "LEVEL-A", "2026-10-05T10:00:00Z"),),
+    )
+
+    result = validate_manifest_references(manifest, (build,))
+
+    assert result.eligible is True
+    assert all(check.accepted for check in result.checks)
+    assert is_level_disabled(manifest, "Level-A") is True
 
 
 def test_reference_gate_fails_closed_for_missing_pack_or_level_evidence() -> None:

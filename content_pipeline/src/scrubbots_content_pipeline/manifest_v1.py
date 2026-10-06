@@ -320,12 +320,12 @@ class ContentManifestV1:
 
 
 def is_level_disabled(manifest: ContentManifestV1, level_id: object) -> bool:
-    """Return whether an explicit canonical level ID appears in this manifest's disable list."""
+    """Return whether a valid logical level ID appears in this manifest's disable list."""
     if not isinstance(manifest, ContentManifestV1):
         raise ContentManifestError("manifest must be a ContentManifestV1")
     if not isinstance(level_id, str) or not _LEVEL_ID.fullmatch(level_id):
         raise ContentManifestError("invalid level_id")
-    return level_id in manifest.disabled_levels
+    return level_id.casefold() in {disabled_id.casefold() for disabled_id in manifest.disabled_levels}
 
 
 def is_schedule_active(schedule: ManifestScheduleV1, at_utc: object) -> bool:

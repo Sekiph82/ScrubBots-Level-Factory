@@ -26,6 +26,7 @@ from scrubbots_content_pipeline import (  # noqa: E402
     append_manifest_history,
     check_app_content_compatibility,
     check_manifest_successor,
+    is_level_disabled,
     parse_content_manifest_v1,
     serialize_manifest_history,
     validate_manifest_references,
@@ -149,6 +150,22 @@ def test_parser_leaves_unknown_references_for_the_separate_cp009_gate() -> None:
     assert reasons["level_pack_references"] == "LEVEL_PACK_NOT_DECLARED"
     assert reasons["disabled_level_references"] == "DISABLED_LEVEL_NOT_DECLARED"
     assert reasons["schedule_target_references"] == "SCHEDULE_TARGET_NOT_DECLARED"
+
+
+def test_parser_corpus_keeps_casefold_disabled_identity_aligned_with_reference_gate() -> None:
+    value = {
+        **_valid_dict(),
+        "levels": [{"level_id": "Level-A", "pack_id": "pack-a"}],
+        "disabled_levels": ["level-a"],
+    }
+    parsed = parse_content_manifest_v1(_bytes(value))
+
+    assert parsed.levels[0].level_id == "Level-A"
+    assert parsed.disabled_levels == ("level-a",)
+    assert is_level_disabled(parsed, "Level-A") is True
+    reference_result = validate_manifest_references(parsed, ())
+    disabled_check = next(check for check in reference_result.checks if check.check_id == "disabled_level_references")
+    assert disabled_check.accepted is True
 
 
 def test_parser_corpus_includes_and_detects_tampered_manifest_history() -> None:

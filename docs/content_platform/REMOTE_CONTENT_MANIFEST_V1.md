@@ -25,7 +25,10 @@ query/fragment syntax, and credentials are rejected. Each level entry owns a
 stable `level_id` and its declared `pack_id`. Model types are immutable,
 pack records are sorted by canonical pack ID, while level entries preserve the
 declared array order. Level IDs use the existing path-safe grammar and are
-casefold-unique. IDs may be nonnumeric or gapped; no catalog order is inferred
+casefold-unique, while their supplied spelling is preserved in the model and
+serialized JSON. Logical collision, reference, and disabled-state comparisons
+use casefold identity; IDs are not rewritten to lowercase. IDs may be nonnumeric
+or gapped; no catalog order is inferred
 from a numeric suffix or from sorting IDs. V1 has no explicit presentation
 order field, so this contract does not renumber levels. `to_dict()` and
 canonical JSON serialization are deterministic, including per-pack
@@ -36,7 +39,8 @@ canonical minimal V1 value.
 `disabled_levels` is a canonical ASCII-sorted list of unique path-safe level
 IDs. It records declarative state only: it does not delete the level metadata,
 remove pack references, rewrite or mutate `.scrubpack` bytes, or reject an
-unknown level reference at parse time. `is_level_disabled()` is a pure query;
+unknown level reference at parse time. `is_level_disabled()` is a pure query
+that compares valid level IDs using casefold identity;
 full reference validation is owned by the later publish-validation child.
 
 `schedules` contains zero or one canonical UTC window per `(target_kind,

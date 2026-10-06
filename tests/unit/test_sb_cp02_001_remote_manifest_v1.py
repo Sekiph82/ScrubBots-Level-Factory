@@ -316,6 +316,27 @@ def test_disabled_levels_sort_canonically_and_preserve_unrelated_metadata() -> N
     assert pack.to_json_bytes() == before_pack_bytes
 
 
+def test_disabled_level_query_uses_casefold_identity_and_preserves_spelling() -> None:
+    manifest = ContentManifestV1(
+        levels=(ManifestLevelV1("Level-A", "pack-a"),),
+        disabled_levels=("level-a",),
+    )
+
+    assert manifest.levels[0].level_id == "Level-A"
+    assert manifest.disabled_levels == ("level-a",)
+    assert manifest.to_dict()["levels"] == [{"level_id": "Level-A", "pack_id": "pack-a"}]
+    assert manifest.to_dict()["disabled_levels"] == ["level-a"]
+    assert is_level_disabled(manifest, "Level-A")
+    assert is_level_disabled(manifest, "LEVEL-A")
+    assert not is_level_disabled(manifest, "other-valid-id")
+
+    reverse_spelling = ContentManifestV1(
+        levels=(ManifestLevelV1("Level-A", "pack-a"),),
+        disabled_levels=("Level-A",),
+    )
+    assert is_level_disabled(reverse_spelling, "level-a")
+
+
 @pytest.mark.parametrize(
     "disabled_levels",
     [
