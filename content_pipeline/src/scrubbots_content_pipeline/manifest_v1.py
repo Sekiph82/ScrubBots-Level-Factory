@@ -17,6 +17,7 @@ CONTENT_MANIFEST_SCHEMA = "scrubbots.content.manifest.v1"
 CONTENT_MANIFEST_SCHEMA_VERSION = 1
 _PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_GAME_VERSION = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
 
 
 class ContentManifestError(ValueError):
@@ -38,6 +39,33 @@ class ManifestSuccessorResult:
 
     accepted: bool
     reason_code: ManifestSuccessorReasonCode
+
+
+class ManifestCompatibilityReasonCode(str, Enum):
+    """Stable local outcomes for an explicit game/minimum version comparison."""
+
+    COMPATIBLE = "COMPATIBLE"
+    GAME_VERSION_TOO_OLD = "GAME_VERSION_TOO_OLD"
+    INVALID_MINIMUM_GAME_VERSION = "INVALID_MINIMUM_GAME_VERSION"
+    INVALID_CURRENT_GAME_VERSION = "INVALID_CURRENT_GAME_VERSION"
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestCompatibilityResult:
+    """Deterministic result for checking an explicit game version."""
+
+    compatible: bool
+    reason_code: ManifestCompatibilityReasonCode
+
+
+def parse_canonical_game_version(value: object) -> tuple[int, int, int]:
+    """Parse strict MAJOR.MINOR.PATCH decimal triplets without whitespace or leading zeroes."""
+    if not isinstance(value, str):
+        raise ContentManifestError("game version must be a canonical string")
+    match = _GAME_VERSION.fullmatch(value)
+    if match is None:
+        raise ContentManifestError("game version must use canonical MAJOR.MINOR.PATCH")
+    return tuple(int(part) for part in match.groups())  # type: ignore[return-value]
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +108,7 @@ class ContentManifestV1:
     schema: str = CONTENT_MANIFEST_SCHEMA
     schema_version: int = CONTENT_MANIFEST_SCHEMA_VERSION
     content_version: int = 1
+    minimum_game_version: str = "0.0.0"
 
     def __post_init__(self) -> None:
         if self.schema != CONTENT_MANIFEST_SCHEMA:
@@ -88,6 +117,7 @@ class ContentManifestV1:
             raise ContentManifestError("unsupported manifest schema_version")
         if type(self.content_version) is not int or self.content_version < 1:
             raise ContentManifestError("content_version must be a positive integer")
+        parse_canonical_game_version(self.minimum_game_version)
         if not isinstance(self.packs, tuple) or any(not isinstance(pack, ManifestPackV1) for pack in self.packs):
             raise ContentManifestError("packs must contain ManifestPackV1 values")
         if not isinstance(self.levels, tuple) or any(not isinstance(level, ManifestLevelV1) for level in self.levels):
@@ -111,6 +141,7 @@ class ContentManifestV1:
             "schema": self.schema,
             "schema_version": self.schema_version,
             "content_version": self.content_version,
+            "minimum_game_version": self.minimum_game_version,
             "packs": [pack.to_dict() for pack in self.packs],
             "levels": [level.to_dict() for level in self.levels],
         }
@@ -124,7 +155,7 @@ class ContentManifestV1:
     @classmethod
     def from_dict(cls, value: object) -> ContentManifestV1:
         """Parse a mapping only when every root and item field is explicitly known."""
-        required = {"schema", "schema_version", "content_version", "packs", "levels"}
+        required = {"schema", "schema_version", "content_version", "minimum_game_version", "packs", "levels"}
         if not isinstance(value, Mapping) or set(value) != required:
             raise ContentManifestError("invalid manifest fields")
         if value["schema"] != CONTENT_MANIFEST_SCHEMA:
@@ -133,6 +164,7 @@ class ContentManifestV1:
             raise ContentManifestError("unsupported manifest schema_version")
         if type(value["content_version"]) is not int or value["content_version"] < 1:
             raise ContentManifestError("content_version must be a positive integer")
+        parse_canonical_game_version(value["minimum_game_version"])
         if not isinstance(value["packs"], list) or not isinstance(value["levels"], list):
             raise ContentManifestError("packs and levels must be arrays")
         packs: list[ManifestPackV1] = []
@@ -151,6 +183,7 @@ class ContentManifestV1:
             value["schema"],
             value["schema_version"],
             value["content_version"],
+            value["minimum_game_version"],
         )
 
 
@@ -169,14 +202,35 @@ def check_manifest_successor(
     return ManifestSuccessorResult(True, ManifestSuccessorReasonCode.VALID_SUCCESSOR)
 
 
+def check_game_version_compatibility(
+    minimum_game_version: object, current_game_version: object
+) -> ManifestCompatibilityResult:
+    """Compare explicit canonical versions numerically without external lookups."""
+    try:
+        minimum = parse_canonical_game_version(minimum_game_version)
+    except ContentManifestError:
+        return ManifestCompatibilityResult(False, ManifestCompatibilityReasonCode.INVALID_MINIMUM_GAME_VERSION)
+    try:
+        current = parse_canonical_game_version(current_game_version)
+    except ContentManifestError:
+        return ManifestCompatibilityResult(False, ManifestCompatibilityReasonCode.INVALID_CURRENT_GAME_VERSION)
+    if current < minimum:
+        return ManifestCompatibilityResult(False, ManifestCompatibilityReasonCode.GAME_VERSION_TOO_OLD)
+    return ManifestCompatibilityResult(True, ManifestCompatibilityReasonCode.COMPATIBLE)
+
+
 __all__ = [
     "CONTENT_MANIFEST_SCHEMA",
     "CONTENT_MANIFEST_SCHEMA_VERSION",
     "ContentManifestError",
     "ContentManifestV1",
+    "ManifestCompatibilityReasonCode",
+    "ManifestCompatibilityResult",
     "ManifestSuccessorReasonCode",
     "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
     "check_manifest_successor",
+    "check_game_version_compatibility",
+    "parse_canonical_game_version",
 ]

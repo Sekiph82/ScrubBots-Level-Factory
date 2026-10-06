@@ -15,10 +15,13 @@ from scrubbots_content_pipeline.manifest_v1 import (  # noqa: E402
     CONTENT_MANIFEST_SCHEMA_VERSION,
     ContentManifestError,
     ContentManifestV1,
+    ManifestCompatibilityReasonCode,
     ManifestSuccessorReasonCode,
     ManifestLevelV1,
     ManifestPackV1,
+    check_game_version_compatibility,
     check_manifest_successor,
+    parse_canonical_game_version,
 )
 
 
@@ -79,8 +82,13 @@ def test_schema_and_fixture_are_closed_and_declarative() -> None:
     assert schema["additionalProperties"] is False
     assert schema["properties"]["schema"]["const"] == CONTENT_MANIFEST_SCHEMA
     assert schema["properties"]["schema_version"] == {"type": "integer", "const": 1}
-    assert set(schema["required"]) == {"schema", "schema_version", "content_version", "packs", "levels"}
+    assert set(schema["required"]) == {
+        "schema", "schema_version", "content_version", "minimum_game_version", "packs", "levels"
+    }
     assert schema["properties"]["content_version"] == {"type": "integer", "minimum": 1}
+    assert schema["properties"]["minimum_game_version"]["pattern"] == (
+        r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$"
+    )
 
 
 @pytest.mark.parametrize("version", [True, False, 0, -1, 1.0, "1", None])
@@ -144,3 +152,60 @@ def test_changed_bytes_with_same_content_version_are_not_a_successor() -> None:
     result = check_manifest_successor(4, changed_bytes)
     assert not result.accepted
     assert result.reason_code is ManifestSuccessorReasonCode.CONTENT_VERSION_NOT_INCREASED
+
+
+@pytest.mark.parametrize(
+    "version, expected",
+    [("0.0.0", (0, 0, 0)), ("1.2.3", (1, 2, 3)), ("10.4.25", (10, 4, 25))],
+)
+def test_canonical_game_version_parser(version: str, expected: tuple[int, int, int]) -> None:
+    assert parse_canonical_game_version(version) == expected
+
+
+@pytest.mark.parametrize("version", [None, True, 1, "", "1", "1.2", "1.2.3.4", "01.2.3", "1.02.3", "1.2.03", "-1.2.3", "1.+2.3", " 1.2.3", "1.2.3 ", "1. 2.3"])
+def test_canonical_game_version_parser_rejects_malformed_ambiguous_values(version: object) -> None:
+    with pytest.raises(ContentManifestError):
+        parse_canonical_game_version(version)
+
+
+@pytest.mark.parametrize("version", [None, True, 1, "1.2", " 1.2.3"])
+def test_manifest_requires_a_canonical_minimum_game_version(version: object) -> None:
+    raw = ContentManifestV1().to_dict()
+    raw["minimum_game_version"] = version
+    with pytest.raises(ContentManifestError, match="game version"):
+        ContentManifestV1.from_dict(raw)
+
+
+def test_manifest_requires_minimum_game_version_field() -> None:
+    raw = ContentManifestV1().to_dict()
+    del raw["minimum_game_version"]
+    with pytest.raises(ContentManifestError, match="invalid manifest fields"):
+        ContentManifestV1.from_dict(raw)
+
+
+@pytest.mark.parametrize(
+    "minimum,current,compatible,reason",
+    [
+        ("1.2.3", "1.2.3", True, ManifestCompatibilityReasonCode.COMPATIBLE),
+        ("1.2.3", "1.2.4", True, ManifestCompatibilityReasonCode.COMPATIBLE),
+        ("1.2.3", "1.3.0", True, ManifestCompatibilityReasonCode.COMPATIBLE),
+        ("1.2.3", "2.0.0", True, ManifestCompatibilityReasonCode.COMPATIBLE),
+        ("1.2.3", "1.2.2", False, ManifestCompatibilityReasonCode.GAME_VERSION_TOO_OLD),
+        ("1.10.0", "1.9.99", False, ManifestCompatibilityReasonCode.GAME_VERSION_TOO_OLD),
+    ],
+)
+def test_game_version_compatibility_uses_explicit_numeric_tuple_order(
+    minimum: str, current: str, compatible: bool, reason: ManifestCompatibilityReasonCode
+) -> None:
+    result = check_game_version_compatibility(minimum, current)
+    assert result.compatible is compatible
+    assert result.reason_code is reason
+
+
+def test_game_version_compatibility_rejects_malformed_inputs_deterministically() -> None:
+    assert check_game_version_compatibility("1.2.3", "1.2").reason_code is (
+        ManifestCompatibilityReasonCode.INVALID_CURRENT_GAME_VERSION
+    )
+    assert check_game_version_compatibility("1.2", "1.2.3").reason_code is (
+        ManifestCompatibilityReasonCode.INVALID_MINIMUM_GAME_VERSION
+    )

@@ -2,7 +2,7 @@
 
 The canonical local contract is `scrubbots.content.manifest.v1` with integer
 `schema_version: 1`. Its root is closed and contains only `schema`,
-`schema_version`, positive integer `content_version`, `packs`, and `levels`. Unknown properties and unsupported
+`schema_version`, positive integer `content_version`, canonical `minimum_game_version`, `packs`, and `levels`. Unknown properties and unsupported
 identity or version values fail closed. Add future fields only through an
 explicit versioned schema evolution.
 
@@ -18,6 +18,14 @@ successor is accepted only when its version is numerically greater than the
 previous accepted version; gaps are allowed, while equal or lower versions
 fail closed. `check_manifest_successor()` is a pure local check and does not
 persist history.
+
+`minimum_game_version` and the explicitly supplied current game version use
+the strict `MAJOR.MINOR.PATCH` grammar. Each component is a non-negative
+decimal integer with no leading zero unless the component is `0`; whitespace,
+signs, missing components, booleans, and other forms are rejected. The
+compatibility helper compares numeric triplets: equal/newer current versions
+are compatible and older versions are not. It performs no project, filesystem,
+clock, network, or runtime lookup.
 
 This manifest is declarative local data. It contains no executable payload,
 provider choice, URL, credential, or runtime operation. It does not publish,
