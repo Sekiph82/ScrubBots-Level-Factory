@@ -58,3 +58,13 @@ Document role: CODEX BUILDER LOG
 - Child builder log: `.hiveai/codex-logs/SB-CP02-009-C001_VALIDATE_REFERENCES_BEFORE_PUBLISH_CODEX_LOG.md`; initial log commit `ae75ee9a705f06a1c87f01048d78a624983c6044`, post-publication evidence commit `8ed22f3b44534b4d6c7a4e31a137218fbb6ffd4e`.
 - Both commits pushed normally to `main`; post-push fetch verified HEAD == `origin/main` == `8ed22f3b44534b4d6c7a4e31a137218fbb6ffd4e`, 0/0 divergence, clean worktree.
 - No TASKS/audit edits, dependencies, provider/network implementation, credentials, or game/runtime changes.
+
+### SB-CP02-010-C001 — Keep Prior Manifest / Version History
+
+- Child base SHA: `88dd9c6ef907c0d6966ff0cff2066022a8567777`.
+- Implementation commit: `80633624b324edfbd95a31773029d515fffc1353`; added exact-byte append-only history, monotonic content versions, canonical UTC records, chained digests, deterministic parser/serializer/replay verifier, pinned tip truncation detection, and schema-agnostic historical JSON inspection.
+- Focused child history tests: **5 passed in 0.14s**. Cumulative CP02-001/009/010 + CP01/M12 + CP00/M11 + governance: **368 passed in 2.42s**.
+- Unfiltered `python -m pytest -q`: **1,526 passed, 19 skipped in 883.88s**. Compileall PASS; all 16 Content Pipeline JSON files parsed; staged/working diff checks PASS.
+- Child builder log `.hiveai/codex-logs/SB-CP02-010-C001_MANIFEST_VERSION_HISTORY_CODEX_LOG.md`; initial log commit `2b7ac11c9e69a5cac2aba6ad0382393ee2860f4e`, publication addendum `99a186a6348361b8972cea5b8406cbf5969bbdac`.
+- Implementation and log commits pushed normally. Post-push fetch verified HEAD == `origin/main` == `99a186a6348361b8972cea5b8406cbf5969bbdac`, 0/0 divergence, clean worktree.
+- No TASKS/audit edits, dependencies, credentials, network/provider behavior, or game/runtime changes.
