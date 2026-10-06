@@ -133,6 +133,13 @@ from .publication_plan import (
     serialize_publication_plan,
     validate_plan_current,
 )
+from .publisher_validation import (
+    PUBLISHER_VALIDATION_VERSION,
+    PublisherValidationCheck,
+    PublisherValidationReport,
+    serialize_publisher_validation_report,
+    validate_publisher_candidate,
+)
 from .provider import (
     PROVIDER_CONTRACT_VERSION,
     CapabilityNegotiationResult,
@@ -288,6 +295,11 @@ __all__ = [
     "build_publication_plan",
     "serialize_publication_plan",
     "validate_plan_current",
+    "PUBLISHER_VALIDATION_VERSION",
+    "PublisherValidationCheck",
+    "PublisherValidationReport",
+    "serialize_publisher_validation_report",
+    "validate_publisher_candidate",
     "PROVIDER_CONTRACT_VERSION",
     "CapabilityNegotiationResult",
     "MutatingProvider",
