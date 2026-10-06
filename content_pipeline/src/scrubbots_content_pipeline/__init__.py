@@ -190,6 +190,7 @@ from .provider import (
     ProviderObjectBytesResult,
     ProviderResult,
     ProviderResultCategory,
+    ProductionPromotionProvider,
     ReadOnlyProvider,
     negotiate_capabilities,
     serialize_provider_capability,
@@ -197,6 +198,14 @@ from .provider import (
     serialize_provider_result,
     validate_provider_capability,
     validate_provider_identity,
+)
+from .production_promotion import (
+    OwnerPromotionApproval,
+    ProductionManifestPrecondition,
+    ProductionPromotionReport,
+    PromotionReasonCode,
+    PromotedObjectEvidence,
+    promote_verified_staging_to_production,
 )
 from .publication_receipt import (
     BUILDER_RECEIPT_VERSION,
@@ -349,6 +358,12 @@ __all__ = [
     "CurrentMainReplayError",
     "CurrentMainReplayReceipt",
     "verify_current_main_supply_replay",
+    "OwnerPromotionApproval",
+    "ProductionManifestPrecondition",
+    "ProductionPromotionReport",
+    "PromotionReasonCode",
+    "PromotedObjectEvidence",
+    "promote_verified_staging_to_production",
     "MAX_SCRUBPACK_ARCHIVE_BYTES",
     "MAX_SCRUBPACK_MEMBERS",
     "ScrubpackInspectionResult",
@@ -372,6 +387,7 @@ __all__ = [
     "PROVIDER_CONTRACT_VERSION",
     "CapabilityNegotiationResult",
     "MutatingProvider",
+    "ProductionPromotionProvider",
     "ProviderAdapter",
     "ProviderFeature",
     "ProviderIdentity",

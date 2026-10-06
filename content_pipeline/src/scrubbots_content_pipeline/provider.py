@@ -273,6 +273,51 @@ class MutatingProvider(Protocol):
         ...
 
 
+class ProductionPromotionProvider(Protocol):
+    """Narrow source-bound copy/read/CAS surface for STAGING to PRODUCTION promotion."""
+
+    @property
+    def identity(self) -> ProviderIdentity: ...
+
+    @property
+    def capabilities(self) -> ProviderCapability: ...
+
+    def promote_object(
+        self,
+        source_environment: Environment,
+        source_object_key: str,
+        target_environment: Environment,
+        target_object_key: str,
+        expected_sha256: str,
+    ) -> ProviderResult:
+        """Copy one exact existing object between environments without deleting source."""
+        ...
+
+    def read_object_bytes(
+        self, environment: Environment, object_key: str
+    ) -> ProviderObjectBytesResult:
+        """Read exact bytes in either environment for local verification."""
+        ...
+
+    def append_release_event(self, event: object) -> ProviderResult:
+        """Durably append a hash-chained M11 release event."""
+        ...
+
+    def write_manifest_conditionally(
+        self,
+        environment: Environment,
+        target_id: str,
+        object_key: str,
+        content_digest: str,
+        content_bytes: bytes,
+        *,
+        expected_prior_sha256: str | None,
+        promotion_pending_event_digest: str,
+    ) -> ProviderResult:
+        """Atomically activate a manifest under CAS after durable pending evidence."""
+        ...
+
+
 class ProviderAdapter(Protocol):
     """Deprecated combined placeholder retained for the CP001 boundary contract.
 
@@ -300,7 +345,7 @@ class ProviderAdapter(Protocol):
 __all__ = [
     "PROVIDER_CONTRACT_VERSION", "CapabilityNegotiationResult", "ProviderAdapter",
     "ProviderCapability", "ProviderFeature", "ProviderIdentity", "ProviderObjectBytesResult", "ProviderResult",
-    "ProviderResultCategory", "ReadOnlyProvider", "MutatingProvider",
+    "ProviderResultCategory", "ReadOnlyProvider", "MutatingProvider", "ProductionPromotionProvider",
     "negotiate_capabilities", "serialize_provider_capability", "serialize_provider_identity", "serialize_provider_result",
     "validate_provider_capability", "validate_provider_identity",
 ]
