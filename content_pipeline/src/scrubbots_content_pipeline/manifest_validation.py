@@ -217,6 +217,12 @@ __all__ = [
 
 def _verify_build(build: ScrubpackBuildResult) -> bool:
     try:
+        if build.solver_identity_artifact_bytes is not None:
+            from .scrubpack_solver_identity import verify_solver_proven_scrubpack
+
+            return verify_solver_proven_scrubpack(
+                build.archive_bytes, build.solver_identity_artifact_bytes, build.evidence
+            )
         return verify_scrubpack_build(build.archive_bytes, build.evidence)
     except Exception:
         return False

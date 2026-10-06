@@ -166,6 +166,12 @@ from .publication_plan import (
     serialize_publication_plan,
     validate_plan_current,
 )
+from .current_main_replay import (
+    CURRENT_MAIN_REPLAY_VERSION,
+    CurrentMainReplayError,
+    CurrentMainReplayReceipt,
+    verify_current_main_supply_replay,
+)
 from .publisher_validation import (
     PUBLISHER_VALIDATION_VERSION,
     PublisherValidationCheck,
@@ -339,6 +345,10 @@ __all__ = [
     "ScrubpackSolverProof",
     "build_solver_proven_scrubpack",
     "verify_solver_proven_scrubpack",
+    "CURRENT_MAIN_REPLAY_VERSION",
+    "CurrentMainReplayError",
+    "CurrentMainReplayReceipt",
+    "verify_current_main_supply_replay",
     "MAX_SCRUBPACK_ARCHIVE_BYTES",
     "MAX_SCRUBPACK_MEMBERS",
     "ScrubpackInspectionResult",
