@@ -78,3 +78,23 @@ Document role: CODEX BUILDER LOG
 - Child log `.hiveai/codex-logs/SB-CP02-011-C001_APP_CONTENT_SCHEMA_COMPATIBILITY_CODEX_LOG.md`; initial log commit `bc82bbc793d950008dfb274631d36d3aa4b726dd`, publication addendum `3cf2fc1f286b471466189f513df2c7022e475664`.
 - Implementation and log commits pushed normally. Post-push fetch verified HEAD == `origin/main` == `3cf2fc1f286b471466189f513df2c7022e475664`, 0/0 divergence, clean worktree.
 - No TASKS/audit edits, dependencies, credentials, provider/network behavior, or game/runtime integration.
+
+### SB-CP02-012-C001 — Manifest Parser / Schema Tests
+
+- Child base SHA: `4d374e7d90da115548e5b180db908e02de5d9498`.
+- Implementation commit `743372bc15c368cb98a6097778859905ea50e34f`; added strict UTF-8 bytes-to-immutable-model parsing, duplicate/non-finite/resource-limit rejection, exact V1/nested schema enforcement, canonical round-trip corpus, CP02-001..011 adversarial coverage, and parser documentation.
+- Focused CP02-012 corpus: **16 passed in 0.14s**. Cumulative CP02-001..012 + CP01/M12 + CP00/M11 + governance: **404 passed in 14.83s**.
+- Child unfiltered full suite: **1,562 passed, 19 skipped in 748.58s**. Child compileall PASS; all 16 Content Pipeline JSON files parsed; staged/working diff checks PASS.
+- Child log `.hiveai/codex-logs/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_CODEX_LOG.md`; initial log `f6db349637308b77180089c5bb671dfc58ff4b8c`, publication addendum `d1bbea276ff8597b5d7f90b40cc690066dae583b`, correction `2dda8a285df2fa6e5d9d22c2f480df92690dadca`.
+- All child commits pushed normally; post-push fetch verified HEAD == `origin/main` == `2dda8a285df2fa6e5d9d22c2f480df92690dadca`, 0/0 divergence, clean worktree.
+- Log errata documents a compileall-command path typo and clarifies CP02-010 history wording. The command typo is superseded by the final master compileall pass below.
+
+### M13 master final verification
+
+- Re-ran final CP02-001..012 focused suite, M12/M11 contracts, and governance: **404 passed in 5.69s**.
+- After all child implementation/log commits were published, final unfiltered `python -m pytest -q`: **1,562 passed, 19 skipped in 593.51s**.
+- Final `python -m compileall -q content_pipeline/src tests`: PASS. All **16** Content Pipeline JSON files parsed: PASS. Final `git diff --check`: PASS.
+- Verified all **12** distinct SB-CP02-001..012 child builder logs exist on `origin/main`.
+- Protected paths unchanged since continuation base: `TASKS.md` and `.hiveai/audits/**` diff empty. New CP02 code contains no network/provider/process-launch/upload/download implementation; no credentials, dependency/license changes, or game/runtime mutation were introduced.
+- Final verification was against the published execution HEAD `2dda8a285df2fa6e5d9d22c2f480df92690dadca`, fetched `origin/main` equal, 0/0 divergence, clean status. M13 builder work is complete and handed off for ChatGPT independent audit; no audit pass is claimed.
+- Final master-log publication commit and post-push equality will be recorded after this log update is published.
