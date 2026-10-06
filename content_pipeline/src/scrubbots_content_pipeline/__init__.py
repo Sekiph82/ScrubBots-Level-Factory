@@ -45,6 +45,12 @@ from .manifest_v1 import (
     is_schedule_active,
     parse_canonical_game_version,
 )
+from .manifest_validation import (
+    ManifestReferenceCheck,
+    ManifestReferenceReasonCode,
+    ManifestReferenceValidationResult,
+    validate_manifest_references,
+)
 from .orchestration import (
     EvidenceSink,
     PromotionOrchestrator,
@@ -172,6 +178,10 @@ __all__ = [
     "is_level_disabled",
     "is_schedule_active",
     "parse_canonical_game_version",
+    "ManifestReferenceCheck",
+    "ManifestReferenceReasonCode",
+    "ManifestReferenceValidationResult",
+    "validate_manifest_references",
     "BOUNDARY_VERSION",
     "ClassificationResult",
     "ContentDisposition",
