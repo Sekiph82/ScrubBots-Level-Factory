@@ -39,3 +39,5 @@ Document role: CODEX BUILDER LOG
 
 ## Publication
 - Child log commit and normal push/fetch parity will be recorded after publication.
+- Normal non-force push `git push origin HEAD:main` succeeded; remote advanced from `4d374e7d90da115548e5b180db908e02de5d9498` to `f6db349637308b77180089c5bb671dfc58ff4b8c`.
+- Post-push `git fetch --prune origin` verified local HEAD == `origin/main` == `f6db349637308b77180089c5bb671dfc58ff4b8c`, 0/0 divergence, and clean status. Initial child log commit: `f6db349637308b77180089c5bb671dfc58ff4b8c`.
