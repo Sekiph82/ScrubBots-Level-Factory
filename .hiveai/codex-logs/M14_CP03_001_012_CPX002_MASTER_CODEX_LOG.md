@@ -64,3 +64,19 @@ Detailed per-child prompts, criteria, implementation choices, tests, failures/co
 - Compileall passed, all 16 Content Pipeline JSON files parsed, and `git diff --check` passed (line-ending warning only). No dependencies/licenses or network/provider/mutation paths changed.
 - The prior authorized log-only commit `a13571d31265ce646171508c3cc232ed8df26160` publishes this master log and child log so the GitHub links resolve; the implementation is still separate and is now ready for its required implementation commit. Next, publish implementation and updated log evidence separately, confirm clean 0/0 parity, and continue immediately with CP03-002.
 - CP03-001 implementation commit `1f9934b698891a19e54a5a54e1d5801d056347d1` contains only the publisher-validation module, package exports, and focused tests. Normal non-force push to `main` succeeded after fetch/prune; a subsequent fetch confirmed local HEAD and `origin/main` equal `1f9934b` at 0/0. The refreshed child/master evidence logs are staged for their separate log commit; then push and verify parity before starting CP03-002.
+- Updated evidence-log commit `e5839a1f9d468cd0f7ed8ea377dd790058cc8160` was pushed separately with a normal non-force push; post-push fetch confirmed exact HEAD/origin equality and clean status. CP03-001 publication complete; immediately advancing to the next child under the master authorization.
+
+### SB-CP03-002-C001 start
+
+- Child execution base: `e5839a1f9d468cd0f7ed8ea377dd790058cc8160`; fetch confirmed `origin/main` equal, 0/0, clean worktree before child start.
+- Read exact CP03-002 prompt and audit criteria, then read the CPX-001 solver-proven pack binding prompt and criteria required for freshness reuse. Reviewed current solver identity builder, CPX-001 focused real-Factory integration test, and Factory-side authority/revalidation seam.
+- Created `.hiveai/codex-logs/SB-CP03-002-C001_SERIALIZE_ACCEPTED_FACTORY_OUTPUT_TO_PACKS_CODEX_LOG.md` with exact H1 and builder-log role before implementation. No CP03-002 product edits have started yet.
+
+### SB-CP03-002-C001 implementation and verification
+
+- The first full-suite run exposed a real one-way dependency-boundary violation: **1 failed, 1,581 passed, 19 skipped in 1,043.95s**, at `tests/unit/test_sb_cp00_001_content_pipeline_boundary.py::test_dependencies_are_one_way_and_no_second_tracker_exists`. Moved the Factory/Content Pipeline composition from the Factory core package into the root `scripts/build_accepted_factory_output_pack.py` integration adapter; restored the core package API and did not weaken the boundary test.
+- Post-correction boundary + child integration suite: **11 passed in 98.34s**. Broader all-unit + CPX-001 + CP03-002 integration suite: **1,385 passed, 4 skipped in 307.79s**.
+- Final unfiltered `python -m pytest -q`: **1,582 passed, 19 skipped in 1,064.20s**. Skips are the expected explicit absence of canonical ScrubBots/Godot capability; no implicit owner Desktop project was used. Compileall, all 16 Content Pipeline JSON parses, and `git diff --check` passed.
+- CP03-002 files are limited to the root local integration adapter and its integration test; no tracker/audit, dependency/license, provider/network, Factory review-state, or game-repository mutation. Child log contains the detailed implementation decisions and chronological failed/corrected test evidence.
+- Product implementation commit: `8f9d7f5247d5bf1932e22e8e58417400e8b6f32e`. A pre-publication fetch found three disjoint upstream commits adding an owner-approved maintenance task explicitly queued after M14, its prompt and criteria; current M14 authority remains unchanged. Integrated the upstream commits with a normal merge at `876151b7f97b9fdae3fe82e3e21706cb15f7c9e3`.
+- Next: publish child/master evidence logs in a separate commit, push normally, then fetch and require `HEAD == origin/main`, 0/0, clean worktree before starting CP03-003.
