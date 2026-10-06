@@ -92,6 +92,16 @@ from .staging_manifest_publish import (
     publish_candidate_manifest_to_staging,
     serialize_staging_manifest_receipt,
 )
+from .staging_download_verify import (
+    STAGING_DOWNLOAD_VERIFY_VERSION,
+    StagingDownloadedPackEvidence,
+    StagingDownloadReasonCode,
+    StagingDownloadVerificationReceipt,
+    StagingDownloadVerificationReport,
+    StagingManifestReader,
+    serialize_staging_download_verification_receipt,
+    verify_staged_manifest_download,
+)
 from .manifest_parser import (
     MAX_MANIFEST_BYTES,
     MAX_MANIFEST_COLLECTION_ITEMS,
@@ -271,6 +281,14 @@ __all__ = [
     "StagingManifestWriter",
     "publish_candidate_manifest_to_staging",
     "serialize_staging_manifest_receipt",
+    "STAGING_DOWNLOAD_VERIFY_VERSION",
+    "StagingDownloadedPackEvidence",
+    "StagingDownloadReasonCode",
+    "StagingDownloadVerificationReceipt",
+    "StagingDownloadVerificationReport",
+    "StagingManifestReader",
+    "serialize_staging_download_verification_receipt",
+    "verify_staged_manifest_download",
     "MAX_MANIFEST_BYTES",
     "MAX_MANIFEST_COLLECTION_ITEMS",
     "MAX_MANIFEST_NESTING_DEPTH",
