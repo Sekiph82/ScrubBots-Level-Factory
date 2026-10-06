@@ -5,10 +5,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
-- Current Sprint: M14-MASTER - Execute SB-CP03-001..007 -> SB-CPX-002 -> SB-CP03-008..012 continuously, then independent child audits
+- Current Sprint: M14-CONT-001 - Resume CP03-001 after authoritative tracker format correction, then continue M14 master batch
 - Current Task: SB-CP03-001 — M14 master batch entry point
-- Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M14_MASTER_BATCH_AUTHORIZED
-- Next Task/Action: execute only `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff, with one separate builder log per child, stopping only after master completion or a true blocker.
+- Current Task Status: BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED / PRESERVE_UNCOMMITTED_CP03_001
+- Next Task/Action: execute only `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`; reuse the existing dirty M14 TEMP worktree, preserve all uncommitted CP03-001 implementation/log work, safely incorporate the authoritative tracker-format fix, rerun the governance/full-suite gates, publish CP03-001 if green, then continue CP03-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -17,8 +17,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M14_CP03_001_012_CPX002_MASTER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M14-CONT-001_TRACKER_FORMAT_RESUME_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -225,6 +225,11 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14 Master Prompt: `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`.
 - M14 Master Audit Wrapper: `.hiveai/audit-criteria/M14_CP03_001_012_CPX002_MASTER_AUDIT_CRITERIA.md`.
 - M14 Master Builder Log Target: `.hiveai/codex-logs/M14_CP03_001_012_CPX002_MASTER_CODEX_LOG.md`.
+- M14 Tracker Format Correction Commit: `dd7c4379ae6a5443e26f3117eee80d643d8ef529`; corrected only the canonical `Current Task` separator required by the governance parser.
+- M14-CONT-001 Authorization: `BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED`.
+- M14-CONT-001 Prompt: `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`.
+- M14-CONT-001 Audit Criteria: `.hiveai/audit-criteria/M14-CONT-001_TRACKER_FORMAT_RESUME_AUDIT_CRITERIA.md`.
+- M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Master Execution Order: `SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012`.
 - M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
 - M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
