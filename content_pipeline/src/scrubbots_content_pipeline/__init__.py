@@ -249,9 +249,33 @@ from .secret_refs import (
     validate_secret_reference,
 )
 from .validation import DryRunReport, validate_only
+from .one_command_publisher import (
+    AcceptedFactoryPackBuilder,
+    DownloadedPackBytes,
+    FactoryPackRequest,
+    ProductionRunInputs,
+    PublisherJournalEntry,
+    PublisherMode,
+    PublisherRunReport,
+    PublisherRunRequest,
+    PublisherStage,
+    run_one_command_publisher,
+    serialize_publisher_journal,
+)
 
 __all__ = [
     "DryRunReport",
+    "AcceptedFactoryPackBuilder",
+    "DownloadedPackBytes",
+    "FactoryPackRequest",
+    "ProductionRunInputs",
+    "PublisherJournalEntry",
+    "PublisherMode",
+    "PublisherRunReport",
+    "PublisherRunRequest",
+    "PublisherStage",
+    "run_one_command_publisher",
+    "serialize_publisher_journal",
     "CONTENT_MANIFEST_SCHEMA",
     "CONTENT_MANIFEST_SCHEMA_VERSION",
     "ContentManifestError",
