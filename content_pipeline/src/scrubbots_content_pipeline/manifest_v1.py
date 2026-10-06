@@ -10,6 +10,7 @@ import json
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
+from enum import Enum
 
 
 CONTENT_MANIFEST_SCHEMA = "scrubbots.content.manifest.v1"
@@ -20,6 +21,23 @@ _LEVEL_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 
 class ContentManifestError(ValueError):
     """Raised when a manifest does not satisfy the closed V1 contract."""
+
+
+class ManifestSuccessorReasonCode(str, Enum):
+    """Stable local outcomes for checking one proposed manifest successor."""
+
+    VALID_SUCCESSOR = "VALID_SUCCESSOR"
+    INVALID_PREVIOUS_CONTENT_VERSION = "INVALID_PREVIOUS_CONTENT_VERSION"
+    INVALID_CANDIDATE_MANIFEST = "INVALID_CANDIDATE_MANIFEST"
+    CONTENT_VERSION_NOT_INCREASED = "CONTENT_VERSION_NOT_INCREASED"
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestSuccessorResult:
+    """Deterministic, side-effect-free result for a manifest version check."""
+
+    accepted: bool
+    reason_code: ManifestSuccessorReasonCode
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,12 +79,15 @@ class ContentManifestV1:
     levels: tuple[ManifestLevelV1, ...] = ()
     schema: str = CONTENT_MANIFEST_SCHEMA
     schema_version: int = CONTENT_MANIFEST_SCHEMA_VERSION
+    content_version: int = 1
 
     def __post_init__(self) -> None:
         if self.schema != CONTENT_MANIFEST_SCHEMA:
             raise ContentManifestError("unsupported manifest schema")
         if type(self.schema_version) is not int or self.schema_version != CONTENT_MANIFEST_SCHEMA_VERSION:
             raise ContentManifestError("unsupported manifest schema_version")
+        if type(self.content_version) is not int or self.content_version < 1:
+            raise ContentManifestError("content_version must be a positive integer")
         if not isinstance(self.packs, tuple) or any(not isinstance(pack, ManifestPackV1) for pack in self.packs):
             raise ContentManifestError("packs must contain ManifestPackV1 values")
         if not isinstance(self.levels, tuple) or any(not isinstance(level, ManifestLevelV1) for level in self.levels):
@@ -89,6 +110,7 @@ class ContentManifestV1:
         return {
             "schema": self.schema,
             "schema_version": self.schema_version,
+            "content_version": self.content_version,
             "packs": [pack.to_dict() for pack in self.packs],
             "levels": [level.to_dict() for level in self.levels],
         }
@@ -102,13 +124,15 @@ class ContentManifestV1:
     @classmethod
     def from_dict(cls, value: object) -> ContentManifestV1:
         """Parse a mapping only when every root and item field is explicitly known."""
-        required = {"schema", "schema_version", "packs", "levels"}
+        required = {"schema", "schema_version", "content_version", "packs", "levels"}
         if not isinstance(value, Mapping) or set(value) != required:
             raise ContentManifestError("invalid manifest fields")
         if value["schema"] != CONTENT_MANIFEST_SCHEMA:
             raise ContentManifestError("unsupported manifest schema")
         if type(value["schema_version"]) is not int or value["schema_version"] != 1:
             raise ContentManifestError("unsupported manifest schema_version")
+        if type(value["content_version"]) is not int or value["content_version"] < 1:
+            raise ContentManifestError("content_version must be a positive integer")
         if not isinstance(value["packs"], list) or not isinstance(value["levels"], list):
             raise ContentManifestError("packs and levels must be arrays")
         packs: list[ManifestPackV1] = []
@@ -121,7 +145,28 @@ class ContentManifestV1:
             if not isinstance(item, Mapping) or set(item) != {"level_id", "pack_id"}:
                 raise ContentManifestError("invalid level fields")
             levels.append(ManifestLevelV1(item["level_id"], item["pack_id"]))
-        return cls(tuple(packs), tuple(levels), value["schema"], value["schema_version"])
+        return cls(
+            tuple(packs),
+            tuple(levels),
+            value["schema"],
+            value["schema_version"],
+            value["content_version"],
+        )
+
+
+def check_manifest_successor(
+    previous_content_version: object, candidate: object
+) -> ManifestSuccessorResult:
+    """Check a candidate manifest against an accepted version without storing history."""
+    if type(previous_content_version) is not int or previous_content_version < 1:
+        return ManifestSuccessorResult(False, ManifestSuccessorReasonCode.INVALID_PREVIOUS_CONTENT_VERSION)
+    try:
+        manifest = ContentManifestV1.from_dict(candidate)
+    except ContentManifestError:
+        return ManifestSuccessorResult(False, ManifestSuccessorReasonCode.INVALID_CANDIDATE_MANIFEST)
+    if manifest.content_version <= previous_content_version:
+        return ManifestSuccessorResult(False, ManifestSuccessorReasonCode.CONTENT_VERSION_NOT_INCREASED)
+    return ManifestSuccessorResult(True, ManifestSuccessorReasonCode.VALID_SUCCESSOR)
 
 
 __all__ = [
@@ -129,6 +174,9 @@ __all__ = [
     "CONTENT_MANIFEST_SCHEMA_VERSION",
     "ContentManifestError",
     "ContentManifestV1",
+    "ManifestSuccessorReasonCode",
+    "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
+    "check_manifest_successor",
 ]

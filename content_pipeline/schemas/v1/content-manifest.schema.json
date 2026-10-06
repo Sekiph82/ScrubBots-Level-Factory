@@ -4,10 +4,11 @@
   "title": "SCRUBBOTS Remote Content Manifest V1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "schema_version", "packs", "levels"],
+  "required": ["schema", "schema_version", "content_version", "packs", "levels"],
   "properties": {
     "schema": { "const": "scrubbots.content.manifest.v1" },
     "schema_version": { "type": "integer", "const": 1 },
+    "content_version": { "type": "integer", "minimum": 1 },
     "packs": {
       "type": "array",
       "items": {

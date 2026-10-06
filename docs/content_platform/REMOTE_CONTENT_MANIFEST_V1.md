@@ -2,7 +2,7 @@
 
 The canonical local contract is `scrubbots.content.manifest.v1` with integer
 `schema_version: 1`. Its root is closed and contains only `schema`,
-`schema_version`, `packs`, and `levels`. Unknown properties and unsupported
+`schema_version`, positive integer `content_version`, `packs`, and `levels`. Unknown properties and unsupported
 identity or version values fail closed. Add future fields only through an
 explicit versioned schema evolution.
 
@@ -13,9 +13,14 @@ collections are sorted by case-sensitive ASCII identity, and `to_dict()` and
 `content_pipeline/schemas/v1/examples/content-manifest-minimal.json` is the
 canonical minimal V1 value.
 
+`content_version` is a positive integer revision identity. A proposed
+successor is accepted only when its version is numerically greater than the
+previous accepted version; gaps are allowed, while equal or lower versions
+fail closed. `check_manifest_successor()` is a pure local check and does not
+persist history.
+
 This manifest is declarative local data. It contains no executable payload,
 provider choice, URL, credential, or runtime operation. It does not publish,
-upload, download, resolve references, or change `.scrubpack` identity. Version
-successor, compatibility, pack location and hashes, level metadata, disabled
+upload, download, resolve references, or change `.scrubpack` identity. Compatibility, pack location and hashes, level metadata, disabled
 or scheduled state, reference validation, history, and parser workflows are
 defined by later M13 child contracts.

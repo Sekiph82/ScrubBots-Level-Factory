@@ -32,8 +32,11 @@ from .manifest_v1 import (
     CONTENT_MANIFEST_SCHEMA_VERSION,
     ContentManifestError,
     ContentManifestV1,
+    ManifestSuccessorReasonCode,
+    ManifestSuccessorResult,
     ManifestLevelV1,
     ManifestPackV1,
+    check_manifest_successor,
 )
 from .orchestration import (
     EvidenceSink,
@@ -150,8 +153,11 @@ __all__ = [
     "CONTENT_MANIFEST_SCHEMA_VERSION",
     "ContentManifestError",
     "ContentManifestV1",
+    "ManifestSuccessorReasonCode",
+    "ManifestSuccessorResult",
     "ManifestLevelV1",
     "ManifestPackV1",
+    "check_manifest_successor",
     "BOUNDARY_VERSION",
     "ClassificationResult",
     "ContentDisposition",
