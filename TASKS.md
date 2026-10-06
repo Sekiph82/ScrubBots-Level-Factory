@@ -6,7 +6,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
 - Current Sprint: M14-MASTER - Execute SB-CP03-001..007 -> SB-CPX-002 -> SB-CP03-008..012 continuously, then independent child audits
-- Current Task: SB-CP03-001 - M14 master batch entry point
+- Current Task: SB-CP03-001 — M14 master batch entry point
 - Current Task Status: IMPLEMENT_ALL_THEN_AUDIT / M14_MASTER_BATCH_AUTHORIZED
 - Next Task/Action: execute only `.hiveai/prompts/M14_CP03_001_012_CPX002_MASTER_IMPLEMENTATION_PROMPT.md`; Codex first synchronizes GitHub with the canonical Desktop repository non-destructively, then executes SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff, with one separate builder log per child, stopping only after master completion or a true blocker.
 - Required Actor: CODEX
