@@ -5,21 +5,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
-- Current Sprint: SB-CP03-001 / M14-CONT-001 - Resume CP03-001 after authoritative tracker format correction, then continue M14 master batch
-- Current Task: SB-CP03-001 — M14 master batch entry point
-- Current Task Status: OWNER_PRIORITY_REMOTE_LEVEL_UPDATE / BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED / PRESERVE_UNCOMMITTED_CP03_001
-- Next Task/Action: **TOP PRIORITY: Remote Level Update / Family APK program.** Execute only `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`; reuse the existing dirty M14 TEMP worktree, preserve all uncommitted CP03-001 implementation/log work, safely incorporate the authoritative tracker-format fix, rerun the governance/full-suite gates, publish CP03-001 if green, then continue CP03-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff. After strict M14 PASS/CLOSED, the next program frontier is game-runtime CP04/M15 + CP05/M16, then SB-CPX-004 Factory `Publish to ScrubBots`, then CP07 storage/CDN, then Android Family Test APK.
+- Current Sprint: SB-CP03-005 / M14-CONT-002 - Reverify remote object integrity after tracker denominator fix, then resume M14 master batch
+- Current Task: SB-CP03-005 — Reverify remote object integrity gate, then continue M14
+- Current Task Status: CONDITIONAL_PRODUCT_PASS / TRACKER_FIXED / REVERIFY_THEN_RESUME
+- Next Task/Action: execute only `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`; verify the corrected 248-task denominator, rerun CP03-005 governance/focused/cumulative/full-suite gates unchanged, then if green continue CP03-006 -> CP03-007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff.
 - Required Actor: CODEX
 - Owner Priority Decision [2026-10-06]: **Remote Level Update / Family APK is now the highest-priority SCRUBBOTS program.** Execution order is locked as: (1) CP01/M12 .scrubpack = already PASS/CLOSED; (2) CP02/M13 manifest/versioning = already PASS/CLOSED; (3) finish current CP03/M14 publisher/staging/production; (4) implement CP04/M15 RemoteContentManager in `Sekiph82/Scrubbots`; (5) implement CP05/M16 offline cache/last-known-good in `Sekiph82/Scrubbots`; (6) connect Factory Studio/Pixel Art Factory to the publisher through SB-CPX-004 so an owner-approved batch can be published to ScrubBots without rebuilding the APK; (7) select/integrate storage/CDN through CP07/M18, Cloudflare R2/CDN remaining the preferred candidate until owner approval; (8) build the Android Family Test APK only after the remote runtime is included. Remote payload remains declarative level content only; no GDScript/native/plugin/executable payload may be downloaded.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_INTERIM_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M14-CONT-001_TRACKER_FORMAT_RESUME_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -243,6 +243,17 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
 - M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
 - M14 Post-Builder Audit Rule: ChatGPT independently audits every active child against its own criteria; M14 does not close until all 13 active children are PASS/CLOSED. SB-CPX-003 remains previously closed.
+- M14-CONT-001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/M14-CONT-001_TRACKER_FORMAT_RESUME_STRICT_AUDIT.md`.
+- SB-CP03-001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_STRICT_AUDIT.md`.
+- SB-CP03-002 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-002-C001_SERIALIZE_ACCEPTED_FACTORY_OUTPUT_TO_PACKS_STRICT_AUDIT.md`.
+- SB-CP03-003 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-003-C001_HASHES_CANDIDATE_MANIFEST_STRICT_AUDIT.md`.
+- SB-CP03-004 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-004-C001_UPLOAD_PACKS_BEFORE_MANIFEST_STRICT_AUDIT.md`.
+- SB-CP03-005 Independent Audit Result: `CONDITIONAL / REVERIFY_AFTER_TRACKER_FIX` by `.hiveai/audits/SB-CP03-005-C001_VERIFY_REMOTE_OBJECT_INTEGRITY_STRICT_AUDIT.md`.
+- M14 Interim Independent Audit Result: `CONTINUATION_REQUIRED` by `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_INTERIM_STRICT_AUDIT.md`.
+- M14 Tracker Denominator Fix Commit: `67807bd54d6a31d29ddc8f672ca3f23a7f754a6a`; unified denominator corrected to 248 and SB-CPX extension accounting to 001..004.
+- M14-CONT-002 Authorization: `REVERIFY_CP03_005_THEN_RESUME`.
+- M14-CONT-002 Prompt: `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`.
+- M14-CONT-002 Audit Criteria: `.hiveai/audit-criteria/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_AUDIT_CRITERIA.md`.
 - SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
 - SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
 - SB-CP03-001 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_CODEX_LOG.md`.
@@ -1141,14 +1152,14 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 ### M14.01 - Validation-only packaging and candidate manifest
 
-- [~] SB-CP03-001 — Publisher validation-only mode.
-- [ ] SB-CP03-002 — Serialize accepted Factory output into packs. [PARTIAL]
-- [ ] SB-CP03-003 — Hashes + candidate manifest. [PARTIAL]
+- [x] SB-CP03-001 — Publisher validation-only mode.
+- [x] SB-CP03-002 — Serialize accepted Factory output into packs. [PARTIAL]
+- [x] SB-CP03-003 — Hashes + candidate manifest. [PARTIAL]
 
 ### M14.02 - Upload integrity and staging verification
 
-- [ ] SB-CP03-004 — Upload packs before active manifest references them.
-- [ ] SB-CP03-005 — Verify remote object integrity.
+- [x] SB-CP03-004 — Upload packs before active manifest references them.
+- [~] SB-CP03-005 — Verify remote object integrity.
 - [ ] SB-CP03-006 — Publish STAGING first.
 - [ ] SB-CP03-007 — Verify staging through real download.
 
