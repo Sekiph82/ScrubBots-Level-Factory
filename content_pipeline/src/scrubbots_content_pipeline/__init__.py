@@ -69,6 +69,11 @@ from .compatibility import (
     AppContentCompatibilityResult,
     check_app_content_compatibility,
 )
+from .candidate_manifest import (
+    CandidateManifestBuildResult,
+    CandidateManifestError,
+    build_candidate_manifest,
+)
 from .manifest_parser import (
     MAX_MANIFEST_BYTES,
     MAX_MANIFEST_COLLECTION_ITEMS,
@@ -230,6 +235,9 @@ __all__ = [
     "AppContentCompatibilityReasonCode",
     "AppContentCompatibilityResult",
     "check_app_content_compatibility",
+    "CandidateManifestBuildResult",
+    "CandidateManifestError",
+    "build_candidate_manifest",
     "MAX_MANIFEST_BYTES",
     "MAX_MANIFEST_COLLECTION_ITEMS",
     "MAX_MANIFEST_NESTING_DEPTH",
