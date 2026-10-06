@@ -81,6 +81,17 @@ from .staging_pack_upload import (
     UploadedPackEvidence,
     upload_candidate_packs_to_staging,
 )
+from .staging_manifest_publish import (
+    STAGING_MANIFEST_PUBLISH_VERSION,
+    StagingManifestPackDigest,
+    StagingManifestPrecondition,
+    StagingManifestPublishReport,
+    StagingManifestReasonCode,
+    StagingManifestReceipt,
+    StagingManifestWriter,
+    publish_candidate_manifest_to_staging,
+    serialize_staging_manifest_receipt,
+)
 from .manifest_parser import (
     MAX_MANIFEST_BYTES,
     MAX_MANIFEST_COLLECTION_ITEMS,
@@ -251,6 +262,15 @@ __all__ = [
     "StagingPackUploadReport",
     "UploadedPackEvidence",
     "upload_candidate_packs_to_staging",
+    "STAGING_MANIFEST_PUBLISH_VERSION",
+    "StagingManifestPackDigest",
+    "StagingManifestPrecondition",
+    "StagingManifestPublishReport",
+    "StagingManifestReasonCode",
+    "StagingManifestReceipt",
+    "StagingManifestWriter",
+    "publish_candidate_manifest_to_staging",
+    "serialize_staging_manifest_receipt",
     "MAX_MANIFEST_BYTES",
     "MAX_MANIFEST_COLLECTION_ITEMS",
     "MAX_MANIFEST_NESTING_DEPTH",
