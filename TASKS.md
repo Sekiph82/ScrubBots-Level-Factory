@@ -5,20 +5,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M13 — Remote Manifest & Content Versioning
-- Current Sprint: M13-CONT-001 — Safe full-suite scope guard, then resume SB-CP02-002..012
-- Current Task: M13-CONT-001 — Remove implicit Desktop game-checkout discovery, harden historical CP010 guard, then resume M13 batch
-- Current Task Status: CONTINUATION_REQUIRED / AUTHORIZED / RESUME_MASTER_AFTER_SAFE_FULL_SUITE
-- Next Task/Action: execute only `.hiveai/prompts/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_PROMPT.md`; first synchronize GitHub/local authority, remove implicit Desktop Scrubbots test discovery, make the CP010 guard durable, complete a safe unfiltered full pytest gate, then resume SB-CP02-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012 continuously without inter-child handoff.
+- Current Sprint: SB-CP02-006-C001-R01 — Disabled-level logical identity remediation
+- Current Task: SB-CP02-006 — Align disabled-state lookup with casefold logical level identity
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / REMEDIATE_THEN_REAUDIT
+- Next Task/Action: execute only `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`; first synchronize GitHub/local authority, fix the mixed-case disabled-level lookup inconsistency, add CP006/CP009/CP012 regressions, run safe full suite, publish the R01 builder log, then stop for independent re-audit.
 - Required Actor: CODEX
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_MASTER_INTERIM_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_MASTER_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -198,6 +198,23 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M13-CONT-001 Resume Order: `SB-CP02-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> 011 -> 012`.
 - M13-CONT-001 Harness Rule: unfiltered pytest must not infer or access owner Desktop game checkout; external game authority is explicit capability only, otherwise truthful skip.
 - M13-CONT-001 Historical Guard Rule: CP010 retains package-wide forbidden network/provider/runtime behavior checks but must not require per-child declarative source-path whitelisting.
+- M13-CONT-001 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/M13-CONT-001_FULL_SUITE_SCOPE_GUARD_AND_RESUME_STRICT_AUDIT.md`.
+- M13 Final Builder Audit Result: `CHANGES_REQUIRED` by `.hiveai/audits/M13_CP02_001_012_MASTER_STRICT_AUDIT.md`.
+- SB-CP02-002 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_STRICT_AUDIT.md`.
+- SB-CP02-003 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-003-C001_MINIMUM_GAME_VERSION_COMPATIBILITY_STRICT_AUDIT.md`.
+- SB-CP02-004 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-004-C001_PACK_IDS_LOCATIONS_HASHES_STRICT_AUDIT.md`.
+- SB-CP02-005 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-005-C001_LEVEL_METADATA_NONCONTIGUOUS_IDS_STRICT_AUDIT.md`.
+- SB-CP02-006 Strict Audit Result: `CHANGES_REQUIRED / R01` by `.hiveai/audits/SB-CP02-006-C001_DISABLED_LEVELS_STRICT_AUDIT.md`.
+- SB-CP02-007 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-007-C001_SCHEDULED_ACTIVATION_WINDOWS_STRICT_AUDIT.md`.
+- SB-CP02-008 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-008-C001_REJECT_DUPLICATE_PACK_LEVEL_OWNERSHIP_STRICT_AUDIT.md`.
+- SB-CP02-009 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-009-C001_VALIDATE_REFERENCES_BEFORE_PUBLISH_STRICT_AUDIT.md`.
+- SB-CP02-010 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-010-C001_MANIFEST_VERSION_HISTORY_STRICT_AUDIT.md`.
+- SB-CP02-011 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP02-011-C001_APP_CONTENT_SCHEMA_COMPATIBILITY_STRICT_AUDIT.md`.
+- SB-CP02-012 Independent Audit Result: `CONDITIONAL / REAUDIT_AFTER_CP006_R01` by `.hiveai/audits/SB-CP02-012-C001_MANIFEST_PARSER_SCHEMA_TESTS_STRICT_AUDIT.md`.
+- SB-CP02-006 C001-R01 Authorization: `REMEDIATE_THEN_REAUDIT`.
+- SB-CP02-006 C001-R01 Prompt: `.hiveai/prompts/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_REMEDIATION_PROMPT.md`.
+- SB-CP02-006 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_AUDIT_CRITERIA.md`.
+- SB-CP02-006 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CP02-006-C001-R01_DISABLED_LEVEL_IDENTITY_CODEX_LOG.md`.
 - SB-CP02-001 C001 Prompt: `.hiveai/prompts/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_PROMPT.md`.
 - SB-CP02-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP02-001-C001_REMOTE_MANIFEST_V1_SCHEMA_AUDIT_CRITERIA.md`.
 - SB-CP02-002 C001 Prompt: `.hiveai/prompts/SB-CP02-002-C001_MONOTONIC_CONTENT_VERSION_PROMPT.md`.
@@ -1031,22 +1048,22 @@ Capability source family: `SB-CP02-xxx` from the main Scrubbots master plan.
 ### M13.01 - Manifest schema and compatibility versioning
 
 - [x] SB-CP02-001 — Define versioned manifest schema.
-- [ ] SB-CP02-002 — schema_version + monotonic content_version.
-- [ ] SB-CP02-003 — minimum_game_version compatibility.
+- [x] SB-CP02-002 — schema_version + monotonic content_version.
+- [x] SB-CP02-003 — minimum_game_version compatibility.
 
 ### M13.02 - Pack, level, disable and schedule metadata
 
-- [ ] SB-CP02-004 — Pack IDs/locations/hashes.
-- [ ] SB-CP02-005 — Level metadata without unnecessary contiguous-ID assumption.
-- [ ] SB-CP02-006 — disabled_levels.
-- [ ] SB-CP02-007 — Scheduled activation windows.
+- [x] SB-CP02-004 — Pack IDs/locations/hashes.
+- [x] SB-CP02-005 — Level metadata without unnecessary contiguous-ID assumption.
+- [~] SB-CP02-006 — disabled_levels.
+- [x] SB-CP02-007 — Scheduled activation windows.
 
 ### M13.03 - Ownership conflicts, reference validation and history
 
-- [ ] SB-CP02-008 — Reject duplicate pack/level ownership conflicts.
-- [ ] SB-CP02-009 — Validate references before publish.
-- [ ] SB-CP02-010 — Keep prior manifests/version history.
-- [ ] SB-CP02-011 — App/content schema compatibility behavior.
+- [x] SB-CP02-008 — Reject duplicate pack/level ownership conflicts.
+- [x] SB-CP02-009 — Validate references before publish.
+- [x] SB-CP02-010 — Keep prior manifests/version history.
+- [x] SB-CP02-011 — App/content schema compatibility behavior.
 - [ ] SB-CP02-012 — Parser/schema tests.
 
 ---
