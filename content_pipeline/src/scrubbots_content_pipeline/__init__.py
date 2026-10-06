@@ -262,6 +262,14 @@ from .one_command_publisher import (
     run_one_command_publisher,
     serialize_publisher_journal,
 )
+from .publish_report import (
+    PUBLISH_REPORT_SCHEMA,
+    PUBLISH_REPORT_SCHEMA_VERSION,
+    PublishReport,
+    build_publish_report,
+    render_publish_report,
+    serialize_publish_report,
+)
 
 __all__ = [
     "DryRunReport",
@@ -276,6 +284,12 @@ __all__ = [
     "PublisherStage",
     "run_one_command_publisher",
     "serialize_publisher_journal",
+    "PUBLISH_REPORT_SCHEMA",
+    "PUBLISH_REPORT_SCHEMA_VERSION",
+    "PublishReport",
+    "build_publish_report",
+    "render_publish_report",
+    "serialize_publish_report",
     "CONTENT_MANIFEST_SCHEMA",
     "CONTENT_MANIFEST_SCHEMA_VERSION",
     "ContentManifestError",
