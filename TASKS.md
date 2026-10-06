@@ -7,9 +7,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
 - Current Sprint: SB-CP03-001 / M14-CONT-001 - Resume CP03-001 after authoritative tracker format correction, then continue M14 master batch
 - Current Task: SB-CP03-001 — M14 master batch entry point
-- Current Task Status: BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED / PRESERVE_UNCOMMITTED_CP03_001
-- Next Task/Action: execute only `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`; reuse the existing dirty M14 TEMP worktree, preserve all uncommitted CP03-001 implementation/log work, safely incorporate the authoritative tracker-format fix, rerun the governance/full-suite gates, publish CP03-001 if green, then continue CP03-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff.
+- Current Task Status: OWNER_PRIORITY_REMOTE_LEVEL_UPDATE / BLOCKER_RESOLVED / CONTINUATION_AUTHORIZED / PRESERVE_UNCOMMITTED_CP03_001
+- Next Task/Action: **TOP PRIORITY: Remote Level Update / Family APK program.** Execute only `.hiveai/prompts/M14-CONT-001_TRACKER_FORMAT_RESUME_PROMPT.md`; reuse the existing dirty M14 TEMP worktree, preserve all uncommitted CP03-001 implementation/log work, safely incorporate the authoritative tracker-format fix, rerun the governance/full-suite gates, publish CP03-001 if green, then continue CP03-002 -> 003 -> 004 -> 005 -> 006 -> 007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff. After strict M14 PASS/CLOSED, the next program frontier is game-runtime CP04/M15 + CP05/M16, then SB-CPX-004 Factory `Publish to ScrubBots`, then CP07 storage/CDN, then Android Family Test APK.
 - Required Actor: CODEX
+- Owner Priority Decision [2026-10-06]: **Remote Level Update / Family APK is now the highest-priority SCRUBBOTS program.** Execution order is locked as: (1) CP01/M12 .scrubpack = already PASS/CLOSED; (2) CP02/M13 manifest/versioning = already PASS/CLOSED; (3) finish current CP03/M14 publisher/staging/production; (4) implement CP04/M15 RemoteContentManager in `Sekiph82/Scrubbots`; (5) implement CP05/M16 offline cache/last-known-good in `Sekiph82/Scrubbots`; (6) connect Factory Studio/Pixel Art Factory to the publisher through SB-CPX-004 so an owner-approved batch can be published to ScrubBots without rebuilding the APK; (7) select/integrate storage/CDN through CP07/M18, Cloudflare R2/CDN remaining the preferred candidate until owner approval; (8) build the Android Family Test APK only after the remote runtime is included. Remote payload remains declarative level content only; no GDScript/native/plugin/executable payload may be downloaded.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/M13_CP02_001_012_FINAL_CLOSURE_STRICT_REAUDIT.md`
@@ -1166,6 +1167,10 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 ### M14.05 - Route A game-repository release PR
 
 - [x] SB-CPX-003 — Publish an owner-approved CampaignBuilder batch through a deterministic `Sekiph82/Scrubbots` release branch + reviewable PR, never game `main`: strict clean/in-sync/authenticated preflight, exact allowed-path diff, current-game LevelCatalog/LevelLoader/SupplyPlanLoader/SolvabilitySolver/Difficulty V1 verification before push, one release commit, public-repo visibility warning, immutable release receipt, idempotent collision refusal, and byte-for-byte rollback on failure. Tests use a temporary local bare remote only. [EXTENSION]
+
+### M14.06 - Factory Studio → ScrubBots one-action remote publish handoff
+
+- [ ] **SB-CPX-004 — Add the owner-facing `Publish to ScrubBots` handoff from Factory Studio / Pixel Art Factory to the canonical Content Pipeline.** Input is owner-accepted production level output only. The action must package the exact LevelData + exact solver-proven supply plan + preview + supported metadata into canonical deterministic `.scrubpack` artifacts, invoke the existing CP03 validation/staging/promotion pipeline rather than bypass it, show dry-run/preflight before mutation, require explicit owner production promotion, and emit a reproducible publish receipt. It must never write directly into a phone, never push executable code, never bypass current-main game validation, and never silently overwrite a live content version. V1 target use case: publish the owner's new Level 11–50 batch so already-installed Android family builds discover/download only the missing verified packs. [EXTENSION]
 
 ---
 
