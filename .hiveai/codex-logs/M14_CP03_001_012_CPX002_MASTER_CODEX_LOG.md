@@ -97,3 +97,12 @@ Detailed per-child prompts, criteria, implementation choices, tests, failures/co
 - The first normal push was rejected as non-fast-forward when `origin/main` concurrently gained one tracker-only owner-priority update. The new live tracker retains M14 as Current Task and sequences CP04/CP05/CPX-004 after finishing M14. Integrated that disjoint tracker change with a normal merge at `77dc7ef4aaa6cee5d45ef9d2924f284cebb71aee`.
 - Product implementation commit: `ead32e996cc77a5ec27b3fa9ff879e8b535f8d6a`.
 - Separate child/master evidence-log commit `9c4ba3acb1371dce022cfc0cf0ae84f8de3c5002` was pushed normally; post-push fetch confirmed `HEAD == origin/main == 9c4ba3acb1371dce022cfc0ae84f8de3c5002`, 0/0, clean. This final master-log-only publication records parity before immediately continuing to CP03-005.
+
+
+### SB-CP03-005-C001 — integrity re-read, then live tracker blocker
+
+- CP03-004 publication left `HEAD == origin/main == 189a7544305302fd7c35a1b56d9d744cdf134d62`, 0/0, clean. Read CP03-005 prompt/criteria and created its distinct log before implementation.
+- Added exact provider byte re-read with object-key identity, local byte-length/SHA-256/byte equality checks, and M12 `inspect_scrubpack()` over the downloaded bytes. Initial broad tests found the package static boundary scan rejecting a temporary-file write; corrected by allowing `inspect_scrubpack()` to accept bytes directly. The boundary failure is gone.
+- Focused corrected tests: **35 passed**. Cumulative regression: **1 failed, 1,396 passed, 4 skipped**. Full unfiltered suite: **1 failed, 1,593 passed, 19 skipped in 964.08s**. The sole blocker is live tracker authority: `tests/unit/test_sb_lf00_007_governance_authority.py::test_current_tasks_rows_are_parser_safe_and_declared_denominator_matches` expects the declared denominator to match parsed rows, but live `TASKS.md` declares 247 and parses 248 after owner commit `e33cfc4` added SB-CPX-004. No tracker or governance-test edit is authorized; CP03-005 cannot be claimed green and M14 execution stops here pending tracker-owner reconciliation.
+- Product commit `88d2d09e28e73e4d4f8c5d555efab2e60a809704` was pushed normally; post-push fetch confirmed HEAD/origin equality, 0/0. Compileall, all 16 Content Pipeline JSON parses, and diff-check passed. See the CP03-005 child log for command history and detailed evidence.
+- Publish the blocker evidence logs separately and stop; do not proceed to CP03-006 until the authoritative tracker denominator is reconciled and the governance/full-suite gate passes.
