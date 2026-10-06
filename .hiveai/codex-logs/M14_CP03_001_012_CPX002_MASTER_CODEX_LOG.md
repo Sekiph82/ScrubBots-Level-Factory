@@ -88,3 +88,12 @@ Detailed per-child prompts, criteria, implementation choices, tests, failures/co
 - Added deterministic local manifest assembly from explicit exact M12 pack evidence, including archive SHA/length binding, pack/level references, strict parser round-trip, compatibility and optional successor gating. No provider/network or remote mutation path.
 - Focused CP03-003/M13 gate: **48 passed**. Cumulative all-unit plus prior CPX-001/CP03-002 regressions: **1,390 passed, 4 skipped**. Required unfiltered full suite: **1,587 passed, 19 skipped in 1,077.19s**; skips are the existing explicit missing-game/Godot capability cases. Compileall, 16 Content Pipeline JSON parses and diff-check passed.
 - Separate child/master evidence-log commit `c5b75ee5d866499b8047792ef3035517cc9cc8c6` was pushed normally; post-push fetch confirmed `HEAD == origin/main` at `c5b75ee5d866499b8047792ef3035517cc9cc8c6`, 0/0, clean. The final master-log-only publication records this parity before immediately continuing to CP03-004.
+
+### SB-CP03-004-C001 start and implementation
+
+- CP03-003 final master-log publication left `HEAD == origin/main == 55df7d200ce93c5430bf85e4105aaf6e29df6220`, 0/0, clean. Read exact CP03-004 prompt/criteria and existing M11-M13 provider/capability, manifest validation and staging contracts. Created distinct child log before implementation.
+- Implemented a staging-only, provider-neutral pack byte upload gate. It accepts only publishable CP03-003 evidence, negotiates object write/integrity/conditional-write, uploads packs in deterministic order with exact bytes, and withholds all manifest-write authority after any first failure. No manifest-write or delete method exists in this gate.
+- Focused CP03-003/004 tests: **10 passed**. Cumulative all-unit plus prior CPX-001/CP03-002 regressions: **1,395 passed, 4 skipped**. Required unfiltered full suite: **1,592 passed, 19 skipped in 945.27s**; skips are the existing explicit missing-game/Godot capability cases. Compileall, all 16 JSON parses, and diff-check passed.
+- The first normal push was rejected as non-fast-forward when `origin/main` concurrently gained one tracker-only owner-priority update. The new live tracker retains M14 as Current Task and sequences CP04/CP05/CPX-004 after finishing M14. Integrated that disjoint tracker change with a normal merge at `77dc7ef4aaa6cee5d45ef9d2924f284cebb71aee`.
+- Product implementation commit: `ead32e996cc77a5ec27b3fa9ff879e8b535f8d6a`.
+- Next: publish child/master logs separately, verify post-push parity and continue immediately to CP03-005.
