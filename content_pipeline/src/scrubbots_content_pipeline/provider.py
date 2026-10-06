@@ -312,6 +312,7 @@ class ProductionPromotionProvider(Protocol):
         content_bytes: bytes,
         *,
         expected_prior_sha256: str | None,
+        expected_prior_content_version: int | None,
         promotion_pending_event_digest: str,
     ) -> ProviderResult:
         """Atomically activate a manifest under CAS after durable pending evidence."""

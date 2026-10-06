@@ -98,7 +98,7 @@ def promote_verified_staging_to_production(
     target_id: str, manifest_object_key: str, precondition: ProductionManifestPrecondition,
     release_events: Sequence[ReleaseEvent], provider: ProductionPromotionProvider,
 ) -> ProductionPromotionReport:
-    """Copy all verified objects first, re-read them, then conditionally publish one manifest.
+    """Copy and re-read every verified object, then persist promotion-pending evidence.
 
     This function intentionally has no deletion or rollback path. Any failure leaves
     copied immutable objects in place and withholds manifest activation.
@@ -244,49 +244,10 @@ def promote_verified_staging_to_production(
         if not authority_current:
             return _report(PromotionReasonCode.GAME_AUTHORITY_STALE, target_id, manifest_sha,
                            identity.provider_id, tuple(copied), (pending,))
-        try:
-            result = provider.write_manifest_conditionally(Environment.PRODUCTION, target_id, manifest_object_key,
-                manifest_sha, receipt.manifest_bytes, expected_prior_sha256=precondition.expected_prior_sha256,
-                promotion_pending_event_digest=pending.event_digest)
-        except Exception:
-            # The provider may have committed before losing its response; report the attempt and
-            # leave the durable PROMOTION_PENDING event for reconciliation. Never retry blindly.
-            return _report(PromotionReasonCode.MANIFEST_WRITE_FAILED, target_id, manifest_sha,
-                           identity.provider_id, tuple(copied), (pending,), True)
-        if not _success(result, identity.provider_id, manifest_sha, Environment.PRODUCTION):
-            failed = make_release_event(sequence=sequence + 1, event_id=f"promotion-failed-{manifest_sha[:24]}",
-                transition_id=f"promotion-failed-{manifest_sha[:24]}", record_id=production_id, content_id=content_id,
-                content_digest=manifest_sha, environment=Environment.PRODUCTION,
-                from_state=ReleaseState.PROMOTION_PENDING, to_state=ReleaseState.FAILED,
-                expected_state=ReleaseState.PROMOTION_PENDING, previous_event_digest=pending.event_digest,
-                promotion_intent=True, source_record_id=staged.record_id)
-            try:
-                failure_appended = provider.append_release_event(failed)
-            except Exception:
-                failure_appended = None
-            failure_reason = (PromotionReasonCode.MANIFEST_WRITE_FAILED if _success(
-                failure_appended, identity.provider_id, failed.event_digest, Environment.PRODUCTION)
-                else PromotionReasonCode.RELEASE_EVENT_APPEND_FAILED)
-            return _report(failure_reason, target_id, manifest_sha, identity.provider_id,
-                           tuple(copied), (pending, failed), True)
-        promoted = make_release_event(sequence=sequence + 1, event_id=f"production-promoted-{manifest_sha[:24]}",
-            transition_id=f"production-promoted-{manifest_sha[:24]}", record_id=production_id, content_id=content_id,
-            content_digest=manifest_sha, environment=Environment.PRODUCTION,
-            from_state=ReleaseState.PROMOTION_PENDING, to_state=ReleaseState.PRODUCTION_PROMOTED,
-            expected_state=ReleaseState.PROMOTION_PENDING, previous_event_digest=pending.event_digest,
-            promotion_intent=True, source_record_id=staged.record_id)
-        if not replay_release_events((*pending_history, promoted)).accepted:
-            return _report(PromotionReasonCode.INVALID_HISTORY, target_id, manifest_sha,
-                           identity.provider_id, tuple(copied), (pending,))
-        try:
-            promoted_appended = provider.append_release_event(promoted)
-        except Exception:
-            promoted_appended = None
-        if not _success(promoted_appended, identity.provider_id, promoted.event_digest, Environment.PRODUCTION):
-            return _report(PromotionReasonCode.RELEASE_EVENT_APPEND_FAILED, target_id, manifest_sha,
-                           identity.provider_id, tuple(copied), (pending, promoted), True)
-        return ProductionPromotionReport(True, PromotionReasonCode.PROMOTED, True, identity.provider_id,
-            target_id, manifest_sha, tuple(copied), (pending, promoted), replay_receipt.game_commit)
+        # CP03-008 establishes promoted, byte-verified objects and durable pending evidence.
+        # CP03-009 owns the single versioned manifest activation after M13 validation/history.
+        return ProductionPromotionReport(True, PromotionReasonCode.PROMOTED, False, identity.provider_id,
+            target_id, manifest_sha, tuple(copied), (pending,), replay_receipt.game_commit)
     except Exception:
         return _report(PromotionReasonCode.INVALID_INPUT, target_id, manifest_sha)
 

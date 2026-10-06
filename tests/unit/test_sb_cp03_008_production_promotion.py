@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sys
 from dataclasses import replace
 from pathlib import Path
@@ -41,7 +42,8 @@ class PromotionMemoryProvider:
         self.calls: list[tuple] = []
         self.bad_production_key = False
         self.fail_manifest = False
-        self.raise_manifest = False
+        self.corrupt_manifest_after_write = False
+        self.corrupt_pack_after_write = False
 
     def promote_object(self, source_environment, source_object_key, target_environment, target_object_key, expected_sha256):
         self.calls.append(("promote", source_environment, source_object_key, target_environment, target_object_key))
@@ -69,14 +71,28 @@ class PromotionMemoryProvider:
                               Environment.PRODUCTION, event.event_digest)
 
     def write_manifest_conditionally(self, environment, target_id, object_key, content_digest, content_bytes,
-                                     *, expected_prior_sha256, promotion_pending_event_digest):
+                                     *, expected_prior_sha256, expected_prior_content_version,
+                                     promotion_pending_event_digest):
         self.calls.append(("manifest", environment, object_key, promotion_pending_event_digest))
-        if self.raise_manifest:
-            raise OSError("provider response lost")
-        if self.fail_manifest:
+        slot = (environment, object_key)
+        current = self.objects.get(slot)
+        current_digest = hashlib.sha256(current).hexdigest() if current is not None else None
+        current_version = json.loads(current.decode("utf-8")).get("content_version") if current is not None else None
+        if (self.fail_manifest or current_digest != expected_prior_sha256
+                or current_version != expected_prior_content_version):
             return ProviderResult("1.0", ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                  self.identity.provider_id, environment, current_digest)
+        if hashlib.sha256(content_bytes).hexdigest() != content_digest:
+            return ProviderResult("1.0", ProviderResultCategory.INTEGRITY_MISMATCH,
                                   self.identity.provider_id, environment, None)
+        if self.corrupt_manifest_after_write:
+            content_bytes = content_bytes + b" "
         self.objects[(environment, object_key)] = content_bytes
+        if self.corrupt_pack_after_write:
+            pack_slot = next((key for env, key in self.objects if env is Environment.PRODUCTION
+                              and key.startswith("packs/")), None)
+            if pack_slot is not None:
+                self.objects[(Environment.PRODUCTION, pack_slot)] = b"changed-after-manifest-write"
         return ProviderResult("1.0", ProviderResultCategory.SUCCESS, self.identity.provider_id,
                               environment, content_digest)
 
@@ -131,19 +147,19 @@ def test_promotes_all_exact_pack_objects_and_re_reads_them_before_manifest_activ
     args, provider = _case()
     result = promote_verified_staging_to_production(**args)
     assert result.accepted and result.reason_code is PromotionReasonCode.PROMOTED
-    assert result.manifest_write_attempted
+    assert not result.manifest_write_attempted
     assert len(result.promoted_objects) == 2 and all(item.verified for item in result.promoted_objects)
     assert [call[0] for call in provider.calls].count("promote") == 2
     assert [call[0] for call in provider.calls].count("read") == 2
-    manifest_index = next(i for i, call in enumerate(provider.calls) if call[0] == "manifest")
-    assert provider.calls[-1][0] == "event" and provider.calls[-1][1] is ReleaseState.PRODUCTION_PROMOTED
+    assert provider.calls[-1][0] == "event" and provider.calls[-1][1] is ReleaseState.PROMOTION_PENDING
     assert max(i for i, call in enumerate(provider.calls) if call[0] == "promote") < min(
         i for i, call in enumerate(provider.calls) if call[0] == "read")
     assert max(i for i, call in enumerate(provider.calls) if call[0] == "read") < next(
         i for i, call in enumerate(provider.calls) if call[0] == "event" and call[1] is ReleaseState.PROMOTION_PENDING
-    ) < manifest_index
+    ) < len(provider.calls)
+    assert not any(call[0] == "manifest" for call in provider.calls)
     assert [item.to_state for item in result.release_events] == [ReleaseState.PROMOTION_PENDING,
-                                                                ReleaseState.PRODUCTION_PROMOTED]
+                                                                ]
 
 
 def test_missing_cpx_receipt_or_owner_approval_blocks_before_provider_calls():
@@ -188,25 +204,13 @@ def test_production_object_identity_mismatch_and_game_source_drift_block_manifes
     assert not any(call[0] == "manifest" for call in provider.calls)
 
 
-def test_manifest_conflict_keeps_verified_objects_and_records_failure_without_rollback():
+def test_pack_promotion_does_not_write_production_manifest():
     args, provider = _case()
-    provider.fail_manifest = True
     result = promote_verified_staging_to_production(**args)
-    assert not result.accepted and result.reason_code is PromotionReasonCode.MANIFEST_WRITE_FAILED
-    assert result.manifest_write_attempted
-    assert [event.to_state for event in result.release_events] == [ReleaseState.PROMOTION_PENDING,
-                                                                   ReleaseState.FAILED]
-    assert not any(call[0] == "delete" for call in provider.calls)
-
-
-def test_ambiguous_manifest_provider_exception_reports_attempt_without_blind_retry():
-    args, provider = _case()
-    provider.raise_manifest = True
-    result = promote_verified_staging_to_production(**args)
-    assert not result.accepted and result.reason_code is PromotionReasonCode.MANIFEST_WRITE_FAILED
-    assert result.manifest_write_attempted
+    assert result.accepted and not result.manifest_write_attempted
     assert [event.to_state for event in result.release_events] == [ReleaseState.PROMOTION_PENDING]
-    assert [call[0] for call in provider.calls].count("manifest") == 1
+    assert not any(call[0] == "manifest" for call in provider.calls)
+    assert not any(call[0] == "delete" for call in provider.calls)
 
 
 def test_capability_direct_production_and_stale_staging_receipt_are_rejected_before_mutation():

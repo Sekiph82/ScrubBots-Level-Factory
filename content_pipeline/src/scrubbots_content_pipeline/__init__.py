@@ -207,6 +207,13 @@ from .production_promotion import (
     PromotedObjectEvidence,
     promote_verified_staging_to_production,
 )
+from .production_manifest_activation import (
+    ProductionManifestActivationReport,
+    ProductionManifestReasonCode,
+    ProductionManifestReceipt,
+    ProductionPackVerification,
+    activate_versioned_production_manifest,
+)
 from .publication_receipt import (
     BUILDER_RECEIPT_VERSION,
     BuilderPublicationReceipt,
@@ -364,6 +371,11 @@ __all__ = [
     "PromotionReasonCode",
     "PromotedObjectEvidence",
     "promote_verified_staging_to_production",
+    "ProductionManifestActivationReport",
+    "ProductionManifestReasonCode",
+    "ProductionManifestReceipt",
+    "ProductionPackVerification",
+    "activate_versioned_production_manifest",
     "MAX_SCRUBPACK_ARCHIVE_BYTES",
     "MAX_SCRUBPACK_MEMBERS",
     "ScrubpackInspectionResult",
