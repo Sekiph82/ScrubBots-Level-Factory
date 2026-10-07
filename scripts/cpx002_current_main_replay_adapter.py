@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -24,6 +25,34 @@ _ROOT = Path(__file__).resolve().parents[1]
 _HARNESS = _ROOT / "tests" / "fixtures" / "cpx002_current_main_replay.gd"
 
 
+def resolve_explicit_temp_game_authority(
+    game_root: str | Path | None = None,
+) -> Path:
+    """Require the configured CPX-002 game authority to be an explicit TEMP checkout.
+
+    This preflight is used before the authentic integration constructs a Factory
+    solver-proven pack, because those Factory calls also consume
+    ``SCRUBBOTS_PROJECT``. It intentionally rejects the game-rules module's
+    legacy Desktop default instead of allowing the later replay gate to catch a
+    mismatched authority after Factory work has already happened.
+    """
+    root = _explicit_temp_game_root(game_root)
+    _authority_snapshot(root)
+    return root
+
+
+def _explicit_temp_game_root(game_root: str | Path | None) -> Path:
+    configured = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
+    if not configured:
+        raise CurrentMainReplayError("EXPLICIT_TEMP_GAME_AUTHORITY_REQUIRED")
+    root = Path(configured).resolve()
+    if game_root is not None and Path(game_root).resolve() != root:
+        raise CurrentMainReplayError("GAME_AUTHORITY_ARGUMENT_MISMATCH")
+    if not root.is_relative_to(Path(tempfile.gettempdir()).resolve()):
+        raise CurrentMainReplayError("INVALID_GAME_AUTHORITY_ROOT")
+    return root
+
+
 def verify_staged_supply_with_current_main(
     *,
     staging_report,
@@ -35,7 +64,7 @@ def verify_staged_supply_with_current_main(
     godot_executable: str,
     timeout_seconds: int = 900,
 ) -> CurrentMainReplayReceipt:
-    root = Path(game_root).resolve()
+    root = _explicit_temp_game_root(game_root)
     try:
         authority = _authority_snapshot(root)
     except CurrentMainReplayError as exc:
@@ -98,9 +127,13 @@ def _authority_snapshot(root: Path) -> dict[str, object]:
         raise CurrentMainReplayError("INVALID_GAME_AUTHORITY_REMOTE")
     _git(root, "fetch", "--prune", "origin")
     status = _git(root, "status", "--porcelain", "--untracked-files=all")
+    try:
+        branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD").strip()
+    except CurrentMainReplayError:
+        branch = ""
     head = _git(root, "rev-parse", "HEAD").strip()
     main = _git(root, "rev-parse", "refs/remotes/origin/main").strip()
-    if status or head != main or not _GIT_SHA.fullmatch(head):
+    if status or branch or head != main or not _GIT_SHA.fullmatch(head):
         raise CurrentMainReplayError("INVALID_GAME_AUTHORITY_CHECKOUT")
     source_hashes = {
         relative: hashlib.sha256((root / relative).read_bytes()).hexdigest()
@@ -148,4 +181,4 @@ def _run_godot(root: Path, executable: str, job: Path, timeout_seconds: int) -> 
     raise CurrentMainReplayError("GAME_REPLAY_ERROR")
 
 
-__all__ = ["verify_staged_supply_with_current_main"]
+__all__ = ["resolve_explicit_temp_game_authority", "verify_staged_supply_with_current_main"]

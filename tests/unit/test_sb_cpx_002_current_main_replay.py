@@ -6,8 +6,11 @@ import sys
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
+
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "content_pipeline" / "src"))
+sys.path.insert(0, str(ROOT / "scripts"))
 
 from scrubbots_content_pipeline import (  # noqa: E402
     Environment,
@@ -18,6 +21,9 @@ from scrubbots_content_pipeline import (  # noqa: E402
     verify_current_main_supply_replay,
 )
 from scrubbots_content_pipeline import current_main_replay as gate  # noqa: E402
+from cpx002_current_main_replay_adapter import (  # noqa: E402
+    resolve_explicit_temp_game_authority,
+)
 
 AUTHORITY = {
     "repository": "Sekiph82/Scrubbots", "branch": "main", "commit": "1" * 40,
@@ -36,6 +42,34 @@ PLAN = {
 PLAN_BYTES = json.dumps(PLAN, sort_keys=True, separators=(",", ":")).encode()
 PACK_BYTES = b"immutable scrubpack bytes"
 MANIFEST_BYTES = b"immutable manifest bytes"
+
+
+def test_explicit_temp_authority_rejects_missing_environment_before_factory_use(monkeypatch) -> None:
+    monkeypatch.delenv("SCRUBBOTS_PROJECT", raising=False)
+    with pytest.raises(gate.CurrentMainReplayError, match="EXPLICIT_TEMP_GAME_AUTHORITY_REQUIRED"):
+        resolve_explicit_temp_game_authority()
+
+
+def test_explicit_temp_authority_rejects_non_temp_path_before_git_access(monkeypatch) -> None:
+    monkeypatch.setenv("SCRUBBOTS_PROJECT", "C:/Users/owner/Desktop/ScrubBots")
+    monkeypatch.setattr(
+        "cpx002_current_main_replay_adapter._authority_snapshot",
+        lambda _root: pytest.fail("non-TEMP authority must be rejected before Git access"),
+    )
+    with pytest.raises(gate.CurrentMainReplayError, match="INVALID_GAME_AUTHORITY_ROOT"):
+        resolve_explicit_temp_game_authority()
+
+
+def test_explicit_temp_authority_requires_identical_adapter_argument(monkeypatch, tmp_path) -> None:
+    root = tmp_path / "game-authority"
+    root.mkdir()
+    monkeypatch.setenv("SCRUBBOTS_PROJECT", str(root))
+    monkeypatch.setattr(
+        "cpx002_current_main_replay_adapter._authority_snapshot",
+        lambda _root: AUTHORITY,
+    )
+    with pytest.raises(gate.CurrentMainReplayError, match="GAME_AUTHORITY_ARGUMENT_MISMATCH"):
+        resolve_explicit_temp_game_authority(root / "other")
 
 
 def _report(pack_bytes: bytes = PACK_BYTES) -> StagingDownloadVerificationReport:

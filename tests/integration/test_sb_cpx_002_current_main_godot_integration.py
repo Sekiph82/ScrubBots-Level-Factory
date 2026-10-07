@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
 
@@ -27,7 +29,10 @@ from scrubbots_content_pipeline import (  # noqa: E402
     build_candidate_manifest,
     verify_staged_manifest_download,
 )
-from cpx002_current_main_replay_adapter import verify_staged_supply_with_current_main  # noqa: E402
+from cpx002_current_main_replay_adapter import (  # noqa: E402
+    resolve_explicit_temp_game_authority,
+    verify_staged_supply_with_current_main,
+)
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio  # noqa: E402
 from scrubbots_pixel_factory.output.png import encode_logical_png  # noqa: E402
 from scrubbots_pixel_factory.supply_pipeline.scrubpack_identity import (  # noqa: E402
@@ -60,9 +65,11 @@ class MemoryStagingReader:
 def test_exact_verified_staging_pack_replays_with_current_main_godot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    game_root = Path("C:/Users/sekip/AppData/Local/Temp/ScrubBots-Level-Factory/CPX-002-GAME-AUTHORITY")
-    godot = "C:/Users/sekip/AppData/Local/Microsoft/WinGet/Links/godot_console.exe"
-    assert game_root.is_dir() and Path(godot).is_file(), "the authorized exact current-main Godot authority is required"
+    # Run this before any Factory pipeline/solver call: Factory's game rules
+    # still have a legacy Desktop default when SCRUBBOTS_PROJECT is absent.
+    game_root = resolve_explicit_temp_game_authority()
+    godot = os.environ.get("SCRUBBOTS_GODOT", "").strip() or shutil.which("godot_console.exe")
+    assert godot and Path(godot).is_file(), "the authorized current-main Godot executable is required"
     monkeypatch.setenv("SCRUBBOTS_PROJECT", str(game_root))
 
     repository = tmp_path / "factory-repository"
@@ -139,3 +146,28 @@ def test_exact_verified_staging_pack_replays_with_current_main_godot(
     assert receipt.pack_results[0]["levels"][0]["solver_status"] == "SOLVED"
     assert receipt.pack_results[0]["levels"][0]["replay_solved"] is True
     assert receipt.pack_results[0]["levels"][0]["unresolved"] == 0
+    replayed = receipt.pack_results[0]["levels"][0]
+    fifo_bytes = json.dumps(replayed["fifo_columns"], sort_keys=True, separators=(",", ":")).encode()
+    print("CPX002_R01_EVIDENCE=" + json.dumps({
+        "authority_scope": "TEMP_ONLY",
+        "game_commit": receipt.game_commit,
+        "authority_source_sha256": dict(receipt.authority_source_sha256),
+        "manifest_sha256": receipt.manifest_sha256,
+        "manifest_bytes": len(reader.objects[manifest_key]),
+        "pack_id": pack_id,
+        "pack_sha256": receipt.pack_results[0]["pack_sha256"],
+        "pack_bytes": len(build.archive_bytes),
+        "solver_identity_artifact_sha256": receipt.pack_results[0]["solver_identity_artifact_sha256"],
+        "level_id": replayed["level_id"],
+        "level_data_sha256": replayed["level_sha256"],
+        "supply_plan_sha256": replayed["plan_sha256"],
+        "fifo_columns": replayed["fifo_columns"],
+        "fifo_columns_sha256": hashlib.sha256(fifo_bytes).hexdigest(),
+        "fifo_batch_counts_by_column": [len(column) for column in replayed["fifo_columns"]],
+        "solver_status": replayed["solver_status"],
+        "replay_solved": replayed["replay_solved"],
+        "final_active": replayed["final_active"],
+        "unresolved": replayed["unresolved"],
+        "supply_exhausted": replayed["supply_exhausted"],
+        "staging_accepted": staged.accepted,
+    }, sort_keys=True, separators=(",", ":")))
