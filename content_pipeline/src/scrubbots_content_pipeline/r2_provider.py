@@ -321,6 +321,20 @@ class CloudflareR2Provider:
             prior_digest = hashlib.sha256(prior_bytes).hexdigest() if prior_bytes is not None else None
             if prior_digest != expected_prior_sha256:
                 return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION, environment, prior_digest)
+            parsed = json.loads(content_bytes.decode("utf-8"))
+            version = parsed.get("content_version")
+            prior_version = None
+            if prior_bytes is not None:
+                try:
+                    prior_version = json.loads(prior_bytes.decode("utf-8")).get("content_version")
+                except Exception:
+                    return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, environment, prior_digest)
+            if (type(version) is not int or (production and (
+                    (prior_bytes is None and expected_prior_content_version is not None)
+                    or (prior_bytes is not None and (type(expected_prior_content_version) is not int
+                                                     or prior_version != expected_prior_content_version))
+                    or (expected_prior_content_version is not None and version <= expected_prior_content_version)))):
+                return self._result(ProviderResultCategory.INVALID_REQUEST, environment)
             if production:
                 events = self.read_release_events()
                 tip = events[-1].event_digest if events else "0" * 64
@@ -329,11 +343,6 @@ class CloudflareR2Provider:
                         or not promotion_pending_event_digest
                         or tip != promotion_pending_event_digest):
                     return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION, environment, tip)
-            parsed = json.loads(content_bytes.decode("utf-8"))
-            version = parsed.get("content_version")
-            if type(version) is not int or (expected_prior_content_version is not None
-                    and version <= expected_prior_content_version):
-                return self._result(ProviderResultCategory.INVALID_REQUEST, environment)
             kwargs: dict[str, object] = {"Bucket": R2_BUCKET, "Key": key, "Body": content_bytes,
                                          "ContentType": "application/json", "CacheControl": "no-cache"}
             kwargs["IfNoneMatch" if etag == "" else "IfMatch"] = "*" if etag == "" else etag
