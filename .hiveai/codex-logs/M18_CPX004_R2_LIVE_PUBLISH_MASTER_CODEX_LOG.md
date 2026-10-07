@@ -62,3 +62,14 @@ Status: IN PROGRESS
 - Commands: pending focused immutability/provider tests and M14 publisher regressions.
 
 - SB-CP07-005 focused tests (provider/namespace/immutability) — **15 passed**; selected M14 publisher regressions — **45 passed**. Implementation commit: `01998e5f540dff2b9a3b4e5c76da822cf71e742d`. git diff --cached --check passed.
+
+## SB-CP07-006 — Upload/download/hash round trip
+
+Status: IN PROGRESS
+
+- Added an opt-in live test limited to `staging/_integration/roundtrip/<sha256>.bin`. It accepts only successful or idempotent conditional-create status, then requires exact downloaded bytes, byte length, and SHA-256. It cannot address PRODUCTION.
+- Existing CP07-003 unit tests cover local exact-byte readback, length/hash, idempotence, and mismatch detection. Live credentials remain absent based on presence-only environment inspection; the integration test should be reported as skipped, never PASS.
+- Commands: pending focused M18 tests + M14 regression.
+- `git diff --cached --check` initially found one extra blank line at EOF in the CP07-006 test. Removed only trailing whitespace; test outcomes remain unchanged. Rechecking before commit.
+
+- SB-CP07-006 focused suite: **15 passed, 1 skipped**; skip reason exactly OWNER_R2_WRITE_CREDENTIAL_REQUIRED. The live R2 object was not written. Selected M14 publisher regressions — **45 passed**. Test commit: `4d58a0500f2745e2bba1f035cf8f1cf8ba2de4b9`. Corrected git diff --cached --check passed.
