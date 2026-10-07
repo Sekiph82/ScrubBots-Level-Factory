@@ -37,6 +37,7 @@ _EVENTS_KEY = "_control/release-events/current.json"
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _SAFE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,511}$")
 _ACCOUNT = re.compile(r"^[a-f0-9]{32}$")
+_R2_HOST = re.compile(r"^[a-f0-9]{32}(?:\.(?:eu|fedramp|us))?\.r2\.cloudflarestorage\.com$")
 
 
 def physical_object_key(environment: Environment, logical_key: str) -> str:
@@ -106,7 +107,8 @@ class CloudflareR2Provider:
         endpoint = self._endpoint()
         access = self._env.get("R2_ACCESS_KEY_ID", "")
         secret = self._env.get("R2_SECRET_ACCESS_KEY", "")
-        if not endpoint or not access or not secret:
+        if (not endpoint or not _valid_credential(access, 128)
+                or not _valid_credential(secret, 256)):
             return None
         if self._client_override is not None:
             self._resolved_client = self._client_override
@@ -131,10 +133,10 @@ class CloudflareR2Provider:
             from urllib.parse import urlsplit
 
             parsed = urlsplit(explicit)
-            if (parsed.scheme != "https" or not parsed.hostname
+            if (parsed.scheme != "https" or not parsed.hostname or parsed.port is not None
                     or parsed.username or parsed.password or parsed.query or parsed.fragment
                     or parsed.path not in ("", "/")
-                    or not parsed.hostname.endswith(".r2.cloudflarestorage.com")):
+                    or not _R2_HOST.fullmatch(parsed.hostname.lower())):
                 return None
             return f"https://{parsed.netloc}"
         account = self._env.get("R2_ACCOUNT_ID", "").strip().lower()
@@ -239,16 +241,17 @@ class CloudflareR2Provider:
         try:
             source = physical_object_key(source_environment, source_object_key)
             target = physical_object_key(target_environment, target_object_key)
-            source_bytes, source_etag = self._get(source) or (None, None)
+            source_bytes = (self._get(source) or (None, None))[0]
             if source_bytes is None or hashlib.sha256(source_bytes).hexdigest() != expected_sha256:
                 return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, target_environment)
             client = self._client()
             if client is None:
                 return self._result(ProviderResultCategory.UNAVAILABLE, target_environment)
-            client.copy_object(Bucket=R2_BUCKET, Key=target,
-                               CopySource={"Bucket": R2_BUCKET, "Key": source},
-                               CopySourceIfMatch=source_etag, MetadataDirective="COPY",
-                               IfNoneMatch="*")
+            # Read then conditional PutObject avoids R2's beta-only CopyObject
+            # destination conditionals while retaining immutable destination semantics.
+            client.put_object(Bucket=R2_BUCKET, Key=target, Body=source_bytes,
+                              ContentType=_content_type(target_object_key),
+                              CacheControl=_cache_control(target_object_key), IfNoneMatch="*")
             return self._result(ProviderResultCategory.SUCCESS, target_environment, expected_sha256)
         except Exception as exc:
             return self._result(self._error_category(exc), target_environment)
@@ -373,6 +376,11 @@ def _is_not_found(exc: Exception) -> bool:
     metadata = response.get("ResponseMetadata")
     return ((isinstance(error, Mapping) and str(error.get("Code", "")) in {"NoSuchKey", "NotFound", "404"})
             or (isinstance(metadata, Mapping) and metadata.get("HTTPStatusCode") == 404))
+
+
+def _valid_credential(value: object, max_length: int) -> bool:
+    return (isinstance(value, str) and 16 <= len(value) <= max_length
+            and all(0x21 <= ord(character) <= 0x7e for character in value))
 
 
 __all__ = ["CloudflareR2Provider", "R2_BUCKET", "R2_REGION", "physical_object_key"]

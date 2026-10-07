@@ -14,8 +14,8 @@ from scrubbots_content_pipeline.release_state import ReleaseState, make_release_
 
 FAKE_ENV = {
     "R2_ENDPOINT_URL": "https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com",
-    "R2_ACCESS_KEY_ID": "test-access-key",
-    "R2_SECRET_ACCESS_KEY": "test-secret-key",
+    "R2_ACCESS_KEY_ID": "test-access-key-01",
+    "R2_SECRET_ACCESS_KEY": "test-secret-key-01",
 }
 
 
@@ -24,12 +24,14 @@ class FakeS3:
         self.objects: dict[tuple[str, str], tuple[bytes, str, str, str]] = {}
         self.calls: list[tuple[str, str]] = []
         self.fail_get = False
-        self.fail_copy = False
+        self.fail_production_put = False
         self.corrupt_read = False
 
     def put_object(self, **kwargs):
         key = (kwargs["Bucket"], kwargs["Key"])
         self.calls.append(("put", kwargs["Key"]))
+        if self.fail_production_put and kwargs["Key"].startswith("production/"):
+            raise RuntimeError("secret-like production write failure")
         current = self.objects.get(key)
         if kwargs.get("IfNoneMatch") == "*" and current is not None:
             raise PreconditionError()
@@ -143,7 +145,7 @@ def test_failed_copy_is_normalized_and_cross_environment_copy_is_denied():
     raw = b"copy"
     digest = hashlib.sha256(raw).hexdigest()
     provider.write_object_bytes(Environment.STAGING, "packs/a", digest, raw, if_absent=True)
-    s3.fail_copy = True
+    s3.fail_production_put = True
     failed = provider.promote_object(Environment.STAGING, "packs/a", Environment.PRODUCTION, "packs/a", digest)
     denied = provider.promote_object(Environment.PRODUCTION, "packs/a", Environment.STAGING, "packs/a", digest)
     assert failed.category is ProviderResultCategory.TRANSIENT_FAILURE
