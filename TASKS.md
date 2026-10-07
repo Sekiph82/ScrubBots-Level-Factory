@@ -233,12 +233,12 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
 - M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
-- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Queue: `OWNER_APPROVED / QUEUED_AFTER_M14 / DO_NOT_RUN_CONCURRENTLY`.
+- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Queue: `OWNER_APPROVED / QUEUED_AFTER_M18 / BEFORE_M17 / DO_NOT_RUN_CONCURRENTLY`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_PROMPT.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_AUDIT_CRITERIA.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Owner Icon Path: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\ScrubBots_Factory_Studio.ico`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Required Outcome: real Desktop `ScrubBots Factory Studio.lnk`; same ICO as shortcut/application identity; derived icon visible in the Factory Studio top-left header; direct app launch without Godot editor; idempotent shortcut repair script.
-- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Execution Gate: do not execute until M14 master dirty worktree is closed or ChatGPT explicitly switches canonical Current Task to this maintenance task.
+- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Execution Gate: do not execute until the active M18 / SB-CPX-004 R2 work is independently closed and ChatGPT explicitly switches canonical Current Task to this maintenance task. This launcher task must close before M17 is opened.
 - M14 Master Execution Order: `SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012`.
 - M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
 - M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
@@ -1420,6 +1420,7 @@ Owner-approved post-cutover product specification:
 12. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots` is the next owner-priority program.
 13. SB-CPX-004 Factory Studio → ScrubBots owner-facing publish handoff follows M15-M16.
 14. M18 storage/CDN provider integration follows the runtime/handoff foundation.
-15. M17 rollback/scheduling follows once manifest/publisher/storage are real.
-16. M19 content operations/QA/observability follows provider integration.
-17. M20 store-policy/security/final production release gate remains last.
+15. `MAINT-FACTORY-STUDIO-LAUNCHER-C001` — Desktop Factory Studio launcher/icon/direct-start maintenance executes immediately after M18 closes and before M17 opens.
+16. M17 rollback/scheduling follows only after the launcher task is PASS/CLOSED and manifest/publisher/storage are real.
+17. M19 content operations/QA/observability follows provider integration.
+18. M20 store-policy/security/final production release gate remains last.
