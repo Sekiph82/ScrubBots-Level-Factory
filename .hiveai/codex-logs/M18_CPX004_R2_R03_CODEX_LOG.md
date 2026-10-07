@@ -72,3 +72,6 @@ Document role: CODEX BUILDER LOG
 - Implementation/test commit: `864301396c771c5cd5a11acb6c3dcd81e19a830a` (`fix(cpx004): canonicalize studio publish timestamp`). It contains only the two Factory Studio GDScript/test files, the CPX-004 service, and the CPX-004/M14 tests listed above. Builder log remains a separate pending evidence commit.
 - Final pre-commit checks passed: compileall, 60 JSON parses, 9 schema meta-validations, `git diff --check`, 0 secret-pattern matches, and no `TASKS.md`/audit diff.
 
+### 2026-10-07 — Builder-log whitespace correction
+
+- The first staged builder-log `git diff --cached --check` reported one extra blank line at end of file. The shell sequence continued and created the separate log commit before that nonzero check was acted on. Removed the extra EOF blank line and recorded the correction; no product or test code changed.
