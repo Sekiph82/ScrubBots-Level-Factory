@@ -84,3 +84,13 @@ Status: IN PROGRESS
 - Initial CP07-007 `git diff --cached --check` stopped on an extra trailing blank line in the new test. Removed trailing whitespace; focused/regression outcomes were already green and are unchanged.
 
 - SB-CP07-007 focused M18 suite — **16 passed, 1 skipped** (live R2 credential gate); selected M14 publisher regressions — **45 passed**. Implementation/docs commit: `f5406e9005fcd628bdbba20e7c4e6787ce0c00d0`. Corrected git diff --cached --check passed.
+
+## SB-CP07-008 — Backup/export/migration path
+
+Status: IN PROGRESS
+
+- Added `export_current_production()`: reads only the exact current production manifest and its referenced packs, validates canonical manifest bytes, pack lengths and hashes, and produces a deterministic secret-free receipt. All remote reads and integrity checks complete before local output creation. Existing files are refused to preserve destination data.
+- Added successful exact export, deterministic receipt, corrupt/missing pack, and existing-file preservation tests. This provider operation calls no write/copy/delete methods.
+- Commands: pending focused export/provider tests and M14 publisher regressions.
+
+- SB-CP07-008 focused M18 suite — **19 passed, 1 skipped** (R2 credential-gated live probe); selected M14 publisher regressions — **45 passed**. Export implementation/test commit: `5ee9d7360466da4830e77f1153c51f79cb698259`. git diff --cached --check passed.
