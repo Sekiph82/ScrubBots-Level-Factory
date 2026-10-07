@@ -80,11 +80,11 @@ Require:
 - launcher smoke proves it resolves Godot/project correctly without launching the editor;
 - relevant Factory Studio tests PASS;
 - safe full repository regression PASS except documented capability skips;
-- no M14/M13/M12/M11 regression;
+- no M18/M14/M13/M12/M11 regression;
 - diff check PASS.
 
 ## G. Governance
 
-Do not execute while the active M14 dirty master worktree is still in progress unless ChatGPT has explicitly switched the canonical tracker to this maintenance task.
+Do not execute while the active M18 / SB-CPX-004 work is still in progress. Execute only after M18 is independently closed and ChatGPT switches the canonical tracker to this maintenance task; this task must PASS/CLOSE before M17 opens.
 
 Codex must not edit root `TASKS.md` or `.hiveai/audits/**`.
