@@ -8,6 +8,7 @@ var core_gateway: RefCounted
 
 
 func _ready() -> void:
+	_apply_native_window_icon()
 	var gateway_script := ResourceLoader.call("load", "res://scripts/factory_core_gateway.gd") as Script
 	core_gateway = gateway_script.new() if gateway_script != null else null
 	var navigation := _resolve_navigation()
@@ -22,6 +23,16 @@ func _ready() -> void:
 	navigation.connect("surface_selected", Callable(workspace, "show_surface"))
 	workspace.call("show_surface", "Dashboard")
 	$Frame/Layout/Footer/Status.text = "Canonical Core: %s — %s | %s" % [core_gateway.status_name(), core_gateway.status_message(), core_gateway.capability_summary()]
+
+
+func _apply_native_window_icon() -> void:
+	if OS.get_name() != "Windows" or not DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_ICON):
+		return
+	var icon_path := ProjectSettings.globalize_path("res://assets/icons/ScrubBots_Factory_Studio.ico")
+	if not FileAccess.file_exists(icon_path):
+		push_warning("Factory Studio native window icon is unavailable: %s" % icon_path)
+		return
+	DisplayServer.set_native_icon(icon_path)
 
 
 func _get_configuration_warnings() -> PackedStringArray:

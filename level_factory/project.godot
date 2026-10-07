@@ -5,7 +5,9 @@ config_version=5
 
 [application]
 
-config/name="SCRUBBOTS Level Factory"
+config/name="ScrubBots Factory Studio"
+config/icon="res://assets/icons/ScrubBots_Factory_Studio_256.png"
+config/windows_native_icon="res://assets/icons/ScrubBots_Factory_Studio.ico"
 run/main_scene="res://scenes/factory_studio.tscn"
 
 [display]

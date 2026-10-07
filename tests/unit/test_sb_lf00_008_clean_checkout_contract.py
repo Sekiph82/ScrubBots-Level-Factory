@@ -68,6 +68,8 @@ def test_every_tracked_resource_reference_is_contained_and_tracked() -> None:
     project_root = PROJECT_ROOT.resolve()
 
     for path in _tracked_project_files():
+        if path.suffix.lower() in {".ico", ".png", ".import"}:
+            continue  # Binary assets and generated import metadata are not source text.
         text = path.read_text(encoding="utf-8")
         for reference in RESOURCE_REFERENCE_RE.findall(text):
             assert not reference.startswith("res://../")

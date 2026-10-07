@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/factory_studio_shell.gd" id="1_shell"]
 [ext_resource type="Script" path="res://scripts/factory_studio_navigation.gd" id="2_navigation"]
 [ext_resource type="Script" path="res://scripts/factory_studio_workspace_page.gd" id="3_workspace"]
 [ext_resource type="Script" path="res://scripts/factory_studio_target_controls.gd" id="4_target_controls"]
+[ext_resource type="Texture2D" path="res://assets/icons/ScrubBots_Factory_Studio_256.png" id="5_studio_icon"]
 
 [node name="FactoryStudio" type="Control"]
 layout_mode = 3
@@ -44,16 +45,27 @@ theme_override_constants/separation = 12
 custom_minimum_size = Vector2(0, 58)
 layout_mode = 2
 
-[node name="Identity" type="VBoxContainer" parent="Frame/Layout/Header"]
+[node name="Identity" type="HBoxContainer" parent="Frame/Layout/Header"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Icon" type="TextureRect" parent="Frame/Layout/Header/Identity"]
+custom_minimum_size = Vector2(46, 46)
+layout_mode = 2
+texture = ExtResource("5_studio_icon")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Text" type="VBoxContainer" parent="Frame/Layout/Header/Identity"]
 layout_mode = 2
 theme_override_constants/separation = 2
 
-[node name="Title" type="Label" parent="Frame/Layout/Header/Identity"]
+[node name="Title" type="Label" parent="Frame/Layout/Header/Identity/Text"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "SCRUBBOTS LEVEL FACTORY"
+text = "SCRUBBOTS FACTORY STUDIO"
 
-[node name="Subtitle" type="Label" parent="Frame/Layout/Header/Identity"]
+[node name="Subtitle" type="Label" parent="Frame/Layout/Header/Identity/Text"]
 layout_mode = 2
 text = "Factory Studio — canonical-Core workspace"
 
