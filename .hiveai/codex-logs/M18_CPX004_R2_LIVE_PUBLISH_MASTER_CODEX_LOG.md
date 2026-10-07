@@ -115,3 +115,35 @@ Status: IN PROGRESS
 - No neutral schema or payload files were changed. Commands pending focused provider-isolation and M14 publisher regressions.
 
 - SB-CP07-010 focused M18 suite — **24 passed, 1 skipped** (R2 live gate unavailable); selected M14 publisher regressions — **45 passed**. No neutral schema changes. Test commit: `6591b06c9476d60f018ab842a7733ba7c4426646`. git diff --cached --check passed.
+
+## SB-CPX-004 — Factory Studio Publish to ScrubBots
+
+Status: BLOCKED BEFORE HANDOFF IMPLEMENTATION
+
+- Read-only `release_pool.release_entries()` query in the authorized clean TEMP worktree returned `eligible_release_entries=0`. No current owner-accepted release-eligible batch is available. The exact master-prompt stop state is `AWAITING_OWNER_RELEASE_BATCH`.
+- The production provider credential-presence probe also remains absent; the live STAGING integration probe was skipped as recorded in SB-CP07-006. No R2 mutation was attempted. No separate owner production approval was supplied or inferred.
+- Per the active prompt, stopped the CPX-004 handoff path before game-authority TEMP clone/replay or any publication. No Factory UI/controller or game repository file was changed for CPX-004. Final regression checks for the completed CP07 children follow.
+
+### Final regression follow-up
+
+- Initial unfiltered `python -m pytest -q` result: **1,677 passed, 20 skipped, 4 failed in 701.02s**. Failures: CPX-002 integration lacked required explicit `SCRUBBOTS_PROJECT`; CP00-001/009/010 boundary checks rejected the newly authorized isolated M18 R2 adapter and local export implementation.
+- Updated the boundary tests to preserve offline/provider-neutral guarantees while narrowly permitting the lazy boto3 import only inside `r2_provider.py`, and local destination writes only inside `r2_export.py`; added explicit checks that export code has no tracker references and now refuses destinations inside this Factory repository. Removed `urllib.parse` in favor of endpoint-specific regex parsing, keeping the generic network-import rule unchanged.
+- The game repository clone produced by a CPX-002 test is a clean detached TEMP clone at `C:\Users\sekip\AppData\Local\Temp\pytest-of-sekip\pytest-2113\test_default_route_a_verifier_0\scrubbots-source`, `main` SHA `19a39876572506bcb1df33aaf339c409f60f5eeb`, origin `https://github.com/Sekiph82/Scrubbots.git`. CPX-002's direct integration test requires `SCRUBBOTS_PROJECT` to point under `%TEMP%\ScrubBots-Level-Factory`; a fresh exact-main TEMP authority checkout will be prepared for that regression only.
+- Targeted reruns pending.
+
+### Regression resolution and final builder state — 2026-10-07 16:27 +03:00
+
+- The first unfiltered run ended **1,677 passed, 20 skipped, 4 failed in 701.02s**: CPX-002 lacked its explicit game checkout; the three CP00 boundary tests rejected the scoped M18 adapter/export. Applied the narrow offline-boundary and repository-target corrections described above.
+- Regression rerun `tests/unit/test_sb_lf00_006_workspace_policy.py` plus CP00-001/009/010 and CP07-003 through CP07-010: **62 passed, 1 skipped**. Skip: `OWNER_R2_WRITE_CREDENTIAL_REQUIRED`.
+- First full rerun then ended **1,695 passed, 6 skipped, 1 failed in 736.90s**. The remaining LF00-006 scanner match was a false positive on the local identifier `secret` assigned from the environment. Renamed the local identifier to `secret_value`; the policy test and the same focused CP00/M18 selection then passed: **62 passed, 1 skipped**.
+- A following full-run attempt initially failed collection because a worktree linked to pytest's disposable checkout had lost its Git common directory. Replaced it with a persistent standalone shallow clone under `%TEMP%\ScrubBots-Level-Factory`; that full run ended **1,695 passed, 6 skipped, 1 failed in 727.22s** because CPX-002 requires a detached exact-main checkout. Created a detached worktree from the persistent clone at `19a39876572506bcb1df33aaf339c409f60f5eeb`, verified it equals `origin/main`, has the canonical origin, and is clean. CPX-002 plus LF00-006 then passed: **8 passed**.
+- Final unfiltered `python -m pytest -q`, with `SCRUBBOTS_PROJECT` set to that stable detached TEMP worktree and `SCRUBBOTS_GODOT` set to the installed Godot console executable: **1,696 passed, 6 skipped in 744.66s**. Skips: opt-in slow pipeline; live R2 write round trip (`OWNER_R2_WRITE_CREDENTIAL_REQUIRED`); and four canonical-checkout capability tests. No live R2 request was made.
+- `python -m compileall -q src content_pipeline/src` passed. `git diff --check` passed. The final worktree review showed no `TASKS.md` or `.hiveai/audits/**` changes. Only the provider/export corrections, bounded policy tests, export safety test, and this builder log are changed in this follow-up.
+- Regression authority was only for CPX-002 verification. SB-CPX-004 handoff implementation remains stopped before game publication because eligible release entries remain zero; no game repository file, Factory UI/controller, R2 object, staging manifest, production manifest, or release state was changed. Missing R2 credentials and absent owner production approval remain unverified gates.
+- This is builder evidence only. No audit or acceptance is claimed. Final master state: `AWAITING_OWNER_RELEASE_BATCH`.
+
+### Supplemental publication record — 2026-10-07 16:28 +03:00
+
+- `git fetch --prune origin main` confirmed starting `HEAD` and `origin/main` were both `15e4316f448d6c90a5892e343d730b86accb795c` with `0/0` divergence before the supplemental implementation commit.
+- Implementation and regression corrections were committed separately from this log as `c9be45d` (`M18: close R2 provider regression gaps`) and pushed successfully with `git push origin HEAD:main` (`15e4316..c9be45d`, fast-forward).
+- The master builder log is being committed separately per the prompt. Post-log push verification will confirm the final local `HEAD` equals live `origin/main` and the worktree is clean. No `TASKS.md` or audit files are staged.
