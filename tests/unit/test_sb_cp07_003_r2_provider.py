@@ -9,7 +9,9 @@ sys.path.insert(0, str(ROOT / "content_pipeline" / "src"))
 
 from scrubbots_content_pipeline.config import Environment
 from scrubbots_content_pipeline.provider import ProviderFeature, ProviderResultCategory
-from scrubbots_content_pipeline.r2_provider import CloudflareR2Provider, R2_BUCKET, physical_object_key
+from scrubbots_content_pipeline.r2_provider import (CloudflareR2Provider, InvalidReleaseLedgerError,
+                                                    ReleaseLedgerUnavailableError, R2_BUCKET,
+                                                    physical_object_key)
 from scrubbots_content_pipeline.release_state import ReleaseState, make_release_event
 
 FAKE_ENV = {
@@ -178,6 +180,52 @@ def test_release_event_append_is_content_addressed_and_stale_tip_is_rejected():
     assert accepted.category is ProviderResultCategory.SUCCESS
     assert provider.read_release_events() == (event,)
     assert (R2_BUCKET, "_control/release-events/current.json") in s3.objects
+
+
+def test_release_ledger_distinguishes_absent_invalid_and_unavailable_and_append_never_repairs():
+    s3 = FakeS3()
+    provider = CloudflareR2Provider(client=s3, environ=FAKE_ENV)
+    assert provider.read_release_events() == ()
+    key = (R2_BUCKET, "_control/release-events/current.json")
+    s3.objects[key] = (b"{broken", "etag", "application/json", "no-cache")
+    try:
+        provider.read_release_events()
+    except InvalidReleaseLedgerError:
+        pass
+    else:
+        raise AssertionError("corrupt existing ledger was treated as an empty history")
+    before = s3.objects[key][0]
+    event = make_release_event(
+        sequence=1, event_id="stage-1", transition_id="stage-1", record_id="staging-1",
+        content_id="manifest-v1", content_digest="a" * 64, environment=Environment.STAGING,
+        from_state=None, to_state=ReleaseState.DRAFT, expected_state=None,
+        previous_event_digest="0" * 64,
+    )
+    failed = provider.append_release_event(event, expected_prior_sequence=0,
+                                          expected_prior_event_digest="0" * 64)
+    assert failed.category is ProviderResultCategory.INTEGRITY_MISMATCH
+    assert s3.objects[key][0] == before
+    assert [call for call in s3.calls if call[0] == "put"] == []
+    unavailable = CloudflareR2Provider(environ={})
+    try:
+        unavailable.read_release_events()
+    except ReleaseLedgerUnavailableError:
+        pass
+    else:
+        raise AssertionError("missing credentials were treated as an empty history")
+
+
+def test_release_ledger_rejects_noncanonical_envelope_and_invalid_chain():
+    s3 = FakeS3()
+    provider = CloudflareR2Provider(client=s3, environ=FAKE_ENV)
+    key = (R2_BUCKET, "_control/release-events/current.json")
+    for raw in (b'{ "events": [] }\n', b'{"events":[],"extra":true}\n', b'{"events":[{}]}\n'):
+        s3.objects[key] = (raw, "etag", "application/json", "no-cache")
+        try:
+            provider.read_release_events()
+        except InvalidReleaseLedgerError:
+            continue
+        raise AssertionError(f"invalid ledger was accepted: {raw!r}")
 
 
 def test_staging_manifest_is_conditional_no_cache_json_and_preserves_neutral_key():

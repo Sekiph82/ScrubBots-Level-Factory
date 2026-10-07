@@ -10,6 +10,10 @@ var _order: SpinBox
 var _candidate: LineEdit
 var _rows: RichTextLabel
 var _status: Label
+var _publish_candidates: LineEdit
+var _publish_pack_id: LineEdit
+var _publish_version: SpinBox
+var _publish_game_sha: LineEdit
 
 
 func _ready() -> void:
@@ -26,6 +30,12 @@ func _ready() -> void:
 	var public_warning := Label.new(); public_warning.text = "PUBLIC REPOSITORY: unreleased levels become publicly visible when the release branch is pushed."; public_warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; public_warning.add_theme_color_override("font_color", Color(1.0, 0.72, 0.3)); add_child(public_warning)
 	_status = Label.new(); _status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_status)
 	var approve := Button.new(); approve.text = "APPROVE and Open Release PR"; approve.pressed.connect(_approve); add_child(approve)
+	var publish_title := Label.new(); publish_title.text = "ScrubBots Content Pipeline"; publish_title.add_theme_font_size_override("font_size", 18); add_child(publish_title)
+	_publish_candidates = LineEdit.new(); _publish_candidates.placeholder_text = "Comma-separated owner-accepted Release Pool candidate IDs"; add_child(_publish_candidates)
+	_publish_pack_id = LineEdit.new(); _publish_pack_id.placeholder_text = "Deterministic pack ID"; add_child(_publish_pack_id)
+	_publish_version = SpinBox.new(); _publish_version.min_value = 1; _publish_version.max_value = 2147483647; _publish_version.prefix = "Content version "; add_child(_publish_version)
+	_publish_game_sha = LineEdit.new(); _publish_game_sha.placeholder_text = "Verified game main commit SHA"; add_child(_publish_game_sha)
+	var preflight := Button.new(); preflight.text = "Preflight Publish to ScrubBots"; preflight.pressed.connect(_publish_preflight); add_child(preflight)
 	refresh_pool()
 
 
@@ -67,6 +77,21 @@ func _approve() -> void:
 	else:
 		_status.text = "%s — %s" % [str(result.get("disposition", result.get("state", "ERROR"))), str(result.get("reason", result.get("error", result.get("orders", []))))]
 	refresh_pool()
+
+
+func _publish_preflight() -> void:
+	if _gateway == null: return
+	var candidate_ids := PackedStringArray()
+	for raw_id in _publish_candidates.text.split(","):
+		var candidate_id := raw_id.strip_edges()
+		if not candidate_id.is_empty(): candidate_ids.append(candidate_id)
+	var created_at := Time.get_datetime_string_from_system(true, false)
+	var result: Dictionary = _gateway.call("run_studio_extension", "scrubbots-publish", {
+		"action": "preflight", "candidate_ids": Array(candidate_ids),
+		"pack_id": _publish_pack_id.text.strip_edges(), "content_version": int(_publish_version.value),
+		"scrubbots_main_sha": _publish_game_sha.text.strip_edges(), "created_at_utc": created_at,
+	})
+	_status.text = JSON.stringify(result, "  ")
 
 
 func _render_plan() -> void:

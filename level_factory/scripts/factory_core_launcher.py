@@ -287,6 +287,19 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             if not game_project:
                 raise ValueError("SCRUBBOTS_PROJECT must identify the configured Sekiph82/Scrubbots checkout")
             payload = release_approved_campaign(plan_hash=str(request["plan_hash"]), game_project=game_project, studio_approval=True)
+        elif operation == "scrubbots-publish":
+            from scrubbots_publish_handoff import (
+                publish_preflight, run_m14_handoff,
+            )
+            action = str(request.get("action", "preflight"))
+            if action == "preflight":
+                payload = publish_preflight(request)
+            elif action == "run-m14":
+                # The complete typed PublisherRunRequest is supplied by the
+                # trusted operator integration; JSON clients can only preflight.
+                payload = run_m14_handoff(request.get("publisher_request"))
+            else:
+                raise ValueError("scrubbots-publish action must be preflight or run-m14")
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
@@ -464,6 +477,7 @@ def _primary_supply_verify_main(arguments: Sequence[str]) -> int:
 def _main() -> int:
     repository_root = _repository_root()
     sys.path.insert(0, str(repository_root / "src"))
+    sys.path.insert(0, str(repository_root / "scripts"))
     if len(sys.argv) > 1 and sys.argv[1] == "dashboard-inspect":
         return _dashboard_inspect_main(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "studio-revalidate-art":

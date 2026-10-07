@@ -34,6 +34,36 @@ def test_production_packs_are_copy_if_absent_and_never_replace_existing_bytes():
     assert s3.objects[(R2_BUCKET, "production/packs/v1.scrubpack")][0] == b"preexisting-different"
 
 
+def test_exact_existing_production_bytes_are_idempotent_without_rewrite():
+    s3 = FakeS3()
+    provider = CloudflareR2Provider(client=s3, environ=FAKE_ENV)
+    raw = b"immutable-pack"
+    digest = hashlib.sha256(raw).hexdigest()
+    provider.write_object_bytes(Environment.STAGING, "packs/v1.scrubpack", digest, raw, if_absent=True)
+    _seed(s3, "production/packs/v1.scrubpack", raw)
+    write_count = sum(call[0] == "put" for call in s3.calls)
+    result = provider.promote_object(Environment.STAGING, "packs/v1.scrubpack", Environment.PRODUCTION,
+                                     "packs/v1.scrubpack", digest)
+    assert result.category is ProviderResultCategory.SUCCESS
+    assert result.content_digest == digest
+    assert sum(call[0] == "put" for call in s3.calls) == write_count
+
+
+def test_uncertain_target_read_fails_without_mutation():
+    s3 = FakeS3()
+    provider = CloudflareR2Provider(client=s3, environ=FAKE_ENV)
+    raw = b"immutable-pack"
+    digest = hashlib.sha256(raw).hexdigest()
+    provider.write_object_bytes(Environment.STAGING, "packs/v1.scrubpack", digest, raw, if_absent=True)
+    before = len([call for call in s3.calls if call[0] == "put"])
+    s3.fail_get = True
+    result = provider.promote_object(Environment.STAGING, "packs/v1.scrubpack", Environment.PRODUCTION,
+                                     "packs/v1.scrubpack", digest)
+    assert result.category is ProviderResultCategory.TRANSIENT_FAILURE
+    assert sum(call[0] == "put" for call in s3.calls) == before
+    assert (R2_BUCKET, "production/packs/v1.scrubpack") not in s3.objects
+
+
 def test_production_manifest_requires_exact_prior_digest_version_and_monotonic_successor():
     s3 = FakeS3()
     provider = CloudflareR2Provider(client=s3, environ=FAKE_ENV)

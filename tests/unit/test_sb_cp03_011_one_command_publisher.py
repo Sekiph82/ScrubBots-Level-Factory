@@ -33,6 +33,8 @@ from scrubbots_content_pipeline.scrubpack_builder import ScrubpackBuildResult
 from scrubbots_content_pipeline.staging_manifest_publish import StagingManifestPrecondition
 from scrubbots_content_pipeline.payload_validation import validate_remote_payload
 from test_sb_cp03_006_staging_manifest_publish import EXAMPLES, _build
+from test_sb_cp07_003_r2_provider import FAKE_ENV, FakeS3
+from scrubbots_content_pipeline.r2_provider import CloudflareR2Provider, R2_BUCKET
 
 MANIFEST_KEY = "manifests/current.json"
 
@@ -222,6 +224,30 @@ def test_validation_only_is_callable_without_provider_or_factory_adapter_and_jou
     assert first.staging_upload is None and first.production_activation is None
     assert orchestrator.serialize_publisher_journal(first) == orchestrator.serialize_publisher_journal(second)
     assert len(first.journal) == 1
+
+
+def test_corrupt_remote_r2_ledger_stops_empty_local_first_publication_before_any_mutation(monkeypatch):
+    monkeypatch.setattr(orchestrator, "verify_solver_proven_scrubpack", lambda *_args: True)
+    monkeypatch.setattr(scrubpack_solver_identity, "verify_solver_proven_scrubpack", lambda *_args: True)
+    s3 = FakeS3()
+    key = (R2_BUCKET, "_control/release-events/current.json")
+    s3.objects[key] = (b"not-json", "corrupt", "application/json", "no-cache")
+    r2 = CloudflareR2Provider(client=s3, environ=FAKE_ENV)
+
+    class R2LedgerMemoryProvider(PipelineMemoryProvider):
+        def read_release_events(self):
+            return r2.read_release_events()
+
+    request, _, _, _, _ = _request()
+    provider = R2LedgerMemoryProvider()
+    request = replace(request, provider=provider, release_events=())
+    report = orchestrator.run_one_command_publisher(request)
+    assert not report.accepted
+    assert report.terminal_stage is orchestrator.PublisherStage.RELEASE_HISTORY_PREFLIGHT
+    assert report.reason_code == "RELEASE_HISTORY_STALE_OR_INVALID"
+    assert provider.calls == []
+    assert s3.objects[key][0] == b"not-json"
+    assert not any(call[0] == "put" for call in s3.calls)
 
 
 def test_staging_only_composes_all_staging_gates_and_never_touches_production(monkeypatch):

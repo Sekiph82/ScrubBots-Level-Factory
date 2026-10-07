@@ -39,6 +39,14 @@ _SAFE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,511}$")
 _ACCOUNT = re.compile(r"^[a-f0-9]{32}$")
 
 
+class ReleaseLedgerUnavailableError(RuntimeError):
+    """The remote ledger could not be read, so its state is unknown."""
+
+
+class InvalidReleaseLedgerError(RuntimeError):
+    """An existing remote ledger is malformed or fails replay validation."""
+
+
 def physical_object_key(environment: Environment, logical_key: str) -> str:
     """Map an unchanged provider-neutral object key into its locked namespace."""
     if not isinstance(environment, Environment) or not isinstance(logical_key, str):
@@ -238,12 +246,21 @@ class CloudflareR2Provider:
         try:
             source = physical_object_key(source_environment, source_object_key)
             target = physical_object_key(target_environment, target_object_key)
-            source_bytes = (self._get(source) or (None, None))[0]
-            if source_bytes is None or hashlib.sha256(source_bytes).hexdigest() != expected_sha256:
-                return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, target_environment)
             client = self._client()
             if client is None:
                 return self._result(ProviderResultCategory.UNAVAILABLE, target_environment)
+            source_stored = self._get(source)
+            source_bytes = source_stored[0] if source_stored is not None else None
+            if source_bytes is None or hashlib.sha256(source_bytes).hexdigest() != expected_sha256:
+                return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, target_environment)
+            target_stored = self._get(target)
+            if target_stored is not None:
+                target_bytes = target_stored[0]
+                if (len(target_bytes) == len(source_bytes) and target_bytes == source_bytes
+                        and hashlib.sha256(target_bytes).hexdigest() == expected_sha256):
+                    return self._result(ProviderResultCategory.SUCCESS, target_environment, expected_sha256)
+                return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                    target_environment, hashlib.sha256(target_bytes).hexdigest())
             # Read then conditional PutObject avoids R2's beta-only CopyObject
             # destination conditionals while retaining immutable destination semantics.
             client.put_object(Bucket=R2_BUCKET, Key=target, Body=source_bytes,
@@ -251,21 +268,35 @@ class CloudflareR2Provider:
                               CacheControl=_cache_control(target_object_key), IfNoneMatch="*")
             return self._result(ProviderResultCategory.SUCCESS, target_environment, expected_sha256)
         except Exception as exc:
+            if (_is_not_found(exc)
+                    or self._error_category(exc) is ProviderResultCategory.CONFLICT_STALE_PRECONDITION):
+                # A concurrent writer may have won the conditional create. Only
+                # exact target bytes satisfy this retry; every other state conflicts.
+                try:
+                    target_stored = self._get(target)
+                    if target_stored is not None:
+                        target_bytes = target_stored[0]
+                        if (target_bytes == source_bytes and len(target_bytes) == len(source_bytes)
+                                and hashlib.sha256(target_bytes).hexdigest() == expected_sha256):
+                            return self._result(ProviderResultCategory.SUCCESS, target_environment,
+                                                expected_sha256)
+                        return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                            target_environment, hashlib.sha256(target_bytes).hexdigest())
+                except Exception:
+                    return self._result(ProviderResultCategory.TRANSIENT_FAILURE, target_environment)
             return self._result(self._error_category(exc), target_environment)
 
     def read_release_events(self) -> tuple[ReleaseEvent, ...]:
-        stored = self._get(_EVENTS_KEY)
+        if self._client() is None:
+            raise ReleaseLedgerUnavailableError("release ledger unavailable")
+        try:
+            stored = self._get(_EVENTS_KEY)
+        except Exception as exc:
+            raise ReleaseLedgerUnavailableError("release ledger unavailable") from exc
         if stored is None:
             return ()
         raw, _ = stored
-        try:
-            payload = json.loads(raw.decode("utf-8"))
-            events = tuple(_event_from_dict(item) for item in payload["events"])
-            if not replay_release_events(events).accepted:
-                return ()
-            return events
-        except Exception:
-            return ()
+        return self._parse_release_events(raw)
 
     def append_release_event(self, event: object, *, expected_prior_sequence: int,
                              expected_prior_event_digest: str) -> ProviderResult:
@@ -276,7 +307,7 @@ class CloudflareR2Provider:
             return self._result(ProviderResultCategory.UNAVAILABLE, Environment.PRODUCTION)
         try:
             current = self._get(_EVENTS_KEY)
-            events = self.read_release_events()
+            events = self._parse_release_events(current[0]) if current is not None else ()
             tip = events[-1].event_digest if events else "0" * 64
             if (len(events) != expected_prior_sequence or tip != expected_prior_event_digest
                     or event.sequence != expected_prior_sequence + 1
@@ -295,7 +326,26 @@ class CloudflareR2Provider:
             client.put_object(**kwargs)
             return self._result(ProviderResultCategory.SUCCESS, Environment.PRODUCTION, event.event_digest)
         except Exception as exc:
+            if isinstance(exc, InvalidReleaseLedgerError):
+                return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, Environment.PRODUCTION)
+            if isinstance(exc, ReleaseLedgerUnavailableError):
+                return self._result(ProviderResultCategory.UNAVAILABLE, Environment.PRODUCTION)
             return self._result(self._error_category(exc), Environment.PRODUCTION)
+
+    @staticmethod
+    def _parse_release_events(raw: bytes) -> tuple[ReleaseEvent, ...]:
+        try:
+            payload = json.loads(raw.decode("utf-8"))
+            if not isinstance(payload, dict) or set(payload) != {"events"} or not isinstance(payload["events"], list):
+                raise ValueError("invalid release ledger envelope")
+            events = tuple(_event_from_dict(item) for item in payload["events"])
+            if (not replay_release_events(events).accepted
+                    or raw != _canonical({"events": [json.loads(serialize_release_event(item))
+                                                       for item in events]})):
+                raise ValueError("invalid release ledger history")
+            return events
+        except Exception as exc:
+            raise InvalidReleaseLedgerError("release ledger invalid") from exc
 
     def write_manifest_conditionally(self, environment: Environment, target_id: str,
                                     object_key: str, content_digest: str, content_bytes: bytes, *,
