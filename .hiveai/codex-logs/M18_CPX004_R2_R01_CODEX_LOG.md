@@ -49,3 +49,9 @@ Implementation, tests, contracts, failures/corrections, compile/schema/diff/secr
 - Implementation commit: `7430740` (`fix(m18): fail closed and add ScrubBots publish handoff`), created after path-disjoint fast-forward from current `origin/main`.
 - The first broad secret scan's `secret_access_key=secret_value` match was a code identifier passed to the SDK, not a literal credential. Reviewed the matching line and rescanned for actual credential literals; no values were present. No secret value was printed or logged.
 - Next: commit this builder log separately, verify exact local/remote state, then push normally to `main` if the fetched remote remains a fast-forward ancestor.
+
+### 2026-10-07 18:02 +03:00 — publication blocker
+
+- Normal push was attempted three times after fetching/confirming that `origin/main` remained `5d08e0368841eec8e2203ecc4d8e858ab36f09b3` and local history was a clean 0-ahead/2-commit fast-forward. Each attempt was rejected by GitHub with `remote: Internal Server Error` and a distinct Request ID. `git ls-remote` confirmed the remote main ref is still unchanged. No force push or alternate history path was attempted.
+- Implementation commit: `7430740ba13f68fe159d5ef358a2f7e526f44ffa`. Builder evidence commit: `b7888afdfa0c3838c9dd122f4a6a09cd008e89c3`. Both are preserved in this clean TEMP worktree; local branch remains detached, HEAD is 0 ahead / 2 commits ahead of current `origin/main` in the push direction.
+- Publication remains blocked by the remote GitHub internal error. The builder log is not yet available from `main`; do not treat a local-only log as a published GitHub artifact. Current code and evidence remain ready for a normal retry when GitHub accepts pushes.
