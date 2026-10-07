@@ -137,6 +137,13 @@ func _run_suite() -> void:
 	_check(title.text == "Factory Studio — Release", "Release navigation did not reach the workspace")
 	_check(release_surface != null and release_surface.visible, "Release Pool surface did not instantiate/show")
 	_check(release_surface != null and release_surface.get_child_count() >= 6, "Release Pool plan/lock/approval controls are missing")
+	if release_surface != null:
+		var generated_utc: String = release_surface.call("_current_utc_timestamp")
+		var utc_pattern := RegEx.new()
+		_check(utc_pattern.compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$") == OK,
+			"Studio UTC timestamp pattern did not compile")
+		_check(utc_pattern.search(generated_utc) != null,
+			"Factory Studio did not generate canonical timezone-explicit UTC seconds: " + generated_utc)
 	navigation.emit_signal("surface_selected", "Generate")
 	await process_frame
 	_check(target.visible, "Generate target controls did not return")

@@ -86,6 +86,39 @@ def test_preflight_identity_is_deterministic_and_authority_sha_is_not_owner_inpu
     assert first["mutation_performed"] is False
 
 
+def test_actual_studio_timestamp_boundary_uses_explicit_utc_designator():
+    studio = (ROOT / "level_factory" / "scripts" / "factory_studio_release.gd").read_text(encoding="utf-8")
+    assert "var created_at := _current_utc_timestamp()" in studio
+    assert "func _current_utc_timestamp() -> String:" in studio
+    assert 'Time.get_datetime_string_from_system(true, false) + "Z"' in studio
+
+
+def test_timezone_less_timestamp_cannot_become_reviewed_publish_identity():
+    called = []
+    result = handoff.publish_preflight(
+        _request(created_at_utc="2026-10-07T12:00:00"),
+        release_pool_reader=_accepted_pool,
+        pack_builder=lambda *_args, **_kwargs: called.append(True),
+        game_authority_reader=lambda: AUTHORITY,
+    )
+    assert result["state"] == "PREFLIGHT_INPUT_INVALID"
+    assert "reviewed_identity" not in result
+    assert called == []
+
+
+def test_explicit_offset_timestamp_is_normalized_before_review():
+    seen = []
+    result = handoff.publish_preflight(
+        _request(created_at_utc="2026-10-07T15:00:00+03:00"),
+        release_pool_reader=_accepted_pool,
+        pack_builder=lambda *_args, **kwargs: (seen.append(kwargs["created_at_utc"]) or _build()),
+        game_authority_reader=lambda: AUTHORITY,
+    )
+    assert result["state"] == "PREFLIGHT_READY"
+    assert seen == ["2026-10-07T12:00:00Z"]
+    assert result["reviewed_identity"]["created_at_utc"] == "2026-10-07T12:00:00Z"
+
+
 def test_serializable_publish_staging_revalidates_exact_review_and_assembles_typed_m14(monkeypatch):
     for name in ("R2_ENDPOINT_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"):
         monkeypatch.setenv(name, "test-only-configured")
@@ -110,6 +143,7 @@ def test_serializable_publish_staging_revalidates_exact_review_and_assembles_typ
     assert result["production"] == "AWAITING_OWNER_PRODUCTION_PROMOTION"
     assert seen == [typed]
     assert assembled and assembled[0]["candidate_ids"] == ["accepted-1"]
+    assert assembled[0]["created_at_utc"] == preflight["reviewed_identity"]["created_at_utc"] == "2026-10-07T12:00:00Z"
 
 
 def test_service_assembles_complete_typed_m14_request_and_stages_through_real_orchestrator(monkeypatch):

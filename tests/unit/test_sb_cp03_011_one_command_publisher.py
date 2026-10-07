@@ -327,6 +327,42 @@ def test_missing_explicit_owner_approval_blocks_before_factory_or_provider_work(
     assert not called and provider.calls == []
 
 
+@pytest.mark.parametrize(
+    ("approval_field", "replacement"),
+    [("manifest_sha256", "0" * 64), ("content_version", 4)],
+)
+def test_wrong_owner_approval_manifest_or_version_blocks_before_production_mutation(
+    monkeypatch, approval_field, replacement,
+):
+    monkeypatch.setattr(orchestrator, "verify_solver_proven_scrubpack", lambda *_args: True)
+    monkeypatch.setattr(scrubpack_solver_identity, "verify_solver_proven_scrubpack", lambda *_args: True)
+    request, provider, candidate, approval, authority = _request(orchestrator.PublisherMode.PRODUCTION)
+    wrong_approval = replace(approval, **{approval_field: replacement})
+    request = replace(request, production=replace(request.production, owner_approval=wrong_approval))
+
+    def current_main(**kwargs):
+        pack = kwargs["staging_report"].receipt.packs[0]
+        row = {
+            "pack_id": pack.pack_id, "pack_sha256": pack.sha256,
+            "levels": [{"level_id": level_id, "accepted": True, "solver_status": "SOLVED",
+                        "replay_ok": True, "replay_solved": True, "final_active": 0,
+                        "unresolved": 0, "supply_exhausted": True}
+                       for level_id in pack.level_ids],
+        }
+        return CurrentMainReplayReceipt(True, "VERIFIED", "Sekiph82/Scrubbots", "main",
+                                        "a" * 40, authority["source_sha256"],
+                                        candidate.manifest_sha256, (row,))
+
+    monkeypatch.setattr(orchestrator, "verify_current_main_supply_replay", current_main)
+    result = orchestrator.run_one_command_publisher(request)
+    assert not result.accepted
+    assert result.production_promotion is not None
+    assert result.production_promotion.reason_code.value == "OWNER_APPROVAL_REQUIRED"
+    assert not result.production_promotion.manifest_write_attempted
+    assert not any(call[0] in {"promote", "manifest"} for call in provider.calls)
+    assert (Environment.PRODUCTION, MANIFEST_KEY) not in provider.objects
+
+
 def test_first_staging_failure_stops_and_leaves_production_unchanged(monkeypatch):
     monkeypatch.setattr(orchestrator, "verify_solver_proven_scrubpack", lambda *_args: True)
     monkeypatch.setattr(scrubpack_solver_identity, "verify_solver_proven_scrubpack", lambda *_args: True)

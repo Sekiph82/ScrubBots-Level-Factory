@@ -88,7 +88,7 @@ func _publish_preflight() -> void:
 	for raw_id in _publish_candidates.text.split(","):
 		var candidate_id := raw_id.strip_edges()
 		if not candidate_id.is_empty(): candidate_ids.append(candidate_id)
-	var created_at := Time.get_datetime_string_from_system(true, false)
+	var created_at := _current_utc_timestamp()
 	_publish_identity.clear()
 	_publish_button.disabled = true
 	var result: Dictionary = _gateway.call("run_studio_extension", "scrubbots-publish", {
@@ -118,6 +118,11 @@ func _publish_staging() -> void:
 	})
 	_status.text = JSON.stringify(result, "  ")
 	if result.get("state") != "STAGING_PUBLISHED": _publish_button.disabled = false
+
+
+func _current_utc_timestamp() -> String:
+	# Godot's UTC system string has no timezone suffix; bind its UTC value explicitly.
+	return Time.get_datetime_string_from_system(true, false) + "Z"
 
 
 func _render_plan() -> void:

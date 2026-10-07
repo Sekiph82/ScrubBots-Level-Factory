@@ -22,6 +22,8 @@ for _SOURCE_ROOT in (_REPOSITORY_ROOT / "src", _REPOSITORY_ROOT / "content_pipel
     if str(_SOURCE_ROOT) not in sys.path:
         sys.path.insert(0, str(_SOURCE_ROOT))
 
+from scrubbots_content_pipeline.scrubpack_spec import normalize_created_at_utc
+
 R2_BUCKET = "scrubbots-content-prod"
 PUBLIC_READ_BASE = "https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev"
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -48,6 +50,10 @@ def publish_preflight(
             or type(content_version) is not int or content_version < 2
             or not isinstance(created_at, str)):
         return _blocked("PREFLIGHT_INPUT_INVALID", "Pack identity, content version, and canonical UTC timestamp are required.")
+    try:
+        created_at = normalize_created_at_utc(created_at)
+    except ValueError:
+        return _blocked("PREFLIGHT_INPUT_INVALID", "created_at_utc must be an explicit timezone-aware whole-second instant.")
     try:
         entries = tuple(_release_entries(release_pool_reader))
         current = {str(entry.get("candidate_id")): entry for entry in entries if _valid_pool_entry(entry)}
