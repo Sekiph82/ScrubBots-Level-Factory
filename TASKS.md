@@ -6,10 +6,10 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: M18 - Cloudflare R2 Storage/CDN + SB-CPX-004 Publish Handoff
 - Current Sprint: SB-CP07-003..010 + SB-CPX-004 — R2 Provider Integration and Factory Studio Remote Publish
-- Current Task: SB-CP07-003 — Implement Cloudflare R2 provider adapter, then continue master through SB-CPX-004
-- Current Task Status: MASTER_AUTHORIZED / R2_PROVISIONED / IMPLEMENT_ALL_THEN_AUDIT
-- Next Task/Action: **CODEX executes now** `.hiveai/prompts/M18_CPX004_R2_LIVE_PUBLISH_MASTER_PROMPT.md` continuously in order `SB-CP07-003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-004`. R2 provider selection/provisioning is already owner-closed. Live publication remains fail-closed on missing write credential, missing owner-approved release batch, or missing exact owner production approval.
-- Required Actor: CODEX
+- Current Task: M18/CPX-004 R01 — Fail-Closed R2 Release State + Idempotent Promotion + Handoff Implementation
+- Current Task Status: STRICT_AUDIT_CHANGES_REQUIRED / R01_AUTHORIZED / LIVE_R2_AND_RELEASE_BATCH_STILL_EXTERNAL_GATES
+- Next Task/Action: **CODEX executes now** `.hiveai/prompts/M18_CPX004_R2_R01_PROMPT.md`. R01 must close the corrupt-release-ledger fail-open defect, make exact production-pack retry idempotent, and implement/test the SB-CPX-004 Factory Studio + headless handoff without fabricating live content. Real R2 write proof remains blocked until secure publisher credentials exist; real publication remains blocked until an actual owner-approved release batch and exact owner production approval exist.
+- Required Actor: CODEX (R01 implementation), then CHATGPT strict re-audit
 - Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
@@ -287,6 +287,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M18 + CPX-004 Builder Log Target: `.hiveai/codex-logs/M18_CPX004_R2_LIVE_PUBLISH_MASTER_CODEX_LOG.md`.
 - M18 + CPX-004 Execution Order: `SB-CP07-003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-004`.
 - M18 + CPX-004 Live Gate Rule: missing secure publisher credential -> `OWNER_R2_WRITE_CREDENTIAL_REQUIRED`; no eligible owner batch -> `AWAITING_OWNER_RELEASE_BATCH`; no exact production approval -> `AWAITING_OWNER_PRODUCTION_PROMOTION`. None of those may be mislabeled PASS.
+- M18 + CPX-004 Strict Audit V01 [2026-10-07]: **CHANGES_REQUIRED / R01** by `.hiveai/audits/M18_CPX004_R2_LIVE_PUBLISH_MASTER_STRICT_AUDIT_V01.md`. Builder stop `AWAITING_OWNER_RELEASE_BATCH` was truthful, but source audit found two blocking technical gaps before live publication: (1) an existing corrupt/noncanonical R2 release ledger can collapse to empty history and be overwritten on a first-publication path; (2) an exact already-promoted production pack is not accepted idempotently on retry. SB-CPX-004 handoff code also remains unimplemented because the prior builder stopped at the empty Release Pool gate. R01 prompt: `.hiveai/prompts/M18_CPX004_R2_R01_PROMPT.md`; criteria: `.hiveai/audit-criteria/M18_CPX004_R2_R01_AUDIT_CRITERIA.md`.
 
 - SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
 - SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
