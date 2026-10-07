@@ -4,13 +4,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M15 - Godot Remote Content Runtime
-- Current Sprint: SB-CP04-001 / M15-PREP - Remote Content Runtime queued after M14 publisher-core closure
-- Current Task: SB-CP04-001 — Prepare RemoteContentManager implementation authority
-- Current Task Status: QUEUED / NOT_STARTED / AWAITING_CHATGPT_IMPLEMENTATION_PROMPT
-- Next Task/Action: SB-CP04-001 / M15 remains queued; when the owner asks to proceed, ChatGPT must inspect current `Sekiph82/Scrubbots` main and publish the actual M15 child prompts, audit criteria, sequencing and master prompt. Do not run a builder from the preparation hold.
-- Required Actor: CHATGPT
-- Owner Priority Decision [2026-10-06]: **Remote Level Update / Family APK is now the highest-priority SCRUBBOTS program.** Execution order is locked as: (1) CP01/M12 .scrubpack = already PASS/CLOSED; (2) CP02/M13 manifest/versioning = already PASS/CLOSED; (3) finish current CP03/M14 publisher/staging/production; (4) implement CP04/M15 RemoteContentManager in `Sekiph82/Scrubbots`; (5) implement CP05/M16 offline cache/last-known-good in `Sekiph82/Scrubbots`; (6) connect Factory Studio/Pixel Art Factory to the publisher through SB-CPX-004 so an owner-approved batch can be published to ScrubBots without rebuilding the APK; (7) select/integrate storage/CDN through CP07/M18, Cloudflare R2/CDN remaining the preferred candidate until owner approval; (8) build the Android Family Test APK only after the remote runtime is included. Remote payload remains declarative level content only; no GDScript/native/plugin/executable payload may be downloaded.
+- Current Milestone: M18 - Cloudflare R2 Storage/CDN + SB-CPX-004 Publish Handoff
+- Current Sprint: SB-CP07-003..010 + SB-CPX-004 — R2 Provider Integration and Factory Studio Remote Publish
+- Current Task: SB-CP07-003 — Implement Cloudflare R2 provider adapter, then continue master through SB-CPX-004
+- Current Task Status: MASTER_AUTHORIZED / R2_PROVISIONED / IMPLEMENT_ALL_THEN_AUDIT
+- Next Task/Action: **CODEX executes now** `.hiveai/prompts/M18_CPX004_R2_LIVE_PUBLISH_MASTER_PROMPT.md` continuously in order `SB-CP07-003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-004`. R2 provider selection/provisioning is already owner-closed. Live publication remains fail-closed on missing write credential, missing owner-approved release batch, or missing exact owner production approval.
+- Required Actor: CODEX
+- Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
 - Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_FINAL_CLOSURE_STRICT_REAUDIT.md`
@@ -279,6 +279,15 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14 CP03/CPX-002 Publisher Core Final Result: `PASS / CLOSED` by `.hiveai/audits/M14_CP03_001_012_CPX002_FINAL_CLOSURE_STRICT_REAUDIT.md`.
 - M14 Core Scope Note: SB-CPX-004 remains intentionally deferred until after M15/M16 per the owner-priority sequence; it does not reopen the closed CP03/CPX-002 publisher core.
 - M15 Preparation State: `QUEUED / HOLD / NO_BUILDER_AUTHORITY`; the hold prompt is `.hiveai/prompts/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_PROMPT.md` and implementation requires a new ChatGPT-authored M15 master.
+- M15/M16 external game-runtime closure [2026-10-07]: implemented and strict-audited in `Sekiph82/Scrubbots`; CP04/M15 + CP05/M16 are no longer LF execution blockers. The LF tracker keeps their GAME_RUNTIME rows as external-source capability references rather than reimplementing them here.
+- M18 R2 owner authority [2026-10-07]: provider evaluation/selection are owner-closed. Bucket `scrubbots-content-prod` is provisioned; Family Test public read base is `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. No write credential is committed.
+- M18 + CPX-004 Master Authorization: `IMPLEMENT_ALL_THEN_AUDIT / R2_LIVE_PUBLISH_MASTER_AUTHORIZED`.
+- M18 + CPX-004 Master Prompt: `.hiveai/prompts/M18_CPX004_R2_LIVE_PUBLISH_MASTER_PROMPT.md`.
+- M18 + CPX-004 Master Audit Criteria: `.hiveai/audit-criteria/M18_CPX004_R2_LIVE_PUBLISH_MASTER_AUDIT_CRITERIA.md`.
+- M18 + CPX-004 Builder Log Target: `.hiveai/codex-logs/M18_CPX004_R2_LIVE_PUBLISH_MASTER_CODEX_LOG.md`.
+- M18 + CPX-004 Execution Order: `SB-CP07-003 -> 004 -> 005 -> 006 -> 007 -> 008 -> 009 -> 010 -> SB-CPX-004`.
+- M18 + CPX-004 Live Gate Rule: missing secure publisher credential -> `OWNER_R2_WRITE_CREDENTIAL_REQUIRED`; no eligible owner batch -> `AWAITING_OWNER_RELEASE_BATCH`; no exact production approval -> `AWAITING_OWNER_PRODUCTION_PROMOTION`. None of those may be mislabeled PASS.
+
 - SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
 - SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
 - SB-CP03-001 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_CODEX_LOG.md`.
@@ -1301,8 +1310,8 @@ Capability source family: `SB-CP07-xxx` from the main Scrubbots master plan.
 
 ### M18.01 - Provider selection and adapter boundary
 
-- [ ] SB-CP07-001 — Evaluate provider candidates.
-- [ ] SB-CP07-002 — Select provider with owner approval.
+- [x] SB-CP07-001 — Evaluate provider candidates. **OWNER DECISION CLOSED [2026-10-07]: Cloudflare R2 selected.**
+- [x] SB-CP07-002 — Select provider with owner approval. **OWNER APPROVED / PROVISIONED [2026-10-07]: `scrubbots-content-prod`, Family Test r2.dev read endpoint active.**
 - [ ] SB-CP07-003 — Provider adapter; no credentials in project data. [PARTIAL]
 
 ### M18.02 - Storage separation, naming and integrity round trip
