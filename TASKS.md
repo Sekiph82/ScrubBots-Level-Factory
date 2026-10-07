@@ -4,22 +4,22 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 ## Project Status
 
-- Current Milestone: M14 - Publisher, Staging & Production Promotion
-- Current Sprint: SB-CPX-002 / M14-R01 - TEMP-only current-main authority evidence closure
-- Current Task: SB-CPX-002 — Close current-main replay evidence boundary with TEMP-only authority
-- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / PRODUCT_SEMANTICS_RETAINED
-- Next Task/Action: execute only `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`; remediate the CPX-002 Desktop-fallback evidence boundary, produce a fresh TEMP-only authentic current-main Godot replay, publish the R01 log, then stop for independent ChatGPT re-audit.
-- Required Actor: CODEX
+- Current Milestone: M15 - Godot Remote Content Runtime
+- Current Sprint: SB-CP04-001 / M15-PREP - Remote Content Runtime queued after M14 publisher-core closure
+- Current Task: SB-CP04-001 — Prepare RemoteContentManager implementation authority
+- Current Task Status: QUEUED / NOT_STARTED / AWAITING_CHATGPT_IMPLEMENTATION_PROMPT
+- Next Task/Action: SB-CP04-001 / M15 remains queued; when the owner asks to proceed, ChatGPT must inspect current `Sekiph82/Scrubbots` main and publish the actual M15 child prompts, audit criteria, sequencing and master prompt. Do not run a builder from the preparation hold.
+- Required Actor: CHATGPT
 - Owner Priority Decision [2026-10-06]: **Remote Level Update / Family APK is now the highest-priority SCRUBBOTS program.** Execution order is locked as: (1) CP01/M12 .scrubpack = already PASS/CLOSED; (2) CP02/M13 manifest/versioning = already PASS/CLOSED; (3) finish current CP03/M14 publisher/staging/production; (4) implement CP04/M15 RemoteContentManager in `Sekiph82/Scrubbots`; (5) implement CP05/M16 offline cache/last-known-good in `Sekiph82/Scrubbots`; (6) connect Factory Studio/Pixel Art Factory to the publisher through SB-CPX-004 so an owner-approved batch can be published to ScrubBots without rebuilding the APK; (7) select/integrate storage/CDN through CP07/M18, Cloudflare R2/CDN remaining the preferred candidate until owner approval; (8) build the Android Family Test APK only after the remote runtime is included. Remote payload remains declarative level content only; no GDScript/native/plugin/executable payload may be downloaded.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_FINAL_CLOSURE_STRICT_REAUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -272,6 +272,13 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-R01 Master Prompt: `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`.
 - M14-R01 Master Audit Criteria: `.hiveai/audit-criteria/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_AUDIT_CRITERIA.md`.
 - M14-R01 Closure Rule: CP03-001..012 remain closed except CPX-002; if R01 retains the accepted CPX-002 receipt semantics and all regressions stay green, no downstream child is reopened and M14 may close on independent re-audit.
+- SB-CPX-002 C001-R01 Implementation Commit: `ef51c6da78d8fe6f6b2aaa2b606dae5ef12941fc`.
+- SB-CPX-002 C001-R01 Final Builder Publication: `4af899d22aee38aa28cf52112cbb624b5d8fb222`.
+- SB-CPX-002 C001-R01 Independent Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CPX-002-C001-R01_TEMP_ONLY_AUTHORITY_EVIDENCE_STRICT_REAUDIT.md`.
+- SB-CPX-002 Final Result: `PASS / CLOSED`; explicit TEMP-only current-main authority is required before Factory/solver/replay and the owner Desktop game fallback is fail-closed.
+- M14 CP03/CPX-002 Publisher Core Final Result: `PASS / CLOSED` by `.hiveai/audits/M14_CP03_001_012_CPX002_FINAL_CLOSURE_STRICT_REAUDIT.md`.
+- M14 Core Scope Note: SB-CPX-004 remains intentionally deferred until after M15/M16 per the owner-priority sequence; it does not reopen the closed CP03/CPX-002 publisher core.
+- M15 Preparation State: `QUEUED / HOLD / NO_BUILDER_AUTHORITY`; the hold prompt is `.hiveai/prompts/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_PROMPT.md` and implementation requires a new ChatGPT-authored M15 master.
 - SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
 - SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
 - SB-CP03-001 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_CODEX_LOG.md`.
@@ -1191,7 +1198,7 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 
 ### M14.04 - Current-main supply replay promotion gate
 
-- [~] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
+- [x] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
 
 ### M14.05 - Route A game-repository release PR
 
@@ -1399,7 +1406,10 @@ Owner-approved post-cutover product specification:
 8. M08 batch production plus `SB-LFX-013..015` failure/import/recovery extensions are COMPLETE / VERIFIED.
 9. M09 advanced generation continues only as authorized, beginning with `SB-LF09-001` and preserving the experimental/offline boundary.
 10. M10 Campaign Intelligence is COMPLETE / VERIFIED; `SB-LF10-001..008 = PASS/CLOSED`.
-11. M11-M14 Content Platform architecture/pack/manifest/publisher.
-12. M18-M20 storage/operations/security.
-13. M17 rollback/scheduling once manifest/publisher/storage are real.
-14. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots`.
+11. M11-M14 Content Platform architecture/pack/manifest/publisher core is PASS/CLOSED; SB-CPX-004 remains a separately deferred extension by owner priority.
+12. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots` is the next owner-priority program.
+13. SB-CPX-004 Factory Studio → ScrubBots owner-facing publish handoff follows M15-M16.
+14. M18 storage/CDN provider integration follows the runtime/handoff foundation.
+15. M17 rollback/scheduling follows once manifest/publisher/storage are real.
+16. M19 content operations/QA/observability follows provider integration.
+17. M20 store-policy/security/final production release gate remains last.
