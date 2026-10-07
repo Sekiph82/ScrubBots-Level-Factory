@@ -289,17 +289,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = release_approved_campaign(plan_hash=str(request["plan_hash"]), game_project=game_project, studio_approval=True)
         elif operation == "scrubbots-publish":
             from scrubbots_publish_handoff import (
-                publish_preflight, run_m14_handoff,
+                publish_preflight, publish_to_staging,
             )
             action = str(request.get("action", "preflight"))
             if action == "preflight":
                 payload = publish_preflight(request)
-            elif action == "run-m14":
-                # The complete typed PublisherRunRequest is supplied by the
-                # trusted operator integration; JSON clients can only preflight.
-                payload = run_m14_handoff(request.get("publisher_request"))
+            elif action == "publish-staging":
+                payload = publish_to_staging(request)
             else:
-                raise ValueError("scrubbots-publish action must be preflight or run-m14")
+                raise ValueError("scrubbots-publish action must be preflight or publish-staging")
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

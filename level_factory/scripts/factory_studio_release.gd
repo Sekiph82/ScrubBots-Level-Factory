@@ -13,7 +13,9 @@ var _status: Label
 var _publish_candidates: LineEdit
 var _publish_pack_id: LineEdit
 var _publish_version: SpinBox
-var _publish_game_sha: LineEdit
+var _publish_authority: Label
+var _publish_identity: Dictionary = {}
+var _publish_button: Button
 
 
 func _ready() -> void:
@@ -33,9 +35,10 @@ func _ready() -> void:
 	var publish_title := Label.new(); publish_title.text = "ScrubBots Content Pipeline"; publish_title.add_theme_font_size_override("font_size", 18); add_child(publish_title)
 	_publish_candidates = LineEdit.new(); _publish_candidates.placeholder_text = "Comma-separated owner-accepted Release Pool candidate IDs"; add_child(_publish_candidates)
 	_publish_pack_id = LineEdit.new(); _publish_pack_id.placeholder_text = "Deterministic pack ID"; add_child(_publish_pack_id)
-	_publish_version = SpinBox.new(); _publish_version.min_value = 1; _publish_version.max_value = 2147483647; _publish_version.prefix = "Content version "; add_child(_publish_version)
-	_publish_game_sha = LineEdit.new(); _publish_game_sha.placeholder_text = "Verified game main commit SHA"; add_child(_publish_game_sha)
+	_publish_version = SpinBox.new(); _publish_version.min_value = 2; _publish_version.max_value = 2147483647; _publish_version.prefix = "Content version "; add_child(_publish_version)
+	_publish_authority = Label.new(); _publish_authority.text = "Game authority is resolved from the exact-current TEMP checkout."; _publish_authority.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; add_child(_publish_authority)
 	var preflight := Button.new(); preflight.text = "Preflight Publish to ScrubBots"; preflight.pressed.connect(_publish_preflight); add_child(preflight)
+	_publish_button = Button.new(); _publish_button.text = "Publish to STAGING"; _publish_button.disabled = true; _publish_button.pressed.connect(_publish_staging); add_child(_publish_button)
 	refresh_pool()
 
 
@@ -86,12 +89,35 @@ func _publish_preflight() -> void:
 		var candidate_id := raw_id.strip_edges()
 		if not candidate_id.is_empty(): candidate_ids.append(candidate_id)
 	var created_at := Time.get_datetime_string_from_system(true, false)
+	_publish_identity.clear()
+	_publish_button.disabled = true
 	var result: Dictionary = _gateway.call("run_studio_extension", "scrubbots-publish", {
 		"action": "preflight", "candidate_ids": Array(candidate_ids),
 		"pack_id": _publish_pack_id.text.strip_edges(), "content_version": int(_publish_version.value),
-		"scrubbots_main_sha": _publish_game_sha.text.strip_edges(), "created_at_utc": created_at,
+		"created_at_utc": created_at,
+	})
+	if result.get("state") == "PREFLIGHT_READY" and result.get("reviewed_identity", {}) is Dictionary:
+		_publish_identity = result["reviewed_identity"]
+		_publish_button.disabled = false
+		_publish_authority.text = "Verified ScrubBots main SHA: %s" % str(result.get("scrubbots_main_sha", ""))
+	_status.text = JSON.stringify(result, "  ")
+
+
+func _publish_staging() -> void:
+	if _gateway == null or _publish_identity.is_empty(): return
+	_publish_button.disabled = true
+	var candidate_ids := PackedStringArray()
+	for raw_id in _publish_candidates.text.split(","):
+		var candidate_id := raw_id.strip_edges()
+		if not candidate_id.is_empty(): candidate_ids.append(candidate_id)
+	var result: Dictionary = _gateway.call("run_studio_extension", "scrubbots-publish", {
+		"action": "publish-staging", "candidate_ids": Array(candidate_ids),
+		"pack_id": _publish_pack_id.text.strip_edges(), "content_version": int(_publish_version.value),
+		"created_at_utc": str(_publish_identity.get("created_at_utc", "")),
+		"reviewed_identity": _publish_identity,
 	})
 	_status.text = JSON.stringify(result, "  ")
+	if result.get("state") != "STAGING_PUBLISHED": _publish_button.disabled = false
 
 
 func _render_plan() -> void:
