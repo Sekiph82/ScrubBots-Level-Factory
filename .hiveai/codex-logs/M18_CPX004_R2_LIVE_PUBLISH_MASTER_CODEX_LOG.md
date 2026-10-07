@@ -73,3 +73,14 @@ Status: IN PROGRESS
 - `git diff --cached --check` initially found one extra blank line at EOF in the CP07-006 test. Removed only trailing whitespace; test outcomes remain unchanged. Rechecking before commit.
 
 - SB-CP07-006 focused suite: **15 passed, 1 skipped**; skip reason exactly OWNER_R2_WRITE_CREDENTIAL_REQUIRED. The live R2 object was not written. Selected M14 publisher regressions — **45 passed**. Test commit: `4d58a0500f2745e2bba1f035cf8f1cf8ba2de4b9`. Corrected git diff --cached --check passed.
+
+## SB-CP07-007 — Cache/CDN metadata
+
+Status: IN PROGRESS
+
+- `.scrubpack` writes use `application/octet-stream` and `public, max-age=31536000, immutable`; current manifest writes use `application/json` and `no-cache`.
+- Added operator documentation for locked namespace mapping, stable production manifest key, cache policy, and the distinction between Family Test `r2.dev` delivery and a future custom CDN.
+- Added focused metadata verification. Commands pending alongside selected M14 publisher regressions.
+- Initial CP07-007 `git diff --cached --check` stopped on an extra trailing blank line in the new test. Removed trailing whitespace; focused/regression outcomes were already green and are unchanged.
+
+- SB-CP07-007 focused M18 suite — **16 passed, 1 skipped** (live R2 credential gate); selected M14 publisher regressions — **45 passed**. Implementation/docs commit: `f5406e9005fcd628bdbba20e7c4e6787ce0c00d0`. Corrected git diff --cached --check passed.
