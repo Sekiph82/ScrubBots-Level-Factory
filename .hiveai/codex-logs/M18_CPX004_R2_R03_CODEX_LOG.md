@@ -75,3 +75,4 @@ Document role: CODEX BUILDER LOG
 ### 2026-10-07 — Builder-log whitespace correction
 
 - The first staged builder-log `git diff --cached --check` reported one extra blank line at end of file. The shell sequence continued and created the separate log commit before that nonzero check was acted on. Removed the extra EOF blank line and recorded the correction; no product or test code changed.
+- First post-push parity assertion printed matching `HEAD` and `origin/main` and `0<TAB>0`, but its PowerShell comparison mistakenly used a single-quoted literal backtick-t, causing a false assertion failure. No repository state changed. The parity check is being repeated by splitting the count fields as whitespace.
