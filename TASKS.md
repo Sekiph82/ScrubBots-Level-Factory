@@ -5,21 +5,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M14 - Publisher, Staging & Production Promotion
-- Current Sprint: SB-CP03-005 / M14-CONT-002 - Reverify remote object integrity after tracker denominator fix, then resume M14 master batch
-- Current Task: SB-CP03-005 — Reverify remote object integrity gate, then continue M14
-- Current Task Status: CONDITIONAL_PRODUCT_PASS / TRACKER_FIXED / REVERIFY_THEN_RESUME
-- Next Task/Action: execute only `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`; verify the corrected 248-task denominator, rerun CP03-005 governance/focused/cumulative/full-suite gates unchanged, then if green continue CP03-006 -> CP03-007 -> CPX-002 -> CP03-008 -> 009 -> 010 -> 011 -> 012 without inter-child handoff.
+- Current Sprint: SB-CPX-002 / M14-R01 - TEMP-only current-main authority evidence closure
+- Current Task: SB-CPX-002 — Close current-main replay evidence boundary with TEMP-only authority
+- Current Task Status: CHANGES_REQUIRED / R01_AUTHORIZED / PRODUCT_SEMANTICS_RETAINED
+- Next Task/Action: execute only `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`; remediate the CPX-002 Desktop-fallback evidence boundary, produce a fresh TEMP-only authentic current-main Godot replay, publish the R01 log, then stop for independent ChatGPT re-audit.
 - Required Actor: CODEX
 - Owner Priority Decision [2026-10-06]: **Remote Level Update / Family APK is now the highest-priority SCRUBBOTS program.** Execution order is locked as: (1) CP01/M12 .scrubpack = already PASS/CLOSED; (2) CP02/M13 manifest/versioning = already PASS/CLOSED; (3) finish current CP03/M14 publisher/staging/production; (4) implement CP04/M15 RemoteContentManager in `Sekiph82/Scrubbots`; (5) implement CP05/M16 offline cache/last-known-good in `Sekiph82/Scrubbots`; (6) connect Factory Studio/Pixel Art Factory to the publisher through SB-CPX-004 so an owner-approved batch can be published to ScrubBots without rebuilding the APK; (7) select/integrate storage/CDN through CP07/M18, Cloudflare R2/CDN remaining the preferred candidate until owner approval; (8) build the Android Family Test APK only after the remote runtime is included. Remote payload remains declarative level content only; no GDScript/native/plugin/executable payload may be downloaded.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_INTERIM_STRICT_AUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_STRICT_AUDIT.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -254,6 +254,24 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-002 Authorization: `REVERIFY_CP03_005_THEN_RESUME`.
 - M14-CONT-002 Prompt: `.hiveai/prompts/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_PROMPT.md`.
 - M14-CONT-002 Audit Criteria: `.hiveai/audit-criteria/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_AUDIT_CRITERIA.md`.
+- M14-CONT-002 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/M14-CONT-002_CP03_005_REVERIFY_AND_RESUME_STRICT_AUDIT.md`.
+- SB-CP03-005 Final Re-Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-005-C001_FINAL_CLOSURE_STRICT_REAUDIT.md`.
+- SB-CP03-006 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-006-C001_PUBLISH_STAGING_FIRST_STRICT_AUDIT.md`.
+- SB-CP03-007 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-007-C001_VERIFY_STAGING_REAL_DOWNLOAD_STRICT_AUDIT.md`.
+- SB-CPX-002 Independent Audit Result: `CHANGES_REQUIRED / R01 / PRODUCT_SEMANTICS_RETAINED` by `.hiveai/audits/SB-CPX-002-C001_CURRENT_MAIN_SUPPLY_REPLAY_PROMOTION_GATE_STRICT_AUDIT.md`.
+- SB-CP03-008 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-008-C001_EXPLICIT_STAGING_TO_PRODUCTION_PROMOTION_STRICT_AUDIT.md`.
+- SB-CP03-009 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-009-C001_NEW_VERSIONED_PRODUCTION_MANIFEST_STRICT_AUDIT.md`.
+- SB-CP03-010 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-010-C001_NO_SILENT_LIVE_OVERWRITE_STRICT_AUDIT.md`.
+- SB-CP03-011 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-011-C001_ONE_COMMAND_PUBLISH_ORCHESTRATOR_STRICT_AUDIT.md`.
+- SB-CP03-012 Independent Audit Result: `PASS / CLOSED` by `.hiveai/audits/SB-CP03-012-C001_PUBLISH_REPORT_STRICT_AUDIT.md`.
+- M14 Final Strict Audit Result: `CHANGES_REQUIRED / CPX002_R01_ONLY` by `.hiveai/audits/M14_CP03_001_012_CPX002_MASTER_STRICT_AUDIT.md`.
+- SB-CPX-002 C001-R01 Authorization: `REMEDIATE_THEN_REAUDIT / TEMP_ONLY_AUTHORITY_EVIDENCE`.
+- SB-CPX-002 C001-R01 Prompt: `.hiveai/prompts/SB-CPX-002-C001-R01_TEMP_ONLY_AUTHORITY_EVIDENCE_CLOSURE_PROMPT.md`.
+- SB-CPX-002 C001-R01 Audit Criteria: `.hiveai/audit-criteria/SB-CPX-002-C001-R01_TEMP_ONLY_AUTHORITY_EVIDENCE_AUDIT_CRITERIA.md`.
+- SB-CPX-002 C001-R01 Builder Log Target: `.hiveai/codex-logs/SB-CPX-002-C001-R01_TEMP_ONLY_AUTHORITY_EVIDENCE_CODEX_LOG.md`.
+- M14-R01 Master Prompt: `.hiveai/prompts/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_PROMPT.md`.
+- M14-R01 Master Audit Criteria: `.hiveai/audit-criteria/M14-R01_CPX002_TEMP_ONLY_CLOSURE_MASTER_AUDIT_CRITERIA.md`.
+- M14-R01 Closure Rule: CP03-001..012 remain closed except CPX-002; if R01 retains the accepted CPX-002 receipt semantics and all regressions stay green, no downstream child is reopened and M14 may close on independent re-audit.
 - SB-CP03-001 C001 Prompt: `.hiveai/prompts/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_PROMPT.md`.
 - SB-CP03-001 C001 Audit Criteria: `.hiveai/audit-criteria/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_AUDIT_CRITERIA.md`.
 - SB-CP03-001 C001 Builder Log Target: `.hiveai/codex-logs/SB-CP03-001-C001_PUBLISHER_VALIDATION_ONLY_MODE_CODEX_LOG.md`.
@@ -1159,21 +1177,21 @@ Capability source family: `SB-CP03-xxx` from the main Scrubbots master plan.
 ### M14.02 - Upload integrity and staging verification
 
 - [x] SB-CP03-004 — Upload packs before active manifest references them.
-- [~] SB-CP03-005 — Verify remote object integrity.
-- [ ] SB-CP03-006 — Publish STAGING first.
-- [ ] SB-CP03-007 — Verify staging through real download.
+- [x] SB-CP03-005 — Verify remote object integrity.
+- [x] SB-CP03-006 — Publish STAGING first.
+- [x] SB-CP03-007 — Verify staging through real download.
 
 ### M14.03 - Production promotion, overwrite safety and reporting
 
-- [ ] SB-CP03-008 — Explicit staging→production promotion.
-- [ ] SB-CP03-009 — New versioned production manifest.
-- [ ] SB-CP03-010 — No silent live overwrite.
-- [ ] SB-CP03-011 — One-command publish only after stages individually testable.
-- [ ] SB-CP03-012 — Publish report.
+- [x] SB-CP03-008 — Explicit staging→production promotion.
+- [x] SB-CP03-009 — New versioned production manifest.
+- [x] SB-CP03-010 — No silent live overwrite.
+- [x] SB-CP03-011 — One-command publish only after stages individually testable.
+- [x] SB-CP03-012 — Publish report.
 
 ### M14.04 - Current-main supply replay promotion gate
 
-- [ ] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
+- [~] SB-CPX-002 — Before staging→production promotion, resolve the exact current `Sekiph82/Scrubbots` main authority and replay every explicit packaged supply plan through the current main-game `SupplyPlanLoader` + canonical solver/ProofState path; require identity match to `SB-CPX-001`, exact per-color conservation, exact level binding and a current-main SOLVED result. Any supply-plan drift, unsupported schema, loader rejection, solver inconclusive/error/unsolved result or authority drift must block promotion without mutating the live manifest. [EXTENSION]
 
 ### M14.05 - Route A game-repository release PR
 
