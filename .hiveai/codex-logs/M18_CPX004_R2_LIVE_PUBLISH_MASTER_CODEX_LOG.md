@@ -106,3 +106,12 @@ Status: IN PROGRESS
 - Commands pending focused secret/provider tests and selected M14 publisher regressions.
 
 - SB-CP07-009 focused M18 suite — **22 passed, 1 skipped** (live R2 credentials unavailable); selected M14 publisher regressions — **45 passed**. Secret boundary/provider implementation commit: `c8b6f61658093e4d97f871fee0358b662c5b1954`. No R2 API call made. git diff --cached --check passed.
+
+## SB-CP07-010 — Provider-specific isolation
+
+Status: IN PROGRESS
+
+- Added a boundary test scanning the neutral content-manifest and scrubpack schemas plus LevelData, supply-plan, and metadata examples for R2/Cloudflare/bucket/credential fields. It also verifies provider SDK imports remain in the provider adapter and absent from neutral contract modules.
+- No neutral schema or payload files were changed. Commands pending focused provider-isolation and M14 publisher regressions.
+
+- SB-CP07-010 focused M18 suite — **24 passed, 1 skipped** (R2 live gate unavailable); selected M14 publisher regressions — **45 passed**. No neutral schema changes. Test commit: `6591b06c9476d60f018ab842a7733ba7c4426646`. git diff --cached --check passed.
