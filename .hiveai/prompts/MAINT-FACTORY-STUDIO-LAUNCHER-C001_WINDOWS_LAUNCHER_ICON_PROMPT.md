@@ -13,14 +13,14 @@ Owner-provided local icon:
 
 ## EXECUTION GATE
 
-This maintenance task is queued behind the currently active M14 master batch.
+This maintenance task is queued immediately after the currently active M18 / SB-CPX-004 R2 work and explicitly before M17.
 
 Before doing anything:
 - read current `origin/main:TASKS.md`;
-- execute only when ChatGPT has made `MAINT-FACTORY-STUDIO-LAUNCHER-C001` the canonical Current Task or has explicitly marked M14 closed and this task executable;
-- if M14 is still the current active dirty batch, STOP without touching the repo.
+- execute only when ChatGPT has made `MAINT-FACTORY-STUDIO-LAUNCHER-C001` the canonical Current Task after M18 / SB-CPX-004 is independently closed;
+- if M18 / SB-CPX-004 is still the current active batch, STOP without touching the repo.
 
-Do not run concurrently with the M14 TEMP worktree.
+Do not run concurrently with the M18 / SB-CPX-004 TEMP worktree. This maintenance task must PASS/CLOSE before M17 is opened.
 
 ## FIRST OPERATION — mandatory GitHub ↔ Desktop synchronization
 
