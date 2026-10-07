@@ -41,3 +41,14 @@ Status: IN PROGRESS
 - Dependency note: boto3 is declared (`>=1.37,<2`); it is not installed in this execution environment. Unit tests inject a fake S3 client and do not require it. No runtime network request was made.
 - `git diff --cached --check` passed. Implementation commit: `1f5189014c25d18441440bd9a36c312cb6741cb0`.
 - Child result is implementation evidence only; real R2 credential/network verification remains unavailable and is not marked PASS.
+
+## SB-CP07-004 — Staging/production separation
+
+Status: IN PROGRESS
+
+- The adapter physically prefixes unchanged neutral object keys with `staging/` or `production/`, rejects already-prefixed and `_control/` logical keys, restricts pack writes to STAGING, and restricts manifest writes to `manifests/current.json` under the exact target identity.
+- Added focused namespace tests proving identical logical keys cannot alias, control objects cannot enter the game content path, and direct production writes/control-manifest writes fail closed.
+- Commands: pending focused namespace and M14 publisher regressions.
+- `git diff --cached --check` initially rejected one extra blank line at EOF in the new CP07-004 test. Removed only that trailing whitespace; focused/regression test results above are unchanged. Rechecking and committing.
+
+- SB-CP07-004 tests: python -m pytest tests/unit/test_sb_cp07_004_r2_namespace_separation.py tests/unit/test_sb_cp07_003_r2_provider.py -q — **12 passed**; selected M14 publisher regressions — **45 passed**. Implementation/test commit: `9312b2c0cdefbf83fee7de8b8a597bff4704ea02`. Corrected git diff --cached --check passed.
