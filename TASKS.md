@@ -6,20 +6,20 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 
 - Current Milestone: M18 - Cloudflare R2 Storage/CDN + SB-CPX-004 Publish Handoff
 - Current Sprint: SB-CP07-003..010 + SB-CPX-004 — R2 Provider Integration and Factory Studio Remote Publish
-- Current Task: M18/CPX-004 R01 — Fail-Closed R2 Release State + Idempotent Promotion + Handoff Implementation
-- Current Task Status: STRICT_AUDIT_CHANGES_REQUIRED / R01_AUTHORIZED / LIVE_R2_AND_RELEASE_BATCH_STILL_EXTERNAL_GATES
-- Next Task/Action: **CODEX executes now** `.hiveai/prompts/M18_CPX004_R2_R01_PROMPT.md`. R01 must close the corrupt-release-ledger fail-open defect, make exact production-pack retry idempotent, and implement/test the SB-CPX-004 Factory Studio + headless handoff without fabricating live content. Real R2 write proof remains blocked until secure publisher credentials exist; real publication remains blocked until an actual owner-approved release batch and exact owner production approval exist.
-- Required Actor: CODEX (R01 implementation), then CHATGPT strict re-audit
+- Current Task: SB-CPX-004 — M18/CPX-004 R02 Live Release Pool + Executable Publish Handoff Closure
+- Current Task Status: STRICT_AUDIT_CHANGES_REQUIRED / R02_AUTHORIZED / LIVE_R2_AND_RELEASE_BATCH_STILL_EXTERNAL_GATES
+- Next Task/Action: **CODEX executes SB-CPX-004 R02 now** `.hiveai/prompts/M18_CPX004_R2_R02_PROMPT.md`. R01 provider fixes are retained as PASS; R02 must repair the canonical Release Pool default path, make the Studio/headless Publish to ScrubBots handoff actually executable through internal typed M14 request assembly, and reuse CPX-002 exact-current TEMP game authority. Real R2 write proof and real publication remain externally gated by secure writer credentials, a genuine owner-approved batch, and exact owner production approval.
+- Required Actor: CODEX, THEN CHATGPT
 - Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M14_CP03_001_012_CPX002_FINAL_CLOSURE_STRICT_REAUDIT.md`
+- Previous Strict Audit: `.hiveai/audits/M18_CPX004_R2_R01_STRICT_REAUDIT_V01.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/M15-PREP_REMOTE_CONTENT_RUNTIME_HOLD_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/M18_CPX004_R2_R02_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/M18_CPX004_R2_R02_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -233,6 +233,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
 - M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
+- M18/CPX-004 R01 Strict Re-audit [2026-10-07]: `CHANGES_REQUIRED / R02` by `.hiveai/audits/M18_CPX004_R2_R01_STRICT_REAUDIT_V01.md`. R01 release-ledger fail-closed and exact-object idempotency are PASS/retained; CPX-004 default live Release Pool import and executable Studio/headless publish handoff remain blocking. R02 is authorized; external live R2 credentials/release batch/production approval remain pending.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Queue: `OWNER_APPROVED / QUEUED_AFTER_M18 / BEFORE_M17 / DO_NOT_RUN_CONCURRENTLY`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_PROMPT.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_AUDIT_CRITERIA.md`.
