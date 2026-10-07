@@ -52,3 +52,13 @@ Status: IN PROGRESS
 - `git diff --cached --check` initially rejected one extra blank line at EOF in the new CP07-004 test. Removed only that trailing whitespace; focused/regression test results above are unchanged. Rechecking and committing.
 
 - SB-CP07-004 tests: python -m pytest tests/unit/test_sb_cp07_004_r2_namespace_separation.py tests/unit/test_sb_cp07_003_r2_provider.py -q — **12 passed**; selected M14 publisher regressions — **45 passed**. Implementation/test commit: `9312b2c0cdefbf83fee7de8b8a597bff4704ea02`. Corrected git diff --cached --check passed.
+
+## SB-CP07-005 — Immutable/versioned naming
+
+Status: IN PROGRESS
+
+- Production pack promotion remains copy-if-absent and exact source SHA checked. Stable manifest writes now require exact prior bytes/hash, exact prior content version, strictly increasing successor version, and a current release-state pending-event fence; conditional S3 writes protect the observed ETag.
+- Added collision, prior-version mismatch, non-increasing version, and manifest-byte-preservation tests. Manifest history remains in the existing M13/M14 authority; the provider does not create a vendor-specific history schema.
+- Commands: pending focused immutability/provider tests and M14 publisher regressions.
+
+- SB-CP07-005 focused tests (provider/namespace/immutability) — **15 passed**; selected M14 publisher regressions — **45 passed**. Implementation commit: `01998e5f540dff2b9a3b4e5c76da822cf71e742d`. git diff --cached --check passed.
