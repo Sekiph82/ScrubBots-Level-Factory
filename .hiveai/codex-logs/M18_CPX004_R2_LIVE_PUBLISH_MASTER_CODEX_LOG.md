@@ -94,3 +94,15 @@ Status: IN PROGRESS
 - Commands: pending focused export/provider tests and M14 publisher regressions.
 
 - SB-CP07-008 focused M18 suite — **19 passed, 1 skipped** (R2 credential-gated live probe); selected M14 publisher regressions — **45 passed**. Export implementation/test commit: `5ee9d7360466da4830e77f1153c51f79cb698259`. git diff --cached --check passed.
+
+## SB-CP07-009 — Least-privilege secret boundary
+
+Status: IN PROGRESS
+
+- Added fail-closed format/endpoint validation and tests proving malformed/missing values cannot use even an injected client, and credential values do not appear in provider repr/capabilities/results or raw provider exceptions.
+- Added `R2_PUBLISHER_SECRET_BOUNDARY.md`: bucket-scoped Object Read & Write permission only; current code uses GET and conditional PUT but no object/bucket listing, account administration, DNS, billing, Workers, ACL, bucket configuration, or delete. No `.env` credentials/templates were added.
+- Replaced server-side `CopyObject` with exact authenticated source GET followed by destination `PutObject IfNoneMatch=*`. Current Cloudflare docs identify destination CopyObject conditions as R2-specific and beta, while PutObject conditions are documented; this keeps immutable copy behavior on the stable conditional Put path.
+- Official source review dated 2026-10-07: Cloudflare R2 S3 setup documents bucket-scoped Object Read & Write and the endpoint; R2 token docs describe bucket scope and object permissions; R2 S3 API docs document conditional PutObject; R2 extension docs identify conditional CopyObject destination headers as beta. boto3 upstream LICENSE identifies Apache-2.0. References: `https://developers.cloudflare.com/r2/get-started/s3/`, `https://developers.cloudflare.com/r2/api/tokens/`, `https://developers.cloudflare.com/r2/api/s3/`, `https://developers.cloudflare.com/r2/api/s3/extensions/`, `https://github.com/boto/boto3/blob/develop/LICENSE`.
+- Commands pending focused secret/provider tests and selected M14 publisher regressions.
+
+- SB-CP07-009 focused M18 suite — **22 passed, 1 skipped** (live R2 credentials unavailable); selected M14 publisher regressions — **45 passed**. Secret boundary/provider implementation commit: `c8b6f61658093e4d97f871fee0358b662c5b1954`. No R2 API call made. git diff --cached --check passed.
