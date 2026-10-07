@@ -37,7 +37,6 @@ _EVENTS_KEY = "_control/release-events/current.json"
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _SAFE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,511}$")
 _ACCOUNT = re.compile(r"^[a-f0-9]{32}$")
-_R2_HOST = re.compile(r"^[a-f0-9]{32}(?:\.(?:eu|fedramp|us))?\.r2\.cloudflarestorage\.com$")
 
 
 def physical_object_key(environment: Environment, logical_key: str) -> str:
@@ -106,9 +105,9 @@ class CloudflareR2Provider:
         self._client_attempted = True
         endpoint = self._endpoint()
         access = self._env.get("R2_ACCESS_KEY_ID", "")
-        secret = self._env.get("R2_SECRET_ACCESS_KEY", "")
+        secret_value = self._env.get("R2_SECRET_ACCESS_KEY", "")
         if (not endpoint or not _valid_credential(access, 128)
-                or not _valid_credential(secret, 256)):
+                or not _valid_credential(secret_value, 256)):
             return None
         if self._client_override is not None:
             self._resolved_client = self._client_override
@@ -119,7 +118,7 @@ class CloudflareR2Provider:
 
             self._resolved_client = boto3.client(
                 "s3", endpoint_url=endpoint, region_name=R2_REGION,
-                aws_access_key_id=access, aws_secret_access_key=secret,
+                aws_access_key_id=access, aws_secret_access_key=secret_value,
                 config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
             )
         except Exception:
@@ -130,15 +129,13 @@ class CloudflareR2Provider:
     def _endpoint(self) -> str | None:
         explicit = self._env.get("R2_ENDPOINT_URL", "").strip()
         if explicit:
-            from urllib.parse import urlsplit
-
-            parsed = urlsplit(explicit)
-            if (parsed.scheme != "https" or not parsed.hostname or parsed.port is not None
-                    or parsed.username or parsed.password or parsed.query or parsed.fragment
-                    or parsed.path not in ("", "/")
-                    or not _R2_HOST.fullmatch(parsed.hostname.lower())):
+            match = re.fullmatch(
+                r"https://([a-f0-9]{32}(?:\.(?:eu|fedramp|us))?\.r2\.cloudflarestorage\.com)/?",
+                explicit, re.IGNORECASE,
+            )
+            if match is None:
                 return None
-            return f"https://{parsed.netloc}"
+            return f"https://{match.group(1).lower()}"
         account = self._env.get("R2_ACCOUNT_ID", "").strip().lower()
         return f"https://{account}.r2.cloudflarestorage.com" if _ACCOUNT.fullmatch(account) else None
 

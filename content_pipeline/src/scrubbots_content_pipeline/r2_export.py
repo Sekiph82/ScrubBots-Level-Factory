@@ -89,6 +89,9 @@ def export_current_production(provider: object, destination: str | Path) -> Prod
     })
     try:
         root = Path(destination).expanduser().resolve()
+        project_root = Path(__file__).resolve().parents[3]
+        if root == project_root or root.is_relative_to(project_root):
+            return ProductionExportReport(False, ExportReason.DESTINATION_ERROR, None, ())
         targets = {key: _safe_destination(root, key) for key in objects}
         receipt_target = _safe_destination(root, "export-receipt.json")
         if any(path.exists() for path in (*targets.values(), receipt_target)):

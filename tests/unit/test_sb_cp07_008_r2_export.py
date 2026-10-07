@@ -84,3 +84,10 @@ def test_export_refuses_existing_files_without_overwriting(tmp_path):
     result = export_current_production(provider, destination)
     assert result.reason_code is ExportReason.DESTINATION_CONFLICT
     assert target.read_bytes() == b"owner data"
+
+
+def test_export_refuses_destinations_inside_the_factory_repository():
+    provider = ProductionReader()
+    result = export_current_production(provider, ROOT / ".hiveai")
+    assert result.reason_code is ExportReason.DESTINATION_ERROR
+    assert not (ROOT / ".hiveai" / "production" / MANIFEST_KEY).exists()

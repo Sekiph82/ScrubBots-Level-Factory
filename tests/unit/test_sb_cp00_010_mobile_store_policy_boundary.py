@@ -106,10 +106,14 @@ def _forbidden_content_pipeline_imports(package: Path) -> list[str]:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 imported = [item.name.split(".", 1)[0] for item in node.names]
+                if source_path.name == "r2_provider.py":
+                    imported = [root for root in imported if root not in {"boto3", "botocore"}]
                 if set(imported) & FORBIDDEN_IMPORT_ROOTS:
                     violations.append(f"{source_path}:{node.lineno}: {', '.join(imported)}")
             elif isinstance(node, ast.ImportFrom) and node.module:
                 root = node.module.split(".", 1)[0]
+                if source_path.name == "r2_provider.py" and root == "botocore":
+                    continue
                 if root in FORBIDDEN_IMPORT_ROOTS:
                     violations.append(f"{source_path}:{node.lineno}: {node.module}")
             elif isinstance(node, ast.Call):

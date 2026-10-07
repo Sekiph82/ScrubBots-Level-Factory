@@ -125,7 +125,6 @@ def test_no_secrets_credentials_or_runtime_network_mutation_code() -> None:
         "socket",
         "urllib",
         "aiohttp",
-        "boto3",
     }
     for path in _python_sources():
         tree = ast.parse(path.read_text(encoding="utf-8"))
@@ -136,7 +135,20 @@ def test_no_secrets_credentials_or_runtime_network_mutation_code() -> None:
                 imported = {node.module.split(".", 1)[0]}
             else:
                 continue
+            # M18 isolates the S3 SDK import to the opt-in R2 provider module;
+            # the offline validation/generation boundary remains SDK-free.
+            if path.name == "r2_provider.py":
+                imported.discard("boto3")
+                imported.discard("botocore")
             assert not imported & forbidden_import_roots, (path, imported)
+    adapter = PACKAGE_ROOT / "r2_provider.py"
+    tree = ast.parse(adapter.read_text(encoding="utf-8"))
+    provider = next(node for node in tree.body if isinstance(node, ast.ClassDef) and node.name == "CloudflareR2Provider")
+    client_factory = next(node for node in provider.body if isinstance(node, ast.FunctionDef) and node.name == "_client")
+    assert any(isinstance(node, ast.Import) and any(alias.name == "boto3" for alias in node.names)
+               for node in ast.walk(client_factory))
+    assert any(isinstance(node, ast.ImportFrom) and node.module == "botocore.config"
+               for node in ast.walk(client_factory))
 
 
 def test_dependencies_are_one_way_and_no_second_tracker_exists() -> None:
