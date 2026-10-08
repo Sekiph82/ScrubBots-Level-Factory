@@ -59,3 +59,10 @@ Owner action needed: repair or republish the indexed PIXEL ART master asset on c
 
 - The decode probe `python -c "from PIL import Image; im=Image.open('docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp'); print(im.size,im.mode)"` exited 1 with `UnidentifiedImageError`; this confirms the referenced master image cannot be decoded by Pillow.
 - At the time of the blocker record, no implementation, product tests, or runtime verification had been started.
+
+## First publication checkpoint
+
+- Builder-log checkpoint commit: `b177d749db0d2fb43ef88a9f0100f1dea78420bd` (`docs: record R02 visual-master blocker`).
+- Pre-push fetch/prune verified `origin/main` (`c613ce29e4bd6fb56b970fda64f5d2885e9f16ab`) was an ancestor of the checkpoint; ahead/behind was 0/1.
+- `git push origin HEAD:main` succeeded as a normal fast-forward: `c613ce2..b177d74 HEAD -> main`.
+- Post-push fetch/prune verified `HEAD == origin/main == b177d749db0d2fb43ef88a9f0100f1dea78420bd`, 0 ahead / 0 behind, clean worktree.
