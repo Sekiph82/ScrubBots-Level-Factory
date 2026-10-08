@@ -1,0 +1,176 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+<defs>
+  <pattern id="checker" width="24" height="24" patternUnits="userSpaceOnUse">
+    <rect width="24" height="24" fill="#4c5863"/>
+    <rect width="12" height="12" fill="#65727d"/>
+    <rect x="12" y="12" width="12" height="12" fill="#65727d"/>
+  </pattern>
+  <linearGradient id="blue" x1="0" x2="1"><stop stop-color="#0b78ff"/><stop offset="1" stop-color="#1593ff"/></linearGradient>
+  <linearGradient id="green" x1="0" x2="1"><stop stop-color="#00c96f"/><stop offset="1" stop-color="#09df83"/></linearGradient>
+</defs>
+
+<rect width="1536" height="1024" fill="#071927"/>
+<rect x="0" y="0" width="1536" height="100" fill="#071724"/>
+<text x="76" y="42" font-family="Arial" font-size="24" font-weight="700" fill="#fff">ScrubBots Factory Studio</text>
+<text x="76" y="67" font-family="Arial" font-size="14" fill="#d9e5ef">Pixel art to playable levels</text>
+
+<rect x="365" y="24" width="255" height="70" rx="10" fill="#122b3e" stroke="#25445b"/>
+<text x="469" y="66" font-family="Arial" font-size="22" font-weight="700" fill="#fff">PIXEL ART</text>
+<rect x="632" y="24" width="272" height="70" rx="10" fill="#122b3e" stroke="#25445b"/>
+<text x="723" y="66" font-family="Arial" font-size="22" font-weight="700" fill="#fff">LEVEL FACTORY</text>
+<rect x="916" y="24" width="271" height="70" rx="10" fill="url(#blue)"/>
+<text x="1010" y="66" font-family="Arial" font-size="22" font-weight="700" fill="#fff">RELEASE POOL</text>
+<text x="1345" y="41" font-family="Arial" font-size="25" fill="#fff">⚙</text>
+<text x="1398" y="40" font-family="Arial" font-size="24" fill="#fff">—</text>
+<text x="1450" y="41" font-family="Arial" font-size="24" fill="#fff">□</text>
+<text x="1500" y="41" font-family="Arial" font-size="24" fill="#fff">×</text>
+
+<!-- left ready pool -->
+<rect x="12" y="106" width="365" height="858" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="26" y="140" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Ready Levels (24)</text>
+<rect x="25" y="154" width="335" height="44" rx="7" fill="#0c1c2a" stroke="#25445b"/>
+<text x="45" y="182" font-family="Arial" font-size="15" fill="#9fb4c4">⌕   Search levels...</text>
+<rect x="25" y="211" width="165" height="40" rx="7" fill="#0c1c2a" stroke="#25445b"/>
+<text x="37" y="237" font-family="Arial" font-size="14" fill="#fff">All Difficulties</text>
+<rect x="196" y="211" width="164" height="40" rx="7" fill="#0c1c2a" stroke="#25445b"/>
+<text x="208" y="237" font-family="Arial" font-size="14" fill="#fff">All Columns</text>
+
+<!-- pool rows -->
+<g font-family="Arial">
+  <rect x="25" y="261" width="335" height="68" rx="7" fill="#10324a" stroke="#0f8bff" stroke-width="2"/>
+  <rect x="36" y="270" width="51" height="51" rx="6" fill="#15384f"/>
+  <text x="98" y="285" font-size="16" font-weight="700" fill="#fff">#08  Owl Grove</text>
+  <circle cx="105" cy="310" r="6" fill="#22e38a"/><text x="118" y="315" font-size="13" fill="#fff">Easy</text>
+  <text x="185" y="315" font-size="13" fill="#fff">3 cols</text>
+  <circle cx="281" cy="310" r="6" fill="#22e38a"/><text x="294" y="315" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="336" width="335" height="62" rx="7" fill="#0e2739"/>
+  <rect x="36" y="343" width="49" height="49" rx="6" fill="#15384f"/>
+  <text x="98" y="358" font-size="16" font-weight="700" fill="#fff">#09  Fox Trail</text>
+  <circle cx="105" cy="383" r="6" fill="#22e38a"/><text x="118" y="388" font-size="13" fill="#fff">Easy</text>
+  <text x="185" y="388" font-size="13" fill="#fff">3 cols</text>
+  <circle cx="281" cy="383" r="6" fill="#22e38a"/><text x="294" y="388" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="405" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="427" font-size="16" font-weight="700" fill="#fff">#10  Fish Reef</text>
+  <circle cx="105" cy="451" r="6" fill="#ffd126"/><text x="118" y="456" font-size="13" fill="#fff">Medium</text>
+  <text x="185" y="456" font-size="13" fill="#fff">4 cols</text>
+  <circle cx="281" cy="451" r="6" fill="#22e38a"/><text x="294" y="456" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="474" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="496" font-size="16" font-weight="700" fill="#fff">#11  Crab Cove</text>
+  <circle cx="105" cy="520" r="6" fill="#ffd126"/><text x="118" y="525" font-size="13" fill="#fff">Medium</text>
+  <text x="185" y="525" font-size="13" fill="#fff">4 cols</text>
+  <circle cx="281" cy="520" r="6" fill="#22e38a"/><text x="294" y="525" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="543" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="565" font-size="16" font-weight="700" fill="#fff">#12  Star Bay</text>
+  <circle cx="105" cy="589" r="6" fill="#ffd126"/><text x="118" y="594" font-size="13" fill="#fff">Medium</text>
+  <text x="185" y="594" font-size="13" fill="#fff">5 cols</text>
+  <circle cx="281" cy="589" r="6" fill="#22e38a"/><text x="294" y="594" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="612" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="634" font-size="16" font-weight="700" fill="#fff">#13  Frog Pond</text>
+  <circle cx="105" cy="658" r="6" fill="#ff3c43"/><text x="118" y="663" font-size="13" fill="#fff">Hard</text>
+  <text x="185" y="663" font-size="13" fill="#fff">5 cols</text>
+  <circle cx="281" cy="658" r="6" fill="#22e38a"/><text x="294" y="663" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="681" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="703" font-size="16" font-weight="700" fill="#fff">#14  Penguin Path</text>
+  <circle cx="105" cy="727" r="6" fill="#ffd126"/><text x="118" y="732" font-size="13" fill="#fff">Medium</text>
+  <text x="185" y="732" font-size="13" fill="#fff">4 cols</text>
+  <circle cx="281" cy="727" r="6" fill="#22e38a"/><text x="294" y="732" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+
+  <rect x="25" y="750" width="335" height="62" rx="7" fill="#0e2739"/>
+  <text x="98" y="772" font-size="16" font-weight="700" fill="#fff">#15  Turtle Beach</text>
+  <circle cx="105" cy="796" r="6" fill="#22e38a"/><text x="118" y="801" font-size="13" fill="#fff">Easy</text>
+  <text x="185" y="801" font-size="13" fill="#fff">3 cols</text>
+  <circle cx="281" cy="796" r="6" fill="#22e38a"/><text x="294" y="801" font-size="13" font-weight="700" fill="#37e99b">READY</text>
+</g>
+
+<rect x="25" y="826" width="335" height="52" rx="8" fill="url(#blue)"/>
+<text x="112" y="859" font-family="Arial" font-size="18" font-weight="700" fill="#fff">☑  Manage Selection (3)</text>
+<rect x="25" y="889" width="164" height="48" rx="8" fill="#122b3e"/>
+<text x="76" y="920" font-family="Arial" font-size="16" fill="#fff">Select All</text>
+<rect x="198" y="889" width="162" height="48" rx="8" fill="#122b3e"/>
+<text x="255" y="920" font-family="Arial" font-size="16" fill="#fff">Clear</text>
+
+<!-- center -->
+<rect x="390" y="106" width="795" height="672" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="406" y="144" font-family="Arial" font-size="21" font-weight="700" fill="#fff">Visual Review Canvas</text>
+<text x="680" y="144" font-family="Arial" font-size="15" fill="#d6e0e8">Zoom:</text>
+<rect x="735" y="134" width="136" height="6" rx="3" fill="#27475e"/>
+<circle cx="791" cy="137" r="8" fill="#0f8bff"/>
+<text x="884" y="144" font-family="Arial" font-size="15" font-weight="700" fill="#fff">8x</text>
+<rect x="398" y="166" width="775" height="600" rx="8" fill="#091b28"/>
+<rect x="486" y="174" width="600" height="584" fill="url(#checker)"/>
+
+<!-- owl -->
+<g transform="translate(555 245)">
+<rect x="85" y="25" width="365" height="390" fill="#b95b19"/>
+<rect x="45" y="0" width="110" height="100" fill="#7c2c08"/>
+<rect x="380" y="0" width="110" height="100" fill="#7c2c08"/>
+<rect x="105" y="105" width="150" height="145" fill="#fff2c8"/>
+<rect x="280" y="105" width="150" height="145" fill="#fff2c8"/>
+<rect x="145" y="140" width="80" height="90" fill="#070707"/>
+<rect x="310" y="140" width="80" height="90" fill="#070707"/>
+<rect x="178" y="150" width="20" height="24" fill="#fff"/>
+<rect x="343" y="150" width="20" height="24" fill="#fff"/>
+<rect x="245" y="225" width="70" height="52" fill="#ff8300"/>
+<rect x="150" y="270" width="235" height="145" fill="#ffe4a5"/>
+<rect x="115" y="415" width="80" height="35" fill="#ffb000"/>
+<rect x="340" y="415" width="80" height="35" fill="#ffb000"/>
+</g>
+
+<!-- selected release strip -->
+<rect x="390" y="790" width="1134" height="174" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="406" y="820" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Selected for Release (3)</text>
+<g font-family="Arial">
+  <rect x="405" y="839" width="198" height="105" rx="8" fill="#10324a" stroke="#0f8bff" stroke-width="2"/>
+  <text x="493" y="862" font-size="15" font-weight="700" fill="#fff">#11</text><text x="493" y="886" font-size="14" fill="#fff">Owl Grove</text>
+  <circle cx="496" cy="918" r="6" fill="#ffd126"/><text x="510" y="923" font-size="13" fill="#fff">Medium</text>
+  <rect x="618" y="839" width="198" height="105" rx="8" fill="#10324a"/>
+  <text x="706" y="862" font-size="15" font-weight="700" fill="#fff">#14</text><text x="706" y="886" font-size="14" fill="#fff">Fox Trail</text>
+  <circle cx="709" cy="918" r="6" fill="#22e38a"/><text x="723" y="923" font-size="13" fill="#fff">Easy</text>
+  <rect x="830" y="839" width="198" height="105" rx="8" fill="#10324a"/>
+  <text x="918" y="862" font-size="15" font-weight="700" fill="#fff">#16</text><text x="918" y="886" font-size="14" fill="#fff">Fish Reef</text>
+  <circle cx="921" cy="918" r="6" fill="#ffd126"/><text x="935" y="923" font-size="13" fill="#fff">Medium</text>
+  <rect x="1044" y="839" width="198" height="105" rx="8" fill="#0c1c2a" stroke="#315066" stroke-dasharray="7 5"/>
+  <text x="1134" y="886" font-size="34" fill="#fff">＋</text>
+  <text x="1090" y="924" font-size="14" fill="#dce7ee">Add More Levels</text>
+</g>
+
+<!-- right details -->
+<rect x="1192" y="106" width="332" height="672" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="1207" y="140" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Level Details</text>
+<rect x="1207" y="164" width="98" height="98" rx="8" fill="#143249"/>
+<text x="1320" y="184" font-family="Arial" font-size="15" fill="#e7eff5">Level Number</text><text x="1450" y="184" font-family="Arial" font-size="15" fill="#fff">11</text>
+<text x="1320" y="212" font-family="Arial" font-size="15" fill="#e7eff5">Name</text><text x="1432" y="212" font-family="Arial" font-size="15" fill="#fff">Owl Grove</text>
+<text x="1320" y="240" font-family="Arial" font-size="15" fill="#e7eff5">Size</text><text x="1435" y="240" font-family="Arial" font-size="15" fill="#fff">32 × 32</text>
+<text x="1320" y="268" font-family="Arial" font-size="15" fill="#e7eff5">Supply Columns</text><text x="1470" y="268" font-family="Arial" font-size="15" fill="#fff">4</text>
+<text x="1320" y="296" font-family="Arial" font-size="15" fill="#e7eff5">Difficulty (V1)</text><text x="1434" y="296" font-family="Arial" font-size="15" fill="#fff">48 (Medium)</text>
+
+<text x="1207" y="344" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Release Settings</text>
+<text x="1207" y="380" font-family="Arial" font-size="15" fill="#e7eff5">Target Environment</text>
+<circle cx="1230" cy="414" r="10" fill="#0f8bff"/><circle cx="1230" cy="414" r="4" fill="#fff"/>
+<text x="1250" y="420" font-family="Arial" font-size="16" fill="#fff">STAGING (Family Test)</text>
+<circle cx="1230" cy="454" r="10" fill="#17354b" stroke="#2b4e66"/>
+<text x="1250" y="460" font-family="Arial" font-size="16" fill="#fff">PRODUCTION</text>
+
+<g font-family="Arial" font-size="15" fill="#fff">
+<rect x="1208" y="492" width="20" height="20" rx="4" fill="#0f8bff"/><text x="1240" y="508">Run Preflight Checks</text>
+<rect x="1208" y="530" width="20" height="20" rx="4" fill="#0f8bff"/><text x="1240" y="546">Validate Assets &amp; Data</text>
+<rect x="1208" y="568" width="20" height="20" rx="4" fill="#0f8bff"/><text x="1240" y="584">Build ScrubPack</text>
+<rect x="1208" y="606" width="20" height="20" rx="4" fill="#0f8bff"/><text x="1240" y="622">Upload to R2</text>
+</g>
+<rect x="1207" y="648" width="291" height="54" rx="8" fill="url(#green)"/>
+<text x="1265" y="681" font-family="Arial" font-size="18" font-weight="700" fill="#fff">⇧  Upload Selected (3)</text>
+<rect x="1207" y="713" width="291" height="50" rx="8" fill="#122b3e" stroke="#25445b"/>
+<text x="1260" y="744" font-family="Arial" font-size="16" font-weight="700" fill="#fff">▤  Preview Release Manifest</text>
+
+<!-- status -->
+<rect x="0" y="970" width="1536" height="54" fill="#071724"/>
+<circle cx="32" cy="996" r="8" fill="#17db78"/>
+<text x="52" y="1002" font-family="Arial" font-size="15" fill="#e1ebf2">Ready</text>
+<text x="925" y="1002" font-family="Arial" font-size="14" fill="#dce6ed">Selected: 3 levels   |   Columns: 3, 4, 5   |   Total size: 96 × 96   |   Estimated upload: ~1.2 MB</text>
+</svg>
