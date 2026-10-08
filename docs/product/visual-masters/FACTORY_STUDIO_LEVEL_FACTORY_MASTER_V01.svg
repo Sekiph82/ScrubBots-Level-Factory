@@ -1,0 +1,135 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+<defs>
+  <pattern id="checker" width="24" height="24" patternUnits="userSpaceOnUse">
+    <rect width="24" height="24" fill="#4c5863"/>
+    <rect width="12" height="12" fill="#65727d"/>
+    <rect x="12" y="12" width="12" height="12" fill="#65727d"/>
+  </pattern>
+  <linearGradient id="blue" x1="0" x2="1"><stop stop-color="#0b78ff"/><stop offset="1" stop-color="#1593ff"/></linearGradient>
+  <linearGradient id="green" x1="0" x2="1"><stop stop-color="#00c96f"/><stop offset="1" stop-color="#09df83"/></linearGradient>
+  <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="5" flood-opacity=".32"/></filter>
+</defs>
+<rect width="1536" height="1024" fill="#071927"/>
+<rect x="0" y="0" width="1536" height="76" fill="#071724"/>
+<text x="76" y="42" font-family="Arial" font-size="24" font-weight="700" fill="#fff">ScrubBots Factory Studio</text>
+<text x="76" y="66" font-family="Arial" font-size="14" fill="#d9e5ef">Pixel art to playable levels</text>
+<rect x="366" y="24" width="254" height="68" rx="10" fill="#122b3e" stroke="#25445b"/>
+<text x="472" y="65" font-family="Arial" font-size="22" font-weight="700" fill="#fff">PIXEL ART</text>
+<rect x="632" y="24" width="272" height="68" rx="10" fill="url(#blue)" filter="url(#shadow)"/>
+<text x="724" y="65" font-family="Arial" font-size="22" font-weight="700" fill="#fff">LEVEL FACTORY</text>
+<rect x="918" y="24" width="268" height="68" rx="10" fill="#122b3e" stroke="#25445b"/>
+<text x="1014" y="65" font-family="Arial" font-size="22" font-weight="700" fill="#fff">RELEASE POOL</text>
+<text x="1347" y="42" font-family="Arial" font-size="24" fill="#fff">⚙</text>
+
+<!-- left panel -->
+<rect x="12" y="108" width="365" height="856" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="27" y="140" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Select Artwork</text>
+<rect x="42" y="165" width="95" height="100" rx="8" fill="#143249" stroke="#0f8bff" stroke-width="3"/>
+<rect x="147" y="165" width="95" height="100" rx="8" fill="#143249"/>
+<rect x="252" y="165" width="95" height="100" rx="8" fill="#143249"/>
+<text x="56" y="286" font-family="Arial" font-size="12" fill="#dbe7ef">owl_001.png</text>
+<text x="159" y="286" font-family="Arial" font-size="12" fill="#dbe7ef">fox_001.png</text>
+<text x="265" y="286" font-family="Arial" font-size="12" fill="#dbe7ef">fish_001.png</text>
+
+<!-- tiny owl thumbnail -->
+<g transform="translate(61 177) scale(.09)">
+  <rect x="120" y="40" width="520" height="600" fill="#b85a17"/>
+  <rect x="80" y="0" width="130" height="160" fill="#7c2d09"/>
+  <rect x="550" y="0" width="130" height="160" fill="#7c2d09"/>
+  <rect x="190" y="150" width="160" height="160" fill="#fff6d7"/>
+  <rect x="410" y="150" width="160" height="160" fill="#fff6d7"/>
+  <rect x="230" y="190" width="80" height="90" fill="#111"/>
+  <rect x="450" y="190" width="80" height="90" fill="#111"/>
+  <rect x="345" y="280" width="70" height="55" fill="#ff8a00"/>
+  <rect x="230" y="340" width="300" height="250" fill="#ffe8ad"/>
+</g>
+
+<text x="27" y="330" font-family="Arial" font-size="19" font-weight="700" fill="#fff">Level Settings</text>
+<text x="27" y="370" font-family="Arial" font-size="16" fill="#e6eef5">Level Number</text>
+<rect x="172" y="346" width="190" height="38" rx="7" fill="#0c1c2a" stroke="#25445b"/><text x="187" y="371" font-family="Arial" font-size="16" fill="#fff">11</text>
+<text x="27" y="415" font-family="Arial" font-size="16" fill="#e6eef5">Supply Columns</text>
+<rect x="172" y="392" width="56" height="40" rx="7" fill="#122b3e"/><text x="196" y="418" font-family="Arial" font-size="17" fill="#fff">3</text>
+<rect x="238" y="392" width="56" height="40" rx="7" fill="url(#blue)"/><text x="262" y="418" font-family="Arial" font-size="17" fill="#fff">4</text>
+<rect x="304" y="392" width="56" height="40" rx="7" fill="#122b3e"/><text x="328" y="418" font-family="Arial" font-size="17" fill="#fff">5</text>
+<text x="27" y="464" font-family="Arial" font-size="16" fill="#e6eef5">Max Robots</text>
+<rect x="172" y="440" width="190" height="38" rx="7" fill="#0c1c2a" stroke="#25445b"/><text x="187" y="465" font-family="Arial" font-size="16" fill="#fff">Auto</text>
+<text x="27" y="511" font-family="Arial" font-size="16" fill="#e6eef5">Background</text>
+<rect x="172" y="487" width="190" height="38" rx="7" fill="#0c1c2a" stroke="#25445b"/><text x="187" y="512" font-family="Arial" font-size="16" fill="#fff">Transparent</text>
+
+<text x="27" y="575" font-family="Arial" font-size="19" font-weight="700" fill="#fff">Pipeline Steps</text>
+<g font-family="Arial" font-size="15" fill="#e6eef5">
+<text x="30" y="610" fill="#24e695">●</text><text x="60" y="610">1. Validate Artwork</text>
+<text x="30" y="643" fill="#24e695">●</text><text x="60" y="643">2. Generate Supplies</text>
+<text x="30" y="676" fill="#24e695">●</text><text x="60" y="676">3. Solve Level</text>
+<text x="30" y="709" fill="#24e695">●</text><text x="60" y="709">4. Verify Replay</text>
+<text x="30" y="742" fill="#24e695">●</text><text x="60" y="742">5. Difficulty V1</text>
+<text x="30" y="775" fill="#71899a">●</text><text x="60" y="775">6. Prepare for Release</text>
+</g>
+<rect x="26" y="803" width="335" height="52" rx="8" fill="url(#blue)"/><text x="132" y="837" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Run Pipeline</text>
+
+<!-- central canvas -->
+<rect x="390" y="108" width="795" height="666" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="407" y="147" font-family="Arial" font-size="21" font-weight="700" fill="#fff">Visual Review Canvas</text>
+<text x="680" y="146" font-family="Arial" font-size="15" fill="#d6e0e8">Zoom:</text>
+<rect x="735" y="136" width="136" height="6" rx="3" fill="#27475e"/><circle cx="790" cy="139" r="8" fill="#0f8bff"/>
+<text x="885" y="146" font-family="Arial" font-size="15" font-weight="700" fill="#fff">8x</text>
+<rect x="398" y="168" width="775" height="596" rx="8" fill="#091b28"/>
+<rect x="486" y="176" width="600" height="580" fill="url(#checker)"/>
+
+<!-- owl pixel art in review canvas -->
+<g transform="translate(555 245)">
+<rect x="85" y="25" width="365" height="390" fill="#b95b19"/>
+<rect x="45" y="0" width="110" height="100" fill="#7c2c08"/>
+<rect x="380" y="0" width="110" height="100" fill="#7c2c08"/>
+<rect x="105" y="105" width="150" height="145" fill="#fff2c8"/>
+<rect x="280" y="105" width="150" height="145" fill="#fff2c8"/>
+<rect x="145" y="140" width="80" height="90" fill="#070707"/>
+<rect x="310" y="140" width="80" height="90" fill="#070707"/>
+<rect x="178" y="150" width="20" height="24" fill="#fff"/>
+<rect x="343" y="150" width="20" height="24" fill="#fff"/>
+<rect x="245" y="225" width="70" height="52" fill="#ff8300"/>
+<rect x="150" y="270" width="235" height="145" fill="#ffe4a5"/>
+<rect x="115" y="415" width="80" height="35" fill="#ffb000"/>
+<rect x="340" y="415" width="80" height="35" fill="#ffb000"/>
+</g>
+
+<!-- right panel -->
+<rect x="1192" y="108" width="332" height="666" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="1207" y="142" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Level Details</text>
+<rect x="1207" y="166" width="98" height="98" rx="8" fill="#143249"/>
+<text x="1322" y="183" font-family="Arial" font-size="15" fill="#e7eff5">Level Number</text><text x="1450" y="183" font-family="Arial" font-size="15" fill="#fff">11</text>
+<text x="1322" y="213" font-family="Arial" font-size="15" fill="#e7eff5">Size</text><text x="1450" y="213" font-family="Arial" font-size="15" fill="#fff">32 × 32</text>
+<text x="1322" y="243" font-family="Arial" font-size="15" fill="#e7eff5">Supply Columns</text><text x="1470" y="243" font-family="Arial" font-size="15" fill="#fff">4</text>
+<text x="1207" y="330" font-family="Arial" font-size="20" font-weight="700" fill="#fff">Solver &amp; Difficulty</text>
+<text x="1207" y="370" font-family="Arial" font-size="16" fill="#e7eff5">Solver Status</text>
+<rect x="1368" y="348" width="130" height="34" rx="8" fill="#078942"/><text x="1410" y="371" font-family="Arial" font-size="16" font-weight="700" fill="#fff">SOLVED</text>
+<text x="1207" y="415" font-family="Arial" font-size="16" fill="#e7eff5">Replay Result</text>
+<rect x="1368" y="393" width="130" height="34" rx="8" fill="#078942"/><text x="1420" y="416" font-family="Arial" font-size="16" font-weight="700" fill="#fff">WIN</text>
+<text x="1207" y="460" font-family="Arial" font-size="16" fill="#e7eff5">Difficulty V1</text>
+<rect x="1368" y="438" width="130" height="34" rx="8" fill="#078942"/><text x="1390" y="461" font-family="Arial" font-size="16" font-weight="700" fill="#fff">48 Medium</text>
+<text x="1207" y="510" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Supply Plan (4 columns)</text>
+<rect x="1207" y="530" width="290" height="74" rx="8" fill="#0c1c2a" stroke="#25445b"/>
+<text x="1230" y="575" font-family="Arial" font-size="15" fill="#fff">1 ×6</text><text x="1295" y="575" font-family="Arial" font-size="15" fill="#fff">2 ×5</text><text x="1360" y="575" font-family="Arial" font-size="15" fill="#fff">3 ×4</text><text x="1425" y="575" font-family="Arial" font-size="15" fill="#fff">4 ×5</text>
+<rect x="1207" y="625" width="291" height="50" rx="8" fill="url(#green)"/><text x="1300" y="657" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Solve Again</text>
+<rect x="1207" y="686" width="138" height="50" rx="8" fill="#078942"/><text x="1236" y="718" font-family="Arial" font-size="17" font-weight="700" fill="#fff">Accept Level</text>
+<rect x="1360" y="686" width="138" height="50" rx="8" fill="#d92929"/><text x="1402" y="718" font-family="Arial" font-size="17" font-weight="700" fill="#fff">Reject</text>
+
+<!-- bottom level variations -->
+<rect x="390" y="782" width="1134" height="182" rx="10" fill="#0b2132" stroke="#18384d"/>
+<text x="407" y="815" font-family="Arial" font-size="18" font-weight="700" fill="#fff">Level Variations (8)</text>
+<g font-family="Arial" font-size="13" fill="#dce7ee">
+<rect x="425" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="450" y="945">#08 Easy</text>
+<rect x="525" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="550" y="945">#09 Easy</text>
+<rect x="625" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="648" y="945">#10 Med</text>
+<rect x="725" y="829" width="91" height="100" rx="8" fill="#143249" stroke="#0f8bff" stroke-width="3"/><text x="748" y="947">#11 Med</text>
+<rect x="831" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="854" y="945">#12 Med</text>
+<rect x="931" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="954" y="945">#13 Hard</text>
+<rect x="1031" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="1054" y="945">#14 Med</text>
+<rect x="1131" y="835" width="85" height="88" rx="8" fill="#143249"/><text x="1154" y="945">#15 Easy</text>
+</g>
+
+<!-- status bar -->
+<rect x="0" y="970" width="1536" height="54" fill="#071724"/>
+<circle cx="32" cy="996" r="8" fill="#17db78"/><text x="52" y="1002" font-family="Arial" font-size="15" fill="#e1ebf2">Ready</text>
+<text x="1168" y="1002" font-family="Arial" font-size="14" fill="#dce6ed">Artwork: owl_001.png   |   32 × 32   |   7 colors   |   PNG</text>
+</svg>
