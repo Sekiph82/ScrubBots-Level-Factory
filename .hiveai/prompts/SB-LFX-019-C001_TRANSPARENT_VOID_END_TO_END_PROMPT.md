@@ -16,20 +16,20 @@ Standing sync/publish:
 
 ## HARD EXECUTION GATE
 
-Current known game main at planning time still uses `LevelData.FORMAT_VERSION := 1`.
+The game dependency is now merged and independently closed:
 
-DO NOT IMPLEMENT until current `Sekiph82/Scrubbots:main` has merged the owner-approved VOID task and authoritative ADR/spec.
+- game implementation: `Sekiph82/Scrubbots@7d0d148b8609ec04852fdee02f6b8ef37598c616`;
+- game audit: `https://github.com/Sekiph82/Scrubbots/blob/main/coordination/sessions/VOID-CELLS-C001/CHATGPT_STRICT_AUDIT_V01.md`.
+
+Run only when root LF `TASKS.md` makes `SB-LFX-019-C001` Current Task.
 
 At task start:
 
-1. resolve exact current game main in a clean configured authority;
-2. read the VOID ADR/spec first;
-3. prove the LevelData VOID capability and exact format/version/encoding;
-4. record D1 presentation and D2/minimum-artwork decisions from that game authority.
-
-If absent, stop with:
-
-`BLOCKED_BY_GAME_VOID_MERGE`
+1. resolve exact current `Sekiph82/Scrubbots:main` in a clean configured authority;
+2. require audited commit `7d0d148b8609ec04852fdee02f6b8ef37598c616` to be an ancestor of that current game authority;
+3. read ADR-030 and current Level Data spec first;
+4. positively prove `FORMAT_VERSION_VOID == 2`, `VOID_CELL == -1`, D1 and D2 from the current game code/docs;
+5. if the audited contract is absent/incompatible, stop fail-closed.
 
 Do not fill transparency. Do not partially emit production artifacts.
 
