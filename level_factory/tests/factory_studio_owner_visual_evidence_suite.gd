@@ -10,7 +10,7 @@ func _init() -> void:
 
 
 func _capture_all() -> void:
-	var packed_scene := ResourceLoader.load(MAIN_SCENE_PATH) as PackedScene
+	var packed_scene := ResourceLoader.call("load", MAIN_SCENE_PATH) as PackedScene
 	if packed_scene == null:
 		push_error("Factory Studio scene did not load for visual evidence.")
 		quit(1)
@@ -39,6 +39,7 @@ func _capture_all() -> void:
 		return
 	for index in range(DESTINATIONS.size()):
 		workspace.call("show_surface", DESTINATIONS[index])
+		workspace.call("set_visual_evidence_fixture", DESTINATIONS[index])
 		await process_frame
 		await process_frame
 		if sample_texture != null:

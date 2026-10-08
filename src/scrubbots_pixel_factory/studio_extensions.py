@@ -1243,6 +1243,52 @@ def batch_load(batch_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
 
 
+def owner_pages_snapshot() -> dict[str, Any]:
+    """Build a read-only owner-page view from validated canonical records.
+
+    This is a presentation projection only. It writes no index or state and
+    deliberately returns the source records needed by the owner pages.
+    """
+    root = extensions_root()
+    batches: list[dict[str, Any]] = []
+    batch_root = root / "batches"
+    for path in sorted(batch_root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True) if batch_root.exists() else []:
+        batch_id = path.stem
+        try:
+            loaded = batch_load(batch_id)
+            batches.append(loaded["batch"])
+        except (StudioExtensionError, OSError, ValueError):
+            continue
+
+    pipelines: list[dict[str, Any]] = []
+    pipeline_root = root / "pipelines"
+    for path in sorted(pipeline_root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True) if pipeline_root.exists() else []:
+        try:
+            value = _read_json(path)
+            if value.get("schema") == PIPELINE_SCHEMA and value.get("run_id") == path.stem and isinstance(value.get("stages"), list):
+                pipelines.append(value)
+        except (StudioExtensionError, OSError, ValueError):
+            continue
+
+    inbox = candidate_inbox()
+    library = library_refresh()
+    failures = list_failures()
+    from .supply_pipeline.release_pool import release_entries
+    release = release_entries()
+    return {
+        "schema": "scrubbots-owner-pages-projection",
+        "version": 1,
+        "read_only": True,
+        "batches": batches,
+        "pipelines": pipelines,
+        "candidates": inbox.get("candidates", []),
+        "sources": library.get("sources", []),
+        "failures": failures.get("failures", []),
+        "release_entries": release,
+        "mutated": False,
+    }
+
+
 _SESSION_FIELDS = {"surface", "selected_source_id", "selected_candidate_id", "active_batch_id", "active_pipeline_run_id", "active_retry_id", "active_revision_id", "autosave_generation", "draft"}
 _SESSION_DRAFT_FIELDS = {"difficulty", "width", "height", "seed", "mode"}
 _SESSION_REFERENCE_FIELDS = {"selected_source_id": "source", "selected_candidate_id": "candidate", "active_batch_id": "batch", "active_pipeline_run_id": "pipeline", "active_retry_id": "retry", "active_revision_id": "revision"}

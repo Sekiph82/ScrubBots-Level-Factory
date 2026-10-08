@@ -44,6 +44,8 @@ var release_surface: Node
 var owner_page: VBoxContainer
 var owner_heading: Label
 var owner_guidance: Label
+var owner_live_details: RichTextLabel
+var owner_interaction_row: HFlowContainer
 var owner_system_state: Label
 var owner_state_cards: HBoxContainer
 var owner_preview_texture: TextureRect
@@ -60,6 +62,10 @@ var active_tool_node: Control
 var active_owner_route := "HOME"
 var active_tool_route := ""
 var core_gateway: RefCounted
+var owner_projection: Dictionary = {}
+var selected_owner_candidate_id := ""
+var selected_owner_query := ""
+var selected_owner_collection := "ALL"
 
 const OWNER_PAGES := {
 	"HOME": {
@@ -155,6 +161,18 @@ func _build_owner_page() -> void:
 	owner_guidance.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	owner_guidance.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	owner_page.add_child(owner_guidance)
+	owner_live_details = RichTextLabel.new()
+	owner_live_details.name = "OwnerLiveDetails"
+	owner_live_details.fit_content = true
+	owner_live_details.scroll_active = true
+	owner_live_details.custom_minimum_size.y = 92
+	owner_live_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owner_live_details.bbcode_enabled = false
+	owner_page.add_child(owner_live_details)
+	owner_interaction_row = HFlowContainer.new()
+	owner_interaction_row.name = "OwnerPageActions"
+	owner_interaction_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	owner_page.add_child(owner_interaction_row)
 	owner_state_cards = HBoxContainer.new()
 	owner_state_cards.name = "ReadinessSummary"
 	owner_state_cards.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -292,8 +310,9 @@ func _park_all_legacy_surfaces() -> void:
 			child.visible = false
 			continue
 		if child is Control:
-			content.remove_child(child)
-			legacy_tool_host.add_child(child)
+			if child == release_surface:
+				content.remove_child(child)
+				legacy_tool_host.add_child(child)
 			child.visible = false
 
 
@@ -356,8 +375,10 @@ func _show_owner_page(route: String) -> void:
 		button.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		button.pressed.connect(_open_tool.bind(str(tool[1])))
 		owner_tools_row.add_child(button)
+	_refresh_owner_projection()
 	_refresh_owner_state()
 	_refresh_owner_preview()
+	_render_owner_route_details()
 	var technical := "System status: %s\n" % _system_state_name()
 	if core_gateway != null:
 		technical += "Core: %s — %s\n" % [core_gateway.status_name(), core_gateway.status_message()]
@@ -393,6 +414,34 @@ func _refresh_owner_state() -> void:
 	}
 	var labels := ["ArtworkState", "SupplyState", "SolverState", "ReviewState", "ReleaseState"]
 	var states: Array = defaults.get(active_owner_route, defaults["HOME"])
+	var candidates: Array = owner_projection.get("candidates", [])
+	var pipelines: Array = owner_projection.get("pipelines", [])
+	var batches: Array = owner_projection.get("batches", [])
+	var failures: Array = owner_projection.get("failures", [])
+	var accepted := 0
+	var reviewed := 0
+	var ready_runs := {}
+	for candidate in candidates:
+		var review_state := str(candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW"))
+		if review_state == "ACCEPT": accepted += 1
+		if review_state in ["ACCEPT", "REJECT"]: reviewed += 1
+	for pipeline in pipelines:
+		if str(pipeline.get("disposition", "")) == "READY":
+			ready_runs[str(pipeline.get("candidate_id", pipeline.get("source_id", pipeline.get("run_id", ""))))] = true
+	if not batches.is_empty() or not candidates.is_empty():
+		var latest_batch: Dictionary = batches[0] if not batches.is_empty() else {}
+		var item_count := (latest_batch.get("items", []) as Array).size()
+		var imported_count := int(latest_batch.get("counts", {}).get("success", 0)) if item_count > 0 else candidates.size()
+		states = ["%d imported" % imported_count, "%d solved" % ready_runs.size(), "%d needs attention" % maxi(failures.size(), int(latest_batch.get("counts", {}).get("failed", 0))), "%d reviewed" % reviewed, "%d accepted" % accepted]
+	if active_owner_route == "SOLVE" and not selected_owner_candidate_id.is_empty():
+		var current_pipeline := _latest_candidate_pipeline(selected_owner_candidate_id)
+		states = [selected_owner_candidate_id, str(current_pipeline.get("request", {}).get("column_count", "3/4/5 columns")), str(current_pipeline.get("disposition", "Not run")), "Readiness", str(current_pipeline.get("disposition", "Not started"))]
+	if active_owner_route == "PUBLISH":
+		states[0] = "%d accepted" % owner_projection.get("release_entries", []).size()
+		states[3] = "Preflight pending"
+	if active_owner_route == "LIBRARY":
+		states[0] = "%d sources" % owner_projection.get("sources", []).size()
+		states[1] = "%d candidates" % candidates.size()
 	if target_controls != null and target_controls.has_method("last_successful_core_evidence_snapshot"):
 		var last_success: Dictionary = target_controls.call("last_successful_core_evidence_snapshot")
 		if last_success.get("state", "") == "SUCCESS":
@@ -403,19 +452,250 @@ func _refresh_owner_state() -> void:
 			status_label.text = str(states[index])
 
 
+func _refresh_owner_projection() -> void:
+	if core_gateway == null:
+		owner_projection = {"state": "UNAVAILABLE", "reason": "Canonical local core is not connected."}
+		return
+	var result: Variant = core_gateway.call("run_studio_extension", "owner-pages", {})
+	owner_projection = result.duplicate(true) if result is Dictionary else {"state": "ERROR", "reason": "Canonical owner projection returned no structured record."}
+
+
+func _render_owner_route_details() -> void:
+	if owner_live_details == null:
+		return
+	var candidates: Array = owner_projection.get("candidates", [])
+	var sources: Array = owner_projection.get("sources", [])
+	var batches: Array = owner_projection.get("batches", [])
+	var failures: Array = owner_projection.get("failures", [])
+	var lines := PackedStringArray()
+	match active_owner_route:
+		"HOME", "BATCH":
+			if batches.is_empty() and candidates.is_empty():
+				lines.append("No canonical batch or candidate evidence yet.")
+			else:
+				var batch: Dictionary = batches[0] if not batches.is_empty() else {}
+				var items: Array = batch.get("items", [])
+				var imported := int(batch.get("counts", {}).get("success", 0))
+				var needs_attention := int(batch.get("counts", {}).get("failed", 0))
+				var accepted := 0
+				var reviewed := 0
+				var solved_ids := {}
+				for candidate in candidates:
+					var disposition := str(candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW"))
+					if disposition in ["ACCEPT", "REJECT"]: reviewed += 1
+					if disposition == "ACCEPT": accepted += 1
+				for pipeline in owner_projection.get("pipelines", []):
+					if str(pipeline.get("disposition", "")) == "READY":
+						var solved_id := str(pipeline.get("candidate_id", pipeline.get("source_id", pipeline.get("run_id", ""))))
+						solved_ids[solved_id] = true
+				needs_attention = maxi(needs_attention, failures.size())
+				lines.append("Latest batch %s · %s" % [str(batch.get("batch_id", "No batch")), str(batch.get("created_at", ""))])
+				lines.append("Imported %d  ·  Solved %d  ·  Needs attention %d  ·  Reviewed %d  ·  Accepted %d" % [imported if not items.is_empty() else candidates.size(), solved_ids.size(), needs_attention, reviewed, accepted])
+				lines.append("Progress %d / %d" % [imported, items.size()] if not items.is_empty() else "Candidate items %d" % candidates.size())
+				for item in items.slice(0, 5): lines.append("• %s  —  %s" % [str(item.get("display_path", item.get("source_id", "Artwork"))), _batch_item_status(item)])
+				for candidate in candidates.slice(0, 4): lines.append("• %s  —  %s" % [str(candidate.get("candidate_id", "")), str(candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW"))])
+			if active_owner_route == "BATCH":
+				lines.append("Eligible retries: %d" % failures.filter(func(failure): return bool(failure.get("retryable", false))).size())
+		"CREATE":
+			lines.append("Choose one local PNG for immutable OWNER_UPLOAD, or select multiple PNGs for a canonical batch.")
+			lines.append("Imported sources: %d  ·  Candidate records: %d" % [sources.size(), candidates.size()])
+		"SOLVE":
+			var candidate := _owner_candidate(selected_owner_candidate_id)
+			lines.append("Artwork: %s" % (selected_owner_candidate_id if not selected_owner_candidate_id.is_empty() else "Select a canonical candidate in Review or the candidate tools."))
+			lines.append("Supply columns: 3 / 4 / 5 · pipeline/solver/replay/Difficulty V1 evidence is shown only when recorded by the canonical pipeline.")
+			if not candidate.is_empty():
+				var readiness: Dictionary = core_gateway.call("run_studio_extension", "readiness", {"candidate_id": selected_owner_candidate_id}) if core_gateway != null else {}
+				var pipeline := _latest_candidate_pipeline(selected_owner_candidate_id)
+				var primary: Dictionary = pipeline.get("primary", {})
+				var difficulty: Dictionary = primary.get("difficulty", {})
+				lines.append("Supply %s columns · Solver %s · Replay %s · Difficulty V1 %s %s · Readiness %s" % [str(pipeline.get("request", {}).get("column_count", "NOT AVAILABLE")), str(readiness.get("gates", {}).get("SOLVER", {}).get("disposition", "NOT AVAILABLE")), str(readiness.get("gates", {}).get("QA", {}).get("disposition", "NOT AVAILABLE")), str(difficulty.get("score", "NOT AVAILABLE")), str(difficulty.get("class", "")), str(readiness.get("overall", "NOT AVAILABLE"))])
+		"REVIEW":
+			var candidate := _owner_candidate(selected_owner_candidate_id)
+			if candidate.is_empty(): lines.append("Select a candidate to inspect canonical identity, supply, solver, Difficulty V1, readiness, and owner-review history.")
+			else:
+				var readiness: Dictionary = core_gateway.call("run_studio_extension", "readiness", {"candidate_id": selected_owner_candidate_id}) if core_gateway != null else {}
+				lines.append("Candidate %s · %sx%s · %s" % [selected_owner_candidate_id, str(candidate.get("width", "?")), str(candidate.get("height", "?")), str(candidate.get("artwork_sha256", ""))])
+				var pipeline := _latest_candidate_pipeline(selected_owner_candidate_id)
+				var primary: Dictionary = pipeline.get("primary", {})
+				var difficulty: Dictionary = primary.get("difficulty", {})
+				lines.append("Supply %s columns · Solver %s · Replay %s · Difficulty V1 %s %s" % [str(pipeline.get("request", {}).get("column_count", "NOT AVAILABLE")), str(readiness.get("gates", {}).get("SOLVER", {}).get("disposition", "NOT AVAILABLE")), str(readiness.get("gates", {}).get("QA", {}).get("disposition", "NOT AVAILABLE")), str(difficulty.get("score", "NOT AVAILABLE")), str(difficulty.get("class", ""))])
+				lines.append("Structural %s · Owner %s · Readiness %s · History %s" % [str(candidate.get("quality", {}).get("decision", "NOT AVAILABLE")), str(candidate.get("owner_review", {}).get("disposition", "NEEDS_REVIEW")), str(readiness.get("overall", "NOT AVAILABLE")), str(candidate.get("owner_review_history", []))])
+		"LIBRARY":
+			var discovery: Dictionary = core_gateway.call("run_studio_extension", "discover", {"query": selected_owner_query, "collection": selected_owner_collection if selected_owner_collection != "ALL" else null}) if core_gateway != null else {}
+			var records: Array = discovery.get("records", [])
+			lines.append("Search: %s  ·  %d canonical results" % [selected_owner_query if not selected_owner_query.is_empty() else "All", records.size()])
+			for record in records.slice(0, 8): lines.append("• %s  %s  —  %s" % [str(record.get("record_type", "")), str(record.get("record_id", "")), str(record.get("review", record.get("qa", "UNKNOWN")))])
+		"PUBLISH":
+			var entries: Array = owner_projection.get("release_entries", [])
+			lines.append("Accepted Levels (%d)  →  Campaign Order  →  Preflight  →  STAGING  →  Production Approval" % entries.size())
+			lines.append("Authoritative content version: shown by campaign preflight when available · STAGING: not started · Production approval: separate owner action")
+			for index in range(mini(entries.size(), 5)):
+				var entry: Dictionary = entries[index]
+				lines.append("• Level %d  %s  ·  %s" % [index + 1, str(entry.get("candidate_id", "")), str(entry.get("disposition", "ACCEPTED"))])
+			lines.append("Production promotion remains a separate owner-controlled step after STAGING.")
+		"SETTINGS":
+			lines.append("Provider: NOT AVAILABLE unless reported by a configured provider authority.")
+			lines.append("Core/runtime: %s · %s" % [_system_state_name(), core_gateway.status_message() if core_gateway != null else "Local core is not connected."])
+			var costs: Dictionary = core_gateway.call("run_studio_extension", "cost-center", {}) if core_gateway != null else {}
+			lines.append("Cost/credits: %s" % str(costs.get("state", "NOT AVAILABLE")))
+	owner_live_details.text = "\n".join(lines)
+	for child in owner_interaction_row.get_children():
+		child.queue_free()
+	match active_owner_route:
+		"CREATE":
+			var one := Button.new(); one.text = "Choose one PNG"; one.pressed.connect(_open_tool.bind("Import")); owner_interaction_row.add_child(one)
+			var many := Button.new(); many.text = "Choose multiple PNGs"; many.pressed.connect(_open_tool.bind("Batch Import")); owner_interaction_row.add_child(many)
+			var validate := Button.new(); validate.text = "Validation and preparation"; validate.pressed.connect(_open_tool.bind("Import Validation")); owner_interaction_row.add_child(validate)
+		"HOME", "BATCH":
+			var continue_batch := Button.new(); continue_batch.text = "Continue Batch"; continue_batch.pressed.connect(_continue_owner_batch); owner_interaction_row.add_child(continue_batch)
+			var resume := Button.new(); resume.text = "Resume / Recover"; resume.pressed.connect(_open_tool.bind("Session Recovery")); owner_interaction_row.add_child(resume)
+			if active_owner_route == "BATCH":
+				var retry := Button.new(); retry.text = "Retry eligible failures"; retry.pressed.connect(_retry_owner_failure); owner_interaction_row.add_child(retry)
+		"SOLVE":
+			var choose := OptionButton.new(); choose.name = "SolveCandidate"; _populate_candidate_choices(choose); owner_interaction_row.add_child(choose)
+			var columns := OptionButton.new(); columns.name = "SolveColumnCount"; columns.add_item("3 columns"); columns.add_item("4 columns"); columns.add_item("5 columns"); owner_interaction_row.add_child(columns)
+			var solve := Button.new(); solve.text = "Solve / Re-solve"; solve.pressed.connect(_run_owner_pipeline.bind(choose, columns)); owner_interaction_row.add_child(solve)
+		"REVIEW":
+			var choose := OptionButton.new(); choose.name = "ReviewCandidate"; _populate_candidate_choices(choose); owner_interaction_row.add_child(choose)
+			var accept := Button.new(); accept.text = "ACCEPT"; accept.pressed.connect(_review_owner_candidate.bind(choose, "ACCEPT")); owner_interaction_row.add_child(accept)
+			var reject := Button.new(); reject.text = "REJECT"; reject.pressed.connect(_review_owner_candidate.bind(choose, "REJECT")); owner_interaction_row.add_child(reject)
+			var compare := Button.new(); compare.text = "Compare"; compare.pressed.connect(_open_tool.bind("Comparison")); owner_interaction_row.add_child(compare)
+		"LIBRARY":
+			var query := LineEdit.new(); query.name = "LibrarySearch"; query.placeholder_text = "Search artwork and candidates"; query.text = selected_owner_query; query.size_flags_horizontal = Control.SIZE_EXPAND_FILL; owner_interaction_row.add_child(query)
+			var search := Button.new(); search.text = "Search"; search.pressed.connect(_search_owner_library.bind(query)); owner_interaction_row.add_child(search)
+			var filter := OptionButton.new(); filter.name = "LibraryFilter"; filter.add_item("All records"); filter.add_item("Imported Sources"); filter.add_item("Needs Review"); filter.add_item("Owner Accepted"); filter.add_item("Owner Rejected"); filter.item_selected.connect(_select_owner_collection); filter.select(_owner_collection_index()); owner_interaction_row.add_child(filter)
+		"PUBLISH":
+			var release := Button.new(); release.text = "Campaign order / preflight / STAGING"; release.pressed.connect(_open_tool.bind("Release")); owner_interaction_row.add_child(release)
+		"SETTINGS":
+			for entry in [["Providers", "Providers"], ["Cost / credits", "Cost Center"], ["Recovery", "Session Recovery"], ["Diagnostics", "Diagnostics"]]:
+				var button := Button.new(); button.text = entry[0]; button.pressed.connect(_open_tool.bind(entry[1])); owner_interaction_row.add_child(button)
+
+
+func _populate_candidate_choices(control: OptionButton) -> void:
+	control.add_item("Select candidate")
+	for candidate in owner_projection.get("candidates", []):
+		control.add_item(str(candidate.get("candidate_id", "")))
+		if str(candidate.get("candidate_id", "")) == selected_owner_candidate_id:
+			control.select(control.item_count - 1)
+	control.item_selected.connect(_select_owner_candidate.bind(control))
+
+
+func _select_owner_candidate(index: int, control: OptionButton) -> void:
+	if index > 0:
+		selected_owner_candidate_id = control.get_item_text(index)
+		_refresh_owner_preview()
+		_render_owner_route_details()
+
+
+func _review_owner_candidate(control: OptionButton, disposition: String) -> void:
+	if core_gateway == null or control.selected <= 0:
+		return
+	var candidate_id := control.get_item_text(control.selected)
+	var result: Dictionary = core_gateway.call("run_studio_extension", "owner-review", {"candidate_id": candidate_id, "disposition": disposition})
+	selected_owner_candidate_id = candidate_id
+	_refresh_owner_projection()
+	_render_owner_route_details()
+	owner_live_details.text += "\nOwner review: %s · %s" % [disposition, str(result.get("review_id", result.get("state", "RECORDED")))]
+
+
+func _run_owner_pipeline(control: OptionButton, columns: OptionButton) -> void:
+	if core_gateway == null or control.selected <= 0:
+		return
+	selected_owner_candidate_id = control.get_item_text(control.selected)
+	var column_count := 3 + columns.selected
+	var result: Dictionary = core_gateway.call("run_studio_extension", "pipeline", {"candidate_id": selected_owner_candidate_id, "request": {"column_count": column_count}})
+	_refresh_owner_projection()
+	_render_owner_route_details()
+	owner_live_details.text += "\nCanonical pipeline %s · %s columns" % [str(result.get("disposition", result.get("state", "UNKNOWN"))), column_count]
+
+
+func _search_owner_library(control: LineEdit) -> void:
+	selected_owner_query = control.text.strip_edges()
+	_render_owner_route_details()
+
+
+func _select_owner_collection(index: int) -> void:
+	selected_owner_collection = ["ALL", "Imported Sources", "Needs Review", "Owner Accepted", "Owner Rejected"][index]
+	_render_owner_route_details()
+
+
+func _owner_collection_index() -> int:
+	var values := ["ALL", "Imported Sources", "Needs Review", "Owner Accepted", "Owner Rejected"]
+	return values.find(selected_owner_collection)
+
+
+func _continue_owner_batch() -> void:
+	var batches: Array = owner_projection.get("batches", [])
+	if batches.is_empty():
+		_open_tool("Batch Import")
+		return
+	var batch: Dictionary = batches[0]
+	for item in batch.get("items", []):
+		var source_id := str(item.get("source_id", ""))
+		if not source_id.is_empty():
+			var result: Dictionary = core_gateway.call("run_studio_extension", "pipeline", {"source_id": source_id}) if core_gateway != null else {}
+			owner_live_details.text += "\nContinue %s · %s" % [source_id, str(result.get("disposition", result.get("state", "UNAVAILABLE")))]
+			break
+
+
+func _retry_owner_failure() -> void:
+	if core_gateway == null:
+		return
+	for failure in owner_projection.get("failures", []):
+		if bool(failure.get("retryable", false)):
+			var result: Dictionary = core_gateway.call("run_studio_extension", "retry-failure", {"failure_id": failure.get("failure_id", "")})
+			owner_live_details.text += "\nRetry %s · %s" % [str(failure.get("failure_id", "")), str(result.get("disposition", result.get("state", "UNKNOWN")))]
+			return
+	owner_live_details.text += "\nNo canonical failure is currently marked retryable."
+
+
+func _owner_candidate(candidate_id: String) -> Dictionary:
+	for candidate in owner_projection.get("candidates", []):
+		if str(candidate.get("candidate_id", "")) == candidate_id:
+			return candidate
+	return {}
+
+
+func _latest_candidate_pipeline(candidate_id: String) -> Dictionary:
+	for pipeline in owner_projection.get("pipelines", []):
+		if str(pipeline.get("candidate_id", "")) == candidate_id:
+			return pipeline
+	return {}
+
+
+func _batch_item_status(item: Dictionary) -> String:
+	var source_id := str(item.get("source_id", ""))
+	for pipeline in owner_projection.get("pipelines", []):
+		if not source_id.is_empty() and str(pipeline.get("source_id", "")) == source_id:
+			var stages: Array = pipeline.get("stages", [])
+			var last_stage: Dictionary = stages.back() if not stages.is_empty() else {}
+			return "%s · %s" % [str(pipeline.get("disposition", "UNKNOWN")), str(last_stage.get("stage", "Pipeline"))]
+	return str(item.get("disposition", "UNKNOWN"))
+
+
 func _refresh_owner_preview() -> void:
 	var image: Image = null
+	if active_owner_route in ["SOLVE", "REVIEW"] and not selected_owner_candidate_id.is_empty():
+		var candidate := _owner_candidate(selected_owner_candidate_id)
+		var relative_artwork := str(candidate.get("artwork_path", ""))
+		if not relative_artwork.is_empty():
+			var repository_root := ProjectSettings.globalize_path("res://../")
+			var candidate_image := Image.new()
+			if candidate_image.call("load", repository_root.path_join(relative_artwork)) == OK:
+				image = candidate_image
 	if target_controls != null:
-		var preview := target_controls.get_node_or_null("ActionArea/CanonicalArtworkPreview")
-		if preview != null and preview.has_method("displayed_image_snapshot"):
-			image = preview.call("displayed_image_snapshot") as Image
+		if image == null:
+			var preview := target_controls.get_node_or_null("ActionArea/CanonicalArtworkPreview")
+			if preview != null and preview.has_method("displayed_image_snapshot"):
+				image = preview.call("displayed_image_snapshot") as Image
 	var empty_state := owner_page.find_child("PreviewEmptyState", true, false) as Label
 	if image != null and not image.is_empty():
 		owner_preview_texture.texture = ImageTexture.create_from_image(image)
 		owner_preview_texture.visible = true
 		empty_state.visible = false
 		var snapshot: Dictionary = target_controls.call("action_result_snapshot") if target_controls.has_method("action_result_snapshot") else {}
-		owner_preview_caption.text = "Latest canonical artwork · %s" % str(snapshot.get("candidate_id", "candidate"))
+		var candidate_caption := selected_owner_candidate_id if active_owner_route in ["SOLVE", "REVIEW"] and not selected_owner_candidate_id.is_empty() else str(snapshot.get("candidate_id", "candidate"))
+		owner_preview_caption.text = "Canonical artwork · %s" % candidate_caption
 	else:
 		owner_preview_texture.texture = null
 		owner_preview_texture.visible = false
@@ -449,7 +729,8 @@ func _open_tool(surface_name: String) -> void:
 	if active_tool_node != null:
 		if active_tool_node.get_parent() == legacy_tool_host:
 			legacy_tool_host.remove_child(active_tool_node)
-		content.add_child(active_tool_node)
+		if active_tool_node.get_parent() == null:
+			content.add_child(active_tool_node)
 	_show_legacy_surface(surface_name)
 
 
@@ -458,6 +739,24 @@ func show_surface(surface_name: String) -> void:
 		_show_owner_page(surface_name)
 		return
 	_open_tool(surface_name)
+
+
+func set_visual_evidence_fixture(route: String) -> void:
+	"""Harness-only display fixture. It never calls a core operation or writes evidence."""
+	if not OWNER_PAGES.has(route):
+		return
+	active_owner_route = route
+	var examples := {
+		"HOME": "VISUAL FIXTURE — not canonical data\nImported 8 · Solved 5 · Needs attention 1 · Reviewed 4 · Accepted 3\nProgress 6 / 8\n• Coral Reef · READY   • Moon Garden · SOLVING   • Glass Harbor · NEEDS ATTENTION",
+		"CREATE": "VISUAL FIXTURE — source entry controls\nChoose one strict PNG or a group. Original logical pixels remain unchanged.\nValidation: waiting for selected source.",
+		"BATCH": "VISUAL FIXTURE — not canonical data\nProgress 6 / 8 · Imported 8 · Processing 1 · Success 5 · Needs attention 1\n• Coral Reef · READY   • Moon Garden · PROCESSING   • Glass Harbor · RETRY AVAILABLE",
+		"SOLVE": "VISUAL FIXTURE — not solver evidence\nArtwork: Coral Reef · Supply columns: 4 · Supply plan: 24 entries\nSolver: SOLVED · Replay: WIN · Difficulty V1: 42 / STANDARD",
+		"REVIEW": "VISUAL FIXTURE — no owner decision recorded\nCandidate: Coral Reef · Supply 4 columns · Solver SOLVED · Difficulty V1 42 / STANDARD\nReadiness: READY FOR OWNER REVIEW · ACCEPT / REJECT are available below.",
+		"LIBRARY": "VISUAL FIXTURE — not canonical catalog data\n6 matching records\n• Coral Reef · ACCEPT · 32×32   • Moon Garden · NEEDS REVIEW · 24×24   • Glass Harbor · REJECT · 16×16",
+		"PUBLISH": "VISUAL FIXTURE — no release occurred\nAccepted Levels → Campaign Order → Preflight → STAGING → Production Approval\nSTAGING: NOT STARTED · Production approval: PENDING OWNER ACTION",
+		"SETTINGS": "VISUAL FIXTURE — example values only\nProvider: NOT CONFIGURED · Runtime: LOCAL CORE AVAILABLE\nCost / credits: UNKNOWN · Recovery: available · Diagnostics: available",
+	}
+	owner_live_details.text = str(examples[route])
 
 
 func _system_state_name() -> String:
@@ -655,6 +954,7 @@ func _ensure_release() -> void:
 
 
 func configure_gateway(gateway: RefCounted) -> void:
+	core_gateway = gateway
 	if target_controls != null and target_controls.has_method("configure_gateway"):
 		target_controls.call("configure_gateway", gateway)
 	if dashboard != null and dashboard.has_method("configure_gateway"):
@@ -697,6 +997,8 @@ func configure_gateway(gateway: RefCounted) -> void:
 		cost_surface.call("configure_gateway", gateway)
 	if release_surface != null and release_surface.has_method("configure_gateway"):
 		release_surface.call("configure_gateway", gateway)
+	_refresh_owner_projection()
+	_render_owner_route_details()
 
 
 func _show_legacy_surface(surface_name: String) -> void:

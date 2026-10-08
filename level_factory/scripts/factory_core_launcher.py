@@ -216,7 +216,9 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             raise ValueError("request-json must be an object")
         from scrubbots_pixel_factory import studio_extensions as extensions
         operation = args.operation
-        if operation == "library-refresh":
+        if operation == "owner-pages":
+            payload = extensions.owner_pages_snapshot()
+        elif operation == "library-refresh":
             payload = extensions.library_refresh()
         elif operation == "library-save":
             payload = extensions.save_library_metadata(str(request["source_id"]), str(request.get("label", "")), request.get("tags", []))
