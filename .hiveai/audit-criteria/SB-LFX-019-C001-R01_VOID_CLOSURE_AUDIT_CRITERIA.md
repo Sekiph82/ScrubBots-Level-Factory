@@ -43,25 +43,33 @@ Tests may be parameterized. Do not substitute screening-only checks for this end
 
 ## B. Owner-authentic 32x32 live evidence
 
-Use a real owner/Claude-created 32x32 transparent PNG from the authorized owner-local workspace if one exists.
+The owner has now supplied and authorized this exact fixture:
+
+`tests/fixtures/owner_void/017_a_single_brown_owl_centered_simple_clear_32px.png`
+
+Expected immutable facts:
+
+- dimensions: 32x32;
+- transparent cells: 354;
+- artwork/opaque cells: 670;
+- semi-alpha cells: 0;
+- used opaque RGB colors: 7;
+- SHA-256: `9f3cff525745cd0623997cb0c2d99084e3c2ddb110457042ebdefe58cdcb7214`.
+
+The earlier approximately-550-transparent example is superseded by the owner-selected owl.
 
 Requirements:
 
-- read-only source;
-- binary alpha;
-- approximately 550 transparent pixels is acceptable; report exact count;
-- source SHA-256 recorded;
-- source bytes unchanged before/after;
+- exact committed source bytes unchanged before/after;
 - owner upload -> validation -> pipeline;
 - 3, 4 and 5 columns each READY;
+- VOID count 354 and artwork count 670 preserved;
 - SOLVED;
 - replay WIN;
 - Difficulty V1;
 - LevelLoader / ProductionLevelValidator / SupplyPlanLoader PASS.
 
-The deterministic synthetic 32x32 regression remains required but does not satisfy this owner evidence gate.
-
-If no qualifying owner-authentic file exists, stop truthfully with `OWNER_TRANSPARENT_32X32_FIXTURE_REQUIRED`.
+The deterministic synthetic 32x32 regression remains required in addition to this owner evidence.
 
 ## C. Minimum/color/alpha boundaries
 
