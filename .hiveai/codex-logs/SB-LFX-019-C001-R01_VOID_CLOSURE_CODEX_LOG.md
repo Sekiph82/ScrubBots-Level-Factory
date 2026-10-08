@@ -110,3 +110,8 @@ Per the prompt, implementation, test execution, hang classification, and full re
 - Implementation/test commit `e6e6af61236e1b1e7836edb7dd3873cf45871f6a` (`test: close SB-LFX-019-C001 VOID regressions`) was pushed using normal `git push origin HEAD:main`; push fast-forwarded `56ddcff..e6e6af6`.
 - Post-push `git fetch --prune origin` verified `HEAD == origin/main == e6e6af61236e1b1e7836edb7dd3873cf45871f6a`, 0 ahead / 0 behind. Only this builder log remained modified before its separate log-only commit.
 - Builder-log commit SHA and final equality/clean-worktree verification will be appended after this log-only commit is pushed.
+
+## Final publication verification
+
+- Builder-log commit `b9052e77e789e4fba8bb0b404deeb24e1ae1be2f` was pushed by normal fast-forward from `e6e6af6`; post-push fetch verified `HEAD == origin/main`, 0 ahead / 0 behind, and a clean task worktree.
+- This final publication note is a follow-up log-only commit. After its normal fast-forward push, fetch/prune and verify the final local HEAD exactly equals `origin/main` with 0 ahead / 0 behind and a clean worktree.
