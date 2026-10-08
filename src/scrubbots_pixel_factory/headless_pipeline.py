@@ -387,7 +387,7 @@ def _process_source(
     validation_event = _completed_stage(events, source_id, "VALIDATE")
     if validation_event is None:
         _append_stage_start(job, events, source, "VALIDATE", after_checkpoint)
-        validation = studio.validate_owner_source(source_id, game_project=request.get("game_project"))
+        validation = studio.validate_owner_source(source_id)
         valid = validation.get("exact_logical_source") is True and validation.get("structural", {}).get("disposition") == "PASS"
         reason = "Canonical OWNER_UPLOAD palette, alpha, dimensions, logical-cell, and structural checks passed." if valid else str(validation.get("structural", {}).get("reason") or ",".join(validation.get("structural", {}).get("rejection_codes", [])) or "Canonical OWNER_UPLOAD validation did not produce exact logical cells.")
         validation_event = _append_event(

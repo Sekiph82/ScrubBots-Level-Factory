@@ -183,8 +183,8 @@ def enclosed_unsolvable():
     so 5 slots fill with waiting batches before any colour-0 batch can be placed: no win."""
     idx = np.zeros((6, 6), int)
     idx[2:4, 2:4] = 1  # 4 enclosed cells... need 15 single-robot colour-1 batches -> 15 cells
-    idx = np.zeros((9, 9), int)
-    idx[2:7, 2:5] = 1  # 15 cells, fully enclosed by colour 0 ring
+    idx = np.zeros((20, 20), int)
+    idx[7:10, 8:13] = 1  # 15 cells, fully enclosed by colour 0 ring
     ring = int((idx == 0).sum())
     col = [(1, 1)] * 5
     return idx, [col + [(0, ring)], list(col), list(col)]

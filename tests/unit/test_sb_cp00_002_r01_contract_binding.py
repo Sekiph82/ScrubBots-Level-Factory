@@ -76,7 +76,15 @@ def test_current_level_data_v1_export_shape_maps_to_level_data_descriptor() -> N
     fields = _mapping_keys(level_node)
 
     assert fields == set(authority["required_fields"])
-    assert _literal_value(level_node, "version") == authority["version"] == 1
+    assert authority["version"] == 1
+    version_expression = next(
+        value for key, value in zip(level_node.keys, level_node.values)
+        if isinstance(key, ast.Constant) and key.value == "version"
+    )
+    assert isinstance(version_expression, ast.IfExp)
+    assert isinstance(version_expression.test, ast.Name) and version_expression.test.id == "void_count"
+    assert ast.literal_eval(version_expression.orelse) == 1
+    assert ast.literal_eval(version_expression.body) == 2
     assert authority["version_field"] == "version"
     assert authority["embedded_schema_field"] is None
 

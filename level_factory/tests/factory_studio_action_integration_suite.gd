@@ -128,7 +128,7 @@ func _run_suite() -> void:
 	if preview_before_action != null:
 		var empty_preview: Dictionary = preview_before_action.call("snapshot")
 		_check(empty_preview.get("state") == "EMPTY", "Preview was not EMPTY before a successful canonical action")
-		_check(preview_before_action.get_node_or_null("ArtworkImage").texture == null, "Preview fabricated a texture before canonical success")
+		_check(preview_before_action.get_node_or_null("VoidPresentationBackground/ArtworkImage").texture == null, "Preview fabricated a texture before canonical success")
 	var evidence_before_action := target.get_node_or_null("ActionArea/CanonicalEvidencePanel")
 	_check(evidence_before_action != null, "Canonical evidence panel is missing before execution")
 	if evidence_before_action != null:
@@ -269,7 +269,7 @@ func _run_suite() -> void:
 	var expected_scale := maxi(1, mini(16, floori(512.0 / 21.0)))
 	_check(preview_before_success.get("presentation_scale") == expected_scale, "Preview presentation scale was not the deterministic bounded integer scale")
 	_check(preview_before_success.get("displayed_width") == 20 * expected_scale and preview_before_success.get("displayed_height") == 21 * expected_scale, "Preview display dimensions do not equal logical dimensions multiplied by scale")
-	var displayed_texture := preview.get_node_or_null("ArtworkImage").texture as ImageTexture
+	var displayed_texture := preview.get_node_or_null("VoidPresentationBackground/ArtworkImage").texture as ImageTexture
 	_check(displayed_texture != null, "Canonical preview did not create an ImageTexture")
 	var displayed_image := displayed_texture.get_image() if displayed_texture != null else null
 	_check(displayed_image != null, "Canonical preview texture did not expose a displayed image")

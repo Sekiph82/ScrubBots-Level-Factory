@@ -30,7 +30,7 @@ def _project(tmp_path: Path):
     for i, number in enumerate((8, 9)):
         identity = f"batch-level-{i}"
         bundle = tmp_path / f"bundle-{i}"; bundle.mkdir(); (bundle / "artwork.png").write_bytes(b"pixels" + bytes([i]))
-        level = tmp_path / f"level-{i}.json"; level.write_text(json.dumps({"id": identity, "width": 20, "height": 20, "cells": ["C01"] * 400}), encoding="utf-8")
+        level = tmp_path / f"level-{i}.json"; level.write_text(json.dumps({"version": 1, "id": identity, "width": 20, "height": 20, "name": identity, "difficulty": "EASY", "palette": ["#3690EAFF"], "cells": [0] * 400}), encoding="utf-8")
         supply = tmp_path / f"supply-{i}.json"; supply.write_text(json.dumps({"levelId": identity, "columnCount": 4, "visiblePreviewDepth": 3}), encoding="utf-8")
         items.append({"level_number": number, "candidate": {"candidate_id": identity, "artwork_sha256": "a" * 64, "grid_hash": "b" * 64, "source_lineage": {"source_sha256": "c" * 64}, "background_intent": "BACKGROUND"}, "pipeline": {"run_id": f"run-{i}", "disposition": "READY", "primary": {"state": "READY", "load_check": {"state": "READY", "disposition": "READY"}, "files": {"level": str(level), "supply_plan": str(supply)}, "difficulty": {"score": 50, "class": "EASY"}}}, "source_bundle": bundle})
     return root, catalog_path, catalog, items
