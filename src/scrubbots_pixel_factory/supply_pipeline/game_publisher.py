@@ -55,12 +55,13 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         raise PublicationError("CampaignBuilder must provide an explicit positive level_number")
 
     root = discover_game_project(game_project)
+    background_intent = str(candidate.get("background_intent", "BACKGROUND"))
+    level = None
+    void_count = 0
     candidate_id = str(candidate.get("candidate_id", ""))
     level_id = str(pipeline.get("primary", {}).get("level_id", candidate_id)) if isinstance(pipeline.get("primary"), Mapping) else candidate_id
     if not _STABLE_ID.fullmatch(level_id) or level_id != candidate_id:
         raise PublicationError("stable candidate/level identity is invalid or not immutable")
-    if str(candidate.get("background_intent", "BACKGROUND")) == "TRANSPARENT":
-        raise PublicationError("transparent artwork is valid input but is not publishable to current LevelData")
     primary = pipeline.get("primary")
     if not isinstance(primary, Mapping) or primary.get("state") != "READY" or pipeline.get("disposition") != "READY":
         raise PublicationError("only a READY canonical ZIP pipeline may be published")
@@ -82,6 +83,20 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
     plan = _load(plan_source)
     if not isinstance(level, dict) or not isinstance(plan, dict) or level.get("id") != level_id or plan.get("levelId") != level_id:
         raise PublicationError("level and supply identities do not match the immutable candidate")
+    cells = level.get("cells")
+    if not isinstance(cells, list) or any(type(value) is not int for value in cells):
+        raise PublicationError("exported LevelData cells are malformed")
+    void_count = cells.count(-1)
+    if any(value < -1 for value in cells) or (void_count and (level.get("version") != 2 or void_count == len(cells))) or (not void_count and level.get("version") != 1):
+        raise PublicationError("exported LevelData uses a non-canonical V1/V2 VOID encoding")
+    if background_intent == "TRANSPARENT" or void_count:
+        from .void_capability import void_capability
+
+        gate = void_capability(root)
+        if gate.get("state") != "OPEN":
+            raise PublicationError(f"TRANSPARENT_UNAVAILABLE: {gate.get('reason', 'current-game VOID capability gate is closed')}")
+    if void_count and background_intent != "TRANSPARENT":
+        raise PublicationError("VOID LevelData requires TRANSPARENT source intent")
     catalog_path = root / "data" / "levels" / "catalog" / "production_catalog_v1.json"
     catalog = _load(catalog_path)
     if not isinstance(catalog, dict) or catalog.get("schema") != "scrubbots.production_catalog.v1" or not isinstance(catalog.get("entries"), list):
@@ -116,6 +131,9 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         "pipelineRunId": pipeline.get("run_id"), "loadCheck": load_check,
         "progression": progression, "fileDigests": {},
     }
+    if void_count:
+        metadata["artworkCellCount"] = len(cells) - void_count
+        metadata["voidCellCount"] = void_count
     solver_metrics = primary.get("solver_metrics", {}) if isinstance(primary.get("solver_metrics", {}), Mapping) else {}
     official = solver_metrics.get("official_difficulty_v1", {}) if isinstance(solver_metrics.get("official_difficulty_v1", {}), Mapping) else {}
     official_profile = official.get("profile", {}) if isinstance(official.get("profile", {}), Mapping) else {}

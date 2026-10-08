@@ -22,6 +22,7 @@ from typing import Any
 import numpy as np
 
 from .contracts import CANONICAL_PALETTE
+from .contracts.palette import VOID_CELL_ID
 from .output.bundle import read_bundle
 from .output.png import decode_logical_png
 from .owner_upload import OWNER_UPLOAD_ORIGIN, OWNER_UPLOAD_STATUS, OWNER_UPLOAD_VALIDATION_STATE, owner_upload_root, import_owner_upload
@@ -200,7 +201,7 @@ def _validation_pixels(raw: bytes) -> tuple[int, int, bytes]:
     return decoded.width, decoded.height, decoded.pixels
 
 
-def validate_owner_source(source_id: str, *, persist: bool = True) -> dict[str, Any]:
+def validate_owner_source(source_id: str, *, persist: bool = True, game_project: str | Path | None = None) -> dict[str, Any]:
     source = verify_owner_source(source_id)
     raw = Path(_repository_root() / source["source_path"]).read_bytes()
     width, height, pixels = _validation_pixels(raw)
@@ -213,8 +214,12 @@ def validate_owner_source(source_id: str, *, persist: bool = True) -> dict[str, 
         red, green, blue, alpha = pixels[index * 4 : index * 4 + 4]
         if alpha == 0:
             transparent += 1
+            cells.append(VOID_CELL_ID)
+            continue
         elif alpha != 255:
             semi_alpha += 1
+            cells.append("INVALID_ALPHA")
+            continue
         try:
             color_id = CANONICAL_PALETTE.id_for_rgb((red, green, blue))
         except ValueError:
@@ -224,7 +229,16 @@ def validate_owner_source(source_id: str, *, persist: bool = True) -> dict[str, 
             used.add(color_id)
         cells.append(color_id)
     legal_dimensions = 20 <= width <= 59 and 20 <= height <= 59
-    exact_logical = legal_dimensions and foreign == 0 and semi_alpha == 0 and transparent == 0
+    capability = None
+    if transparent:
+        from .supply_pipeline.void_capability import void_capability
+
+        capability = void_capability(game_project)
+    gate_open = capability is None or capability.get("state") == "OPEN"
+    artwork_count = width * height - transparent
+    minimum_artwork_ok = not transparent or (artwork_count >= 200 and artwork_count >= width * height * 0.25)
+    color_count_ok = 3 <= len(used) <= 12
+    exact_logical = legal_dimensions and foreign == 0 and semi_alpha == 0 and gate_open and minimum_artwork_ok and color_count_ok
     structural: dict[str, Any]
     if exact_logical:
         report = evaluate_grid(width, height, cells, policy=QualityPolicy())
@@ -233,8 +247,13 @@ def validate_owner_source(source_id: str, *, persist: bool = True) -> dict[str, 
         reasons: list[str] = []
         if not legal_dimensions: reasons.append("ILLEGAL_LOGICAL_DIMENSIONS")
         if foreign: reasons.append("FOREIGN_COLORS")
-        if semi_alpha or transparent: reasons.append("ALPHA_CONTRACT")
-        structural = {"disposition": "NOT APPLICABLE / NEEDS DERIVATION", "rejection_codes": reasons, "reason": "Exact logical C-ID grid is not available without an explicit derived artifact."}
+        if semi_alpha: reasons.append("ALPHA_CONTRACT")
+        if transparent and not gate_open: reasons.append("VOID_CAPABILITY_UNAVAILABLE")
+        if transparent and not minimum_artwork_ok: reasons.append("MINIMUM_ARTWORK")
+        if not color_count_ok: reasons.append("USED_COLOR_COUNT")
+        disposition = "UNAVAILABLE" if transparent and not gate_open else "FAIL" if legal_dimensions and not reasons == [] else "NOT APPLICABLE / NEEDS DERIVATION"
+        reason = str((capability or {}).get("reason", "")) if transparent and not gate_open else "Exact source does not satisfy the current logical LevelData contract."
+        structural = {"disposition": disposition, "rejection_codes": reasons, "reason": reason}
     report = {
         "schema": VALIDATION_SCHEMA, "version": 1, "analysis_policy": "SB-LFX-004-C001_CANONICAL_IMPORT_ANALYSIS_V1",
         "source_id": source_id, "source_sha256": source["source_sha256"], "source_record_identity": _digest(source),
@@ -243,13 +262,20 @@ def validate_owner_source(source_id: str, *, persist: bool = True) -> dict[str, 
         "exact_logical_source": exact_logical, "logical_dimension_status": "EXACT" if exact_logical else "DERIVED_ARTIFACT_REQUIRED",
         "palette": {"canonical_ids": sorted(used, key=lambda value: int(value[1:])), "used_color_count": len(used), "foreign_color_count": foreign},
         "alpha": {"transparent_count": transparent, "semi_alpha_count": semi_alpha, "opaque_count": width * height - transparent - semi_alpha},
+        "artwork": {"cell_count": artwork_count, "void_cell_count": transparent, "minimum_rule": ">=200 non-VOID and >=25% W*H", "minimum_rule_pass": minimum_artwork_ok},
+        "void_capability": capability or {"state": "NOT_REQUIRED", "disposition": "NOT_REQUIRED"},
         "grid_hash": logical_grid_hash(width, height, cells) if exact_logical else None,
         "structural": structural,
+        "reason": structural.get("reason", "Canonical validation evidence."),
         "policies": {"resize": "CELL_MAJORITY_V1", "palette": "PALETTE_SNAP_V1"} if not exact_logical else {"logical_interpretation": "READ_ONLY_SOURCE_PIXELS"},
         "claims": {"solver": "NOT AVAILABLE — canonical ZIP pipeline has not been executed", "difficulty": "NOT AVAILABLE — official Difficulty V1 evidence has not been produced", "owner_acceptance": "NOT AVAILABLE — validation is not acceptance"},
     }
     if persist:
-        path = extensions_root() / "validation" / f"{source_id}-{source['source_sha256']}.json"
+        suffix = ""
+        if transparent:
+            gate_head = str((capability or {}).get("git_head", "unavailable"))[:12]
+            suffix = f"-void-{(capability or {}).get('state', 'closed').lower()}-{gate_head}"
+        path = extensions_root() / "validation" / f"{source_id}-{source['source_sha256']}{suffix}.json"
         _write_json(path, report, immutable=True)
         report = {**report, "evidence_path": _relative(path)}
     return report
@@ -281,7 +307,7 @@ def list_candidates() -> list[dict[str, Any]]:
             candidates.append({
                 "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
                 "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
-                "used_colors": sorted(set(bundle.artwork.cells), key=lambda value: int(value[1:])), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
+                "used_colors": list(CANONICAL_PALETTE.used_ids(bundle.artwork.cells)), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
                 "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
                 "quality": dict(quality), "metadata": metadata,
                 "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
@@ -530,15 +556,20 @@ def _pipeline_stage(
 
 def _canonical_cells_to_grid(cells: Sequence[str], width: int, height: int, rules: Any) -> tuple[np.ndarray, list[int]]:
     by_id = {str(color_id): index for index, (color_id, _hex) in enumerate(rules.palette)}
-    try:
-        local_cells = [by_id[str(cell)] for cell in cells]
-    except KeyError as exc:
-        raise StudioExtensionError(f"canonical artwork references an unknown palette id: {exc.args[0]}") from exc
+    local_cells: list[int] = []
+    for cell in cells:
+        if cell == VOID_CELL_ID:
+            local_cells.append(-1)
+            continue
+        try:
+            local_cells.append(by_id[str(cell)])
+        except KeyError as exc:
+            raise StudioExtensionError(f"canonical artwork references an unknown palette id: {exc.args[0]}") from exc
     if len(local_cells) != width * height:
         raise StudioExtensionError("canonical artwork cell count does not match its dimensions")
-    used = sorted(set(local_cells))
+    used = sorted(value for value in set(local_cells) if value >= 0)
     local_by_global = {global_index: local_index for local_index, global_index in enumerate(used)}
-    compact = [local_by_global[value] for value in local_cells]
+    compact = [-1 if value < 0 else local_by_global[value] for value in local_cells]
     return np.asarray(compact, dtype=np.int16).reshape((height, width)), used
 
 
@@ -554,11 +585,17 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
     cells: list[str] = []
     for index in range(width * height):
         red, green, blue, alpha = pixels[index * 4 : index * 4 + 4]
+        if alpha == 0:
+            cells.append(VOID_CELL_ID)
+            continue
         if alpha != 255:
-            raise StudioExtensionError("transparent OWNER_UPLOAD remains a valid source but cannot form a publishable logical candidate")
+            raise StudioExtensionError("semi-alpha OWNER_UPLOAD cannot form a logical candidate")
         cells.append(CANONICAL_PALETTE.id_for_rgb((red, green, blue)))
     candidate_id = f"candidate-owner-{validation['source_sha256'][:48]}"
-    request = GenerationRequest(seed=str(validation["source_sha256"]), generator_mode="MASK", width=width, height=height, background_intent="BACKGROUND")
+    transparent = VOID_CELL_ID in cells
+    if transparent and validation.get("void_capability", {}).get("state") != "OPEN":
+        raise StudioExtensionError("transparent OWNER_UPLOAD is unavailable: current-game VOID capability gate is closed")
+    request = GenerationRequest(seed=str(validation["source_sha256"]), generator_mode="MASK", width=width, height=height, background_intent="TRANSPARENT" if transparent else "BACKGROUND")
     rng = DeterministicRNG(request.seed)
     result = GenerationResult.success(
         request=request, width=width, height=height, logical_grid=cells,
@@ -660,6 +697,12 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             candidates=int(request_data.get("candidates", 300)),
             column_count=int(request_data.get("column_count", 3)),
             verify_top=int(request_data.get("verify_top", 1)),
+            screen_budget=int(request_data.get("screen_budget", 3000)),
+            metric_top=int(request_data.get("metric_top", 12)),
+            viability_budget=int(request_data.get("viability_budget", 3000)),
+            real_max_visited=request_data.get("real_max_visited"),
+            level_number=int(request_data.get("level_number", 1)),
+            game_project=request_data.get("game_project"),
         )
         state = str(primary.get("state", "ERROR"))
         solve_state = "PASS" if primary.get("acceptance", {}).get("solver_status") == "SOLVED" else state
@@ -690,7 +733,7 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
     stages: list[dict[str, Any]] = []
     known_inputs: list[str] = [source_id or candidate_id or ""]
     if source_id is not None:
-        validation = validate_owner_source(source_id)
+        validation = validate_owner_source(source_id, game_project=request_data.get("game_project"))
         source_evidence = str(validation.get("record_path", ""))
         stages.append(_pipeline_stage("SOURCE", "PASS", inputs=[source_id], outputs=[source_id], evidence=source_evidence, reason="Verified immutable OWNER_UPLOAD source identity."))
         stages.append(_pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason="Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."))
@@ -747,7 +790,9 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             else:
                 stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[current_identity], reason="Canonical downstream dependency is unavailable."))
     run_id = f"pipeline-{_digest({'source_id': source_id, 'candidate_id': candidate_id, 'request': dict(request or {}), 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
-    payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": "INTERRUPTED" if interrupted else "PARTIAL / STOPPED" if hard_stop else "COMPLETE", "created_at": datetime.now(timezone.utc).isoformat()}
+    unavailable_gate = source_id is not None and validation.get("structural", {}).get("disposition") == "UNAVAILABLE"
+    disposition = "INTERRUPTED" if interrupted else "UNAVAILABLE" if unavailable_gate else "PARTIAL / STOPPED" if hard_stop else "COMPLETE"
+    payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": disposition, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(_pipeline_path(run_id), payload, immutable=True)
     return payload
 
@@ -933,9 +978,10 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
 
 
 def create_revision(candidate_id: str, width: int, height: int, cells: Sequence[str], parent_revision_id: str | None = None, change_summary: str = "", edit_operations: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
-    if type(width) is not int or type(height) is not int or len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells): raise StudioExtensionError("revision logical grid is invalid")
+    if type(width) is not int or type(height) is not int or len(cells) != width * height or any(cell != VOID_CELL_ID and cell not in CANONICAL_PALETTE.ids for cell in cells): raise StudioExtensionError("revision logical grid is invalid")
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None: raise StudioExtensionError("revision source candidate is unavailable")
+    if VOID_CELL_ID in cells and candidate.get("background_intent") != "TRANSPARENT": raise StudioExtensionError("VOID revisions require a candidate validated with transparent intent")
     root = extensions_root() / "revisions" / candidate_id
     existing = list_revisions(candidate_id) if root.exists() else []
     sequence = len(existing)
@@ -1000,7 +1046,7 @@ def list_revisions(candidate_id: str) -> list[dict[str, Any]]:
         if value.get("revision_digest") != _digest({key: item for key, item in value.items() if key not in {"created_at", "revision_digest"}}):
             raise StudioExtensionError("revision content digest is invalid")
         width, height, cells = value.get("width"), value.get("height"), value.get("cells")
-        if type(width) is not int or type(height) is not int or not isinstance(cells, list) or len(cells) != width * height or any(cell not in CANONICAL_PALETTE.ids for cell in cells) or value.get("working_grid_hash") != logical_grid_hash(width, height, cells):
+        if type(width) is not int or type(height) is not int or not isinstance(cells, list) or len(cells) != width * height or any(cell != VOID_CELL_ID and cell not in CANONICAL_PALETTE.ids for cell in cells) or value.get("working_grid_hash") != logical_grid_hash(width, height, cells):
             raise StudioExtensionError("revision grid identity is invalid")
         values.append(value)
     values.sort(key=lambda item: int(item["sequence"]))

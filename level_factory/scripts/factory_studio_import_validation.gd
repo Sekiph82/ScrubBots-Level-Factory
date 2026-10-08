@@ -81,12 +81,14 @@ func _set_empty() -> void:
 func _render() -> void:
 	if _state_label == null: return
 	var state := str(_projection.get("state", _projection.get("disposition", "EMPTY")))
-	_state_label.text = "Validation: %s | source=%s\n%s" % [state, _projection.get("source_id", _source_id), _projection.get("error", _projection.get("reason", ""))]
+	var structural: Dictionary = _projection.get("structural", {})
+	_state_label.text = "Validation: %s | source=%s\n%s" % [state, _projection.get("source_id", _source_id), _projection.get("error", _projection.get("reason", structural.get("reason", "")))]
 	if _projection.has("original_dimensions"):
 		var dimensions: Dictionary = _projection.get("original_dimensions", {})
 		var palette: Dictionary = _projection.get("palette", {})
 		var alpha: Dictionary = _projection.get("alpha", {})
-		var structural: Dictionary = _projection.get("structural", {})
-		_facts_label.text = "format=%s | dimensions=%sx%s legal=%s | logical=%s | C-ID colors=%s used=%s foreign=%s | alpha transparent=%s semi=%s | structural=%s codes=%s | solver=NOT AVAILABLE | difficulty=NOT AVAILABLE | owner=NOT AVAILABLE" % [_projection.get("format", {}).get("disposition", "NOT AVAILABLE"), dimensions.get("width", ""), dimensions.get("height", ""), _projection.get("legal_logical_dimensions", false), _projection.get("logical_dimension_status", ""), palette.get("canonical_ids", []), palette.get("used_color_count", ""), palette.get("foreign_color_count", ""), alpha.get("transparent_count", ""), alpha.get("semi_alpha_count", ""), structural.get("disposition", ""), structural.get("rejection_codes", [])]
+		var artwork: Dictionary = _projection.get("artwork", {})
+		var void_gate: Dictionary = _projection.get("void_capability", {})
+		_facts_label.text = "format=%s | dimensions=%sx%s legal=%s | logical=%s | C-ID colors=%s used=%s foreign=%s | alpha transparent=%s semi=%s | artwork=%s VOID=%s | VOID gate=%s | structural=%s codes=%s | solver=NOT AVAILABLE | difficulty=NOT AVAILABLE | owner=NOT AVAILABLE" % [_projection.get("format", {}).get("disposition", "NOT AVAILABLE"), dimensions.get("width", ""), dimensions.get("height", ""), _projection.get("legal_logical_dimensions", false), _projection.get("logical_dimension_status", ""), palette.get("canonical_ids", []), palette.get("used_color_count", ""), palette.get("foreign_color_count", ""), alpha.get("transparent_count", ""), alpha.get("semi_alpha_count", ""), artwork.get("cell_count", ""), artwork.get("void_cell_count", ""), void_gate.get("state", "NOT_REQUIRED"), structural.get("disposition", ""), structural.get("rejection_codes", [])]
 	else:
 		_facts_label.text = "Canonical facts: NOT AVAILABLE until validation runs."

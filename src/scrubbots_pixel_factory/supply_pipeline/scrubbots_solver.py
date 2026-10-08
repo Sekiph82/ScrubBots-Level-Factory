@@ -23,6 +23,37 @@ class ScrubBotsSolver:
         """level: {id,width,height,palette:[#RRGGBBAA local],cells:[local or -1]}
         candidates: [{id, columns:[[{color,count}]*3]} or {..., replay_trace:[...]}]"""
         work = Path(tempfile.mkdtemp(prefix="sb_bridge_"))
+        # Exercise the game's owner-facing loaders for every candidate, including
+        # generated candidates. SupplyPlanLoader resolves canonical global C IDs
+        # through the live game's palette authority before building runtime state.
+        cid_by_hex = {color.upper()[:7]: cid for cid, color in self.rules.palette}
+        for index, candidate in enumerate(candidates):
+            if "columns" not in candidate:
+                continue
+            columns = []
+            maximum = 1
+            for column_index, column in enumerate(candidate["columns"]):
+                batches = []
+                for batch_index, batch in enumerate(column):
+                    amount = int(batch["count"])
+                    maximum = max(maximum, amount)
+                    local_color = int(batch["color"])
+                    if local_color < 0 or local_color >= len(level["palette"]):
+                        raise ValueError("candidate batch uses a palette index outside the level")
+                    local_hex = str(level["palette"][local_color]).upper()[:7]
+                    cid = cid_by_hex.get(local_hex)
+                    if cid is None:
+                        raise ValueError(f"level palette color {local_hex} is not in the current game's canonical palette")
+                    batches.append({"batchId": f"C{index:04d}-K{column_index:02d}-B{batch_index:03d}",
+                                    "cid": cid, "robots": amount})
+                columns.append(batches)
+            plan = {"schema": "scrubbots.level_supply_plan.v1", "version": 1,
+                    "levelId": str(level["id"]), "columnCount": len(columns),
+                    "visiblePreviewDepth": self.rules.preview_depth,
+                    "maxRobotsPerBatch": maximum, "columns": columns}
+            plan_path = work / f"plan-{index}.json"
+            plan_path.write_text(json.dumps(plan), encoding="utf-8")
+            candidate["supply_plan_path"] = str(plan_path)
         req = {"level": level, "candidates": candidates, "column_count": self.rules.column_count,
                "visible_preview_depth": self.rules.preview_depth, "stop_after_solved": stop_after,
                "analyze": analyze, "level_number": level_number,

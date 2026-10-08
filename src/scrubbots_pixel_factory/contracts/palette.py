@@ -20,6 +20,7 @@ PALETTE_DATA_PATH = (
 )
 _LOGICAL_ID = re.compile(r"^C(?:0[1-9]|1[0-6])$")
 _HEX = re.compile(r"^#[0-9A-F]{6}$")
+VOID_CELL_ID = "VOID"
 
 
 class PaletteContractError(ValueError):
@@ -127,7 +128,7 @@ class CanonicalPalette:
         return value
 
     def used_ids(self, cells: Iterable[Any]) -> tuple[str, ...]:
-        used = {self.validate_logical_id(value) for value in cells}
+        used = {self.validate_logical_id(value) for value in cells if value != VOID_CELL_ID}
         return tuple(sorted(used, key=lambda value: int(value[1:])))
 
 

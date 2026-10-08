@@ -25,8 +25,10 @@ class PixelAnalyzer:
         for y in range(h):
             for x in range(w):
                 r, g, b, al = (int(v) for v in a[y, x])
-                if al < 128:
+                if al == 0:
                     continue
+                if al != 255:
+                    raise ValueError(f"semi-alpha pixel at ({x}, {y}) has unsupported alpha {al}; alpha must be 0 or 255")
                 gi = self.rgb_to_global.get((r, g, b))
                 if gi is None:
                     bad.append((x, y, (r, g, b)))

@@ -70,6 +70,13 @@ def derive_solver_supply_identity(
     if not isinstance(level, dict) or not isinstance(plan, dict):
         raise SolverSupplyIdentityError("solver level and supply inputs must be JSON objects")
     level_id = level.get("id")
+    cells = level.get("cells")
+    if not isinstance(cells, list) or any(type(value) is not int for value in cells):
+        raise SolverSupplyIdentityError("level cells must be integer palette IDs or VOID -1")
+    void_count = cells.count(-1)
+    artwork_count = len(cells) - void_count
+    if any(value < -1 for value in cells) or (level.get("version") == 1 and void_count) or (level.get("version") == 2 and (void_count == 0 or artwork_count == 0)) or level.get("version") not in (1, 2):
+        raise SolverSupplyIdentityError("level V1/V2 VOID encoding is not canonical")
     if (
         not isinstance(level_id, str)
         or plan.get("schema") != "scrubbots.level_supply_plan.v1"
@@ -149,8 +156,11 @@ def derive_solver_supply_identity(
         "max_robots_per_batch": max_robots,
         "authority": dict(authority),
     }
+    if void_count:
+        state_body["artwork_cell_count"] = artwork_count
+        state_body["void_cell_count"] = void_count
     evidence_body = solver_evidence_body(result, authority)
-    return {
+    identity = {
         "schema": IDENTITY_SCHEMA,
         "version": 1,
         "level_id": level_id,
@@ -164,6 +174,10 @@ def derive_solver_supply_identity(
         "solver_state_sha256": canonical_sha256(state_body),
         "solver_evidence_sha256": canonical_sha256(evidence_body),
     }
+    if void_count:
+        identity["artwork_cell_count"] = artwork_count
+        identity["void_cell_count"] = void_count
+    return identity
 
 
 def current_solver_proof_for_candidate(candidate_id: str) -> tuple[bytes, dict[str, Any]]:

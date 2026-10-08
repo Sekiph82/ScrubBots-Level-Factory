@@ -6,18 +6,18 @@ extends SceneTree
 ##
 ## For each candidate supply (3..5 FIFO columns of {color: local palette index, count}) it:
 ##   1. builds a real LevelData + BatchSupplyEngine (ColorBatch.make / load_candidate);
-##   2. builds the initial ProofState (transparent source pixels start CLEARED: open space);
+##   2. builds the initial ProofState from native LevelData V2 VOID cells;
 ##   3. runs the game's SolvabilitySolver.solve (bounded, deterministic DFS over the real
 ##      ProofKernel: M23 supply, M24 slots, M25 claims, TargetSelector, production routing);
 ##   4. for SOLVED: replays the trace with SolvabilitySolver.replay on a FRESH state;
-##   5. optionally (full-canvas levels only) measures + scores the replayed path with the
-##      official LevelDifficultyAnalyzerV1 (locked Difficulty V1 model).
+##   5. measures + scores the replayed path with the official LevelDifficultyAnalyzerV1
+##      for both legacy V1 and native VOID V2 levels.
 ## Request "replay_only" entries replay an externally supplied trace (differential tests).
 ## Never writes into the game project. Prints "BRIDGE <i>/<n> <id> <status>" progress lines.
 
 const LevelData = preload("res://scripts/data/level_data.gd")
-const BatchSupplyEngine = preload("res://scripts/gameplay/supply/batch_supply_engine.gd")
-const ColorBatch = preload("res://scripts/gameplay/supply/color_batch.gd")
+const LevelLoader = preload("res://scripts/data/level_loader.gd")
+const ProductionLevelValidator = preload("res://scripts/data/production_level_validator.gd")
 const ProofState = preload("res://scripts/gameplay/solver/proof_state.gd")
 const SolvabilitySolver = preload("res://scripts/gameplay/solver/solvability_solver.gd")
 const SupplyPlanLoader = preload("res://scripts/gameplay/supply/supply_plan_loader.gd")
@@ -42,6 +42,8 @@ func _initialize() -> void:
 	var out := {"schema": "pixelartstudio.scrubbots_bridge.v1",
 		"authority": req.get("game_authority", {"git_head": "UNAVAILABLE"}),
 		"gameConstants": {"slotCount": ProofState.SLOT_COUNT,
+			"formatVersionVoid": LevelData.FORMAT_VERSION_VOID,
+			"voidCell": LevelData.VOID_CELL,
 			"batchCountPolicy": "positive per-plan metadata bound; no global cap",
 			"columnCount": selected_column_count,
 			"previewDepth": VISIBLE_PREVIEW_DEPTH},
@@ -52,34 +54,59 @@ func _initialize() -> void:
 		return
 	var lv: Dictionary = req["level"]
 	var cells := PackedInt32Array()
-	var transparent: Array = []
+	var void_count := 0
 	for i in range(lv["cells"].size()):
 		var c := int(lv["cells"][i])
-		if c < 0:
-			transparent.append(i)
-			c = 0  # LevelData has no empty cell; the proof state marks it CLEARED below
+		if c == LevelData.VOID_CELL:
+			void_count += 1
+		elif c < 0:
+			printerr("unsupported negative LevelData cell")
+			quit(2)
+			return
 		cells.append(c)
-	var level = LevelData.new(1, String(lv["id"]), String(lv["id"]), "EASY", int(lv["width"]),
-		int(lv["height"]), PackedStringArray(lv["palette"]), cells)
+	if void_count > 0 and (LevelData.FORMAT_VERSION_VOID != 2 or LevelData.VOID_CELL != -1 or void_count == cells.size()):
+		printerr("current game does not support canonical VOID V2 LevelData")
+		quit(2)
+		return
+	var level_version := LevelData.FORMAT_VERSION_VOID if void_count > 0 else LevelData.FORMAT_VERSION
+	var level_payload := {"version": level_version, "id": String(lv["id"]), "name": String(lv.get("name", lv["id"])),
+		"difficulty": String(lv.get("difficulty", "EASY")), "width": int(lv["width"]),
+		"height": int(lv["height"]), "palette": lv["palette"], "cells": cells}
+	var loaded = LevelLoader.load_from_text(JSON.stringify(level_payload), String(lv["id"]))
+	if not loaded.is_ok():
+		printerr("LevelLoader rejected bridge LevelData: %s" % "; ".join(loaded.errors))
+		quit(2)
+		return
+	var level = loaded.level_data
+	var production = ProductionLevelValidator.validate(level)
+	if not production.is_ok():
+		printerr("ProductionLevelValidator rejected bridge LevelData: %s" % "; ".join(production.errors))
+		quit(2)
+		return
+	out["levelLoaderPass"] = true
+	out["productionValidatorPass"] = true
 	var solver = SolvabilitySolver.new()
 	var cfg := {"max_visited": int(req.get("max_visited", SolvabilitySolver.DEFAULT_MAX_VISITED)),
 		"max_depth": int(req.get("max_depth", SolvabilitySolver.DEFAULT_MAX_DEPTH))}
 	var stop_after := int(req.get("stop_after_solved", 1))
-	var analyze: bool = bool(req.get("analyze", true)) and transparent.is_empty()
+	var analyze: bool = bool(req.get("analyze", true))
 	var level_number := int(req.get("level_number", 1))
 	var solved_n := 0
 	var cands: Array = req.get("candidates", [])
 	for i in range(cands.size()):
 		var cand: Dictionary = cands[i]
-		var rec := {"id": cand["id"]}
-		var eng = _engine(cand["columns"], level, selected_column_count)
-		if eng == null:
+		var rec := {"id": cand["id"], "artworkCellCount": level.get_artwork_cell_count(), "voidCellCount": level.get_void_cell_count(), "levelDataVersion": level.version}
+		var loaded_plan := SupplyPlanLoader.load_engine(String(cand.get("supply_plan_path", "")), level)
+		rec["supplyPlanLoaderPass"] = bool(loaded_plan.get("ok", false))
+		if not loaded_plan.get("ok", false):
 			rec["status"] = "MALFORMED"
+			rec["supplyPlanError"] = loaded_plan.get("error", "loader rejected plan")
 			out["results"].append(rec)
 			print("BRIDGE %d/%d %s MALFORMED" % [i + 1, cands.size(), cand["id"]])
 			continue
+		var eng = loaded_plan["engine"]
 		if cand.has("replay_trace"):  # differential replay of an external trace
-			var rp: Dictionary = solver.replay(_initial(level, eng, transparent), cand["replay_trace"])
+			var rp: Dictionary = solver.replay(_initial(level, eng), cand["replay_trace"])
 			rec["status"] = "REPLAY"
 			rec["replay"] = {"ok": rp["ok"], "solved": rp["solved"], "finalActive": int(rp["final_active"]),
 				"steps": int(rp["steps"]), "divergedAt": int(rp["diverged_at"])}
@@ -87,7 +114,7 @@ func _initialize() -> void:
 			print("BRIDGE %d/%d %s REPLAY ok=%s solved=%s" % [i + 1, cands.size(), cand["id"], rp["ok"], rp["solved"]])
 			continue
 		var t0 := Time.get_ticks_msec()
-		var res: Dictionary = solver.solve(_initial(level, eng, transparent), cfg)
+		var res: Dictionary = solver.solve(_initial(level, eng), cfg)
 		rec["status"] = String(res["status"])
 		rec["reason"] = res.get("reason", "")
 		rec["solver"] = {"visited": int(res.get("visited", 0)), "memoHits": int(res.get("memo_hits", 0)),
@@ -101,7 +128,7 @@ func _initialize() -> void:
 					"active_after": int(a["active_after"])})
 			rec["trace"] = trace
 			rec["traceHash"] = int(res["trace_hash"])
-			var rp: Dictionary = solver.replay(_initial(level, eng, transparent), res["trace"])
+			var rp: Dictionary = solver.replay(_initial(level, eng), res["trace"])
 			rec["replay"] = {"ok": rp["ok"], "solved": rp["solved"], "finalActive": int(rp["final_active"]),
 				"steps": int(rp["steps"]), "divergedAt": int(rp["diverged_at"])}
 			if analyze and rp["ok"] and rp["solved"]:
@@ -117,30 +144,8 @@ func _initialize() -> void:
 	f.close()
 	quit(0)
 
-func _engine(columns: Array, level, column_count: int):
-	var eng = BatchSupplyEngine.create(column_count, 3)
-	if eng == null or columns.size() != column_count:
-		return null
-	var cols: Array = []
-	var n := 0
-	for col in columns:
-		var q: Array = []
-		for b in col:
-			var cb = ColorBatch.make("B%04d" % n, int(b["color"]), int(b["count"]), level.palette.size())
-			if cb == null:
-				return null
-			q.append(cb)
-			n += 1
-		cols.append(q)
-	if not eng.load_candidate(cols, 0, level.palette.size()):
-		return null
-	return eng
-
-func _initial(level, eng, transparent: Array):
-	var ps = ProofState.from_level_and_supply(level, eng)
-	for i in transparent:
-		ps.active[int(i)] = ProofState.CLEARED_BYTE
-	return ps
+func _initial(level, eng):
+	return ProofState.from_level_and_supply(level, eng)
 
 func _difficulty(level, eng, trace: Array, level_number: int) -> Dictionary:
 	var an = Analyzer.new()

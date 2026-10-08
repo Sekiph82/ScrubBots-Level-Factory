@@ -13,9 +13,6 @@ from pathlib import Path
 
 from .contracts import BASELINE_SLOT_COUNT, VISIBLE_PREVIEW_DEPTH, validate_column_count
 
-DEFAULT_PROJECT = Path.home() / "Desktop" / "Scrubbots"
-
-
 def _gd_const(path, name):
     m = re.search(rf"const\s+{name}(?:\s*:\s*[A-Za-z_][A-Za-z0-9_]*)?\s*(?::=|=)\s*(\d+)", Path(path).read_text(encoding="utf-8"))
     if not m:
@@ -49,7 +46,11 @@ class GameRules:
         used the owner ZIP API, but is intentionally ignored: global caps are not
         part of the current game contract.
         """
-        p = Path(project or os.environ.get("SCRUBBOTS_PROJECT") or DEFAULT_PROJECT)
+        configured_project = project or os.environ.get("SCRUBBOTS_PROJECT")
+        self._void_project_configured = configured_project is not None
+        if not configured_project:
+            raise FileNotFoundError("SCRUBBOTS_PROJECT or an explicit game_project is required; implicit Desktop fallback is disabled")
+        p = Path(configured_project)
         if not (p / "project.godot").exists():
             raise FileNotFoundError(f"ScrubBots project not found: {p}")
         self.project = p
@@ -108,3 +109,9 @@ class GameRules:
     def classify(self, challenge_score):
         """Difficulty class = nearest owner-locked lane base (level_progression_v1.json)."""
         return min(self.lanes, key=lambda k: abs(self.lanes[k] - challenge_score))
+
+    def void_capability(self):
+        """Current-game VOID gate; opaque V1 callers do not need this capability."""
+        from .void_capability import void_capability
+
+        return void_capability(self.project if self._void_project_configured else None)

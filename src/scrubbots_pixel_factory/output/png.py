@@ -8,6 +8,7 @@ import zlib
 from collections.abc import Iterable
 
 from ..contracts import CANONICAL_PALETTE
+from ..contracts.palette import VOID_CELL_ID
 from .artwork import ArtworkContractError
 
 
@@ -62,14 +63,27 @@ def _encode_rgb_png(width: int, height: int, raw_rgb: bytes) -> bytes:
     return PNG_SIGNATURE + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", compressed) + _chunk(b"IEND", b"")
 
 
+def _encode_rgba_png(width: int, height: int, raw_rgba: bytes) -> bytes:
+    if len(raw_rgba) != width * height * 4:
+        raise PNGContractError("raw RGBA length does not equal width*height*4")
+    scanlines = b"".join(b"\x00" + raw_rgba[row * width * 4 : (row + 1) * width * 4] for row in range(height))
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0)
+    return PNG_SIGNATURE + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", zlib.compress(scanlines, level=9)) + _chunk(b"IEND", b"")
+
+
 def encode_logical_png(width: int, height: int, cells: Iterable[str]) -> bytes:
-    """Encode one flat canonical RGB pixel per logical cell, with no scaling."""
+    """Encode one exact source pixel per logical cell; VOID cells have alpha zero."""
 
     width, height = _validate_dimensions(width, height, _MAX_LOGICAL_DIMENSION)
     normalized = tuple(cells)
     if len(normalized) != width * height:
         raise PNGContractError("logical cell count does not equal PNG dimensions")
-    return _encode_rgb_png(width, height, logical_rgb_bytes(normalized))
+    if VOID_CELL_ID not in normalized:
+        return _encode_rgb_png(width, height, logical_rgb_bytes(normalized))
+    rgba = bytearray()
+    for cell in normalized:
+        rgba.extend((0, 0, 0, 0) if cell == VOID_CELL_ID else (*CANONICAL_PALETTE.rgb_for(cell), 255))
+    return _encode_rgba_png(width, height, bytes(rgba))
 
 
 def encode_preview_png(width: int, height: int, cells: Iterable[str], scale: int) -> bytes:
@@ -84,15 +98,23 @@ def encode_preview_png(width: int, height: int, cells: Iterable[str], scale: int
     scaled_width, scaled_height = width * scale, height * scale
     if scaled_width > _MAX_DECODE_DIMENSION or scaled_height > _MAX_DECODE_DIMENSION:
         raise PNGContractError("preview dimensions exceed the supported bound")
-    source = logical_rgb_bytes(normalized)
+    has_void = VOID_CELL_ID in normalized
+    if has_void:
+        rgba = bytearray()
+        for cell in normalized:
+            rgba.extend((0, 0, 0, 0) if cell == VOID_CELL_ID else (*CANONICAL_PALETTE.rgb_for(cell), 255))
+        source = bytes(rgba)
+    else:
+        source = logical_rgb_bytes(normalized)
     rows: list[bytes] = []
-    source_row_bytes = width * 3
+    channels = 4 if has_void else 3
+    source_row_bytes = width * channels
     for row in range(height):
         source_row = source[row * source_row_bytes : (row + 1) * source_row_bytes]
-        expanded_row = b"".join(source_row[index * 3 : index * 3 + 3] * scale for index in range(width))
+        expanded_row = b"".join(source_row[index * channels : index * channels + channels] * scale for index in range(width))
         rows.extend([expanded_row] * scale)
     scanlines = b"".join(b"\x00" + row for row in rows)
-    ihdr = struct.pack(">IIBBBBB", scaled_width, scaled_height, 8, 2, 0, 0, 0)
+    ihdr = struct.pack(">IIBBBBB", scaled_width, scaled_height, 8, 6 if has_void else 2, 0, 0, 0)
     return PNG_SIGNATURE + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", zlib.compress(scanlines, level=9)) + _chunk(b"IEND", b"")
 
 
@@ -132,7 +154,7 @@ def _parse_chunks(data: bytes) -> list[tuple[bytes, bytes]]:
 
 
 def decode_png(data: bytes, *, max_dimension: int = _MAX_LOGICAL_DIMENSION) -> DecodedPNG:
-    """Decode only the project's 8-bit RGB, non-interlaced, filter-0 profile."""
+    """Decode project 8-bit RGB/RGBA, filter-0 PNGs; alpha must be binary."""
 
     chunks = _parse_chunks(data)
     ihdr = chunks[0][1]
@@ -140,10 +162,11 @@ def decode_png(data: bytes, *, max_dimension: int = _MAX_LOGICAL_DIMENSION) -> D
         raise PNGContractError("PNG IHDR length is invalid")
     width, height, bit_depth, color_type, compression, filter_method, interlace = struct.unpack(">IIBBBBB", ihdr)
     width, height = _validate_dimensions(width, height, max_dimension)
-    if (bit_depth, color_type, compression, filter_method, interlace) != (8, 2, 0, 0, 0):
-        raise PNGContractError("PNG must be 8-bit RGB, non-interlaced, with standard compression/filter methods")
+    if (bit_depth, color_type, compression, filter_method, interlace) not in {(8, 2, 0, 0, 0), (8, 6, 0, 0, 0)}:
+        raise PNGContractError("PNG must be 8-bit RGB or RGBA, non-interlaced, with standard compression/filter methods")
+    channels = 4 if color_type == 6 else 3
     compressed = b"".join(chunk for kind, chunk in chunks if kind == b"IDAT")
-    expected_length = height * (1 + width * 3)
+    expected_length = height * (1 + width * channels)
     decompressor = zlib.decompressobj()
     try:
         raw = decompressor.decompress(compressed, expected_length + 1)
@@ -159,15 +182,23 @@ def decode_png(data: bytes, *, max_dimension: int = _MAX_LOGICAL_DIMENSION) -> D
         if raw[cursor] != 0:
             raise PNGContractError("PNG uses an unsupported non-zero scanline filter")
         cursor += 1
-        row = raw[cursor : cursor + width * 3]
-        cursor += width * 3
-        rgb.extend(row)
+        row = raw[cursor : cursor + width * channels]
+        cursor += width * channels
         for pixel in range(width):
-            triplet = row[pixel * 3 : pixel * 3 + 3]
+            offset = pixel * channels
+            triplet = row[offset : offset + 3]
+            alpha = row[offset + 3] if channels == 4 else 255
+            if alpha not in (0, 255):
+                raise PNGContractError("PNG alpha must be binary (0 or 255)")
+            if alpha == 0:
+                cells.append(VOID_CELL_ID)
+                rgb.extend((0, 0, 0))
+                continue
             try:
                 cells.append(CANONICAL_PALETTE.id_for_rgb(tuple(triplet)))
             except (TypeError, ValueError) as exc:
                 raise PNGContractError("PNG RGB does not map exactly to a canonical logical C-ID") from exc
+            rgb.extend(triplet)
     return DecodedPNG(width, height, tuple(cells), bytes(rgb))
 
 

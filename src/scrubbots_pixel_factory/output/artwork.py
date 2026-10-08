@@ -16,6 +16,7 @@ from ..contracts import (
     validate_used_color_count,
 )
 from ..quality import logical_grid_hash
+from ..contracts.palette import VOID_CELL_ID
 from ..core.request import LegacyGenerationRequest
 
 
@@ -72,6 +73,8 @@ def _validate_artwork_fields(
         raise ArtworkContractError("cells length must equal width multiplied by height")
     if any(type(cell) is not str for cell in normalized):
         raise ArtworkContractError("cells must contain only canonical C-ID strings")
+    if VOID_CELL_ID in normalized and (normalized.count(VOID_CELL_ID) == len(normalized)):
+        raise ArtworkContractError("VOID artwork must contain at least one non-VOID artwork cell")
     try:
         actual_palette = validate_current_used_color_count(normalized) if selected is None else validate_used_color_count(selected, normalized)
     except (TypeError, ValueError) as exc:

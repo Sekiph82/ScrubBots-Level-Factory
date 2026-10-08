@@ -12,6 +12,7 @@ from ..contracts import (
     validate_dimensions,
     validate_used_color_count,
 )
+from ..contracts.palette import VOID_CELL_ID
 from .request import (
     GenerationRequest,
     LegacyGenerationRequest,
@@ -155,6 +156,10 @@ class GenerationResult:
                     raise ResultContractError("result height does not match explicit request height")
                 if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                     raise ResultContractError("logical_grid length must equal width multiplied by height")
+                if VOID_CELL_ID in cells and request.background_intent != "TRANSPARENT":
+                    raise ResultContractError("VOID cells require TRANSPARENT background intent")
+                if VOID_CELL_ID in cells and cells.count(VOID_CELL_ID) == len(cells):
+                    raise ResultContractError("VOID artwork must contain at least one non-VOID artwork cell")
                 actual_used = validate_used_color_count(request.difficulty, cells) if isinstance(request, LegacyGenerationRequest) else validate_current_used_color_count(cells)
                 supplied_palette = tuple(used_palette)  # type: ignore[arg-type]
             except ResultContractError:
@@ -269,6 +274,10 @@ class GenerationResult:
                 raise ResultContractError("result height does not match explicit request height")
             if len(cells) != width * height or any(type(cell) is not str for cell in cells):
                 raise ResultContractError("logical_grid length must equal width multiplied by height")
+            if VOID_CELL_ID in cells and request.background_intent != "TRANSPARENT":
+                raise ResultContractError("VOID cells require TRANSPARENT background intent")
+            if VOID_CELL_ID in cells and cells.count(VOID_CELL_ID) == len(cells):
+                raise ResultContractError("VOID artwork must contain at least one non-VOID artwork cell")
             used = validate_used_color_count(request.difficulty, cells) if isinstance(request, LegacyGenerationRequest) else validate_current_used_color_count(cells)
         except ResultContractError:
             raise

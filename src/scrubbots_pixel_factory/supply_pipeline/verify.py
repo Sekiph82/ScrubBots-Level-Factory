@@ -29,6 +29,12 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         return {"state": "ERROR", "disposition": "ERROR", "reason": f"export is unreadable: {exc}"}
     if not isinstance(level, dict) or not isinstance(plan, dict):
         return {"state": "ERROR", "disposition": "ERROR", "reason": "level and plan must be JSON objects"}
+    cells = level.get("cells")
+    if not isinstance(cells, list) or any(type(value) is not int for value in cells):
+        return {"state": "ERROR", "disposition": "ERROR", "reason": "LevelData cells must be integer palette IDs or VOID -1"}
+    void_count = cells.count(-1)
+    if any(value < -1 for value in cells) or (void_count and (level.get("version") != 2 or void_count == len(cells))) or (not void_count and level.get("version") != 1):
+        return {"state": "ERROR", "disposition": "ERROR", "reason": "LevelData V1/V2 VOID encoding is not canonical"}
     required = {"schema", "version", "levelId", "columnCount", "visiblePreviewDepth", "maxRobotsPerBatch", "columns"}
     if plan.get("schema") != "scrubbots.level_supply_plan.v1" or not required.issubset(plan):
         return {"state": "ERROR", "disposition": "ERROR", "reason": "supply plan schema or fields are invalid"}
@@ -48,6 +54,10 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         return {"state": "ERROR", "disposition": "ERROR", "reason": "plan and current game dimensions do not match"}
     if not rules.live_column_verification_available:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "live game column compatibility is pending the separate game task", "column_count": selected_columns, "authority": rules.authority}
+    if void_count:
+        gate = rules.void_capability()
+        if gate.get("state") != "OPEN":
+            return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": gate.get("reason", "current-game VOID capability gate is closed"), "capability": gate, "authority": rules.authority}
     level_palette = [_hex(value) for value in level.get("palette", [])]
     cid_to_hex = {cid: _hex(color) for cid, color in rules.palette}
     local_by_hex = {value: index for index, value in enumerate(level_palette)}
@@ -70,10 +80,10 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc)}
     if len(columns) != selected_columns:
         return {"state": "ERROR", "disposition": "ERROR", "reason": "supply column count mismatch"}
-    cells = [int(value) for value in level.get("cells", [])]
     counts: dict[int, int] = {}
     for value in cells:
-        counts[value] = counts.get(value, 0) + 1
+        if value >= 0:
+            counts[value] = counts.get(value, 0) + 1
     candidate = {"id": str(level["id"]), "columns": [[{"color": color, "count": amount} for color, amount in column] for column in columns]}
     try:
         response = ScrubBotsSolver(rules).run(level, [candidate], analyze=True)
@@ -81,7 +91,12 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc), "authority": rules.authority}
     record = response.get("results", [{}])[0]
     verification = SolutionVerifier().verify(counts, sum(counts.values()), columns, record, selected_columns)
-    ready = record.get("status") == "SOLVED" and verification["all_ok"]
+    loader_evidence = {
+        "levelLoaderPass": response.get("levelLoaderPass") is True,
+        "productionValidatorPass": response.get("productionValidatorPass") is True,
+        "supplyPlanLoaderPass": record.get("supplyPlanLoaderPass") is True,
+    }
+    ready = record.get("status") == "SOLVED" and verification["all_ok"] and all(loader_evidence.values())
     return {
         "schema": "scrubbots-primary-supply-verification/v1",
         "state": "READY" if ready else "REJECTED",
@@ -89,7 +104,10 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         "authority": rules.authority,
         "solver": record,
         "verification": verification,
+        **loader_evidence,
         "difficulty_v1": record.get("difficultyV1"),
+        "artworkCellCount": len(cells) - void_count,
+        "voidCellCount": void_count,
         "supply_count_policy": "positive per-plan metadata bound; no global cap",
     }
 

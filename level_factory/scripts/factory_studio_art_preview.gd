@@ -27,6 +27,7 @@ var _error_message := ""
 var _source_image: Image
 var _displayed_image: Image
 var _preview_texture: ImageTexture
+var _preview_background: ColorRect
 var _state_label: Label
 var _identity_label: Label
 var _image_control: TextureRect
@@ -56,6 +57,14 @@ func _build_preview() -> void:
 	_identity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(_identity_label)
 
+	_preview_background = ColorRect.new()
+	_preview_background.name = "VoidPresentationBackground"
+	_preview_background.color = Color("#202533")
+	_preview_background.visible = false
+	_preview_background.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_preview_background.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	add_child(_preview_background)
+
 	_image_control = TextureRect.new()
 	_image_control.name = "ArtworkImage"
 	_image_control.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -63,7 +72,7 @@ func _build_preview() -> void:
 	_image_control.stretch_mode = TextureRect.STRETCH_KEEP
 	_image_control.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	_image_control.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	add_child(_image_control)
+	_preview_background.add_child(_image_control)
 
 
 func consume_action_result(result: Dictionary) -> void:
@@ -121,6 +130,10 @@ func _load_successful_artwork(result: Dictionary) -> void:
 	_displayed_image = image.duplicate()
 	_displayed_image.resize(_displayed_width, _displayed_height, Image.INTERPOLATE_NEAREST)
 	_preview_texture = ImageTexture.create_from_image(_displayed_image)
+	_preview_background.visible = image.detect_alpha()
+	_preview_background.custom_minimum_size = Vector2(_displayed_width, _displayed_height)
+	_preview_background.size = Vector2(_displayed_width, _displayed_height)
+	_image_control.position = Vector2.ZERO
 	_source_action = str(result.get("action", ""))
 	_candidate_id = str(result.get("candidate_id", ""))
 	_source_bundle_path = output_path

@@ -136,6 +136,13 @@ def _proof_for_level(
         raise ScrubpackSolverIdentityError("packaging level or supply bytes are malformed") from exc
     if not isinstance(level_data, dict) or not isinstance(plan, dict):
         raise ScrubpackSolverIdentityError("packaging level and supply payloads must be objects")
+    cells = level_data.get("cells")
+    if not isinstance(cells, list) or any(type(value) is not int for value in cells):
+        raise ScrubpackSolverIdentityError("packaged LevelData cells must be integer palette IDs or VOID -1")
+    void_count = cells.count(-1)
+    artwork_count = len(cells) - void_count
+    if any(value < -1 for value in cells) or (level_data.get("version") == 1 and void_count) or (level_data.get("version") == 2 and (void_count == 0 or artwork_count == 0)) or level_data.get("version") not in (1, 2):
+        raise ScrubpackSolverIdentityError("packaged LevelData V1/V2 VOID encoding is not canonical")
     level_sha256 = _sha256(level_raw)
     plan_sha256 = _sha256(plan_raw)
     pipeline_files = primary.get("files")
@@ -207,6 +214,13 @@ def _proof_for_level(
         "max_robots_per_batch": plan["maxRobotsPerBatch"],
         "authority": dict(authority),
     }
+    if void_count:
+        if identity.get("artwork_cell_count") != artwork_count or identity.get("void_cell_count") != void_count:
+            raise ScrubpackSolverIdentityError("VOID artwork/void counts differ from exact packaged LevelData")
+        state_body["artwork_cell_count"] = artwork_count
+        state_body["void_cell_count"] = void_count
+    elif "artwork_cell_count" in identity or "void_cell_count" in identity:
+        raise ScrubpackSolverIdentityError("void-free V1 identity must preserve the legacy state schema")
     if _canonical_digest(state_body) != identity["solver_state_sha256"]:
         raise ScrubpackSolverIdentityError("canonical initial solver-state digest does not match exact pack inputs")
     evidence_body = _solver_evidence_body(result, authority)
@@ -222,7 +236,7 @@ def _proof_for_level(
     if primary.get("load_check", {}).get("state") != "READY":
         raise ScrubpackSolverIdentityError("current canonical supply-plan load check is not READY")
 
-    return {
+    binding = {
         "level_id": level.level_id,
         "level_data_sha256": level_sha256,
         "supply_plan_sha256": plan_sha256,
@@ -242,6 +256,10 @@ def _proof_for_level(
             "pipeline_sha256": pipeline_sha256,
         },
     }
+    if void_count:
+        binding["artwork_cell_count"] = artwork_count
+        binding["void_cell_count"] = void_count
+    return binding
 
 
 def build_solver_proven_scrubpack(

@@ -2,6 +2,8 @@
 
 import random
 
+import numpy as np
+
 from .batch_planner import BatchPlanner
 from .candidate_generator import SupplyCandidateGenerator
 from .contracts import DEFAULT_COLUMN_COUNT, validate_column_count
@@ -77,6 +79,22 @@ class SupplyOptimizer:
                       candidates, level_id, verify_top, screen_budget, metric_top,
                       viability_budget, real_max_visited, level_number, progress):
         log = progress or (lambda *_: None)
+        void_count = int(np.count_nonzero(np.asarray(grid) < 0))
+        if void_count:
+            gate_reader = getattr(self.rules, "void_capability", None)
+            gate = gate_reader() if callable(gate_reader) else {
+                "state": "CLOSED", "reason": "configured current-game VOID capability is unavailable"
+            }
+            if not isinstance(gate, dict) or gate.get("state") != "OPEN":
+                reason = gate.get("reason", "current-game VOID capability gate is closed") if isinstance(gate, dict) else "current-game VOID capability gate is invalid"
+                raise NoValidSupply(f"TRANSPARENT_UNAVAILABLE: {reason}")
+            artwork_count = m["playable_pixels"]
+            if artwork_count < 200 or artwork_count < m["width"] * m["height"] * 0.25:
+                raise NoValidSupply(
+                    f"VOID minimum artwork rule failed: {artwork_count} non-VOID cells on {m['width']}x{m['height']}"
+                )
+            if not 3 <= m["color_count"] <= 12:
+                raise NoValidSupply(f"VOID production requires 3..12 non-VOID colors; received {m['color_count']}")
         log(
             f"image {m['width']}x{m['height']} playable={m['playable_pixels']} "
             f"colors={m['color_count']} complexity={m['image_complexity_score']} "
@@ -136,7 +154,7 @@ class SupplyOptimizer:
                 level,
                 [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
                 stop_after=verify_top - len(accepted), max_visited=real_max_visited,
-                analyze=m["full_canvas"], level_number=level_number,
+                analyze=True, level_number=level_number,
                 progress=lambda line: log("  game solver: " + line),
             )
             by_id = {p["id"]: p for p in chunk}

@@ -20,6 +20,7 @@ from typing import Any
 from ..contracts import CANONICAL_PALETTE, Difficulty, parse_difficulty, validate_dimensions, validate_used_color_count
 from ..contracts.color_usage import ColorUsageContractError
 from ..contracts.palette import PaletteContractError
+from ..contracts.palette import VOID_CELL_ID
 
 
 QUALITY_SCHEMA = "scrubbots-quality"
@@ -285,6 +286,8 @@ def _validate_grid(width: int, height: int, cells: Iterable[str]) -> tuple[str, 
             f"logical cell count {len(normalized)} does not equal width*height {width * height}",
         )
     for index, value in enumerate(normalized):
+        if value == VOID_CELL_ID:
+            continue
         try:
             CANONICAL_PALETTE.validate_logical_id(value)
         except (PaletteContractError, TypeError) as exc:
@@ -301,6 +304,22 @@ def _boundary_indices(width: int, height: int) -> tuple[int, ...]:
 
 
 def _infer_negative_space(width: int, height: int, cells: tuple[str, ...]) -> NegativeSpaceEvidence:
+    if VOID_CELL_ID in cells:
+        colors = _sorted_ids(set(cells) - {VOID_CELL_ID})
+        whole = {color: 0 for color in colors}
+        for cell in cells:
+            if cell != VOID_CELL_ID:
+                whole[cell] += 1
+        boundary: dict[str, int] = {color: 0 for color in whole}
+        boundary_indices = _boundary_indices(width, height)
+        for index in boundary_indices:
+            if cells[index] != VOID_CELL_ID:
+                boundary[cells[index]] += 1
+        return NegativeSpaceEvidence(
+            VOID_CELL_ID, boundary, whole,
+            sum(cells[index] != VOID_CELL_ID for index in boundary_indices),
+            cells.count(VOID_CELL_ID),
+        )
     whole: dict[str, int] = {color: 0 for color in _sorted_ids(set(cells))}
     for cell in cells:
         whole[cell] += 1
@@ -363,9 +382,10 @@ def _symmetry(cells: tuple[str, ...], width: int, height: int, horizontal: bool)
 
 
 def _checkerboard_score(cells: tuple[str, ...], width: int, height: int) -> float:
-    used = _sorted_ids(set(cells))
+    used = _sorted_ids(set(cells) - {VOID_CELL_ID})
     if len(used) != 2:
         return 0.0
+    artwork_count = sum(cell != VOID_CELL_ID for cell in cells)
     matches_a = 0
     matches_b = 0
     for y in range(height):
@@ -373,9 +393,11 @@ def _checkerboard_score(cells: tuple[str, ...], width: int, height: int) -> floa
             expected_a = used[(x + y) % 2]
             expected_b = used[1 - ((x + y) % 2)]
             actual = cells[y * width + x]
+            if actual == VOID_CELL_ID:
+                continue
             matches_a += actual == expected_a
             matches_b += actual == expected_b
-    return _ratio(max(matches_a, matches_b), width * height)
+    return _ratio(max(matches_a, matches_b), artwork_count)
 
 
 def analyze_grid(
@@ -398,7 +420,7 @@ def analyze_grid(
     occupied_sizes = tuple(len(component) for component in occupied_components)
 
     color_components: list[ColorComponent] = []
-    for color in _sorted_ids(set(normalized)):
+    for color in _sorted_ids(set(normalized) - {VOID_CELL_ID}):
         color_mask = tuple(occupied_mask[index] and normalized[index] == color for index in range(width * height))
         for component in _components(color_mask, width, height):
             color_components.append(
@@ -411,7 +433,7 @@ def analyze_grid(
     largest_region = max(occupied_sizes, default=0)
     occupied_color_counts = {
         color: sum(1 for index in occupied_indices if normalized[index] == color)
-        for color in _sorted_ids(set(normalized) - {negative_space.inferred_color})
+        for color in _sorted_ids(set(normalized) - {negative_space.inferred_color, VOID_CELL_ID})
     }
     largest_color = max(occupied_color_counts.values(), default=0)
     edge_indices = set(_boundary_indices(width, height))
@@ -432,9 +454,11 @@ def analyze_grid(
 
     counts = tuple(negative_space.whole_grid_counts[color] for color in _sorted_ids(negative_space.whole_grid_counts))
     entropy = 0.0
+    artwork_count = sum(counts)
     for count in counts:
-        probability = count / len(normalized)
-        entropy -= probability * math.log2(probability)
+        if artwork_count:
+            probability = count / artwork_count
+            entropy -= probability * math.log2(probability)
     entropy = round(entropy, 8)
 
     adjacency: dict[str, int] = {}
@@ -446,6 +470,8 @@ def analyze_grid(
                 if nx >= width or ny >= height:
                     continue
                 other = ny * width + nx
+                if normalized[index] == VOID_CELL_ID or normalized[other] == VOID_CELL_ID:
+                    continue
                 left, right = sorted((normalized[index], normalized[other]), key=_cid_key)
                 key = f"{left}|{right}"
                 adjacency[key] = adjacency.get(key, 0) + 1
@@ -482,7 +508,7 @@ def analyze_grid(
         negative_space_ratio=_ratio(negative_space.inferred_count, len(normalized)),
         checkerboard_score=_checkerboard_score(normalized, width, height),
     )
-    return QualityAnalysis(width, height, normalized, _sorted_ids(set(normalized)), negative_space, metrics)
+    return QualityAnalysis(width, height, normalized, _sorted_ids(set(normalized) - {VOID_CELL_ID}), negative_space, metrics)
 
 
 def _quality_codes(analysis: QualityAnalysis, policy: QualityPolicy) -> tuple[str, ...]:
