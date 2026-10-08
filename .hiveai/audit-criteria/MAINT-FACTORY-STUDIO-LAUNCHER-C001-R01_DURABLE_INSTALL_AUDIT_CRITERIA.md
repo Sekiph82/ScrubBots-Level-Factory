@@ -11,10 +11,12 @@ Require:
 - runtime/install root outside `%TEMP%`;
 - recommended location: `%LOCALAPPDATA%\ScrubBots Factory Studio\runtime`;
 - source revision is the exact current published Factory repository revision used by the installer;
-- dirty/stale owner Desktop checkout remains untouched;
+- dirty/stale owner Desktop source checkout remains untouched except for the explicitly authorized `Release\\ScrubBots Factory Studio` deployment subtree;
 - no Desktop sibling clone/worktree;
 - stable runtime contains all Factory Studio runtime dependencies;
 - install/repair is idempotent;
+- the `Release` folder is created if absent;
+- pre-existing unknown owner files under the runtime destination are preserved or cause fail-closed behavior, never silent destructive overwrite;
 - owner-generated/output data is not silently destroyed.
 
 ## B. Shortcut durability
@@ -26,8 +28,8 @@ Require Desktop shortcut:
 COM readback must prove:
 
 - TargetPath is the intended Windows launcher host;
-- launcher argument points to the stable runtime root, never `%TEMP%`;
-- WorkingDirectory is the stable runtime root, never `%TEMP%`;
+- launcher argument points exactly into `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio`, never `%TEMP%`;
+- WorkingDirectory is exactly that stable runtime root, never `%TEMP%`;
 - Description remains `ScrubBots Factory Studio`;
 - IconLocation is the authoritative owner ICO or byte-identical stable copy.
 
