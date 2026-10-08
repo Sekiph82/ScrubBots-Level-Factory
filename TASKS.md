@@ -5,21 +5,21 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: POST-M18 MAINTENANCE - Desktop Factory Studio Launcher
-- Current Sprint: MAINT-FACTORY-STUDIO-LAUNCHER-C001 — Desktop Factory Studio Launcher / Icon / Direct Start
-- Current Task: MAINT-FACTORY-STUDIO-LAUNCHER-C001 — Windows Desktop Launcher + ScrubBots Factory Studio Icon
-- Current Task Status: OWNER_APPROVED / AUTHORIZED_CURRENT / AFTER_M18_TECHNICAL_PASS / BEFORE_M17
-- Next Task/Action: **CODEX executes MAINT-FACTORY-STUDIO-LAUNCHER-C001 now** `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_PROMPT.md`. M18 / SB-CPX-004 technical implementation is PASS with no R04 required. The launcher must create/verify the real Desktop `ScrubBots Factory Studio.lnk`, direct-start behavior and icon identity, then stop for ChatGPT audit. M17 remains blocked until this launcher task is PASS/CLOSED. Real R2 live publication gates remain pending separately: secure writer credentials, genuine owner-approved batch, first live STAGING proof and exact production approval.
+- Current Sprint: MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01 — Durable Desktop Factory Studio Install / Shortcut Closure
+- Current Task: MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01 — Durable Local Runtime + Real Desktop Shortcut Launch
+- Current Task Status: STRICT_AUDIT_CHANGES_REQUIRED / R01_AUTHORIZED / BEFORE_M17
+- Next Task/Action: **CODEX executes launcher R01 now** `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_PROMPT.md`. Retain the accepted icon/Godot/launcher implementation; replace the TEMP-bound Desktop shortcut with a durable `%LOCALAPPDATA%` runtime/install authority and prove the actual `.lnk` launches Factory Studio without the editor. M17 remains blocked until independent PASS/CLOSED.
 - Required Actor: CODEX, THEN CHATGPT
 - Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/M18_CPX004_R2_R03_STRICT_REAUDIT_V01.md`
+- Previous Strict Audit: `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_STRICT_AUDIT_V01.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_PROMPT.md`.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -233,15 +233,16 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
 - M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
+- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Strict Audit [2026-10-08]: `CHANGES_REQUIRED / R01` by `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_STRICT_AUDIT_V01.md`. Icon authority, Godot app identity, header icon, direct launcher implementation and regressions PASS/retained. Blocking deployment defects: Desktop `.lnk` points into `%TEMP%` and therefore is not durable; actual `.lnk` launch was not executed/proven. R01 must install a stable LocalAppData runtime and prove real shortcut launch before M17.
 - M18/CPX-004 R03 Strict Re-audit [2026-10-07]: `TECHNICAL PASS / EXTERNAL LIVE GATES PENDING` by `.hiveai/audits/M18_CPX004_R2_R03_STRICT_REAUDIT_V01.md`. No R04 required. Provider/R2 architecture, canonical Release Pool, executable Studio/headless STAGING handoff, CPX-002 exact-current authority, canonical UTC binding, production approval adversarial regressions and full regression are PASS. Remaining R2 gates are live operational evidence only. Owner sequencing now activates `MAINT-FACTORY-STUDIO-LAUNCHER-C001` before M17.
 - M18/CPX-004 R02 Strict Re-audit [2026-10-07]: `CHANGES_REQUIRED / R03` by `.hiveai/audits/M18_CPX004_R2_R02_STRICT_REAUDIT_V01.md`. Canonical Release Pool, executable Studio/headless STAGING handoff, CPX-002 authority reuse and full regression are PASS/retained. Blocking edge: actual Godot Studio timestamp lacks explicit UTC suffix required by the scrubpack contract; R02 also omitted permanent wrong-manifest/wrong-content-version approval regressions. R03 is narrow and authorized.
 - M18/CPX-004 R01 Strict Re-audit [2026-10-07]: `CHANGES_REQUIRED / R02` by `.hiveai/audits/M18_CPX004_R2_R01_STRICT_REAUDIT_V01.md`. R01 release-ledger fail-closed and exact-object idempotency are PASS/retained; CPX-004 default live Release Pool import and executable Studio/headless publish handoff remain blocking. R02 is authorized; external live R2 credentials/release batch/production approval remain pending.
-- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Queue: `OWNER_APPROVED / CURRENT / AUTHORIZED / BEFORE_M17 / DO_NOT_RUN_CONCURRENTLY`.
+- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Queue: `CHANGES_REQUIRED / R01_CURRENT / BEFORE_M17 / DO_NOT_RUN_CONCURRENTLY`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_PROMPT.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001_WINDOWS_LAUNCHER_ICON_AUDIT_CRITERIA.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Owner Icon Path: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\ScrubBots_Factory_Studio.ico`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Required Outcome: real Desktop `ScrubBots Factory Studio.lnk`; same ICO as shortcut/application identity; derived icon visible in the Factory Studio top-left header; direct app launch without Godot editor; idempotent shortcut repair script.
-- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Execution Gate: SATISFIED by `.hiveai/audits/M18_CPX004_R2_R03_STRICT_REAUDIT_V01.md` (`TECHNICAL PASS / EXTERNAL LIVE GATES PENDING`) and this canonical Current Task switch. Execute now; this launcher task must PASS/CLOSE before M17 is opened.
+- MAINT-FACTORY-STUDIO-LAUNCHER-C001 Execution Gate: base implementation completed but strict audit `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_STRICT_AUDIT_V01.md` requires R01. Execute `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_PROMPT.md`; M17 remains blocked until R01 PASS/CLOSED.
 - M14 Master Execution Order: `SB-CP03-001 -> 002 -> 003 -> 004 -> 005 -> 006 -> 007 -> SB-CPX-002 -> SB-CP03-008 -> 009 -> 010 -> 011 -> 012`.
 - M14 Provider Rule: provider-neutral transaction semantics only; no real cloud vendor adapter/credentials until M18. Stateful deterministic test provider is allowed for byte-level upload/download/promotion tests.
 - M14 CPX-002 Rule: authentic current `Sekiph82/Scrubbots` origin/main Godot replay in isolated TEMP authority is mandatory before production promotion; inability to resolve it is a true blocker, not a skip.
