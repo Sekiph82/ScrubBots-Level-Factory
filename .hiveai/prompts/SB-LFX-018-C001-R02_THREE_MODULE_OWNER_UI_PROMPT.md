@@ -9,7 +9,7 @@ Owner contract:
 `docs/product/FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`
 
 Approved visual master:
-`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp`
+`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
 
 ## VISUAL MASTER IS AUTHORITATIVE
 
@@ -36,11 +36,11 @@ Use the visual master for:
 - blue/green action emphasis.
 
 Owner-locked header text:
-- **`1 PIXEL ART`**
+- **`PIXEL ART`**
 - **`LEVEL FACTORY`**
 - **`RELEASE POOL`**
 
-The leading **`1`** in **`1 PIXEL ART`** is intentional. Preserve it exactly.
+The leading **`1`** in **`PIXEL ART`** is intentional. Preserve it exactly.
 
 Functional implementation may adapt controls to real canonical capability, but the visible composition must remain faithful to the master.
 
@@ -250,7 +250,7 @@ Technical details collapsed.
 
 Capture from durable Release runtime and compare every screenshot side-by-side with the approved visual master.
 
-The Pixel Art Single screenshot must be recognizably the same screen as the master, including the exact visible header label `1 PIXEL ART`.
+The Pixel Art Single screenshot must be recognizably the same screen as the master, including the exact visible header label `PIXEL ART`.
 
 Capture:
 
