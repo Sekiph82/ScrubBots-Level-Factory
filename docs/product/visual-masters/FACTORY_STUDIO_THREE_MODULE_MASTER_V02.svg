@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024">
+  <image href="FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp" x="0" y="0" width="1536" height="1024"/>
+  <!-- Owner correction 2026-10-08: remove the leading numeral from the first module label. -->
+  <rect x="451" y="38" width="165" height="54" rx="8" fill="#1689F3"/>
+  <text x="474" y="70" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">PIXEL ART</text>
+</svg>
