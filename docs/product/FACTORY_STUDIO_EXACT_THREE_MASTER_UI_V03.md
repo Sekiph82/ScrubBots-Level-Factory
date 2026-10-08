@@ -22,7 +22,7 @@ Dynamic values may change. The visible structure may not.
 
 ### PIXEL ART
 
-`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
+`docs/product/visual-masters/FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`
 
 ### LEVEL FACTORY
 
