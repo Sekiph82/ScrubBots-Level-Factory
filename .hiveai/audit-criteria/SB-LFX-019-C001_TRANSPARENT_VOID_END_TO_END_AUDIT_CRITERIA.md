@@ -2,9 +2,12 @@
 
 ## Gate
 
-Do not implement unless exact current `Sekiph82/Scrubbots:main` positively exposes the owner-approved VOID LevelData contract.
+Game dependency is independently PASS/CLOSED:
 
-Current pre-gate behavior must remain fail-closed.
+- implementation: `Sekiph82/Scrubbots@7d0d148b8609ec04852fdee02f6b8ef37598c616`;
+- audit: `coordination/sessions/VOID-CELLS-C001/CHATGPT_STRICT_AUDIT_V01.md`.
+
+At LF execution time, exact current `Sekiph82/Scrubbots:main` must still contain that audited contract. If it does not, fail closed.
 
 ## A. Game capability authority
 
