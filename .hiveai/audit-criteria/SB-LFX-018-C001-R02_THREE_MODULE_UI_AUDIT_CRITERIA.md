@@ -4,7 +4,7 @@ Product contract:
 `docs/product/FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`
 
 Visual master:
-`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp`
+`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
 
 ## Visual-master fidelity gate
 
@@ -13,7 +13,7 @@ The final durable-runtime UI must visually track the approved master, not merely
 Strictly verify:
 
 - same three-button header composition;
-- exact visible header labels: **`1 PIXEL ART`**, **`LEVEL FACTORY`**, **`RELEASE POOL`**;
+- exact visible header labels: **`PIXEL ART`**, **`LEVEL FACTORY`**, **`RELEASE POOL`**;
 - first module selected in blue in the Pixel Art screenshot;
 - large central Visual Review Canvas dominates the workspace;
 - left control column, central canvas, right detail/action column and bottom thumbnail strip remain recognizable in the same proportions;
