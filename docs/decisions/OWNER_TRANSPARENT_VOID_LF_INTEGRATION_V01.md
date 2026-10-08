@@ -1,6 +1,6 @@
 # Owner Decision — Transparent Artwork -> VOID Cells in Level Factory V01
 
-Status: OWNER-APPROVED / GAME VOID CAPABILITY MERGED + AUDITED / LF IMPLEMENTATION READY  
+Status: OWNER-APPROVED / GAME VOID CAPABILITY MERGED + AUDITED / LF IMPLEMENTATION PASS-CLOSED  
 Date: 2026-10-08  
 Repository: `Sekiph82/ScrubBots-Level-Factory`  
 Depends on: `Sekiph82/Scrubbots` main-game VOID ADR and LevelData V2 support.
@@ -83,12 +83,36 @@ Once the game gate opens:
 - Factory Studio preview displays VOID exactly as the current game contract specifies;
 - release/campaign logic uses official resulting score without a separate VOID difficulty hack.
 
-## Required owner-real fixture
+## Owner-real fixture acceptance
 
-A real 32x32 owner/Claude-drawn sprite with approximately 550 transparent pixels must reach READY with supply columns 3, 4 and 5 when all normal production gates pass.
+Canonical owner-supplied fixture:
+
+`tests/fixtures/owner_void/017_a_single_brown_owl_centered_simple_clear_32px.png`
+
+Accepted immutable facts:
+
+- 32x32;
+- 354 transparent/VOID cells;
+- 670 artwork cells;
+- 0 semi-alpha cells;
+- 7 opaque RGB colors;
+- SHA-256 `9f3cff525745cd0623997cb0c2d99084e3c2ddb110457042ebdefe58cdcb7214`.
+
+This exact fixture reached READY with supply columns 3, 4 and 5, with official current-game loader/validator/supply checks, solver SOLVED, replay WIN and Difficulty V1.
+
+The earlier approximately-550-transparent example is superseded by this owner-selected fixture.
 
 ## Regression invariant
 
 Opaque full-canvas artwork must preserve the pre-VOID output/hashes/behavior where the format remains V1-compatible.
 
 No V2/VOID feature may rewrite legacy opaque content merely because the capability exists.
+
+
+## Level Factory closure
+
+SB-LFX-019-C001-R01 is independently PASS/CLOSED by:
+
+`.hiveai/audits/SB-LFX-019-C001-R01_STRICT_REAUDIT_V01.md`
+
+No R02 is required.
