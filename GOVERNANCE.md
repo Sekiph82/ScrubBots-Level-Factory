@@ -194,3 +194,20 @@ Historical audit copies under `reference/audits/` remain read-only evidence.
 Pixel Art Generator V1 runtime generation must remain offline-only.
 
 No cloud image-generation API, runtime HTTP dependency, API key, telemetry requirement, or network-only generation path may become necessary for core generation.
+
+## Factory Studio owner-UI visual authority
+
+The owner has locked the Factory Studio production interface to exactly three visual masters. Current authority:
+
+- contract: `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
+- index: `docs/product/visual-masters/FACTORY_STUDIO_VISUAL_MASTER_INDEX_V01.md`
+
+The production UI must expose exactly:
+
+`PIXEL ART | LEVEL FACTORY | RELEASE POOL`
+
+No leading numeral before PIXEL ART. No extra owner production page, explanatory paragraph, technical-details link, engineering dashboard, extra action group, or additional visible region is permitted unless the owner updates the visual masters.
+
+For visual/layout disputes, the current master image wins over older UI prose. For backend truth/security/safety, canonical pipeline/game/release contracts remain authoritative.
+
+Historical prompts/logs/audits remain immutable evidence even when their UI direction has been superseded. New work must use the current prompt named by root `TASKS.md`.
