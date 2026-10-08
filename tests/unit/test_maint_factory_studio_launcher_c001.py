@@ -113,8 +113,7 @@ def test_installer_repair_preserves_unchanged_managed_files_and_unknown_outputs(
     installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
 
     assert "$previousFiles[$file.Path] -eq $file.Sha256" in installer
-    assert "$previousManifest.sourceRevision -eq $source.Revision" in installer
-    assert "$installedAtUtc = [string]$previousManifest.installedAtUtc" in installer
+    assert "installedAtUtc" not in installer
     assert "foreach ($relativePath in $previousFiles.Keys)" in installer
     assert "Remove-Item -LiteralPath $targetPath -Force" in installer
     assert "Remove-Item -LiteralPath $runtimeRoot" not in installer

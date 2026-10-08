@@ -285,14 +285,9 @@ try {
             $changedPaths.Add($relativePath)
         }
     }
-    $installedAtUtc = [DateTime]::UtcNow.ToString('o')
-    if ($previousManifest -and $previousManifest.sourceRevision -eq $source.Revision -and -not [string]::IsNullOrWhiteSpace([string]$previousManifest.installedAtUtc)) {
-        $installedAtUtc = [string]$previousManifest.installedAtUtc
-    }
     $newManifest = [ordered]@{
         formatVersion = 1
         sourceRevision = $source.Revision
-        installedAtUtc = $installedAtUtc
         managedFiles = @($source.Files | ForEach-Object { [ordered]@{ path = $_.Path; sha256 = $_.Sha256 } })
     }
     $stagedManifest = Join-Path $stageRoot $manifestName
