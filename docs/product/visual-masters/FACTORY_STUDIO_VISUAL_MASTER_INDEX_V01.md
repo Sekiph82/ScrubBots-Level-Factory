@@ -25,3 +25,14 @@ No leading numeral.
 Implementation contract:
 
 `../FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
+
+
+## Binary integrity status
+
+The intended PIXEL ART layout remains owner-locked, but the currently tracked `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp` binary is **not a valid WebP** and is quarantined from implementation authority until R02-R01 replaces it with the exact owner-approved 1536x1024 source.
+
+Current repair/audit authority:
+- `.hiveai/audits/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_STRICT_AUDIT_V01.md`
+- `.hiveai/prompts/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_PROMPT.md`
+
+LEVEL FACTORY and RELEASE POOL masters remain valid.
