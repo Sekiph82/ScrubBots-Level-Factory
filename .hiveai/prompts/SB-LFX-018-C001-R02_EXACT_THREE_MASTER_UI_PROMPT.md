@@ -12,12 +12,16 @@ Audit criteria:
 `.hiveai/audit-criteria/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_AUDIT_CRITERIA.md`
 
 Visual masters:
-1. `docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
+1. `docs/product/visual-masters/FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`
 2. `docs/product/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
 3. `docs/product/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg`
 
 Standing sync/publish:
 `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`
+
+## MASTER INTEGRITY PREFLIGHT
+
+Before implementation, decode/render all three canonical masters from the repository and verify their declared dimensions/content are readable. The PIXEL ART master is the repaired standalone WebP `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`; do not use the historical broken V01/V02 dependency chain. If any current indexed master is unreadable, stop before product mutation and report the exact file/hash.
 
 ## OWNER LOCK
 
