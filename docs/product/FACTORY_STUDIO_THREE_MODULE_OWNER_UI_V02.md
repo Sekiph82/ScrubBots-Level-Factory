@@ -76,6 +76,13 @@ The canvas must appear at minimum in:
 
 RELEASE POOL must also provide a selected-level visual preview, using the same component or a size-appropriate instance of it.
 
+## Module-specific visual masters
+
+- PIXEL ART: `docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
+- LEVEL FACTORY: `docs/product/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
+
+The LEVEL FACTORY master is owner-approved and is the visual authority for that module, including the central owl Visual Review Canvas, left artwork/settings/pipeline column, right solver/difficulty/actions column, and bottom Level Variations strip.
+
 ## Main navigation
 
 Top-level navigation is exactly:
