@@ -8,6 +8,43 @@ Repository:
 Owner contract:
 `docs/product/FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`
 
+Approved visual master:
+`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp`
+
+## VISUAL MASTER IS AUTHORITATIVE
+
+Before changing UI code, open and inspect the visual master.
+
+The owner requires the final Factory Studio to match this image **as closely as possible**.
+
+Do not create a new visual concept.
+
+Do not reinterpret the layout.
+
+Do not simplify it into generic Godot forms.
+
+Use the visual master for:
+- overall window composition;
+- panel geometry;
+- spacing;
+- left generation/batch column;
+- central Visual Review Canvas;
+- right artwork/details/actions column;
+- bottom thumbnail strip;
+- top navigation;
+- dark visual language;
+- blue/green action emphasis.
+
+Owner-locked header text:
+- **`1 PIXEL ART`**
+- **`LEVEL FACTORY`**
+- **`RELEASE POOL`**
+
+The leading **`1`** in **`1 PIXEL ART`** is intentional. Preserve it exactly.
+
+Functional implementation may adapt controls to real canonical capability, but the visible composition must remain faithful to the master.
+
+
 Audit criteria:
 `.hiveai/audit-criteria/SB-LFX-018-C001-R02_THREE_MODULE_UI_AUDIT_CRITERIA.md`
 
@@ -211,7 +248,11 @@ Technical details collapsed.
 
 ## 8. Visual evidence
 
-Capture from durable Release runtime:
+Capture from durable Release runtime and compare every screenshot side-by-side with the approved visual master.
+
+The Pixel Art Single screenshot must be recognizably the same screen as the master, including the exact visible header label `1 PIXEL ART`.
+
+Capture:
 
 1. PIXEL ART — Single
 2. PIXEL ART — Batch / CSV
