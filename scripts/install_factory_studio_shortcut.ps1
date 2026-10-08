@@ -58,8 +58,10 @@ function Get-ManagedSource {
 
     $gitDirectory = Join-Path $SourceRoot '.git'
     if (Test-Path -LiteralPath $gitDirectory) {
-        $origin = (& git -C $SourceRoot remote get-url origin 2>$null | Select-Object -First 1)
-        if ($LASTEXITCODE -ne 0 -or $origin.TrimEnd('/') -ine $canonicalOrigin.TrimEnd('/')) {
+        $originOutput = & git -C $SourceRoot remote get-url origin 2>$null
+        $originExitCode = $LASTEXITCODE
+        $origin = ($originOutput -join "`n").Trim()
+        if ($originExitCode -ne 0 -or $origin.TrimEnd('/') -ine $canonicalOrigin.TrimEnd('/')) {
             throw "Source root is not the canonical Factory repository: $SourceRoot"
         }
         $revision = (& git -C $SourceRoot rev-parse HEAD).Trim()

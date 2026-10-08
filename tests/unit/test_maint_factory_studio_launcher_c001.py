@@ -90,6 +90,7 @@ def test_installer_binds_runtime_to_published_tracked_source() -> None:
     installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
 
     assert "remote get-url origin" in installer
+    assert "$originExitCode = $LASTEXITCODE" in installer
     assert "rev-parse origin/main" in installer
     assert "published clean revision" in installer
     assert "ls-files --cached" in installer
