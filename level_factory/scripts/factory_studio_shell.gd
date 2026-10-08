@@ -8,6 +8,7 @@ var core_gateway: RefCounted
 
 
 func _ready() -> void:
+	DisplayServer.window_set_title("ScrubBots Factory Studio")
 	_apply_native_window_icon()
 	var gateway_script := ResourceLoader.call("load", "res://scripts/factory_core_gateway.gd") as Script
 	core_gateway = gateway_script.new() if gateway_script != null else null
@@ -21,8 +22,10 @@ func _ready() -> void:
 		return
 	workspace.configure_gateway(core_gateway)
 	navigation.connect("surface_selected", Callable(workspace, "show_surface"))
-	workspace.call("show_surface", "Dashboard")
-	$Frame/Layout/Footer/Status.text = "Canonical Core: %s — %s | %s" % [core_gateway.status_name(), core_gateway.status_message(), core_gateway.capability_summary()]
+	workspace.call("show_surface", "HOME")
+	var available: bool = core_gateway.status_name() == "AVAILABLE"
+	$Frame/Layout/Footer/Status.text = "System: Ready" if available else "System: Needs setup"
+	$Frame/Layout/Footer/Status.tooltip_text = "%s — %s | %s" % [core_gateway.status_name(), core_gateway.status_message(), core_gateway.capability_summary()]
 
 
 func _apply_native_window_icon() -> void:

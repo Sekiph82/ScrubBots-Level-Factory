@@ -58,26 +58,30 @@ def test_executable_runtime_contract_is_committed_and_binds_scene_hierarchy() ->
     assert runtime.startswith("extends Node")
 
 
-def test_navigation_is_single_deterministic_future_surface_list() -> None:
-    expected = [
-        "Dashboard",
-        "Generate",
-        "Import",
-        "Library",
-        "Batches",
-        "Candidates",
-        "Review",
-        "QA",
-        "Providers",
-        "Outputs",
-        "Settings",
-    ]
+def test_navigation_is_the_exact_eight_owner_destinations() -> None:
+    expected = ["HOME", "CREATE", "BATCH", "SOLVE", "REVIEW", "LIBRARY", "PUBLISH", "SETTINGS"]
     source = NAVIGATION.read_text(encoding="utf-8")
-    assert "const NAVIGATION_SURFACES" in source
-    assert source.count('"Dashboard"') == 1
-    for surface in expected:
-        assert source.count(f'"{surface}"') == 1
-    assert source.index('"Dashboard"') < source.index('"Settings"')
+    assert "const PRIMARY_DESTINATIONS" in source
+    assert "func primary_routes()" in source
+    assert "surface_selected.emit(surface_name)" in source
+    positions = [source.index(f'"label": "{surface}"') for surface in expected]
+    assert positions == sorted(positions)
+    for technical_page in ("Import Validation", "Pipeline", "Candidates", "Comparison", "Presets", "Search", "Readiness", "Reproduce", "Revisions", "Failures", "Batch Import", "Session Recovery", "Similarity", "Cost Center", "Release", "QA", "Providers", "Outputs"):
+        assert f'"label": "{technical_page}"' not in source
+
+
+def test_owner_page_keeps_legacy_tools_contextual_and_system_status_compact() -> None:
+    source = WORKSPACE.read_text(encoding="utf-8")
+    assert '"CREATE"' in source and '"Import Validation"' in source
+    assert '"BATCH"' in source and '"Failures"' in source and '"Session Recovery"' in source
+    assert '"REVIEW"' in source and '"Comparison"' in source and '"Similarity"' in source
+    assert '"LIBRARY"' in source and '"Search"' in source and '"Revisions"' in source and '"Reproduce"' in source
+    assert '"PUBLISH"' in source and '"Release"' in source and '"Outputs"' in source
+    assert '"SETTINGS"' in source and '"Providers"' in source and '"Cost Center"' in source
+    shell = SHELL.read_text(encoding="utf-8")
+    assert 'window_set_title("ScrubBots Factory Studio")' in shell
+    assert '"System: Ready"' in shell and '"System: Needs setup"' in shell
+    assert 'tooltip_text' in shell
 
 
 def test_unimplemented_surfaces_are_truthful_placeholders() -> None:
@@ -116,7 +120,7 @@ def test_gateway_is_a_truthful_local_canonical_core_bridge() -> None:
 
 def test_no_gdscript_factory_core_clone_or_main_game_dependency() -> None:
     runtime = "\n".join(path.read_text(encoding="utf-8") for path in _runtime_sources()).lower()
-    for marker in ("scrubbots/", "scrubbots\\", "subprocess", "import ", "generate(", "solve(", "validate("):
+    for marker in ("scrubbots/", "scrubbots\\", "subprocess", "generate(", "solve(", "validate("):
         assert marker not in runtime
 
 

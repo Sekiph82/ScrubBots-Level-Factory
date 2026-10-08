@@ -12,8 +12,11 @@ run/main_scene="res://scenes/factory_studio.tscn"
 
 [display]
 
-window/size/viewport_width=640
-window/size/viewport_height=360
+window/size/viewport_width=1280
+window/size/viewport_height=800
+window/size/window_width_override=1280
+window/size/window_height_override=800
+window/size/window_width_override_margin=32
 
 [rendering]
 

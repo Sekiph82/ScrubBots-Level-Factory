@@ -40,7 +40,7 @@ def test_factory_studio_header_uses_derived_icon_without_distortion() -> None:
     assert '[node name="Icon" type="TextureRect" parent="Frame/Layout/Header/Identity"]' in scene
     assert "custom_minimum_size = Vector2(46, 46)" in scene
     assert "stretch_mode = 6" in scene
-    assert 'text = "SCRUBBOTS FACTORY STUDIO"' in scene
+    assert 'text = "ScrubBots Factory Studio"' in scene
     shell = (FACTORY / "scripts" / "factory_studio_shell.gd").read_text(encoding="utf-8")
     assert "DisplayServer.FEATURE_NATIVE_ICON" in shell
     assert "DisplayServer.set_native_icon(icon_path)" in shell

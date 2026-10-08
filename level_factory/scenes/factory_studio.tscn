@@ -42,7 +42,7 @@ layout_mode = 2
 theme_override_constants/separation = 12
 
 [node name="Header" type="PanelContainer" parent="Frame/Layout"]
-custom_minimum_size = Vector2(0, 58)
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 
 [node name="Identity" type="HBoxContainer" parent="Frame/Layout/Header"]
@@ -63,11 +63,11 @@ theme_override_constants/separation = 2
 [node name="Title" type="Label" parent="Frame/Layout/Header/Identity/Text"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 24
-text = "SCRUBBOTS FACTORY STUDIO"
+text = "ScrubBots Factory Studio"
 
 [node name="Subtitle" type="Label" parent="Frame/Layout/Header/Identity/Text"]
 layout_mode = 2
-text = "Factory Studio — canonical-Core workspace"
+text = "Pixel art to playable levels"
 
 [node name="Body" type="HBoxContainer" parent="Frame/Layout"]
 layout_mode = 2
@@ -75,7 +75,7 @@ size_flags_vertical = 3
 theme_override_constants/separation = 12
 
 [node name="NavigationPanel" type="PanelContainer" parent="Frame/Layout/Body"]
-custom_minimum_size = Vector2(160, 0)
+custom_minimum_size = Vector2(190, 0)
 layout_mode = 2
 
 [node name="Navigation" type="VBoxContainer" parent="Frame/Layout/Body/NavigationPanel"]
@@ -98,6 +98,8 @@ theme_override_constants/margin_bottom = 24
 
 [node name="Content" type="VBoxContainer" parent="Frame/Layout/Body/Workspace/Padding"]
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 theme_override_constants/separation = 12
 
 [node name="Title" type="Label" parent="Frame/Layout/Body/Workspace/Padding/Content"]
@@ -122,10 +124,10 @@ theme_override_constants/separation = 10
 script = ExtResource("4_target_controls")
 
 [node name="Footer" type="PanelContainer" parent="Frame/Layout"]
-custom_minimum_size = Vector2(0, 42)
+custom_minimum_size = Vector2(0, 30)
 layout_mode = 2
 
 [node name="Status" type="Label" parent="Frame/Layout/Footer"]
 layout_mode = 2
-text = "Canonical Core: UNAVAILABLE — status boundary initializing."
+text = "System: Needs setup"
 autowrap_mode = 2

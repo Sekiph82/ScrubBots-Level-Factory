@@ -38,12 +38,13 @@ func _run_contract() -> void:
 		var navigation_control := navigation as FactoryStudioNavigation
 		var workspace_handler := Callable(workspace_page, "show_surface")
 		_check(navigation_control.surface_selected.is_connected(workspace_handler), "Navigation signal is not connected to Workspace presentation")
+		_check(navigation_control.primary_routes() == ["HOME", "CREATE", "BATCH", "SOLVE", "REVIEW", "LIBRARY", "PUBLISH", "SETTINGS"], "Primary navigation is not the exact owner destination list")
 
 		var title := workspace_page.get_node("Padding/Content/Title") as Label
 		var state := workspace_page.get_node("Padding/Content/State") as Label
-		_check(title.text == "Factory Studio — Dashboard", "initial surface is not Dashboard")
-		_check("NOT AVAILABLE" in state.text, "initial Dashboard does not report truthful unavailability")
-		_check("generated data" not in state.text.to_lower(), "initial Dashboard exposes fabricated/generated operational state")
+		_check(workspace_page.get_node("Padding/Content/OwnerPage").visible, "initial owner HOME page is not visible")
+		_check(workspace_page.get_node("Padding/Content/OwnerPage/OwnerPageTitle").text == "Your production floor", "initial HOME title is incorrect")
+		_check(title.visible == false and state.visible == false, "technical status wall is visible on default HOME")
 
 		navigation_control.surface_selected.emit("Generate")
 		await get_tree().process_frame
@@ -55,14 +56,14 @@ func _run_contract() -> void:
 		if target_controls != null:
 			_check(target_controls.visible, "Generate target controls are not visible on the Generate surface")
 
-		navigation_control.surface_selected.emit("Dashboard")
+		navigation_control.surface_selected.emit("HOME")
 		await get_tree().process_frame
-		_check(title.text == "Factory Studio — Dashboard", "Dashboard could not be restored deterministically")
+		_check(workspace_page.get_node("Padding/Content/OwnerPage").visible, "HOME could not be restored deterministically")
 
 	var footer_status := instance.get_node_or_null(FOOTER_STATUS_PATH) as Label
 	_check(footer_status != null, "Core status footer did not resolve")
 	if footer_status != null:
-		_check("UNAVAILABLE" in footer_status.text, "Core status is not truthful UNAVAILABLE")
+		_check(footer_status.text in ["System: Needs setup", "System: Ready"], "Core status footer is not concise and truthful")
 
 	instance.queue_free()
 	if failures.is_empty():
