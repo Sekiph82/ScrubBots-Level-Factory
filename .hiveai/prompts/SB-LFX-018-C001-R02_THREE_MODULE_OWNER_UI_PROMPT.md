@@ -11,6 +11,9 @@ Owner contract:
 Approved visual master:
 `docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
 
+Approved LEVEL FACTORY visual master:
+`docs/product/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
+
 ## VISUAL MASTER IS AUTHORITATIVE
 
 Before changing UI code, open and inspect the visual master.
