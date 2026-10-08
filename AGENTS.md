@@ -150,3 +150,18 @@ Do not resize, resample, interpolate, or antialias logical source art to force i
 - The repository root `TASKS.md` is the only current project-management/task-state tracker.
 - Do not create or revive legacy `.hiveai` tracker/control-plane files or a lowercase root `tasks.md`.
 - Prompts, builder logs, audits, README, AGENTS, CLAUDE, and other documents are not tracker inputs.
+
+## Factory Studio exact visual-master lock
+
+For any Factory Studio owner-UI task, current visual authority is:
+
+- `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
+- `docs/product/visual-masters/FACTORY_STUDIO_VISUAL_MASTER_INDEX_V01.md`
+
+The owner-facing production UI has exactly three screens:
+
+`PIXEL ART | LEVEL FACTORY | RELEASE POOL`
+
+Do not add owner-facing production pages, explanatory paragraphs, Technical details links, engineering dashboards, extra cards, extra buttons, or extra visible regions beyond the three masters. The first header label is exactly `PIXEL ART`; there is no leading numeral.
+
+The three visual-master files are layout authority. Dynamic data may change inside master-defined components, but visible structure/control count must not be reinterpreted. Backend safety/canonical authority remains unchanged.
