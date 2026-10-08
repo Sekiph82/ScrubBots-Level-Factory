@@ -12,7 +12,7 @@ Canonical UI contract:
 `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
 
 Audit criteria:
-`.hiveai/audit-criteria/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_AUDIT_CRITERIA.md`
+`.hiveai/audit-criteria/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_AUDIT_CRITERIA.md`
 
 Standing sync:
 `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`
