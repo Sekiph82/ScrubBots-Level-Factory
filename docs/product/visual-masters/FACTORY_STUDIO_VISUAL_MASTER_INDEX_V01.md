@@ -6,7 +6,7 @@ Date: 2026-10-08
 There are exactly three canonical production-screen masters.
 
 1. PIXEL ART  
-   `FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
+   `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`
 
 2. LEVEL FACTORY  
    `FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
