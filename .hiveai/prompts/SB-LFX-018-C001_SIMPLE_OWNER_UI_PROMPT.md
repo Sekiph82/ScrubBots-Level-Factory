@@ -16,7 +16,7 @@ Standing sync/publish:
 
 ## EXECUTION GATE
 
-Run only after `MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01` is independently PASS/CLOSED and root `TASKS.md` makes `SB-LFX-018-C001` Current Task.
+Run only after `MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01` and `SB-LFX-019-C001` are independently PASS/CLOSED and root `TASKS.md` makes `SB-LFX-018-C001` Current Task. VOID is implemented first so CREATE/SOLVE/REVIEW previews and status surfaces are simplified once against the final transparent-art contract.
 
 Do not begin M17 concurrently.
 
