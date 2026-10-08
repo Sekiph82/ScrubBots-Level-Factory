@@ -162,11 +162,13 @@ Matching filenames:
 - Local folders must never be searched to infer the active project or task.
 - `C:\Users\sekip\Desktop\ScrubBots` is the separate main-game repository and is off-limits unless an authoritative prompt names a narrowly scoped read-only or recovery action.
 - The only persistent local root for this repository is `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
-- **Standing owner rule:** every new ChatGPT-authored Codex implementation, remediation, continuation, or maintenance prompt must place a mandatory local↔GitHub `main` synchronization preflight as the **first operational section**, before any implementation analysis, product edits, tests, or builder-log work.
-- That preflight must verify canonical path/repository/branch/origin, fetch/prune, inspect dirty state/stashes/worktrees, compare local HEAD with `origin/main`, and either synchronize non-destructively or stop before implementation.
-- Clean local-behind state should fast-forward. Legitimate local work must be preserved and reconciled without reset/rebase/stash/clean/force operations. Ambiguous or unsafe divergence stops the task.
-- No prompt may create a sibling Desktop clone/worktree/copy as a synchronization shortcut. Explicitly authorized temporary worktrees, if ever needed, belong only under `%TEMP%\ScrubBots-Level-Factory\...`.
-- Synchronization is therefore no longer optional or prompt-specific; it is a mandatory preamble for every future Codex task in this repository.
+- **Standing owner rule:** every Codex implementation, remediation, continuation, or maintenance task follows `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`.
+- Start: verify canonical repository/origin, fetch/prune, inspect status/ahead-behind/stashes/worktrees. If the persistent Desktop checkout is clean and only behind, fast-forward only. If it contains owner work, is divergent, stale/unsafe, or cannot be made current without touching owner work, do **not** reconcile it; preserve it byte-for-byte and immediately use a clean task-specific worktree under `%TEMP%\ScrubBots-Level-Factory\<TASK-ID>` from exact current `origin/main`.
+- The owner does not need to manually synchronize the persistent Desktop checkout for builder work.
+- Never reset, rebase, auto-stash, clean, force, restore/discard, or create a sibling Desktop clone/worktree/copy.
+- Finish: completed implementation/test commits and builder-log/evidence commits must be published by normal fast-forward push before handoff. Fetch/prune before push, require `origin/main` ancestry, push `HEAD:main`, fetch again, and require `HEAD == origin/main`, 0 ahead / 0 behind, clean execution worktree.
+- Transient GitHub server errors preserve existing commits and may be retried up to three times with a fresh fetch/ancestry check. Never regenerate or rewrite good commits merely because a push temporarily failed.
+- A builder task must not be handed back with completed commits only local unless publication is genuinely blocked and the exact blocker is reported.
 
 ## Tracker ownership
 
