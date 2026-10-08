@@ -55,3 +55,10 @@ No implementation, test, screenshot, audit, or acceptance claim is made. Builder
 
 - Initial attempt to read V03 from the pre-refresh `a8cb236` worktree returned `FileNotFoundError` because the asset had only been added on newer `origin/main`; after the verified fast-forward to `9a966cf`, the file existed and the decode/signature check above completed, confirming the binary is invalid.
 - `Get-ChildItem -Recurse` source discovery hit access denied under `.pytest_cache`. A follow-up Python filename search completed with no matching PNG and one inaccessible directory; no local source was identified.
+
+## First publication checkpoint
+
+- Builder-log checkpoint commit: `fb63a2e7a168c5f9e758e50011fc4e129d9284d6` (`docs: record R02-R01 owner master blocker`).
+- Pre-push fetch/prune confirmed current `origin/main` (`9a966cf9f3d6c2985bea868d69842f5c77e42f89`) was its ancestor; ahead/behind was 0/1.
+- Normal fast-forward `git push origin HEAD:main` succeeded: `9a966cf..fb63a2e HEAD -> main`.
+- Post-push fetch/prune confirmed `HEAD == origin/main == fb63a2e7a168c5f9e758e50011fc4e129d9284d6`, 0 ahead / 0 behind, clean worktree.
