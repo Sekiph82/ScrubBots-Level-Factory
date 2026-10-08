@@ -1,8 +1,12 @@
 # Factory Studio Simple Owner UI V01
 
-Status: OWNER-APPROVED PRODUCT CONTRACT  
+Status: SUPERSEDED BY `docs/product/FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`  
 Date: 2026-10-08  
 Repository: `Sekiph82/ScrubBots-Level-Factory`
+
+## Supersession note
+
+The owner superseded the eight-page navigation on 2026-10-08. Historical implementation/audit references remain valid as evidence only. Current owner UI authority is `FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`.
 
 ## Owner goal
 
