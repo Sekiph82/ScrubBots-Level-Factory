@@ -68,7 +68,52 @@ def test_shortcut_installer_repairs_one_named_com_shortcut() -> None:
     assert "ScrubBots Factory Studio.lnk" in installer
     assert "$shortcut.TargetPath = $powerShellPath" in installer
     assert "$shortcut.Arguments = $arguments" in installer
-    assert "$shortcut.WorkingDirectory = $repoRoot" in installer
+    assert "$shortcut.WorkingDirectory = $runtimeRoot" in installer
     assert "$shortcut.Description = 'ScrubBots Factory Studio'" in installer
     assert "ScrubBots_Factory_Studio.ico" in installer
+    assert "$stableIconPath" in installer
     assert "$shortcut.Save()" in installer
+
+
+def test_installer_uses_the_authorized_stable_runtime_and_rejects_temp() -> None:
+    installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
+
+    assert "$runtimeRoot = 'C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio'" in installer
+    assert "$releaseRoot = Split-Path -Parent $runtimeRoot" in installer
+    assert "Test-PathWithin -Path $runtimeRoot -Parent $tempRoot" in installer
+    assert "Factory Studio runtime may not be installed under TEMP" in installer
+    assert "Join-Path $runtimeRoot 'scripts\\launch_factory_studio.ps1'" in installer
+    assert "--editor" not in installer
+
+
+def test_installer_binds_runtime_to_published_tracked_source() -> None:
+    installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
+
+    assert "remote get-url origin" in installer
+    assert "rev-parse origin/main" in installer
+    assert "published clean revision" in installer
+    assert "ls-files --cached" in installer
+    assert "sourceRevision = $source.Revision" in installer
+    assert "$manifestName = '.factory-studio-install-manifest.json'" in installer
+
+
+def test_installer_fails_closed_on_unknown_or_changed_owner_files() -> None:
+    installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
+
+    assert "already contains unknown owner data without an installer manifest" in installer
+    assert "Unmanaged owner file conflicts with a new runtime file" in installer
+    assert "Previously managed runtime file was modified" in installer
+    assert "Owner-authoritative ICO is missing" in installer
+    assert "Committed runtime ICO does not match the owner-authoritative ICO" in installer
+    assert "Remove-Item -LiteralPath $stageRoot -Recurse -Force" in installer
+
+
+def test_installer_repair_preserves_unchanged_managed_files_and_unknown_outputs() -> None:
+    installer = (ROOT / "scripts" / "install_factory_studio_shortcut.ps1").read_text(encoding="utf-8")
+
+    assert "$previousFiles[$file.Path] -eq $file.Sha256" in installer
+    assert "$previousManifest.sourceRevision -eq $source.Revision" in installer
+    assert "$installedAtUtc = [string]$previousManifest.installedAtUtc" in installer
+    assert "foreach ($relativePath in $previousFiles.Keys)" in installer
+    assert "Remove-Item -LiteralPath $targetPath -Force" in installer
+    assert "Remove-Item -LiteralPath $runtimeRoot" not in installer
