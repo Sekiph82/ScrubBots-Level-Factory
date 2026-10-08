@@ -8,7 +8,7 @@ Repository: `Sekiph82/ScrubBots-Level-Factory`
 
 The owner approved the following repository image as the **canonical visual master** for the Factory Studio redesign:
 
-`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp`
+`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
 
 This image is the visual authority for layout, proportions, density, spacing, hierarchy, dark theme, panel placement, Visual Review Canvas size, bottom thumbnail strip, right-side details/actions, left-side generation/batch controls, header composition and overall visual character.
 
@@ -16,11 +16,11 @@ This image is the visual authority for layout, proportions, density, spacing, hi
 
 Important header detail, explicitly owner-locked:
 
-- first module button text is **`1 PIXEL ART`**;
+- first module button text is **`PIXEL ART`**;
 - second is **`LEVEL FACTORY`**;
 - third is **`RELEASE POOL`**.
 
-The leading numeral **`1`** before `PIXEL ART` is intentional in this approved master and must be preserved.
+There is **no leading numeral** before `PIXEL ART`. The first module label must be exactly `PIXEL ART`.
 
 Where this written contract and the visual master differ in ordinary composition detail, the visual master wins. Safety, canonical authority and functional truth rules in this contract still win over purely decorative mockup content.
 
