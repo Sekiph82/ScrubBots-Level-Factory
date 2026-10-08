@@ -1,6 +1,6 @@
 # Owner Decision — Transparent Artwork -> VOID Cells in Level Factory V01
 
-Status: OWNER-APPROVED / IMPLEMENTATION BLOCKED BY GAME VOID CAPABILITY  
+Status: OWNER-APPROVED / GAME VOID CAPABILITY MERGED + AUDITED / LF IMPLEMENTATION READY  
 Date: 2026-10-08  
 Repository: `Sekiph82/ScrubBots-Level-Factory`  
 Depends on: `Sekiph82/Scrubbots` main-game VOID ADR and LevelData V2 support.
@@ -15,13 +15,25 @@ Full-canvas opaque artwork must behave exactly as before.
 
 ## Current gate
 
-As of this decision, `Sekiph82/Scrubbots:main` still reports:
+**OPEN as of 2026-10-08.**
 
-`LevelData.FORMAT_VERSION := 1`
+Main-game implementation authority:
 
-and its current Level Data spec defines only fully coloured source cells.
+`Sekiph82/Scrubbots@7d0d148b8609ec04852fdee02f6b8ef37598c616`
 
-Therefore LF implementation must remain **BLOCKED_BY_GAME_VOID_MERGE** until current game `main` contains the owner-approved VOID contract.
+Independent game audit:
+
+`coordination/sessions/VOID-CELLS-C001/CHATGPT_STRICT_AUDIT_V01.md`
+
+Game contract now defines:
+
+- legacy opaque levels: `LevelData.FORMAT_VERSION := 1`;
+- VOID levels: `LevelData.FORMAT_VERSION_VOID := 2`;
+- VOID encoding: `LevelData.VOID_CELL := -1`;
+- D1: VOID renders exactly like CLEARED/BG01;
+- D2: production >= 200 non-VOID cells and >= 25% W*H.
+
+The LF task must still resolve exact current `Sekiph82/Scrubbots:main` at execution time and prove that the audited VOID authority remains an ancestor/current contract.
 
 ## Capability gate
 
@@ -29,7 +41,7 @@ The LF implementation must resolve a configured clean current-game authority and
 
 At minimum, the game authority must define the new LevelData format with `-1` cell semantics or an equivalent exact owner-approved constant/contract.
 
-If the gate is absent:
+If a future current-game authority no longer contains or is incompatible with the audited VOID contract:
 
 - transparent artwork remains unavailable for production;
 - reason is explicit;
