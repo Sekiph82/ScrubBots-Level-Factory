@@ -3,6 +3,28 @@
 Product contract:
 `docs/product/FACTORY_STUDIO_THREE_MODULE_OWNER_UI_V02.md`
 
+Visual master:
+`docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp`
+
+## Visual-master fidelity gate
+
+The final durable-runtime UI must visually track the approved master, not merely satisfy the same information architecture.
+
+Strictly verify:
+
+- same three-button header composition;
+- exact visible header labels: **`1 PIXEL ART`**, **`LEVEL FACTORY`**, **`RELEASE POOL`**;
+- first module selected in blue in the Pixel Art screenshot;
+- large central Visual Review Canvas dominates the workspace;
+- left control column, central canvas, right detail/action column and bottom thumbnail strip remain recognizable in the same proportions;
+- dark navy/charcoal visual language and blue accent hierarchy match the master;
+- no extra primary navigation;
+- no dense engineering text walls;
+- no replacement with a generic Godot form layout.
+
+Audit may accept minor rendering/font/platform differences, but not structural reinterpretation.
+
+
 ## PASS rule
 
 PASS requires the owner-facing application to expose exactly three main production modules:
