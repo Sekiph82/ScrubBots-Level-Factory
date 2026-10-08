@@ -1,7 +1,11 @@
 # Factory Studio Three-Module Owner UI V02
 
-Status: OWNER-APPROVED / SUPERSEDES V01 EIGHT-PAGE NAVIGATION
+Status: SUPERSEDED BY `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
 Date: 2026-10-08
+
+## V03 supersession
+
+Current owner-facing UI authority is `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md` plus the three files in `docs/product/visual-masters/FACTORY_STUDIO_VISUAL_MASTER_INDEX_V01.md`. This V02 remains historical context only.
 Repository: `Sekiph82/ScrubBots-Level-Factory`
 
 ## Approved visual master
