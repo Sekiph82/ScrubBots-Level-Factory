@@ -31,27 +31,37 @@ The GitHub repository is the sole task authority. The local mirror is not a disc
 
 ## Mandatory session start
 
-Before implementation:
+Before implementation, follow the standing owner rule in:
+
+`docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`
+
+Operational summary:
 
 1. Read the authoritative cycle prompt from the full GitHub URL supplied in the handoff.
-2. Verify the repository identity is `Sekiph82/ScrubBots-Level-Factory` and branch is `main`.
-3. **Every implementation/remediation/continuation/maintenance prompt begins with a mandatory local↔GitHub synchronization preflight as its first operational section.** Synchronize only `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator` against `origin/main` using non-destructive Git operations before any implementation analysis, builder-log work, tests, or product edits.
-4. The mandatory preflight must fetch/prune, verify exact repository/root/branch/origin identity, inspect dirty state, compare local HEAD vs `origin/main`, inspect stashes/worktrees, and reach a truthful synchronization disposition before implementation.
-5. If local `main` is clean and only behind, fast-forward it. If legitimate local work exists, preserve it without data loss and reconcile by a normal merge when safe. Never overwrite owner work merely to synchronize.
-6. If safe synchronization cannot be completed, stop the task before product edits and report the blocker. Do not bypass the preflight.
-7. Never reset, automatically rebase, force-push, discard user changes, auto-stash, clean, or search sibling local repositories to discover work.
-8. Never create a sibling Desktop clone/worktree/copy for synchronization. If an explicitly authorized temporary worktree is ever required, it must live under `%TEMP%\ScrubBots-Level-Factory\...`, never beside the canonical Desktop project.
-9. Verify branch, HEAD, origin, status, stashes, and worktrees where relevant.
-6. Read completely from the authorized GitHub-first source set:
-   - root `TASKS.md`
-   - `AGENTS.md`
-   - `GOVERNANCE.md`
-   - the previous audit and specific contracts required by the authoritative prompt
-   - the authoritative prompt URL supplied in the handoff
-7. Treat `.hiveai/prompts/`, `.hiveai/codex-logs/`, and `.hiveai/audits/` as process/evidence archives only, not task-state sources. Do not recreate legacy tracker/control-plane files.
-8. Create the matching Codex log before implementation, tests, documentation, or governance edits and append chronologically.
+2. Verify repository `Sekiph82/ScrubBots-Level-Factory`, canonical origin, and persistent root `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
+3. Run `git fetch --prune origin`; inspect branch, HEAD, status, ahead/behind, stashes and worktrees.
+4. If persistent `main` is clean and only behind, fast-forward only.
+5. If the persistent checkout has legitimate owner work, is divergent/stale/unsafe, or synchronization would require touching owner work, preserve it byte-for-byte and immediately use one clean task-specific worktree under `%TEMP%\ScrubBots-Level-Factory\<TASK-ID>` at exact current `origin/main`.
+6. Never reset, rebase, auto-stash, clean, force, restore/discard, or create a sibling Desktop clone/worktree/copy.
+7. Read root `TASKS.md`, `AGENTS.md`, `GOVERNANCE.md`, the active prompt, required previous audit/contracts, and the standing sync/publish standard.
+8. Create the matching builder log before product edits.
 
-If safe synchronization cannot be performed, stop without modifying product files and record the reason only if a matching log can be created safely.
+The persistent Desktop checkout does not need to be made current manually for builder execution when owner-local work exists.
+
+## Mandatory session finish and publication
+
+Before handing a completed task back:
+
+1. Commit authorized implementation/tests.
+2. Commit builder log/evidence separately where practical.
+3. Fetch/prune and prove current `origin/main` remains an ancestor of local task HEAD.
+4. Normal push only: `git push origin HEAD:main`.
+5. Fetch/prune again and require local `HEAD == origin/main`, 0 ahead / 0 behind, and clean execution worktree.
+6. Return the GitHub builder-log URL.
+
+If GitHub returns a transient server-side error, preserve the exact commits and retry the same normal push up to three times with fetch/ancestry verification before each retry. Do not rebuild, amend, rebase or rewrite good commits because of a transient remote failure.
+
+If remote main advanced and normal fast-forward publication is no longer valid, stop and report the exact divergence. Never force.
 
 ## Builder-only boundary
 
