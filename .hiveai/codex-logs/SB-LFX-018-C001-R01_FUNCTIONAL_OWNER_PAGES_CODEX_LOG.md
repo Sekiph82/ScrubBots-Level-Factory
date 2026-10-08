@@ -67,3 +67,9 @@ Pending.
 ## Publication
 
 Implementation commit `4fbe66b445e39d87c18af2a8f59b2784058a262c` was pushed by normal fast-forward. The builder-log/screenshots evidence commit and final synchronization check are pending. Required handoff state: `AWAITING_GPT_SB_LFX_018_C001_R01_STRICT_REAUDIT`.
+
+### 2026-10-08 16:08 UTC — evidence publication closeout
+
+- Committed builder log and eight durable screenshots separately from implementation as `dcde53a54b37d0e1ece3315f408952e9114ced46` (`SB-LFX-018 C001-R01 builder evidence`). `git push origin HEAD:main` succeeded as a normal fast-forward from `4fbe66b` to `dcde53a`.
+- After `git fetch --prune origin`, final local HEAD and `origin/main` both equal `dcde53a54b37d0e1ece3315f408952e9114ced46`; ahead/behind is 0/0 and the R01 execution worktree is clean.
+- Final builder handoff state: `AWAITING_GPT_SB_LFX_018_C001_R01_STRICT_REAUDIT`.
