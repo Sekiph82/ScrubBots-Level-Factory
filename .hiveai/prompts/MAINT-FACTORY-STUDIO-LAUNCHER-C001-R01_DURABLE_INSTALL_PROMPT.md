@@ -50,11 +50,13 @@ Create a stable owner-local runtime root outside TEMP, recommended:
 
 `%LOCALAPPDATA%\ScrubBots Factory Studio\runtime`
 
-The committed install/repair flow must populate and maintain this stable runtime from the exact published repository revision being installed without touching the dirty Desktop checkout.
+The committed install/repair flow must populate and maintain this stable runtime from the exact published repository revision being installed. The existing dirty Desktop checkout must not be reset, cleaned, rebased, stashed, restored, overwritten, or used as source authority. The new `Release` subtree is an owner-authorized deployment destination only.
 
 Choose a safe implementation such as a dedicated stable local clone/snapshot. Requirements:
 
 - ordinary launch must not require network;
+- create the `Release` folder if absent, then create/update only `Release\\ScrubBots Factory Studio`;
+- treat any pre-existing unknown files inside that runtime destination as owner data: preserve or fail closed, never silently delete/overwrite;
 - do not depend on the implementation TEMP worktree after install;
 - stable runtime must include every Factory Studio runtime dependency, not only the two PowerShell scripts;
 - preserve any owner-generated/output data on repair/update;
@@ -66,7 +68,7 @@ After installation, update:
 
 `%USERPROFILE%\Desktop\ScrubBots Factory Studio.lnk`
 
-so its launcher argument and WorkingDirectory point to the stable runtime root only.
+so its launcher argument and WorkingDirectory point only to `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio`.
 
 No shortcut field may reference the R01 implementation TEMP worktree.
 
@@ -103,7 +105,7 @@ If process-command-line inspection is unavailable, use an equivalently strong Wi
 Add focused tests for:
 
 - installer rejects/avoids TEMP as final shortcut/runtime authority;
-- stable runtime path derivation;
+- exact owner-selected stable runtime path derivation (`C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio`);
 - shortcut arguments/WorkingDirectory use stable runtime;
 - repair/idempotency semantics;
 - owner output preservation boundary where applicable.
