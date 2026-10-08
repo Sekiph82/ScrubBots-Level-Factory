@@ -5,23 +5,23 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M06.07 - Transparent Artwork VOID Integration
-- Current Sprint: SB-LFX-019-C001 — Transparent Artwork -> VOID End-to-End
-- Current Task: SB-LFX-019-C001 — Transparent Artwork -> VOID End-to-End
-- Current Task Status: GAME_DEPENDENCY_PASS / AUTHORIZED_CURRENT / BEFORE_SIMPLE_UI_AND_M17
-- Next Task/Action: **CODEX executes SB-LFX-019-C001 now** `.hiveai/prompts/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_PROMPT.md`. Game dependency `Sekiph82/Scrubbots@7d0d148b8609ec04852fdee02f6b8ef37598c616` is independently PASS/CLOSED. Implement LF import/QA/solver/supply/export/identity/publish/preview VOID support, prove the owner-real 32x32 transparent sprite at 3/4/5 columns, publish normally, then stop for ChatGPT strict audit. `SB-LFX-018-C001` Simple Owner UI follows only after VOID integration PASS/CLOSED.
+- Current Sprint: SB-LFX-019-C001-R01 — VOID Fixture / Owner Evidence / Regression Closure
+- Current Task: SB-LFX-019-C001-R01 — VOID Fixture + Owner Evidence + Regression Closure
+- Current Task Status: STRICT_AUDIT_CHANGES_REQUIRED / R01_AUTHORIZED / BEFORE_SIMPLE_UI_AND_M17
+- Next Task/Action: **CODEX executes SB-LFX-019-C001-R01 now** `.hiveai/prompts/SB-LFX-019-C001-R01_VOID_CLOSURE_PROMPT.md`. Retain the accepted C001 VOID architecture. Close the missing ring/hole/border/row-column end-to-end current-game fixture matrix, use a real owner/Claude 32x32 transparent PNG for live 3/4/5-column evidence, classify/fix the Factory Studio action-integration hang, and complete the full regression. Simple Owner UI remains blocked until R01 independent PASS/CLOSED.
 - Required Actor: CODEX, THEN CHATGPT
 - Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_R01_STRICT_REAUDIT_V01.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LFX-019-C001_STRICT_AUDIT_V01.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_PROMPT.md`.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-019-C001-R01_VOID_CLOSURE_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LFX-019-C001-R01_VOID_CLOSURE_PROMPT.md`.
 - Queued Owner UX: `SB-LFX-018-C001 — Simple Owner UI`; prompt `.hiveai/prompts/SB-LFX-018-C001_SIMPLE_OWNER_UI_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-018-C001_SIMPLE_OWNER_UI_AUDIT_CRITERIA.md`. Execute after launcher R01 and `SB-LFX-019` VOID integration independently PASS/CLOSED, before M17.
-- Current Technical Capability: `SB-LFX-019-C001 — Transparent Artwork -> VOID End-to-End`; prompt `.hiveai/prompts/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_AUDIT_CRITERIA.md`; status `GAME_DEPENDENCY_PASS / AUTHORIZED_CURRENT`. Game authority `Sekiph82/Scrubbots@7d0d148b8609ec04852fdee02f6b8ef37598c616` is PASS/CLOSED by `coordination/sessions/VOID-CELLS-C001/CHATGPT_STRICT_AUDIT_V01.md`.
+- Current Technical Capability: `SB-LFX-019-C001-R01 — Transparent Artwork -> VOID Closure`; prompt `.hiveai/prompts/SB-LFX-019-C001-R01_VOID_CLOSURE_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-019-C001-R01_VOID_CLOSURE_AUDIT_CRITERIA.md`; status `CHANGES_REQUIRED / R01_AUTHORIZED`. C001 core VOID implementation is retained; missing fixture/evidence/full-regression closure remains.
 - Standing Builder Sync/Publish: `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`. Persistent dirty Desktop work is preserved; builders use exact-current clean TEMP authority when needed and must normally push completed implementation/log commits to GitHub `main` before handoff.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
@@ -236,6 +236,7 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
 - M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
+- SB-LFX-019-C001 Strict Audit [2026-10-08]: `CHANGES_REQUIRED / R01` by `.hiveai/audits/SB-LFX-019-C001_STRICT_AUDIT_V01.md`. Core alpha0->VOID, V2/-1, current-game loaders, solver/replay, Difficulty V1, export/identity/publisher and preview architecture PASS/retained. Blocking closure: ring/hole/border/VOID-row fixtures are not all end-to-end through export/load/replay/difficulty; the 32x32 3/4/5 evidence used a generated fixture rather than owner-authentic art; broad pytest was interrupted after unresolved failure markers and not rerun after the parse fix. R01 authorized; Simple Owner UI remains blocked.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01 Strict Re-audit [2026-10-08]: `PASS / CLOSED` by `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_R01_STRICT_REAUDIT_V01.md`. Stable runtime is `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio`; Desktop `.lnk` is TEMP-independent and a real launch proved Godot starts the stable project without `--editor`. Tracker denominator was corrected to 250 after SB-LFX-018/019 additions. Current task advances to SB-LFX-019 VOID integration.
 - SB-VOID-C001 Game Dependency Audit [2026-10-08]: `PASS / CLOSED` in `Sekiph82/Scrubbots` by `coordination/sessions/VOID-CELLS-C001/CHATGPT_STRICT_AUDIT_V01.md`; audited implementation `7d0d148b8609ec04852fdee02f6b8ef37598c616`. This opens the LF `SB-LFX-019` capability gate. Owner sequencing is now launcher R01 -> LF VOID -> Simple Owner UI -> M17.
 - SB-LFX-018 Owner UI Decision [2026-10-08]: Factory Studio owner surface will be simplified to eight primary destinations `HOME | CREATE | BATCH | SOLVE | REVIEW | LIBRARY | PUBLISH | SETTINGS`. Existing technical capabilities remain contextual/advanced; default pages must stop exposing backend contract text walls. Product contract: `docs/product/FACTORY_STUDIO_SIMPLE_OWNER_UI_V01.md`.
