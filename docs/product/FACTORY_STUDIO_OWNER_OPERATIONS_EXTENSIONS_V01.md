@@ -1,7 +1,7 @@
 # Factory Studio Owner Operations Extensions V01
 
 Status: OWNER-APPROVED PRODUCT PLAN
-Date: 2026-09-15
+Date: 2026-09-15 (owner-expanded 2026-10-08)
 Repository: `Sekiph82/ScrubBots-Level-Factory`
 
 ## Purpose
@@ -15,7 +15,7 @@ These extensions do not replace canonical Factory Core, solver, QA, provenance, 
 - Root `TASKS.md` remains the only H!veAI project tracker. The Factory Operations Dashboard is not a project-management tracker.
 - Factory Studio must consume canonical Factory Core and canonical artifact/job/evidence records. It must not maintain a second compiler or second production-truth database.
 - One logical artwork pixel equals one gameplay cell.
-- Production logical art remains C01..C16 only, with the current 3..12 used-color envelope.
+- Production non-VOID artwork cells remain C01..C16 only, with the current 3..12 used-color envelope. Transparent/VOID production is game-capability-gated and must follow `docs/decisions/OWNER_TRANSPARENT_VOID_LF_INTEGRATION_V01.md`; until that gate opens, the prior transparent-art rejection remains fail-closed.
 - Owner source images are preserved byte-for-byte. Any normalization, resizing, palette snapping, or other transformation creates a separately identified derived artifact.
 - `CELL_MAJORITY_V1` and `PALETTE_SNAP_V1` remain the locked high-resolution reduction and palette policies where applicable.
 - No silent mutation of owner source art.
@@ -146,20 +146,37 @@ Factory Studio should persist enough canonical job/session progress to recover f
 
 Recovery must rely on durable canonical job/artifact state, remain deterministic where the underlying operation is deterministic, and clearly distinguish `RESUMED`, `RETRIED`, and newly generated work.
 
-## Suggested Studio navigation
+### 18. Simple Owner UI
 
-A future Studio information architecture may expose:
+Recompose Factory Studio into the owner-facing information architecture defined by `docs/product/FACTORY_STUDIO_SIMPLE_OWNER_UI_V01.md`.
 
-`Dashboard | Generate | Import | Library | Batches | Candidates | Review | QA | Providers | Outputs | Settings`
+The normal owner surface must expose only:
 
-This navigation is product guidance, not a second task hierarchy.
+`HOME | CREATE | BATCH | SOLVE | REVIEW | LIBRARY | PUBLISH | SETTINGS`
+
+All existing canonical capabilities remain available contextually or under Technical details/Advanced/Diagnostics. The simplification is presentation/orchestration only and must not create shadow truth or bypass gates.
+
+### 19. Transparent Artwork -> VOID End-to-End
+
+Once exact current `Sekiph82/Scrubbots:main` exposes the owner-approved VOID LevelData contract, support transparent owner artwork as first-class VOID cells end-to-end according to `docs/decisions/OWNER_TRANSPARENT_VOID_LF_INTEGRATION_V01.md`.
+
+Until that capability gate opens, transparent production remains unavailable and must never fall back to filling transparent pixels with a color.
+
+## Owner Studio navigation
+
+Owner-approved navigation is now:
+
+`HOME | CREATE | BATCH | SOLVE | REVIEW | LIBRARY | PUBLISH | SETTINGS`
+
+This navigation is product guidance, not a second task hierarchy. Technical/diagnostic surfaces are contextual, not primary navigation.
 
 ## Dependency notes
 
-- Dashboard, import, library, review, comparison, search, readiness and revision UX primarily belong to M06 Factory Studio.
+- Dashboard, import, library, review, comparison, search, readiness and revision UX primarily belong to M06 Factory Studio and are recomposed by SB-LFX-018 into the simple owner navigation.
 - Failure/retry, batch import and interruption recovery integrate strongly with M08 Batch Factory.
 - Provider cost/accounting and advanced similarity/provider views integrate with M09 provider evolution.
 - Actual ScrubBots solution evidence depends on authoritative M03 gameplay solver work.
+- SB-LFX-019 transparent/VOID support additionally depends on the exact current main-game VOID ADR and LevelData capability; it remains blocked until that game contract is merged.
 - Difficulty evidence depends on M04.
 - Production-ready status must consume M05 QA and owner-review truth, then hand off through M08/Content Platform rather than bypassing it.
 
@@ -167,4 +184,4 @@ This navigation is product guidance, not a second task hierarchy.
 
 The original canonical source denominator remains exactly `224` (`112 Level Factory + 112 Content Pipeline`).
 
-These 17 owner-approved capabilities are new Factory product extensions. Together with existing `PAG-SP11`, `PAG-SP12`, and `PAG-SP13`, the repository carries 20 live extension tasks beyond the 224 source requirements.
+These 19 owner-approved capabilities are Factory product extensions. Together with existing `PAG-SP11`, `PAG-SP12`, and `PAG-SP13`, the repository carries 22 live extension tasks beyond the 224 source requirements.
