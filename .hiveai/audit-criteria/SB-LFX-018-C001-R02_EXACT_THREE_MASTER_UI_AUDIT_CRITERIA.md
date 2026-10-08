@@ -4,9 +4,13 @@ Canonical contract:
 `docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
 
 Visual masters:
-- `docs/product/visual-masters/FACTORY_STUDIO_THREE_MODULE_MASTER_V02.svg`
+- `docs/product/visual-masters/FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`
 - `docs/product/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
 - `docs/product/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg`
+
+## 0. Master integrity
+
+All three indexed current masters must decode/render directly from the repository. Historical `FACTORY_STUDIO_THREE_MODULE_MASTER_V01.webp` / V02 wrapper are not current authority. The repaired PIXEL ART master must be readable at 1536×1024 before audit proceeds.
 
 ## A. Exactly three production screens
 
