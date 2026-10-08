@@ -20,6 +20,9 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
 - Current Audit Criteria: `.hiveai/audit-criteria/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_AUDIT_CRITERIA.md`.
 - Current Prompt: `.hiveai/prompts/MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01_DURABLE_INSTALL_PROMPT.md`.
+- Queued Next Owner UX: `SB-LFX-018-C001 — Simple Owner UI`; prompt `.hiveai/prompts/SB-LFX-018-C001_SIMPLE_OWNER_UI_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-018-C001_SIMPLE_OWNER_UI_AUDIT_CRITERIA.md`. Execute only after launcher R01 independent PASS/CLOSED and before normal M17 continuation.
+- Queued Game-Gated Capability: `SB-LFX-019-C001 — Transparent Artwork -> VOID End-to-End`; prompt `.hiveai/prompts/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-019-C001_TRANSPARENT_VOID_END_TO_END_AUDIT_CRITERIA.md`; status `BLOCKED_BY_GAME_VOID_MERGE`. Planning-time `Sekiph82/Scrubbots:main` still has `LevelData.FORMAT_VERSION := 1`; do not implement until exact current game main merges the owner-approved VOID ADR/LevelData capability.
+- Standing Builder Sync/Publish: `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`. Persistent dirty Desktop work is preserved; builders use exact-current clean TEMP authority when needed and must normally push completed implementation/log commits to GitHub `main` before handoff.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
 - P3 Owner Prompt SHA-256: `c310b033152ddc079d3261f12cc07d4036e5c4e921371e1bd930d8749fe8042f`.
 - P3 Audit Criteria: `.hiveai/audit-criteria/P3_HEADLESS_BATCH_PIPELINE_AUDIT_CRITERIA.md`.
@@ -233,6 +236,8 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 - M14-CONT-001 Preservation Rule: reuse the existing M14 TEMP worktree and preserve the uncommitted CP03-001 implementation/log bytes; no stash/reset/clean/discard is authorized.
 - M14 Current Sprint Governance Correction: authoritative `Current Sprint` now includes active task identity `SB-CP03-001`, satisfying the canonical governance parser without changing the governance test or product code.
 - M14-CONT-001 Resume Rule After Sprint Fix: reuse the same existing dirty TEMP worktree, fetch current `origin/main`, verify the tracker-only upstream change does not overlap CP03-001 product/log paths, rerun the exact governance gate first, then continue the existing continuation prompt if green.
+- SB-LFX-018 Owner UI Decision [2026-10-08]: Factory Studio owner surface will be simplified to eight primary destinations `HOME | CREATE | BATCH | SOLVE | REVIEW | LIBRARY | PUBLISH | SETTINGS`. Existing technical capabilities remain contextual/advanced; default pages must stop exposing backend contract text walls. Product contract: `docs/product/FACTORY_STUDIO_SIMPLE_OWNER_UI_V01.md`.
+- SB-LFX-019 Owner VOID Decision [2026-10-08]: transparent pixels become game VOID only after the current ScrubBots main-game VOID ADR/LevelData support is merged. LF must never fill transparency with a color. Until the gate opens, transparent production remains unavailable. Decision: `docs/decisions/OWNER_TRANSPARENT_VOID_LF_INTEGRATION_V01.md`.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Owner Deployment Decision [2026-10-08]: durable runtime location is locked to `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator\\Release\\ScrubBots Factory Studio`; `%LOCALAPPDATA%` is no longer the target. R01 must also execute/prove the real Desktop `.lnk` launch from this stable runtime.
 - MAINT-FACTORY-STUDIO-LAUNCHER-C001 Strict Audit [2026-10-08]: `CHANGES_REQUIRED / R01` by `.hiveai/audits/MAINT_FACTORY_STUDIO_LAUNCHER_C001_STRICT_AUDIT_V01.md`. Icon authority, Godot app identity, header icon, direct launcher implementation and regressions PASS/retained. Blocking deployment defects: Desktop `.lnk` points into `%TEMP%` and therefore is not durable; actual `.lnk` launch was not executed/proven. R01 must install a stable LocalAppData runtime and prove real shortcut launch before M17.
 - M18/CPX-004 R03 Strict Re-audit [2026-10-07]: `TECHNICAL PASS / EXTERNAL LIVE GATES PENDING` by `.hiveai/audits/M18_CPX004_R2_R03_STRICT_REAUDIT_V01.md`. No R04 required. Provider/R2 architecture, canonical Release Pool, executable Studio/headless STAGING handoff, CPX-002 exact-current authority, canonical UTC binding, production approval adversarial regressions and full regression are PASS. Remaining R2 gates are live operational evidence only. Owner sequencing now activates `MAINT-FACTORY-STUDIO-LAUNCHER-C001` before M17.
@@ -720,7 +725,7 @@ Additional inline tags do not replace checkbox state:
 - Canonical LF/CP source-requirement completion: **75 / 224 = 33.48%**.
 - Canonical LF/CP engineering/migration coverage: **116 / 224 = 51.79%** (`VERIFIED + PARTIAL + MIGRATION`).
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
-- Seventeen owner-approved Factory Studio/operator extensions are retained live as `SB-LFX-001..017`; their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
+- Nineteen owner-approved Factory Studio/operator extensions are retained as `SB-LFX-001..019`; `SB-LFX-001..017` are PASS/CLOSED, while `SB-LFX-018` Simple Owner UI and game-gated `SB-LFX-019` Transparent Artwork -> VOID are live/open. Their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Four owner-approved Content Platform/release extensions are live as `SB-CPX-001..004` and are outside the fixed 224 LF/CP source-requirement denominator.
 - Unified live task denominator: **248** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 4 Content Platform/release extensions.
 - Unified verified completion: **84 / 246 = 34.15%**.
@@ -751,7 +756,7 @@ Additional inline tags do not replace checkbox state:
 - `SB-LFX-001` is PASS/CLOSED through `SB-LFX-001-C001`; the Factory Operations Dashboard is a real read-only fail-closed derived view over canonical batch/action evidence with no second truth store or tracker.
 - `SB-LFX-002` is PASS/CLOSED through `SB-LFX-002-C001`; manual Pixel Art import now creates explicit content-addressed immutable OWNER_UPLOAD source records while preserving original PNG bytes exactly and making no validation/candidate claims.
 - `SB-LFX-003` is PASS/CLOSED through `SB-LFX-003-C001`; the Source Art Library re-verifies canonical OWNER_UPLOAD source truth, persists only bounded label/tag catalog metadata, and keeps unavailable review/palette/usage domains truthful.
-- SB-LFX R04 independent re-audit is complete. `SB-LFX-001..017 = PASS/CLOSED`; the Factory Studio/operator extension frontier is fully closed. `SB-LF03-001,002,003,004,006,007,008` are PASS/CLOSED; the active M03 frontier is `SB-LF03-005` R02 remediation. SB-LFX extensions remain outside the fixed 224 LF/CP source denominator.
+- SB-LFX R04 independent re-audit closed the legacy extension frontier through `SB-LFX-017`. Owner decisions on 2026-10-08 reopen the Factory Studio extension frontier with `SB-LFX-018` Simple Owner UI and `SB-LFX-019` Transparent Artwork -> VOID. `SB-LF03-001,002,003,004,006,007,008` are PASS/CLOSED; historical M03 evidence remains unchanged. SB-LFX extensions remain outside the fixed 224 LF/CP source denominator.
 - M00–M10 historical PAG technical foundation remains accepted evidence except the M10 visual pack, which remains OWNER REJECTED 100/100 and is retained as negative evidence.
 
 ## Locked production contracts
@@ -982,6 +987,11 @@ Capability source family: `SB-LF06-xxx` from the main Scrubbots master plan plus
 - [x] SB-LFX-010 — Add Production Readiness Card exposing truthful SOURCE/PALETTE/STRUCTURE/SOLVER/DIFFICULTY/QA/OWNER/EXPORT dispositions. [EXTENSION]
 - [x] SB-LFX-011 — Expose Exact Reproduce action only where recorded canonical identities and the underlying path support truthful reproducibility. [EXTENSION]
 - [x] SB-LFX-012 — Add immutable manual-edit revision history with compare/undo/restore-source behavior and no silent source overwrite. [EXTENSION]
+
+### M06.07 - Owner simplification and transparent-art gameplay integration
+
+- [ ] SB-LFX-018 — Recompose Factory Studio into the owner-simple navigation `HOME | CREATE | BATCH | SOLVE | REVIEW | LIBRARY | PUBLISH | SETTINGS`; preserve all canonical capabilities contextually, remove engineering text walls from default pages, use previews/cards/progress as primary UI, compact readiness/system status, and remove `(DEBUG)` from normal owner runtime. Contract: `docs/product/FACTORY_STUDIO_SIMPLE_OWNER_UI_V01.md`. [EXTENSION]
+- [ ] SB-LFX-019 — Support transparent owner artwork as first-class game VOID cells end-to-end after exact current `Sekiph82/Scrubbots:main` merges the owner-approved VOID ADR/LevelData capability. Alpha 0 is VOID, never color fill or supply; semi-alpha rejects; non-VOID color/minimum-art rules follow game ADR; official game solver/replay/Difficulty V1/export/publish/preview parity required; opaque full-canvas behavior preserved. Status: `BLOCKED_BY_GAME_VOID_MERGE`. Contract: `docs/decisions/OWNER_TRANSPARENT_VOID_LF_INTEGRATION_V01.md`. [EXTENSION]
 ---
 
 # M07 - Mutation & Automatic Difficulty Targeting
@@ -1392,7 +1402,7 @@ Capability source family: `SB-CP09-xxx` from the main Scrubbots master plan.
 - PAG-SP07-C001 strict audit = CHANGES_REQUIRED / PRODUCT IMPLEMENTATION RETAINED; PAG-SP07-C001-R01 strict audit = PASS / CLOSED; both are mapped as accepted evidence under partial `SB-LF09-003` rather than counted as separate live tasks.
 - PAG-SP08 maps to Edit/Inpaint capability; PAG-SP09 to Factory Studio UI; PAG-SP10 to automated batch production.
 - PAG-SP11/PAG-SP12/PAG-SP13 are the three legacy unique extension tasks retained under M09.06.
-- `SB-LFX-001..017` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
+- `SB-LFX-001..019` are owner-approved post-cutover Factory Studio/operator extensions governed by `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`; they add to the extension denominator but do not alter the 224 canonical LF/CP source mapping. `SB-LFX-019` is hard-gated by exact current main-game VOID support.
 - `SB-CPX-001..004` are owner-approved Content Platform/release extensions: exact solver-proven supply-plan packaging, current-main promotion replay, Route A game-repository branch+PR release, and Factory Studio `Publish to ScrubBots` handoff; they add to the unified denominator but do not alter the 224 canonical LF/CP source mapping.
 - PAG-SP14 is the final semantic-to-unified-Factory bridge/closure alias and adds no duplicate denominator.
 - Windows Factory Studio v1.3.6 is retained as M06 migration evidence; its operator/provider/job/accounting layers are reusable, while its legacy compiler is not canonical.
@@ -1412,7 +1422,7 @@ Owner-approved post-cutover product specification:
 # EXECUTION ORDER
 
 1. M00 migration/governance is PASS/CLOSED through `SB-LF00-007`.
-2. `SB-LF01-005`, all `SB-LF06-001..012`, and all `SB-LFX-001..017` are PASS/CLOSED. M06 Factory Studio is complete.
+2. `SB-LF01-005`, all `SB-LF06-001..012`, and legacy extensions `SB-LFX-001..017` are PASS/CLOSED. Owner decisions on 2026-10-08 add open `SB-LFX-018` and game-gated `SB-LFX-019`.
 3. M03 Puzzle Intelligence is COMPLETE / VERIFIED; `SB-LF03-001..012 = PASS/CLOSED`.
 4. M04 Difficulty Intelligence is COMPLETE / VERIFIED; `SB-LF04-001..012 = PASS/CLOSED`.
 5. M05 Unified Factory Validation & Level QA is COMPLETE / VERIFIED; `SB-LF05-001..010 = PASS/CLOSED`.
@@ -1425,7 +1435,9 @@ Owner-approved post-cutover product specification:
 12. M15-M16 main-game runtime/offline implementation in `Sekiph82/Scrubbots` is the next owner-priority program.
 13. SB-CPX-004 Factory Studio → ScrubBots owner-facing publish handoff follows M15-M16.
 14. M18 storage/CDN provider integration follows the runtime/handoff foundation.
-15. `MAINT-FACTORY-STUDIO-LAUNCHER-C001` — Desktop Factory Studio launcher/icon/direct-start maintenance executes immediately after M18 closes and before M17 opens.
-16. M17 rollback/scheduling follows only after the launcher task is PASS/CLOSED and manifest/publisher/storage are real.
-17. M19 content operations/QA/observability follows provider integration.
-18. M20 store-policy/security/final production release gate remains last.
+15. `MAINT-FACTORY-STUDIO-LAUNCHER-C001-R01` — close durable Release-folder runtime + real Desktop shortcut launch proof first.
+16. `SB-LFX-018-C001` — Simple Owner UI executes immediately after launcher R01 PASS/CLOSED and before normal M17 continuation.
+17. `SB-LFX-019-C001` — Transparent Artwork -> VOID executes as soon as exact current ScrubBots main merges the owner-approved VOID capability. If the game gate is open after SB-LFX-018, run it before M17; if the game gate is still closed, M17 may proceed, but transparent-art production/live publication remains blocked until SB-LFX-019 PASS/CLOSED.
+18. M17 rollback/scheduling follows after launcher/UI closure, subject to the VOID dependency rule above.
+19. M19 content operations/QA/observability follows provider integration.
+20. M20 store-policy/security/final production release gate remains last.
