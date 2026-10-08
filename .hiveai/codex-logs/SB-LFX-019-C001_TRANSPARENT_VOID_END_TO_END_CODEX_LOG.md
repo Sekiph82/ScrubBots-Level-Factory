@@ -54,3 +54,10 @@ Pending.
 - After the successful Godot editor scan generated 51 untracked `.gd.uid` import sidecars, I preserved them intact outside the checkout at `%TEMP%\ScrubBots-Level-Factory\SB-LFX-019-C001-generated-godot-uids`; they are not part of the implementation commit. The icon `.import` file's content hash matched the existing index blob and is not included.
 - `git diff --cached --check` -> exit 0. Scope review confirms no root `TASKS.md`, `.hiveai/audits/**`, active prompt, or game-repository files changed. Exact Level Factory `origin/main` was fetched before implementation commit and remained ancestor of local HEAD; starting remote was `6e011d1f273d173ff41bb2f563a87c868213d28c`.
 - Publication remains pending the separate builder-log commit, final fetch/ancestry check, and normal fast-forward push.
+
+### 2026-10-08 13:12 Europe/Istanbul — first normal push verified
+
+- Builder-log commit `a4999766db8b9dd83696e7c541f690e4992b80f6` was created separately from implementation commit `51c7db12a4629c67d233d3acd57867c6b22fcfe7`.
+- `git fetch --prune origin` before push showed origin/main ancestor of local HEAD and 2 commits ahead / 0 behind. Normal command `git push origin HEAD:main` succeeded (`6e011d1..a499976`, `HEAD -> main`).
+- Post-push `git fetch --prune origin` verified `HEAD == origin/main == a4999766db8b9dd83696e7c541f690e4992b80f6`, ahead/behind `0 0`, clean tracked/untracked worktree. No force push, reset, rebase, or task-state edit was used.
+- The following log-only commit records this verified publication result; its normal fast-forward publication is the remaining publication step.
