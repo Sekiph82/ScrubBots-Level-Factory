@@ -728,7 +728,7 @@ Additional inline tags do not replace checkbox state:
 - Existing Semantic Pixel Studio extensions remain live: `PAG-SP11`, `PAG-SP12`, `PAG-SP13`.
 - Nineteen owner-approved Factory Studio/operator extensions are retained as `SB-LFX-001..019`; `SB-LFX-001..017` are PASS/CLOSED, while `SB-LFX-018` Simple Owner UI and game-gated `SB-LFX-019` Transparent Artwork -> VOID are live/open. Their product contract is `docs/product/FACTORY_STUDIO_OWNER_OPERATIONS_EXTENSIONS_V01.md`.
 - Four owner-approved Content Platform/release extensions are live as `SB-CPX-001..004` and are outside the fixed 224 LF/CP source-requirement denominator.
-- Unified live task denominator: **248** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 17 Factory Studio/operator extensions + 4 Content Platform/release extensions.
+- Unified live task denominator: **250** = 224 LF/CP source requirements + 3 Semantic Pixel Studio extensions + 19 Factory Studio/operator extensions + 4 Content Platform/release extensions.
 - Unified verified completion: **84 / 246 = 34.15%**.
 - Direct local implementation surface excluding 28 GAME_RUNTIME rows: **218 live tasks**.
 - Conservative verified local completion: **84 / 218 = 38.53%**.
