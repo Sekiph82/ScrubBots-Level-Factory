@@ -45,6 +45,22 @@ Never write `.hiveai/audits/**`.
 Builder log:
 `.hiveai/codex-logs/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_CODEX_LOG.md`
 
+## OWNER-PROVIDED SOURCE PATH
+
+The owner has now placed the exact PIXEL ART master at:
+
+`C:\Users\sekip\Downloads\pixel art exact master.png`
+
+Use this path first.
+
+Before copying it anywhere, verify its SHA-256 is exactly:
+
+`b03f00cf01374a5cf884ce572637cbf06a654bb30a6262e28f4e0d76efd10def`
+
+If the SHA matches, use it byte-for-byte as the canonical PIXEL ART master source.
+
+If the SHA does not match, STOP with `OWNER_MASTER_SHA_MISMATCH`. Do not substitute, redraw, re-encode, crop, resize or regenerate it.
+
 ## 0. OWNER MASTER BINARY GATE
 
 The exact owner-approved PIXEL ART master has a fixed identity:
