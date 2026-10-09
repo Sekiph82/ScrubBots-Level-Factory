@@ -37,6 +37,23 @@ func _run_suite() -> void:
 	root.add_child(instance)
 	await process_frame
 
+	var master_ui := instance.get_node_or_null("MasterUI")
+	_check(master_ui != null, "Exact three-master production UI did not instantiate")
+	_check(instance.get_node_or_null("Frame") != null and not instance.get_node("Frame").visible, "Legacy eight-page shell is visible in production")
+	if master_ui != null:
+		_check(master_ui.call("master_names") == ["PIXEL ART", "LEVEL FACTORY", "RELEASE POOL"], "Production UI does not expose exactly the three owner master screens")
+		var master_canvas := master_ui.get_node_or_null("MasterCanvas") as TextureRect
+		_check(master_canvas != null and master_canvas.texture != null, "PIXEL ART owner master did not load")
+		if master_canvas != null and master_canvas.texture != null:
+			_check(master_canvas.texture.get_width() == 1536 and master_canvas.texture.get_height() == 1024, "PIXEL ART master dimensions changed")
+			master_ui.call("_show_screen", "LEVEL FACTORY")
+			_check(master_ui.call("active_master") == "LEVEL FACTORY", "LEVEL FACTORY master navigation failed")
+			_check(master_canvas.texture.get_width() == 1536 and master_canvas.texture.get_height() == 1024, "LEVEL FACTORY master dimensions changed")
+			master_ui.call("_show_screen", "RELEASE POOL")
+			_check(master_ui.call("active_master") == "RELEASE POOL", "RELEASE POOL master navigation failed")
+			_check(master_canvas.texture.get_width() == 1536 and master_canvas.texture.get_height() == 1024, "RELEASE POOL master dimensions changed")
+			master_ui.call("_show_screen", "PIXEL ART")
+
 	var navigation := instance.get_node_or_null(NAVIGATION_NODE_PATH)
 	var workspace := instance.get_node_or_null(WORKSPACE_NODE_PATH)
 	_check(navigation != null, "Navigation did not instantiate at the committed path")

@@ -1,10 +1,14 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/factory_studio_shell.gd" id="1_shell"]
 [ext_resource type="Script" path="res://scripts/factory_studio_navigation.gd" id="2_navigation"]
 [ext_resource type="Script" path="res://scripts/factory_studio_workspace_page.gd" id="3_workspace"]
 [ext_resource type="Script" path="res://scripts/factory_studio_target_controls.gd" id="4_target_controls"]
 [ext_resource type="Texture2D" path="res://assets/icons/ScrubBots_Factory_Studio_256.png" id="5_studio_icon"]
+[ext_resource type="Script" path="res://scripts/factory_studio_exact_ui.gd" id="6_exact_ui"]
+[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png" id="7_pixel_master"]
+[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg" id="8_level_master"]
+[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg" id="9_release_master"]
 
 [node name="FactoryStudio" type="Control"]
 layout_mode = 3
@@ -26,6 +30,7 @@ color = Color(0.055, 0.071, 0.11, 1)
 mouse_filter = 2
 
 [node name="Frame" type="MarginContainer" parent="."]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -130,4 +135,44 @@ layout_mode = 2
 [node name="Status" type="Label" parent="Frame/Layout/Footer"]
 layout_mode = 2
 text = "System: Needs setup"
+autowrap_mode = 2
+
+[node name="MasterUI" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("6_exact_ui")
+pixel_art_master = ExtResource("7_pixel_master")
+level_factory_master = ExtResource("8_level_master")
+release_pool_master = ExtResource("9_release_master")
+
+[node name="MasterCanvas" type="TextureRect" parent="MasterUI"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 6
+mouse_filter = 2
+
+[node name="FileDialog" type="FileDialog" parent="MasterUI"]
+title = "Select artwork"
+size = Vector2i(900, 650)
+access = 2
+filters = PackedStringArray("*.png ; PNG image")
+
+[node name="Status" type="Label" parent="MasterUI"]
+visible = false
+layout_mode = 0
+offset_left = 36.0
+offset_top = 968.0
+offset_right = 1490.0
+offset_bottom = 1000.0
+theme_override_colors/font_color = Color(0.7, 0.92, 1, 1)
+theme_override_font_sizes/font_size = 16
 autowrap_mode = 2

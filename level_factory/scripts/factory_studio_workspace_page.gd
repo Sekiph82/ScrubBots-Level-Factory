@@ -679,7 +679,7 @@ func _refresh_owner_preview() -> void:
 		var candidate := _owner_candidate(selected_owner_candidate_id)
 		var relative_artwork := str(candidate.get("artwork_path", ""))
 		if not relative_artwork.is_empty():
-			var repository_root := ProjectSettings.globalize_path("res://../")
+			var repository_root := ProjectSettings.globalize_path("res://").get_base_dir()
 			var candidate_image := Image.new()
 			if candidate_image.call("load", repository_root.path_join(relative_artwork)) == OK:
 				image = candidate_image

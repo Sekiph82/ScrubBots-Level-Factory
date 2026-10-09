@@ -6,7 +6,7 @@ Date: 2026-10-08
 There are exactly three canonical production-screen masters.
 
 1. PIXEL ART  
-   `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp`
+   `FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png`
 
 2. LEVEL FACTORY  
    `FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
@@ -29,10 +29,6 @@ Implementation contract:
 
 ## Binary integrity status
 
-The intended PIXEL ART layout remains owner-locked, but the currently tracked `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp` binary is **not a valid WebP** and is quarantined from implementation authority until R02-R01 replaces it with the exact owner-approved 1536x1024 source.
+`FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png` is the exact owner-approved 1536x1024 PNG source. Its SHA-256 is `b03f00cf01374a5cf884ce572637cbf06a654bb30a6262e28f4e0d76efd10def`; Pillow verifies PNG decode and RGB dimensions. The invalid V03 WebP was removed from current authority; its prior bytes remain in Git history.
 
-Current repair/audit authority:
-- `.hiveai/audits/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_STRICT_AUDIT_V01.md`
-- `.hiveai/prompts/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_PROMPT.md`
-
-LEVEL FACTORY and RELEASE POOL masters remain valid.
+LEVEL FACTORY and RELEASE POOL masters remain unchanged.
