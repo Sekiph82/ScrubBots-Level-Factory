@@ -58,12 +58,17 @@ The exact owner-approved PIXEL ART master has a fixed identity:
 - no leading numeral
 - owl Visual Review Canvas
 
-Search the persistent owner workspace first for the exact SHA-256, not merely by filename.
+Search read-only by exact SHA-256, not merely by filename, in this order:
+
+1. `C:\\Users\\sekip\\Desktop\\Scrubbots - Pixel Art Generator`
+2. `C:\\Users\\sekip\\Downloads`
+3. `C:\\Users\\sekip\\Desktop`
+4. `C:\\Users\\sekip\\Documents`
 
 Preferred source filename if present:
 `ScrubBots Pixel Art Studio.png`
 
-Do not re-encode or modify the source.
+The filename is not authoritative; the SHA-256 is. Do not re-encode or modify the source. Do not scan unrelated system locations.
 
 If the exact SHA is not available locally, stop with:
 `OWNER_MASTER_BINARY_REQUIRED`
