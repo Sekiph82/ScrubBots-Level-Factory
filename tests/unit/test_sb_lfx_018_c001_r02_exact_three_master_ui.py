@@ -75,7 +75,9 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
     assert (runtime_assets / "FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png.import").is_file()
     assert "owner-review" in source and '"pipeline"' in source
     assert '"release-pool"' in source and '"scrubbots-publish"' in source
-    assert '"seed", "width", "height", "mode", "background_intent"' in source
+    assert '"prompt", "style", "width", "height", "provider", "seed", "background_intent"' in source
+    assert '"semantic-generate"' in source
+    assert '"ZoomOut"' in source and '"ToggleGrid"' in source
     assert '_gateway.call("run_action", "Generate"' in source
     assert '"column_count": _column_count' in source and 'columns in [3, 4, 5]' in source
     assert 'str(_last_pipeline.get("disposition", "")) != "READY"' in source

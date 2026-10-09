@@ -278,6 +278,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "release-pool":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
             payload = {"state": "READY", "pool_size": len(release_entries()), "entries": release_entries()}
+        elif operation == "semantic-generate":
+            payload = _semantic_generate(request)
+        elif operation == "provider-options":
+            payload = _provider_options()
         elif operation == "campaign-build":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
             payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
@@ -308,6 +312,90 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         payload = {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": f"ERROR — Studio extension: {str(exc)[:512]}"}
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
         return 2
+
+
+def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
+    """Run an explicitly selected registered semantic provider and import its bytes.
+
+    Secrets are read only by the provider adapter from process environment. They
+    are never accepted in the request payload or copied into the result.
+    """
+    allowed = {"prompt", "style", "provider_id", "provider_model", "width", "height", "seed", "background_intent"}
+    if set(request) - allowed or "prompt" not in request:
+        raise ValueError("semantic generation request contains unsupported or missing fields")
+    if request.get("provider_id") != "PIXELLAB":
+        raise ValueError("only the configured PIXELLAB provider is currently executable")
+    from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest
+    from scrubbots_pixel_factory.semantic.providers.registry import create_provider, get_provider_descriptor
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    prompt = _text(request.get("prompt"), "prompt")
+    style = _text(request.get("style"), "style")
+    width, height = _exact_int(request.get("width"), "width"), _exact_int(request.get("height"), "height")
+    seed = request.get("seed")
+    if isinstance(seed, bool) or not isinstance(seed, (str, int)):
+        raise ValueError("seed must be a string or integer")
+    model = _text(request.get("provider_model"), "provider_model").upper()
+    background = request.get("background_intent", "TRANSPARENT")
+    if background not in {"TRANSPARENT", "BACKGROUND"}:
+        raise ValueError("background_intent must be TRANSPARENT or BACKGROUND")
+    descriptor = get_provider_descriptor("PIXELLAB")
+    semantic_request = SemanticGenerationRequest(
+        output_class=OutputClass.ASSET_ART,
+        description=f"{prompt}. Pixel art style: {style}.",
+        width=width,
+        height=height,
+        seed=seed,
+        no_background=background == "TRANSPARENT",
+        provider_id="PIXELLAB",
+        provider_model=model,
+        provider_config_version=descriptor.config_version,
+    )
+    provider = create_provider("PIXELLAB", engine=model)
+    candidate = provider.generate_checked(semantic_request)
+    if candidate.status.value != "SUCCESS":
+        raise ValueError(candidate.reason or "selected provider did not return an image")
+    factory_output = (_repository_root() / "level_factory" / "output").resolve()
+    output_root = (factory_output / "semantic-generated").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    destination = (output_root / f"{candidate.candidate_id}.png").resolve()
+    if not _inside_output(destination, factory_output):
+        raise ValueError("semantic output path escaped the Factory output directory")
+    destination.write_bytes(candidate.image_bytes)
+    imported = extensions.batch_import([str(destination)])
+    items = imported.get("items", [])
+    if not isinstance(items, list) or not items or not isinstance(items[0], Mapping):
+        raise ValueError("semantic output was not accepted by canonical artwork import")
+    item = items[0]
+    source_id = item.get("source_id")
+    if not isinstance(source_id, str) or not source_id:
+        raise ValueError(str(item.get("reason", item.get("state", "canonical artwork import failed"))))
+    return {
+        "operation": STUDIO_EXTENSION_OPERATION,
+        "state": "IMPORTED",
+        "candidate_id": candidate.candidate_id,
+        "source_id": source_id,
+        "provider_id": candidate.provider_id,
+        "provider_version": candidate.provider_version,
+        "width": candidate.returned_width,
+        "height": candidate.returned_height,
+        "content_sha256": candidate.content_sha256,
+        "source_path": str(destination),
+    }
+
+
+def _provider_options() -> dict[str, object]:
+    """Expose only adapters that are actually executable in this process."""
+    import importlib.util
+    import os
+
+    options: list[dict[str, object]] = [{"id": "LOCAL_MASK", "available": True, "prompt_capable": False}]
+    if os.environ.get("PIXELLAB_SECRET", "").strip() and importlib.util.find_spec("pixellab") is not None:
+        options.extend([
+            {"id": "PIXELLAB/PIXFLUX", "available": True, "prompt_capable": True},
+            {"id": "PIXELLAB/BITFORGE", "available": True, "prompt_capable": True},
+        ])
+    return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
 
 
 def _validate_studio_request(raw: object) -> dict[str, object]:

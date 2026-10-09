@@ -47,13 +47,20 @@ def publish_preflight(
             or len(set(candidate_ids)) != len(candidate_ids)):
         return _blocked("AWAITING_OWNER_RELEASE_BATCH", "Select one or more current owner-accepted Release Pool entries.")
     if (not isinstance(pack_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9._-]{0,63}", pack_id)
-            or type(content_version) is not int or content_version < 2
+            or (content_version is not None and (type(content_version) is not int or content_version < 2))
             or not isinstance(created_at, str)):
-        return _blocked("PREFLIGHT_INPUT_INVALID", "Pack identity, content version, and canonical UTC timestamp are required.")
+        return _blocked("PREFLIGHT_INPUT_INVALID", "Pack identity and canonical UTC timestamp are required.")
     try:
         created_at = normalize_created_at_utc(created_at)
     except ValueError:
         return _blocked("PREFLIGHT_INPUT_INVALID", "created_at_utc must be an explicit timezone-aware whole-second instant.")
+    try:
+        next_version = _next_content_version()
+    except Exception:
+        return _blocked("RELEASE_HISTORY_UNAVAILABLE", "Current STAGING and PRODUCTION manifests could not establish the next content version.")
+    if content_version is not None and content_version != next_version:
+        return _blocked("CONTENT_VERSION_STALE", "Requested content version does not match current release history.")
+    content_version = next_version
     try:
         entries = tuple(_release_entries(release_pool_reader))
         current = {str(entry.get("candidate_id")): entry for entry in entries if _valid_pool_entry(entry)}
@@ -220,6 +227,30 @@ def _release_entries(reader):
         return reader()
     from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
     return release_entries()
+
+
+def _next_content_version(provider_factory=None) -> int:
+    """Derive the next version from both canonical current manifests, fail closed on unknown state."""
+    from scrubbots_content_pipeline.config import Environment
+    from scrubbots_content_pipeline.manifest_parser import parse_content_manifest_v1
+    from scrubbots_content_pipeline.r2_provider import CloudflareR2Provider, physical_object_key
+
+    provider = (provider_factory or CloudflareR2Provider)()
+    if provider._client() is None:
+        raise RuntimeError("canonical release history is unavailable")
+    versions: list[int] = []
+    for environment in (Environment.STAGING, Environment.PRODUCTION):
+        stored = provider._get(physical_object_key(environment, _MANIFEST_KEY))
+        if stored is None:
+            continue
+        raw, _etag = stored
+        parsed = parse_content_manifest_v1(raw)
+        version = parsed.content_version
+        if type(version) is not int or version < 1:
+            raise ValueError("current release manifest version is invalid")
+        versions.append(version)
+    # Version 1 is the schema baseline. First publication derives to its successor.
+    return max([1, *versions]) + 1
 
 
 def _valid_pool_entry(entry: object) -> bool:

@@ -16,6 +16,13 @@ from scrubbots_content_pipeline.config import PipelineConfig
 import scrubbots_publish_handoff as handoff
 
 
+@pytest.fixture(autouse=True)
+def _version_history_fixture(monkeypatch):
+    """Keep this module's isolated publisher fixtures independent of live R2."""
+    original = handoff._next_content_version
+    monkeypatch.setattr(handoff, "_next_content_version", lambda *args: 7 if not args else original(*args))
+
+
 SHA = "a" * 40
 AUTHORITY = {"repository": "Sekiph82/Scrubbots", "branch": "main", "commit": SHA,
              "source_sha256": {"project.godot": "b" * 64}}
@@ -183,6 +190,7 @@ def test_service_assembles_complete_typed_m14_request_and_stages_through_real_or
         "primary": {"state": "READY", "disposition": "READY"}})
     monkeypatch.setattr(builder_module, "_level_input", lambda *_args, **_kwargs: ("level-a", level_input))
 
+    monkeypatch.setattr(handoff, "_next_content_version", lambda: 2)
     values = _request(candidate_ids=["candidate-accepted"], pack_id="pack-a", content_version=2)
     preflight = handoff.publish_preflight(values, release_pool_reader=lambda: candidate_pool,
                                           pack_builder=lambda *_args, **_kwargs: build,
@@ -220,6 +228,47 @@ def test_missing_writer_credentials_stop_before_assembly_or_mutation(monkeypatch
                                         pack_builder=_build, game_authority_reader=lambda: AUTHORITY)
     assert result["state"] == "OWNER_R2_WRITE_CREDENTIAL_REQUIRED"
     assert result["mutation_performed"] is False
+
+
+def test_next_content_version_comes_from_both_environment_manifests(monkeypatch):
+    from scrubbots_content_pipeline import config, manifest_parser
+
+    class FakeProvider:
+        def __init__(self):
+            self.reads = []
+
+        def _client(self):
+            return object()
+
+        def _get(self, key):
+            self.reads.append(key)
+            return (key.encode(), "etag")
+
+    fake = FakeProvider()
+    versions = {"staging/manifests/current.json": 11, "production/manifests/current.json": 8}
+    monkeypatch.setattr(manifest_parser, "parse_content_manifest_v1", lambda raw: SimpleNamespace(content_version=versions[raw.decode()]))
+    assert handoff._next_content_version(lambda: fake) == 12
+    assert fake.reads == ["staging/manifests/current.json", "production/manifests/current.json"]
+
+
+def test_next_content_version_uses_schema_baseline_only_when_both_manifests_are_absent():
+    class EmptyProvider:
+        def _client(self):
+            return object()
+
+        def _get(self, _key):
+            return None
+
+    assert handoff._next_content_version(EmptyProvider) == 2
+
+
+def test_next_content_version_fails_closed_when_provider_history_is_unavailable():
+    class UnavailableProvider:
+        def _client(self):
+            return None
+
+    with pytest.raises(RuntimeError, match="release history is unavailable"):
+        handoff._next_content_version(UnavailableProvider)
 
 
 def test_stale_reviewed_identity_rejects_before_credentials_or_provider(monkeypatch):

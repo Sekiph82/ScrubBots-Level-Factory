@@ -321,7 +321,7 @@ func _execute_process(executable: String, arguments: PackedStringArray, captured
 
 
 func _generate_arguments(draft: Dictionary, output_root: String) -> PackedStringArray:
-	return PackedStringArray([
+	var arguments := PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"generate",
 		"--width", str(int(draft.get("width", 20))),
@@ -331,6 +331,10 @@ func _generate_arguments(draft: Dictionary, output_root: String) -> PackedString
 		"--background-intent", str(draft.get("background_intent", "BACKGROUND")),
 		"--output", output_root,
 	])
+	var style := str(draft.get("style", "")).strip_edges()
+	if not style.is_empty():
+		arguments.append_array(PackedStringArray(["--style", style]))
+	return arguments
 
 
 func _reproduce_arguments(metadata_path: String, output_root: String) -> PackedStringArray:
