@@ -11,8 +11,8 @@ UI = UI_PATH.read_text(encoding="utf-8")
 sys.path.insert(0, str(ROOT / "level_factory/scripts"))
 
 
-def test_every_declared_master_hotspot_has_one_unique_explicit_action() -> None:
-    declared = re.findall(r'_hotspot\("([A-Za-z0-9]+)",\s*Rect2\([^\n]+?,\s*([A-Za-z_][A-Za-z0-9_.]*(?:\.bind\([^\n]*?\))?)\)', UI)
+def test_every_declared_master_control_has_one_unique_explicit_action() -> None:
+    declared = re.findall(r'_place_control\("([A-Za-z0-9]+)",\s*Rect2\([^\n]+?,\s*([A-Za-z_][A-Za-z0-9_.]*(?:\.bind\([^\n]*?\))?)\)', UI)
     names = [name for name, _ in declared]
     assert len(names) >= 65
     assert len(names) == len(set(names))
@@ -62,7 +62,9 @@ def test_release_projection_and_publish_stay_within_canonical_boundaries() -> No
     assert '"content_version"' in UI
     assert '"content_version": 2' not in UI
     assert "CloudflareR2Provider" not in UI and "write_object_bytes" not in UI
-    assert 'PRODUCTION is unavailable: exact verified STAGING manifest and trusted owner-approval promotion handoff are not connected.' in UI
+    assert '"action": "publish-production"' in UI
+    assert '"manifest_sha256": _pending_production_confirmation.get' in UI
+    assert '_release_confirmation.confirmed.connect(_publish_production_confirmed)' in UI
 
 
 def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None:
@@ -91,3 +93,28 @@ def test_provider_picker_exposes_owner_provider_choices_with_truthful_availabili
     configured = factory_core_launcher._provider_options()
     assert configured["providers"][2]["available"] is True
     assert "redacted-test-secret" not in str(configured)
+
+
+def test_production_screens_are_native_controls_and_master_textures_are_not_live_underlays() -> None:
+    assert "_canvas.texture = null" in UI
+    assert "_canvas.visible = false" in UI
+    assert "func _build_live_chrome()" in UI
+    assert "Panel.new()" in UI and "Label.new()" in UI
+    assert "button.flat = false" in UI
+    assert "func _refresh_live_data()" in UI
+    assert "candidate_manifest_sha256" in UI or "manifest_sha256" in UI
+
+
+def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_source_order() -> None:
+    single = UI.split("func _on_file_selected", 1)[1].split("func _on_files_selected", 1)[0]
+    multiple = UI.split("func _on_files_selected", 1)[1].split("func _set_generation_mode", 1)[0]
+    csv = UI.split("func _process_level_csv", 1)[1].split("func _minimize_window", 1)[0]
+    assert '"batch-import", {"paths": [path]}' in single
+    assert '"batch-import", {"paths": Array(paths)}' in multiple
+    assert '"batch-import", {"paths": [artwork_path]}' in csv
+    assert 'for item in items:' in multiple and '"pipeline", {"source_id": source_id' in multiple
+    assert 'while not file.eof_reached():' in csv and '"pipeline", {"source_id": source_id' in csv
+    assert '"column_count": _column_count' in multiple
+    assert '"column_count": int(row[col_index])' in csv
+    assert '"background_intent": _background_intent' in multiple
+    assert '"background_intent": row[bg_index]' in csv

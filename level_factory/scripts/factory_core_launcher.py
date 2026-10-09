@@ -301,15 +301,17 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = release_approved_campaign(plan_hash=str(request["plan_hash"]), game_project=game_project, studio_approval=True)
         elif operation == "scrubbots-publish":
             from scrubbots_publish_handoff import (
-                publish_preflight, publish_to_staging,
+                publish_preflight, publish_to_staging, publish_to_production,
             )
             action = str(request.get("action", "preflight"))
             if action == "preflight":
                 payload = publish_preflight(request)
             elif action == "publish-staging":
                 payload = publish_to_staging(request)
+            elif action == "publish-production":
+                payload = publish_to_production(request, owner_confirmation=request.get("owner_confirmation", {}))
             else:
-                raise ValueError("scrubbots-publish action must be preflight or publish-staging")
+                raise ValueError("scrubbots-publish action must be preflight, publish-staging, or publish-production")
         else:
             raise ValueError(f"unsupported Studio extension operation: {operation}")
         print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))

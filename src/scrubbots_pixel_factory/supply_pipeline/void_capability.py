@@ -50,20 +50,34 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
         head = _git(root, "rev-parse", "HEAD")
         current_main = _git(root, "rev-parse", "refs/remotes/origin/main")
         status = _git(root, "status", "--porcelain")
-        ancestor = subprocess.run(
-            ["git", "-C", str(root), "merge-base", "--is-ancestor", AUDITED_VOID_COMMIT, "HEAD"],
+        shallow = _git(root, "rev-parse", "--is-shallow-repository") == "true"
+        audited_object_available = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", f"{AUDITED_VOID_COMMIT}^{{commit}}"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             check=False,
         ).returncode == 0
+        ancestor_result = subprocess.run(
+            ["git", "-C", str(root), "merge-base", "--is-ancestor", AUDITED_VOID_COMMIT, "HEAD"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode
     except (OSError, subprocess.CalledProcessError):
         return _closed("Configured ScrubBots authority is not a readable Git checkout with origin/main.")
     if top != root or origin not in _EXPECTED_ORIGINS:
         return _closed("Configured project root or canonical ScrubBots origin does not match.")
     if branch not in {"main", ""} or head != current_main or status:
         return _closed("Configured ScrubBots authority must be clean and equal exact origin/main.", head=head)
-    if not ancestor:
-        return _closed("Current ScrubBots main does not contain the audited VOID implementation.", head=head)
+    if shallow and (not audited_object_available or ancestor_result == 1):
+        return _closed(
+            "Configured current ScrubBots history is shallow and cannot prove audited VOID ancestry.",
+            head=head,
+            reason_code="INCOMPLETE_GIT_HISTORY",
+        )
+    if not audited_object_available or ancestor_result != 0:
+        return _closed("Current ScrubBots main does not contain the audited VOID implementation.", head=head,
+                       reason_code="AUDITED_VOID_ANCESTOR_MISSING")
 
     adr_path = root / "docs" / "05_TECH_DECISIONS.md"
     spec_path = root / "docs" / "03_LEVEL_DATA_SPEC.md"
@@ -102,8 +116,13 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
     }
 
 
-def _closed(reason: str, *, head: str | None = None) -> dict[str, Any]:
-    result: dict[str, Any] = {"state": "CLOSED", "disposition": "UNAVAILABLE", "reason": reason}
+def _closed(
+    reason: str, *, head: str | None = None, reason_code: str = "AUTHORITY_UNAVAILABLE"
+) -> dict[str, Any]:
+    result: dict[str, Any] = {
+        "state": "CLOSED", "disposition": "UNAVAILABLE", "reason": reason,
+        "reason_code": reason_code,
+    }
     if head:
         result["git_head"] = head
     return result

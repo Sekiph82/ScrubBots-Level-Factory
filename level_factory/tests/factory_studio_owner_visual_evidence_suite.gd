@@ -30,6 +30,11 @@ func _capture_all() -> void:
 		push_error("Could not create owner evidence directory: %s" % error_string(directory_error))
 		quit(1)
 		return
+	var master_canvas := master_ui.get_node_or_null("MasterCanvas") as TextureRect
+	if master_canvas == null or master_canvas.texture != null:
+		push_error("Final visual evidence must render native Controls without a master-image underlay.")
+		quit(1)
+		return
 	for index in range(MASTERS.size()):
 		master_ui.call("_show_screen", MASTERS[index])
 		await process_frame

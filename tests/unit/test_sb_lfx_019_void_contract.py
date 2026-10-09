@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 import sys
+import subprocess
 
 from PIL import Image
 import pytest
@@ -330,3 +331,28 @@ def test_transparent_publisher_is_capability_gated_and_does_not_write(tmp_path: 
         )
     assert catalog.read_bytes() == catalog_bytes
     assert not (game / "data/levels/void-gated.json").exists()
+
+
+def test_void_capability_distinguishes_shallow_history_from_missing_ancestor(tmp_path: Path) -> None:
+    game = tmp_path / "game"
+    game.mkdir()
+    (game / "project.godot").write_text("config_version=5\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-b", "main", str(game)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(game), "config", "user.name", "Fixture"], check=True)
+    subprocess.run(["git", "-C", str(game), "config", "user.email", "fixture@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(game), "remote", "add", "origin", "https://github.com/Sekiph82/Scrubbots.git"], check=True)
+    subprocess.run(["git", "-C", str(game), "add", "project.godot"], check=True)
+    subprocess.run(["git", "-C", str(game), "commit", "-m", "fixture"], check=True, capture_output=True)
+    head = subprocess.check_output(["git", "-C", str(game), "rev-parse", "HEAD"], text=True).strip()
+    subprocess.run(["git", "-C", str(game), "update-ref", "refs/remotes/origin/main", head], check=True)
+    (game / ".git" / "shallow").write_text(head + "\n", encoding="ascii")
+
+    report = void_module.void_capability(game)
+
+    assert report["state"] == "CLOSED"
+    assert report["reason_code"] == "INCOMPLETE_GIT_HISTORY"
+
+    (game / ".git" / "shallow").unlink()
+    report = void_module.void_capability(game)
+    assert report["state"] == "CLOSED"
+    assert report["reason_code"] == "AUDITED_VOID_ANCESTOR_MISSING"

@@ -77,6 +77,7 @@ def publish_preflight(
     evidence = build.evidence
     if not evidence.level_ids:
         return _blocked("PREFLIGHT_REJECTED", "The deterministic pack contains no levels.")
+    manifest_sha = _candidate_manifest_sha(build, content_version)
     identity_fields = {
         "schema": "scrubbots.publish.review.v1",
         "candidate_ids": list(candidate_ids),
@@ -84,6 +85,7 @@ def publish_preflight(
         "created_at_utc": created_at,
         "packs": [{"pack_id": evidence.pack_id, "sha256": evidence.archive_sha256,
                    "byte_length": evidence.archive_byte_length}],
+        "candidate_manifest_sha256": manifest_sha,
         "scrubbots_main_sha": game_sha,
         "bucket": R2_BUCKET,
         "public_read_base": PUBLIC_READ_BASE,
@@ -94,10 +96,68 @@ def publish_preflight(
         "mutation_performed": False, "content_version": content_version,
         "candidate_ids": list(candidate_ids), "level_ids": list(evidence.level_ids),
         "pack_ids": [evidence.pack_id], "packs": identity_fields["packs"],
+        "candidate_manifest_sha256": manifest_sha,
         "scrubbots_main_sha": game_sha, "game_authority": dict(authority),
         "bucket": R2_BUCKET, "public_read_base": PUBLIC_READ_BASE,
         "reviewed_identity": identity,
         "production": "AWAITING_OWNER_PRODUCTION_PROMOTION",
+    }
+
+
+def publish_to_production(
+    request: Mapping[str, Any], *, owner_confirmation: Mapping[str, Any],
+    release_pool_reader: Callable[[], Sequence[Mapping[str, Any]]] | None = None,
+    pack_builder: Callable[..., Any] | None = None,
+    game_authority_reader: Callable[[], Mapping[str, object]] | None = None,
+    provider_factory: Callable[[], object] | None = None,
+    publisher_runner: Callable[[object], object] | None = None,
+) -> dict[str, Any]:
+    """Run the canonical M14 -> CP03-007 -> CPX-002 -> CP03-008/009 chain after exact owner confirmation."""
+    reviewed = request.get("reviewed_identity")
+    if not isinstance(reviewed, Mapping):
+        return _blocked("REVIEWED_PREFLIGHT_REQUIRED", "A successful exact preflight identity is required.")
+    if (not isinstance(owner_confirmation, Mapping)
+            or owner_confirmation.get("confirmed") is not True
+            or owner_confirmation.get("target") != "PRODUCTION"
+            or owner_confirmation.get("manifest_sha256") != reviewed.get("candidate_manifest_sha256")
+            or owner_confirmation.get("content_version") != reviewed.get("content_version")
+            or not isinstance(owner_confirmation.get("approval_id"), str)
+            or not owner_confirmation["approval_id"].strip()
+            or not isinstance(owner_confirmation.get("owner_id"), str)
+            or not owner_confirmation["owner_id"].strip()):
+        return _blocked("EXACT_OWNER_CONFIRMATION_REQUIRED", "Owner confirmation must bind the reviewed manifest SHA-256, content version, and PRODUCTION target.")
+    current_request = {key: request.get(key) for key in
+                       ("candidate_ids", "pack_id", "content_version", "created_at_utc")}
+    fresh = publish_preflight(current_request, release_pool_reader=release_pool_reader,
+                              pack_builder=pack_builder, game_authority_reader=game_authority_reader)
+    if fresh.get("state") != "PREFLIGHT_READY" or fresh.get("reviewed_identity") != dict(reviewed):
+        return _blocked("REVIEWED_PREFLIGHT_STALE", "Current Release Pool, pack bytes, authority, or target differs from the reviewed preflight.")
+    if (owner_confirmation.get("manifest_sha256") != fresh.get("candidate_manifest_sha256")
+            or owner_confirmation.get("content_version") != fresh.get("content_version")):
+        return _blocked("EXACT_OWNER_CONFIRMATION_REQUIRED", "Confirmed manifest identity no longer matches current preflight.")
+    env = os.environ
+    if not all(env.get(name, "").strip() for name in
+               ("R2_ENDPOINT_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")):
+        return _blocked("OWNER_R2_WRITE_CREDENTIAL_REQUIRED", "Secure R2 writer credentials are not available to this process.")
+    try:
+        typed_request = _assemble_staging_request(
+            current_request, provider_factory=provider_factory,
+            release_pool_reader=release_pool_reader, pack_builder=pack_builder,
+            game_authority_reader=game_authority_reader, reviewed_identity=reviewed,
+            production_confirmation=owner_confirmation,
+        )
+        from scrubbots_content_pipeline.one_command_publisher import run_one_command_publisher
+        report = (publisher_runner or run_one_command_publisher)(typed_request)
+    except Exception:
+        return _blocked("M14_PRODUCTION_CHAIN_REJECTED", "Trusted M14/current-main/production authority chain failed closed.")
+    to_dict = getattr(report, "to_dict", None)
+    payload = to_dict() if callable(to_dict) else {"accepted": bool(getattr(report, "accepted", False))}
+    return {
+        "operation": "scrubbots-publish",
+        "state": "PRODUCTION_ACTIVATED" if payload.get("accepted") is True else "PRODUCTION_REJECTED",
+        "m14": payload, "receipt": _receipt(payload),
+        "production": "ACTIVATED" if payload.get("accepted") is True else payload.get("reason_code", "REJECTED"),
+        "mutation_performed": True,
     }
 
 
@@ -152,11 +212,12 @@ def _assemble_staging_request(
     pack_builder: Callable[..., Any] | None,
     game_authority_reader: Callable[[], Mapping[str, object]] | None,
     reviewed_identity: Mapping[str, object],
+    production_confirmation: Mapping[str, Any] | None = None,
 ) -> object:
     from scrubbots_content_pipeline import (
         FactoryPackRequest, PublisherMode, PublisherRunRequest,
     )
-    from scrubbots_content_pipeline.config import PipelineConfig, STAGING_TARGET
+    from scrubbots_content_pipeline.config import Environment, PipelineConfig, STAGING_TARGET
     from scrubbots_content_pipeline.manifest_v1 import CONTENT_MANIFEST_SCHEMA
     from scrubbots_content_pipeline.payload_validation import validate_remote_payload
     from scrubbots_content_pipeline.publication_plan import build_publication_plan
@@ -206,10 +267,54 @@ def _assemble_staging_request(
         target=STAGING_TARGET, replay=replay, current_state=None,
         capability=provider.capabilities, owner_approved=True,
     )
-    precondition = StagingManifestPrecondition(
-        STAGING_TARGET.logical_target_id, _MANIFEST_KEY, False, None, None, None)
+    precondition = _read_manifest_precondition(
+        provider, Environment.STAGING, STAGING_TARGET.logical_target_id,
+        StagingManifestPrecondition, _MANIFEST_KEY,
+    )
+    candidate_sha = _candidate_manifest_sha(build, version)
+    if candidate_sha != reviewed_identity.get("candidate_manifest_sha256"):
+        raise ValueError("candidate manifest changed after owner preflight")
+    mode = PublisherMode.STAGING_ONLY
+    production_inputs = None
+    if production_confirmation is not None:
+        from scrubbots_content_pipeline import OwnerPromotionApproval, ProductionManifestPrecondition
+        from scrubbots_content_pipeline.config import PRODUCTION_TARGET
+        from scrubbots_content_pipeline.manifest_history import ManifestHistoryV1
+        from scrubbots_content_pipeline.one_command_publisher import ProductionRunInputs
+        if (production_confirmation.get("target") != "PRODUCTION"
+                or production_confirmation.get("manifest_sha256") != candidate_sha
+                or production_confirmation.get("content_version") != version
+                or production_confirmation.get("confirmed") is not True):
+            raise ValueError("production confirmation is not bound to candidate manifest")
+        approval = OwnerPromotionApproval(
+            str(production_confirmation["approval_id"]), str(production_confirmation["owner_id"]),
+            candidate_sha, version, PRODUCTION_TARGET.logical_target_id,
+        )
+        production_precondition = _read_manifest_precondition(
+            provider, Environment.PRODUCTION, PRODUCTION_TARGET.logical_target_id,
+            ProductionManifestPrecondition, _MANIFEST_KEY,
+        )
+        current_production = provider.read_object_bytes(Environment.PRODUCTION, _MANIFEST_KEY).content_bytes
+        if current_production is not None:
+            # The existing activation contract requires a complete independently supplied history.
+            # This adapter has no canonical history read API, so it fails closed instead of inventing one.
+            raise ValueError("production manifest history is not available from the provider contract")
+        authority = dict(authority)
+        game_root = Path(os.environ.get("SCRUBBOTS_PROJECT", "")).expanduser().resolve()
+        def check_approval():
+            return approval
+        def check_authority():
+            return dict((game_authority_reader or _resolve_game_authority)())
+        production_inputs = ProductionRunInputs(
+            game_authority=authority, authority_check=check_authority,
+            game_runner=_current_game_runner(game_root), owner_approval=approval,
+            owner_approval_check=check_approval,
+            production_precondition=production_precondition,
+            manifest_history=ManifestHistoryV1(), recorded_at_utc=created,
+        )
+        mode = PublisherMode.PRODUCTION
     return PublisherRunRequest(
-        mode=PublisherMode.STAGING_ONLY, config=PipelineConfig(), provider=provider,
+        mode=mode, config=PipelineConfig(), provider=provider,
         factory_pack_requests=(FactoryPackRequest(ids, pack_id, version, created),),
         factory_pack_builder=trusted_builder, content_version=version,
         previous_content_version=version - 1,
@@ -219,7 +324,71 @@ def _assemble_staging_request(
         publication_plan=plan, current_content_digest=plan.content_digest,
         owner_approved=True, staging_precondition=precondition,
         release_events=events, manifest_object_key=_MANIFEST_KEY,
+        production=production_inputs,
     )
+
+
+def _read_manifest_precondition(provider, environment, target_id, precondition_type, object_key):
+    from scrubbots_content_pipeline.manifest_parser import parse_content_manifest_v1
+    result = provider.read_object_bytes(environment, object_key)
+    raw = result.content_bytes
+    if raw is None:
+        if precondition_type.__name__ == "StagingManifestPrecondition":
+            return precondition_type(target_id, object_key, False, None, None, None)
+        return precondition_type(target_id, object_key, None, None, None)
+    parsed = parse_content_manifest_v1(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    if precondition_type.__name__ == "StagingManifestPrecondition":
+        return precondition_type(target_id, object_key, True, digest, parsed.content_version, bytes(raw))
+    return precondition_type(target_id, object_key, digest, parsed.content_version, bytes(raw))
+
+
+def _candidate_manifest_sha(build, version: int) -> str | None:
+    from scrubbots_content_pipeline.scrubpack_builder import ScrubpackBuildResult
+    if not isinstance(build, ScrubpackBuildResult):
+        return None
+    from scrubbots_content_pipeline.candidate_manifest import build_candidate_manifest
+    from scrubbots_content_pipeline.manifest_v1 import CONTENT_MANIFEST_SCHEMA
+    candidate = build_candidate_manifest(
+        (build,), content_version=version, minimum_game_version="2.4.0",
+        object_keys={build.evidence.pack_id: f"packs/{build.evidence.pack_id}/v{version}.scrubpack"},
+        current_game_version="2.4.1",
+        supported_manifest_schema_versions={CONTENT_MANIFEST_SCHEMA: (1,)},
+        prior_accepted_content_version=version - 1,
+    )
+    if not candidate.publishable:
+        raise ValueError("candidate manifest is not publishable")
+    return candidate.manifest_sha256
+
+
+def _current_game_runner(game_root: Path):
+    def run(levels):
+        import json
+        import shutil
+        import tempfile
+        from pathlib import Path
+        from cpx002_current_main_replay_adapter import _run_godot
+        executable = shutil.which("godot") or shutil.which("godot4")
+        if not executable:
+            raise RuntimeError("Godot executable is unavailable for exact-current replay")
+        with tempfile.TemporaryDirectory(prefix="sb-lfx-production-replay-") as work:
+            work_path = Path(work)
+            rows = []
+            for item in levels:
+                level_id = str(item["level_id"])
+                level_path = work_path / f"{level_id}.level.json"
+                plan_path = work_path / f"{level_id}.supply.json"
+                level_path.write_bytes(item["level_data_bytes"])
+                plan_path.write_bytes(item["supply_plan_bytes"])
+                rows.append({"level_id": level_id, "level_path": str(level_path),
+                             "plan_path": str(plan_path), "level_sha256": item["level_sha256"],
+                             "plan_sha256": item["plan_sha256"], "fifo_columns": item["fifo_columns"],
+                             "solver_state_sha256": item["solver_state_sha256"],
+                             "solver_evidence_sha256": item["solver_evidence_sha256"]})
+            job = work_path / "job.json"
+            job.write_text(json.dumps({"levels": rows}, sort_keys=True), encoding="utf-8")
+            return _run_godot(game_root, executable, job, 900)
+    return run
 
 
 def _release_entries(reader):
@@ -321,4 +490,4 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
             "production": "AWAITING_OWNER_PRODUCTION_PROMOTION"}
 
 
-__all__ = ["PUBLIC_READ_BASE", "R2_BUCKET", "publish_preflight", "publish_to_staging"]
+__all__ = ["PUBLIC_READ_BASE", "R2_BUCKET", "publish_preflight", "publish_to_staging", "publish_to_production"]

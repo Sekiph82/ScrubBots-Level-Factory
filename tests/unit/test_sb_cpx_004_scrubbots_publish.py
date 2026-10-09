@@ -168,7 +168,7 @@ def test_service_assembles_complete_typed_m14_request_and_stages_through_real_or
         monkeypatch.setenv(name, "test-only-configured")
     monkeypatch.setattr(orchestrator, "verify_solver_proven_scrubpack", lambda *_args: True)
     monkeypatch.setattr(scrubpack_solver_identity, "verify_solver_proven_scrubpack", lambda *_args: True)
-    base_request, provider, _candidate, _approval, _authority = m14_fixture(PublisherMode.STAGING_ONLY)
+    base_request, provider, candidate_manifest, _approval, _authority = m14_fixture(PublisherMode.STAGING_ONLY)
     build = base_request.factory_pack_builder(base_request.factory_pack_requests[0])
     candidate_pool = ({"schema": "scrubbots-release-pool-entry/v1", "candidate_id": "candidate-accepted",
                        "review_id": "review-1", "pipeline_run_id": "run-1", "pipeline_sha256": "c" * 64,
@@ -196,6 +196,16 @@ def test_service_assembles_complete_typed_m14_request_and_stages_through_real_or
                                           pack_builder=lambda *_args, **_kwargs: build,
                                           game_authority_reader=lambda: AUTHORITY)
     values["reviewed_identity"] = preflight["reviewed_identity"]
+    from scrubbots_content_pipeline.candidate_manifest import build_candidate_manifest
+    from scrubbots_content_pipeline.manifest_v1 import CONTENT_MANIFEST_SCHEMA
+    expected_manifest = build_candidate_manifest(
+        (build,), content_version=2, minimum_game_version="2.4.0",
+        object_keys={"pack-a": "packs/pack-a/v2.scrubpack"}, current_game_version="2.4.1",
+        supported_manifest_schema_versions={CONTENT_MANIFEST_SCHEMA: (1,)},
+        prior_accepted_content_version=1,
+    )
+    assert preflight["candidate_manifest_sha256"] == expected_manifest.manifest_sha256
+    assert preflight["reviewed_identity"]["candidate_manifest_sha256"] == expected_manifest.manifest_sha256
     assembled = handoff._assemble_staging_request(
         values, provider_factory=lambda: provider, release_pool_reader=lambda: candidate_pool,
         pack_builder=lambda *_args, **_kwargs: build, game_authority_reader=lambda: AUTHORITY,
@@ -287,3 +297,35 @@ def test_headless_launcher_and_studio_expose_same_serializable_staging_action():
     assert '"action": "publish-staging"' in studio
     assert '"Publish to STAGING"' in studio
     assert '"scrubbots_main_sha":' not in studio
+
+
+def test_production_handoff_requires_exact_owner_confirmation_before_assembly(monkeypatch):
+    import hashlib
+
+    identity = {"schema": "scrubbots.publish.review.v1", "candidate_manifest_sha256": "a" * 64,
+                "content_version": 7, "candidate_ids": ["accepted-1"], "created_at_utc": "2026-10-07T12:00:00Z"}
+    fresh = {"state": "PREFLIGHT_READY", "reviewed_identity": identity,
+             "candidate_manifest_sha256": identity["candidate_manifest_sha256"], "content_version": 7}
+    monkeypatch.setattr(handoff, "publish_preflight", lambda *_args, **_kwargs: fresh)
+    for name in ("R2_ENDPOINT_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY"):
+        monkeypatch.setenv(name, "test-only-configured")
+    assembled = []
+    typed = object()
+    monkeypatch.setattr(handoff, "_assemble_staging_request",
+                        lambda *_args, **kwargs: (assembled.append(kwargs["production_confirmation"]) or typed))
+    class Report:
+        accepted = True
+        def to_dict(self): return {"accepted": True, "candidate_manifest_sha256": "a" * 64, "production_manifest_sha256": "a" * 64}
+    seen = []
+    confirmation = {"confirmed": True, "approval_id": "approval-1", "owner_id": "owner",
+                    "manifest_sha256": "a" * 64, "content_version": 7, "target": "PRODUCTION"}
+    result = handoff.publish_to_production({"reviewed_identity": identity}, owner_confirmation=confirmation,
+        publisher_runner=lambda request: (seen.append(request) or Report()))
+    assert result["state"] == "PRODUCTION_ACTIVATED"
+    assert assembled == [confirmation] and seen == [typed]
+
+    assembled.clear()
+    wrong = {**confirmation, "manifest_sha256": "b" * 64}
+    blocked = handoff.publish_to_production({"reviewed_identity": identity}, owner_confirmation=wrong)
+    assert blocked["state"] == "EXACT_OWNER_CONFIRMATION_REQUIRED"
+    assert blocked["mutation_performed"] is False and assembled == []

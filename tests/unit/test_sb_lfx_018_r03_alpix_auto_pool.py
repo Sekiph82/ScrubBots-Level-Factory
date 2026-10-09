@@ -157,7 +157,7 @@ def test_magnific_ui_route_prepares_existing_external_job_without_claiming_gener
     assert result["request"]["model_slug"] == "recraft-v4-1"
 
 
-def test_master_ui_uses_auto_batch_numbering_and_fails_closed_for_unwired_production() -> None:
+def test_master_ui_uses_auto_batch_numbering_and_exact_owner_production_confirmation() -> None:
     from pathlib import Path
 
     root = Path(__file__).resolve().parents[2]
@@ -165,7 +165,8 @@ def test_master_ui_uses_auto_batch_numbering_and_fails_closed_for_unwired_produc
 
     assert '_level_number_label.text = "Auto"' in ui
     assert 'PackedStringArray(["artwork_path", "supply_columns", "background_intent"])' in ui
-    assert 'PRODUCTION is unavailable:' in ui
+    assert '"action": "publish-production"' in ui
+    assert 'Confirm Production Promotion' in ui
     assert '"production-promotion"' not in ui
 
 
