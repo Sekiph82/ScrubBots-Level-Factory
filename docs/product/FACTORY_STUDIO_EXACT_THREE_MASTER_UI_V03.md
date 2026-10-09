@@ -4,6 +4,10 @@ Status: OWNER-LOCKED / CANONICAL UI AUTHORITY
 Date: 2026-10-08
 Repository: `Sekiph82/ScrubBots-Level-Factory`
 
+## Functional control authority
+
+Every interactive control is governed by `docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V01.md`. The masters define appearance; that binding contract defines runtime behavior. A visually correct but non-functional control is non-compliant.
+
 ## Final owner decision
 
 The Factory Studio owner UI has exactly three production screens and must visually match the three approved repository masters.
