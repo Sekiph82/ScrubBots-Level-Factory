@@ -11,3 +11,10 @@
 - Real R05 A/B/C identity/supply/solver/replay/order, N->N+1->N+2 production, full pytest 0 failures/errors, LF19/VOID, no unbounded headless job and other original R05 gates still required, without mock substitutes.
 - Owner visual/runtime defects are acceptance gates: usable maximize/reflow and actual 150-PNG Level Factory multi-select + independent per-source canonical supply/solver processing/READY auto-pool, maintaining exactly three master screens.
 - Source/product commits and installer are forbidden before passing gates; Codex supplies one existing R05 builder log and independent GPT audit follows. Alpix smoke cannot be claimed if plugin absent.
+
+## R04 post-denial acceptance clarification (2026-10-09)
+
+- The 4 retained R03 scratch roots total **13,851,852 bytes (~14 MB)**, not GB. Filesystem approval denied actual deletion, so there is **no cleanup PASS**. A one-time supported authorization request may be made for exact owned paths; a repeat or bypass of automatic denial fails.
+- Cleanup denial does NOT make no-temp, low-write product development invalid. Continue native responsive UI/multi-PNG canonical batch functional remediation and production-history source fixes without heavy test data, publish only after the inherited full verification gates.
+- Heavy tests must not start while their disposable output cannot be safely removed. No claim of full regression, install, release, GitHub builder-log publication or GPT audit PASS until actually supported by evidence.
+- Do not invent additional R05 disk-forensics revisions; preserve uncommitted R05 source/log and summarize a single operational authorization blocker if still denied.
