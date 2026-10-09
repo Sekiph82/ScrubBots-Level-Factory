@@ -46,3 +46,18 @@ Next action in the SAME R04:
 4. Focus next on the incomplete R05 production-history source/validation path without starting forbidden heavy tests. Record concrete UI screenshots/results and exact NOT RUN gates in the existing R05 builder log. **Do not install/push production or claim R05 PASS** without the parent strict gates. Do not open another disk-forensics iteration or treat 14 MB as a multi-GB emergency.
 
 When cleanup approval or a low-disk testing route becomes available, run the real 150-PNG and inherited full-regression gates as originally required. Leave scratch data alone if cleanup remains policy-denied.
+
+
+## 2026-10-10 FOLLOW-UP: Computer Use initializer failure is NOT a Godot failure
+
+Latest Codex report: non-destructive sync at `c33200e`, Godot 4.7.2 headless editor parse exited 0, but Computer Use runtime failed twice with `failed to write kernel assets: The system cannot find the path specified`. Canvas scaling and 150-PNG selection remain **UNVERIFIED**, 4 R03 scratch roots (13,851,852 bytes) remain untouched, and no install/commit/push took place.
+
+**Next action: do not retry Computer Use or open an R05 forensic subtask.** That particular automation environment is broken; it does not establish the Godot app is broken. Use supported DIRECT Godot/runtime test facilities under the existing project, without Computer Use and without disk-heavy temporary clones:
+
+1. Launch the same Godot app normally in graphical mode (not `--headless`) via the known local Godot binary and project path. For reproducible tests, drive the genuine scene/control tree through a small Godot runtime test script that calls `DisplayServer.window_set_size`, reads actual window/viewport sizes, and records each real Control's `get_global_rect()`, visible/disabled state and GUI tree. For screenshots use Godot's rendered Viewport image after `RenderingServer.frame_post_draw` if a graphical backend is available. Capture 1536×1024 and a wider/maximized window. A successful headless editor parse alone is not PASS.
+2. If graphical runtime itself is unavailable for a specific reason, still implement *permanent lightweight scene-tree/geometry and signal tests* without external Computer Use. Report `NATIVE_WINDOW_NOT_VERIFIED` rather than claiming visual PASS. Do not install untested changes. No repeated attempts to repair the third-party Computer Use environment.
+3. Explicitly inspect whether the project setting `stretch/aspect=keep` letterboxes; adjust Control anchors/containers/layout minimally as necessary, preserving exactly the 3 approved master screens. Prove clickable areas and central preview use the client area at both tested sizes, not just that Godot reports resized outer window.
+4. Activate existing real `Select PNG` control and check that the native/dialog source allows **multiple distinct files** (`FileDialog.FILE_MODE_OPEN_FILES` or equivalent genuine Windows multi-picker contract). Use existing tiny distinct fixture PNGs to validate `files_selected` => canonical per-source import/queue identity, plus a lightweight scripted 150-file selection/queue acceptance test **without 150 heavy solves**. Do not treat calling backend code directly as proof that the visible owner button is bound; inspect its signal. Mark actual 150 canonical solve/replay/READY gate NOT RUN until safe scratch cleanup.
+5. Do the lightweight checks and source remediation now; the ~14 MB denied deletion is not a reason to stop them. Retain R05 uncommitted local work/log, append actual command results and honest screenshot/geometry evidence. Keep heavy suite, permanent installer and GitHub R05 PASS publication behind original requirements.
+
+Do not turn this follow-up into a new versioned remediation loop; continue the SAME R04 prompt.
