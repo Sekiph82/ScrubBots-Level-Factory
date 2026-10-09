@@ -21,6 +21,25 @@ Before product mutation, the recovered PIXEL ART owner source must satisfy all o
 
 No re-encoding, redraw, substitute, generated replacement, crop, rescale or recomposition may be used as the master source.
 
+## A0. Master control binding completeness
+
+Authority:
+`docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V01.md`
+
+PASS only if every visible interactive master control is functional and tested.
+
+Reject:
+- inert/transparent hotspots with no real effect;
+- decorative dropdowns;
+- Prompt/Style/Size/Provider values that do not reach generation;
+- Edit Prompt that only reports unavailable;
+- Preview Replay that does not consume canonical replay proof;
+- release controls that bypass trusted handoff;
+- production mutation without exact owner approval;
+- hard-coded publication content version.
+
+Require permanent handler-to-authority tests for all control groups defined by the binding contract.
+
 ## A. Canonical master repair
 
 PASS only if:

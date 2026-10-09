@@ -14,6 +14,9 @@ Audit criteria:
 Standing sync:
 `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`
 
+Mandatory functional control contract:
+`docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V01.md`
+
 ## OWNER LOCK
 
 Exactly three production screens:
@@ -102,6 +105,31 @@ If found:
 6. quarantine/remove invalid V03 from current authority without rewriting history.
 
 Only after this gate passes may product implementation begin.
+
+## 0B. ALL MASTER CONTROLS MUST WORK
+
+Read `docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V01.md` before editing product code.
+
+The master images are NOT decorative backgrounds.
+
+Implement every interactive control in that contract.
+
+Hard requirements:
+
+- no inert hotspot;
+- no decorative fake dropdown/button;
+- no primary action that only prints "UNAVAILABLE";
+- no prompt/style/provider field whose value is ignored;
+- no CSV batch path that uses a weaker generator than Single mode;
+- no Run Pipeline path that bypasses the canonical primary supply/solver/replay/Difficulty V1 route;
+- no Preview Replay button that merely reports WIN;
+- no ACCEPT without canonical READY;
+- no release selection outside canonical owner-accepted READY entries;
+- no direct UI -> R2 call;
+- no PRODUCTION upload without exact manifest SHA + content version + production-target owner approval;
+- no hard-coded content version for real publishing.
+
+The three masters define appearance. The binding contract defines what every visible control does.
 
 ## 1. EXACT THREE-MASTER IMPLEMENTATION
 
