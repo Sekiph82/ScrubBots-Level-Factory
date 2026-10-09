@@ -20,3 +20,15 @@ Existing R05 code + builder log are preserved. Codex never edits root `TASKS.md`
 ## Handoff
 
 Return the existing **GitHub R05 builder log URL**, whether PASS pending GPT audit or a specific real blocker. Log per-test scratch peak, cleanup success and reclaimed bytes. No more forensic-only loops.
+
+## OWNER-FOLLOWUP: 2026-10-09 R04 CLEANUP DENIAL (LATEST; supersedes "stop all work" interpretation)
+
+Builder status received: deterministic descendant monitor self-test PASS; R05 genuine integration NOT RUN; cleanup action of the four retained R03 scratch roots was denied by automatic filesystem approval before execution; no files deleted, installed, committed or pushed. The FOUR roots together are **13,851,852 bytes (~14 MB), NOT 13 GB**. Do not turn this into another disk-forensics milestone.
+
+**ONE-TIME NORMAL APPROVAL PATH:** determine whether the execution environment provides an explicit legitimate approval/request mechanism for deletion of these exact four identified run-owned R03 scratch roots. If it does, request it once with the precise paths/ownership, obtain approval, then use the approved normal cleanup and verify space returned. If approval is automatically denied or no supported approval mechanism exists, do not retry through another API, language, renamed path, hidden process, implicit pytest pruning, or alternate filesystem operation. Record `CLEANUP_APPROVAL_DENIED` and leave them intact.
+
+**KEEP WORKING WHERE SAFE:** denial of deletion of **14 MB** does not itself preclude useful *read-only or minimal-write* development. Without creating new sizable transient roots, inspect and implement the already-required owner-visible Factory Studio native UI fixes (maximize scaling; actual 150-file LEVEL FACTORY multi-PNG selection and canonical per-source dispatch), product production-history integration fixes, and scoped tests that do not need disk-heavy scratch or forbidden cleanup. Preserve ALL existing R05 code/log and source authority. Finish all achievable static/Godot parse checks that do not require disposable multi-GB outputs. Give one succinct progress/blocker report in the existing R05 builder log; do not initiate additional "R06/R07 disk forensics" work.
+
+**HEAVY TESTS REMAIN GATED:** do NOT begin the multi-GB integration/full-regression runs until normal cleanup of run-owned scratch can be performed reliably or a genuinely low-disk/no-cleanup-required test approach is demonstrated. Owner still expects all *new* disposable test files to be removed and disk space reclaimed on completion. Keep run-owned artifacts and durable evidence clearly separate. If cleanup authority remains unavailable, state that external approval/policy configuration is the only unresolved operational dependency, not that more forensic programming is needed. No install, R05 PASS or publication before original gates.
+
+**Handoff:** report work actually achieved and the one remaining cleanup authorization need. No owner request to run manual console commands, and no claims of deletion that did not occur.
