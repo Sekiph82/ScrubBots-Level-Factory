@@ -7,8 +7,8 @@
 [ext_resource type="Texture2D" path="res://assets/icons/ScrubBots_Factory_Studio_256.png" id="5_studio_icon"]
 [ext_resource type="Script" path="res://scripts/factory_studio_exact_ui.gd" id="6_exact_ui"]
 [ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png" id="7_pixel_master"]
-[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg" id="8_level_master"]
-[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg" id="9_release_master"]
+[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.png" id="8_level_master"]
+[ext_resource type="Texture2D" path="res://assets/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.png" id="9_release_master"]
 
 [node name="FactoryStudio" type="Control"]
 layout_mode = 3

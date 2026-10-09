@@ -57,6 +57,9 @@ def test_launcher_resolves_from_script_location_and_runs_project_not_editor() ->
     assert "Get-Command -Name $commandName" in launcher
     assert "Start-Process -FilePath $godotPath" in launcher
     assert "'--path', $quotedProjectPath" in launcher
+    assert "SetWindowText" in launcher
+    assert "$windowTitle = 'ScrubBots Factory Studio'" in launcher
+    assert "$studioProcess.MainWindowTitle -ne $windowTitle" in launcher
     assert "--editor" not in launcher
     assert "$ResolveOnly" in launcher
 

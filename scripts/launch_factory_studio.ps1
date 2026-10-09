@@ -66,7 +66,49 @@ try {
     }
 
     $quotedProjectPath = '"{0}"' -f $projectPath
-    Start-Process -FilePath $godotPath -ArgumentList @('--path', $quotedProjectPath) -WorkingDirectory $repoRoot | Out-Null
+    $studioProcess = Start-Process -FilePath $godotPath -ArgumentList @('--path', $quotedProjectPath) -WorkingDirectory $repoRoot -PassThru
+    $studioProcessId = $studioProcess.Id
+    $windowTitle = 'ScrubBots Factory Studio'
+    if (-not ('FactoryStudioNativeWindowTitle' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class FactoryStudioNativeWindowTitle {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SetWindowTextW", SetLastError = true)]
+    public static extern bool SetWindowText(IntPtr windowHandle, string windowTitle);
+}
+'@
+    }
+
+    $windowHandle = [IntPtr]::Zero
+    for ($attempt = 0; $attempt -lt 80; $attempt++) {
+        $studioProcess = Get-Process -Id $studioProcessId -ErrorAction Stop
+        if ($studioProcess.HasExited) {
+            throw 'Godot exited before the Studio window was ready.'
+        }
+        $windowHandle = $studioProcess.MainWindowHandle
+        if ($windowHandle -ne [IntPtr]::Zero) {
+            break
+        }
+        Start-Sleep -Milliseconds 125
+    }
+    if ($windowHandle -eq [IntPtr]::Zero) {
+        throw 'Factory Studio did not create a main window within 10 seconds.'
+    }
+    Start-Sleep -Seconds 5
+    $studioProcess = Get-Process -Id $studioProcessId -ErrorAction Stop
+    $windowHandle = $studioProcess.MainWindowHandle
+    if ($windowHandle -eq [IntPtr]::Zero) {
+        throw 'Factory Studio main window closed before its title was verified.'
+    }
+    if (-not [FactoryStudioNativeWindowTitle]::SetWindowText($windowHandle, $windowTitle)) {
+        throw 'Could not set the Factory Studio window title.'
+    }
+    Start-Sleep -Milliseconds 300
+    $studioProcess.Refresh()
+    if ($studioProcess.MainWindowTitle -ne $windowTitle) {
+        throw 'Factory Studio window title did not match the owner-approved title.'
+    }
 }
 catch {
     $message = "ScrubBots Factory Studio could not start.`r`n`r`n$($_.Exception.Message)"

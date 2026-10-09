@@ -54,13 +54,23 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
 
     assert '"PIXEL ART"' in source and '"LEVEL FACTORY"' in source and '"RELEASE POOL"' in source
     assert "FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png" in scene
-    assert "FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg" in scene
-    assert "FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg" in scene
+    assert "FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.png" in scene
+    assert "FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.png" in scene
     for master_name in (
         "FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg",
         "FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg",
     ):
         assert (runtime_assets / master_name).read_bytes() == (root / "docs/product/visual-masters" / master_name).read_bytes()
+        assert (runtime_assets / f"{master_name}.import").is_file()
+    runtime_render_sha256 = {
+        "FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.png": "310da9787a1d67ae47ce7c052f4938a9da6c6c4ac118052a3a431d86c7d96a25",
+        "FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.png": "2bb86b7816201e17d7a8f217902632cd10c6085c206aa000522b3ec4e449ce1f",
+    }
+    for master_name, expected_sha256 in runtime_render_sha256.items():
+        assert hashlib.sha256((runtime_assets / master_name).read_bytes()).hexdigest() == expected_sha256
+        with Image.open(runtime_assets / master_name) as image:
+            assert image.format == "PNG"
+            assert image.size == (1536, 1024)
         assert (runtime_assets / f"{master_name}.import").is_file()
     assert (runtime_assets / "FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png.import").is_file()
     assert "owner-review" in source and '"pipeline"' in source

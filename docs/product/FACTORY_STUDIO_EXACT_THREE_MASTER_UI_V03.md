@@ -28,9 +28,13 @@ Dynamic values may change. The visible structure may not.
 
 `docs/product/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.svg`
 
+Godot uses the 1536 × 1024 PNG at `level_factory/assets/visual-masters/FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.png`, rasterized from the unchanged canonical SVG with CairoSVG 2.9.0 so its text labels render in the runtime. SHA-256: `310da9787a1d67ae47ce7c052f4938a9da6c6c4ac118052a3a431d86c7d96a25`.
+
 ### RELEASE POOL
 
 `docs/product/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.svg`
+
+Godot uses the 1536 × 1024 PNG at `level_factory/assets/visual-masters/FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.png`, rasterized from the unchanged canonical SVG with CairoSVG 2.9.0 so its text labels render in the runtime. SHA-256: `2bb86b7816201e17d7a8f217902632cd10c6085c206aa000522b3ec4e449ce1f`.
 
 These three files are the visual specification.
 
