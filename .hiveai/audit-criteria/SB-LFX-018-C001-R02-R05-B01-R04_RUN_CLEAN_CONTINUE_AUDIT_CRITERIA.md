@@ -18,3 +18,12 @@
 - Cleanup denial does NOT make no-temp, low-write product development invalid. Continue native responsive UI/multi-PNG canonical batch functional remediation and production-history source fixes without heavy test data, publish only after the inherited full verification gates.
 - Heavy tests must not start while their disposable output cannot be safely removed. No claim of full regression, install, release, GitHub builder-log publication or GPT audit PASS until actually supported by evidence.
 - Do not invent additional R05 disk-forensics revisions; preserve uncommitted R05 source/log and summarize a single operational authorization blocker if still denied.
+
+
+## 2026-10-10 native UI verification alternative
+
+- Computer Use runtime initialization error is an external test-driver failure, NOT a Godot runtime test; never label headless parse as native visual PASS.
+- Godot direct graphical runtime and real scene-tree Control geometry/visible/action signal testing are valid alternate evidence; record windows/viewport actual sizes, runtime Control rectangles, screenshots when graphical rendering supported.
+- Aspect-preserving fixed-scale canvas may letterbox and fails if controls/preview do not use usable client area. Test 1536×1024 and one maximized/widescreen case.
+- Select PNG visible button => genuinely multi-select-capable dialog => `files_selected` => per-file canonical import identity and small live functional sample. A lightweight 150-file UI queue/selection test is distinct from the expensive **150 fully solved** production batch, which remains NOT RUN until tested.
+- If graphical runtime unavailable, mark visual native acceptance NOT VERIFIED and execute scriptable lightweight tests; no fabricated success, no forced Computer Use retries, no new cleanup investigations.
