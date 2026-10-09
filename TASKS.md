@@ -5,22 +5,22 @@ This root `TASKS.md` is the sole authoritative Level Factory + Content Platform 
 ## Project Status
 
 - Current Milestone: M06.07 - Factory Studio Simple Owner UI
-- Current Sprint: SB-LFX-018-C001-R02-R01 — Master Repair + Exact Three-Master UI Closure
-- Current Task: SB-LFX-018-C001-R02-R01 — Repair PIXEL ART Master and Implement Exact Three-Master UI
-- Current Task Status: R02_STRICT_AUDIT_BLOCKED_BEFORE_IMPLEMENTATION / PIXEL_ART_MASTER_BINARY_INVALID / R02_R01_AUTHORIZED / EXACT_MATCH_REQUIRED / BEFORE_M17
-- Next Task/Action: **CODEX executes SB-LFX-018-C001-R02-R01 now** from `.hiveai/prompts/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_PROMPT.md`. Strict audit `.hiveai/audits/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_STRICT_AUDIT_V01.md` confirms the prior builder correctly stopped before implementation because the indexed PIXEL ART master was not a valid image. Current `FACTORY_STUDIO_PIXEL_ART_MASTER_V03.webp` is also byte-invalid and must not be treated as repaired authority. First gate is to restore the exact owner-approved 1536x1024 PIXEL ART source, prove valid PNG/WebP decode/signature/dimensions, then implement the exact three production screens `PIXEL ART | LEVEL FACTORY | RELEASE POOL` with no explanations or extra UI. LEVEL FACTORY and RELEASE POOL masters remain valid. M17 stays blocked until independent technical PASS plus owner acceptance of all three final screenshots.
+- Current Sprint: SB-LFX-018-C001-R02-R02 — Owner Master Handoff + Exact Three-Master UI Closure
+- Current Task: SB-LFX-018-C001-R02-R02 — Inject Exact Owner PIXEL ART Master and Implement Exact Three-Master UI
+- Current Task Status: R02_R01_REAUDIT_COMPLETE / OWNER_MASTER_BINARY_HANDOFF_REQUIRED / EXACT_OWNER_SHA_LOCKED / R02_R02_AUTHORIZED / BEFORE_M17
+- Next Task/Action: **R02-R01 strict re-audit is complete. CODEX executes SB-LFX-018-C001-R02-R02 after the exact owner PNG is available in the persistent workspace** from `.hiveai/prompts/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_PROMPT.md`. Exact owner PIXEL ART source identity is locked to valid PNG 1536x1024, SHA-256 `b03f00cf01374a5cf884ce572637cbf06a654bb30a6262e28f4e0d76efd10def`. Builder must search by SHA, copy byte-for-byte to canonical master authority, prove decode/signature/dimensions, then implement exactly `PIXEL ART | LEVEL FACTORY | RELEASE POOL`, durable Release runtime, three final 1536x1024 screenshots and zero-unresolved-failure regression. M17 remains blocked until independent technical PASS plus owner acceptance of all three screenshots.
 - Required Actor: CODEX, THEN CHATGPT
 - Owner Priority Decision [2026-10-07]: **Remote Level Update / Family APK remains highest priority. Cloudflare R2 is OWNER-LOCKED and PROVISIONED.** Game-side CP04/M15 RemoteContentManager + CP05/M16 offline/LKG + M53 clean-regression closure are complete in `Sekiph82/Scrubbots`. Canonical R2 bucket: `scrubbots-content-prod`; Family Test public read base: `https://pub-dd36dd94999d4beaad95d6409ad0167e.r2.dev`. LF execution now combines CP07/M18 provider integration with SB-CPX-004 Factory Studio `Publish to ScrubBots` handoff. Remaining sequence: R2 adapter/integrity/storage controls -> owner-facing handoff -> first real staging publish -> exact owner production approval -> first real production manifest/packs -> ScrubBots live endpoint binding -> Android Family Test APK. Remote payload remains declarative-only; no executable content.
 - Tracking Repository: Sekiph82/ScrubBots-Level-Factory
 - Tracking Branch: main
-- Previous Strict Audit: `.hiveai/audits/SB-LFX-018-C001-R02_EXACT_THREE_MASTER_UI_STRICT_AUDIT_V01.md`
+- Previous Strict Audit: `.hiveai/audits/SB-LFX-018-C001-R02-R01_STRICT_REAUDIT_V01.md`
 - SB-LFX-002 Disposition: PASS / CLOSED through C001
 - SB-LFX-002 Implementation Commit: `7e6ad79a5436b013e787509e9b2ab374ed90c78d`
 - SB-LFX-002 Final Builder Publication: `adf1edaf8bc4ee78ce9028a084c819fcba3a46b8`
 - SB-LFX-002 Closing Strict Audit Commit: `57490a92b1018d3770983cadd8866e2dc625b74b`
-- Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_AUDIT_CRITERIA.md`.
-- Current Prompt: `.hiveai/prompts/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_PROMPT.md`.
-- Current Owner UX: `SB-LFX-018-C001-R02-R01 — Master Repair + Exact Three-Master UI`; prompt `.hiveai/prompts/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-018-C001-R02-R01_MASTER_REPAIR_AND_EXACT_UI_AUDIT_CRITERIA.md`; status `MASTER_BINARY_REPAIR_REQUIRED / AUTHORIZED_CURRENT`. Final production UI remains exactly PIXEL ART, LEVEL FACTORY and RELEASE POOL, with no explanatory prose or extra visible UI.
+- Current Audit Criteria: `.hiveai/audit-criteria/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_AUDIT_CRITERIA.md`.
+- Current Prompt: `.hiveai/prompts/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_PROMPT.md`.
+- Current Owner UX: `SB-LFX-018-C001-R02-R02 — Owner Master Handoff + Exact Three-Master UI`; prompt `.hiveai/prompts/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_PROMPT.md`; audit criteria `.hiveai/audit-criteria/SB-LFX-018-C001-R02-R02_OWNER_MASTER_HANDOFF_EXACT_UI_AUDIT_CRITERIA.md`; status `EXACT_OWNER_MASTER_SHA_LOCKED / HANDOFF_REQUIRED / AUTHORIZED_CURRENT`. Final production UI remains exactly PIXEL ART, LEVEL FACTORY and RELEASE POOL, with no explanatory prose or extra visible UI.
 - Previous Technical Capability: `SB-LFX-019-C001-R01 — Transparent Artwork -> VOID Closure`; status `PASS / CLOSED` by `.hiveai/audits/SB-LFX-019-C001-R01_STRICT_REAUDIT_V01.md`. Owner owl 3/4/5, topology matrix, current-game loaders/solver/replay/Difficulty V1, identity/publisher and full regression are closed.
 - Standing Builder Sync/Publish: `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`. Persistent dirty Desktop work is preserved; builders use exact-current clean TEMP authority when needed and must normally push completed implementation/log commits to GitHub `main` before handoff.
 - P3 Headless Batch Pipeline Owner Prompt: `.hiveai/prompts/P3_HEADLESS_BATCH_PIPELINE.md`.
