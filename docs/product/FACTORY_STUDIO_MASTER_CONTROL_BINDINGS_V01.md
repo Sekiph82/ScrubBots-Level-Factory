@@ -1,8 +1,12 @@
 # Factory Studio Master Control Bindings V01
 
-Status: OWNER-FUNCTIONAL / CANONICAL UI ACTION CONTRACT
+Status: SUPERSEDED BY `docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V02.md`
 Date: 2026-10-09
 Repository: `Sekiph82/ScrubBots-Level-Factory`
+
+## Supersession
+
+V02 replaces the owner-review-gated Release Pool rule with owner-approved READY auto-pool behavior and adds Claude+Alpix resumable production. Historical references remain evidence only.
 
 ## Purpose
 

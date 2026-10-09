@@ -1,12 +1,12 @@
 # Factory Studio Exact Three-Master UI V03
 
-Status: OWNER-LOCKED / CANONICAL UI AUTHORITY
+Status: VISUAL AUTHORITY RETAINED / FUNCTIONAL WORKFLOW SUPERSEDED BY `docs/product/FACTORY_STUDIO_OWNER_WORKFLOW_V04.md`
 Date: 2026-10-08
 Repository: `Sekiph82/ScrubBots-Level-Factory`
 
 ## Functional control authority
 
-Every interactive control is governed by `docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V01.md`. The masters define appearance; that binding contract defines runtime behavior. A visually correct but non-functional control is non-compliant.
+Every interactive control is governed by `docs/product/FACTORY_STUDIO_MASTER_CONTROL_BINDINGS_V02.md`. The masters define appearance; that binding contract defines runtime behavior. A visually correct but non-functional control is non-compliant.
 
 ## Final owner decision
 
@@ -219,7 +219,7 @@ The visual lock does not weaken:
 - supply conservation;
 - official solver/replay;
 - Difficulty V1;
-- owner Accept/Reject;
+- READY auto-pool include/exclude controls;
 - Release Pool readiness;
 - STAGING vs production separation;
 - exact production approval;
