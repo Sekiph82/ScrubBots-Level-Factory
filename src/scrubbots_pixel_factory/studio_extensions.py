@@ -420,12 +420,12 @@ def record_owner_review(candidate_id: str, disposition: str, reason: str = "", n
     sequence = 1 if previous is None else int(previous["sequence"]) + 1
     payload = {"schema": REVIEW_SCHEMA, "version": 1, "review_id": f"review-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "candidate_identity_hash": _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]}), "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"], "disposition": disposition, "reason": reason.strip(), "note": note.strip(), "sequence": sequence, "created_at": datetime.now(timezone.utc).isoformat(), "previous_review_id": previous.get("review_id") if previous else None}
     _write_json(_review_root() / f"{payload['review_id']}.json", payload, immutable=True)
-    publication = _enter_candidate_release_pool(candidate) if disposition == "ACCEPT" else {"disposition": "NOT_PUBLISHED", "reason": "Owner REJECT does not publish."}
+    publication = _enter_candidate_release_pool(candidate) if disposition == "ACCEPT" else {"disposition": "EXCLUDED_FROM_RELEASE_POOL", "reason": "Owner REJECT excludes this READY candidate; it does not publish."}
     return {**payload, "publication": publication}
 
 
-def _enter_candidate_release_pool(candidate: Mapping[str, Any]) -> dict[str, Any]:
-    """Enter an owner-accepted READY level into the Release Pool; never publish here."""
+def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Include a true READY candidate; owner ACCEPT is optional and never publishes."""
 
     runs = []
     for path in (extensions_root() / "pipelines").glob("*.json"):
@@ -437,14 +437,13 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any]) -> dict[str, Any
             runs.append(value)
     if not runs:
         return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "ACCEPT recorded, but no READY canonical ZIP run with official Difficulty V1 evidence exists."}
-    run = max(runs, key=lambda value: str(value.get("created_at", "")))
+    run = pipeline if isinstance(pipeline, Mapping) else max(runs, key=lambda value: str(value.get("created_at", "")))
     from .supply_pipeline.release_pool import ReleaseError, enter_release_pool
-    request = run.get("request", {}) if isinstance(run.get("request", {}), Mapping) else {}
     try:
         review = _latest_review(str(candidate["candidate_id"]), str(candidate["artwork_sha256"]))
-        if review is None or review.get("disposition") != "ACCEPT":
-            return {"disposition": "NOT_ENTERED_NOT_ACCEPTED", "pipeline_run_id": run["run_id"]}
-        pooled = enter_release_pool(candidate, run, review)
+        if review is not None and review.get("disposition") == "REJECT":
+            return {"disposition": "EXCLUDED_FROM_RELEASE_POOL", "pipeline_run_id": run["run_id"]}
+        pooled = enter_release_pool(candidate, run, review if review and review.get("disposition") == "ACCEPT" else None)
     except (ReleaseError, OSError, ValueError) as exc:
         return {"disposition": "NOT_ENTERED", "reason": str(exc)[:512], "pipeline_run_id": run["run_id"]}
     return {**pooled, "pipeline_run_id": run["run_id"], "publication": "OWNER_ACCEPT_RELEASE_POOL_ONLY"}
@@ -678,6 +677,10 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     run_id = f"pipeline-{_digest({'identity': identity, 'request': request_data, 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
     payload = {"schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id, "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": identity if source_kind == "OWNER_UPLOAD" else None, "candidate_id": identity if source_kind == "CANDIDATE" else None, "request": request_data, "stages": stages, "disposition": disposition, "primary": primary, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(_pipeline_path(run_id), payload, immutable=True)
+    if disposition == "READY":
+        candidate = next((item for item in list_candidates() if item.get("candidate_id") == identity), None)
+        if candidate is not None:
+            payload["release_pool"] = _enter_candidate_release_pool(candidate, pipeline=payload)
     return payload
 
 

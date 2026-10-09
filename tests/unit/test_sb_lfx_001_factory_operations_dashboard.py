@@ -16,7 +16,7 @@ INTEGRATION = FACTORY / "tests" / "factory_studio_dashboard_integration_suite.gd
 def test_dashboard_projection_reuses_canonical_manifest_validation_and_is_read_only() -> None:
     source = LAUNCHER.read_text(encoding="utf-8")
     start = source.index("def _dashboard_manifest_path")
-    end = source.index("def _validate_studio_request")
+    end = source.index("def _semantic_generate")
     dashboard_section = source[start:end]
     assert 'DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"' in source
     assert "_validate_manifest" in dashboard_section

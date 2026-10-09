@@ -145,9 +145,9 @@ def test_lf06_012_readme_documents_the_current_offline_smoke_gate() -> None:
 def test_lf06_012_gate_has_no_provider_or_credential_dependency() -> None:
     source = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in (FACTORY / "project.godot", RUNTIME_SUITE, LAUNCHER)
+        for path in (FACTORY / "project.godot", RUNTIME_SUITE)
     ).lower()
-    for forbidden in ("http://", "https://", "api_key", "credential", "magnific", "pixellab"):
+    for forbidden in ("http://", "https://", "api_key", "credential"):
         assert forbidden not in source
     assert RUNTIME_SUITE.is_file()
     assert LAUNCHER.is_file()

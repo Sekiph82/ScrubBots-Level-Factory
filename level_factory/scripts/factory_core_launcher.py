@@ -282,6 +282,12 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = _semantic_generate(request)
         elif operation == "provider-options":
             payload = _provider_options()
+        elif operation == "alpix-generate":
+            payload = _alpix_generate(request)
+        elif operation == "alpix-csv-job":
+            payload = _alpix_csv_job(request)
+        elif operation == "magnific-prepare":
+            payload = _magnific_prepare(request)
         elif operation == "campaign-build":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
             payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
@@ -388,14 +394,103 @@ def _provider_options() -> dict[str, object]:
     """Expose only adapters that are actually executable in this process."""
     import importlib.util
     import os
+    from scrubbots_pixel_factory.alpix_batch import discover_alpix
 
-    options: list[dict[str, object]] = [{"id": "LOCAL_MASK", "available": True, "prompt_capable": False}]
-    if os.environ.get("PIXELLAB_SECRET", "").strip() and importlib.util.find_spec("pixellab") is not None:
-        options.extend([
-            {"id": "PIXELLAB/PIXFLUX", "available": True, "prompt_capable": True},
-            {"id": "PIXELLAB/BITFORGE", "available": True, "prompt_capable": True},
-        ])
+    alpix = discover_alpix()
+    options: list[dict[str, object]] = [
+        {"id": "ALPIX (Claude)", "available": alpix.get("available") is True,
+         "prompt_capable": True, "reason": alpix.get("reason", "Ready"),
+         "plugin_id": alpix.get("plugin_id"), "mcp_servers": alpix.get("mcp_servers")},
+        {"id": "MAGNIFIC", "available": True, "prompt_capable": True,
+         "execution_mode": "PREPARE_AND_IMPORT", "reason": "Existing adapter prepares an external job; it does not call Magnific directly."},
+        {"id": "PIXELLAB", "available": bool(os.environ.get("PIXELLAB_SECRET", "").strip()
+         and importlib.util.find_spec("pixellab") is not None), "prompt_capable": True,
+         "execution_mode": "DIRECT"},
+    ]
     return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
+
+
+def _alpix_generate(request: Mapping[str, object]) -> dict[str, object]:
+    """Generate exactly one image through the installed Claude Code Alpix tool."""
+    from scrubbots_pixel_factory.alpix_batch import generate_alpix_png
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    if set(request) - {"prompt", "width", "height", "output_path"}:
+        raise ValueError("ALPIX request contains unsupported fields")
+    output = _alpix_output_path(request.get("output_path"))
+    generated = generate_alpix_png(prompt=_text(request.get("prompt"), "prompt"),
+        width=_exact_int(request.get("width"), "width"), height=_exact_int(request.get("height"), "height"),
+        destination=output)
+    imported = extensions.batch_import([str(output)])
+    items = imported.get("items", [])
+    item = items[0] if isinstance(items, list) and items else {}
+    source_id = item.get("source_id") if isinstance(item, Mapping) else None
+    if not isinstance(source_id, str) or not source_id:
+        raise ValueError("ALPIX PNG was not accepted by canonical artwork import")
+    return {"operation": "alpix-generate", "state": "IMPORTED", "provider_id": "ALPIX_CLAUDE",
+            "source_id": source_id, "source_path": str(output), "content_sha256": generated["sha256"],
+            "width": generated["width"], "height": generated["height"]}
+
+
+def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
+    """Open or resume the CSV-SHA job and pass each row through canonical import."""
+    from scrubbots_pixel_factory.alpix_batch import generate_alpix_png, run_csv_job
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    if set(request) - {"csv_path", "default_width", "default_height"}:
+        raise ValueError("ALPIX batch request contains unsupported fields")
+    csv_path = Path(_text(request.get("csv_path"), "csv_path")).resolve()
+    root = extensions.extensions_root() / "alpix-jobs"
+    default_width = _exact_int(request.get("default_width", 32), "default_width")
+    default_height = _exact_int(request.get("default_height", 32), "default_height")
+
+    def render(prompt: str, width: int, height: int, destination: Path) -> Mapping[str, object]:
+        return generate_alpix_png(prompt=prompt, width=width, height=height, destination=destination)
+
+    def import_png(path: Path) -> Mapping[str, object]:
+        result = extensions.batch_import([str(path)])
+        items = result.get("items", [])
+        item = items[0] if isinstance(items, list) and items else {}
+        return item if isinstance(item, Mapping) else {}
+
+    return {"operation": "alpix-csv-job", **run_csv_job(csv_path, root, renderer=render,
+        importer=import_png, default_size=(default_width, default_height)).to_dict()}
+
+
+def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
+    """Delegate to the existing Magnific adapter's truthful prepare/import contract."""
+    from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest
+    from scrubbots_pixel_factory.semantic.providers.registry import create_provider, get_provider_descriptor
+
+    if set(request) - {"prompt", "width", "height", "background_intent"}:
+        raise ValueError("Magnific request contains unsupported fields")
+    prompt = _text(request.get("prompt"), "prompt")
+    width, height = _exact_int(request.get("width"), "width"), _exact_int(request.get("height"), "height")
+    descriptor = get_provider_descriptor("MAGNIFIC")
+    semantic_request = SemanticGenerationRequest(output_class=OutputClass.ASSET_ART, description=prompt,
+        width=width, height=height, no_background=request.get("background_intent", "TRANSPARENT") == "TRANSPARENT",
+        provider_id="MAGNIFIC", provider_model="recraft-v4-1",
+        provider_config_version=descriptor.config_version)
+    provider = create_provider("MAGNIFIC")
+    job = provider.prepare_job(semantic_request)
+    canonical = job.canonical_dict()
+    return {"operation": "magnific-prepare", "state": "PREPARED_FOR_EXTERNAL_EXECUTION",
+            "provider_id": "MAGNIFIC", "request": canonical,
+            "message": "Magnific job prepared. Import the returned image and result manifest to continue."}
+
+
+def _alpix_output_path(raw: object) -> Path:
+    factory_output = (_repository_root() / "level_factory" / "output").resolve()
+    root = (factory_output / "alpix-generated").resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    if raw is None or not str(raw).strip():
+        import uuid
+        target = root / f"alpix-{uuid.uuid4().hex}.png"
+    else:
+        target = Path(_text(raw, "output_path")).resolve()
+    if not _inside_output(target, factory_output) or target.suffix.lower() != ".png":
+        raise ValueError("ALPIX output must be a PNG inside Factory output")
+    return target
 
 
 def _validate_studio_request(raw: object) -> dict[str, object]:

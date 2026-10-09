@@ -62,9 +62,10 @@ def _pool_root() -> Path:
     return studio.extensions_root() / "release-pool"
 
 
-def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], review: Mapping[str, Any]) -> dict[str, Any]:
-    if review.get("disposition") != "ACCEPT" or pipeline.get("disposition") != "READY" or pipeline.get("primary", {}).get("state") != "READY":
-        return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "Release Pool requires owner ACCEPT and a READY canonical ZIP/solver/replay/Difficulty pipeline."}
+def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], review: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    if (pipeline.get("disposition") != "READY" or pipeline.get("primary", {}).get("state") != "READY"
+            or (review is not None and review.get("disposition") != "ACCEPT")):
+        return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "Release Pool requires a canonical READY ZIP/solver/replay/Difficulty pipeline; owner ACCEPT is optional."}
     primary = pipeline["primary"]
     difficulty = primary.get("difficulty", {})
     if not isinstance(difficulty, Mapping) or type(difficulty.get("score")) not in {int, float} or not math.isfinite(float(difficulty["score"])):
@@ -94,10 +95,12 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "session_load": official.get("sessionLoad") if isinstance(official, Mapping) else None,
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
         "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
-        "review_id": review["review_id"], "source_bundle": candidate["source_path"], "candidate": dict(candidate), "pipeline": dict(pipeline),
+        "review_id": review.get("review_id") if review is not None else None,
+        "eligibility_source": "OWNER_ACCEPT" if review is not None else "READY_AUTO",
+        "source_bundle": candidate["source_path"], "candidate": dict(candidate), "pipeline": dict(pipeline),
     }
     payload["entry_digest"] = _hash(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
-    path = _pool_root() / f"{candidate['candidate_id']}-{review['review_id']}.json"
+    path = _pool_root() / f"{candidate['candidate_id']}-{pipeline['run_id']}-{review.get('review_id') if review is not None else 'ready'}.json"
     raw = (json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
     if path.exists() and path.read_bytes() != raw:
         raise ReleaseError("candidate already has different immutable Release Pool evidence")
@@ -114,20 +117,31 @@ def release_entries() -> list[dict[str, Any]]:
         actual = _hash(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
         value["entry_digest"] = expected
         if expected != actual: raise ReleaseError(f"Release Pool entry digest mismatch: {path.name}")
-        latest = studio._latest_review(str(value.get("candidate_id", "")))
-        if latest and latest.get("disposition") == "ACCEPT" and latest.get("review_id") == value.get("review_id"):
-            pipeline_path = studio._pipeline_path(str(value.get("pipeline_run_id", "")))
-            if not pipeline_path.is_file() or _hash(pipeline_path.read_bytes()) != value.get("pipeline_sha256"):
-                raise ReleaseError(f"Release Pool pipeline evidence changed or disappeared: {path.name}")
-            current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == value.get("candidate_id")), None)
-            if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
-                raise ReleaseError(f"Release Pool candidate identity changed or disappeared: {path.name}")
-            for name, file_record in value.get("files", {}).items():
-                evidence_file = Path(str(file_record.get("path", "")))
-                if not evidence_file.is_file() or _hash(evidence_file.read_bytes()) != file_record.get("sha256"):
-                    raise ReleaseError(f"Release Pool {name} artifact changed or disappeared: {path.name}")
-            entries.append(value)
-    return sorted(entries, key=lambda item: str(item["candidate_id"]))
+        candidate_id = str(value.get("candidate_id", ""))
+        latest = studio._latest_review(candidate_id)
+        if latest and latest.get("disposition") == "REJECT":
+            continue
+        current_run = studio._latest_ready_pipeline(candidate_id)
+        if current_run is None or current_run.get("run_id") != value.get("pipeline_run_id"):
+            continue
+        pipeline_path = studio._pipeline_path(str(value.get("pipeline_run_id", "")))
+        if not pipeline_path.is_file() or _hash(pipeline_path.read_bytes()) != value.get("pipeline_sha256"):
+            raise ReleaseError(f"Release Pool pipeline evidence changed or disappeared: {path.name}")
+        current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
+        if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
+            raise ReleaseError(f"Release Pool candidate identity changed or disappeared: {path.name}")
+        for name, file_record in value.get("files", {}).items():
+            evidence_file = Path(str(file_record.get("path", "")))
+            if not evidence_file.is_file() or _hash(evidence_file.read_bytes()) != file_record.get("sha256"):
+                raise ReleaseError(f"Release Pool {name} artifact changed or disappeared: {path.name}")
+        entries.append(value)
+    by_candidate: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        candidate_id = str(entry["candidate_id"])
+        current = by_candidate.get(candidate_id)
+        if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT" and current.get("eligibility_source") != "OWNER_ACCEPT"):
+            by_candidate[candidate_id] = entry
+    return [by_candidate[key] for key in sorted(by_candidate)]
 
 
 def _game_authority(game: Path) -> tuple[dict[str, Any], dict[str, Any]]:

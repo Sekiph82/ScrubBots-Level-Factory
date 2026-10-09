@@ -78,7 +78,8 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
     assert '"prompt", "style", "width", "height", "provider", "seed", "background_intent"' in source
     assert '"semantic-generate"' in source
     assert '"ZoomOut"' in source and '"ToggleGrid"' in source
-    assert '_gateway.call("run_action", "Generate"' in source
+    assert '"alpix-generate"' in source and '"magnific-prepare"' in source
+    assert '"ALPIX (Claude)"' in source and '"PIXELLAB"' in source
     assert '"column_count": _column_count' in source and 'columns in [3, 4, 5]' in source
     assert 'str(_last_pipeline.get("disposition", "")) != "READY"' in source
     legacy_shell = scene.split('[node name="Frame"', 1)[1].split('[node name="Layout"', 1)[0]

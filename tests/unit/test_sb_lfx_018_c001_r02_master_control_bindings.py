@@ -29,14 +29,14 @@ def test_generation_values_and_csv_use_the_same_real_generation_entrypoint() -> 
     assert '"provider_model": model' in UI
     assert '"width": request.get("width", 32)' in UI
     assert '"height": request.get("height", 32)' in UI
-    assert '"style": family' in UI
+    assert 'selected_provider == "ALPIX (Claude)"' in UI
+    assert 'selected_provider == "MAGNIFIC"' in UI
     assert 'var result := _generate_request({' in UI
     assert 'var result := _generate_request({"prompt": str(row_values.get("prompt", ""))' in UI
     assert 'PackedStringArray(["prompt", "style", "width", "height", "provider", "seed", "background_intent"])' in UI
     assert '"size"' in UI and "_csv_dimensions" in UI
-    assert '"PIXELLAB_SECRET: %s"' in UI
-    assert 'OS.get_environment("PIXELLAB_SECRET")' in UI
-    assert 'credentials.text = "PIXELLAB_SECRET: %s" % ("Configured"' in UI
+    assert 'OS.get_environment("PIXELLAB_SECRET")' not in UI
+    assert '"provider-options"' in UI
 
 
 def test_pipeline_review_and_replay_bind_to_canonical_studio_operations() -> None:
@@ -57,12 +57,12 @@ def test_release_projection_and_publish_stay_within_canonical_boundaries() -> No
     assert 'func _clear_release_selection()' in UI
     assert 'func _remove_release_selection(index: int)' in UI
     assert '"action": "publish-staging"' in UI
-    assert '"production-promotion"' in UI
-    assert '"manifest_sha256"' in UI
+    assert '"production-promotion"' not in UI
+    assert '"reviewed_identity": reviewed' in UI
     assert '"content_version"' in UI
     assert '"content_version": 2' not in UI
     assert "CloudflareR2Provider" not in UI and "write_object_bytes" not in UI
-    assert '_release_confirmation.confirmed.connect(_confirm_production_promotion' in UI
+    assert 'PRODUCTION is unavailable: exact verified STAGING manifest and trusted owner-approval promotion handoff are not connected.' in UI
 
 
 def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None:
@@ -74,16 +74,20 @@ def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None
     assert "line.visible = _grid_enabled" in UI
 
 
-def test_provider_picker_exposes_only_registry_adapter_with_configured_execution(monkeypatch) -> None:
+def test_provider_picker_exposes_owner_provider_choices_with_truthful_availability(monkeypatch) -> None:
     import importlib.util
     import factory_core_launcher
+    from scrubbots_pixel_factory import alpix_batch
 
     monkeypatch.delenv("PIXELLAB_SECRET", raising=False)
+    monkeypatch.setattr(alpix_batch, "discover_alpix", lambda: {"available": False, "reason": "not installed"})
     options = factory_core_launcher._provider_options()
     assert options["state"] == "READY"
-    assert options["providers"] == [{"id": "LOCAL_MASK", "available": True, "prompt_capable": False}]
+    assert [item["id"] for item in options["providers"]] == ["ALPIX (Claude)", "MAGNIFIC", "PIXELLAB"]
+    assert options["providers"][0]["available"] is False
+    assert options["providers"][1]["execution_mode"] == "PREPARE_AND_IMPORT"
     monkeypatch.setenv("PIXELLAB_SECRET", "redacted-test-secret")
     monkeypatch.setattr(importlib.util, "find_spec", lambda name: object() if name == "pixellab" else None)
     configured = factory_core_launcher._provider_options()
-    assert [item["id"] for item in configured["providers"]] == ["LOCAL_MASK", "PIXELLAB/PIXFLUX", "PIXELLAB/BITFORGE"]
+    assert configured["providers"][2]["available"] is True
     assert "redacted-test-secret" not in str(configured)

@@ -17,16 +17,17 @@ var _last_candidate_id := ""
 var _last_source_id := ""
 var _last_pipeline: Dictionary = {}
 var _selected_release_ids: Array[String] = []
-var _manage_release_selection := false
+var _release_selection_manage_mode := false
 var _release_pool: Dictionary = {}
 var _operation_running := false
 var _column_count := 4
 var _level_number := 11
+var _manual_level_override := false
 var _prompt := "pixel art owl"
 var _generation_style := "CREATURE"
 var _width := 32
 var _height := 32
-var _provider_model := "LOCAL_MASK"
+var _provider_model := "ALPIX (Claude)"
 var _generation_mode := "SINGLE"
 var _batch_csv_path := ""
 var _release_target := "STAGING"
@@ -94,7 +95,8 @@ func _ready() -> void:
 	_level_number_label.size = Vector2(150, 28)
 	_level_number_label.add_theme_color_override("font_color", Color.WHITE)
 	_level_number_label.add_theme_font_size_override("font_size", 16)
-	_level_number_label.visible = false
+	_level_number_label.text = "Auto"
+	_level_number_label.visible = true
 	add_child(_level_number_label)
 	_build_hotspots()
 	_show_screen(_screen)
@@ -244,11 +246,8 @@ func _build_secondary_surfaces() -> void:
 	_settings_game = LineEdit.new()
 	_settings_game.placeholder_text = "ScrubBots project path"
 	_settings_game.text = OS.get_environment("SCRUBBOTS_PROJECT")
-	var credentials := Label.new()
-	credentials.text = "PIXELLAB_SECRET: %s" % ("Configured" if not OS.get_environment("PIXELLAB_SECRET").is_empty() else "Not configured")
 	settings.add_child(_settings_python)
 	settings.add_child(_settings_game)
-	settings.add_child(credentials)
 	_settings_dialog.add_child(settings)
 	add_child(_settings_dialog)
 	_settings_dialog.confirmed.connect(func():
@@ -355,17 +354,20 @@ func _process_level_csv(path: String) -> void:
 		_report("Could not read the level batch CSV")
 		return
 	var header := file.get_csv_line()
-	var required := PackedStringArray(["artwork_path", "level_number", "supply_columns", "background_intent"])
-	if header != required:
+	var legacy := PackedStringArray(["artwork_path", "level_number", "supply_columns", "background_intent"])
+	var automatic := PackedStringArray(["artwork_path", "supply_columns", "background_intent"])
+	if header != legacy and header != automatic:
 		file.close()
-		_report("CSV columns: artwork_path,level_number,supply_columns,background_intent")
+		_report("CSV columns: artwork_path,supply_columns,background_intent (optional legacy level_number is ignored)")
 		return
 	var ready := 0
 	var failed := 0
 	while not file.eof_reached():
 		var row := file.get_csv_line()
 		if row.size() == 1 and row[0].strip_edges().is_empty(): continue
-		if row.size() != required.size() or not row[1].is_valid_int() or not row[2].is_valid_int() or int(row[2]) not in [3, 4, 5] or row[3] not in ["TRANSPARENT", "BACKGROUND"]:
+		var col_index := 2 if header == legacy else 1
+		var bg_index := 3 if header == legacy else 2
+		if row.size() != header.size() or (header == legacy and not row[1].is_valid_int()) or not row[col_index].is_valid_int() or int(row[col_index]) not in [3, 4, 5] or row[bg_index] not in ["TRANSPARENT", "BACKGROUND"]:
 			failed += 1
 			continue
 		var source_ref := row[0].strip_edges()
@@ -380,13 +382,14 @@ func _process_level_csv(path: String) -> void:
 		if source_id.is_empty():
 			failed += 1
 			continue
-		var request := {"column_count": int(row[2]), "level_number": int(row[1]), "background_intent": row[3], "game_project": OS.get_environment("SCRUBBOTS_PROJECT")}
+		var request := {"column_count": int(row[col_index]), "level_number": _level_number if _manual_level_override else 1, "background_intent": row[bg_index], "game_project": OS.get_environment("SCRUBBOTS_PROJECT")}
 		var result := _extension("pipeline", {"source_id": source_id, "request": request})
 		if str(result.get("disposition", "")) == "READY":
 			ready += 1
 			_last_source_id = source_id
 			_last_candidate_id = str(result.get("derived_candidate_id", _last_candidate_id))
 			_last_pipeline = result
+			_refresh_release_pool(false)
 		else:
 			failed += 1
 	file.close()
@@ -440,11 +443,13 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 		if source_id.is_empty():
 			failed += 1
 			continue
-		var pipeline := _extension("pipeline", {"source_id": source_id, "request": {"column_count": _column_count, "level_number": _level_number + succeeded, "background_intent": _background_intent, "game_project": OS.get_environment("SCRUBBOTS_PROJECT")}})
+		var pipeline := _extension("pipeline", {"source_id": source_id, "request": {"column_count": _column_count, "level_number": _level_number if _manual_level_override else 1, "background_intent": _background_intent, "game_project": OS.get_environment("SCRUBBOTS_PROJECT")}})
 		if str(pipeline.get("disposition", "")) == "READY":
 			succeeded += 1
 			_last_source_id = source_id
 			_last_candidate_id = str(pipeline.get("derived_candidate_id", _last_candidate_id))
+			_last_pipeline = pipeline
+			_refresh_release_pool(false)
 		else:
 			failed += 1
 	_report("Batch pipeline: %d READY · %d failed" % [succeeded, failed])
@@ -453,17 +458,39 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 func _generate_art() -> void:
 	if _operation_running:
 		return
+	_last_candidate_id = ""
+	_last_source_id = ""
+	_last_pipeline = {}
 	_seed = "pixel-art-%d" % Time.get_unix_time_from_system()
 	var result := _generate_request({"prompt": _prompt, "style": _generation_style, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	_finish_generation(result)
 
 
 func _run_batch() -> void:
+	if not _batch_csv_path.is_empty() and str(_semantic_progress.get("state", "")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY"]:
+		_generate_batch_csv(_batch_csv_path)
+		return
 	_open_batch_csv()
 
 
 func _generate_batch_csv(path: String) -> void:
 	if _gateway == null or _operation_running:
+		return
+	_batch_csv_path = path
+	if _provider_model == "ALPIX (Claude)":
+		_operation_running = true
+		var job := _extension("alpix-csv-job", {"csv_path": path, "default_width": _width, "default_height": _height})
+		_operation_running = false
+		_semantic_progress = {"job_id": job.get("job_id", ""), "completed": job.get("completed", 0), "failed": job.get("failed", 0), "remaining": job.get("remaining", 0), "state": job.get("state", "ERROR")}
+		_set_batch_action_label(str(job.get("state", "ERROR")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY"])
+		var rows: Array = job.get("rows", [])
+		for row in rows:
+			if str(row.get("state", "")) == "IMPORTED":
+				_last_source_id = str(row.get("source_id", _last_source_id))
+				_selected_art_path = str(row.get("artifact_path", _selected_art_path))
+		if not _selected_art_path.is_empty():
+			_load_selected_art_preview(_selected_art_path)
+		_report("ALPIX %s · %d complete · %d remaining" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("remaining", 0))])
 		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -492,7 +519,7 @@ func _generate_batch_csv(path: String) -> void:
 		var row_values := {}
 		for index in range(header.size()): row_values[str(header[index]).strip_edges()] = row[index].strip_edges()
 		var dims := _csv_dimensions(row_values)
-		var result := _generate_request({"prompt": str(row_values.get("prompt", "")), "style": str(row_values.get("style", "CREATURE")), "width": dims.x, "height": dims.y, "provider": str(row_values.get("provider", "LOCAL_MASK")), "seed": str(row_values.get("seed", "")), "background_intent": str(row_values.get("background_intent", "TRANSPARENT"))})
+		var result := _generate_request({"prompt": str(row_values.get("prompt", "")), "style": str(row_values.get("style", _generation_style)), "width": dims.x, "height": dims.y, "provider": str(row_values.get("provider", _provider_model)), "seed": str(row_values.get("seed", "")), "background_intent": str(row_values.get("background_intent", _background_intent))})
 		if str(result.get("state", "")) in ["SUCCESS", "IMPORTED"]:
 			_last_candidate_id = str(result.get("candidate_id", _last_candidate_id))
 			_last_source_id = str(result.get("source_id", _last_source_id))
@@ -525,12 +552,14 @@ func _run_level_pipeline() -> void:
 		_report("Select or generate a candidate first.")
 		return
 	_operation_running = true
-	var request := {"column_count": _column_count, "level_number": _level_number, "game_project": OS.get_environment("SCRUBBOTS_PROJECT"), "background_intent": _background_intent, "max_robots": null, "target_difficulty": "V1_ADVISORY"}
+	var request := {"column_count": _column_count, "level_number": _level_number if _manual_level_override else 1, "game_project": OS.get_environment("SCRUBBOTS_PROJECT"), "background_intent": _background_intent, "max_robots": null, "target_difficulty": "V1_ADVISORY"}
 	var pipeline_request := {"source_id": _last_source_id, "request": request} if not _last_source_id.is_empty() else {"candidate_id": _last_candidate_id, "request": request}
 	var result: Dictionary = _extension("pipeline", pipeline_request)
 	_last_pipeline = result
 	if not str(result.get("derived_candidate_id", "")).is_empty():
 		_last_candidate_id = str(result["derived_candidate_id"])
+	if str(result.get("disposition", "")) == "READY":
+		_refresh_release_pool(false)
 	_report("Pipeline %s · %s" % [str(result.get("disposition", result.get("state", "UNKNOWN"))), str(result.get("run_id", ""))])
 	_operation_running = false
 
@@ -547,9 +576,10 @@ func _edit_level_number() -> void:
 
 func _save_level_number() -> void:
 	_level_number = int(_level_number_input.value)
+	_manual_level_override = true
 	_level_number_label.text = str(_level_number)
-	_level_number_label.visible = _level_number != 11
-	_report("Level number: %d" % _level_number)
+	_level_number_label.visible = true
+	_report("Manual level number: %d" % _level_number)
 
 
 func _review_candidate(disposition: String) -> void:
@@ -569,23 +599,24 @@ func _review_candidate(disposition: String) -> void:
 
 func _refresh_release_pool(show_status: bool = true) -> void:
 	_release_pool = _extension("release-pool", {})
+	_apply_release_projection()
 	if show_status:
-		_report("Ready levels: %s" % str(_release_pool.get("pool_size", 0)))
+		_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
 
 
 func _select_first_release() -> void:
 	if _visible_release_ids.is_empty():
-		_report("No owner-accepted READY level is available in the Release Pool.")
+		_report("No READY, included level is available in the Release Pool.")
 		return
 	var id := _visible_release_ids[0]
 	if id not in _selected_release_ids: _selected_release_ids.append(id)
 	_selected_release_id = id
-	_report("Selected %d owner-accepted level(s)" % _selected_release_ids.size())
+	_report("Selected %d READY level(s)" % _selected_release_ids.size())
 
 
 func _preflight_release() -> void:
 	if _selected_release_ids.is_empty():
-		_report("Select an owner-accepted READY level first.")
+		_report("Select one or more READY levels first.")
 		return
 	var result := _extension("scrubbots-publish", {
 		"action": "preflight", "candidate_ids": _selected_release_ids,
@@ -622,13 +653,16 @@ func _generate_request(request: Dictionary) -> Dictionary:
 		return {"state": "UNAVAILABLE", "reason": "Factory Core is unavailable."}
 	_operation_running = true
 	var result: Dictionary
-	var output := "res://output/exact-three-master/%s" % str(request.get("seed", "candidate"))
-	if str(request.get("provider", "LOCAL_MASK")).begins_with("PIXELLAB"):
-		var model := str(request.get("provider", "PIXELLAB/PIXFLUX")).get_slice("/", 1)
+	var selected_provider := str(request.get("provider", _provider_model))
+	if selected_provider == "ALPIX (Claude)":
+		result = _extension("alpix-generate", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32)})
+	elif selected_provider == "MAGNIFIC":
+		result = _extension("magnific-prepare", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32), "background_intent": request.get("background_intent", "TRANSPARENT")})
+	elif selected_provider == "PIXELLAB":
+		var model := "PIXFLUX"
 		result = _extension("semantic-generate", {"prompt": request.get("prompt", ""), "style": request.get("style", ""), "provider_id": "PIXELLAB", "provider_model": model, "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT")})
 	else:
-	var family := str(request.get("style", "CREATURE"))
-		result = _gateway.call("run_action", "Generate", {"width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "mode": "MASK", "style": family, "background_intent": request.get("background_intent", "TRANSPARENT")}, output)
+		result = {"state": "UNAVAILABLE", "reason": "Selected provider is not configured."}
 	_operation_running = false
 	return result
 
@@ -694,7 +728,7 @@ func _choose_provider() -> void:
 	var options: Array = result.get("providers", [])
 	var names: Array[String] = []
 	for item in options:
-		if item is Dictionary and item.get("available", false):
+		if item is Dictionary:
 			names.append(str(item.get("id", "")))
 	for item in names: choice.add_item(item)
 	var selected := maxi(0, names.find(_provider_model))
@@ -706,6 +740,13 @@ func _choose_provider() -> void:
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog); dialog.popup_centered()
+
+
+func _set_batch_action_label(resume: bool) -> void:
+	for button in _master_buttons:
+		if button.name == "RunBatch":
+			button.text = "Resume" if resume else "Run Batch"
+			return
 
 
 func _open_settings() -> void:
@@ -876,7 +917,7 @@ func _apply_release_projection() -> void:
 func _select_release_row(index: int) -> void:
 	if index < 0 or index >= _visible_release_ids.size(): return
 	var candidate_id := _visible_release_ids[index]
-	if _manage_release_selection:
+	if _release_selection_manage_mode:
 		if _selected_release_ids.has(candidate_id):
 			_selected_release_ids.erase(candidate_id)
 		else:
@@ -886,8 +927,8 @@ func _select_release_row(index: int) -> void:
 
 
 func _manage_release_selection() -> void:
-	_manage_release_selection = not _manage_release_selection
-	_report("Manage selection %s" % ("active" if _manage_release_selection else "closed"))
+	_release_selection_manage_mode = not _release_selection_manage_mode
+	_report("Manage selection %s" % ("active" if _release_selection_manage_mode else "closed"))
 
 
 func _select_all_release() -> void:
@@ -931,21 +972,7 @@ func _upload_selected() -> void:
 	if _release_target == "STAGING":
 		_publish_staging()
 		return
-	var preflight: Dictionary = _release_pool.get("publish_preflight", {})
-	var identity: Dictionary = preflight.get("reviewed_identity", {})
-	var manifest_sha := str(identity.get("manifest_sha256", ""))
-	var version := str(identity.get("content_version", ""))
-	if manifest_sha.is_empty() or version.is_empty():
-		_report("Verified STAGING manifest is required")
-		return
-	_release_confirmation.dialog_text = "Promote manifest %s · version %s · PRODUCTION?" % [manifest_sha, version]
-	_release_confirmation.confirmed.connect(_confirm_production_promotion, CONNECT_ONE_SHOT)
-	_release_confirmation.popup_centered()
-
-
-func _confirm_production_promotion() -> void:
-	var result := _extension("production-promotion", {"action": "promote", "target": "PRODUCTION", "reviewed_identity": _release_pool.get("publish_preflight", {}).get("reviewed_identity", {})})
-	_report("PRODUCTION: %s" % str(result.get("state", result.get("disposition", "ERROR"))))
+	_report("PRODUCTION is unavailable: exact verified STAGING manifest and trusted owner-approval promotion handoff are not connected.")
 
 
 func _preview_release_manifest() -> void:
