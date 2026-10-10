@@ -25,3 +25,8 @@ Document role: CODEX BUILDER LOG
 - Ran only the new F02 cases once: `python -m pytest tests/unit/test_m17_release_controls.py -q -p no:cacheprovider -k f02_interrupted_firing` — 3 passed, 7 deselected in 0.82s. The existing M17 7-test and 63-test results were not rerun; no compileall or broad verification was run.
 - `git diff --cached --check` passed; targeted credential-pattern scan of the changed module and test file found no matches. No owner-untracked path was staged or touched. The 57 protected untracked paths remain; this new log is the only additional untracked file before its separate commit.
 - Source/test commit: `01d65c0` (`Fix F02 interrupted FIRING claim recovery`).
+
+### 2026-10-10 17:42 UTC — Main publication and parity
+- Before push, `git fetch --prune origin` confirmed origin `556074ad4259fcb2063ecd1a648c55610987be4e` was an ancestor of Desktop HEAD `9109eb7aafb7afcb975119be5ee45fe0448419f0` (0 behind / 2 ahead). Normal `git push origin HEAD:main` succeeded, publishing source/test commit `01d65c0` and builder-log commit `9109eb7`.
+- Post-push `git fetch --prune origin` confirmed Desktop HEAD and `origin/main` both `9109eb7aafb7afcb975119be5ee45fe0448419f0`, 0 ahead / 0 behind. There are zero staged or tracked working-tree changes. All 57 protected untracked paths remain present and untouched.
+- No prior Stage 1 suites were repeated. R01 F02 ends here; R05 and M17 Stage 2 remain open for independent GPT audit and later authorized work.
