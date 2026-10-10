@@ -27,3 +27,11 @@
 - Aspect-preserving fixed-scale canvas may letterbox and fails if controls/preview do not use usable client area. Test 1536×1024 and one maximized/widescreen case.
 - Select PNG visible button => genuinely multi-select-capable dialog => `files_selected` => per-file canonical import identity and small live functional sample. A lightweight 150-file UI queue/selection test is distinct from the expensive **150 fully solved** production batch, which remains NOT RUN until tested.
 - If graphical runtime unavailable, mark visual native acceptance NOT VERIFIED and execute scriptable lightweight tests; no fabricated success, no forced Computer Use retries, no new cleanup investigations.
+
+## 2026-10-10 R04 graphical progress classification
+
+- Current reported Godot graphical UI smoke = `errors: []`, 1920×1080 window gives 1820×1024 viewport, three-tab navigation, responsive panels; retain screenshots and test evidence for independent review. This establishes a bounded UI-smoke improvement, not overall visual acceptance.
+- 150 synthetic path entries prove queue/signals only. They **do not count** as 150 actual PNG file selection, decoding, solver or Supply Plan runs.
+- Immediate focused proof requires **actual distinct valid small PNGs** through the real visible LEVEL FACTORY selection/signal, immutable source identity, canonical per-source import/pipeline stages and correct queue/preview. Track native Windows picker visual separately if inaccessible; signal binding alone is not equivalent to a visibly tested native chooser.
+- Original A READY/B FAILED/C READY, production N→N+1→N+2, LF19 VOID, 150 real PNG solved/stress, full pytest, deployment and independent audit remain OPEN until real evidence. No fake score/solver/publish proof.
+- Policy-denied cleanup of prior ~14 MB does not prohibit safe narrow read-only/non-heavy tests, but never bypass deletion policy or begin disk-heavy scratch dependent on denied cleanup.
