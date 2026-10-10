@@ -53,4 +53,6 @@ R05 remains `R05_PARTIAL_IMPLEMENTED / OPEN_GATES`; this builder log does not cl
 ## Publication
 
 - Implementation/tests commit: `6b68ce4f4e1b2bfcb42fc818ee60079d80121fb4` (`R05: connect durable production manifest history`). Before push, fetched/pruned `origin`; confirmed `origin/main` was an ancestor of local `HEAD`. `git push origin HEAD:main` succeeded as a normal fast-forward from `de7deae` to `6b68ce4`.
-- Builder log/evidence is being committed separately. Final post-log fetch, parity, ahead/behind and tracked-status verification will be recorded after that push.
+- Builder log/evidence commit: `3a67df91cc145e87fc45f694a56ccfaea637ca66` (`R05: record Desktop continuation evidence`) was pushed separately with a normal fast-forward from `6b68ce4`.
+- Post-log fetch/prune verified Desktop `HEAD == origin/main == 3a67df91cc145e87fc45f694a56ccfaea637ca66`, 0 ahead / 0 behind, branch `main`, and 0 tracked dirty paths. Exactly 57 owner-local untracked paths remain; no cleanup or staging of those paths occurred. `git diff HEAD~2..HEAD --check` passed.
+- This final status record is a separate builder-log-only follow-up; the equality above is the verified state immediately before that evidence-only commit. The implementation commit and builder log are published; no product/runtime state was modified after the recorded verification.
