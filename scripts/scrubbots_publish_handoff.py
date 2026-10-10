@@ -140,8 +140,10 @@ def publish_to_production(
                ("R2_ENDPOINT_URL", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY")):
         return _blocked("OWNER_R2_WRITE_CREDENTIAL_REQUIRED", "Secure R2 writer credentials are not available to this process.")
     try:
+        from scrubbots_content_pipeline.r2_provider import CloudflareR2Provider
+        provider = (provider_factory or CloudflareR2Provider)()
         typed_request = _assemble_staging_request(
-            current_request, provider_factory=provider_factory,
+            current_request, provider_factory=lambda: provider,
             release_pool_reader=release_pool_reader, pack_builder=pack_builder,
             game_authority_reader=game_authority_reader, reviewed_identity=reviewed,
             production_confirmation=owner_confirmation,
@@ -152,11 +154,47 @@ def publish_to_production(
         return _blocked("M14_PRODUCTION_CHAIN_REJECTED", "Trusted M14/current-main/production authority chain failed closed.")
     to_dict = getattr(report, "to_dict", None)
     payload = to_dict() if callable(to_dict) else {"accepted": bool(getattr(report, "accepted", False))}
+    history_status = None
+    if payload.get("accepted") is True:
+        activation = getattr(report, "production_activation", None)
+        receipt = getattr(activation, "receipt", None)
+        production_inputs = getattr(typed_request, "production", None)
+        history = getattr(receipt, "manifest_history", None)
+        manifest_bytes = getattr(receipt, "manifest_bytes", None)
+        prior_history = getattr(production_inputs, "manifest_history", None)
+        write_history = getattr(provider, "write_manifest_history", None)
+        read_history = getattr(provider, "read_manifest_history", None)
+        if (history is None or type(manifest_bytes) is not bytes or prior_history is None
+                or not callable(write_history) or not callable(read_history)):
+            return _post_activation_history_block(
+                "PRODUCTION_HISTORY_READBACK_REQUIRED",
+                "Canonical activation succeeded but the M13 durable history readback contract is unavailable.")
+        try:
+            persisted = write_history(
+                history, expected_prior_tip_sha256=prior_history.tip_sha256,
+                current_manifest_bytes=manifest_bytes,
+            )
+            from scrubbots_content_pipeline.provider import ProviderResultCategory
+            if getattr(persisted, "category", None) is not ProviderResultCategory.SUCCESS:
+                return _post_activation_history_block(
+                    "PRODUCTION_HISTORY_PERSIST_FAILED",
+                    "Production activated, but canonical M13 history persistence did not confirm; further promotion is blocked.")
+            readback = read_history()
+            if readback != history:
+                return _post_activation_history_block(
+                    "PRODUCTION_HISTORY_READBACK_MISMATCH",
+                    "Production activated, but durable M13 history did not read back exactly.")
+        except Exception:
+            return _post_activation_history_block(
+                "PRODUCTION_HISTORY_PERSIST_FAILED",
+                "Production activated, but canonical M13 history persistence/readback failed closed.")
+        history_status = "EXACT_READBACK"
     return {
         "operation": "scrubbots-publish",
         "state": "PRODUCTION_ACTIVATED" if payload.get("accepted") is True else "PRODUCTION_REJECTED",
         "m14": payload, "receipt": _receipt(payload),
         "production": "ACTIVATED" if payload.get("accepted") is True else payload.get("reason_code", "REJECTED"),
+        **({"manifest_history": history_status} if history_status is not None else {}),
         "mutation_performed": True,
     }
 
@@ -294,11 +332,12 @@ def _assemble_staging_request(
             provider, Environment.PRODUCTION, PRODUCTION_TARGET.logical_target_id,
             ProductionManifestPrecondition, _MANIFEST_KEY,
         )
-        current_production = provider.read_object_bytes(Environment.PRODUCTION, _MANIFEST_KEY).content_bytes
-        if current_production is not None:
-            # The existing activation contract requires a complete independently supplied history.
-            # This adapter has no canonical history read API, so it fails closed instead of inventing one.
-            raise ValueError("production manifest history is not available from the provider contract")
+        current_production = production_precondition.expected_prior_manifest_bytes
+        history_reader = getattr(provider, "read_manifest_history", None)
+        if not callable(history_reader):
+            raise ValueError("canonical production manifest history is unavailable")
+        manifest_history = _read_production_manifest_history(
+            history_reader(), current_production, production_precondition)
         authority = dict(authority)
         game_root = Path(os.environ.get("SCRUBBOTS_PROJECT", "")).expanduser().resolve()
         def check_approval():
@@ -310,7 +349,7 @@ def _assemble_staging_request(
             game_runner=_current_game_runner(game_root), owner_approval=approval,
             owner_approval_check=check_approval,
             production_precondition=production_precondition,
-            manifest_history=ManifestHistoryV1(), recorded_at_utc=created,
+            manifest_history=manifest_history, recorded_at_utc=created,
         )
         mode = PublisherMode.PRODUCTION
     return PublisherRunRequest(
@@ -341,6 +380,23 @@ def _read_manifest_precondition(provider, environment, target_id, precondition_t
     if precondition_type.__name__ == "StagingManifestPrecondition":
         return precondition_type(target_id, object_key, True, digest, parsed.content_version, bytes(raw))
     return precondition_type(target_id, object_key, digest, parsed.content_version, bytes(raw))
+
+
+def _read_production_manifest_history(history, current_manifest: bytes | None, precondition):
+    """Require persisted M13 history to terminate at the exact live manifest CAS state."""
+    from scrubbots_content_pipeline.manifest_history import ManifestHistoryV1, verify_manifest_history
+
+    if not isinstance(history, ManifestHistoryV1) or not verify_manifest_history(history).accepted:
+        raise ValueError("canonical production manifest history is invalid")
+    if current_manifest is None:
+        if history.records:
+            raise ValueError("manifest history exists without a current production manifest")
+    elif (not history.records
+          or history.records[-1].manifest_bytes != current_manifest
+          or history.records[-1].manifest_sha256 != precondition.expected_prior_sha256
+          or history.records[-1].content_version != precondition.expected_prior_content_version):
+        raise ValueError("current production manifest is not the exact M13 history tip")
+    return history
 
 
 def _candidate_manifest_sha(build, version: int) -> str | None:
@@ -488,6 +544,13 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
     return {"operation": "scrubbots-publish", "state": state, "reason": reason,
             "mutation_performed": False, "bucket": R2_BUCKET, "public_read_base": PUBLIC_READ_BASE,
             "production": "AWAITING_OWNER_PRODUCTION_PROMOTION"}
+
+
+def _post_activation_history_block(state: str, reason: str) -> dict[str, Any]:
+    """Report the already completed production write without implying full closure."""
+    return {"operation": "scrubbots-publish", "state": state, "reason": reason,
+            "mutation_performed": True, "bucket": R2_BUCKET, "public_read_base": PUBLIC_READ_BASE,
+            "production": "ACTIVATED_HISTORY_INCOMPLETE"}
 
 
 __all__ = ["PUBLIC_READ_BASE", "R2_BUCKET", "publish_preflight", "publish_to_staging", "publish_to_production"]

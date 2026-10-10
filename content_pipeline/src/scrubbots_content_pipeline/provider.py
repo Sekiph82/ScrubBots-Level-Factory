@@ -309,6 +309,17 @@ class ProductionPromotionProvider(Protocol):
         """Append one hash-chained M11 event only at the exact observed ledger tip."""
         ...
 
+    def read_manifest_history(self) -> object:
+        """Read the canonical M13 exact-byte production manifest history."""
+        ...
+
+    def write_manifest_history(
+        self, history: object, *, expected_prior_tip_sha256: str | None,
+        current_manifest_bytes: bytes,
+    ) -> ProviderResult:
+        """CAS-persist M13 history after the matching production manifest readback."""
+        ...
+
     def write_manifest_conditionally(
         self,
         environment: Environment,

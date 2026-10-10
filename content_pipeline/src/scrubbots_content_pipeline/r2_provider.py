@@ -34,6 +34,7 @@ from .release_state import (
 R2_BUCKET = "scrubbots-content-prod"
 R2_REGION = "auto"
 _EVENTS_KEY = "_control/release-events/current.json"
+_MANIFEST_HISTORY_KEY = "_control/manifest-history/current.json"
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
 _SAFE_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,511}$")
 _ACCOUNT = re.compile(r"^[a-f0-9]{32}$")
@@ -45,6 +46,10 @@ class ReleaseLedgerUnavailableError(RuntimeError):
 
 class InvalidReleaseLedgerError(RuntimeError):
     """An existing remote ledger is malformed or fails replay validation."""
+
+
+class ManifestHistoryUnavailableError(RuntimeError):
+    """The canonical M13 manifest history could not be read or verified."""
 
 
 def physical_object_key(environment: Environment, logical_key: str) -> str:
@@ -297,6 +302,68 @@ class CloudflareR2Provider:
             return ()
         raw, _ = stored
         return self._parse_release_events(raw)
+
+    def read_manifest_history(self):
+        """Read and verify the canonical M13 exact-byte production history."""
+        from .manifest_history import ManifestHistoryV1, parse_manifest_history
+
+        if self._client() is None:
+            raise ManifestHistoryUnavailableError("manifest history unavailable")
+        try:
+            stored = self._get(_MANIFEST_HISTORY_KEY)
+            if stored is None:
+                return ManifestHistoryV1()
+            return parse_manifest_history(stored[0])
+        except Exception as exc:
+            raise ManifestHistoryUnavailableError("manifest history unavailable") from exc
+
+    def write_manifest_history(self, history, *, expected_prior_tip_sha256: str | None,
+                               current_manifest_bytes: bytes) -> ProviderResult:
+        """CAS-write exact M13 history only after exact production readback."""
+        from .manifest_history import (
+            ManifestHistoryError, ManifestHistoryV1, parse_manifest_history, serialize_manifest_history,
+            verify_manifest_history,
+        )
+
+        if (not isinstance(history, ManifestHistoryV1) or not history.records
+                or type(current_manifest_bytes) is not bytes
+                or history.records[-1].manifest_bytes != current_manifest_bytes
+                or not verify_manifest_history(history).accepted):
+            return self._result(ProviderResultCategory.INVALID_REQUEST, Environment.PRODUCTION)
+        client = self._client()
+        if client is None:
+            return self._result(ProviderResultCategory.UNAVAILABLE, Environment.PRODUCTION)
+        try:
+            manifest_stored = self._get("production/manifests/current.json")
+            if manifest_stored is None or manifest_stored[0] != current_manifest_bytes:
+                return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                    Environment.PRODUCTION)
+            current = self._get(_MANIFEST_HISTORY_KEY)
+            if current is None:
+                prior = ManifestHistoryV1()
+                if expected_prior_tip_sha256 is not None:
+                    return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                        Environment.PRODUCTION)
+                kwargs: dict[str, object] = {"IfNoneMatch": "*"}
+            else:
+                prior = parse_manifest_history(current[0])
+                if prior.tip_sha256 != expected_prior_tip_sha256:
+                    return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                        Environment.PRODUCTION, prior.tip_sha256)
+                kwargs = {"IfMatch": current[1]}
+            if (history.records[:-1] != prior.records
+                    or prior.tip_sha256 != expected_prior_tip_sha256):
+                return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
+                                    Environment.PRODUCTION, prior.tip_sha256)
+            body = serialize_manifest_history(history)
+            client.put_object(Bucket=R2_BUCKET, Key=_MANIFEST_HISTORY_KEY, Body=body,
+                              ContentType="application/json", CacheControl="no-cache", **kwargs)
+            return self._result(ProviderResultCategory.SUCCESS, Environment.PRODUCTION,
+                                history.tip_sha256)
+        except ManifestHistoryError:
+            return self._result(ProviderResultCategory.INTEGRITY_MISMATCH, Environment.PRODUCTION)
+        except Exception as exc:
+            return self._result(self._error_category(exc), Environment.PRODUCTION)
 
     def append_release_event(self, event: object, *, expected_prior_sequence: int,
                              expected_prior_event_digest: str) -> ProviderResult:

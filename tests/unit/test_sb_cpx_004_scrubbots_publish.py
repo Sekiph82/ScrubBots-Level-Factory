@@ -321,7 +321,8 @@ def test_production_handoff_requires_exact_owner_confirmation_before_assembly(mo
                     "manifest_sha256": "a" * 64, "content_version": 7, "target": "PRODUCTION"}
     result = handoff.publish_to_production({"reviewed_identity": identity}, owner_confirmation=confirmation,
         publisher_runner=lambda request: (seen.append(request) or Report()))
-    assert result["state"] == "PRODUCTION_ACTIVATED"
+    assert result["state"] == "PRODUCTION_HISTORY_READBACK_REQUIRED"
+    assert result["mutation_performed"] is True
     assert assembled == [confirmation] and seen == [typed]
 
     assembled.clear()
