@@ -36,3 +36,14 @@
 
 ## Audit outcome
 `M17_QUEUED_WAITING_FOR_R05_AUDIT`, `CHANGES_REQUIRED`, `M17_LF_TECHNICAL_READY_EXTERNAL_GAME_RUNTIME_PENDING`, `M17_OWNER_LIVE_APPROVAL_PENDING`, or `PASS/CLOSED` (only after mandatory evidence).
+
+
+## Stage 1 review-branch evidence audit (2026-10-10)
+
+Builder has *reported*, not independently proved, 63 focused PASS, clean compile/diff, and two local commits `e980ff2` (source/tests) + `ac0335d` (builder log). Until source/tests/log can be read through a verified GitHub review ref, Stage 1 is **BUILDER_REPORTED / AWAITING_INDEPENDENT_STAGE1_AUDIT**, not PASS.
+
+An isolated `review/m17-cp06-c001-stage1` branch is authorized solely to publish the existing two local commits for GPT inspection while `main` advances independently. Require no force, clean local worktree, verified matching remote tip, no `main` update, original ancestor base and unmodified root TASKS.md. A changed `main` due to documentation commits alone does not bar an isolated review branch. No secret/private credentials in branch or logs.
+
+Once readable, independently inspect `m17_release_controls.py`, `test_m17_release_controls.py`, existing CP03/M18 controls and the builder log. Verify actual authorization/CAS, rollback monotonic history, immutable pack identities, fail-closed schedule/disable, receipts, idempotent race/DST cases, and that 63 tests did not merely assert mocks. Focused implementation PASS is **partial** and does not imply real provider wiring, CP03 activation, durable weekly registration, CP06-004/010 runtime, full LF regression or M17 closure.
+
+Return `STAGE1_REVIEW_PENDING_SOURCE_PUBLICATION` while branch absent; `STAGE1_AUDITED_PASS_STAGE2_PENDING` or `STAGE1_CHANGES_REQUIRED` only after authentic code/tests/log inspection. Stage 2 may only finish after R05 independently PASS/CLOSED and accepted integration gates. Never claim M17 PASS based solely on locally reported tests.
