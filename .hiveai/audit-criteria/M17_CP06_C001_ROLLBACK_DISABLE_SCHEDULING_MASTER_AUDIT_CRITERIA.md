@@ -6,8 +6,8 @@
 **Audit owner:** ChatGPT; Codex implements/logs but cannot alter root TASKS.md or audits.
 
 ## Gate 0 / governance
-- Current R05 independently audited PASS/CLOSED by ChatGPT in LF root TASKS.md **before M17 implementation**; otherwise queue-only `M17_QUEUED_WAITING_FOR_R05_AUDIT`. Prior R04 A/B/C and 150 imported PNGs are NOT proof R05 PASS (only 2/150 solver-replayed, production history/full regression local/unpublished).
-- Correct LF origin/main authority; owner Desktop and R05 TEMP state preserved without deletion/rebase/reset/clean/force; no unauthorized game-repo edit, R2 production mutation or policy-bypass.
+- **STAGE 1 AUTHORIZED WHILE R05 UNVERIFIED [2026-10-10]:** bounded LF-owned CP06-001..003,005..009,011..012 implementation and focused provider-neutral/local-state tests may proceed on isolated clean M17 TEMP worktree. Prior queue-only stop `M17_QUEUED_WAITING_FOR_R05_AUDIT` is RETIRED for Stage 1. R05 is still unverified; R04 A/B/C plus 150 imported PNGs (2 actually solver-replayed) cannot close it. Stage 1 cannot deploy, mutate live R2, close M17, or start full disk-heavy tests. Final Stage 2 Release Pool integration, mandatory full regression, publication and M17 closure still wait for independent R05 PASS/CLOSED. Partial completion is `M17_STAGE1_IMPLEMENTED_R05_INTEGRATION_PENDING`, not M17 PASS.
+- Correct LF origin/main authority; owner Desktop and R05 TEMP state preserved without deletion/rebase/reset/clean/force; no unauthorized game-repo edit, R2 production mutation or policy-bypass. If M17 intersects uncommitted R05 files, record exact conflict and defer only that scope; do not silently rewrite R05. Stage 1 commit work may remain locally preserved until R05 safely lands; never misrepresent local logs as GitHub publication.
 - Reuse accepted CP03, CPX-002 current-game replay, CPX-004 and M18/CDN interfaces. No parallel publisher/history/status tracker, no 4th top-level Studio module.
 
 ## M17.01
