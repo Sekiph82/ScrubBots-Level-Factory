@@ -59,6 +59,21 @@ func _run_suite() -> void:
 	await process_frame
 	var gateway := RecordingGateway.new()
 	ui.call("configure_gateway", gateway)
+	var select_button := ui.get_node("SelectArtwork") as Button
+	ui.size = Vector2(920, 610)
+	ui.call("_apply_responsive_layout")
+	var small_snapshot: Dictionary = ui.call("responsive_layout_snapshot")
+	var small_rect := select_button.get_global_rect()
+	_check(is_equal_approx(float(small_snapshot.get("scale", 0.0)), 610.0 / 1024.0), "live controls did not resize with a compact client area")
+	_check(small_rect.position.x >= -0.1 and small_rect.position.y >= -0.1 and small_rect.end.x <= 920.1 and small_rect.end.y <= 610.1, "compact-window Select PNG hitbox escaped the client area")
+	ui.size = Vector2(1920, 1080)
+	ui.call("_apply_responsive_layout")
+	var wide_snapshot: Dictionary = ui.call("responsive_layout_snapshot")
+	var wide_rect := select_button.get_global_rect()
+	_check(is_equal_approx(float(wide_snapshot.get("scale", 0.0)), 1080.0 / 1024.0), "live controls did not scale at widescreen size")
+	_check(wide_rect.position.x >= -0.1 and wide_rect.position.y >= -0.1 and wide_rect.end.x <= 1920.1 and wide_rect.end.y <= 1080.1, "widescreen Select PNG hitbox escaped the client area")
+	ui.size = Vector2(1536, 1024)
+	ui.call("_apply_responsive_layout")
 
 	var project_root := ProjectSettings.globalize_path("res://..").simplify_path()
 	var easy_path := project_root.path_join("tests/golden/fixtures/m08/golden-easy.png")
