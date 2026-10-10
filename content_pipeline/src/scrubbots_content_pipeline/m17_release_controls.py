@@ -877,6 +877,13 @@ class CandidateRevalidator(Protocol):
 
 
 class CandidateActivator(Protocol):
+    """Idempotent activation keyed by durable claim identity.
+
+    Implementations must deduplicate activation effects by ``idempotency_key``.
+    A false result or raised exception may mean the remote acknowledgment was
+    lost; callers keep the schedule FIRING and may retry with the same key.
+    """
+
     def __call__(self, revision: ScheduleRevision, *, idempotency_key: str) -> bool: ...
 
 
@@ -924,7 +931,17 @@ def run_due(
     activated: list[str] = []
     rejected: list[tuple[str, str]] = []
     for revision in sorted(due, key=lambda item: (item.scheduled_at.utc_iso8601, item.schedule_id)):
-        claim_key = f"{revision.schedule_id}:{revision.revision}:{revision.candidate_manifest_sha256}"
+        # claim_due advances SCHEDULED revision N to FIRING revision N+1.
+        # Reconstruct N on a resumed FIRING head so retries use the identity
+        # already persisted by the original claim, including after uncertain
+        # activation acknowledgments.
+        claim_revision = revision.revision
+        if revision.state is ScheduleState.FIRING:
+            if revision.revision < 2:
+                rejected.append((revision.schedule_id, "FIRING_REVISION_INVALID"))
+                continue
+            claim_revision -= 1
+        claim_key = f"{revision.schedule_id}:{claim_revision}:{revision.candidate_manifest_sha256}"
         if not journal.claim_due(revision.schedule_id,
                                  expected_revision_sha256=revision.revision_sha256, claim_key=claim_key):
             rejected.append((revision.schedule_id, "SCHEDULE_CLAIM_CONFLICT"))

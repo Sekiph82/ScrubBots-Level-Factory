@@ -62,24 +62,31 @@ def _manifest(version: int, *, disabled: tuple[str, ...] = (), minimum_game_vers
 
 
 class SQLiteLocalProvider:
-    """Small durable local object/history provider; never connects to a remote service."""
+    """Small local SQLite object/history provider; never connects to a remote service."""
 
     identity = ProviderIdentity("m17-local-stateful", "1.0")
 
-    def __init__(self, path: Path):
-        self.path = path
-        with sqlite3.connect(self.path) as db:
+    def __init__(self, path: Path | sqlite3.Connection):
+        self._connection = path if isinstance(path, sqlite3.Connection) else None
+        self.path = None if self._connection is not None else path
+        with self._connect() as db:
             db.execute("CREATE TABLE IF NOT EXISTS objects (environment TEXT, object_key TEXT, raw BLOB, PRIMARY KEY(environment, object_key))")
             db.execute("CREATE TABLE IF NOT EXISTS schedule_revisions (schedule_id TEXT, revision INTEGER, digest TEXT UNIQUE, raw BLOB, PRIMARY KEY(schedule_id, revision))")
             db.execute("CREATE TABLE IF NOT EXISTS schedule_claims (schedule_id TEXT PRIMARY KEY, claim_key TEXT UNIQUE)")
             db.execute("CREATE TABLE IF NOT EXISTS active_state (slot INTEGER PRIMARY KEY CHECK(slot=1), manifest BLOB, history BLOB)")
 
+    def _connect(self, *, timeout: float = 5.0) -> sqlite3.Connection:
+        if self._connection is not None:
+            return self._connection
+        assert self.path is not None
+        return sqlite3.connect(self.path, timeout=timeout)
+
     def put_object(self, environment: Environment, key: str, raw: bytes) -> None:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute("INSERT OR REPLACE INTO objects VALUES (?, ?, ?)", (environment.value, key, raw))
 
     def read_object_bytes(self, environment: Environment, object_key: str) -> ProviderObjectBytesResult:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             row = db.execute("SELECT raw FROM objects WHERE environment=? AND object_key=?", (environment.value, object_key)).fetchone()
         return ProviderObjectBytesResult(
             "1.0", ProviderResultCategory.SUCCESS, self.identity.provider_id, environment,
@@ -87,17 +94,17 @@ class SQLiteLocalProvider:
         )
 
     def initialize_active(self, manifest: bytes, history: bytes) -> None:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute("INSERT OR REPLACE INTO active_state VALUES (1, ?, ?)", (manifest, history))
 
     def read_active(self) -> tuple[bytes, bytes]:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             row = db.execute("SELECT manifest, history FROM active_state WHERE slot=1").fetchone()
         assert row is not None
         return bytes(row[0]), bytes(row[1])
 
     def compare_and_swap_active(self, expected_sha: str, expected_version: int, manifest: bytes, history: bytes) -> bool:
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT manifest FROM active_state WHERE slot=1").fetchone()
             if row is None or hashlib.sha256(bytes(row[0])).hexdigest() != expected_sha:
@@ -112,14 +119,14 @@ class SQLiteLocalProvider:
 
     def schedule_heads(self):
         from scrubbots_content_pipeline.m17_release_controls import parse_schedule_revision
-        with sqlite3.connect(self.path) as db:
+        with self._connect() as db:
             rows = db.execute("SELECT raw FROM schedule_revisions r WHERE revision=(SELECT MAX(revision) FROM schedule_revisions WHERE schedule_id=r.schedule_id)").fetchall()
         items = [parse_schedule_revision(bytes(row[0])) for row in rows]
         return {item.schedule_id: item for item in items}
 
     def append_revision(self, revision, *, expected_revision_sha256):
         from scrubbots_content_pipeline.m17_release_controls import parse_schedule_revision, serialize_schedule_revision
-        with sqlite3.connect(self.path, timeout=5) as db:
+        with self._connect(timeout=5) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT raw FROM schedule_revisions WHERE schedule_id=? ORDER BY revision DESC LIMIT 1", (revision.schedule_id,)).fetchone()
             previous = parse_schedule_revision(bytes(row[0])) if row else None
@@ -139,7 +146,7 @@ class SQLiteLocalProvider:
 
     def claim_due(self, schedule_id: str, *, expected_revision_sha256: str, claim_key: str) -> bool:
         from scrubbots_content_pipeline.m17_release_controls import make_schedule_revision, serialize_schedule_revision
-        with sqlite3.connect(self.path, timeout=5) as db:
+        with self._connect(timeout=5) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT raw FROM schedule_revisions WHERE schedule_id=? ORDER BY revision DESC LIMIT 1", (schedule_id,)).fetchone()
             if row is None:
@@ -185,7 +192,7 @@ class SQLiteLocalProvider:
         from scrubbots_content_pipeline.m17_release_controls import make_schedule_revision, serialize_schedule_revision
         if state not in {ScheduleState.FIRED, ScheduleState.BLOCKED}:
             return False
-        with sqlite3.connect(self.path, timeout=5) as db:
+        with self._connect(timeout=5) as db:
             db.execute("BEGIN IMMEDIATE")
             row = db.execute("SELECT raw FROM schedule_revisions WHERE schedule_id=? ORDER BY revision DESC LIMIT 1", (schedule_id,)).fetchone()
             claim = db.execute("SELECT claim_key FROM schedule_claims WHERE schedule_id=?", (schedule_id,)).fetchone()
@@ -573,3 +580,143 @@ def test_receipts_are_deterministic_and_weekly_batches_keep_distinct_lineage() -
     assert batch_a.immutable_identity_sha256 != batch_b.immutable_identity_sha256
     with pytest.raises(ReleaseControlError, match="INVALID_WEEKLY_BATCH"):
         make_weekly_accepted_batch("batch-a", "2026-W41", ("candidate-a", "candidate-a"), sha, "b" * 64, "c" * 64)
+
+
+def _f02_scheduled_intent(schedule_id: str):
+    current = _manifest(1)
+    current_manifest = ContentManifestV1.from_dict(__import__("json").loads(current))
+    desired = ContentManifestV1(
+        packs=current_manifest.packs, levels=current_manifest.levels,
+        content_version=2, disabled_levels=("Level-01",),
+    ).to_json_bytes()
+    approval = _approval_for(ControlAction.DISABLE, current, desired)
+    candidate = prepare_disable_candidate(
+        current, _history(current), ("Level-01",), disabled=True,
+        target_id=TARGET, reason="F02 interrupted FIRING recovery",
+        approval=approval, approval_check=lambda: approval,
+        recorded_at_utc="2026-10-10T14:00:00Z",
+    )
+    scheduled = create_schedule_revision(
+        candidate, schedule_id=schedule_id, candidate_object_key=f"control-candidates/{schedule_id}.json",
+        scheduled_at=ScheduleInstant(
+            "2026-10-10T15:00:00+00:00", "UTC", 0, "2026-10-10T15:00:00Z",
+        ),
+        actor_ref="owner-1", clock=FixedClock(NOW), verification=_schedule_verification(candidate),
+    )
+    return candidate, scheduled
+
+
+class SimulatedProcessInterruption(BaseException):
+    """Models abrupt process loss that normal exception handling cannot absorb."""
+
+
+@pytest.mark.parametrize("crash_point", ("before_activation", "after_activation_before_finalize"))
+def test_f02_interrupted_firing_reuses_original_claim_and_activation_key_without_duplicate_effects(
+    crash_point: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from scrubbots_content_pipeline.m17_release_controls import DueRevalidationResult
+
+    candidate, scheduled = _f02_scheduled_intent(f"f02-{crash_point}")
+    store = SQLiteLocalProvider(sqlite3.connect(":memory:"))
+    assert store.append_revision(scheduled, expected_revision_sha256=None)
+    key = f"{scheduled.schedule_id}:{scheduled.revision}:{candidate.manifest_sha256}"
+    revalidated_states: list[ScheduleState] = []
+    activation_keys: list[str] = []
+    activation_effects: set[str] = set()
+    activation_side_effects: list[str] = []
+
+    def revalidate(revision):
+        revalidated_states.append(revision.state)
+        if crash_point == "before_activation" and len(revalidated_states) == 1:
+            raise SimulatedProcessInterruption()
+        return DueRevalidationResult(True, True, True, True)
+
+    def activate(_revision, *, idempotency_key: str) -> bool:
+        activation_keys.append(idempotency_key)
+        if idempotency_key not in activation_effects:
+            activation_effects.add(idempotency_key)
+            activation_side_effects.append(idempotency_key)
+        return True
+
+    original_finish = store.finish_due
+    interrupted_finalize = False
+
+    def interrupt_first_finalize(schedule_id, *, expected_revision_sha256, state, claim_key):
+        nonlocal interrupted_finalize
+        if crash_point == "after_activation_before_finalize" and state is ScheduleState.FIRED and not interrupted_finalize:
+            interrupted_finalize = True
+            raise SimulatedProcessInterruption()
+        return original_finish(
+            schedule_id, expected_revision_sha256=expected_revision_sha256,
+            state=state, claim_key=claim_key,
+        )
+
+    monkeypatch.setattr(store, "finish_due", interrupt_first_finalize)
+    with pytest.raises(SimulatedProcessInterruption):
+        run_due(
+            store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+            revalidate, activate,
+        )
+
+    firing = store.schedule_heads()[scheduled.schedule_id]
+    assert firing.state is ScheduleState.FIRING
+    persisted_claim = store._connect().execute(
+        "SELECT claim_key FROM schedule_claims WHERE schedule_id=?", (scheduled.schedule_id,),
+    ).fetchone()
+    assert persisted_claim == (key,)
+    if crash_point == "before_activation":
+        assert activation_keys == [] and activation_effects == set() and activation_side_effects == []
+    else:
+        assert activation_keys == [key] and activation_effects == {key} and activation_side_effects == [key]
+
+    monkeypatch.setattr(store, "finish_due", original_finish)
+    recovered = run_due(
+        store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+        revalidate, activate,
+    )
+    assert recovered.activated == (scheduled.schedule_id,)
+    assert recovered.rejected == ()
+    assert revalidated_states == [ScheduleState.FIRING, ScheduleState.FIRING]
+    assert activation_keys == ([key] if crash_point == "before_activation" else [key, key])
+    assert activation_effects == {key}
+    assert activation_side_effects == [key]
+    assert store.schedule_heads()[scheduled.schedule_id].state is ScheduleState.FIRED
+
+    already_finished = run_due(
+        store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+        revalidate, activate,
+    )
+    assert already_finished.considered == 0
+    assert len(activation_keys) == (1 if crash_point == "before_activation" else 2)
+
+
+def test_f02_interrupted_firing_stale_revalidation_blocks_without_activation() -> None:
+    from scrubbots_content_pipeline.m17_release_controls import DueRevalidationResult
+
+    _candidate, scheduled = _f02_scheduled_intent("f02-stale-recovery")
+    store = SQLiteLocalProvider(sqlite3.connect(":memory:"))
+    assert store.append_revision(scheduled, expected_revision_sha256=None)
+
+    def interrupt_during_revalidation(_revision):
+        raise SimulatedProcessInterruption()
+
+    with pytest.raises(SimulatedProcessInterruption):
+        run_due(
+            store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+            interrupt_during_revalidation,
+            lambda _revision, *, idempotency_key: pytest.fail("interrupted before activation"),
+        )
+
+    blocked = run_due(
+        store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+        lambda _revision: DueRevalidationResult(True, False, True, True),
+        lambda _revision, *, idempotency_key: pytest.fail("stale recovery must not activate"),
+    )
+    assert blocked.rejected == ((scheduled.schedule_id, "DUE_REVALIDATION_REJECTED"),)
+    assert store.schedule_heads()[scheduled.schedule_id].state is ScheduleState.BLOCKED
+    terminal = run_due(
+        store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+        lambda _revision: pytest.fail("terminal blocked schedule must not revalidate"),
+        lambda _revision, *, idempotency_key: pytest.fail("terminal blocked schedule must not activate"),
+    )
+    assert terminal.considered == 0
