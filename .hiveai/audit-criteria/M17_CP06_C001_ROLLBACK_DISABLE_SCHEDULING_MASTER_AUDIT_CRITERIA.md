@@ -1,0 +1,38 @@
+# M17-CP06-C001 | Independent Master Audit Criteria
+
+**Source:** `Sekiph82/ScrubBots-Level-Factory` only.
+**Master:** `.hiveai/prompts/M17_CP06_C001_ROLLBACK_DISABLE_SCHEDULING_MASTER_PROMPT.md`.
+**Builder log:** `.hiveai/codex-logs/M17_CP06_C001_ROLLBACK_DISABLE_SCHEDULING_MASTER_CODEX_LOG.md`.
+**Audit owner:** ChatGPT; Codex implements/logs but cannot alter root TASKS.md or audits.
+
+## Gate 0 / governance
+- Current R05 independently audited PASS/CLOSED by ChatGPT in LF root TASKS.md **before M17 implementation**; otherwise queue-only `M17_QUEUED_WAITING_FOR_R05_AUDIT`. Prior R04 A/B/C and 150 imported PNGs are NOT proof R05 PASS (only 2/150 solver-replayed, production history/full regression local/unpublished).
+- Correct LF origin/main authority; owner Desktop and R05 TEMP state preserved without deletion/rebase/reset/clean/force; no unauthorized game-repo edit, R2 production mutation or policy-bypass.
+- Reuse accepted CP03, CPX-002 current-game replay, CPX-004 and M18/CDN interfaces. No parallel publisher/history/status tracker, no 4th top-level Studio module.
+
+## M17.01
+- **001** rollback to known-good as strictly newer auditable content_version, immutable prior history.
+- **002** real durable prior manifest and pack retrieval, byte/hash/schema/compatibility/replay checks before live mutation; corrupted or absent history fails closed.
+- **003** disable/re-enable exact selected level IDs without changing pack bytes, adjacent levels/order or mandatory provenance; negative invalid IDs and stale version tested.
+- **004** LF-only consumer contract; actual game runtime audit required for DISABLED skip semantics and offline/LKG. External-only gap correctly marked PENDING.
+
+## M17.02
+- **005** schedule intent durable and not LIVE until independently invoked, verified `run-due` with genuine environment trigger disclosure; no phantom background scheduler.
+- **006** zone-aware ISO 8601 and deterministic UTC/DST/clock-boundary handling, not naive time strings.
+- **007** full provider/CAS/approval/identity/hash/schema/current-main replay recheck at due-time; incompatible/unapproved never promoted.
+- **008** append-only cancel/edit and race/duplicate/retry behavior, no superseded or cancelled intent firing.
+
+## M17.03
+- **009** stateful provider N healthy→N+1 bad→N+2 restored as a new version, real readback, adversarial corrupt/stale negatives.
+- **010** official game runtime single-level-disable evidence separate from LF fixture; without independent game audit mark PENDING.
+- **011** multiple accepted weekly packs staged safely, stable identity/lineage, concurrent CAS collision refusal.
+- **012** deterministic reports include action, approval reference, UTC, prev/next versions and manifest/pack hashes, real provider receipts, report digest; no invented live success or leaks.
+
+## Cross-cutting acceptance
+- Explicit narrowly bound owner approval for PRODUCTION only (action, target, prev hash/version, candidate SHA/new version), immutable source/LevelData/supply/solver/replay/Difficulty/VOID and pack semantics intact.
+- Tests evidence per row, adversarial auth/CAS/provider/DST/duplicate/race, exact current-game authority, Godot three-master UI, CP03/CPX2/4/M18, LF19 and full green repository regression. Distinguish product implementation from missing external live credentials/game-runtime/owner approval.
+- Test disk footprint minimized; only run-owned scratch cleaned after completion when permitted; no clone/archive GB explosion or deletion-policy circumvention. No claimed PASS on unexecuted required tests.
+- Separate normal fast-forward source/test and evidence/log commits, published builder log, zero ahead/behind, independent GPT strict audit. `M17_PASS` reserved for evidence-complete LF and external gates; otherwise technical-ready/PENDING/CHANGES_REQUIRED.
+
+## Audit outcome
+`M17_QUEUED_WAITING_FOR_R05_AUDIT`, `CHANGES_REQUIRED`, `M17_LF_TECHNICAL_READY_EXTERNAL_GAME_RUNTIME_PENDING`, `M17_OWNER_LIVE_APPROVAL_PENDING`, or `PASS/CLOSED` (only after mandatory evidence).
