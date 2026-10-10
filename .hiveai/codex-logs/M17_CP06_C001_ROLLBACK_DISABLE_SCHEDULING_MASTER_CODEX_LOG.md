@@ -57,3 +57,8 @@ Document role: CODEX BUILDER LOG
 - Read the updated task authority and sync/publish standard. They explicitly say reuse the logged tests for unchanged code, no test reruns, and preserve exact code/test Git object identity.
 - Read-only Git checks confirmed original/recovered blob IDs are identical for all product files: package `__init__.py` `65e256d45aa9bbe335f31007e17b72cc61c9e77b`, `m17_release_controls.py` `7520c63b79781354f208c6cdbbadd383dfa3c080`, and `test_m17_release_controls.py` `dfd6c7d462348fca498fd67dd8923eec973879b8`. Product patch stat remains exactly 3 files, 1,579 insertions.
 - Safely merged latest `origin/main` into Desktop (`git merge --no-edit origin/main`), no conflict; merge commit `144c2e214b73da5fda5b16e634b45030c6eb278e`. Local branch had 0 behind / 6 ahead at this point. No tests or compile commands were rerun after the updated no-retest authority.
+
+### 2026-10-10 16:28 UTC — First normal main push and parity
+- Ran `git fetch --prune origin`; latest `origin/main` was an ancestor of Desktop HEAD with 0 behind / 7 ahead. Ran normal `git push origin HEAD:main`; push succeeded, advancing remote from `d4f69754887c7acb959551b00e071a38688e124e` to `3b5805a86eda58c8f23284a5a5f29dda5c762a7c`.
+- Post-push `git fetch --prune origin` confirmed Desktop `HEAD == origin/main == 3b5805a86eda58c8f23284a5a5f29dda5c762a7c`, 0 ahead / 0 behind, no staged or tracked working-tree diff. Existing owner-untracked paths and the two test-owned scratch directories remain local and were not included in the push.
+- The builder-log URL on GitHub main is now live. This append records the publication evidence in the same single builder log; the log-only commit will also be normally published and parity rechecked. No tests were rerun.
