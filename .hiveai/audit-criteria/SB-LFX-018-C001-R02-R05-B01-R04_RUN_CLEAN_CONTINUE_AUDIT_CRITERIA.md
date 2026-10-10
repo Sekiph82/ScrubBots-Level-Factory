@@ -35,3 +35,13 @@
 - Immediate focused proof requires **actual distinct valid small PNGs** through the real visible LEVEL FACTORY selection/signal, immutable source identity, canonical per-source import/pipeline stages and correct queue/preview. Track native Windows picker visual separately if inaccessible; signal binding alone is not equivalent to a visibly tested native chooser.
 - Original A READY/B FAILED/C READY, production N→N+1→N+2, LF19 VOID, 150 real PNG solved/stress, full pytest, deployment and independent audit remain OPEN until real evidence. No fake score/solver/publish proof.
 - Policy-denied cleanup of prior ~14 MB does not prohibit safe narrow read-only/non-heavy tests, but never bypass deletion policy or begin disk-heavy scratch dependent on denied cleanup.
+
+
+## 2026-10-10 real-PNG focused result and inherited gates
+
+- Reported real-PNG smoke (pending independent inspection): actual Godot `files_selected` two distinct PNG paths, `golden-easy.png` full official `SOLVED`/`WIN`/Difficulty V1/QA PASS; `golden-rectangular.png` structurally REJECTED for `EXCESSIVE_SALT_AND_PEPPER` and `EXCESSIVE_TINY_REGIONS`. This is a correct negative, not a READY or solved level.
+- New run root: peak **116,509 bytes**, normal cleanup completed and absence verified. Separately observed C: free-space decline **1,364,811,776 bytes** is `UNATTRIBUTED`; cannot falsely assign it to tests. Four old protected R03 roots remain untouched. New, separate, exact-owned run-root disposal is demonstrated *for that test only*, not universal permission for every future path.
+- Next meaningful functional proof: third genuinely READY, distinct real PNG completes **A READY/B REJECTED/C READY** identity, exact supply/solver/replay/difficulty binding, rejection-gap-free CampaignBuilder order, stable retry/resume. Need real canonical N→N+1→N+2 history/approval promotion activation, LF19 and complete bounded full regression.
+- Real 150-PNG test requires distinct readable PNGs and individual canonical dispatch/evidence; synthetic 150-path queue fails this gate. Windows OS picker visual remains separately NOT VERIFIED until actually observed.
+- Every heavy test has a new own isolated root, verified cleanup after test, compact retained evidence, no policy circumvention or duplicate GB-class fixture trees; if new scratch cleanup is blocked, do not start the next heavy test.
+- No R05 final PASS, installation or GitHub publication until inherited gates, final screenshot validation and independent GPT audit.
