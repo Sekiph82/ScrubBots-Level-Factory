@@ -67,3 +67,22 @@ When safely possible perform one unfiltered exact-authority full LF pytest reach
 Use ONE log `.hiveai/codex-logs/M17_CP06_C001_ROLLBACK_DISABLE_SCHEDULING_MASTER_CODEX_LOG.md` with per-child test table, implementation SHAs, immutable before/after identity and external gate status. No changes to root TASKS/audit files. For completed LF implementation, commit source/tests separately from log/evidence and safely fast-forward push `main` with HEAD/origin parity. Retain truthful external gates; no real R2 mutation without explicit owner approval.
 
 Permitted final statuses: `M17_STAGE1_IMPLEMENTED_R05_INTEGRATION_PENDING`, `M17_STAGE1_BLOCKED_<EXACT_REASON>`, `M17_IMPLEMENTED_AWAITING_GPT_STRICT_AUDIT`, `M17_LF_TECHNICAL_READY_EXTERNAL_GAME_RUNTIME_PENDING`, `M17_OWNER_LIVE_APPROVAL_PENDING`, or `M17_BLOCKED_<EXACT_REASON>`. **Only independent GPT audit may close M17 in TASKS.md.** Return a real published GitHub builder log link only when it exists; otherwise report exact stopped gate and preserved local evidence.
+
+
+## 2026-10-10 Stage 1 builder handoff / READ-ONLY INDEPENDENT AUDIT PUBLICATION (LATEST)
+
+Codex reports Stage 1 implemented locally in task-specific clean TEMP worktree:
+- `content_pipeline/src/scrubbots_content_pipeline/m17_release_controls.py`: rollback, known-good, disable/re-enable, schedule revise/cancel/due-run, receipt and weekly batch controls.
+- `tests/unit/test_m17_release_controls.py`: **63 focused tests reported PASS**; compilation and `git diff --check` reported PASS.
+- Local implementation commit `e980ff2`; log commit `ac0335d`; `origin/main` ancestor, task worktree clean, **two local commits not pushed**.
+- Still OPEN: real provider/CP03 activation wiring, durable weekly registration, CP06-004/010 game-runtime evidence, R05 review and all final M17 gates.
+
+**The builder's claims are NOT yet independently audited**. Their source, tests and log are absent from public LF `main`. Do not call Stage 1 PASS until GPT can inspect these exact bytes. To allow GPT source review without changing `main`, the next Codex action is **PUBLISH EXISTING TWO COMMITS TO AN ISOLATED REVIEW BRANCH ONLY**; this is a narrow, explicit exception to the earlier Stage-1 "do not push" rule.
+
+1. Reuse EXACT worktree `C:\Users\sekip\AppData\Local\Temp\ScrubBots-Level-Factory\M17-CP06-C001`. Do not recreate or reset it. `git status --porcelain` must be clean; verify `git rev-parse HEAD` resolves to the current full `ac0335d` commit, and that `e980ff2` is its immediate parent. Verify the local `TASKS.md` was NOT modified by Codex.
+2. `git fetch origin`; verify local `origin/main` is still an ancestor of `HEAD` using `git merge-base --is-ancestor origin/main HEAD`. If main advanced after local commits, **do not rebase or force**, stop and report current SHAs; request safe review branch action without changing parent history. Avoid changing any files or rerunning expensive tests.
+3. Publish **only** the existing commit tip to a non-production review branch named `review/m17-cp06-c001-stage1` via standard, non-force push of `HEAD:refs/heads/review/m17-cp06-c001-stage1`. If that ref already exists, require exact matching HEAD or stop for review; do not overwrite. Absolutely do NOT push to `main`, merge, cherry-pick, deploy, or modify R05 code. GitHub review branch is temporary evidence transport, NOT a second tracker or production authority.
+4. Fetch the review branch and verify its remote SHA equals local HEAD. Return the **REAL** GitHub branch links to the M17 Python implementation, focused tests and builder log plus both full local commits. Use direct links of form `https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/review/m17-cp06-c001-stage1/<path>` **only after** verified push; otherwise supply local evidence and exact push blocker, with no invented GitHub links.
+5. STOP FOR GPT STAGE1 INDEPENDENT AUDIT. GPT will inspect the review branch, report PASS/CHANGES_REQUIRED for the *partial Stage 1 implementation*, and update only LF root `TASKS.md`. No full M17 PASS while Stage 2 gates remain. No live R2 actions or storage cleanup retries.
+
+This review-branch evidence handoff **supersedes** any Stage 1 sentence telling Codex to keep already-built commits local indefinitely. Original Stage 2 R05 integration gating is unchanged.
