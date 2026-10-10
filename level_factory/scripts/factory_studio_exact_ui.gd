@@ -58,6 +58,13 @@ var _preview_rect: TextureRect
 var _selected_art_path := ""
 var _seed := ""
 var _background_intent := "TRANSPARENT"
+const _REFERENCE_SIZE := Vector2(1536.0, 1024.0)
+var _responsive_nodes: Array[CanvasItem] = []
+var _responsive_base: Dictionary = {}
+var _responsive_scale := 1.0
+var _responsive_offset := Vector2.ZERO
+var _last_import_summary: Dictionary = {}
+var _file_selection_action := "PNG_IMPORT"
 
 
 func _ready() -> void:
@@ -103,6 +110,68 @@ func _ready() -> void:
 	add_child(_level_number_label)
 	_build_master_controls()
 	_show_screen(_screen)
+	_capture_responsive_layout()
+	resized.connect(_apply_responsive_layout)
+	_apply_responsive_layout()
+
+
+func _capture_responsive_layout() -> void:
+	_responsive_nodes.clear()
+	_responsive_base.clear()
+	for child in get_children():
+		if child is Control:
+			var control := child as Control
+			if control == _canvas or control.anchor_left != 0.0 or control.anchor_top != 0.0 or control.anchor_right != 0.0 or control.anchor_bottom != 0.0:
+				continue
+			_responsive_nodes.append(control)
+			_responsive_base[control.get_instance_id()] = {"position": control.position, "size": control.size, "scale": control.scale}
+		elif child is Line2D:
+			var line := child as Line2D
+			_responsive_nodes.append(line)
+			_responsive_base[line.get_instance_id()] = {"position": line.position, "scale": line.scale}
+
+
+func _apply_responsive_layout() -> void:
+	if _responsive_nodes.is_empty() or size.x <= 0.0 or size.y <= 0.0:
+		return
+	var geometry := responsive_geometry(size)
+	_responsive_scale = float(geometry.get("scale", 1.0))
+	_responsive_offset = geometry.get("offset", Vector2.ZERO)
+	for node in _responsive_nodes:
+		if not is_instance_valid(node):
+			continue
+		var base: Dictionary = _responsive_base.get(node.get_instance_id(), {})
+		if base.is_empty():
+			continue
+		if node is Control:
+			var control := node as Control
+			control.position = _responsive_offset + base.position * _responsive_scale
+			if control == _preview_rect:
+				control.size = base.size * _responsive_scale
+				control.scale = Vector2.ONE * (_zoom / 8.0) * _responsive_scale
+			else:
+				control.size = base.size
+				control.scale = base.scale * _responsive_scale
+		elif node is Line2D:
+			var line := node as Line2D
+			line.position = _responsive_offset + base.position * _responsive_scale
+			line.scale = base.scale * _responsive_scale
+
+
+func responsive_layout_snapshot() -> Dictionary:
+	return {"reference_size": _REFERENCE_SIZE, "viewport_size": size, "scale": _responsive_scale, "offset": _responsive_offset}
+
+
+func responsive_geometry(viewport_size: Vector2) -> Dictionary:
+	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
+		return {"scale": 1.0, "offset": Vector2.ZERO, "content_size": _REFERENCE_SIZE}
+	var scale_factor := minf(viewport_size.x / _REFERENCE_SIZE.x, viewport_size.y / _REFERENCE_SIZE.y)
+	var content_size := _REFERENCE_SIZE * scale_factor
+	return {"scale": scale_factor, "offset": (viewport_size - content_size) * 0.5, "content_size": content_size}
+
+
+func last_import_snapshot() -> Dictionary:
+	return _last_import_summary.duplicate(true)
 
 
 func configure_gateway(gateway: RefCounted) -> void:
@@ -216,6 +285,7 @@ func _update_live_chrome() -> void:
 		_preview_rect.position = preview_position
 		_preview_rect.size = preview_size
 	_refresh_live_data()
+	_apply_responsive_layout()
 
 
 func _refresh_live_data() -> void:
@@ -528,17 +598,18 @@ func _report(message: String) -> void:
 func _open_files(multiple: bool) -> void:
 	if _file_dialog == null:
 		return
+	_file_selection_action = "PNG_IMPORT"
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILES if multiple else FileDialog.FILE_MODE_OPEN_FILE
 	_file_dialog.title = "Select artwork PNG"
 	_file_dialog.clear_filters()
 	_file_dialog.add_filter("*.png ; PNG image")
-	if _screen == "LEVEL FACTORY": _file_dialog.add_filter("*.csv ; Level batch CSV")
 	_file_dialog.popup_centered_ratio(0.72)
 
 
 func _open_batch_csv() -> void:
 	if _file_dialog == null:
 		return
+	_file_selection_action = "PIXEL_ART_BATCH"
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	_file_dialog.title = "Select artwork batch CSV"
 	_file_dialog.clear_filters()
@@ -608,49 +679,82 @@ func _close_window() -> void:
 
 
 func _on_file_selected(path: String) -> void:
-	if path.get_extension().to_lower() == "png":
-		_selected_art_path = path
-		_load_selected_art_preview(path)
-	if path.get_extension().to_lower() == "csv":
-		_process_level_csv(path) if _screen == "LEVEL FACTORY" else _generate_batch_csv(path)
+	if _file_selection_action == "PIXEL_ART_BATCH":
+		_generate_batch_csv(path)
 		return
-	if _screen == "LEVEL FACTORY":
-		var imported: Dictionary = _extension("batch-import", {"paths": [path]})
-		var items: Array = imported.get("items", [])
-		if not items.is_empty():
-			_last_source_id = str(items[0].get("source_id", ""))
-			if _last_source_id.is_empty():
-				_report(str(items[0].get("state", imported.get("state", "Import unavailable"))))
-			else:
-				_last_candidate_id = ""
-				_report("Artwork selected. Run the canonical pipeline to continue.")
-		else:
-			_report(str(imported.get("reason", imported.get("error", "Artwork import unavailable."))))
-	else:
-		var imported: Dictionary = _extension("batch-import", {"paths": [path]})
-		_report(str(imported.get("state", imported.get("reason", "Artwork imported."))))
-
+	_import_pngs([path])
 
 func _on_files_selected(paths: PackedStringArray) -> void:
-	var result := _extension("batch-import", {"paths": Array(paths)})
+	_import_pngs(Array(paths))
+
+
+func _import_pngs(paths: Array) -> void:
+	_last_source_id = ""
+	_last_candidate_id = ""
+	_last_pipeline.clear()
+	_selected_art_path = ""
+	if _preview_rect != null:
+		_preview_rect.texture = null
+		_preview_rect.visible = false
+	var result := _extension("batch-import", {"paths": paths})
 	var items: Array = result.get("items", [])
-	var succeeded := 0
-	var failed := 0
-	for item in items:
+	var lines: Array[String] = []
+	var imported_count := 0
+	var reused_count := 0
+	var rejected_count := 0
+	var preview_path := ""
+	var preview_source_id := ""
+	for index in range(paths.size()):
+		var path := str(paths[index])
+		var item: Dictionary = items[index] if index < items.size() and items[index] is Dictionary else {}
 		var source_id := str(item.get("source_id", ""))
-		if source_id.is_empty():
-			failed += 1
-			continue
-		var pipeline := _extension("pipeline", {"source_id": source_id, "request": {"column_count": _column_count, "level_number": _level_number if _manual_level_override else 1, "background_intent": _background_intent, "game_project": OS.get_environment("SCRUBBOTS_PROJECT")}})
-		if str(pipeline.get("disposition", "")) == "READY":
-			succeeded += 1
-			_last_source_id = source_id
-			_last_candidate_id = str(pipeline.get("derived_candidate_id", _last_candidate_id))
-			_last_pipeline = pipeline
-			_refresh_release_pool(false)
+		var state := str(item.get("disposition", item.get("state", "")))
+		if not source_id.is_empty() and state in ["IMPORTED", "ALREADY_IMPORTED"]:
+			if state == "ALREADY_IMPORTED":
+				reused_count += 1
+			else:
+				imported_count += 1
+			if preview_path.is_empty():
+				preview_path = path
+				preview_source_id = source_id
+			var detail := "%s · %s" % ["ALREADY_IMPORTED" if state == "ALREADY_IMPORTED" else "IMPORTED", source_id]
+			lines.append("%s\n%s" % [path.get_file(), detail])
 		else:
-			failed += 1
-	_report("Batch pipeline: %d READY · %d failed" % [succeeded, failed])
+			rejected_count += 1
+			var reason := str(item.get("error", item.get("reason", state if not state.is_empty() else result.get("reason", "Canonical import returned no source identity."))))
+			lines.append("%s\nREJECTED · %s" % [path.get_file(), reason])
+	_last_import_summary = {
+		"selected_count": paths.size(), "imported_count": imported_count, "reused_count": reused_count,
+		"rejected_count": rejected_count, "batch_id": str(result.get("batch_id", "")),
+		"preview_source_id": preview_source_id, "preview_path": preview_path,
+		"solver_calls": 0, "items": lines.duplicate()
+	}
+	if not preview_path.is_empty():
+		_selected_art_path = preview_path
+		_last_source_id = preview_source_id
+		_load_selected_art_preview(preview_path)
+	var summary := "PNG selection: %d selected · %d imported · %d reused · %d rejected" % [paths.size(), imported_count, reused_count, rejected_count]
+	if not preview_source_id.is_empty():
+		summary += "\nSelected for Run Pipeline: " + preview_source_id
+	_report(summary)
+	if not paths.is_empty():
+		_show_import_results(paths.size(), lines)
+
+
+func _show_import_results(selected_count: int, lines: Array[String]) -> void:
+	var dialog := AcceptDialog.new()
+	dialog.title = "PNG import · %d selected" % selected_count
+	var detail := Label.new()
+	detail.custom_minimum_size = Vector2(640, minf(520.0, 56.0 + float(lines.size()) * 44.0))
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var visible_lines := lines.slice(0, 24)
+	if lines.size() > visible_lines.size():
+		visible_lines.append("… %d additional file statuses are available in the batch record." % (lines.size() - visible_lines.size()))
+	detail.text = "\n\n".join(visible_lines)
+	dialog.add_child(detail)
+	add_child(dialog)
+	dialog.confirmed.connect(dialog.queue_free)
+	dialog.popup_centered()
 
 
 func _generate_art() -> void:
@@ -963,10 +1067,13 @@ func _load_selected_art_preview(path: String) -> void:
 	_preview_rect.texture = ImageTexture.create_from_image(image)
 	_preview_rect.visible = true
 	var transparent := 0
+	var colors: Dictionary = {}
 	for y in range(image.get_height()):
 		for x in range(image.get_width()):
-			if image.get_pixel(x, y).a < 1.0: transparent += 1
-	_report("%d × %d · %d colors · %d transparent · PNG" % [image.get_width(), image.get_height(), image.get_used_colors().size(), transparent])
+			var pixel := image.get_pixel(x, y)
+			if pixel.a < 1.0: transparent += 1
+			colors[pixel.to_rgba32()] = true
+	_report("%d × %d · %d colors · %d transparent · PNG" % [image.get_width(), image.get_height(), colors.size(), transparent])
 
 
 func _select_artwork(index: int) -> void:
@@ -1011,7 +1118,7 @@ func _adjust_zoom(amount: float) -> void:
 
 func _set_zoom(value: float) -> void:
 	_zoom = clampf(value, 1.0, 16.0)
-	_preview_rect.scale = Vector2.ONE * (_zoom / 8.0)
+	_preview_rect.scale = Vector2.ONE * (_zoom / 8.0) * _responsive_scale
 
 
 func _set_zoom_from_pointer() -> void:
