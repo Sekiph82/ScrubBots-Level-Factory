@@ -120,6 +120,48 @@ def test_production_history_handoff_rejects_stale_tip_and_current_manifest_misma
                 hashlib.sha256(manifest).hexdigest(), 3, manifest))
 
 
+def test_production_manifest_history_retry_after_lost_ack_is_idempotent():
+    client = _MemoryR2()
+    provider = _provider(client)
+    base = _candidate().manifest
+    manifest_n = replace(base, content_version=3).to_json_bytes()
+    manifest_next = replace(base, content_version=4).to_json_bytes()
+    client.objects["production/manifests/current.json"] = (
+        manifest_n, hashlib.sha256(manifest_n).hexdigest())
+    prior = _recorded(ManifestHistoryV1(), manifest_n, 0)
+    assert provider.write_manifest_history(
+        prior, expected_prior_tip_sha256=None,
+        current_manifest_bytes=manifest_n).category is ProviderResultCategory.SUCCESS
+
+    client.objects["production/manifests/current.json"] = (
+        manifest_next, hashlib.sha256(manifest_next).hexdigest())
+    successor = _recorded(prior, manifest_next, 1)
+    # First call represents the durable CAS whose acknowledgment was lost.
+    assert provider.write_manifest_history(
+        successor, expected_prior_tip_sha256=prior.tip_sha256,
+        current_manifest_bytes=manifest_next).category is ProviderResultCategory.SUCCESS
+    # Retrying the identical proof succeeds without rewriting a different tip.
+    assert provider.write_manifest_history(
+        successor, expected_prior_tip_sha256=prior.tip_sha256,
+        current_manifest_bytes=manifest_next).category is ProviderResultCategory.SUCCESS
+    assert provider.read_manifest_history() == successor
+
+
+def test_post_activation_history_gap_reports_operator_authority_and_preserves_mutation_status():
+    from scrubbots_publish_handoff import _post_activation_history_block
+
+    result = _post_activation_history_block(
+        "PRODUCTION_HISTORY_PERSIST_FAILED",
+        "Production activated, but canonical M13 history persistence did not confirm.")
+    assert result["state"] == "PRODUCTION_HISTORY_PERSIST_FAILED"
+    assert result["mutation_performed"] is True
+    assert result["production"] == "ACTIVATED_HISTORY_INCOMPLETE"
+    assert result["history_recovery"] == "OPERATOR_AUTHORITY_REQUIRED"
+    assert "recorded_at_utc" in result["history_recovery_reason"]
+    assert "owner-approval" in result["history_recovery_reason"]
+    assert "replay receipts" in result["history_recovery_reason"]
+
+
 def test_lf_production_handoff_persists_exact_activation_receipt_history(monkeypatch):
     import scrubbots_publish_handoff as handoff
     from types import SimpleNamespace

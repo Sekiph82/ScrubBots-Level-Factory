@@ -547,10 +547,17 @@ def _blocked(state: str, reason: str) -> dict[str, Any]:
 
 
 def _post_activation_history_block(state: str, reason: str) -> dict[str, Any]:
-    """Report the already completed production write without implying full closure."""
+    """Report completed activation and the authority boundary for history repair."""
     return {"operation": "scrubbots-publish", "state": state, "reason": reason,
             "mutation_performed": True, "bucket": R2_BUCKET, "public_read_base": PUBLIC_READ_BASE,
-            "production": "ACTIVATED_HISTORY_INCOMPLETE"}
+            "production": "ACTIVATED_HISTORY_INCOMPLETE",
+            "history_recovery": "OPERATOR_AUTHORITY_REQUIRED",
+            "history_recovery_reason": (
+                "Automatic reconstruction is unavailable after the exact activation receipt is lost: "
+                "the M11 release event does not contain the original M13 recorded_at_utc or the "
+                "scoped owner-approval and current-main replay receipts. No repair or second "
+                "activation was attempted."
+            )}
 
 
 __all__ = ["PUBLIC_READ_BASE", "R2_BUCKET", "publish_preflight", "publish_to_staging", "publish_to_production"]

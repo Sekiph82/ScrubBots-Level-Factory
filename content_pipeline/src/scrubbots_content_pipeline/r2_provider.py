@@ -347,6 +347,15 @@ class CloudflareR2Provider:
                 kwargs: dict[str, object] = {"IfNoneMatch": "*"}
             else:
                 prior = parse_manifest_history(current[0])
+                # A caller may have lost the acknowledgment for an earlier CAS.
+                # Accept only the exact requested history already at the durable
+                # tip, with the same recorded predecessor, after the exact live
+                # production-manifest readback above.
+                requested_predecessor = (history.records[-2].record_sha256
+                                         if len(history.records) > 1 else None)
+                if (prior == history and expected_prior_tip_sha256 == requested_predecessor):
+                    return self._result(ProviderResultCategory.SUCCESS, Environment.PRODUCTION,
+                                        history.tip_sha256)
                 if prior.tip_sha256 != expected_prior_tip_sha256:
                     return self._result(ProviderResultCategory.CONFLICT_STALE_PRECONDITION,
                                         Environment.PRODUCTION, prior.tip_sha256)
