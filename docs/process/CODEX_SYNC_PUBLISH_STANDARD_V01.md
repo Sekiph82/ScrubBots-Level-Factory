@@ -32,7 +32,7 @@ Preserve the established GitHub implementation and audit workflow without expand
 
 ## Mandatory finish / GitHub publication
 
-1. Run the scope's real tests/verification and identify what remains NOT RUN, not false PASS.
+1. Test each actual product-code change once and record its exact commands/results in the builder log. **When a later task merely moves/publishes the same unchanged, previously tested commits, REUSE that original test evidence; do not repeat the test suite.** Read-only Git tree/object/diff verification is sufficient to establish code identity. Re-run only tests affected by a demonstrable product-code change, missing/corrupt evidence or an independently identified defect, and state the precise reason. Identify genuinely NOT RUN gates without falsely claiming PASS.
 2. Commit implementation/tests first, builder log/evidence separately.
 3. `git fetch --prune origin` and require an actual safe fast-forward ancestor relationship before publish. If remote changed, reconcile safely in the Desktop checkout by inspection; do not manufacture a clean state, recreate worktrees, rewrite accepted commits or force push.
 4. Publish using normal `git push origin HEAD:main`.
