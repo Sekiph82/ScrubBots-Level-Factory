@@ -484,9 +484,17 @@ def _valid_pool_entry(entry: object) -> bool:
     candidate_id = entry.get("candidate_id")
     pipeline = entry.get("pipeline")
     primary = pipeline.get("primary") if isinstance(pipeline, Mapping) else None
+    eligibility_source = entry.get("eligibility_source")
+    review_id = entry.get("review_id")
+    eligibility_valid = (
+        eligibility_source == "READY_AUTO" and review_id is None
+    ) or (
+        eligibility_source in {None, "OWNER_ACCEPT"}
+        and isinstance(review_id, str) and bool(review_id)
+    )
     return (
         isinstance(candidate_id, str) and bool(candidate_id)
-        and isinstance(entry.get("review_id"), str) and bool(entry["review_id"])
+        and eligibility_valid
         and isinstance(entry.get("pipeline_run_id"), str)
         and isinstance(entry.get("pipeline_sha256"), str) and bool(_SHA256.fullmatch(entry["pipeline_sha256"]))
         and isinstance(pipeline, Mapping) and pipeline.get("candidate_id") == candidate_id

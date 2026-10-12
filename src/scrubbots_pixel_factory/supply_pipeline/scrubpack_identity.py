@@ -303,13 +303,34 @@ def revalidate_current_solver_proofs(levels: Sequence[Any], proofs: Mapping[str,
         )
         latest_review = studio._latest_review(candidate_id)
         latest_ready = studio._latest_ready_pipeline(candidate_id)
+        if source.get("schema") == "scrubbots-release-pool-entry/v1":
+            eligibility_source = source.get("eligibility_source")
+            if eligibility_source == "READY_AUTO":
+                review_current = source.get("review_id") is None and not (
+                    isinstance(latest_review, Mapping)
+                    and latest_review.get("disposition") == "REJECT"
+                )
+            elif eligibility_source == "OWNER_ACCEPT":
+                review_current = (
+                    isinstance(latest_review, Mapping)
+                    and latest_review.get("disposition") == "ACCEPT"
+                    and latest_review.get("review_id") == source.get("review_id")
+                )
+            else:
+                review_current = False
+        else:
+            # Legacy proof without an immutable Release Pool entry still needs
+            # explicit current owner acceptance.
+            review_current = (
+                isinstance(latest_review, Mapping)
+                and latest_review.get("disposition") == "ACCEPT"
+                and latest_review.get("review_id") == source.get("review_id")
+            )
         if (
             final_bytes != proof_bytes
             or final_source != source
             or not candidate_exists
-            or not isinstance(latest_review, Mapping)
-            or latest_review.get("disposition") != "ACCEPT"
-            or latest_review.get("review_id") != source.get("review_id")
+            or not review_current
             or not isinstance(latest_ready, Mapping)
             or latest_ready.get("run_id") != source.get("pipeline_run_id")
         ):

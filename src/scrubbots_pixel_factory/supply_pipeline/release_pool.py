@@ -121,6 +121,8 @@ def release_entries() -> list[dict[str, Any]]:
         latest = studio._latest_review(candidate_id)
         if latest and latest.get("disposition") == "REJECT":
             continue
+        if not _eligibility_matches_current_review(value, latest):
+            continue
         current_run = studio._latest_ready_pipeline(candidate_id)
         if current_run is None or current_run.get("run_id") != value.get("pipeline_run_id"):
             continue
@@ -142,6 +144,24 @@ def release_entries() -> list[dict[str, Any]]:
         if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT" and current.get("eligibility_source") != "OWNER_ACCEPT"):
             by_candidate[candidate_id] = entry
     return [by_candidate[key] for key in sorted(by_candidate)]
+
+
+def _eligibility_matches_current_review(entry: Mapping[str, Any], latest_review: Mapping[str, Any] | None) -> bool:
+    """Keep immutable pool eligibility consistent with the current review authority."""
+    source = entry.get("eligibility_source")
+    review_id = entry.get("review_id")
+    if source == "READY_AUTO":
+        return review_id is None and not (
+            isinstance(latest_review, Mapping) and latest_review.get("disposition") == "REJECT"
+        )
+    if source == "OWNER_ACCEPT":
+        return (
+            isinstance(review_id, str) and bool(review_id)
+            and isinstance(latest_review, Mapping)
+            and latest_review.get("disposition") == "ACCEPT"
+            and latest_review.get("review_id") == review_id
+        )
+    return False
 
 
 def _game_authority(game: Path) -> tuple[dict[str, Any], dict[str, Any]]:
