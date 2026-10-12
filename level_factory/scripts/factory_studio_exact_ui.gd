@@ -74,21 +74,36 @@ var _responsive_offset := Vector2.ZERO
 var _last_import_summary: Dictionary = {}
 var _file_selection_action := "PNG_IMPORT"
 var _activity_panel: Panel
-var _activity_label: Label
+var _activity_title: Label
+var _activity_state_chip: Panel
+var _activity_state_label: Label
+var _activity_source_label: Label
+var _activity_phase_label: Label
+var _activity_scroll: ScrollContainer
+var _activity_rows: VBoxContainer
+var _activity_events: Array[Dictionary] = []
 var _pipeline_thread: Thread
 var _pipeline_mutex := Mutex.new()
 var _pipeline_worker_done := false
 var _pipeline_worker_result: Dictionary = {}
 var _activity_file_path := ""
+var _activity_stream_reader_override: Object
 var _activity_run_id := ""
 var _activity_source_id := ""
 var _activity_source_sha256 := ""
+var _activity_source_filename := ""
 var _activity_started_msec := 0
+var _activity_finished_msec := 0
 var _activity_seen_sequence := 0
+var _activity_read_offset := 0
+var _activity_pending_bytes := PackedByteArray()
 var _activity_previous_sha256 := "0000000000000000000000000000000000000000000000000000000000000000"
 var _activity_stage := "IDLE"
 var _activity_message := "Select an imported PNG, then run the pipeline."
 var _activity_terminal_state := ""
+var _activity_backend_disposition := ""
+var _activity_event_backend_disposition := ""
+var _activity_integrity_error := ""
 
 
 func _ready() -> void:
@@ -138,24 +153,29 @@ func _ready() -> void:
 	add_child(_level_dialog)
 	_build_secondary_surfaces()
 	_level_number_label = Label.new()
-	_level_number_label.position = Vector2(187, 353)
+	_level_number_label.position = Vector2(187, 172)
 	_level_number_label.size = Vector2(150, 28)
 	_level_number_label.add_theme_color_override("font_color", Color.WHITE)
 	_level_number_label.add_theme_font_size_override("font_size", 16)
+	_level_number_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_level_number_label.text = "Auto"
 	_level_number_label.visible = true
 	add_child(_level_number_label)
 	_build_master_controls()
+	_level_number_label.move_to_front()
 	_show_screen(_screen)
+	call_deferred("_restore_imported_sources")
 	_capture_responsive_layout()
 	resized.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
 
 
 func _process(_delta: float) -> void:
+	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
+		_poll_pipeline_activity()
+		_refresh_activity_header()
 	if _pipeline_thread == null:
 		return
-	_poll_pipeline_activity()
 	_pipeline_mutex.lock()
 	var completed := _pipeline_worker_done
 	var result := _pipeline_worker_result.duplicate(true) if completed else {}
@@ -335,23 +355,62 @@ func _build_live_chrome() -> void:
 	add_child(live)
 	_activity_panel = Panel.new()
 	_activity_panel.name = "PipelineActivityPanel"
-	_activity_panel.position = Vector2(27, 540)
-	_activity_panel.size = Vector2(334, 250)
-	_activity_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_activity_panel.position = Vector2(27, 412)
+	_activity_panel.size = Vector2(334, 498)
+	_activity_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_activity_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
 	_activity_panel.visible = false
 	add_child(_activity_panel)
-	_activity_label = Label.new()
-	_activity_label.name = "PipelineActivityText"
-	_activity_label.position = Vector2(40, 552)
-	_activity_label.size = Vector2(308, 224)
-	_activity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_activity_label.add_theme_font_size_override("font_size", 12)
-	_activity_label.add_theme_color_override("font_color", Color("#dce8f8"))
-	_activity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_activity_label.text = "PIPELINE ACTIVITY\n" + _activity_message
-	_activity_label.visible = false
-	add_child(_activity_label)
+	_activity_title = Label.new()
+	_activity_title.name = "PipelineActivityTitle"
+	_activity_title.position = Vector2(12, 8)
+	_activity_title.size = Vector2(205, 24)
+	_activity_title.text = "PIPELINE ACTIVITY"
+	_activity_title.add_theme_font_size_override("font_size", 12)
+	_activity_title.add_theme_color_override("font_color", Color("#91a7c5"))
+	_activity_panel.add_child(_activity_title)
+	_activity_state_chip = Panel.new()
+	_activity_state_chip.name = "PipelineActivityStateChip"
+	_activity_state_chip.position = Vector2(232, 8)
+	_activity_state_chip.size = Vector2(88, 22)
+	_activity_state_chip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_activity_panel.add_child(_activity_state_chip)
+	_activity_state_label = Label.new()
+	_activity_state_label.name = "PipelineActivityState"
+	_activity_state_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_activity_state_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_activity_state_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_activity_state_label.add_theme_font_size_override("font_size", 10)
+	_activity_state_chip.add_child(_activity_state_label)
+	_activity_source_label = Label.new()
+	_activity_source_label.name = "PipelineActivitySource"
+	_activity_source_label.position = Vector2(12, 34)
+	_activity_source_label.size = Vector2(308, 22)
+	_activity_source_label.text = "Select PNG, then Run Pipeline"
+	_activity_source_label.add_theme_font_size_override("font_size", 11)
+	_activity_source_label.add_theme_color_override("font_color", Color("#dce8f8"))
+	_activity_panel.add_child(_activity_source_label)
+	_activity_phase_label = Label.new()
+	_activity_phase_label.name = "PipelineActivityPhase"
+	_activity_phase_label.position = Vector2(12, 57)
+	_activity_phase_label.size = Vector2(308, 20)
+	_activity_phase_label.add_theme_font_size_override("font_size", 10)
+	_activity_phase_label.add_theme_color_override("font_color", Color("#91a7c5"))
+	_activity_panel.add_child(_activity_phase_label)
+	_activity_scroll = ScrollContainer.new()
+	_activity_scroll.name = "PipelineActivityScroll"
+	_activity_scroll.position = Vector2(10, 80)
+	_activity_scroll.size = Vector2(314, 406)
+	_activity_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_activity_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_activity_panel.add_child(_activity_scroll)
+	_activity_rows = VBoxContainer.new()
+	_activity_rows.name = "PipelineActivityRows"
+	_activity_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_activity_rows.add_theme_constant_override("separation", 4)
+	_activity_scroll.add_child(_activity_rows)
+	_activity_panel.visible = false
+	_refresh_activity_header()
 	_refresh_live_data()
 
 
@@ -362,7 +421,6 @@ func _update_live_chrome() -> void:
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
 	if _activity_panel != null: _activity_panel.visible = _screen == "LEVEL FACTORY"
-	if _activity_label != null: _activity_label.visible = _screen == "LEVEL FACTORY"
 	if _preview_host != null:
 		_preview_host.position = Vector2(401, 160)
 		_preview_host.size = Vector2(780, 640)
@@ -380,7 +438,13 @@ func _refresh_live_data() -> void:
 		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nSeed: %s\nBatch: %d complete · %d failed · %d remaining" % [_provider_model, _generation_mode, _width, _height, _seed if not _seed.is_empty() else "Auto", _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining]
 	elif _screen == "LEVEL FACTORY":
 		var primary: Dictionary = _last_pipeline.get("primary", {})
-		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\nSupply: %s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, str(primary.get("state", "Awaiting pipeline")), str(primary.get("acceptance", {}).get("replay", "—")), str(primary.get("difficulty", {}).get("class", "—")), "Ready" if not primary.is_empty() else "Awaiting pipeline", selected_source_text]
+		var monitor_failed := str(_last_pipeline.get("studio_monitor_validation", "")) == "FAILED_CLOSED"
+		var pipeline_state := "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "Awaiting pipeline")))
+		var pipeline_reason := str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
+		var solver_text := "ERROR · activity integrity failed" if monitor_failed else str(primary.get("state", pipeline_state)) if not primary.is_empty() else pipeline_state
+		var replay_text := str(primary.get("acceptance", {}).get("replay", "—")) if not primary.is_empty() and not monitor_failed else "—"
+		var difficulty_text := str(primary.get("difficulty", {}).get("class", "—")) if not primary.is_empty() and not monitor_failed else "—"
+		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\n%s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, solver_text, replay_text, difficulty_text, pipeline_reason, selected_source_text]
 	else:
 		var entries: Array = _release_pool.get("entries", [])
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
@@ -406,6 +470,92 @@ func _runtime_png_texture(path: String) -> Texture2D:
 	var image := Image.load_from_file(resolved)
 	if image == null or image.is_empty(): return null
 	return ImageTexture.create_from_image(image)
+
+
+func _pipeline_stop_reason(result: Dictionary) -> String:
+	if result.is_empty():
+		return "Pipeline: Awaiting run"
+	var stages: Array = result.get("stages", [])
+	for desired_state in ["ERROR", "TIMEOUT", "UNAVAILABLE", "INTERRUPTED", "PARTIAL / STOPPED", "BLOCKED", "FAIL"]:
+		for stage_variant in stages:
+			if not stage_variant is Dictionary:
+				continue
+			var stage: Dictionary = stage_variant
+			if str(stage.get("disposition", "")) != desired_state:
+				continue
+			var reason := str(stage.get("reason", "")).strip_edges()
+			if not reason.is_empty():
+				return "%s: %s" % [str(stage.get("stage", "Pipeline")), reason.left(110)]
+	var direct_reason := str(result.get("error", result.get("reason", ""))).strip_edges()
+	return direct_reason.left(110) if not direct_reason.is_empty() else "Pipeline: %s" % str(result.get("disposition", result.get("state", "UNKNOWN")))
+
+
+func _restore_imported_sources() -> void:
+	if _gateway == null:
+		return
+	var catalog := _extension("library-refresh", {})
+	if str(catalog.get("schema", "")) != "scrubbots-source-library-view":
+		return
+	var release_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
+	var sources: Array = catalog.get("sources", [])
+	var source_by_id: Dictionary = {}
+	for source_variant in sources:
+		if not source_variant is Dictionary:
+			continue
+		var source: Dictionary = source_variant
+		var catalog_source_id := str(source.get("source_id", ""))
+		var expected_sha := str(source.get("source_sha256", ""))
+		var relative_path := str(source.get("immutable_source_path", ""))
+		if not catalog_source_id.begins_with("owner-upload-") or catalog_source_id.trim_prefix("owner-upload-") != expected_sha or expected_sha.length() != 64 or relative_path.is_empty():
+			continue
+		var png_path := release_root.path_join(relative_path).simplify_path()
+		if not FileAccess.file_exists(png_path):
+			continue
+		var bytes := FileAccess.get_file_as_bytes(png_path)
+		var hash_ctx := HashingContext.new()
+		hash_ctx.start(HashingContext.HASH_SHA256)
+		hash_ctx.update(bytes)
+		if hash_ctx.finish().hex_encode() != expected_sha:
+			continue
+		source_by_id[catalog_source_id] = {"path": png_path, "source_id": catalog_source_id, "source_sha256": expected_sha, "disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png"))}
+	var order_ids: Array[String] = []
+	var history := _extension("owner-pages", {})
+	var batches: Array = history.get("batches", [])
+	for batch_index in range(batches.size() - 1, -1, -1):
+		if not batches[batch_index] is Dictionary:
+			continue
+		var items: Array = batches[batch_index].get("items", [])
+		for item_variant in items:
+			if not item_variant is Dictionary:
+				continue
+			var batch_source_id := str(item_variant.get("source_id", ""))
+			if source_by_id.has(batch_source_id) and batch_source_id not in order_ids:
+				order_ids.append(batch_source_id)
+	for source_variant in sources:
+		if source_variant is Dictionary:
+			var remaining_source_id := str(source_variant.get("source_id", ""))
+			if source_by_id.has(remaining_source_id) and remaining_source_id not in order_ids:
+				order_ids.append(remaining_source_id)
+	for ordered_source_id in order_ids:
+		_upsert_imported_source(source_by_id[ordered_source_id])
+	if _imported_sources.is_empty():
+		return
+	var selected_exists := false
+	for item in _imported_sources:
+		if str(item.get("source_id", "")) == _selected_import_source_id:
+			selected_exists = true
+			break
+	if not selected_exists:
+		_selected_import_source_id = str(_imported_sources[0].get("source_id", ""))
+	var selected_path := ""
+	for item in _imported_sources:
+		if str(item.get("source_id", "")) == _selected_import_source_id:
+			selected_path = str(item.get("path", ""))
+			break
+	if not selected_path.is_empty():
+		_last_source_id = _selected_import_source_id
+		_preview_paths_by_screen["LEVEL FACTORY"] = selected_path
+	_refresh_runtime_cards()
 
 
 func _refresh_runtime_cards() -> void:
@@ -518,13 +668,13 @@ func _build_master_controls() -> void:
 	# LEVEL FACTORY: select artwork, set 3/4/5 columns, run real pipeline,
 	# then record append-only owner acceptance or rejection for its candidate.
 	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _open_files.bind(true))
-	_place_control("LevelNumber", Rect2(172, 346, 190, 38), _edit_level_number)
-	_place_control("SupplyColumns3", Rect2(172, 392, 56, 40), _set_columns.bind(3))
-	_place_control("SupplyColumns4", Rect2(238, 392, 56, 40), _set_columns.bind(4))
-	_place_control("SupplyColumns5", Rect2(304, 392, 56, 40), _set_columns.bind(5))
-	_place_control("MaxRobotsAuto", Rect2(172, 440, 190, 38), _keep_auto_robot_cap)
-	_place_control("BackgroundIntent", Rect2(172, 487, 190, 38), _toggle_background)
-	_place_control("RunLevelPipeline", Rect2(26, 803, 335, 52), _run_level_pipeline)
+	_place_control("LevelNumber", Rect2(172, 165, 190, 38), _edit_level_number)
+	_place_control("SupplyColumns3", Rect2(172, 209, 56, 38), _set_columns.bind(3))
+	_place_control("SupplyColumns4", Rect2(238, 209, 56, 38), _set_columns.bind(4))
+	_place_control("SupplyColumns5", Rect2(304, 209, 56, 38), _set_columns.bind(5))
+	_place_control("MaxRobotsAuto", Rect2(172, 253, 190, 38), _keep_auto_robot_cap)
+	_place_control("BackgroundIntent", Rect2(172, 297, 190, 38), _toggle_background)
+	_place_control("RunLevelPipeline", Rect2(26, 347, 335, 52), _run_level_pipeline)
 	_place_control("SolveAgain", Rect2(1207, 625, 291, 50), _solve_again)
 	_place_control("PreviewReplay", Rect2(1368, 390, 130, 38), _preview_replay)
 	_place_control("ExpandSupplyPlan", Rect2(1207, 485, 291, 42), _toggle_supply_plan)
@@ -881,8 +1031,8 @@ func _upsert_imported_source(record: Dictionary) -> void:
 	for index in range(_imported_sources.size()):
 		if str(_imported_sources[index].get("source_id", "")) == source_id:
 			var existing: Dictionary = _imported_sources[index]
-			if str(existing.get("path", "")).is_empty():
-				existing["path"] = record.get("path", "")
+			for key in ["path", "source_sha256", "display_filename"]:
+				if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
 			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
 			_imported_sources[index] = existing
 			return
@@ -1010,6 +1160,7 @@ func _run_level_pipeline() -> void:
 		_report("Select an imported PNG before starting live pipeline activity.")
 		return
 	_activity_source_sha256 = _activity_source_id.trim_prefix("owner-upload-")
+	_activity_source_filename = _selected_import_filename()
 	if _activity_source_sha256.length() != 64:
 		_operation_running = false
 		_report("Imported PNG identity is malformed; pipeline was not started.")
@@ -1027,24 +1178,34 @@ func _run_level_pipeline() -> void:
 		return
 	_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(_activity_run_id + ".jsonl")
 	_activity_started_msec = Time.get_ticks_msec()
+	_activity_finished_msec = 0
 	_activity_seen_sequence = 0
+	_activity_read_offset = 0
+	_activity_pending_bytes.clear()
 	_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 	_activity_stage = "QUEUED"
 	_activity_message = "Canonical backend is starting for the selected PNG."
 	_activity_terminal_state = ""
-	if _activity_label != null: _activity_label.text = _activity_display_text()
+	_activity_backend_disposition = ""
+	_activity_event_backend_disposition = ""
+	_activity_integrity_error = ""
+	_activity_events.clear()
+	for child in _activity_rows.get_children(): child.queue_free()
+	var run_button := get_node_or_null("RunLevelPipeline") as Button
+	if run_button != null: run_button.disabled = true
+	var solve_button := get_node_or_null("SolveAgain") as Button
+	if solve_button != null: solve_button.disabled = true
+	_refresh_activity_header()
 	var pipeline_request_data := request.duplicate(true)
 	pipeline_request_data["activity_run_id"] = _activity_run_id
 	pipeline_request_data["activity_source_sha256"] = _activity_source_sha256
 	var pipeline_request := {"source_id": _activity_source_id, "request": pipeline_request_data}
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
-		_operation_running = false
-		_report("Canonical async pipeline gateway is unavailable.")
+		_complete_local_pipeline_failure("Canonical async pipeline gateway is unavailable.")
 		return
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "pipeline", pipeline_request)
 	if prepared.is_empty():
-		_operation_running = false
-		_report("Canonical Python Factory Core is unavailable.")
+		_complete_local_pipeline_failure("Canonical Python Factory Core is unavailable.")
 		return
 	_pipeline_mutex.lock()
 	_pipeline_worker_done = false
@@ -1054,11 +1215,11 @@ func _run_level_pipeline() -> void:
 	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
 	if thread_error != OK:
 		_pipeline_thread = null
-		_operation_running = false
-		_report("Pipeline worker could not start.")
+		_complete_local_pipeline_failure("Pipeline worker could not start.")
 		return
-	_activity_message = "Backend worker is active; elapsed time continues without a percentage estimate."
-	if _activity_label != null: _activity_label.text = _activity_display_text()
+	_activity_message = "Waiting for the first backend stage."
+	_activity_stage = "STARTING"
+	_refresh_activity_header()
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -1070,69 +1231,214 @@ func _pipeline_worker(prepared: Dictionary) -> void:
 
 
 func _poll_pipeline_activity() -> void:
-	if _activity_file_path.is_empty() or not FileAccess.file_exists(_activity_file_path):
-		_activity_message = "Waiting for the backend's first durable stage event."
-		if _activity_label != null: _activity_label.text = _activity_display_text()
+	var file: FileAccess
+	var length := 0
+	var chunk := PackedByteArray()
+	if _activity_stream_reader_override != null:
+		length = int(_activity_stream_reader_override.call("get_length"))
+		if length >= _activity_read_offset:
+			chunk = _activity_stream_reader_override.call("read_from", _activity_read_offset)
+	else:
+		if _activity_file_path.is_empty() or not FileAccess.file_exists(_activity_file_path):
+			return
+		file = FileAccess.open(_activity_file_path, FileAccess.READ)
+		if file == null:
+			_fail_activity_monitor("Activity event file cannot be opened.")
+			return
+		length = file.get_length()
+	if length > 256 * 1024 or length < _activity_read_offset:
+		if file != null: file.close()
+		_fail_activity_monitor("Activity stream exceeded 256 KiB or was truncated while active.")
 		return
-	var file := FileAccess.open(_activity_file_path, FileAccess.READ)
-	if file == null or file.get_length() > 256 * 1024:
-		_activity_stage = "INVALID EVENT LOG"
-		_activity_message = "Event file exceeds the allowed 256 KiB bound or cannot be read."
-		if _activity_label != null: _activity_label.text = _activity_display_text()
-		return
-	while not file.eof_reached():
-		var line := file.get_line()
-		if line.is_empty(): continue
+	if file != null:
+		file.seek(_activity_read_offset)
+		chunk = file.get_buffer(length - _activity_read_offset)
+		file.close()
+	_activity_read_offset += chunk.size()
+	_consume_activity_bytes(chunk)
+
+
+func _consume_activity_bytes(chunk: PackedByteArray) -> void:
+	_activity_pending_bytes.append_array(chunk)
+	while true:
+		var newline := _activity_pending_bytes.find(10)
+		if newline < 0:
+			break
+		var line_bytes := _activity_pending_bytes.slice(0, newline)
+		_activity_pending_bytes = _activity_pending_bytes.slice(newline + 1)
+		if line_bytes.is_empty():
+			_fail_activity_monitor("Activity stream contains an empty event line.")
+			return
+		var line := line_bytes.get_string_from_utf8()
+		if line.to_utf8_buffer() != line_bytes:
+			_fail_activity_monitor("Activity stream contains invalid UTF-8.")
+			return
 		var parsed: Variant = JSON.parse_string(line)
 		if not parsed is Dictionary or not parsed.get("body") is Dictionary:
-			_activity_stage = "INVALID EVENT LOG"
-			_activity_message = "Backend event is malformed."
-			break
+			_fail_activity_monitor("Backend activity event is malformed.")
+			return
 		var body: Dictionary = parsed["body"]
+		for numeric_field in ["seq", "elapsed_ms"]:
+			var numeric_value: Variant = body.get(numeric_field)
+			if typeof(numeric_value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(numeric_value)) or int(numeric_value) != numeric_value:
+				_fail_activity_monitor("Activity event numeric field %s is not a finite integer." % numeric_field)
+				return
+			body[numeric_field] = int(numeric_value)
 		var canonical := JSON.stringify(body, "", true, true)
 		var hash_ctx := HashingContext.new()
 		hash_ctx.start(HashingContext.HASH_SHA256)
 		hash_ctx.update(canonical.to_utf8_buffer())
 		var actual_hash := hash_ctx.finish().hex_encode()
-		if int(body.get("seq", -1)) != _activity_seen_sequence + 1 or str(body.get("run_id", "")) != _activity_run_id or str(body.get("source_id", "")) != _activity_source_id or str(body.get("source_sha256", "")) != _activity_source_sha256 or str(body.get("previous_sha256", "")) != _activity_previous_sha256 or str(parsed.get("body_sha256", "")) != actual_hash:
-			_activity_stage = "INVALID EVENT LOG"
-			_activity_message = "Event identity, order, or SHA-256 chain did not verify."
-			break
+		if int(body.get("seq", -1)) != _activity_seen_sequence + 1:
+			_fail_activity_monitor("Activity event sequence is missing, duplicated, or out of order.")
+			return
+		if str(body.get("run_id", "")) != _activity_run_id or str(body.get("source_id", "")) != _activity_source_id or str(body.get("source_sha256", "")) != _activity_source_sha256:
+			_fail_activity_monitor("Activity event run or source identity does not match this selection.")
+			return
+		if str(body.get("previous_sha256", "")) != _activity_previous_sha256:
+			_fail_activity_monitor("Activity event hash-chain predecessor does not match.")
+			return
+		if str(parsed.get("body_sha256", "")) != actual_hash:
+			_fail_activity_monitor("Activity event SHA-256 does not match its body (record %s, computed %s)." % [str(parsed.get("body_sha256", "")).left(12), actual_hash.left(12)])
+			return
 		_activity_seen_sequence += 1
 		_activity_previous_sha256 = actual_hash
-		_activity_stage = str(body.get("stage", "UNKNOWN")) + " · " + str(body.get("state", "UNKNOWN"))
+		_activity_stage = str(body.get("stage", "UNKNOWN"))
 		_activity_message = str(body.get("message", ""))
-		if str(body.get("stage", "")) == "PIPELINE": _activity_terminal_state = str(body.get("state", ""))
-	file.close()
-	if _activity_label != null: _activity_label.text = _activity_display_text()
+		if _activity_stage == "PIPELINE":
+			_activity_terminal_state = str(body.get("state", ""))
+			_activity_event_backend_disposition = str(body.get("backend_disposition", ""))
+		_append_activity_row(body)
+		_refresh_activity_header()
 
 
-func _activity_display_text() -> String:
-	var elapsed := maxf(0.0, float(Time.get_ticks_msec() - _activity_started_msec) / 1000.0)
-	return "PIPELINE ACTIVITY\nPNG: %s\nSource: %s\nRun: %s\nElapsed: %.1f s\nStage: %s\n%s" % [_selected_import_filename(), _wrap_identity(_activity_source_id, 18), _activity_run_id, elapsed, _activity_stage, _activity_message]
+func _append_activity_row(body: Dictionary) -> void:
+	if _activity_rows == null:
+		return
+	var scrollbar := _activity_scroll.get_v_scroll_bar()
+	var follow_latest := scrollbar.value >= scrollbar.max_value - scrollbar.page - 12.0
+	var row := Label.new()
+	row.name = "ActivityEvent%03d" % int(body.get("seq", 0))
+	row.custom_minimum_size = Vector2(292, 30)
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_theme_font_size_override("font_size", 10)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var state := str(body.get("state", "UNKNOWN"))
+	var icon := "✓" if state in ["PASS", "READY"] else "!" if state in ["FAIL", "ERROR", "BLOCKED", "UNAVAILABLE", "TIMEOUT"] else "•"
+	var elapsed := floori(float(maxi(0, int(body.get("elapsed_ms", 0)))) / 1000.0)
+	var message := str(body.get("message", "")).replace("\n", " ").left(76)
+	row.text = "%02d:%02d  %s %s · %s — %s" % [floori(float(elapsed) / 60.0), posmod(elapsed, 60), icon, str(body.get("stage", "UNKNOWN")), state.replace("_", " "), message]
+	var color := Color("#7bd6a2") if icon == "✓" else Color("#f09a8a") if icon == "!" else Color("#e5bd73") if state == "WARNING" else Color("#c5d2e5")
+	row.add_theme_color_override("font_color", color)
+	_activity_rows.add_child(row)
+	_activity_events.append(body.duplicate(true))
+	while _activity_events.size() > 200:
+		_activity_events.pop_front()
+		var first := _activity_rows.get_child(0)
+		_activity_rows.remove_child(first)
+		first.queue_free()
+	if follow_latest:
+		_activity_scroll.call_deferred("set_v_scroll", 999999)
+
+
+func _fail_activity_monitor(reason: String) -> void:
+	if not _activity_integrity_error.is_empty():
+		return
+	_activity_integrity_error = reason.left(200)
+	_activity_stage = "ERROR"
+	_activity_message = _activity_integrity_error
+	_append_activity_row({"seq": _activity_seen_sequence + 1, "elapsed_ms": max(0, Time.get_ticks_msec() - _activity_started_msec), "stage": "TRANSPORT", "state": "ERROR", "message": _activity_integrity_error})
+	_refresh_activity_header()
+
+
+func _refresh_activity_header() -> void:
+	if _activity_state_label == null:
+		return
+	var state := _activity_display_state()
+	_activity_state_label.text = state.replace("_", " ").left(13)
+	var bg := Color("#34425a")
+	if state == "RUNNING": bg = Color("#245478")
+	elif state == "READY": bg = Color("#216444")
+	elif state in ["BLOCKED", "UNAVAILABLE", "PARTIAL_STOPPED"]: bg = Color("#7a5824")
+	elif state in ["ERROR", "TIMEOUT", "INTERRUPTED"]: bg = Color("#743d3c")
+	_activity_state_chip.add_theme_stylebox_override("panel", _control_style(bg, bg.lightened(0.22)))
+	var filename := _activity_source_filename if not _activity_run_id.is_empty() else _selected_import_filename()
+	_activity_source_label.text = "%s  ·  %s" % [filename.left(22) if not filename.is_empty() else "No PNG selected", _format_activity_elapsed()]
+	_activity_source_label.tooltip_text = "Source %s  |  Run %s" % [_activity_source_id, _activity_run_id]
+	_activity_phase_label.text = "" if _activity_stage in ["", "IDLE"] else "%s · %s" % [_activity_stage.replace("_", " ").left(26), _activity_message.left(48)]
+	_activity_phase_label.tooltip_text = _activity_message
+
+
+func _activity_display_state() -> String:
+	if not _activity_backend_disposition.is_empty():
+		return _activity_backend_disposition.replace("PARTIAL / ", "PARTIAL_").replace(" ", "_")
+	if _activity_terminal_state.is_empty():
+		return "RUNNING" if _operation_running else "IDLE"
+	return _activity_terminal_state
+
+
+func _format_activity_elapsed() -> String:
+	if _activity_started_msec <= 0:
+		return "00:00"
+	var finish := _activity_finished_msec if _activity_finished_msec > 0 else Time.get_ticks_msec()
+	var seconds := maxi(0, int((finish - _activity_started_msec) / 1000))
+	return "%02d:%02d" % [floori(float(seconds) / 60.0), posmod(seconds, 60)]
+
+
+func _complete_local_pipeline_failure(reason: String) -> void:
+	_operation_running = false
+	_activity_finished_msec = Time.get_ticks_msec()
+	_activity_terminal_state = "ERROR"
+	_activity_backend_disposition = "ERROR"
+	_activity_stage = "TRANSPORT"
+	_activity_message = reason
+	_append_activity_row({"seq": _activity_seen_sequence + 1, "elapsed_ms": max(0, Time.get_ticks_msec() - _activity_started_msec), "stage": "TRANSPORT", "state": "ERROR", "message": reason})
+	var run_button := get_node_or_null("RunLevelPipeline") as Button
+	if run_button != null: run_button.disabled = false
+	var solve_button := get_node_or_null("SolveAgain") as Button
+	if solve_button != null: solve_button.disabled = false
+	_refresh_activity_header()
+	_refresh_live_data()
+	_report(reason)
 
 
 func _complete_level_pipeline(result: Dictionary) -> void:
 	_last_pipeline = result
-	if not str(result.get("derived_candidate_id", "")).is_empty(): _last_candidate_id = str(result["derived_candidate_id"])
-	var backend_state := str(result.get("disposition", result.get("state", "ERROR")))
-	if _activity_terminal_state.is_empty() or (_activity_terminal_state == "READY") != (backend_state == "READY"):
-		_activity_stage = "MONITOR MISMATCH"
-		_activity_message = "Backend response and durable activity terminal event do not agree."
-	else:
-		_activity_stage = _activity_terminal_state
-		_activity_message = "Backend returned %s · %s." % [backend_state, str(result.get("run_id", ""))]
-	if _activity_label != null: _activity_label.text = _activity_display_text()
-	if backend_state == "READY": _refresh_release_pool(false)
-	_report("Pipeline %s · %s" % [backend_state, str(result.get("run_id", ""))])
 	_operation_running = false
-	_last_pipeline = result
+	_activity_finished_msec = Time.get_ticks_msec()
+	if not _activity_pending_bytes.is_empty():
+		_fail_activity_monitor("Activity stream ended with an incomplete trailing event line.")
 	if not str(result.get("derived_candidate_id", "")).is_empty():
 		_last_candidate_id = str(result["derived_candidate_id"])
-	if str(result.get("disposition", "")) == "READY":
+	var backend_state := str(result.get("disposition", result.get("state", "ERROR")))
+	var event_backend_disposition := _activity_event_backend_disposition
+	_activity_backend_disposition = backend_state
+	var backend_reason := _pipeline_stop_reason(result)
+	var expected_event_state := backend_state.replace("PARTIAL / ", "PARTIAL_").replace(" ", "_")
+	var terminal_matches := not _activity_terminal_state.is_empty() and event_backend_disposition == backend_state and _activity_terminal_state == expected_event_state
+	if not _activity_integrity_error.is_empty():
+		_activity_stage = "TRANSPORT ERROR"
+		_activity_message = "%s Backend: %s." % [_activity_integrity_error, backend_reason]
+	elif not terminal_matches:
+		_activity_stage = "TRANSPORT WARNING"
+		_activity_message = "%s%s" % [backend_reason, " · terminal activity event missing or inconsistent." if _activity_terminal_state.is_empty() or event_backend_disposition != backend_state else " · terminal event state did not match backend."]
+		_append_activity_row({"seq": _activity_seen_sequence + 1, "elapsed_ms": max(0, Time.get_ticks_msec() - _activity_started_msec), "stage": "TRANSPORT", "state": "WARNING", "message": _activity_message})
+	else:
+		_activity_stage = "PIPELINE"
+		_activity_message = backend_reason
+	if backend_state == "READY" and terminal_matches and _activity_integrity_error.is_empty():
 		_refresh_release_pool(false)
-	_report("Pipeline %s · %s" % [str(result.get("disposition", result.get("state", "UNKNOWN"))), str(result.get("run_id", ""))])
-	_operation_running = false
+	if backend_state == "READY" and (not terminal_matches or not _activity_integrity_error.is_empty()):
+		_last_pipeline["studio_monitor_validation"] = "FAILED_CLOSED"
+		_last_pipeline["studio_monitor_reason"] = "Backend READY is withheld because activity integrity or the terminal event did not verify."
+	var run_button := get_node_or_null("RunLevelPipeline") as Button
+	if run_button != null: run_button.disabled = false
+	var solve_button := get_node_or_null("SolveAgain") as Button
+	if solve_button != null: solve_button.disabled = false
+	_refresh_activity_header()
+	_refresh_live_data()
+	_report("Pipeline %s · %s" % [backend_state, backend_reason])
 
 
 func _set_columns(columns: int) -> void:
@@ -1443,6 +1749,7 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_last_candidate_id = ""
 		_last_pipeline.clear()
 		_imported_page = index / 8
+		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
 		_refresh_runtime_cards()
 		_refresh_live_data()

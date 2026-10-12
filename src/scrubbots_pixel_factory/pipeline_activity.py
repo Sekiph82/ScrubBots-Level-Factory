@@ -35,10 +35,13 @@ class PipelineActivityWriter:
         self.sequence = 0
         self.previous_sha256 = "0" * 64
         self.size_bytes = 0
+        self.terminal_emitted = False
 
-    def emit(self, stage: str, state: str, message: str) -> None:
+    def emit(self, stage: str, state: str, message: str, *, backend_disposition: str | None = None) -> None:
         if not re.fullmatch(r"[A-Z][A-Z /_-]{0,47}", stage) or not re.fullmatch(r"[A-Z_]{1,24}", state):
             raise ValueError("pipeline activity stage or state is invalid")
+        if stage == "PIPELINE" and self.terminal_emitted:
+            raise ValueError("pipeline activity terminal event was already emitted")
         self.sequence += 1
         body: dict[str, Any] = {
             "seq": self.sequence,
@@ -51,6 +54,8 @@ class PipelineActivityWriter:
             "message": str(message)[:240],
             "previous_sha256": self.previous_sha256,
         }
+        if backend_disposition is not None:
+            body["backend_disposition"] = str(backend_disposition)[:64]
         canonical = json.dumps(body, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
         digest = hashlib.sha256(canonical).hexdigest()
         line = json.dumps({"body": body, "body_sha256": digest}, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n"
@@ -61,6 +66,8 @@ class PipelineActivityWriter:
             stream.flush()
         self.size_bytes += len(line)
         self.previous_sha256 = digest
+        if stage == "PIPELINE":
+            self.terminal_emitted = True
 
 
 __all__ = ["PipelineActivityWriter"]

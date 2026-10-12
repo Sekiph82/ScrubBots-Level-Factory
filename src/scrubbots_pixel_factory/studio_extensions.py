@@ -657,7 +657,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     ]
     def emit(stage: str, state: str, message: str) -> None:
         if activity_writer is not None:
-            activity_writer.emit(stage, state, message)
+            activity_writer.emit(stage, _activity_state_name(state), message)
 
     emit("SOURCE", "PASS", "Canonical source identity and logical pixels are verified.")
     emit("NORMALIZE/DERIVE", "NOT_APPLICABLE", "Source is already represented as logical cells; no image resampling occurred.")
@@ -736,16 +736,31 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         if candidate is not None:
             payload["release_pool"] = _enter_candidate_release_pool(candidate, pipeline=payload)
     emit("REVIEW", "NOT_AVAILABLE", "Owner review remains an independent decision.")
-    emit("PIPELINE", "READY" if disposition == "READY" else "UNAVAILABLE", "Backend pipeline completed with disposition %s." % disposition)
+    if activity_writer is not None and not activity_writer.terminal_emitted:
+        activity_writer.emit("PIPELINE", _activity_state_name(disposition), "Backend pipeline completed with disposition %s." % disposition, backend_disposition=disposition)
     return payload
+
+
+def _activity_state_name(disposition: str) -> str:
+    normalized = str(disposition).strip().upper()
+    aliases = {
+        "PARTIAL / STOPPED": "PARTIAL_STOPPED",
+        "NOT AVAILABLE": "UNAVAILABLE",
+        "NOT_AVAILABLE": "UNAVAILABLE",
+        "FAIL": "ERROR",
+    }
+    return aliases.get(normalized, normalized.replace(" ", "_"))[:24]
 
 
 def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = None, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     request_data = dict(request or {})
-    activity_run_id = str(request_data.pop("activity_run_id", ""))
-    activity_source_sha256 = str(request_data.pop("activity_source_sha256", ""))
+    activity_run_id = str(request_data.get("activity_run_id", ""))
+    activity_source_sha256 = str(request_data.get("activity_source_sha256", ""))
+    if not activity_run_id:
+        return _run_pipeline_impl(source_id=source_id, candidate_id=candidate_id, request=request_data)
+
     activity_writer = None
-    if activity_run_id:
+    try:
         if source_id is None or candidate_id is not None:
             raise StudioExtensionError("live PNG pipeline activity requires exactly one imported source identity")
         from .pipeline_activity import PipelineActivityWriter
@@ -756,6 +771,51 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             raise StudioExtensionError("selected PNG identity changed before live pipeline activity started")
         activity_writer = PipelineActivityWriter(_repository_root(), activity_run_id, source_id, actual_sha256)
         activity_writer.emit("SOURCE", "RUNNING", "Validating the selected immutable PNG source.")
+        payload = _run_pipeline_impl(source_id=source_id, candidate_id=candidate_id, request=request_data, activity_writer=activity_writer)
+        disposition = str(payload.get("disposition", payload.get("state", "ERROR")))
+        reason = _pipeline_activity_reason(payload)
+        if not activity_writer.terminal_emitted:
+            activity_writer.emit("PIPELINE", _activity_state_name(disposition), reason, backend_disposition=disposition)
+        return payload
+    except Exception as exc:
+        disposition = "ERROR"
+        message = f"Pipeline failed before completion: {str(exc)[:180]}"
+        if activity_writer is not None and not activity_writer.terminal_emitted:
+            try:
+                activity_writer.emit("PIPELINE", "ERROR", message, backend_disposition=disposition)
+            except (OSError, ValueError):
+                message += " Activity terminal could not be persisted."
+        return {
+            "schema": PIPELINE_SCHEMA,
+            "version": 1,
+            "run_id": activity_run_id,
+            "source_id": source_id,
+            "candidate_id": candidate_id,
+            "request": request_data,
+            "stages": [],
+            "disposition": disposition,
+            "error": message,
+            "activity_transport": "TERMINAL_EMITTED" if activity_writer is not None and activity_writer.terminal_emitted else "UNAVAILABLE",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+
+def _pipeline_activity_reason(payload: Mapping[str, Any]) -> str:
+    stages = payload.get("stages", [])
+    if isinstance(stages, list):
+        for state in ("ERROR", "TIMEOUT", "UNAVAILABLE", "INTERRUPTED", "PARTIAL / STOPPED", "BLOCKED", "FAIL", "NOT_AVAILABLE", "NOT AVAILABLE"):
+            for stage in stages:
+                if not isinstance(stage, Mapping) or str(stage.get("disposition", "")).upper() != state:
+                    continue
+                reason = str(stage.get("reason", "")).strip()
+                if reason:
+                    return f"{stage.get('stage', 'Pipeline')}: {reason}"[:240]
+    return str(payload.get("error", payload.get("reason", f"Pipeline disposition {payload.get('disposition', 'UNKNOWN')}.")))[:240]
+
+
+def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None = None, request: Mapping[str, Any] | None = None, activity_writer: Any = None) -> dict[str, Any]:
+    request_data = dict(request or {})
+    activity_source_sha256 = str(request_data.get("activity_source_sha256", ""))
     primary_image = request_data.get("image_path") or request_data.get("primary_image_path")
     if primary_image is not None:
         from .supply_pipeline.primary import run_primary_supply_pipeline
@@ -817,6 +877,9 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
         stages.append(_pipeline_stage("SOURCE", "PASS", inputs=[source_id], outputs=[source_id], evidence=source_evidence, reason="Verified immutable OWNER_UPLOAD source identity."))
         stages.append(_pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason="Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."))
         stages.append(_pipeline_stage("PALETTE/STRUCTURE VALIDATION", validation["structural"]["disposition"], inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason=validation["structural"].get("reason", "Canonical validation evidence.")))
+        if activity_writer is not None:
+            activity_writer.emit("NORMALIZE/DERIVE", _activity_state_name(str(stages[-2]["disposition"])), str(stages[-2]["reason"]))
+            activity_writer.emit("VOID VALIDATION" if validation.get("structural", {}).get("disposition") == "UNAVAILABLE" else "PALETTE/STRUCTURE VALIDATION", _activity_state_name(str(stages[-1]["disposition"])), str(stages[-1]["reason"]))
         if validation["exact_logical_source"] and validation["structural"]["disposition"] == "PASS":
             stages.append(_pipeline_stage("CANDIDATE", "NOT_AVAILABLE", inputs=[source_id], evidence=validation.get("evidence_path"), reason="OWNER_UPLOAD source is not automatically a candidate."))
         else:
