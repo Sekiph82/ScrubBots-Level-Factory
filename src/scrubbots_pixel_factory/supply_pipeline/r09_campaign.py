@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 from typing import Any
+import inspect
 
 from .game_rules import GameRules
 from .pinned_game_source import PINNED_MAIN_SHA, expected_runtime_root, verify_attested_runtime
@@ -16,6 +17,7 @@ from .r09_solver_attempts import (
     build_ranked_candidate_queue,
     load_r08_ranked_plan_refs,
     run_capped_candidate_queue,
+    serialize_bridge_candidate,
 )
 from .scrubbots_solver import ScrubBotsSolver
 from .screening import ScreeningSimulator
@@ -134,13 +136,13 @@ def _assert_continuation_output_available(output_dir: Path) -> None:
         raise R09Blocked("R09-R01 continuation output already exists; refusing to repeat the sequence")
 
 
-def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
-    """Shared exact-source route with separate no-reuse R09 and R09-R01 outputs."""
+def _build_r09_r01_campaign_context(root: Path | None = None) -> dict[str, Any]:
+    """Build and validate the exact live campaign inputs without creating outputs or a solver."""
     from .. import studio_extensions as studio
     from ..contracts.palette import CANONICAL_PALETTE, VOID_CELL_ID
     from .r09_solver_attempts import R09Blocked
 
-    root = studio._repository_root().resolve()
+    root = (root or studio._repository_root()).resolve()
     runtime = expected_runtime_root().resolve()
     manifest = verify_attested_runtime(runtime)
     if manifest.get("source_commit") != PINNED_MAIN_SHA or manifest.get("full_game_checkout_verified") is not False:
@@ -148,16 +150,9 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
 
     source_dir = (root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output"
                   / "owner-uploads" / SOURCE_ID)
-    output_dir = root / "level_factory" / "output"
-    output_dir = (
-        output_dir / f"r09-r01-continuation-{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
-        if continuation else output_dir / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
-    )
-    if continuation:
-        _assert_continuation_output_available(output_dir)
-    elif output_dir.exists():
-        raise R09Blocked("fixed R09 campaign output already exists; refusing to repeat the source budget")
-    predecessor_proof = _historical_r09_predecessor_proof(root) if continuation else None
+    output_dir = root / "level_factory" / "output" / f"r09-r01-continuation-{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
+    _assert_continuation_output_available(output_dir)
+    predecessor_proof = _historical_r09_predecessor_proof(root)
     png_path = source_dir / "source.png"
     record_path = source_dir / "source.json"
     if _sha256(png_path) != SOURCE_SHA256 or _sha256(record_path) != SOURCE_RECORD_SHA256:
@@ -196,13 +191,10 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
         seed=17018, source_sha256=SOURCE_SHA256, game_sha=PINNED_MAIN_SHA,
         target_count=6, screen_budget=1200, viability_budget=600, max_generated_plans=12,
     )
-    if continuation:
-        _assert_original_queue_identity(ranked)
-    print("R09_RANKED_QUEUE " + json.dumps([
-        {"rank": index, "candidate_id": item["id"], "score": item["score"],
-         "plan_sha256": item["plan_sha256"]}
-        for index, item in enumerate(ranked, 1)
-    ], sort_keys=True), flush=True)
+    _assert_original_queue_identity(ranked)
+    bridge_candidates = [serialize_bridge_candidate(candidate) for candidate in ranked]
+    if len(bridge_candidates) != 6 or [item["id"] for item in bridge_candidates] != [item["id"] for item in ranked]:
+        raise R09Blocked("serialized six-candidate native queue does not preserve ranked identities")
 
     metadata = optimizer.analyzer.analyze(grid, used)
     level = {
@@ -211,6 +203,111 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
         "cells": [int(value) for value in grid.ravel()],
         "column_count": 3,
     }
+    campaign_metadata = {
+        "schema": "scrubbots.r09-r01-continuation.v1",
+        "source_sha256": SOURCE_SHA256,
+        "source_record_sha256": SOURCE_RECORD_SHA256,
+        "game_sha": PINNED_MAIN_SHA,
+        "predecessor": predecessor_proof,
+        "candidate_queue": [
+            {"rank": index, "candidate_id": item["id"], "score": round(float(item["score"]), 4),
+             "plan_sha256": item["plan_sha256"]}
+            for index, item in enumerate(ranked, 1)
+        ],
+        "native_primary_call_budget": min(MAX_PRIMARY_ATTEMPTS, predecessor_proof["remaining_authorized_primary_calls"]),
+    }
+    json.dumps(campaign_metadata, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    required_args = {"candidates", "solver", "level", "counts", "playable_cells", "source_sha256", "game_sha", "receipt_dir", "timeout_seconds", "max_visited", "load_check", "source_sha256_reader", "progress", "campaign_metadata"}
+    if not required_args.issubset(inspect.signature(run_capped_candidate_queue).parameters):
+        raise R09Blocked("bounded runner interface no longer accepts the attested campaign argument shape")
+    if campaign_metadata["native_primary_call_budget"] != 6 or MAX_NATIVE_TIMEOUT_SECONDS != 90 or MAX_NATIVE_VISITED != 25000:
+        raise R09Blocked("authorized native budget differs from the six-call 90s/25,000-visit cap")
+    print("R09_RANKED_QUEUE " + json.dumps([
+        {"rank": index, "candidate_id": item["id"], "score": item["score"], "plan_sha256": item["plan_sha256"]}
+        for index, item in enumerate(ranked, 1)
+    ], sort_keys=True), flush=True)
+    return {
+        "root": root, "runtime": runtime, "manifest": manifest, "source_dir": source_dir,
+        "output_dir": output_dir, "predecessor_proof": predecessor_proof,
+        "png_path": png_path, "record_path": record_path, "source": source,
+        "validation": validation, "width": width, "height": height, "cells": cells,
+        "rules": rules, "grid": grid, "used": used, "optimizer": optimizer,
+        "ranked": ranked, "bridge_candidates": bridge_candidates,
+        "metadata": metadata, "level": level, "campaign_metadata": campaign_metadata,
+    }
+
+
+def preflight_original_002_r09_r01_continuation() -> dict[str, Any]:
+    """Read-only report for the same verified inputs used by the live continuation."""
+    from .r09_solver_attempts import R09Blocked
+
+    try:
+        context = _build_r09_r01_campaign_context()
+    except R09Blocked as exc:
+        return {"state": "BLOCKED", "disposition": "BLOCKED_PRECONDITION", "reason": str(exc), "native_calls": 0}
+    return {
+        "state": "PRE_NATIVE_READY", "disposition": "PRE_NATIVE_READY",
+        "source_sha256": SOURCE_SHA256, "source_record_sha256": SOURCE_RECORD_SHA256,
+        "game_sha": PINNED_MAIN_SHA,
+        "candidate_ids": [item["id"] for item in context["ranked"]],
+        "candidate_plan_sha256": [item["plan_sha256"] for item in context["ranked"]],
+        "native_primary_call_budget": context["campaign_metadata"]["native_primary_call_budget"],
+        "timeout_seconds": MAX_NATIVE_TIMEOUT_SECONDS, "max_visited": MAX_NATIVE_VISITED,
+        "native_calls": 0, "output_created": False,
+    }
+
+
+def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
+    """Shared exact-source route with separate no-reuse R09 and R09-R01 outputs."""
+    from .. import studio_extensions as studio
+    from ..contracts.palette import CANONICAL_PALETTE, VOID_CELL_ID
+    from .r09_solver_attempts import R09Blocked
+
+    if continuation:
+        context = _build_r09_r01_campaign_context()
+        root, runtime = context["root"], context["runtime"]
+        output_dir, predecessor_proof = context["output_dir"], context["predecessor_proof"]
+        png_path, record_path = context["png_path"], context["record_path"]
+        width, height = context["width"], context["height"]
+        rules, grid, used, optimizer = context["rules"], context["grid"], context["used"], context["optimizer"]
+        ranked, metadata, level = context["ranked"], context["metadata"], context["level"]
+        campaign_metadata = context["campaign_metadata"]
+    else:
+        root = studio._repository_root().resolve()
+        runtime = expected_runtime_root().resolve()
+        manifest = verify_attested_runtime(runtime)
+        if manifest.get("source_commit") != PINNED_MAIN_SHA or manifest.get("full_game_checkout_verified") is not False:
+            raise R09Blocked("pinned mini-runtime identity is not the accepted R08 source authority")
+        source_dir = (root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "owner-uploads" / SOURCE_ID)
+        output_dir = root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
+        if output_dir.exists():
+            raise R09Blocked("fixed R09 campaign output already exists; refusing to repeat the source budget")
+        predecessor_proof = None
+        png_path, record_path = source_dir / "source.png", source_dir / "source.json"
+        if _sha256(png_path) != SOURCE_SHA256 or _sha256(record_path) != SOURCE_RECORD_SHA256:
+            raise R09Blocked("original installed 002 source identity changed")
+        source = studio.verify_owner_source(SOURCE_ID, source_directory=source_dir)
+        if source.get("source_sha256") != SOURCE_SHA256:
+            raise R09Blocked("immutable OWNER_UPLOAD record does not match the approved PNG")
+        validation = studio.validate_owner_source(SOURCE_ID, persist=False, game_project=runtime, source_directory=source_dir)
+        if validation.get("exact_logical_source") is not True or validation.get("structural", {}).get("disposition") != "PASS" or validation.get("alpha") != {"transparent_count": 288, "semi_alpha_count": 0, "opaque_count": 736}:
+            raise R09Blocked("source validation no longer matches the accepted 736-artwork / 288-VOID R08 proof")
+        width, height, rgba = studio._validation_pixels(png_path.read_bytes())
+        cells: list[str] = []
+        for index in range(width * height):
+            red, green, blue, alpha = rgba[index * 4:index * 4 + 4]
+            if alpha == 0: cells.append(VOID_CELL_ID)
+            elif alpha == 255: cells.append(CANONICAL_PALETTE.id_for_rgb((red, green, blue)))
+            else: raise R09Blocked("original PNG contains semitransparent pixels")
+        rules = GameRules(runtime, column_count=3)
+        grid, used = studio._canonical_cells_to_grid(cells, width, height, rules)
+        optimizer = SupplyOptimizer(rules)
+        r08_refs = load_r08_ranked_plan_refs(runtime / ".lf_solver_jobs" / R08_JOB_NAME, rules=rules, expected_game_sha=PINNED_MAIN_SHA, expected_level_id="r08_002_first_real")
+        ranked = build_ranked_candidate_queue(optimizer, grid, used, r08_refs, seed=17018, source_sha256=SOURCE_SHA256, game_sha=PINNED_MAIN_SHA, target_count=6, screen_budget=1200, viability_budget=600, max_generated_plans=12)
+        print("R09_RANKED_QUEUE " + json.dumps([{"rank": index, "candidate_id": item["id"], "score": item["score"], "plan_sha256": item["plan_sha256"]} for index, item in enumerate(ranked, 1)], sort_keys=True), flush=True)
+        metadata = optimizer.analyzer.analyze(grid, used)
+        level = {"id": LEVEL_ID, "width": width, "height": height, "palette": [rules.palette[global_index][1].upper() + "FF" for global_index in used], "cells": [int(value) for value in grid.ravel()], "column_count": 3}
+        campaign_metadata = None
     source_png_reader = lambda: _sha256(png_path)
 
     def load_check(candidate: dict[str, Any], timeout: float, visited: int) -> dict[str, Any]:
@@ -285,20 +382,7 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
         max_visited=MAX_NATIVE_VISITED, load_check=load_check_adapter,
         source_sha256_reader=source_png_reader,
         progress=lambda line: print(line, flush=True),
-        campaign_metadata=({
-            "schema": "scrubbots.r09-r01-continuation.v1",
-            "source_sha256": SOURCE_SHA256,
-            "source_record_sha256": SOURCE_RECORD_SHA256,
-            "game_sha": PINNED_MAIN_SHA,
-            "predecessor": predecessor_proof,
-            "candidate_queue": [
-                {"rank": index, "candidate_id": item["id"], "score": round(float(item["score"]), 4),
-                 "plan_sha256": item["plan_sha256"]}
-                for index, item in enumerate(ranked, 1)
-            ],
-            "native_primary_call_budget": min(MAX_PRIMARY_ATTEMPTS, predecessor_proof["remaining_authorized_primary_calls"])
-            if predecessor_proof else MAX_PRIMARY_ATTEMPTS,
-        } if continuation else None),
+        campaign_metadata=campaign_metadata,
     )
     record_after = _sha256(record_path)
     predecessor_after = _historical_r09_predecessor_proof(root) if continuation else None

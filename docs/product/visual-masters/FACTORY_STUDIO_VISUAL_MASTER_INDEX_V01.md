@@ -30,6 +30,8 @@ Implementation contract:
 
 `../FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
 
+Owner-approved exception: task `SB-LFX-018-C001-R02-R05-R09-R02` adds the bounded LEVEL FACTORY `PIPELINE ACTIVITY` panel at `Rect2(27, 540, 334, 250)` while preserving these three master canvases, their header, and all existing control positions. The panel is hidden on PIXEL ART and RELEASE POOL and is documented in the implementation contract above.
+
 
 ## Binary integrity status
 

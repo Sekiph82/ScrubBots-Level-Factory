@@ -636,7 +636,8 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
 
 
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
-                                 evidence: str, request: Mapping[str, Any], source_kind: str) -> dict[str, Any]:
+                                 evidence: str, request: Mapping[str, Any], source_kind: str,
+                                 activity_writer: Any = None) -> dict[str, Any]:
     """Run generated and OWNER_UPLOAD logical grids through the identical ZIP backend."""
 
     from .supply_pipeline.contracts import validate_column_count
@@ -654,11 +655,20 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         _pipeline_stage("PALETTE/STRUCTURE VALIDATION", "PASS", inputs=[identity], outputs=[identity], evidence=evidence, reason="Canonical palette, dimensions, and logical-cell identity were validated before supply planning."),
         _pipeline_stage("CANDIDATE", "PASS", inputs=[identity], outputs=[level_id], evidence=evidence, reason="Generated artwork and external OWNER_UPLOAD artwork use the same candidate identity path."),
     ]
+    def emit(stage: str, state: str, message: str) -> None:
+        if activity_writer is not None:
+            activity_writer.emit(stage, state, message)
+
+    emit("SOURCE", "PASS", "Canonical source identity and logical pixels are verified.")
+    emit("NORMALIZE/DERIVE", "NOT_APPLICABLE", "Source is already represented as logical cells; no image resampling occurred.")
+    emit("PALETTE/STRUCTURE VALIDATION", "PASS", "Palette, dimensions, transparency, and structure checks passed.")
+    emit("CANDIDATE", "PASS", "Canonical candidate identity and lineage are established.")
     try:
         rules = GameRules(request_data.get("game_project"), column_count=selected)
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
         solver_timeout = request_data.get("solver_timeout_seconds")
         solver_max_visited = request_data.get("real_max_visited")
+        emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
             level_id=level_id, verify_top=int(request_data.get("verify_top", 1)),
@@ -688,6 +698,12 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         solve = "PASS" if result.get("solver_status") == "SOLVED" else "FAIL"
         replay = "PASS" if result.get("solution_final") == "WIN" else "FAIL"
         difficulty = "PASS" if result.get("difficulty") is not None and str(result.get("difficulty_basis", "")).startswith("ScrubBots Difficulty V1") else "FAIL"
+        emit("ANALYZE/PLAN", "PASS", "Canonical supply analysis and plan generation completed.")
+        emit("SCREEN", "RANKED", "Bounded offline screening ranked the canonical plans.")
+        emit("SOLVE", solve, "Canonical solver result: %s." % str(result.get("solver_status", "UNAVAILABLE")))
+        emit("REPLAY", replay, "Canonical replay result: %s." % str(result.get("solution_final", "UNAVAILABLE")))
+        emit("DIFFICULTY", difficulty, str(result.get("difficulty_basis", "Difficulty V1 evidence is unavailable."))[:200])
+        emit("QA", "PASS" if solve == replay == difficulty == "PASS" and load_check.get("state") == "READY" else "FAIL", "Conservation, replay, Difficulty V1, and shipping load-check were evaluated.")
         stages.extend([
             _pipeline_stage("SOLVE", solve, inputs=[level_id], outputs=[level_id] if solve == "PASS" else (), evidence=str(files.get("result", "")), reason="Canonical ScrubBots SolvabilitySolver proved the selected supply."),
             _pipeline_stage("REPLAY", replay, inputs=[level_id], outputs=[level_id] if replay == "PASS" else (), evidence=str(files.get("result", "")), reason="The canonical solver replay reached WIN on a fresh proof state."),
@@ -703,6 +719,10 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         }
         disposition = "READY"
     except (FileNotFoundError, NoValidSupply, OSError, RuntimeError, ValueError, StudioExtensionError) as exc:
+        emit("SOLVE", "UNAVAILABLE", "Canonical pipeline stopped before complete solver evidence.")
+        emit("REPLAY", "NOT_AVAILABLE", "Replay was not established by the canonical pipeline.")
+        emit("DIFFICULTY", "NOT_AVAILABLE", "Difficulty V1 evidence is unavailable.")
+        emit("QA", "NOT_AVAILABLE", "Required canonical QA evidence is incomplete.")
         stages.append(_pipeline_stage("SOLVE", "UNAVAILABLE", inputs=[level_id], evidence=evidence, reason=str(exc)))
         for name in ("REPLAY", "DIFFICULTY", "QA", "REVIEW"):
             stages.append(_pipeline_stage(name, "NOT_AVAILABLE", inputs=[level_id], evidence=evidence, reason=f"Stopped after SOLVE: {exc}"))
@@ -715,11 +735,27 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         candidate = next((item for item in list_candidates() if item.get("candidate_id") == identity), None)
         if candidate is not None:
             payload["release_pool"] = _enter_candidate_release_pool(candidate, pipeline=payload)
+    emit("REVIEW", "NOT_AVAILABLE", "Owner review remains an independent decision.")
+    emit("PIPELINE", "READY" if disposition == "READY" else "UNAVAILABLE", "Backend pipeline completed with disposition %s." % disposition)
     return payload
 
 
 def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = None, request: Mapping[str, Any] | None = None) -> dict[str, Any]:
     request_data = dict(request or {})
+    activity_run_id = str(request_data.pop("activity_run_id", ""))
+    activity_source_sha256 = str(request_data.pop("activity_source_sha256", ""))
+    activity_writer = None
+    if activity_run_id:
+        if source_id is None or candidate_id is not None:
+            raise StudioExtensionError("live PNG pipeline activity requires exactly one imported source identity")
+        from .pipeline_activity import PipelineActivityWriter
+
+        identity_record = verify_owner_source(source_id, source_directory=request_data.get("source_directory"))
+        actual_sha256 = str(identity_record.get("source_sha256", ""))
+        if actual_sha256 != activity_source_sha256:
+            raise StudioExtensionError("selected PNG identity changed before live pipeline activity started")
+        activity_writer = PipelineActivityWriter(_repository_root(), activity_run_id, source_id, actual_sha256)
+        activity_writer.emit("SOURCE", "RUNNING", "Validating the selected immutable PNG source.")
     primary_image = request_data.get("image_path") or request_data.get("primary_image_path")
     if primary_image is not None:
         from .supply_pipeline.primary import run_primary_supply_pipeline
@@ -776,6 +812,8 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             source_directory=request_data.get("source_directory"),
         )
         source_evidence = str(validation.get("record_path", ""))
+        if activity_writer is not None:
+            activity_writer.emit("SOURCE", "PASS" if validation.get("source_sha256") == activity_source_sha256 else "FAIL", "Backend source validation completed.")
         stages.append(_pipeline_stage("SOURCE", "PASS", inputs=[source_id], outputs=[source_id], evidence=source_evidence, reason="Verified immutable OWNER_UPLOAD source identity."))
         stages.append(_pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason="Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."))
         stages.append(_pipeline_stage("PALETTE/STRUCTURE VALIDATION", validation["structural"]["disposition"], inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason=validation["structural"].get("reason", "Canonical validation evidence.")))
@@ -802,7 +840,7 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
         derived_request = dict(request or {})
         derived_request["source_id"] = source_id
         derived_request["source_lineage"] = bundle.metadata.get("generator_metadata", {})
-        payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE")
+        payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE", activity_writer=activity_writer)
         payload["source_id"] = source_id
         payload["candidate_id"] = derived_candidate_id
         payload["derived_candidate_id"] = derived_candidate_id

@@ -44,6 +44,12 @@ These three files are the visual specification.
 
 The application must match them as closely as the Godot runtime and platform font rasterization permit.
 
+## Owner-approved R09-R02 in-workflow exception
+
+The owner-approved task `SB-LFX-018-C001-R02-R05-R09-R02` permits one bounded `PIPELINE ACTIVITY` panel in the existing LEVEL FACTORY workspace, in the existing left workspace gap at the approved 1536 × 1024 reference geometry `Rect2(27, 540, 334, 250)`. It is visible only on LEVEL FACTORY and reports selected PNG identity, run identity, monotonic elapsed time, and hash-verified backend stage events. It contains no progress percentage and does not add a fourth screen, navigation entry, action group, or change to the three master canvases. The existing Run Pipeline button and all other screen controls retain their approved positions and behavior.
+
+Activity receipts are append-only, SHA-256 chained, bounded to 256 KiB, and written only under the installed Release `level_factory/output/studio-pipeline-activity` directory. A monitor identity/order/hash mismatch is shown as an invalid activity stream and cannot promote backend readiness.
+
 ## Exact top navigation
 
 Visible module labels are exactly:

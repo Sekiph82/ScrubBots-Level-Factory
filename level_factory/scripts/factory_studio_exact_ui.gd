@@ -73,6 +73,22 @@ var _responsive_scale := 1.0
 var _responsive_offset := Vector2.ZERO
 var _last_import_summary: Dictionary = {}
 var _file_selection_action := "PNG_IMPORT"
+var _activity_panel: Panel
+var _activity_label: Label
+var _pipeline_thread: Thread
+var _pipeline_mutex := Mutex.new()
+var _pipeline_worker_done := false
+var _pipeline_worker_result: Dictionary = {}
+var _activity_file_path := ""
+var _activity_run_id := ""
+var _activity_source_id := ""
+var _activity_source_sha256 := ""
+var _activity_started_msec := 0
+var _activity_seen_sequence := 0
+var _activity_previous_sha256 := "0000000000000000000000000000000000000000000000000000000000000000"
+var _activity_stage := "IDLE"
+var _activity_message := "Select an imported PNG, then run the pipeline."
+var _activity_terminal_state := ""
 
 
 func _ready() -> void:
@@ -134,6 +150,20 @@ func _ready() -> void:
 	_capture_responsive_layout()
 	resized.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
+
+
+func _process(_delta: float) -> void:
+	if _pipeline_thread == null:
+		return
+	_poll_pipeline_activity()
+	_pipeline_mutex.lock()
+	var completed := _pipeline_worker_done
+	var result := _pipeline_worker_result.duplicate(true) if completed else {}
+	_pipeline_mutex.unlock()
+	if completed and not _pipeline_thread.is_alive():
+		_pipeline_thread.wait_to_finish()
+		_pipeline_thread = null
+		_complete_level_pipeline(result)
 
 
 func _capture_responsive_layout() -> void:
@@ -303,6 +333,25 @@ func _build_live_chrome() -> void:
 	live.add_theme_font_size_override("font_size", 13)
 	live.add_theme_color_override("font_color", Color("#dce8f8"))
 	add_child(live)
+	_activity_panel = Panel.new()
+	_activity_panel.name = "PipelineActivityPanel"
+	_activity_panel.position = Vector2(27, 540)
+	_activity_panel.size = Vector2(334, 250)
+	_activity_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_activity_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
+	_activity_panel.visible = false
+	add_child(_activity_panel)
+	_activity_label = Label.new()
+	_activity_label.name = "PipelineActivityText"
+	_activity_label.position = Vector2(40, 552)
+	_activity_label.size = Vector2(308, 224)
+	_activity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_activity_label.add_theme_font_size_override("font_size", 12)
+	_activity_label.add_theme_color_override("font_color", Color("#dce8f8"))
+	_activity_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_activity_label.text = "PIPELINE ACTIVITY\n" + _activity_message
+	_activity_label.visible = false
+	add_child(_activity_label)
 	_refresh_live_data()
 
 
@@ -312,6 +361,8 @@ func _update_live_chrome() -> void:
 		if panel != null: panel.visible = true
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
+	if _activity_panel != null: _activity_panel.visible = _screen == "LEVEL FACTORY"
+	if _activity_label != null: _activity_label.visible = _screen == "LEVEL FACTORY"
 	if _preview_host != null:
 		_preview_host.position = Vector2(401, 160)
 		_preview_host.size = Vector2(780, 640)
@@ -953,8 +1004,128 @@ func _run_level_pipeline() -> void:
 		return
 	_operation_running = true
 	var request := {"column_count": _column_count, "level_number": _level_number if _manual_level_override else 1, "game_project": OS.get_environment("SCRUBBOTS_PROJECT"), "background_intent": _background_intent, "max_robots": null, "target_difficulty": "V1_ADVISORY"}
-	var pipeline_request := {"source_id": _last_source_id, "request": request} if not _last_source_id.is_empty() else {"candidate_id": _last_candidate_id, "request": request}
-	var result: Dictionary = _extension("pipeline", pipeline_request)
+	_activity_source_id = _last_source_id if not _last_source_id.is_empty() else _selected_import_source_id
+	if _activity_source_id.is_empty() or not _activity_source_id.begins_with("owner-upload-"):
+		_operation_running = false
+		_report("Select an imported PNG before starting live pipeline activity.")
+		return
+	_activity_source_sha256 = _activity_source_id.trim_prefix("owner-upload-")
+	if _activity_source_sha256.length() != 64:
+		_operation_running = false
+		_report("Imported PNG identity is malformed; pipeline was not started.")
+		return
+	var now := Time.get_datetime_dict_from_system(true)
+	var timestamp := "%04d%02d%02dT%02d%02d%02dZ" % [now.year, now.month, now.day, now.hour, now.minute, now.second]
+	var suffix_context := HashingContext.new()
+	suffix_context.start(HashingContext.HASH_SHA256)
+	suffix_context.update((str(Time.get_ticks_usec()) + _activity_source_id).to_utf8_buffer())
+	_activity_run_id = "pipeline-ui-%s-%s" % [timestamp, suffix_context.finish().hex_encode().left(12)]
+	var installed_level_factory := ProjectSettings.globalize_path("res://").simplify_path()
+	if not installed_level_factory.replace("/", "\\").to_lower().contains("\\release\\scrubbots factory studio\\level_factory"):
+		_operation_running = false
+		_report("Live activity requires the approved Release installation.")
+		return
+	_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(_activity_run_id + ".jsonl")
+	_activity_started_msec = Time.get_ticks_msec()
+	_activity_seen_sequence = 0
+	_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+	_activity_stage = "QUEUED"
+	_activity_message = "Canonical backend is starting for the selected PNG."
+	_activity_terminal_state = ""
+	if _activity_label != null: _activity_label.text = _activity_display_text()
+	var pipeline_request_data := request.duplicate(true)
+	pipeline_request_data["activity_run_id"] = _activity_run_id
+	pipeline_request_data["activity_source_sha256"] = _activity_source_sha256
+	var pipeline_request := {"source_id": _activity_source_id, "request": pipeline_request_data}
+	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
+		_operation_running = false
+		_report("Canonical async pipeline gateway is unavailable.")
+		return
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "pipeline", pipeline_request)
+	if prepared.is_empty():
+		_operation_running = false
+		_report("Canonical Python Factory Core is unavailable.")
+		return
+	_pipeline_mutex.lock()
+	_pipeline_worker_done = false
+	_pipeline_worker_result.clear()
+	_pipeline_mutex.unlock()
+	_pipeline_thread = Thread.new()
+	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
+	if thread_error != OK:
+		_pipeline_thread = null
+		_operation_running = false
+		_report("Pipeline worker could not start.")
+		return
+	_activity_message = "Backend worker is active; elapsed time continues without a percentage estimate."
+	if _activity_label != null: _activity_label.text = _activity_display_text()
+
+
+func _pipeline_worker(prepared: Dictionary) -> void:
+	var result: Dictionary = _gateway.call("execute_prepared_studio_extension_call", prepared)
+	_pipeline_mutex.lock()
+	_pipeline_worker_result = result
+	_pipeline_worker_done = true
+	_pipeline_mutex.unlock()
+
+
+func _poll_pipeline_activity() -> void:
+	if _activity_file_path.is_empty() or not FileAccess.file_exists(_activity_file_path):
+		_activity_message = "Waiting for the backend's first durable stage event."
+		if _activity_label != null: _activity_label.text = _activity_display_text()
+		return
+	var file := FileAccess.open(_activity_file_path, FileAccess.READ)
+	if file == null or file.get_length() > 256 * 1024:
+		_activity_stage = "INVALID EVENT LOG"
+		_activity_message = "Event file exceeds the allowed 256 KiB bound or cannot be read."
+		if _activity_label != null: _activity_label.text = _activity_display_text()
+		return
+	while not file.eof_reached():
+		var line := file.get_line()
+		if line.is_empty(): continue
+		var parsed: Variant = JSON.parse_string(line)
+		if not parsed is Dictionary or not parsed.get("body") is Dictionary:
+			_activity_stage = "INVALID EVENT LOG"
+			_activity_message = "Backend event is malformed."
+			break
+		var body: Dictionary = parsed["body"]
+		var canonical := JSON.stringify(body, "", true, true)
+		var hash_ctx := HashingContext.new()
+		hash_ctx.start(HashingContext.HASH_SHA256)
+		hash_ctx.update(canonical.to_utf8_buffer())
+		var actual_hash := hash_ctx.finish().hex_encode()
+		if int(body.get("seq", -1)) != _activity_seen_sequence + 1 or str(body.get("run_id", "")) != _activity_run_id or str(body.get("source_id", "")) != _activity_source_id or str(body.get("source_sha256", "")) != _activity_source_sha256 or str(body.get("previous_sha256", "")) != _activity_previous_sha256 or str(parsed.get("body_sha256", "")) != actual_hash:
+			_activity_stage = "INVALID EVENT LOG"
+			_activity_message = "Event identity, order, or SHA-256 chain did not verify."
+			break
+		_activity_seen_sequence += 1
+		_activity_previous_sha256 = actual_hash
+		_activity_stage = str(body.get("stage", "UNKNOWN")) + " · " + str(body.get("state", "UNKNOWN"))
+		_activity_message = str(body.get("message", ""))
+		if str(body.get("stage", "")) == "PIPELINE": _activity_terminal_state = str(body.get("state", ""))
+	file.close()
+	if _activity_label != null: _activity_label.text = _activity_display_text()
+
+
+func _activity_display_text() -> String:
+	var elapsed := maxf(0.0, float(Time.get_ticks_msec() - _activity_started_msec) / 1000.0)
+	return "PIPELINE ACTIVITY\nPNG: %s\nSource: %s\nRun: %s\nElapsed: %.1f s\nStage: %s\n%s" % [_selected_import_filename(), _wrap_identity(_activity_source_id, 18), _activity_run_id, elapsed, _activity_stage, _activity_message]
+
+
+func _complete_level_pipeline(result: Dictionary) -> void:
+	_last_pipeline = result
+	if not str(result.get("derived_candidate_id", "")).is_empty(): _last_candidate_id = str(result["derived_candidate_id"])
+	var backend_state := str(result.get("disposition", result.get("state", "ERROR")))
+	if _activity_terminal_state.is_empty() or (_activity_terminal_state == "READY") != (backend_state == "READY"):
+		_activity_stage = "MONITOR MISMATCH"
+		_activity_message = "Backend response and durable activity terminal event do not agree."
+	else:
+		_activity_stage = _activity_terminal_state
+		_activity_message = "Backend returned %s · %s." % [backend_state, str(result.get("run_id", ""))]
+	if _activity_label != null: _activity_label.text = _activity_display_text()
+	if backend_state == "READY": _refresh_release_pool(false)
+	_report("Pipeline %s · %s" % [backend_state, str(result.get("run_id", ""))])
+	_operation_running = false
 	_last_pipeline = result
 	if not str(result.get("derived_candidate_id", "")).is_empty():
 		_last_candidate_id = str(result["derived_candidate_id"])

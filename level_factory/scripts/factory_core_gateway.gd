@@ -240,20 +240,28 @@ func run_owner_import(source_path: String) -> Dictionary:
 
 
 func run_studio_extension(operation: String, request: Dictionary = {}) -> Dictionary:
+	var prepared := prepare_studio_extension_call(operation, request)
+	if prepared.is_empty():
+		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."}
+	return execute_prepared_studio_extension_call(prepared)
+
+
+func prepare_studio_extension_call(operation: String, request: Dictionary = {}) -> Dictionary:
 	if _connection_status != ConnectionStatus.AVAILABLE:
-		return {
-			"operation": STUDIO_EXTENSION_OPERATION,
-			"state": "UNAVAILABLE",
-			"disposition": "UNAVAILABLE",
-			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
-		}
+		return {}
 	var request_base64 := Marshalls.raw_to_base64(JSON.stringify(request).to_utf8_buffer())
+	return {"operation": operation, "executable": python_executable, "launcher": ProjectSettings.globalize_path(LAUNCHER_PATH), "request_base64": request_base64}
+
+
+func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
+	if prepared.is_empty():
+		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."}
 	var captured: Array[String] = []
-	var exit_code := _execute_process(python_executable, PackedStringArray([
-		ProjectSettings.globalize_path(LAUNCHER_PATH),
+	var exit_code := _execute_process(str(prepared.get("executable", "")), PackedStringArray([
+		str(prepared.get("launcher", "")),
 		"studio-extension",
-		"--operation", operation,
-		"--request-base64", request_base64,
+		"--operation", str(prepared.get("operation", "")),
+		"--request-base64", str(prepared.get("request_base64", "")),
 	]), captured)
 	var process_output := "\n".join(captured)
 	var payload := _find_extension_result(captured)

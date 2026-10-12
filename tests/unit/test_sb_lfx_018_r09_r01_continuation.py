@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import inspect
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -12,6 +15,47 @@ from scrubbots_pixel_factory.supply_pipeline import r09_solver_attempts as r09
 ROOT = Path(__file__).resolve().parents[2]
 SOURCE_SHA = r09_campaign.SOURCE_SHA256
 GAME_SHA = r09_campaign.PINNED_MAIN_SHA
+
+
+def test_r09_r02_shared_dry_preflight_is_read_only_and_never_invokes_native(monkeypatch):
+    """Exercise the real R08/R09 inputs while sentinels reject every process/solver boundary."""
+    root = ROOT
+    release_source = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "owner-uploads" / r09_campaign.SOURCE_ID
+    png = release_source / "source.png"
+    record = release_source / "source.json"
+    r08_job = r09_campaign.expected_runtime_root() / ".lf_solver_jobs" / r09_campaign.R08_JOB_NAME
+    predecessor = root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
+    successor = root / "level_factory" / "output" / f"r09-r01-continuation-{SOURCE_SHA}-{GAME_SHA}"
+    assert not successor.exists()
+
+    def sha(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    immutable_paths = [png, record, r08_job / "req.json", *sorted(r08_job.glob("*.json")), predecessor / "summary.json", predecessor / "attempt-01.json"]
+    before = {path: sha(path) for path in immutable_paths}
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail("dry preflight reached a native process or solver boundary")
+
+    forbidden.__signature__ = inspect.signature(r09_campaign.run_capped_candidate_queue)
+    monkeypatch.setattr(r09_campaign, "run_capped_candidate_queue", forbidden)
+    monkeypatch.setattr(r09_campaign, "ScrubBotsSolver", forbidden)
+    monkeypatch.setattr(subprocess, "Popen", forbidden)
+    result = r09_campaign.preflight_original_002_r09_r01_continuation()
+
+    assert result["state"] == "PRE_NATIVE_READY"
+    assert result["disposition"] == "PRE_NATIVE_READY"
+    assert result["source_sha256"] == SOURCE_SHA
+    assert result["source_record_sha256"] == r09_campaign.SOURCE_RECORD_SHA256
+    assert result["game_sha"] == GAME_SHA
+    assert result["candidate_ids"] == [item[0] for item in r09_campaign.EXPECTED_R09_RANKED_PLANS]
+    assert result["candidate_plan_sha256"] == [item[2] for item in r09_campaign.EXPECTED_R09_RANKED_PLANS]
+    assert result["native_primary_call_budget"] == 6
+    assert result["timeout_seconds"] == 90
+    assert result["max_visited"] == 25000
+    assert result["native_calls"] == 0 and result["output_created"] is False
+    assert {path: sha(path) for path in immutable_paths} == before
+    assert not successor.exists()
 PREDECESSOR = ROOT / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
 
 
