@@ -56,6 +56,17 @@ func _run() -> void:
 			instance.queue_free()
 			quit(1)
 			return
+	if OS.get_environment("SB_LFX_R09_R02_CAPTURE_RELEASE_UI") == "1":
+		studio.call("_show_screen", "LEVEL FACTORY")
+		await process_frame
+		await process_frame
+		var image := root.get_viewport().get_texture().get_image()
+		var evidence_path := ProjectSettings.globalize_path("res://../owner-visual-evidence/SB-LFX-018-C001-R02-R05-R09-R02-release-level-factory-viewport.png")
+		if image == null or image.is_empty() or FileAccess.file_exists(evidence_path) or image.save_png(evidence_path) != OK:
+			push_error("R09-R02 activity test: installed Release viewport screenshot could not be captured safely")
+			instance.queue_free()
+			quit(1)
+			return
 	instance.queue_free()
 	print("R09-R02 Studio activity UI test: PASS")
 	quit(0)
