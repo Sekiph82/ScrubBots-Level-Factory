@@ -1,0 +1,29 @@
+# R05-R09: Six Capped Single-Candidate Solver Attempts
+
+Repository: Sekiph82/ScrubBots-Level-Factory ONLY. Work only in C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator. Codex implements; ChatGPT exclusively edits root TASKS.md and independent audits. Append builder evidence only to the EXISTING R05 builder log.
+
+## Explicit owner authorization, 2026-10-12
+
+After the earlier R08 60-second timeout, the owner approves one NEW solver attempt with up to FIVE retries. Literal budget is 1 initial attempt plus 5 retries, **6 primary solver calls MAX**, each using a DIFFERENT ranked supply candidate for the same original 002_32x32px.png, and **90 seconds maximum per call**. On a proven win, one separately capped <=90-second independent shipping load-check for the same winning candidate is allowed. Stop on first fully verified success. Do not request permission between the five authorized retries.
+
+If all candidates fail within the six-call budget, label the final user-facing workflow **UNSOLVED**, with count of actual attempts and technical statuses. UNSOLVED means exhausted the owner's limited attempts; it NEVER implies that all valid supply plans are mathematically impossible. TIMEOUT and UNKNOWN_BOUND are not DEADLOCK. If fewer than six unique candidates exist, report UNSOLVED with CANDIDATE_POOL_EXHAUSTED and actual attempt count. On broken authority/corrupt data/uncontrolled process STOP as BLOCKED, not UNSOLVED.
+
+## Reuse actual accepted R08 without repeating it
+
+Native pinned LF-owned mini-runtime at level_factory/output/current-game-runtime/aef60a616d4ac401e9dfac15df6fe56e671c0053, 232 SHA-attested source files, 1,977,597 bytes, verified VOID V2 Godot canary PASS. Immutable owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa, file 002_32x32px.png; source SHA 49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa, source.json SHA 858d302c10281ab2d70d4a9e22043e4eac216ebc6b6b0d89131b6e5930c232bb. Original has 736 valid cells and 288 VOID, no palette or transparency defects. Do not recolor or create extra derivative. R08 sent FOUR ranked plans in one Godot process and timed out at 60s; internal solver.solve count UNKNOWN. No R08 replay, Difficulty V1, READY or Release Pool. Do not repeat R08 job or prior accepted tests/canary.
+
+## Engineering actions, ONE cycle
+
+1. Inspect the saved R08 job request, ranked IDs and screen traces READ ONLY. Check relevant LF supply_optimizer.py, scrubbots_solver.py, godot/solver_bridge.gd, verify.py to trace every native solver entry, including load-check. Preserve recorded R08 historical evidence.
+2. Fix current batching bug: exactly ONE candidate per new Godot bridge request and native SolvabilitySolver.solve invocation. Enforce len(req.candidates)==1 before spawning process. Use a deterministic descending-score ordered queue of distinct SHA-bound candidate plans. Prefer R08's four ranked plans; bounded existing offline screening may supply only enough additional unique plans to reach six. No identical candidate repeated with same seed and limits. No other PNG, no 148 levels.
+3. Implement fail-closed counters: at most SIX actual primary candidate invocations, ONE separate load-check only after actual SOLVED and replay WIN, 90s absolute process timeout each; max_visited<=25,000 per candidate, no unbounded screening/scoring. Ensure reliable Godot process termination and no background survivors. Primary worst-case 540s; load-check <=90s. In case of crash due to corrupted runtime/authority, stop immediately without using retries.
+4. Save small LF-output receipts for each attempt: index, source hash, candidate plan hash, pinned game SHA, timeout/visit limits, start/elapsed, native start/completion if known, exit code, TIMEOUT/UNKNOWN_BOUND/DEADLOCK/SOLVED, replay status and Difficulty V1 if available. Missing response => TIMEOUT, not proven DEADLOCK. Do not equate one process with several unverified internal calls.
+5. After authentic SOLVED, validate fresh WIN replay, Difficulty V1, color conservation and one capped shipping load-check; only represent Release Pool READY if every existing gate truly passes. If mini-runtime is inadequate for current full-game CPX-002 shipping authority, report OFFLINE_SOLVED_SHIPPING_REPLAY_PENDING, never spoof production READY.
+6. After first try and at most five retries, if no verified winner label operational UNSOLVED, with technical causes and no level publish. Do not silently repeat same candidate, increase budget, or restart failed sequence.
+7. Add and run only NEW narrowly affected unit tests for one-candidate-per-process, max six, uniqueness, timeout truth, early success, optional one load-check, blocked authority and no source mutation. Do not re-run previous passing R08/R05/M14 suites or full LF regression.
+
+## Hard boundaries and delivery
+
+Game repository Sekiph82/Scrubbots remains external read-only provenance, never touch the 2620-dirty local game checkout. No Git clone, TEMP worktree, OS TEMP task files, cleanup, reset, rebase, forced push or broad delete. Preserve all 57 owner local untracked roots, immutable original 9 PNGs, current Release install/controller/manifest, desktop PS1/shortcut, UID/ICON/addons/M17. New small generated job evidence only under existing LF-owned ignored output. No Cloudflare R2 or STAGING/PRODUCTION action, no secrets, no extra API costs.
+
+Sync LF main non-destructively, implement and test targeted changes, publish code/tests and append ONE section to existing .hiveai/codex-logs/SB-LFX-018-C001-R02-R05_PRODUCTION_HISTORY_FULL_REGRESSION_EVIDENCE_CODEX_LOG.md. Normal GitHub main fast-forward and 0/0 parity. Return actual log URL plus either ONE_SOURCE_OFFLINE_SOLVED_CP_X002_PENDING, UNSOLVED_RETRY_BUDGET_EXHAUSTED, UNSOLVED_CANDIDATE_POOL_EXHAUSTED, or BLOCKED_EXACT_REASON. Parent R05 remains OPEN; no Family APK publication.
