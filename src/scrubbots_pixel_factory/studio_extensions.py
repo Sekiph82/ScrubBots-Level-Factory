@@ -96,19 +96,31 @@ def _relative(path: Path) -> str:
     return path.resolve().relative_to(_repository_root().resolve()).as_posix()
 
 
-def _source_record_paths(source_id: str) -> tuple[Path, Path]:
+def _owner_source_record_reference(source_png: Path) -> str:
+    """Bind candidate lineage to source.json, including scoped external sources."""
+    record_path = source_png.parent / "source.json"
+    try:
+        return _relative(record_path)
+    except ValueError:
+        return str(record_path.resolve())
+
+
+def _source_record_paths(source_id: str, source_directory: str | Path | None = None) -> tuple[Path, Path]:
     if not isinstance(source_id, str) or not source_id.startswith("owner-upload-"):
         raise StudioExtensionError("source_id is not an OWNER_UPLOAD identity")
-    root = (owner_upload_root() / source_id).resolve()
-    if owner_upload_root().resolve() not in root.parents:
+    root = (Path(source_directory).expanduser().resolve() if source_directory is not None
+            else (owner_upload_root() / source_id).resolve())
+    if root.name != source_id or root.is_symlink():
+        raise StudioExtensionError("source directory does not match the OWNER_UPLOAD identity")
+    if source_directory is None and owner_upload_root().resolve() not in root.parents:
         raise StudioExtensionError("source path escaped the canonical OWNER_UPLOAD area")
     return root / "source.json", root / "source.png"
 
 
-def verify_owner_source(source_id: str) -> dict[str, Any]:
+def verify_owner_source(source_id: str, *, source_directory: str | Path | None = None) -> dict[str, Any]:
     """Re-verify one canonical OWNER_UPLOAD record and its exact bytes."""
 
-    record_path, source_path = _source_record_paths(source_id)
+    record_path, source_path = _source_record_paths(source_id, source_directory)
     record = _read_json(record_path)
     expected_keys = {
         "schema", "version", "source_id", "origin", "source_sha256", "byte_length", "media_type",
@@ -127,10 +139,16 @@ def verify_owner_source(source_id: str) -> dict[str, Any]:
     expected_record = f"owner-uploads/{source_id}/source.json"
     if record.get("immutable_relative_path") != expected_source or record.get("source_record_relative_path") != expected_record:
         raise StudioExtensionError("OWNER_UPLOAD relative paths are not canonical")
+    try:
+        source_relative = _relative(source_path)
+        record_relative = _relative(record_path)
+    except ValueError:
+        source_relative = str(source_path.resolve())
+        record_relative = str(record_path.resolve())
     return {
         **record,
-        "source_path": _relative(source_path),
-        "record_path": _relative(record_path),
+        "source_path": source_relative,
+        "record_path": record_relative,
         "source_bytes_sha256": digest,
     }
 
@@ -201,9 +219,18 @@ def _validation_pixels(raw: bytes) -> tuple[int, int, bytes]:
     return decoded.width, decoded.height, decoded.pixels
 
 
-def validate_owner_source(source_id: str, *, persist: bool = True, game_project: str | Path | None = None) -> dict[str, Any]:
-    source = verify_owner_source(source_id)
-    raw = Path(_repository_root() / source["source_path"]).read_bytes()
+def validate_owner_source(
+    source_id: str,
+    *,
+    persist: bool = True,
+    game_project: str | Path | None = None,
+    source_directory: str | Path | None = None,
+) -> dict[str, Any]:
+    source = verify_owner_source(source_id, source_directory=source_directory)
+    source_path = Path(source["source_path"])
+    if not source_path.is_absolute():
+        source_path = _repository_root() / source_path
+    raw = source_path.read_bytes()
     width, height, pixels = _validation_pixels(raw)
     foreign = 0
     semi_alpha = 0
@@ -603,7 +630,7 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
         provenance={"stage_seeds": rng.stage_seeds()},
     )
     quality = evaluate_grid(width, height, cells, policy=QualityPolicy())
-    lineage = {"source_id": source_id, "source_sha256": validation["source_sha256"], "source_record": validation.get("record_path"), "source_bytes_unchanged": True, "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"}
+    lineage = {"source_id": source_id, "source_sha256": validation["source_sha256"], "source_record": _owner_source_record_reference(source_png), "source_bytes_unchanged": True, "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"}
     bundle_path = export_result(result, candidate_id, _repository_root() / "level_factory" / "output" / "studio-derived-candidates", quality_report=quality, generator_metadata={"namespace": "owner-upload", "data": {"source_lineage": lineage}})
     return candidate_id, bundle_path
 
@@ -630,16 +657,23 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     try:
         rules = GameRules(request_data.get("game_project"), column_count=selected)
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
+        solver_timeout = request_data.get("solver_timeout_seconds")
+        solver_max_visited = request_data.get("real_max_visited")
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
             level_id=level_id, verify_top=int(request_data.get("verify_top", 1)),
             screen_budget=int(request_data.get("screen_budget", 3000)), metric_top=int(request_data.get("metric_top", 12)),
             viability_budget=int(request_data.get("viability_budget", 3000)),
             real_max_visited=request_data.get("real_max_visited"), level_number=int(request_data.get("level_number", 1)),
+            real_timeout_seconds=float(solver_timeout) if solver_timeout is not None else 90,
+            max_native_solver_invocations=1 if rules.attestation is not None else None,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply
-        load_check = verify_exported_supply(files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project")) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
+        load_check = verify_exported_supply(
+            files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project"),
+            max_visited=solver_max_visited, timeout_seconds=float(solver_timeout) if solver_timeout is not None else None,
+        ) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
         if load_check.get("state") != "READY":
             raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")
         from .supply_pipeline.scrubpack_identity import derive_solver_supply_identity
@@ -736,7 +770,11 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
     stages: list[dict[str, Any]] = []
     known_inputs: list[str] = [source_id or candidate_id or ""]
     if source_id is not None:
-        validation = validate_owner_source(source_id, game_project=request_data.get("game_project"))
+        validation = validate_owner_source(
+            source_id,
+            game_project=request_data.get("game_project"),
+            source_directory=request_data.get("source_directory"),
+        )
         source_evidence = str(validation.get("record_path", ""))
         stages.append(_pipeline_stage("SOURCE", "PASS", inputs=[source_id], outputs=[source_id], evidence=source_evidence, reason="Verified immutable OWNER_UPLOAD source identity."))
         stages.append(_pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE" if validation["exact_logical_source"] else "BLOCKED", inputs=[source_id], outputs=[source_id] if validation["exact_logical_source"] else (), evidence=validation.get("evidence_path"), reason="Exact source pixels are already logical." if validation["exact_logical_source"] else "DERIVED_ARTIFACT_REQUIRED — no implicit transform."))
@@ -758,7 +796,7 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
             _pipeline_stage("CANDIDATE", "PASS", inputs=[candidate["artwork_sha256"]], outputs=[candidate_id], evidence=candidate["source_path"], reason="Canonical candidate identity is retained."),
         ])
     if source_id is not None and validation["exact_logical_source"] and validation["structural"]["disposition"] == "PASS":
-        _source_record, source_png = _source_record_paths(source_id)
+        _source_record, source_png = _source_record_paths(source_id, request_data.get("source_directory"))
         derived_candidate_id, derived_bundle = _derive_owner_candidate(source_id, validation, source_png)
         bundle = read_bundle(derived_bundle)
         derived_request = dict(request or {})

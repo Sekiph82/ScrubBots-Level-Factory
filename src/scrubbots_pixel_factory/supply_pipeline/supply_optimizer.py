@@ -56,28 +56,35 @@ class SupplyOptimizer:
 
     def run(self, image, seed=0, candidates=300, level_id="pixelart_level",
             verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
-            real_max_visited=None, level_number=1, progress=print):
+            real_max_visited=None, level_number=1, progress=print,
+            real_timeout_seconds=90, max_native_solver_invocations=None):
         return self._run_prepared(
             *self.prepare(image), seed=seed, candidates=candidates, level_id=level_id,
             verify_top=verify_top, screen_budget=screen_budget, metric_top=metric_top,
             viability_budget=viability_budget, real_max_visited=real_max_visited,
             level_number=level_number, progress=progress,
+            real_timeout_seconds=real_timeout_seconds,
+            max_native_solver_invocations=max_native_solver_invocations,
         )
 
     def run_grid(self, grid, used, seed=0, candidates=300, level_id="pixelart_level",
                  verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
-                 real_max_visited=None, level_number=1, progress=print):
+                 real_max_visited=None, level_number=1, progress=print,
+                 real_timeout_seconds=90, max_native_solver_invocations=None):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,
             metric_top=metric_top, viability_budget=viability_budget,
             real_max_visited=real_max_visited, level_number=level_number,
             progress=progress,
+            real_timeout_seconds=real_timeout_seconds,
+            max_native_solver_invocations=max_native_solver_invocations,
         )
 
     def _run_prepared(self, grid, used, m, band, mean, total, rows, *, seed,
                       candidates, level_id, verify_top, screen_budget, metric_top,
-                      viability_budget, real_max_visited, level_number, progress):
+                      viability_budget, real_max_visited, level_number, progress,
+                      real_timeout_seconds, max_native_solver_invocations):
         log = progress or (lambda *_: None)
         void_count = int(np.count_nonzero(np.asarray(grid) < 0))
         if void_count:
@@ -148,15 +155,26 @@ class SupplyOptimizer:
         }
         solver = self.solver or ScrubBotsSolver(self.rules)
         accepted, real_runs = [], []
+        native_solver_invocations = 0
         for start in range(0, len(scored), 4):
+            if max_native_solver_invocations is not None and native_solver_invocations >= max_native_solver_invocations:
+                break
             chunk = scored[start:start + 4]
+            call_options = {
+                "stop_after": verify_top - len(accepted),
+                "max_visited": real_max_visited,
+                "analyze": True,
+                "level_number": level_number,
+                "progress": lambda line: log("  game solver: " + line),
+            }
+            if isinstance(solver, ScrubBotsSolver):
+                call_options["timeout"] = real_timeout_seconds
             response = solver.run(
                 level,
                 [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
-                stop_after=verify_top - len(accepted), max_visited=real_max_visited,
-                analyze=True, level_number=level_number,
-                progress=lambda line: log("  game solver: " + line),
+                **call_options,
             )
+            native_solver_invocations += int(response.get("_runner", {}).get("invocation_count", 1))
             by_id = {p["id"]: p for p in chunk}
             for record in response["results"]:
                 real_runs.append({"id": record["id"], "status": record["status"], **record.get("solver", {})})
@@ -205,6 +223,7 @@ class SupplyOptimizer:
             "solver_metrics": {"game_solver": record["solver"], "trace_hash": record.get("traceHash"), "gameplay": gameplay_metrics, "gameplay_quality_score": candidate["score"], "gameplay_quality_parts": candidate["score_parts"], "official_difficulty_v1": record.get("difficultyV1")},
             "image": {key: value for key, value in m.items() if not key.startswith("_")},
             "generation_attempts": attempts, "screening_solvable_candidates": len(pool), "real_solver_runs": real_runs, "random_seed": seed,
+            "real_solver_invocations": native_solver_invocations,
             "settings": {"candidates": candidates, "column_count": self.column_count, "visible_preview_depth": 3, "verify_top": verify_top, "screen_budget": screen_budget, "metric_top": metric_top, "viability_budget": viability_budget, "batch_cap": None, "slot_count": getattr(self.rules, "baseline_slot_count", 5), "batch_count_policy": "positive per-plan metadata bound; no global cap"},
             "export_notes": [], "_level": level,
         }

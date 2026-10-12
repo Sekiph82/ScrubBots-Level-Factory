@@ -27,6 +27,13 @@ def discover_game_project(explicit: str | Path | None = None) -> Path:
     if not str(value).strip():
         raise PublicationError("SCRUBBOTS_PROJECT or an explicit game_project is required")
     root = Path(value).expanduser().resolve()
+    from .pinned_game_source import is_pinned_runtime
+
+    if is_pinned_runtime(root):
+        raise PublicationError(
+            "LF_PINNED_SOURCE_MINIMAL_RUNTIME is offline generation authority only; "
+            "the separate full-game CPX-002 production replay remains required"
+        )
     required = (root / "project.godot", root / "data" / "config" / "level_progression_v1.json", root / "data" / "levels" / "catalog" / "production_catalog_v1.json")
     if any(not path.is_file() for path in required):
         raise PublicationError("configured Scrubbots project is missing project/progression/catalog authority")

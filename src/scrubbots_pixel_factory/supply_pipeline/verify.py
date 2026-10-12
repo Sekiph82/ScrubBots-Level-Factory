@@ -19,7 +19,14 @@ def _hex(value: str) -> str:
     return text_value
 
 
-def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_project: str | Path | None = None) -> dict[str, Any]:
+def verify_exported_supply(
+    level_path: str | Path,
+    plan_path: str | Path,
+    game_project: str | Path | None = None,
+    *,
+    max_visited: int | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
     level_file = Path(level_path).expanduser().resolve()
     plan_file = Path(plan_path).expanduser().resolve()
     try:
@@ -86,7 +93,9 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
             counts[value] = counts.get(value, 0) + 1
     candidate = {"id": str(level["id"]), "columns": [[{"color": color, "count": amount} for color, amount in column] for column in columns]}
     try:
-        response = ScrubBotsSolver(rules).run(level, [candidate], analyze=True)
+        response = ScrubBotsSolver(rules).run(
+            level, [candidate], analyze=True, max_visited=max_visited, timeout=timeout_seconds
+        )
     except (OSError, RuntimeError, ValueError) as exc:
         return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc), "authority": rules.authority}
     record = response.get("results", [{}])[0]
@@ -103,6 +112,8 @@ def verify_exported_supply(level_path: str | Path, plan_path: str | Path, game_p
         "disposition": "READY" if ready else "REJECTED",
         "authority": rules.authority,
         "solver": record,
+        "solver_runner": response.get("_runner"),
+        "solver_invocations": int(response.get("_runner", {}).get("invocation_count", 1)),
         "verification": verification,
         **loader_evidence,
         "difficulty_v1": record.get("difficultyV1"),

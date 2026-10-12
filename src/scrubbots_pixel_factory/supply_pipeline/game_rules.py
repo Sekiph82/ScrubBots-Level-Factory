@@ -33,9 +33,27 @@ def find_godot():
     for name in ("godot4", "godot"):
         p = shutil.which(name)
         if p:
-            return p
+            return _console_variant(p)
     link = Path.home() / "AppData/Local/Microsoft/WinGet/Links/godot.exe"
-    return str(link) if link.exists() else None
+    return _console_variant(str(link)) if link.exists() else None
+
+
+def _console_variant(executable: str) -> str:
+    """Prefer a colocated console build so callers can supervise native exit status."""
+    path = Path(executable)
+    try:
+        if path.is_symlink():
+            path = path.resolve(strict=True)
+    except OSError:
+        pass
+    candidates = [
+        path.with_name(path.stem + "_console" + path.suffix),
+        path.with_name(path.stem.replace("_win64", "_win64_console") + path.suffix),
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return str(candidate)
+    return executable
 
 
 class GameRules:
@@ -54,7 +72,25 @@ class GameRules:
         if not (p / "project.godot").exists():
             raise FileNotFoundError(f"ScrubBots project not found: {p}")
         self.project = p
-        self.authority = self._authority_identity(p)
+        from .pinned_game_source import is_pinned_runtime, verify_attested_runtime
+
+        self.attestation = verify_attested_runtime(p) if is_pinned_runtime(p) else None
+        if self.attestation is None:
+            self.authority = self._authority_identity(p)
+        else:
+            self.authority = {
+                "repository": "Sekiph82/Scrubbots",
+                "branch": "main",
+                "git_head": self.attestation["source_commit"],
+                "git_tree": self.attestation["tree_sha"],
+                "source_commit_verified_as_main_at_start": True,
+                "source_tree_attested": True,
+                "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME",
+                "full_game_checkout_verified": False,
+                "loader": "scripts/gameplay/supply/supply_plan_loader.gd",
+                "solver": "scripts/gameplay/solver/solvability_solver.gd",
+                "difficulty_v1": "scripts/difficulty/level_difficulty_analyzer_v1.gd",
+            }
         loader = p / "scripts/gameplay/supply/supply_plan_loader.gd"
         self.loader_cap = None
         self.max_robots_per_batch = None
@@ -114,4 +150,6 @@ class GameRules:
         """Current-game VOID gate; opaque V1 callers do not need this capability."""
         from .void_capability import void_capability
 
+        if self.attestation is not None:
+            return void_capability(self.project)
         return void_capability(self.project if self._void_project_configured else None)

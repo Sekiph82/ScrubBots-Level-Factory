@@ -43,6 +43,31 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
     root = Path(project).expanduser().resolve()
     if not (root / "project.godot").is_file():
         return _closed("Configured ScrubBots project is missing project.godot.")
+    from .pinned_game_source import PinnedGameSourceError, is_pinned_runtime, verify_attested_runtime
+
+    if is_pinned_runtime(root):
+        try:
+            manifest = verify_attested_runtime(root)
+        except PinnedGameSourceError as exc:
+            return _closed(f"Pinned LF mini-runtime attestation failed: {exc}", reason_code="PINNED_RUNTIME_ATTESTATION_INVALID")
+        return {
+            "state": "OPEN",
+            "disposition": "READY",
+            "repository": REPOSITORY,
+            "branch": "main",
+            "git_head": manifest["source_commit"],
+            "git_tree": manifest["tree_sha"],
+            "audited_commit": AUDITED_VOID_COMMIT,
+            "level_data_version_void": FORMAT_VERSION_VOID,
+            "void_cell": VOID_CELL,
+            "adr": "docs/05_TECH_DECISIONS.md#ADR-030",
+            "level_data_spec": "docs/03_LEVEL_DATA_SPEC.md",
+            "d1": "VOID renders exactly like CLEARED/BG01",
+            "d2": {"minimum_artwork_cells": 200, "minimum_artwork_ratio": 0.25},
+            "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME",
+            "full_game_checkout_verified": False,
+            "source_tree_attested": True,
+        }
     try:
         top = Path(_git(root, "rev-parse", "--show-toplevel")).resolve()
         origin = _git(root, "remote", "get-url", "origin").rstrip("/")
