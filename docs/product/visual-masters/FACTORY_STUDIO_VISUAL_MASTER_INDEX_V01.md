@@ -30,7 +30,7 @@ Implementation contract:
 
 `../FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md`
 
-Owner-approved exception: task `SB-LFX-018-C001-R02-R05-R09-R02` adds the bounded LEVEL FACTORY `PIPELINE ACTIVITY` panel at `Rect2(27, 540, 334, 250)` while preserving these three master canvases, their header, and all existing control positions. The panel is hidden on PIXEL ART and RELEASE POOL and is documented in the implementation contract above.
+LATEST OWNER OVERRIDE (R09-R02-R01): Existing LEVEL FACTORY left WORKSPACE MUST arrange top [Select PNG left + Level/3-4-5/Max Robots/Background settings right], immediately below [Run Pipeline], below that [large scrollable PIPELINE ACTIVITY]. Reference: Select PNG Rect2(42,165,95,100), settings Level x172 y165 / columns y209 / Max y253 / Background y297, Run Pipeline Rect2(26,347,335,52), Activity Rect2(27,412,334,498). Supersedes earlier R09-R02 'Activity y540 + Run y803' exception and earlier unchanged-position clause ONLY for these named controls. Three master canvases, top header, center preview, right Details and other pages otherwise unchanged. Activity visible only on LEVEL FACTORY and shows real chronological pipeline events. Owner also approved verifying/updating the actual Desktop .lnk or .exe entrypoint after narrow installed runtime deployment. The detailed current written authority is docs/product/FACTORY_STUDIO_EXACT_THREE_MASTER_UI_V03.md.
 
 
 ## Binary integrity status
