@@ -224,6 +224,12 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.save_library_metadata(str(request["source_id"]), str(request.get("label", "")), request.get("tags", []))
         elif operation == "validate-source":
             payload = extensions.validate_owner_source(str(request["source_id"]))
+        elif operation == "validate-source-readonly":
+            payload = extensions.validate_owner_source(
+                str(request["source_id"]),
+                persist=False,
+                game_project=request.get("game_project"),
+            )
         elif operation == "candidate-inbox":
             payload = extensions.candidate_inbox()
         elif operation == "owner-review":

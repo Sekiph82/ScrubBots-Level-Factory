@@ -67,6 +67,11 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
             "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME",
             "full_game_checkout_verified": False,
             "source_tree_attested": True,
+            "installed_owner_source": {
+                "source_id": manifest["installed_owner_source"]["source_id"],
+                "source_sha256": manifest["installed_owner_source"]["source_sha256"],
+                "source_record_sha256": manifest["installed_owner_source"]["source_record_sha256"],
+            },
         }
     try:
         top = Path(_git(root, "rev-parse", "--show-toplevel")).resolve()

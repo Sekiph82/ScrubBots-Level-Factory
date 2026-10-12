@@ -11,7 +11,6 @@ var _status: Label
 var _file_dialog: FileDialog
 var _level_dialog: ConfirmationDialog
 var _level_number_input: SpinBox
-var _level_number_label: Label
 var _screen := "PIXEL ART"
 var _last_candidate_id := ""
 var _last_source_id := ""
@@ -61,6 +60,7 @@ var _selected_art_path := ""
 var _active_preview_path := ""
 var _preview_paths_by_screen := {"PIXEL ART": "", "LEVEL FACTORY": "", "RELEASE POOL": ""}
 var _imported_sources: Array[Dictionary] = []
+var _gameplay_sources: Array[Dictionary] = []
 var _rejected_imports: Array[Dictionary] = []
 var _imported_page := 0
 var _selected_import_source_id := ""
@@ -104,6 +104,10 @@ var _activity_terminal_state := ""
 var _activity_backend_disposition := ""
 var _activity_event_backend_disposition := ""
 var _activity_integrity_error := ""
+const _PINNED_002_SOURCE_ID := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
+const _PINNED_GAME_COMMIT := "aef60a616d4ac401e9dfac15df6fe56e671c0053"
+var _pinned_source_preflight_ok := false
+var _pinned_source_preflight_message := "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
 
 
 func _ready() -> void:
@@ -152,17 +156,7 @@ func _ready() -> void:
 	_level_dialog.confirmed.connect(_save_level_number)
 	add_child(_level_dialog)
 	_build_secondary_surfaces()
-	_level_number_label = Label.new()
-	_level_number_label.position = Vector2(187, 172)
-	_level_number_label.size = Vector2(150, 28)
-	_level_number_label.add_theme_color_override("font_color", Color.WHITE)
-	_level_number_label.add_theme_font_size_override("font_size", 16)
-	_level_number_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_level_number_label.text = "Auto"
-	_level_number_label.visible = true
-	add_child(_level_number_label)
 	_build_master_controls()
-	_level_number_label.move_to_front()
 	_show_screen(_screen)
 	call_deferred("_restore_imported_sources")
 	_capture_responsive_layout()
@@ -295,7 +289,7 @@ func _control_caption(control_name: String) -> String:
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
 		"ArtworkCarouselLeft": "‹", "ArtworkCarouselRight": "›", "ZoomOut": "−", "ZoomIn": "+",
 		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "Select PNG",
-		"LevelNumber": "Level: Auto", "SupplyColumns3": "3", "SupplyColumns4": "4", "SupplyColumns5": "5",
+		"LevelNumber": _level_number_caption(), "SupplyColumns3": "3", "SupplyColumns4": "4", "SupplyColumns5": "5",
 		"MaxRobotsAuto": "Max Robots: Auto", "BackgroundIntent": "Background: %s" % _background_intent,
 		"RunLevelPipeline": "Run Pipeline", "SolveAgain": "Solve Again", "PreviewReplay": "Preview Replay",
 		"ExpandSupplyPlan": "Supply Plan", "AcceptLevel": "Accept", "RejectLevel": "Reject",
@@ -308,6 +302,10 @@ func _control_caption(control_name: String) -> String:
 		"AddMoreLevels": "Add More Levels"
 	}
 	return str(captions.get(control_name, control_name.replace("_", " ")))
+
+
+func _level_number_caption() -> String:
+	return "Level: %s" % (str(_level_number) if _manual_level_override else "Auto")
 
 
 func _build_live_chrome() -> void:
@@ -517,7 +515,14 @@ func _restore_imported_sources() -> void:
 		hash_ctx.update(bytes)
 		if hash_ctx.finish().hex_encode() != expected_sha:
 			continue
-		source_by_id[catalog_source_id] = {"path": png_path, "source_id": catalog_source_id, "source_sha256": expected_sha, "disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png"))}
+		var image := Image.new()
+		if image.load(png_path) != OK:
+			continue
+		source_by_id[catalog_source_id] = {
+			"path": png_path, "source_id": catalog_source_id, "source_sha256": expected_sha,
+			"disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png")),
+			"width": image.get_width(), "height": image.get_height()
+		}
 	var order_ids: Array[String] = []
 	var history := _extension("owner-pages", {})
 	var batches: Array = history.get("batches", [])
@@ -538,27 +543,18 @@ func _restore_imported_sources() -> void:
 				order_ids.append(remaining_source_id)
 	for ordered_source_id in order_ids:
 		_upsert_imported_source(source_by_id[ordered_source_id])
-	if _imported_sources.is_empty():
+	_refresh_gameplay_sources()
+	if _gameplay_sources.is_empty():
 		return
-	var selected_exists := false
-	for item in _imported_sources:
-		if str(item.get("source_id", "")) == _selected_import_source_id:
-			selected_exists = true
-			break
-	if not selected_exists:
-		_selected_import_source_id = str(_imported_sources[0].get("source_id", ""))
-	var selected_path := ""
-	for item in _imported_sources:
-		if str(item.get("source_id", "")) == _selected_import_source_id:
-			selected_path = str(item.get("path", ""))
-			break
-	if not selected_path.is_empty():
-		_last_source_id = _selected_import_source_id
-		_preview_paths_by_screen["LEVEL FACTORY"] = selected_path
+	var selected_is_gameplay := _gameplay_source_index(_selected_import_source_id) >= 0
+	if not selected_is_gameplay:
+		_selected_import_source_id = _PINNED_002_SOURCE_ID if _gameplay_source_index(_PINNED_002_SOURCE_ID) >= 0 else str(_gameplay_sources[0].get("source_id", ""))
+	_select_imported_source_by_id(_selected_import_source_id)
 	_refresh_runtime_cards()
 
 
 func _refresh_runtime_cards() -> void:
+	_refresh_gameplay_sources()
 	var inbox := _extension("candidate-inbox", {})
 	var candidates: Array = inbox.get("candidates", [])
 	var pixel_slots := ["ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3"]
@@ -571,15 +567,15 @@ func _refresh_runtime_cards() -> void:
 			_set_runtime_button(pixel_slots[index], caption.left(18), image_path)
 		else:
 			_set_runtime_button(pixel_slots[index], "No artwork", "")
-	var page_count := maxi(1, ceili(float(_imported_sources.size()) / float(level_slots.size())))
+	var page_count := maxi(1, ceili(float(_gameplay_sources.size()) / float(level_slots.size())))
 	_imported_page = clampi(_imported_page, 0, page_count - 1)
 	var bottom_heading := get_node_or_null("RuntimeBottomHeading") as Label
 	if bottom_heading != null:
-		bottom_heading.text = "VARIATIONS  /  RECENT ITEMS · %d PNG · %d/%d" % [_imported_sources.size(), _imported_page + 1, page_count] if _screen == "LEVEL FACTORY" else "VARIATIONS  /  RECENT ITEMS"
+		bottom_heading.text = "VARIATIONS  /  RECENT ITEMS · %d PNG · %d/%d" % [_gameplay_sources.size(), _imported_page + 1, page_count] if _screen == "LEVEL FACTORY" else "VARIATIONS  /  RECENT ITEMS"
 	for index in range(level_slots.size()):
 		var source_index := _imported_page * level_slots.size() + index
-		if source_index < _imported_sources.size():
-			var imported: Dictionary = _imported_sources[source_index]
+		if source_index < _gameplay_sources.size():
+			var imported: Dictionary = _gameplay_sources[source_index]
 			var source_id := str(imported.get("source_id", ""))
 			var filename := str(imported.get("display_filename", "image.png"))
 			var disposition := str(imported.get("disposition", "IMPORTED"))
@@ -591,7 +587,7 @@ func _refresh_runtime_cards() -> void:
 				button.tooltip_text = "%s\n%s\n%s" % [filename, disposition, _wrap_identity(source_id, 24)]
 		else:
 			_set_runtime_button(level_slots[index], "—", "")
-	if _imported_sources.is_empty():
+	if _gameplay_sources.is_empty():
 		for index in range(level_slots.size()):
 			if index < candidates.size():
 				var candidate: Dictionary = candidates[index]
@@ -821,6 +817,8 @@ func _show_screen(name: String) -> void:
 	else:
 		_present_active_preview()
 	_refresh_live_data()
+	if name == "LEVEL FACTORY":
+		_refresh_activity_header()
 
 
 func _update_master_control_visibility() -> void:
@@ -1028,15 +1026,39 @@ func _upsert_imported_source(record: Dictionary) -> void:
 	var source_id := str(record.get("source_id", ""))
 	if source_id.is_empty():
 		return
+	var image_path := str(record.get("path", ""))
+	if int(record.get("width", 0)) <= 0 and not image_path.is_empty():
+		var image := Image.new()
+		if image.load(image_path) == OK:
+			record["width"] = image.get_width()
+			record["height"] = image.get_height()
 	for index in range(_imported_sources.size()):
 		if str(_imported_sources[index].get("source_id", "")) == source_id:
 			var existing: Dictionary = _imported_sources[index]
-			for key in ["path", "source_sha256", "display_filename"]:
+			for key in ["path", "source_sha256", "display_filename", "width", "height"]:
 				if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
 			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
 			_imported_sources[index] = existing
+			_refresh_gameplay_sources()
 			return
 	_imported_sources.append(record.duplicate(true))
+	_refresh_gameplay_sources()
+
+
+func _refresh_gameplay_sources() -> void:
+	_gameplay_sources.clear()
+	for source in _imported_sources:
+		var width := int(source.get("width", 0))
+		var height := int(source.get("height", 0))
+		if width >= 20 and width <= 59 and height >= 20 and height <= 59:
+			_gameplay_sources.append(source)
+
+
+func _gameplay_source_index(source_id: String) -> int:
+	for index in range(_gameplay_sources.size()):
+		if str(_gameplay_sources[index].get("source_id", "")) == source_id:
+			return index
+	return -1
 
 
 func _selected_import_filename() -> String:
@@ -1149,12 +1171,32 @@ func _send_to_level_factory() -> void:
 func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
-	if _last_candidate_id.is_empty() and _last_source_id.is_empty():
-		_report("Select or generate a candidate first.")
+	_activity_source_id = _selected_import_source_id
+	if _activity_source_id != _PINNED_002_SOURCE_ID:
+		_pinned_source_preflight_ok = false
+		_pinned_source_preflight_message = "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
+		_activity_stage = "AUTHORITY"
+		_activity_message = _pinned_source_preflight_message
+		_refresh_activity_header()
+		_report(_pinned_source_preflight_message)
+		return
+	if not _pinned_source_preflight_ok:
+		_refresh_pinned_source_preflight()
+		if not _pinned_source_preflight_ok:
+			_report(_pinned_source_preflight_message)
+			return
+	var route := _build_selected_source_pipeline_request()
+	if str(route.get("state", "")) != "AUTHORIZED_SOURCE_SCOPE":
+		_pinned_source_preflight_ok = false
+		_pinned_source_preflight_message = str(route.get("reason", "PINNED_SOURCE_SCOPE_NOT_VERIFIED"))
+		_activity_stage = "AUTHORITY"
+		_activity_message = _pinned_source_preflight_message
+		_refresh_activity_header()
+		_report(_pinned_source_preflight_message)
 		return
 	_operation_running = true
-	var request := {"column_count": _column_count, "level_number": _level_number if _manual_level_override else 1, "game_project": OS.get_environment("SCRUBBOTS_PROJECT"), "background_intent": _background_intent, "max_robots": null, "target_difficulty": "V1_ADVISORY"}
-	_activity_source_id = _last_source_id if not _last_source_id.is_empty() else _selected_import_source_id
+	var request: Dictionary = route["request"]
+	_activity_source_id = str(route["source_id"])
 	if _activity_source_id.is_empty() or not _activity_source_id.begins_with("owner-upload-"):
 		_operation_running = false
 		_report("Select an imported PNG before starting live pipeline activity.")
@@ -1365,9 +1407,10 @@ func _refresh_activity_header() -> void:
 	_activity_state_chip.add_theme_stylebox_override("panel", _control_style(bg, bg.lightened(0.22)))
 	var filename := _activity_source_filename if not _activity_run_id.is_empty() else _selected_import_filename()
 	_activity_source_label.text = "%s  ·  %s" % [filename.left(22) if not filename.is_empty() else "No PNG selected", _format_activity_elapsed()]
-	_activity_source_label.tooltip_text = "Source %s  |  Run %s" % [_activity_source_id, _activity_run_id]
-	_activity_phase_label.text = "" if _activity_stage in ["", "IDLE"] else "%s · %s" % [_activity_stage.replace("_", " ").left(26), _activity_message.left(48)]
-	_activity_phase_label.tooltip_text = _activity_message
+	var source_id := _activity_source_id if not _activity_run_id.is_empty() else _selected_import_source_id
+	_activity_source_label.tooltip_text = "Source %s  |  Run %s" % [source_id, _activity_run_id]
+	_activity_phase_label.text = "" if _activity_stage in ["", "IDLE"] else "%s · %s" % [_activity_stage.replace("_", " ").left(26), _activity_message.left(40)]
+	_activity_phase_label.tooltip_text = "%s · pinned %s" % [_activity_message, _PINNED_GAME_COMMIT]
 
 
 func _activity_display_state() -> String:
@@ -1454,8 +1497,9 @@ func _edit_level_number() -> void:
 func _save_level_number() -> void:
 	_level_number = int(_level_number_input.value)
 	_manual_level_override = true
-	_level_number_label.text = str(_level_number)
-	_level_number_label.visible = true
+	var level_button := get_node_or_null("LevelNumber") as Button
+	if level_button != null:
+		level_button.text = _level_number_caption()
 	_report("Manual level number: %d" % _level_number)
 
 
@@ -1730,17 +1774,18 @@ func _page_artwork(direction: int) -> void:
 
 
 func _select_variation(index: int) -> void:
-	if not _imported_sources.is_empty():
+	if not _gameplay_sources.is_empty():
 		var queue_index := _imported_page * 8 + index
-		if index >= 0 and queue_index < _imported_sources.size():
-			_select_imported_source_by_id(str(_imported_sources[queue_index].get("source_id", "")))
+		if index >= 0 and queue_index < _gameplay_sources.size():
+			_select_imported_source_by_id(str(_gameplay_sources[queue_index].get("source_id", "")))
 		return
 	_select_inbox_candidate(index)
 
 
 func _select_imported_source_by_id(source_id: String) -> void:
-	for index in range(_imported_sources.size()):
-		var imported: Dictionary = _imported_sources[index]
+	_refresh_gameplay_sources()
+	for index in range(_gameplay_sources.size()):
+		var imported: Dictionary = _gameplay_sources[index]
 		if str(imported.get("source_id", "")) != source_id:
 			continue
 		_selected_import_source_id = source_id
@@ -1748,17 +1793,72 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_last_source_id = source_id
 		_last_candidate_id = ""
 		_last_pipeline.clear()
-		_imported_page = index / 8
+		_imported_page = int(index / 8)
 		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
+		_refresh_pinned_source_preflight()
 		_refresh_runtime_cards()
 		_refresh_live_data()
 		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
 		return
 
 
+func _pinned_game_project_path() -> String:
+	return ProjectSettings.globalize_path("res://output/current-game-runtime/%s" % _PINNED_GAME_COMMIT).simplify_path()
+
+
+func _build_selected_source_pipeline_request() -> Dictionary:
+	if _selected_import_source_id != _PINNED_002_SOURCE_ID or not _pinned_source_preflight_ok:
+		return {"state": "BLOCKED", "reason": "PINNED_SOURCE_SCOPE_NOT_VERIFIED"}
+	return {
+		"state": "AUTHORIZED_SOURCE_SCOPE",
+		"source_id": _selected_import_source_id,
+		"source_sha256": _selected_import_source_id.trim_prefix("owner-upload-"),
+		"request": {
+			"column_count": _column_count,
+			"level_number": _level_number if _manual_level_override else 1,
+			"game_project": _pinned_game_project_path(),
+			"background_intent": _background_intent,
+			"max_robots": null,
+			"target_difficulty": "V1_ADVISORY",
+		}
+	}
+
+
+func _refresh_pinned_source_preflight() -> void:
+	_pinned_source_preflight_ok = false
+	if _selected_import_source_id != _PINNED_002_SOURCE_ID:
+		_pinned_source_preflight_message = "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
+		_activity_stage = "AUTHORITY"
+		_activity_message = _pinned_source_preflight_message
+		_refresh_activity_header()
+		return
+	var result := _extension("validate-source-readonly", {
+		"source_id": _selected_import_source_id,
+		"game_project": _pinned_game_project_path()
+	})
+	var capability: Dictionary = result.get("void_capability", {})
+	var structural: Dictionary = result.get("structural", {})
+	_pinned_source_preflight_ok = (
+		str(result.get("source_sha256", "")) == _PINNED_002_SOURCE_ID.trim_prefix("owner-upload-")
+		and bool(result.get("exact_logical_source", false))
+		and str(capability.get("state", "")) == "OPEN"
+		and str(structural.get("disposition", "")) == "PASS"
+	)
+	if _pinned_source_preflight_ok:
+		_pinned_source_preflight_message = "SOURCE/VOID PASS · NOT SHIPPING"
+		_activity_stage = "PINNED OFFLINE"
+		_activity_message = _pinned_source_preflight_message
+	else:
+		var scope := str(capability.get("reason_code", ""))
+		_pinned_source_preflight_message = scope if scope == "PINNED_SOURCE_SCOPE_NOT_VERIFIED" else str(result.get("reason", result.get("error", "Pinned source preflight is unavailable.")))
+		_activity_stage = "AUTHORITY"
+		_activity_message = _pinned_source_preflight_message
+	_refresh_activity_header()
+
+
 func _page_imported_sources(direction: int) -> void:
-	var page_count := maxi(1, ceili(float(_imported_sources.size()) / 8.0))
+	var page_count := maxi(1, ceili(float(_gameplay_sources.size()) / 8.0))
 	if page_count <= 1:
 		return
 	_imported_page = posmod(_imported_page + direction, page_count)
@@ -1766,7 +1866,7 @@ func _page_imported_sources(direction: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _screen != "LEVEL FACTORY" or _imported_sources.size() <= 8 or _preview_host == null:
+	if _screen != "LEVEL FACTORY" or _gameplay_sources.size() <= 8 or _preview_host == null:
 		return
 	if not event is InputEventMouseButton:
 		return

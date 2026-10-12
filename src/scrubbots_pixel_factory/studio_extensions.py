@@ -257,10 +257,31 @@ def validate_owner_source(
         cells.append(color_id)
     legal_dimensions = 20 <= width <= 59 and 20 <= height <= 59
     capability = None
-    if transparent:
+    pinned_runtime = False
+    if game_project is not None:
+        from .supply_pipeline.pinned_game_source import is_pinned_runtime
+
+        pinned_runtime = is_pinned_runtime(game_project)
+    if transparent or pinned_runtime:
         from .supply_pipeline.void_capability import void_capability
 
         capability = void_capability(game_project)
+    if pinned_runtime and capability is not None and capability.get("state") == "OPEN":
+        owner_scope = capability.get("installed_owner_source", {})
+        record_path, _ = _source_record_paths(source_id, source_directory)
+        record_sha256 = hashlib.sha256(record_path.read_bytes()).hexdigest()
+        if (
+            source_id != owner_scope.get("source_id")
+            or source["source_sha256"] != owner_scope.get("source_sha256")
+            or record_sha256 != owner_scope.get("source_record_sha256")
+        ):
+            capability = {
+                **capability,
+                "state": "CLOSED",
+                "disposition": "UNAVAILABLE",
+                "reason_code": "PINNED_SOURCE_SCOPE_NOT_VERIFIED",
+                "reason": "Pinned mini-runtime authority is attested only for its exact original owner source and source record.",
+            }
     gate_open = capability is None or capability.get("state") == "OPEN"
     artwork_count = width * height - transparent
     minimum_artwork_ok = not transparent or (artwork_count >= 200 and artwork_count >= width * height * 0.25)
