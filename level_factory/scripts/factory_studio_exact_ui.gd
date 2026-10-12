@@ -38,7 +38,7 @@ var _columns_filter := "All Columns"
 var _visible_release_ids: Array[String] = []
 var _selected_release_id := ""
 var _grid_enabled := false
-var _zoom := 8.0
+var _zoom := 1.0
 var _supply_expanded := false
 var _settings_dialog: AcceptDialog
 var _prompt_dialog: ConfirmationDialog
@@ -54,8 +54,16 @@ var _pending_production_confirmation: Dictionary = {}
 var _semantic_progress := {"completed": 0, "failed": 0, "remaining": 0}
 var _master_buttons: Array[Button] = []
 var _grid_lines: Array[Line2D] = []
+var _preview_host: Control
+var _preview_content: Control
 var _preview_rect: TextureRect
 var _selected_art_path := ""
+var _active_preview_path := ""
+var _preview_paths_by_screen := {"PIXEL ART": "", "LEVEL FACTORY": "", "RELEASE POOL": ""}
+var _imported_sources: Array[Dictionary] = []
+var _rejected_imports: Array[Dictionary] = []
+var _imported_page := 0
+var _selected_import_source_id := ""
 var _seed := ""
 var _background_intent := "TRANSPARENT"
 const _REFERENCE_SIZE := Vector2(1536.0, 1024.0)
@@ -76,16 +84,29 @@ func _ready() -> void:
 	_file_dialog.file_selected.connect(_on_file_selected)
 	_file_dialog.files_selected.connect(_on_files_selected)
 	_build_live_chrome()
+	_preview_host = Control.new()
+	_preview_host.name = "VisualReviewClip"
+	_preview_host.position = Vector2(401, 160)
+	_preview_host.size = Vector2(780, 640)
+	_preview_host.clip_contents = true
+	_preview_host.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_preview_host)
+	_preview_content = Control.new()
+	_preview_content.name = "VisualReviewContent"
+	_preview_content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_preview_content.pivot_offset = _preview_host.size * 0.5
+	_preview_host.add_child(_preview_content)
 	_preview_rect = TextureRect.new()
 	_preview_rect.name = "SelectedArtworkPreview"
-	_preview_rect.position = Vector2(486, 176)
-	_preview_rect.size = Vector2(600, 580)
+	_preview_rect.position = Vector2.ZERO
+	_preview_rect.size = _preview_host.size
+	_preview_rect.pivot_offset = _preview_rect.size * 0.5
 	_preview_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_preview_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_preview_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_preview_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_preview_rect.visible = false
-	add_child(_preview_rect)
+	_preview_content.add_child(_preview_rect)
 	_build_grid_overlay()
 	_level_dialog = ConfirmationDialog.new()
 	_level_dialog.title = "Level Settings"
@@ -146,12 +167,8 @@ func _apply_responsive_layout() -> void:
 		if node is Control:
 			var control := node as Control
 			control.position = _responsive_offset + base.position * _responsive_scale
-			if control == _preview_rect:
-				control.size = base.size * _responsive_scale
-				control.scale = Vector2.ONE * (_zoom / 8.0) * _responsive_scale
-			else:
-				control.size = base.size
-				control.scale = base.scale * _responsive_scale
+			control.size = base.size
+			control.scale = base.scale * _responsive_scale
 		elif node is Line2D:
 			var line := node as Line2D
 			line.position = _responsive_offset + base.position * _responsive_scale
@@ -172,6 +189,22 @@ func responsive_geometry(viewport_size: Vector2) -> Dictionary:
 
 func last_import_snapshot() -> Dictionary:
 	return _last_import_summary.duplicate(true)
+
+
+func imported_queue_snapshot() -> Array[Dictionary]:
+	return _imported_sources.duplicate(true)
+
+
+func preview_state_snapshot() -> Dictionary:
+	return {
+		"active_screen": _screen,
+		"active_path": _active_preview_path,
+		"visible": _preview_rect != null and _preview_rect.visible,
+		"host_rect": _preview_host.get_global_rect() if _preview_host != null else Rect2(),
+		"host_clip_contents": _preview_host.clip_contents if _preview_host != null else false,
+		"zoom": _zoom,
+		"source_id": _last_source_id
+	}
 
 
 func configure_gateway(gateway: RefCounted) -> void:
@@ -265,7 +298,7 @@ func _build_live_chrome() -> void:
 	var live := Label.new()
 	live.name = "RuntimeLiveData"
 	live.position = Vector2(1222, 170)
-	live.size = Vector2(270, 112)
+	live.size = Vector2(270, 198)
 	live.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	live.add_theme_font_size_override("font_size", 13)
 	live.add_theme_color_override("font_color", Color("#dce8f8"))
@@ -279,11 +312,9 @@ func _update_live_chrome() -> void:
 		if panel != null: panel.visible = true
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
-	var preview_position := Vector2(430, 172)
-	var preview_size := Vector2(720, 590)
-	if _preview_rect != null:
-		_preview_rect.position = preview_position
-		_preview_rect.size = preview_size
+	if _preview_host != null:
+		_preview_host.position = Vector2(401, 160)
+		_preview_host.size = Vector2(780, 640)
 	_refresh_live_data()
 	_apply_responsive_layout()
 
@@ -291,11 +322,14 @@ func _update_live_chrome() -> void:
 func _refresh_live_data() -> void:
 	var live := get_node_or_null("RuntimeLiveData") as Label
 	if live == null: return
+	var selected_source_text := ""
+	if _screen == "LEVEL FACTORY" and not _selected_import_source_id.is_empty():
+		selected_source_text = "\nPNG: %s\nSource:\n%s" % [_selected_import_filename(), _wrap_identity(_selected_import_source_id, 18)]
 	if _screen == "PIXEL ART":
 		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nSeed: %s\nBatch: %d complete · %d failed · %d remaining" % [_provider_model, _generation_mode, _width, _height, _seed if not _seed.is_empty() else "Auto", _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining]
 	elif _screen == "LEVEL FACTORY":
 		var primary: Dictionary = _last_pipeline.get("primary", {})
-		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\nSupply: %s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, str(primary.get("state", "Awaiting pipeline")), str(primary.get("acceptance", {}).get("replay", "—")), str(primary.get("difficulty", {}).get("class", "—")), "Ready" if not primary.is_empty() else "Awaiting pipeline"]
+		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\nSupply: %s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, str(primary.get("state", "Awaiting pipeline")), str(primary.get("acceptance", {}).get("replay", "—")), str(primary.get("difficulty", {}).get("class", "—")), "Ready" if not primary.is_empty() else "Awaiting pipeline", selected_source_text]
 	else:
 		var entries: Array = _release_pool.get("entries", [])
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
@@ -307,6 +341,7 @@ func _set_runtime_button(button_name: String, caption: String, image_path: Strin
 	if button == null: return
 	button.text = caption
 	button.icon = _runtime_png_texture(image_path) if not image_path.is_empty() else null
+	button.tooltip_text = ""
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	button.expand_icon = not image_path.is_empty()
@@ -335,12 +370,33 @@ func _refresh_runtime_cards() -> void:
 			_set_runtime_button(pixel_slots[index], caption.left(18), image_path)
 		else:
 			_set_runtime_button(pixel_slots[index], "No artwork", "")
+	var page_count := maxi(1, ceili(float(_imported_sources.size()) / float(level_slots.size())))
+	_imported_page = clampi(_imported_page, 0, page_count - 1)
+	var bottom_heading := get_node_or_null("RuntimeBottomHeading") as Label
+	if bottom_heading != null:
+		bottom_heading.text = "VARIATIONS  /  RECENT ITEMS · %d PNG · %d/%d" % [_imported_sources.size(), _imported_page + 1, page_count] if _screen == "LEVEL FACTORY" else "VARIATIONS  /  RECENT ITEMS"
 	for index in range(level_slots.size()):
-		if index < candidates.size():
-			var candidate: Dictionary = candidates[index]
-			_set_runtime_button(level_slots[index], str(candidate.get("candidate_id", "Level %d" % (index + 1))).left(12), str(candidate.get("artwork_path", "")))
+		var source_index := _imported_page * level_slots.size() + index
+		if source_index < _imported_sources.size():
+			var imported: Dictionary = _imported_sources[source_index]
+			var source_id := str(imported.get("source_id", ""))
+			var filename := str(imported.get("display_filename", "image.png"))
+			var disposition := str(imported.get("disposition", "IMPORTED"))
+			var status_caption := "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
+			var caption := ("● " if source_id == _selected_import_source_id else "") + filename.get_basename().left(9) + "\n" + status_caption
+			_set_runtime_button(level_slots[index], caption, str(imported.get("path", "")))
+			var button := get_node_or_null(level_slots[index]) as Button
+			if button != null:
+				button.tooltip_text = "%s\n%s\n%s" % [filename, disposition, _wrap_identity(source_id, 24)]
 		else:
 			_set_runtime_button(level_slots[index], "—", "")
+	if _imported_sources.is_empty():
+		for index in range(level_slots.size()):
+			if index < candidates.size():
+				var candidate: Dictionary = candidates[index]
+				_set_runtime_button(level_slots[index], str(candidate.get("candidate_id", "Level %d" % (index + 1))).left(12), str(candidate.get("artwork_path", "")))
+			else:
+				_set_runtime_button(level_slots[index], "—", "")
 	var release_slots := ["SelectReleaseLevel", "ReleaseRow2", "ReleaseRow3", "ReleaseRow4", "ReleaseRow5", "ReleaseRow6", "ReleaseRow7", "ReleaseRow8"]
 	var entries: Array = _release_pool.get("entries", [])
 	for index in range(release_slots.size()):
@@ -405,7 +461,7 @@ func _build_master_controls() -> void:
 	_place_control("ZoomOut", Rect2(650, 124, 34, 34), _adjust_zoom.bind(-1.0))
 	_place_control("ZoomSlider", Rect2(735, 123, 136, 32), _set_zoom_from_pointer)
 	_place_control("ZoomIn", Rect2(875, 124, 34, 34), _adjust_zoom.bind(1.0))
-	_place_control("ZoomOneToOne", Rect2(910, 124, 50, 32), _set_zoom.bind(1.0))
+	_place_control("ZoomOneToOne", Rect2(910, 124, 50, 32), _zoom_one_to_one)
 	_place_control("ZoomFit", Rect2(960, 124, 50, 32), _fit_canvas)
 	_place_control("ToggleGrid", Rect2(1010, 124, 45, 32), _toggle_grid)
 	# LEVEL FACTORY: select artwork, set 3/4/5 columns, run real pipeline,
@@ -556,10 +612,13 @@ func _show_screen(name: String) -> void:
 	if _status != null:
 		_status.visible = false
 	if name == "RELEASE POOL":
+		_clear_preview_for_screen("RELEASE POOL")
 		_refresh_release_pool(false)
 		_apply_release_projection()
-	elif not _selected_art_path.is_empty():
-		_load_selected_art_preview(_selected_art_path)
+		if not _selected_release_id.is_empty():
+			_select_release_entry(_selected_release_id)
+	else:
+		_present_active_preview()
 	_refresh_live_data()
 
 
@@ -689,21 +748,16 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 
 
 func _import_pngs(paths: Array) -> void:
-	_last_source_id = ""
-	_last_candidate_id = ""
-	_last_pipeline.clear()
-	_selected_art_path = ""
-	if _preview_rect != null:
-		_preview_rect.texture = null
-		_preview_rect.visible = false
 	var result := _extension("batch-import", {"paths": paths})
 	var items: Array = result.get("items", [])
 	var lines: Array[String] = []
+	var item_records: Array[Dictionary] = []
 	var imported_count := 0
 	var reused_count := 0
 	var rejected_count := 0
 	var preview_path := ""
 	var preview_source_id := ""
+	_rejected_imports.clear()
 	for index in range(paths.size()):
 		var path := str(paths[index])
 		var item: Dictionary = items[index] if index < items.size() and items[index] is Dictionary else {}
@@ -714,28 +768,40 @@ func _import_pngs(paths: Array) -> void:
 				reused_count += 1
 			else:
 				imported_count += 1
+			_upsert_imported_source({"path": path, "source_id": source_id, "disposition": state, "display_filename": path.get_file()})
 			if preview_path.is_empty():
 				preview_path = path
 				preview_source_id = source_id
-			var detail := "%s · %s" % ["ALREADY_IMPORTED" if state == "ALREADY_IMPORTED" else "IMPORTED", source_id]
+			var detail := "%s · %s" % [state, _wrap_identity(source_id, 24)]
 			lines.append("%s\n%s" % [path.get_file(), detail])
+			item_records.append({"path": path, "source_id": source_id, "disposition": state, "display_filename": path.get_file()})
 		else:
 			rejected_count += 1
 			var reason := str(item.get("error", item.get("reason", state if not state.is_empty() else result.get("reason", "Canonical import returned no source identity."))))
 			lines.append("%s\nREJECTED · %s" % [path.get_file(), reason])
+			var rejected := {"path": path, "source_id": source_id, "disposition": "REJECTED", "display_filename": path.get_file(), "error": reason}
+			_rejected_imports.append(rejected)
+			item_records.append(rejected.duplicate(true))
 	_last_import_summary = {
 		"selected_count": paths.size(), "imported_count": imported_count, "reused_count": reused_count,
 		"rejected_count": rejected_count, "batch_id": str(result.get("batch_id", "")),
 		"preview_source_id": preview_source_id, "preview_path": preview_path,
-		"solver_calls": 0, "items": lines.duplicate()
+		"accepted_source_count": _imported_sources.size(), "solver_calls": 0,
+		"items": lines.duplicate(), "item_records": item_records.duplicate(true), "rejected": _rejected_imports.duplicate(true)
 	}
 	if not preview_path.is_empty():
-		_selected_art_path = preview_path
-		_last_source_id = preview_source_id
-		_load_selected_art_preview(preview_path)
+		_select_imported_source_by_id(preview_source_id)
+	else:
+		_last_source_id = ""
+		_last_candidate_id = ""
+		_last_pipeline.clear()
+		_selected_import_source_id = ""
+		_clear_preview_for_screen("LEVEL FACTORY")
 	var summary := "PNG selection: %d selected · %d imported · %d reused · %d rejected" % [paths.size(), imported_count, reused_count, rejected_count]
 	if not preview_source_id.is_empty():
-		summary += "\nSelected for Run Pipeline: " + preview_source_id
+		summary += "\nSelected: %s · %s" % [preview_path.get_file(), _wrap_identity(preview_source_id, 24)]
+	_refresh_runtime_cards()
+	_refresh_live_data()
 	_report(summary)
 	if not paths.is_empty():
 		_show_import_results(paths.size(), lines)
@@ -744,17 +810,46 @@ func _import_pngs(paths: Array) -> void:
 func _show_import_results(selected_count: int, lines: Array[String]) -> void:
 	var dialog := AcceptDialog.new()
 	dialog.title = "PNG import · %d selected" % selected_count
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(660, minf(520.0, 76.0 + float(lines.size()) * 38.0))
+	dialog.add_child(scroll)
 	var detail := Label.new()
-	detail.custom_minimum_size = Vector2(640, minf(520.0, 56.0 + float(lines.size()) * 44.0))
+	detail.custom_minimum_size = Vector2(640, maxf(76.0, float(lines.size()) * 62.0))
 	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	var visible_lines := lines.slice(0, 24)
-	if lines.size() > visible_lines.size():
-		visible_lines.append("… %d additional file statuses are available in the batch record." % (lines.size() - visible_lines.size()))
-	detail.text = "\n\n".join(visible_lines)
-	dialog.add_child(detail)
+	detail.text = "\n\n".join(lines)
+	scroll.add_child(detail)
 	add_child(dialog)
 	dialog.confirmed.connect(dialog.queue_free)
 	dialog.popup_centered()
+
+
+func _upsert_imported_source(record: Dictionary) -> void:
+	var source_id := str(record.get("source_id", ""))
+	if source_id.is_empty():
+		return
+	for index in range(_imported_sources.size()):
+		if str(_imported_sources[index].get("source_id", "")) == source_id:
+			var existing: Dictionary = _imported_sources[index]
+			if str(existing.get("path", "")).is_empty():
+				existing["path"] = record.get("path", "")
+			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
+			_imported_sources[index] = existing
+			return
+	_imported_sources.append(record.duplicate(true))
+
+
+func _selected_import_filename() -> String:
+	for record in _imported_sources:
+		if str(record.get("source_id", "")) == _selected_import_source_id:
+			return str(record.get("display_filename", "image.png"))
+	return ""
+
+
+func _wrap_identity(value: String, chunk_size: int = 24) -> String:
+	var parts: Array[String] = []
+	for offset in range(0, value.length(), maxi(1, chunk_size)):
+		parts.append(value.substr(offset, chunk_size))
+	return "\n".join(parts)
 
 
 func _generate_art() -> void:
@@ -840,10 +935,13 @@ func _edit_prompt() -> void:
 
 
 func _send_to_level_factory() -> void:
+	var pixel_art_path := str(_preview_paths_by_screen.get("PIXEL ART", ""))
 	_show_screen("LEVEL FACTORY")
 	if _last_candidate_id.is_empty():
 		_report("Generate or select a candidate first.")
 	else:
+		if not pixel_art_path.is_empty():
+			_load_selected_art_preview(pixel_art_path, "LEVEL FACTORY")
 		_report("Candidate %s selected. Choose supply columns and run the pipeline." % _last_candidate_id)
 
 
@@ -913,6 +1011,7 @@ func _select_first_release() -> void:
 	var id := _visible_release_ids[0]
 	if id not in _selected_release_ids: _selected_release_ids.append(id)
 	_selected_release_id = id
+	_select_release_entry(id)
 	_report("Selected %d READY level(s)" % _selected_release_ids.size())
 
 
@@ -1057,15 +1156,27 @@ func _open_settings() -> void:
 	_settings_dialog.popup_centered()
 
 
-func _load_selected_art_preview(path: String) -> void:
+func _load_selected_art_preview(path: String, screen_name: String = "") -> void:
+	var target_screen := screen_name if not screen_name.is_empty() else _screen
+	if target_screen not in master_names():
+		return
+	_preview_paths_by_screen[target_screen] = path
+	if target_screen != _screen:
+		return
+	if path.is_empty():
+		_hide_preview_display()
+		return
 	var global_path := ProjectSettings.globalize_path(path) if path.begins_with("res://") else path
 	if not FileAccess.file_exists(global_path):
+		_preview_paths_by_screen[target_screen] = ""
+		_hide_preview_display()
 		return
 	var image := Image.load_from_file(global_path)
 	if image == null or image.is_empty():
+		_preview_paths_by_screen[target_screen] = ""
+		_hide_preview_display()
 		return
-	_preview_rect.texture = ImageTexture.create_from_image(image)
-	_preview_rect.visible = true
+	_render_preview_image(image, path)
 	var transparent := 0
 	var colors: Dictionary = {}
 	for y in range(image.get_height()):
@@ -1074,6 +1185,49 @@ func _load_selected_art_preview(path: String) -> void:
 			if pixel.a < 1.0: transparent += 1
 			colors[pixel.to_rgba32()] = true
 	_report("%d × %d · %d colors · %d transparent · PNG" % [image.get_width(), image.get_height(), colors.size(), transparent])
+
+
+func _render_preview_image(image: Image, path: String = "") -> void:
+	_preview_rect.texture = ImageTexture.create_from_image(image)
+	var fit_scale := minf(_preview_host.size.x / float(image.get_width()), _preview_host.size.y / float(image.get_height()))
+	var fitted_size := Vector2(image.get_width(), image.get_height()) * fit_scale
+	_preview_rect.size = fitted_size
+	_preview_rect.position = (_preview_host.size - fitted_size) * 0.5
+	_preview_rect.pivot_offset = fitted_size * 0.5
+	_preview_content.size = _preview_host.size
+	_preview_content.pivot_offset = _preview_content.size * 0.5
+	_preview_content.scale = Vector2.ONE * _zoom
+	_preview_rect.visible = true
+	_active_preview_path = path
+	_selected_art_path = path
+	_update_grid_overlay(image.get_width(), image.get_height())
+
+
+func _hide_preview_display() -> void:
+	_active_preview_path = ""
+	if _preview_rect != null:
+		_preview_rect.texture = null
+		_preview_rect.visible = false
+	for line in _grid_lines:
+		line.visible = false
+	if _preview_content != null:
+		_preview_content.scale = Vector2.ONE
+
+
+func _clear_preview_for_screen(screen_name: String) -> void:
+	_preview_paths_by_screen[screen_name] = ""
+	if screen_name == _screen:
+		_hide_preview_display()
+		_selected_art_path = ""
+
+
+func _present_active_preview() -> void:
+	var path := str(_preview_paths_by_screen.get(_screen, ""))
+	if path.is_empty():
+		_hide_preview_display()
+		_selected_art_path = ""
+		return
+	_load_selected_art_preview(path, _screen)
 
 
 func _select_artwork(index: int) -> void:
@@ -1092,11 +1246,60 @@ func _page_artwork(direction: int) -> void:
 		if str(candidates[i].get("candidate_id", "")) == _last_candidate_id: current = i
 	var chosen: Dictionary = candidates[posmod(current + direction, candidates.size())]
 	_last_candidate_id = str(chosen.get("candidate_id", ""))
+	var artwork_path := str(chosen.get("artwork_path", ""))
+	if not artwork_path.is_empty():
+		_load_selected_art_preview(artwork_path, "PIXEL ART")
 	_report("Artwork selected")
 
 
 func _select_variation(index: int) -> void:
+	if not _imported_sources.is_empty():
+		var queue_index := _imported_page * 8 + index
+		if index >= 0 and queue_index < _imported_sources.size():
+			_select_imported_source_by_id(str(_imported_sources[queue_index].get("source_id", "")))
+		return
 	_select_inbox_candidate(index)
+
+
+func _select_imported_source_by_id(source_id: String) -> void:
+	for index in range(_imported_sources.size()):
+		var imported: Dictionary = _imported_sources[index]
+		if str(imported.get("source_id", "")) != source_id:
+			continue
+		_selected_import_source_id = source_id
+		_selected_art_path = str(imported.get("path", ""))
+		_last_source_id = source_id
+		_last_candidate_id = ""
+		_last_pipeline.clear()
+		_imported_page = index / 8
+		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
+		_refresh_runtime_cards()
+		_refresh_live_data()
+		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
+		return
+
+
+func _page_imported_sources(direction: int) -> void:
+	var page_count := maxi(1, ceili(float(_imported_sources.size()) / 8.0))
+	if page_count <= 1:
+		return
+	_imported_page = posmod(_imported_page + direction, page_count)
+	_refresh_runtime_cards()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _screen != "LEVEL FACTORY" or _imported_sources.size() <= 8 or _preview_host == null:
+		return
+	if not event is InputEventMouseButton:
+		return
+	var mouse := event as InputEventMouseButton
+	if not mouse.pressed or mouse.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
+		return
+	var strip := get_node_or_null("RuntimeBottomStrip") as Control
+	if strip == null or not strip.get_global_rect().has_point(get_global_mouse_position()):
+		return
+	_page_imported_sources(-1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
+	get_viewport().set_input_as_handled()
 
 
 func _select_inbox_candidate(index: int) -> void:
@@ -1105,49 +1308,83 @@ func _select_inbox_candidate(index: int) -> void:
 	if index < 0 or index >= candidates.size(): return
 	var candidate: Dictionary = candidates[index]
 	_last_candidate_id = str(candidate.get("candidate_id", ""))
+	_last_source_id = ""
+	_selected_import_source_id = ""
 	var source_path := str(candidate.get("source_path", candidate.get("artwork_path", "")))
-	if source_path.ends_with("artwork.png"): _selected_art_path = source_path
-	elif not source_path.is_empty(): _selected_art_path = source_path.path_join("artwork.png")
-	if not _selected_art_path.is_empty(): _load_selected_art_preview(_selected_art_path)
+	var artwork_path := source_path if source_path.ends_with(".png") else (source_path.path_join("artwork.png") if not source_path.is_empty() else "")
+	if not artwork_path.is_empty(): _load_selected_art_preview(artwork_path, _screen)
 	_report("Artwork selected")
 
 
 func _adjust_zoom(amount: float) -> void:
-	_set_zoom(clampf(_zoom + amount, 1.0, 16.0))
+	_set_zoom(clampf(_zoom * (1.25 if amount > 0.0 else 0.8), 0.02, 16.0))
 
 
 func _set_zoom(value: float) -> void:
-	_zoom = clampf(value, 1.0, 16.0)
-	_preview_rect.scale = Vector2.ONE * (_zoom / 8.0) * _responsive_scale
+	_zoom = clampf(value, 0.02, 16.0)
+	if _preview_content != null:
+		_preview_content.scale = Vector2.ONE * _zoom
+
+
+func _zoom_one_to_one() -> void:
+	if _preview_rect == null or _preview_rect.texture == null:
+		return
+	var image_size := _preview_rect.texture.get_size()
+	var fit_scale := minf(_preview_host.size.x / image_size.x, _preview_host.size.y / image_size.y)
+	_set_zoom(1.0 / fit_scale)
 
 
 func _set_zoom_from_pointer() -> void:
 	var position_x := get_viewport().get_mouse_position().x
-	_set_zoom(1.0 + clampf((position_x - 735.0) / 136.0, 0.0, 1.0) * 15.0)
+	_set_zoom(0.02 + clampf((position_x - 735.0) / 136.0, 0.0, 1.0) * 15.98)
 
 
 func _fit_canvas() -> void:
-	_set_zoom(8.0)
+	_set_zoom(1.0)
 
 
 func _toggle_grid() -> void:
 	_grid_enabled = not _grid_enabled
-	for line in _grid_lines: line.visible = _grid_enabled
+	for line in _grid_lines: line.visible = _grid_enabled and _preview_rect != null and _preview_rect.visible
 	_report("Grid %s" % ("On" if _grid_enabled else "Off"))
 
 
 func _build_grid_overlay() -> void:
-	for index in range(33):
-		var vertical := Line2D.new(); vertical.name = "GridVertical%02d" % index
-		vertical.add_point(Vector2(495 + index * (590.0 / 32.0), 172)); vertical.add_point(Vector2(495 + index * (590.0 / 32.0), 762))
-		var horizontal := Line2D.new(); horizontal.name = "GridHorizontal%02d" % index
-		horizontal.add_point(Vector2(495, 172 + index * (590.0 / 32.0))); horizontal.add_point(Vector2(1085, 172 + index * (590.0 / 32.0)))
-		for line in [vertical, horizontal]:
-			line.width = 1.0
-			line.default_color = Color(1, 1, 1, 0.22)
-			line.visible = false
-			add_child(line)
-			_grid_lines.append(line)
+	_update_grid_overlay(32, 32)
+
+
+func _update_grid_overlay(image_width: int, image_height: int) -> void:
+	for line in _grid_lines:
+		if is_instance_valid(line):
+			line.queue_free()
+	_grid_lines.clear()
+	if _preview_content == null or image_width <= 0 or image_height <= 0:
+		return
+	var fit := minf(_preview_host.size.x / float(image_width), _preview_host.size.y / float(image_height))
+	var draw_size := Vector2(image_width, image_height) * fit
+	var origin := (_preview_host.size - draw_size) * 0.5
+	for index in range(image_width + 1):
+		var x := origin.x + index * fit
+		var line := Line2D.new()
+		line.name = "PreviewGridVertical%03d" % index
+		line.add_point(Vector2(x, origin.y))
+		line.add_point(Vector2(x, origin.y + draw_size.y))
+		_add_preview_grid_line(line)
+	for index in range(image_height + 1):
+		var y := origin.y + index * fit
+		var line := Line2D.new()
+		line.name = "PreviewGridHorizontal%03d" % index
+		line.add_point(Vector2(origin.x, y))
+		line.add_point(Vector2(origin.x + draw_size.x, y))
+		_add_preview_grid_line(line)
+
+
+func _add_preview_grid_line(line: Line2D) -> void:
+	line.width = 1.0
+	line.default_color = Color(1, 1, 1, 0.22)
+	line.visible = _grid_enabled and _preview_rect != null and _preview_rect.visible
+	_preview_content.add_child(line)
+	_grid_lines.append(line)
 
 
 func _keep_auto_robot_cap() -> void:
@@ -1260,8 +1497,9 @@ func _select_release_entry(candidate_id: String) -> void:
 		if str(entry.get("candidate_id", "")) != candidate_id: continue
 		var artwork := str(entry.get("files", {}).get("artwork", {}).get("path", ""))
 		if not artwork.is_empty():
-			_selected_art_path = artwork
-			_load_selected_art_preview(artwork)
+			_load_selected_art_preview(artwork, "RELEASE POOL")
+		else:
+			_clear_preview_for_screen("RELEASE POOL")
 		_last_candidate_id = candidate_id
 		return
 
