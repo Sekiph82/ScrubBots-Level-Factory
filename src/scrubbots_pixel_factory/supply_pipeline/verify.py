@@ -97,7 +97,13 @@ def verify_exported_supply(
             level, [candidate], analyze=True, max_visited=max_visited, timeout=timeout_seconds
         )
     except (OSError, RuntimeError, ValueError) as exc:
-        return {"state": "ERROR", "disposition": "ERROR", "reason": str(exc), "authority": rules.authority}
+        runner = getattr(exc, "telemetry", None)
+        return {
+            "state": "ERROR", "disposition": "ERROR", "reason": str(exc), "authority": rules.authority,
+            "solver_runner": dict(runner) if isinstance(runner, dict) else None,
+            "solver_invocations": int(runner.get("invocation_count", 0)) if isinstance(runner, dict) else 0,
+            "solver_status": "TIMEOUT" if isinstance(runner, dict) and runner.get("timed_out") else "BLOCKED",
+        }
     record = response.get("results", [{}])[0]
     verification = SolutionVerifier().verify(counts, sum(counts.values()), columns, record, selected_columns)
     loader_evidence = {

@@ -17,6 +17,12 @@ BRIDGE = Path(__file__).resolve().parent / "godot" / "solver_bridge.gd"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 
 
+class SolverBridgeError(RuntimeError):
+    def __init__(self, message, telemetry):
+        super().__init__(message)
+        self.telemetry = dict(telemetry)
+
+
 class ScrubBotsSolver:
     def __init__(self, rules, godot=None):
         self.rules = rules
@@ -29,6 +35,13 @@ class ScrubBotsSolver:
         """level: {id,width,height,palette:[#RRGGBBAA local],cells:[local or -1]}
         candidates: [{id, columns:[[{color,count}]*3]} or {..., replay_trace:[...]}]"""
         attested_runtime = getattr(self.rules, "attestation", None) is not None
+        if attested_runtime:
+            if not isinstance(candidates, (list, tuple)) or len(candidates) != 1 or stop_after != 1:
+                raise ValueError("pinned-runtime bridge requires exactly one candidate and stop_after=1")
+            if max_visited is None or type(max_visited) is not int or not 0 < max_visited <= 25_000:
+                raise ValueError("pinned-runtime candidate max_visited must be within 1..25000")
+            if timeout is None or not 0 < float(timeout) <= 90:
+                raise ValueError("pinned-runtime candidate timeout must be within (0, 90] seconds")
         if attested_runtime:
             work_root = Path(self.rules.project).resolve() / ".lf_solver_jobs"
             work = work_root / f"job-{uuid.uuid4().hex}"
@@ -73,9 +86,15 @@ class ScrubBotsSolver:
         if max_visited:
             req["max_visited"] = max_visited
         (work / "req.json").write_text(json.dumps(req), encoding="utf-8")
+        request_sha256 = hashlib.sha256((work / "req.json").read_bytes()).hexdigest()
+        plan_path = Path(str(candidates[0].get("supply_plan_path", ""))) if candidates else None
+        plan_sha256 = hashlib.sha256(plan_path.read_bytes()).hexdigest() if plan_path and plan_path.is_file() else None
         tail = deque(maxlen=30)
         output_bytes = 0
         reader_error = []
+        native_solve_started = False
+        native_solve_completed = False
+        native_solve_status = None
         process_env = None
         if attested_runtime:
             process_env = os.environ.copy()
@@ -85,7 +104,7 @@ class ScrubBotsSolver:
                 process_env[key] = str(bounded_temp)
 
         def drain_output(stream):
-            nonlocal output_bytes
+            nonlocal output_bytes, native_solve_started, native_solve_completed, native_solve_status
             pending = ""
             try:
                 while True:
@@ -101,6 +120,11 @@ class ScrubBotsSolver:
                         line, pending = pending.split("\n", 1)
                         line = line[-2048:].rstrip()
                         tail.append(line)
+                        if line.startswith("BRIDGE_NATIVE_START "):
+                            native_solve_started = True
+                        elif line.startswith("BRIDGE_NATIVE_END "):
+                            native_solve_completed = True
+                            native_solve_status = line.split(" status=", 1)[-1].split(" ", 1)[0]
                         if line.startswith("BRIDGE") and progress:
                             progress(line)
                     if len(pending) > 4096:
@@ -115,19 +139,32 @@ class ScrubBotsSolver:
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         start = time.monotonic()
         hard_timeout = float(timeout if timeout is not None else (90 if attested_runtime else 0))
-        if hard_timeout < 0 or hard_timeout > 300 or (attested_runtime and hard_timeout == 0):
-            raise ValueError("native solver timeout must be from 0 to 300 seconds for an attested runtime")
-        with subprocess.Popen([self.godot, "--headless", "--path", str(self.rules.project), "-s", str(BRIDGE),
-                               "--", str(work / "req.json"), str(work / "res.json")],
-                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                              encoding="utf-8", errors="replace", creationflags=flags,
-                              env=process_env, bufsize=1) as p:
+        timeout_limit = 90 if attested_runtime else 300
+        if hard_timeout < 0 or hard_timeout > timeout_limit or (attested_runtime and hard_timeout == 0):
+            raise ValueError(f"native solver timeout must be from 0 to {timeout_limit} seconds")
+        p = None
+        try:
+            p = subprocess.Popen([self.godot, "--headless", "--path", str(self.rules.project), "-s", str(BRIDGE),
+                                  "--", str(work / "req.json"), str(work / "res.json")],
+                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                 encoding="utf-8", errors="replace", creationflags=flags,
+                                 env=process_env, bufsize=1)
             reader = threading.Thread(target=drain_output, args=(p.stdout,), daemon=True)
             reader.start()
             timed_out = False
+            output_overflow = False
             while p.poll() is None:
                 if hard_timeout and time.monotonic() - start >= hard_timeout:
                     timed_out = True
+                    p.terminate()
+                    try:
+                        p.wait(timeout=2)
+                    except subprocess.TimeoutExpired:
+                        p.kill()
+                        p.wait()
+                    break
+                if reader_error:
+                    output_overflow = True
                     p.terminate()
                     try:
                         p.wait(timeout=2)
@@ -141,28 +178,53 @@ class ScrubBotsSolver:
                 p.kill()
                 p.wait()
                 reader.join(timeout=2)
+            if p.stdout is not None:
+                p.stdout.close()
             elapsed_seconds = round(time.monotonic() - start, 3)
             exit_code = p.returncode
+        except OSError as exc:
+            elapsed_seconds = round(time.monotonic() - start, 3)
+            telemetry = {
+                "invocation_count": 0, "native_solve_started": False, "native_solve_completed": False,
+                "timed_out": False, "elapsed_seconds": elapsed_seconds, "process_exit_code": None,
+                "process_pid": None, "request_sha256": request_sha256, "plan_sha256": plan_sha256,
+                "job_path": str(work), "launch_error": str(exc)[:512], "stdout_tail": list(tail),
+            }
+            self._write_runner_receipt(work, telemetry)
+            raise SolverBridgeError(f"bounded Godot process could not be launched: {exc}", telemetry) from exc
+        telemetry = {
+            "invocation_count": int(native_solve_started),
+            "process_invocation_count": 1 if p is not None else 0,
+            "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME" if attested_runtime else "CONFIGURED_GAME_PROJECT",
+            "timeout_seconds": hard_timeout or None, "elapsed_seconds": elapsed_seconds,
+            "process_exit_code": exit_code, "process_pid": p.pid if p is not None else None,
+            "timed_out": timed_out, "native_solve_started": native_solve_started,
+            "native_solve_completed": native_solve_completed, "native_solve_status": native_solve_status,
+            "stdout_bytes": output_bytes, "stdout_tail": list(tail),
+            "request_sha256": request_sha256, "plan_sha256": plan_sha256,
+            "response_sha256": None, "job_path": str(work),
+        }
+        self._write_runner_receipt(work, telemetry)
         if timed_out:
-            raise RuntimeError(f"bounded Godot solver timed out after {hard_timeout:.1f}s; job retained at {work}")
+            raise SolverBridgeError(
+                f"bounded Godot solver timed out after {hard_timeout:.1f}s; job retained at {work}", telemetry
+            )
         if reader_error:
-            raise RuntimeError("bounded Godot output capture failed: " + "; ".join(reader_error))
+            raise SolverBridgeError("bounded Godot output capture failed: " + "; ".join(reader_error), telemetry)
         out = work / "res.json"
         if exit_code != 0 or not out.exists():
-            raise RuntimeError("solver bridge failed:\n" + "\n".join(tail))
-        response_bytes = out.read_bytes()
-        response = json.loads(response_bytes.decode("utf-8"))
-        response["_runner"] = {
-            "invocation_count": 1,
-            "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME" if attested_runtime else "CONFIGURED_GAME_PROJECT",
-            "timeout_seconds": hard_timeout or None,
-            "elapsed_seconds": elapsed_seconds,
-            "process_exit_code": exit_code,
-            "timed_out": False,
-            "stdout_bytes": output_bytes,
-            "stdout_tail": list(tail),
-            "request_sha256": hashlib.sha256((work / "req.json").read_bytes()).hexdigest(),
-            "response_sha256": hashlib.sha256(response_bytes).hexdigest(),
-            "job_path": str(work),
-        }
+            raise SolverBridgeError("solver bridge failed:\n" + "\n".join(tail), telemetry)
+        try:
+            response_bytes = out.read_bytes()
+            response = json.loads(response_bytes.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise SolverBridgeError(f"solver bridge response is unreadable: {exc}", telemetry) from exc
+        telemetry["response_sha256"] = hashlib.sha256(response_bytes).hexdigest()
+        telemetry["elapsed_seconds"] = elapsed_seconds
+        self._write_runner_receipt(work, telemetry)
+        response["_runner"] = telemetry
         return response
+
+    @staticmethod
+    def _write_runner_receipt(work, telemetry):
+        (work / "runner.json").write_text(json.dumps(telemetry, sort_keys=True, indent=2) + "\n", encoding="utf-8")

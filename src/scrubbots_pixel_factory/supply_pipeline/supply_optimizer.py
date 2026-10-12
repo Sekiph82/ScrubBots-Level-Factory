@@ -86,6 +86,15 @@ class SupplyOptimizer:
                       viability_budget, real_max_visited, level_number, progress,
                       real_timeout_seconds, max_native_solver_invocations):
         log = progress or (lambda *_: None)
+        pinned_runtime = getattr(self.rules, "attestation", None) is not None
+        if pinned_runtime:
+            if real_max_visited is None or type(real_max_visited) is not int or not 0 < real_max_visited <= 25_000:
+                raise NoValidSupply("pinned-runtime solver visit bound must be within 1..25000")
+            if not 0 < float(real_timeout_seconds) <= 90:
+                raise NoValidSupply("pinned-runtime solver timeout must be within (0, 90] seconds")
+            max_native_solver_invocations = min(
+                6, 6 if max_native_solver_invocations is None else max(0, int(max_native_solver_invocations))
+            )
         void_count = int(np.count_nonzero(np.asarray(grid) < 0))
         if void_count:
             gate_reader = getattr(self.rules, "void_capability", None)
@@ -156,10 +165,11 @@ class SupplyOptimizer:
         solver = self.solver or ScrubBotsSolver(self.rules)
         accepted, real_runs = [], []
         native_solver_invocations = 0
-        for start in range(0, len(scored), 4):
+        batch_size = 1 if pinned_runtime else 4
+        for start in range(0, len(scored), batch_size):
             if max_native_solver_invocations is not None and native_solver_invocations >= max_native_solver_invocations:
                 break
-            chunk = scored[start:start + 4]
+            chunk = scored[start:start + batch_size]
             call_options = {
                 "stop_after": verify_top - len(accepted),
                 "max_visited": real_max_visited,

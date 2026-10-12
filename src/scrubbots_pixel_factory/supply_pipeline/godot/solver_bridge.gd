@@ -39,6 +39,15 @@ func _initialize() -> void:
 		return
 	var selected_column_count := int(req.get("column_count", MIN_COLUMNS))
 	var selected_preview_depth := int(req.get("visible_preview_depth", VISIBLE_PREVIEW_DEPTH))
+	var cands: Array = req.get("candidates", [])
+	var stop_after := int(req.get("stop_after_solved", 1))
+	var max_visited := int(req.get("max_visited", SolvabilitySolver.DEFAULT_MAX_VISITED))
+	var authority: Dictionary = req.get("game_authority", {})
+	if authority.get("runtime_kind", "") == "LF_PINNED_SOURCE_MINIMAL_RUNTIME":
+		if cands.size() != 1 or stop_after != 1 or max_visited < 1 or max_visited > 25000:
+			printerr("pinned LF request must contain exactly one candidate, stop_after=1, and max_visited<=25000")
+			quit(2)
+			return
 	var out := {"schema": "pixelartstudio.scrubbots_bridge.v1",
 		"authority": req.get("game_authority", {"git_head": "UNAVAILABLE"}),
 		"gameConstants": {"slotCount": ProofState.SLOT_COUNT,
@@ -86,13 +95,11 @@ func _initialize() -> void:
 	out["levelLoaderPass"] = true
 	out["productionValidatorPass"] = true
 	var solver = SolvabilitySolver.new()
-	var cfg := {"max_visited": int(req.get("max_visited", SolvabilitySolver.DEFAULT_MAX_VISITED)),
+	var cfg := {"max_visited": max_visited,
 		"max_depth": int(req.get("max_depth", SolvabilitySolver.DEFAULT_MAX_DEPTH))}
-	var stop_after := int(req.get("stop_after_solved", 1))
 	var analyze: bool = bool(req.get("analyze", true))
 	var level_number := int(req.get("level_number", 1))
 	var solved_n := 0
-	var cands: Array = req.get("candidates", [])
 	for i in range(cands.size()):
 		var cand: Dictionary = cands[i]
 		var rec := {"id": cand["id"], "artworkCellCount": level.get_artwork_cell_count(), "voidCellCount": level.get_void_cell_count(), "levelDataVersion": level.version}
@@ -114,7 +121,9 @@ func _initialize() -> void:
 			print("BRIDGE %d/%d %s REPLAY ok=%s solved=%s" % [i + 1, cands.size(), cand["id"], rp["ok"], rp["solved"]])
 			continue
 		var t0 := Time.get_ticks_msec()
+		print("BRIDGE_NATIVE_START %s" % String(cand["id"]))
 		var res: Dictionary = solver.solve(_initial(level, eng), cfg)
+		print("BRIDGE_NATIVE_END %s status=%s visited=%d" % [String(cand["id"]), String(res["status"]), int(res.get("visited", 0))])
 		rec["status"] = String(res["status"])
 		rec["reason"] = res.get("reason", "")
 		rec["solver"] = {"visited": int(res.get("visited", 0)), "memoHits": int(res.get("memo_hits", 0)),
