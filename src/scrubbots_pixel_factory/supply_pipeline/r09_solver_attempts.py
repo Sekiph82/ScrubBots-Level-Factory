@@ -234,6 +234,59 @@ def _normalize_status(status: str) -> str:
     return "BLOCKED"
 
 
+def serialize_bridge_candidate(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate one LF tuple-form plan and serialize the native adapter's dict form."""
+    raw_columns = candidate.get("columns")
+    if not isinstance(raw_columns, (list, tuple)) or len(raw_columns) != 3:
+        raise R09Blocked("candidate must contain exactly three supply columns")
+    columns: list[list[dict[str, int]]] = []
+    for column in raw_columns:
+        if not isinstance(column, (list, tuple)) or not column:
+            raise R09Blocked("candidate supply columns must be non-empty ordered batches")
+        batches: list[dict[str, int]] = []
+        for batch in column:
+            if not isinstance(batch, (list, tuple)) or len(batch) != 2:
+                raise R09Blocked("candidate supply batch must be a (color, count) pair")
+            color, count = batch
+            if type(color) is not int or color < 0 or type(count) is not int or count <= 0:
+                raise R09Blocked("candidate supply batch color/count must be bounded nonnegative integers")
+            batches.append({"color": color, "count": count})
+        columns.append(batches)
+    return {"id": str(candidate.get("id", "")), "columns": columns}
+
+
+def _load_check_proves_ready(checked: Mapping[str, Any]) -> bool:
+    """Require every native and LF export gate before reporting local pipeline READY."""
+    runner = checked.get("solver_runner")
+    solver = checked.get("solver")
+    replay = solver.get("replay") if isinstance(solver, Mapping) else None
+    difficulty = checked.get("difficulty_v1")
+    verification = checked.get("verification")
+    return bool(
+        checked.get("state") == "READY"
+        and (checked.get("solver_status") or (solver.get("status") if isinstance(solver, Mapping) else None)) == "SOLVED"
+        and checked.get("solver_invocations") == 1
+        and isinstance(runner, Mapping)
+        and runner.get("invocation_count") == 1
+        and runner.get("process_invocation_count") == 1
+        and runner.get("native_solve_started") is True
+        and runner.get("native_solve_completed") is True
+        and isinstance(runner.get("elapsed_seconds"), (int, float))
+        and 0 <= float(runner["elapsed_seconds"]) <= MAX_NATIVE_TIMEOUT_SECONDS
+        and isinstance(replay, Mapping)
+        and replay.get("ok") is True
+        and replay.get("solved") is True
+        and replay.get("finalActive") == 0
+        and isinstance(difficulty, Mapping)
+        and difficulty.get("ok") is True
+        and isinstance(verification, Mapping)
+        and verification.get("all_ok") is True
+        and checked.get("levelLoaderPass") is True
+        and checked.get("productionValidatorPass") is True
+        and checked.get("supplyPlanLoaderPass") is True
+    )
+
+
 def run_capped_candidate_queue(
     *,
     candidates: Sequence[Mapping[str, Any]],
@@ -249,6 +302,7 @@ def run_capped_candidate_queue(
     load_check: Callable[[Mapping[str, Any], float, int], Mapping[str, Any]] | None = None,
     source_sha256_reader: Callable[[], str] | None = None,
     progress: Callable[[str], None] | None = None,
+    campaign_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run unique candidates serially, stop safely, and retain one receipt per call."""
     if not 1 <= len(candidates) <= MAX_PRIMARY_ATTEMPTS:
@@ -267,6 +321,8 @@ def run_capped_candidate_queue(
     if output.exists():
         raise R09Blocked("attempt campaign receipt directory already exists; refusing to repeat a sequence")
     output.mkdir(parents=True, exist_ok=False)
+    if campaign_metadata is not None:
+        _write_json(output / "campaign.json", campaign_metadata)
     attempts: list[dict[str, Any]] = []
     winner: dict[str, Any] | None = None
     blocked_reason: str | None = None
@@ -293,13 +349,9 @@ def run_capped_candidate_queue(
         if progress:
             progress(f"R09_ATTEMPT_START index={index} candidate={receipt['candidate_id']} plan_sha256={identities[index - 1]}")
         try:
-            bridge_candidate = {
-                "id": receipt["candidate_id"],
-                "columns": [
-                    [{"color": int(color), "count": int(count)} for color, count in column]
-                    for column in candidate["columns"]
-                ],
-            }
+            bridge_candidate = serialize_bridge_candidate(candidate)
+            if bridge_candidate["id"] != receipt["candidate_id"]:
+                raise R09Blocked("serialized bridge candidate identity mismatch")
             response = solver.run(
                 dict(level), [bridge_candidate],
                 stop_after=1, max_visited=max_visited, analyze=True, timeout=timeout_seconds, progress=progress,
@@ -406,6 +458,10 @@ def run_capped_candidate_queue(
                 "replay": (checked.get("solver") or {}).get("replay"),
                 "difficulty_v1": checked.get("difficulty_v1"),
                 "verification": checked.get("verification"),
+                "levelLoaderPass": checked.get("levelLoaderPass"),
+                "productionValidatorPass": checked.get("productionValidatorPass"),
+                "supplyPlanLoaderPass": checked.get("supplyPlanLoaderPass"),
+                "readiness_proven": _load_check_proves_ready(checked),
             }
         except Exception as exc:
             load_receipt = {
@@ -424,8 +480,10 @@ def run_capped_candidate_queue(
     retries_run = max(0, len(attempts) - 1)
     if blocked_reason:
         final_status = "BLOCKED"
+    elif winner is not None and load_receipt and load_receipt.get("readiness_proven") is True:
+        final_status = "OFFLINE_ONE_LEVEL_VALIDATED_CP_X002_PENDING"
     elif winner is not None:
-        final_status = "ONE_SOURCE_OFFLINE_SOLVED_CP_X002_PENDING"
+        final_status = "OFFLINE_SOLVED_SHIPPING_LOAD_CHECK_NOT_READY"
     elif len(attempts) < MAX_PRIMARY_ATTEMPTS and len(candidates) < MAX_PRIMARY_ATTEMPTS:
         final_status = "UNSOLVED_CANDIDATE_POOL_EXHAUSTED"
     else:
@@ -434,8 +492,14 @@ def run_capped_candidate_queue(
         "schema": "scrubbots.r09-solver-attempt-summary.v1",
         "status": final_status,
         "attempts_run": len(attempts), "retries_run": retries_run,
+        "native_primary_calls": sum(
+            int(bool((receipt.get("process") or {}).get("native_solve_started"))) for receipt in attempts
+        ),
         "primary_invocations": sum(
             int(bool((receipt.get("process") or {}).get("native_solve_started"))) for receipt in attempts
+        ),
+        "native_load_check_calls": int(
+            bool(load_receipt and load_receipt.get("solver_invocations") == 1)
         ),
         "optional_load_check_invocations": int(
             bool(load_receipt and load_receipt.get("solver_invocations") == 1)
@@ -447,6 +511,9 @@ def run_capped_candidate_queue(
         "winner_candidate_id": winner["candidate"]["id"] if winner is not None else None,
         "winner_plan_sha256": winner["candidate"]["plan_sha256"] if winner is not None else None,
         "load_check": load_receipt,
+        "local_pipeline_ready": bool(winner is not None and load_receipt and load_receipt.get("readiness_proven") is True),
+        "release_pool_eligible": False,
+        "cpx002_full_game_replay": "PENDING",
         "blocked_reason": blocked_reason,
         "attempt_receipts": [f"attempt-{index:02d}.json" for index in range(1, len(attempts) + 1)],
     }
@@ -456,6 +523,7 @@ def run_capped_candidate_queue(
 
 __all__ = [
     "MAX_PRIMARY_ATTEMPTS", "MAX_NATIVE_TIMEOUT_SECONDS", "MAX_NATIVE_VISITED",
-    "R09Blocked", "candidate_plan_sha256", "load_r08_ranked_plan_refs", "build_ranked_candidate_queue",
+    "R09Blocked", "candidate_plan_sha256", "serialize_bridge_candidate", "_load_check_proves_ready",
+    "load_r08_ranked_plan_refs", "build_ranked_candidate_queue",
     "run_capped_candidate_queue",
 ]

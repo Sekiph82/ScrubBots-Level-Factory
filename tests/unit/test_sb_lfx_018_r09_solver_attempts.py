@@ -146,12 +146,35 @@ def test_first_fully_verified_win_stops_and_uses_one_capped_load_check(tmp_path,
         load_calls.append((candidate["id"], timeout, max_visited))
         return {"state": "READY", "solver_invocations": 1,
                 "solver_runner": {"invocation_count": 1, "process_invocation_count": 1,
-                                  "native_solve_started": True, "elapsed_seconds": 1.0}}
+                                  "native_solve_started": True, "native_solve_completed": True,
+                                  "elapsed_seconds": 1.0},
+                "solver_status": "SOLVED",
+                "solver": {"status": "SOLVED", "replay": {"ok": True, "solved": True, "finalActive": 0}},
+                "difficulty_v1": {"ok": True}, "verification": {"all_ok": True},
+                "levelLoaderPass": True, "productionValidatorPass": True, "supplyPlanLoaderPass": True}
 
     result = _run(tmp_path, solver, candidates, load_check=load_check)
-    assert result["status"] == "ONE_SOURCE_OFFLINE_SOLVED_CP_X002_PENDING"
+    assert result["status"] == "OFFLINE_ONE_LEVEL_VALIDATED_CP_X002_PENDING"
     assert result["attempts_run"] == 1 and result["primary_invocations"] == 1
     assert result["optional_load_check_invocations"] == 1
+    assert len(solver.calls) == 1
+    assert load_calls == [("winner-0", 90, 25_000)]
+
+
+def test_primary_win_with_unavailable_shipping_load_check_never_overclaims_ready(tmp_path, monkeypatch):
+    monkeypatch.setattr(r09.SolutionVerifier, "verify", lambda *args, **kwargs: {"all_ok": True, "checks": {}})
+    candidates = [_candidate("winner-0"), _candidate("unused-1")]
+    solver = _SequencedSolver(["SOLVED"])
+    load_calls = []
+
+    def load_check(candidate, timeout, max_visited):
+        load_calls.append((candidate["id"], timeout, max_visited))
+        return {"state": "UNAVAILABLE", "solver_invocations": 0, "solver_runner": None}
+
+    result = _run(tmp_path, solver, candidates, load_check=load_check)
+    assert result["status"] == "OFFLINE_SOLVED_SHIPPING_LOAD_CHECK_NOT_READY"
+    assert result["attempts_run"] == 1 and result["primary_invocations"] == 1
+    assert result["optional_load_check_invocations"] == 0
     assert len(solver.calls) == 1
     assert load_calls == [("winner-0", 90, 25_000)]
 
