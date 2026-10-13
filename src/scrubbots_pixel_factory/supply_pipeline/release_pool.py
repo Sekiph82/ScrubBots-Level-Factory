@@ -6,6 +6,7 @@ import hashlib
 import json
 import math
 import re
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,185 @@ def _official_profile(official: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(profile, Mapping) or profile.get("dominant") not in _DIFFICULTY_PROFILES:
         raise ReleaseError("official Difficulty V1 profile.dominant is missing or malformed")
     return dict(profile)
+
+
+def _canonical_bytes(value: Any) -> bytes:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _supplement_path(run_id: str) -> Path:
+    from .. import studio_extensions as studio
+    safe = hashlib.sha256(run_id.encode("utf-8")).hexdigest()
+    return studio.extensions_root() / "official-profile-supplements" / f"{safe}.json"
+
+
+def _pinned_profile_from_godot(vector: list[float]) -> tuple[dict[str, Any], str]:
+    from .game_rules import find_godot
+    from . import pinned_game_source
+    runtime = pinned_game_source.expected_runtime_root()
+    pinned_game_source.verify_attested_runtime(runtime)
+    executable = find_godot()
+    if not executable:
+        raise ReleaseError("Godot console runtime is unavailable for official profile derivation")
+    probe = Path(__file__).resolve().parent / "godot" / "difficulty_profile_probe.gd"
+    if not probe.is_file():
+        raise ReleaseError("pinned profile probe source is unavailable")
+    vector_object = dict(zip(("W", "C", "A", "U", "B", "R", "S"), vector, strict=True))
+    command = [executable, "--headless", "--path", str(runtime), "--script", str(probe), "--", json.dumps(vector_object, separators=(",", ":"))]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=45, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise ReleaseError("pinned Difficulty V1 profile probe could not complete") from exc
+    if result.returncode != 0:
+        raise ReleaseError(f"pinned Difficulty V1 profile probe failed: {result.stderr[-300:]}")
+    line = next((line for line in result.stdout.splitlines() if line.startswith("AUTHENTIC_V1_PROFILE:")), None)
+    if line is None:
+        raise ReleaseError("pinned Difficulty V1 profile probe returned no machine-readable profile")
+    try:
+        profile = json.loads(line.removeprefix("AUTHENTIC_V1_PROFILE:"))
+    except json.JSONDecodeError as exc:
+        raise ReleaseError("pinned Difficulty V1 profile probe returned malformed JSON") from exc
+    return _official_profile({"profile": profile}), _hash(probe.read_bytes())
+
+
+def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], official: Mapping[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Resolve direct analyzer output or an immutable, run-bound historical supplement."""
+    if "profile" in official:
+        return _official_profile(official), {"kind": "DIRECT", "supplement_path": None, "supplement_sha256": None}
+    path = _supplement_path(str(pipeline.get("run_id", "")))
+    if not path.is_file():
+        raise ReleaseError("official Difficulty V1 profile.dominant is missing and no authenticated per-run supplement exists")
+    supplement = _json(path)
+    expected_digest = supplement.pop("supplement_digest", None)
+    actual_digest = _hash(_canonical_bytes(supplement))
+    supplement["supplement_digest"] = expected_digest
+    from .. import studio_extensions as studio
+    pipeline_path = studio._pipeline_path(str(pipeline.get("run_id", "")))
+    pipeline_sha = _hash(pipeline_path.read_bytes()) if pipeline_path.is_file() else None
+    source_id = pipeline.get("request", {}).get("source_id") if isinstance(pipeline.get("request"), Mapping) else None
+    source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
+    source_record_sha = _hash(source_record.read_bytes()) if source_record.is_file() else None
+    vector = _official_challenge_vector(official)
+    vector_sha = _hash(_canonical_bytes(vector))
+    authority = pipeline.get("primary", {}).get("authority", {})
+    from . import pinned_game_source
+    try:
+        attestation = pinned_game_source.verify_attested_runtime(pinned_game_source.expected_runtime_root())
+    except (OSError, ValueError) as exc:
+        raise ReleaseError("pinned game runtime authority is unavailable for historical profile proof") from exc
+    analyzer_sha = next((item.get("sha256") for item in attestation["source_files"] if item.get("path") == "scripts/difficulty/level_difficulty_analyzer_v1.gd"), None)
+    if (not source_id or candidate.get("source_id") != source_id or source_record_sha is None
+            or not isinstance(authority, Mapping)
+            or authority.get("git_head") != attestation.get("source_commit")
+            or authority.get("git_tree") != attestation.get("tree_sha")):
+        raise ReleaseError("historical profile proof is not bound to the attested owner source and pinned game authority")
+    expected = {
+        "schema": "scrubbots-official-difficulty-v1-profile-supplement/v1",
+        "disclosure": "AUTHENTIC_V1_PROFILE_DERIVED_LATER",
+        "candidate_id": candidate.get("candidate_id"),
+        "source_id": source_id,
+        "source_record_sha256": source_record_sha,
+        "run_id": pipeline.get("run_id"),
+        "pipeline_sha256": pipeline_sha,
+        "solver_supply_identity": pipeline.get("primary", {}).get("solver_supply_identity"),
+        "vector": vector,
+        "vector_sha256": vector_sha,
+        "analyzer_sha256": analyzer_sha,
+        "profile_probe_sha256": supplement.get("profile_probe_sha256"),
+        "game_commit": attestation.get("source_commit"),
+        "game_tree": attestation.get("tree_sha"),
+        "profile": supplement.get("profile"),
+        "method": "pinned LevelDifficultyAnalyzerV1.profile(vector), static pure function; computed twice and byte-identical",
+    }
+    expected["profile_probe_sha256"] = _hash((Path(__file__).resolve().parent / "godot" / "difficulty_profile_probe.gd").read_bytes())
+    if (expected_digest != actual_digest or supplement.get("schema") != expected["schema"]
+            or any(supplement.get(key) != value for key, value in expected.items() if key != "schema")):
+        raise ReleaseError("historical official-profile supplement chain, analyzer authority, or digest does not match this immutable run")
+    profile = _official_profile({"profile": supplement.get("profile")})
+    return profile, {"kind": "DERIVED", "supplement_path": str(path), "supplement_sha256": _hash(path.read_bytes()), "supplement_digest": expected_digest}
+
+
+def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]) -> dict[str, Any]:
+    """Persist a GDScript-computed profile as an immutable, later-derived supplement."""
+    from .. import studio_extensions as studio
+    run_id = str(pipeline.get("run_id", ""))
+    pipeline_path = studio._pipeline_path(run_id)
+    if not run_id or not pipeline_path.is_file() or _hash(pipeline_path.read_bytes()) != _hash(_canonical_bytes(pipeline) + b"\n"):
+        # Windows newline/indentation can differ from canonical JSON serialization; exact original bytes are read below.
+        try:
+            current = _json(pipeline_path)
+        except (OSError, ReleaseError):
+            raise ReleaseError("cannot bind profile supplement to the exact persisted pipeline")
+        if current != dict(pipeline):
+            raise ReleaseError("cannot bind profile supplement to the exact persisted pipeline")
+    official = _canonical_official_difficulty(pipeline["primary"])
+    vector = _official_challenge_vector(official)
+    first_profile, probe_sha = _pinned_profile_from_godot(vector)
+    second_profile, second_probe_sha = _pinned_profile_from_godot(vector)
+    if first_profile != second_profile or probe_sha != second_probe_sha:
+        raise ReleaseError("pinned Difficulty V1 profile computation was not repeatable")
+    from . import pinned_game_source
+    runtime = pinned_game_source.expected_runtime_root()
+    attestation = pinned_game_source.verify_attested_runtime(runtime)
+    analyzer_sha = next(item["sha256"] for item in attestation["source_files"] if item["path"] == "scripts/difficulty/level_difficulty_analyzer_v1.gd")
+    source_id = pipeline.get("request", {}).get("source_id")
+    source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
+    authority = pipeline.get("primary", {}).get("authority", {})
+    if (not source_id or candidate.get("source_id") != source_id or not source_record.is_file()
+            or not isinstance(authority, Mapping)
+            or authority.get("git_head") != attestation.get("source_commit")
+            or authority.get("git_tree") != attestation.get("tree_sha")):
+        raise ReleaseError("cannot supplement a profile without the exact owner source record and pinned game identity")
+    payload = {
+        "schema": "scrubbots-official-difficulty-v1-profile-supplement/v1",
+        "disclosure": "AUTHENTIC_V1_PROFILE_DERIVED_LATER",
+        "candidate_id": candidate.get("candidate_id"),
+        "source_id": source_id,
+        "source_record_sha256": _hash(source_record.read_bytes()) if source_record.is_file() else None,
+        "run_id": run_id,
+        "pipeline_sha256": _hash(pipeline_path.read_bytes()),
+        "solver_supply_identity": pipeline.get("primary", {}).get("solver_supply_identity"),
+        "vector": vector,
+        "vector_sha256": _hash(_canonical_bytes(vector)),
+        "analyzer_sha256": analyzer_sha,
+        "profile_probe_sha256": probe_sha,
+        "game_commit": attestation.get("source_commit"),
+        "game_tree": attestation.get("tree_sha"),
+        "profile": first_profile,
+        "method": "pinned LevelDifficultyAnalyzerV1.profile(vector), static pure function; computed twice and byte-identical",
+    }
+    payload["supplement_digest"] = _hash(_canonical_bytes(payload))
+    path = _supplement_path(run_id)
+    raw = _canonical_bytes(payload) + b"\n"
+    if path.exists() and path.read_bytes() != raw:
+        raise ReleaseError("a different immutable profile supplement already exists for this run")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_bytes(raw)
+    if path.read_bytes() != raw:
+        raise ReleaseError("historical profile supplement failed exact durable read-back")
+    return {"path": str(path), "sha256": _hash(raw), "supplement_digest": payload["supplement_digest"]}
+
+
+def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str, Any], provenance: Mapping[str, Any]) -> None:
+    score = official.get("challengeScore")
+    difficulty = primary.get("difficulty", {})
+    stored_score = difficulty.get("score") if isinstance(difficulty, Mapping) else None
+    if type(score) not in {int, float} or not math.isfinite(float(score)) or type(stored_score) not in {int, float} or not math.isfinite(float(stored_score)):
+        raise ReleaseError("official Difficulty V1 challengeScore and primary difficulty score are required finite numbers")
+    if provenance.get("kind") == "DERIVED":
+        if float(stored_score) != round(float(score), 2):
+            raise ReleaseError("historical rounded Difficulty V1 score does not match the evidenced two-decimal rule")
+    elif float(stored_score) != float(score):
+        raise ReleaseError("direct official Difficulty V1 challengeScore must exactly equal primary difficulty score")
+    from . import pinned_game_source
+    from .game_rules import GameRules
+    try:
+        rules = GameRules(pinned_game_source.expected_runtime_root(), column_count=int(primary.get("column_count", 3)))
+    except (OSError, RuntimeError, ValueError) as exc:
+        raise ReleaseError("pinned Difficulty V1 class authority is unavailable") from exc
+    if not isinstance(difficulty, Mapping) or difficulty.get("class") != rules.classify(float(score)):
+        raise ReleaseError("stored difficulty class does not match the pinned Difficulty V1 class authority")
 
 
 def _canonical_official_difficulty(primary: Mapping[str, Any]) -> dict[str, Any]:
@@ -81,7 +261,8 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     difficulty = primary.get("difficulty", {})
     official = _canonical_official_difficulty(primary)
     vector = _official_challenge_vector(official)
-    profile = _official_profile(official)
+    profile, profile_provenance = _resolve_official_profile(candidate, pipeline, official)
+    _validate_score_and_class(primary, official, profile_provenance)
     official_score = official.get("challengeScore")
     if type(official_score) not in {int, float} or not math.isfinite(float(official_score)):
         raise ReleaseError("official Difficulty V1 challengeScore is missing or malformed")
@@ -99,6 +280,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"],
         "challenge_score": float(official_score), "difficulty_class": difficulty.get("class"),
         "challenge_vector": vector, "dominant_profile": dominant, "official_profile": profile,
+        "official_profile_provenance": profile_provenance,
         "frustration_risk": official.get("frustrationRisk") if isinstance(official, Mapping) else None,
         "session_load": official.get("sessionLoad") if isinstance(official, Mapping) else None,
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
@@ -137,6 +319,17 @@ def release_entries() -> list[dict[str, Any]]:
         pipeline_path = studio._pipeline_path(str(value.get("pipeline_run_id", "")))
         if not pipeline_path.is_file() or _hash(pipeline_path.read_bytes()) != value.get("pipeline_sha256"):
             raise ReleaseError(f"Release Pool pipeline evidence changed or disappeared: {path.name}")
+        pipeline = _json(pipeline_path)
+        primary = pipeline.get("primary", {})
+        official = _canonical_official_difficulty(primary)
+        resolved_profile, provenance = _resolve_official_profile(value.get("candidate", {}), pipeline, official)
+        _validate_score_and_class(primary, official, provenance)
+        if (resolved_profile != value.get("official_profile")
+                or provenance != value.get("official_profile_provenance")
+                or _official_challenge_vector(official) != value.get("challenge_vector")
+                or float(official.get("challengeScore")) != value.get("challenge_score")
+                or primary.get("difficulty", {}).get("class") != value.get("difficulty_class")):
+            raise ReleaseError(f"Release Pool Difficulty V1 proof no longer matches its immutable pipeline: {path.name}")
         current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
         if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
             raise ReleaseError(f"Release Pool candidate identity changed or disappeared: {path.name}")

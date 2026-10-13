@@ -785,6 +785,22 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
     return candidate_id, bundle_path
 
 
+def _canonical_run_output_dir(identity: str, activity_run_id: str) -> Path:
+    """Allocate one canonical artifact directory per validated activity run."""
+    if not identity or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in identity) or identity in {".", ".."}:
+        raise StudioExtensionError("canonical run identity contains unsafe path characters")
+    if not activity_run_id or len(activity_run_id) > 256:
+        raise StudioExtensionError("canonical per-run output requires a bounded activity_run_id")
+    base = (extensions_root() / "canonical-supply" / identity).resolve()
+    run_scope = hashlib.sha256(activity_run_id.encode("utf-8")).hexdigest()[:20]
+    destination = (base / run_scope).resolve()
+    if not destination.is_relative_to(base):
+        raise StudioExtensionError("canonical per-run output escaped its identity directory")
+    if destination.exists():
+        raise StudioExtensionError("canonical per-run output already exists; refusing to overwrite prior run evidence")
+    return destination
+
+
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
                                  evidence: str, request: Mapping[str, Any], source_kind: str,
                                  activity_writer: Any = None) -> dict[str, Any]:
@@ -800,8 +816,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     selected = validate_column_count(int(request_data.get("column_count", 3)))
     level_id = str(request_data.get("level_id", identity))
     activity_run_id = str(request_data.get("activity_run_id", ""))
-    run_scope = hashlib.sha256((activity_run_id or datetime.now(timezone.utc).isoformat()).encode("utf-8")).hexdigest()[:20]
-    output_dir = Path(str(request_data.get("output_dir") or (extensions_root() / "canonical-supply" / identity / run_scope))).expanduser().resolve()
+    output_dir = _canonical_run_output_dir(identity, activity_run_id or datetime.now(timezone.utc).isoformat())
     stages = [
         _pipeline_stage("SOURCE", "PASS", inputs=[identity], outputs=[identity], evidence=evidence, reason=f"Verified {source_kind} canonical logical grid."),
         _pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE", inputs=[identity], outputs=[identity], evidence=evidence, reason="Canonical logical cells enter the ZIP route without a PNG round-trip."),
