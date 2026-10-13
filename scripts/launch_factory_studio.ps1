@@ -10,6 +10,19 @@ function Get-FullPathForIdentity {
     return [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
 }
 
+function Get-Sha256Hash {
+    param([Parameter(Mandatory)][string]$Path)
+    $stream = [IO.File]::OpenRead($Path)
+    $sha256 = [Security.Cryptography.SHA256]::Create()
+    try {
+        return [BitConverter]::ToString($sha256.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $stream.Dispose()
+        $sha256.Dispose()
+    }
+}
+
 function Test-Godot4Executable {
     param([Parameter(Mandatory)][string]$Candidate)
 
@@ -70,7 +83,7 @@ try {
         return
     }
 
-    $godotSha256 = (Get-FileHash -LiteralPath $godotPath -Algorithm SHA256).Hash
+    $godotSha256 = Get-Sha256Hash $godotPath
     $quotedProjectPath = '"{0}"' -f $projectPath
     $studioProcess = Start-Process -FilePath $godotPath -ArgumentList @('--path', $quotedProjectPath) -WorkingDirectory $repoRoot -PassThru
     $studioProcessId = $studioProcess.Id
@@ -107,7 +120,7 @@ public static class FactoryStudioNativeWindowTitle {
                 throw 'Factory Studio process executable identity could not be read.'
             }
             if (-not (Test-Godot4Executable -Candidate $processIdentity.ExecutablePath) -or
-                    (Get-FileHash -LiteralPath $processIdentity.ExecutablePath -Algorithm SHA256).Hash -ne $godotSha256) {
+                    (Get-Sha256Hash $processIdentity.ExecutablePath) -ne $godotSha256) {
                 throw 'Factory Studio process did not start from the exact approved Godot 4 executable.'
             }
             if ($processIdentity.CommandLine -notmatch $projectArgumentPattern) {
