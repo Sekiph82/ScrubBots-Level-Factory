@@ -9,6 +9,7 @@ from typing import Any
 from .game_rules import GameRules, find_godot
 from .contracts import validate_column_count
 from .scrubbots_solver import ScrubBotsSolver
+from .solver_budget import normalize_solver_budget
 from .solution_verifier import SolutionVerifier
 
 
@@ -55,6 +56,11 @@ def verify_exported_supply(
         rules = GameRules(game_project, column_count=selected_columns)
     except FileNotFoundError as exc:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": str(exc)}
+    if rules.attestation is not None or max_visited is not None or timeout_seconds is not None:
+        try:
+            max_visited, timeout_seconds = normalize_solver_budget(max_visited, timeout_seconds)
+        except ValueError as exc:
+            return {"state": "ERROR", "disposition": "ERROR", "reason": f"invalid solver budget: {exc}"}
     if find_godot() is None:
         return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "Godot executable unavailable"}
     if plan["levelId"] != level.get("id") or plan["columnCount"] != selected_columns or plan["visiblePreviewDepth"] != 3:

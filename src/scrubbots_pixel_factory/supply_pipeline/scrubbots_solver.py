@@ -12,6 +12,7 @@ from collections import deque
 from pathlib import Path
 
 from .game_rules import find_godot
+from .solver_budget import normalize_solver_budget
 
 BRIDGE = Path(__file__).resolve().parent / "godot" / "solver_bridge.gd"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -38,10 +39,7 @@ class ScrubBotsSolver:
         if attested_runtime:
             if not isinstance(candidates, (list, tuple)) or len(candidates) != 1 or stop_after != 1:
                 raise ValueError("pinned-runtime bridge requires exactly one candidate and stop_after=1")
-            if max_visited is None or type(max_visited) is not int or not 0 < max_visited <= 25_000:
-                raise ValueError("pinned-runtime candidate max_visited must be within 1..25000")
-            if timeout is None or not 0 < float(timeout) <= 90:
-                raise ValueError("pinned-runtime candidate timeout must be within (0, 90] seconds")
+            max_visited, timeout = normalize_solver_budget(max_visited, timeout)
         if attested_runtime:
             work_root = Path(self.rules.project).resolve() / ".lf_solver_jobs"
             work = work_root / f"job-{uuid.uuid4().hex}"

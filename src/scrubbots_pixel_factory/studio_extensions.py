@@ -663,6 +663,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
 
     from .supply_pipeline.contracts import validate_column_count
     from .supply_pipeline.game_rules import GameRules
+    from .supply_pipeline.solver_budget import normalize_solver_budget
     from .supply_pipeline.supply_exporter import SupplyExporter
     from .supply_pipeline.supply_optimizer import NoValidSupply, SupplyOptimizer
 
@@ -686,24 +687,34 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     emit("CANDIDATE", "PASS", "Canonical candidate identity and lineage are established.")
     try:
         rules = GameRules(request_data.get("game_project"), column_count=selected)
+        requested_visits = request_data.get("real_max_visited")
+        requested_timeout = request_data.get("solver_timeout_seconds")
+        try:
+            if rules.attestation is None and requested_visits is None and requested_timeout is None:
+                solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 90)
+            else:
+                solver_max_visited, solver_timeout = normalize_solver_budget(
+                    requested_visits, requested_timeout
+                )
+        except ValueError as exc:
+            budget_scope = "pinned solver budget" if rules.attestation is not None else "solver budget"
+            raise StudioExtensionError(f"invalid {budget_scope}: {exc}") from exc
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
-        solver_timeout = request_data.get("solver_timeout_seconds")
-        solver_max_visited = request_data.get("real_max_visited")
         emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
             level_id=level_id, verify_top=int(request_data.get("verify_top", 1)),
             screen_budget=int(request_data.get("screen_budget", 3000)), metric_top=int(request_data.get("metric_top", 12)),
             viability_budget=int(request_data.get("viability_budget", 3000)),
-            real_max_visited=request_data.get("real_max_visited"), level_number=int(request_data.get("level_number", 1)),
-            real_timeout_seconds=float(solver_timeout) if solver_timeout is not None else 90,
+            real_max_visited=solver_max_visited, level_number=int(request_data.get("level_number", 1)),
+            real_timeout_seconds=solver_timeout,
             max_native_solver_invocations=1 if rules.attestation is not None else None,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply
         load_check = verify_exported_supply(
             files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project"),
-            max_visited=solver_max_visited, timeout_seconds=float(solver_timeout) if solver_timeout is not None else None,
+            max_visited=solver_max_visited, timeout_seconds=solver_timeout,
         ) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
         if load_check.get("state") != "READY":
             raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")

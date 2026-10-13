@@ -11,6 +11,7 @@ from .difficulty_model import DifficultyModel
 from .pixel_analyzer import PixelAnalyzer
 from .screening import ScreeningSimulator
 from .scrubbots_solver import ScrubBotsSolver
+from .solver_budget import normalize_solver_budget
 from .solution_verifier import SolutionVerifier
 from .supply_scorer import SupplyScorer
 
@@ -88,10 +89,12 @@ class SupplyOptimizer:
         log = progress or (lambda *_: None)
         pinned_runtime = getattr(self.rules, "attestation", None) is not None
         if pinned_runtime:
-            if real_max_visited is None or type(real_max_visited) is not int or not 0 < real_max_visited <= 25_000:
-                raise NoValidSupply("pinned-runtime solver visit bound must be within 1..25000")
-            if not 0 < float(real_timeout_seconds) <= 90:
-                raise NoValidSupply("pinned-runtime solver timeout must be within (0, 90] seconds")
+            try:
+                real_max_visited, real_timeout_seconds = normalize_solver_budget(
+                    real_max_visited, real_timeout_seconds
+                )
+            except ValueError as exc:
+                raise NoValidSupply(f"pinned-runtime solver budget is invalid: {exc}") from exc
             max_native_solver_invocations = min(
                 6, 6 if max_native_solver_invocations is None else max(0, int(max_native_solver_invocations))
             )

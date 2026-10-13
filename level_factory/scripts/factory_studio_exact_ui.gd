@@ -1816,6 +1816,8 @@ func _build_selected_source_pipeline_request() -> Dictionary:
 		"source_sha256": _selected_import_source_id.trim_prefix("owner-upload-"),
 		"request": {
 			"column_count": _column_count,
+			"real_max_visited": 25000,
+			"solver_timeout_seconds": 90,
 			"level_number": _level_number if _manual_level_override else 1,
 			"game_project": _pinned_game_project_path(),
 			"background_intent": _background_intent,
