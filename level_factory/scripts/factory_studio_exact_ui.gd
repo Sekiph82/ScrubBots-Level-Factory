@@ -737,7 +737,7 @@ func _refresh_live_data() -> void:
 		var batch_caption := ""
 		if not _batch_snapshot.is_empty():
 			var counts: Dictionary = _batch_snapshot.get("counts", {})
-			batch_caption = "%d/%d · %d ready · %d failed" % [int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0)), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+			batch_caption = "%d loaded / %d job · %d READY · %d failed" % [_gameplay_sources.size(), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
@@ -763,10 +763,8 @@ func _refresh_run_button_caption() -> void:
 	var button := get_node_or_null("RunLevelPipeline") as Button
 	if button == null or _screen != "LEVEL FACTORY":
 		return
-	var imported_count := int(_last_import_summary.get("imported_count", 0)) + int(_last_import_summary.get("reused_count", 0))
-	if imported_count == 0 and not _batch_snapshot.is_empty():
-		imported_count = int(_batch_snapshot.get("counts", {}).get("total", 0))
-	var batch_mode := imported_count > 1 and not _batch_import_id.is_empty()
+	var imported_count := _gameplay_sources.size()
+	var batch_mode := imported_count > 1
 	if _operation_running and not _batch_job_id.is_empty():
 		var counts: Dictionary = _batch_snapshot.get("counts", {})
 		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
@@ -774,8 +772,30 @@ func _refresh_run_button_caption() -> void:
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
-		button.text = "Batch mismatch" if _batch_job_source_mismatch else "Batch complete" if state == "COMPLETE" else "Resume Batch" if not _batch_job_id.is_empty() else "Run Entire Batch (%d)" % imported_count
-		button.disabled = state == "COMPLETE"
+		var counts: Dictionary = _batch_snapshot.get("counts", {})
+		if _batch_job_source_mismatch:
+			button.text = "Batch mismatch"
+			button.disabled = true
+		elif state == "COMPLETE" and (int(counts.get("failed", 0)) > 0 or int(counts.get("rejected", 0)) > 0):
+			if int(counts.get("failed", 0)) > 0 and _batch_job_matches_loaded_sources():
+				button.text = "Retry Failed (%d)" % int(counts.get("failed", 0))
+				button.disabled = false
+			else:
+				button.text = "Finished With Failures · %d READY" % int(counts.get("ready", 0))
+				button.disabled = true
+		elif state == "COMPLETE":
+			if _batch_job_matches_loaded_sources():
+				if int(counts.get("skipped", 0)) > 0:
+					button.text = "Batch Complete · %d READY · %d Skipped" % [int(counts.get("ready", 0)), int(counts.get("skipped", 0))]
+				else:
+					button.text = "Retry Finished · %d READY" % int(counts.get("ready", 0)) if _batch_snapshot.has("parent_job_id") else "Loaded Batch READY (%d)" % int(counts.get("ready", 0))
+				button.disabled = true
+			else:
+				button.text = "Run Entire Loaded Batch (%d)" % imported_count
+				button.disabled = false
+		else:
+			button.text = "Run Entire Loaded Batch (%d)" % imported_count
+			button.disabled = false
 	else:
 		button.text = "Run Pipeline"
 		button.disabled = false
@@ -1300,7 +1320,7 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 func _import_pngs(paths: Array) -> void:
 	var result := _extension("batch-import", {"paths": paths})
 	var new_batch_id := str(result.get("batch_id", ""))
-	if new_batch_id != _batch_import_id:
+	if new_batch_id != _batch_import_id and not _operation_running:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
 		_batch_job_source_mismatch = false
@@ -1308,15 +1328,12 @@ func _import_pngs(paths: Array) -> void:
 	for imported_item in result.get("items", []):
 		if imported_item is Dictionary and not str(imported_item.get("source_id", "")).is_empty():
 			_source_batch_by_id[str(imported_item["source_id"])] = new_batch_id
-	var batch_jobs := _extension("png-batch-latest", {"batch_id": _batch_import_id})
-	_batch_job_source_mismatch = str(batch_jobs.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
-	if _batch_job_source_mismatch:
-		_report("BATCH_JOB_SOURCE_MISMATCH · A resumable job belongs to another imported batch. No batch will run until the matching batch is displayed.")
-	else:
-		var matching_job: Dictionary = batch_jobs.get("job", {})
-		if not matching_job.is_empty():
-			_batch_job_id = str(matching_job.get("job_id", ""))
-			_batch_snapshot = matching_job
+	# Import selection only refreshes read-only thumbnails. Existing jobs stay bound
+	# to their immutable import snapshot; the explicit Run action creates the union.
+	if not _operation_running:
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+		_batch_job_source_mismatch = false
 	var items: Array = result.get("items", [])
 	var lines: Array[String] = []
 	var item_records: Array[Dictionary] = []
@@ -1540,8 +1557,10 @@ func _send_to_level_factory() -> void:
 func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
-	var imported_count := int(_last_import_summary.get("imported_count", 0)) + int(_last_import_summary.get("reused_count", 0))
-	if imported_count > 1 and not _batch_import_id.is_empty():
+	if _gameplay_sources.size() > 1:
+		if str(_batch_snapshot.get("state", "")) == "COMPLETE" and int(_batch_snapshot.get("counts", {}).get("failed", 0)) > 0 and _batch_job_matches_loaded_sources():
+			_retry_failed_png_batch()
+			return
 		_run_png_batch()
 		return
 	_run_single_level_pipeline()
@@ -1640,36 +1659,75 @@ func _run_single_level_pipeline() -> void:
 func _run_png_batch() -> void:
 	if _gateway == null or _operation_running:
 		return
+	if _gameplay_sources.size() < 2:
+		_report("Run Entire Loaded Batch requires at least two verified loaded PNGs.")
+		return
+	if _gameplay_sources.size() > 150:
+		_report("Loaded PNG batch exceeds the 150-source sequential limit; no source was run.")
+		return
+	var source_ids: Array[String] = []
+	for source in _gameplay_sources:
+		var source_id := str(source.get("source_id", ""))
+		if source_id.begins_with("owner-upload-") and source_id not in source_ids:
+			source_ids.append(source_id)
+	if source_ids.size() != _gameplay_sources.size():
+		_report("Loaded gallery changed during snapshot; no batch was created.")
+		return
+	var composite := _extension("loaded-png-batch-create", {"source_ids": source_ids})
+	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
-		_report("Import a multi-PNG batch before starting sequential processing.")
+		_report("Loaded PNG snapshot could not be verified: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
 		return
-	if _batch_job_source_mismatch:
-		_report("BATCH_JOB_SOURCE_MISMATCH · The resumable job does not belong to the currently displayed imported batch.")
+	var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
+	var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
+	var job: Dictionary = created.get("job", {})
+	if job.is_empty():
+		_report("PNG batch plan could not be verified: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
 		return
-	if not _batch_job_id.is_empty() and str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
-		_batch_job_source_mismatch = true
-		_refresh_run_button_caption()
-		_report("BATCH_JOB_SOURCE_MISMATCH · Refusing to resume a job for another imported batch.")
-		return
+	_batch_job_id = str(job.get("job_id", ""))
+	_batch_snapshot = job
 	if _batch_job_id.is_empty():
-		var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
-		var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
-		var job: Dictionary = created.get("job", {})
-		if job.is_empty():
-			_report("PNG batch plan could not be verified: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
-			return
-		_batch_job_id = str(job.get("job_id", ""))
-		_batch_snapshot = job
-		if _batch_job_id.is_empty():
-			_report("PNG batch planner returned no durable job identity.")
-			return
-	if str(_batch_snapshot.get("state", "")) == "COMPLETE":
-		_report("This PNG batch is complete. Import a new batch to start another run.")
+		_report("PNG batch planner returned no durable job identity.")
 		return
+	if str(_batch_snapshot.get("state", "")) == "COMPLETE":
+		var prior_counts: Dictionary = _batch_snapshot.get("counts", {})
+		var prior_ready := int(prior_counts.get("ready", 0))
+		var prior_failed := int(prior_counts.get("failed", 0))
+		var prior_rejected := int(prior_counts.get("rejected", 0))
+		var prior_skipped := int(prior_counts.get("skipped", 0))
+		var terminal := "FINISHED WITH FAILURES · %d/%d READY · %d FAILED · %d REJECTED" % [prior_ready, int(prior_counts.get("total", 0)), prior_failed, prior_rejected]
+		_activity_stage = "FINISHED WITH FAILURES" if prior_failed > 0 or prior_rejected > 0 else "COMPLETE WITH SKIPPED" if prior_skipped > 0 else "READY"
+		_activity_backend_disposition = _activity_stage
+		_activity_terminal_state = _activity_stage
+		_activity_message = terminal if prior_failed > 0 or prior_rejected > 0 else "Loaded batch complete · %d READY · %d SKIPPED · no solver was run." % [prior_ready, prior_skipped] if prior_skipped > 0 else "Loaded batch already has verified READY results; no solver was run."
+		if _activity_panel != null: _activity_panel.visible = true
+		_render_batch_item_results(_batch_snapshot)
+		_refresh_activity_header()
+		_refresh_live_data()
+		_refresh_run_button_caption()
+		_report(_activity_message)
+		return
+	_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
+
+
+func _retry_failed_png_batch() -> void:
+	if _gateway == null or _operation_running or _batch_job_id.is_empty():
+		return
+	var result := _extension("png-batch-retry-failed", {"job_id": _batch_job_id})
+	var job: Dictionary = result.get("job", {})
+	if job.is_empty() or str(job.get("job_id", "")).is_empty():
+		_report("Explicit Retry Failed was not created: %s" % str(result.get("reason", result.get("disposition", "UNAVAILABLE"))))
+		return
+	_batch_job_id = str(job.get("job_id", ""))
+	_batch_snapshot = job
+	_dispatch_png_batch_job(_batch_job_id, str(job.get("import_batch_id", "")))
+
+
+func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
 		_report("Canonical async PNG batch gateway is unavailable.")
 		return
-	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "png-batch-run", {"job_id": _batch_job_id, "expected_batch_id": _batch_import_id})
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "png-batch-run", {"job_id": job_id, "expected_batch_id": batch_id})
 	if prepared.is_empty():
 		_report("Canonical Python Factory Core cannot start the PNG batch.")
 		return
@@ -1698,6 +1756,7 @@ func _run_png_batch() -> void:
 	_activity_terminal_state = ""
 	if _activity_rows != null:
 		for child in _activity_rows.get_children(): child.queue_free()
+	if _activity_panel != null: _activity_panel.visible = true
 	_refresh_activity_header()
 	_refresh_run_button_caption()
 	if _batch_pause_button != null: _batch_pause_button.visible = true
@@ -1764,13 +1823,23 @@ func _complete_png_batch(result: Dictionary) -> void:
 		return
 	_batch_snapshot = result.get("job", _batch_snapshot)
 	_activity_stage = str(_batch_snapshot.get("state", result.get("disposition", "ERROR")))
-	_activity_backend_disposition = _activity_stage
-	_activity_terminal_state = _activity_stage
-	_activity_message = "Batch %s · %s READY · %s failed · %s remaining" % [
-		_activity_stage, str(_batch_snapshot.get("counts", {}).get("ready", 0)),
-		str(_batch_snapshot.get("counts", {}).get("failed", 0)),
-		str(_batch_snapshot.get("counts", {}).get("remaining", 0))
-	]
+	var counts: Dictionary = _batch_snapshot.get("counts", {})
+	var ready := int(counts.get("ready", 0))
+	var failed := int(counts.get("failed", 0))
+	var rejected := int(counts.get("rejected", 0))
+	var total := int(counts.get("total", 0))
+	var loaded := int(_batch_snapshot.get("snapshot_source_count", _gameplay_sources.size()))
+	if failed > 0 or rejected > 0:
+		_activity_backend_disposition = "FINISHED WITH FAILURES"
+		_activity_message = "FINISHED WITH FAILURES · %d/%d READY · %d FAILED · %d REJECTED · %d remaining" % [ready, total, failed, rejected, int(counts.get("remaining", 0))]
+	elif int(counts.get("skipped", 0)) > 0:
+		_activity_backend_disposition = "COMPLETE WITH SKIPPED"
+		_activity_message = "BATCH COMPLETE · %d/%d READY · %d SKIPPED · %d loaded" % [ready, total, int(counts.get("skipped", 0)), loaded]
+	else:
+		_activity_backend_disposition = "RETRY READY" if _batch_snapshot.has("parent_job_id") else "READY"
+		_activity_message = "%s · %d/%d READY · %d loaded" % ["RETRY FINISHED" if _batch_snapshot.has("parent_job_id") else "BATCH READY", ready, total, loaded]
+	_activity_terminal_state = _activity_backend_disposition
+	_render_batch_item_results(_batch_snapshot)
 	if _pipeline_thread != null:
 		_pipeline_thread = null
 	var run_button := get_node_or_null("RunLevelPipeline") as Button
@@ -1783,9 +1852,61 @@ func _complete_png_batch(result: Dictionary) -> void:
 	_refresh_release_pool(false)
 	_refresh_activity_header()
 	_refresh_live_data()
-	_append_activity_row({"seq": _activity_events.size() + 1, "elapsed_ms": max(0, Time.get_ticks_msec() - _activity_started_msec), "stage": "BATCH", "state": _activity_stage, "message": _activity_message})
 	_refresh_run_button_caption()
 	_report(_activity_message)
+
+
+func _render_batch_item_results(job: Dictionary) -> void:
+	if _activity_rows == null:
+		return
+	if _activity_panel != null: _activity_panel.visible = true
+	for child in _activity_rows.get_children():
+		child.queue_free()
+	var counts: Dictionary = job.get("counts", {})
+	var loaded := int(job.get("snapshot_source_count", _gameplay_sources.size()))
+	var total := int(counts.get("total", 0))
+	var quotas: Dictionary = job.get("planned_quotas", {})
+	var actual: Dictionary = job.get("ready_mix", {})
+	var summary := "Loaded %d · Job %d · Eligible %d · READY %d · Failed %d · Rejected %d · Skipped %d · Remaining %d\nPlanned 3/4/5 %d/%d/%d · READY %d/%d/%d" % [
+			loaded, total, int(quotas.get("3", 0)) + int(quotas.get("4", 0)) + int(quotas.get("5", 0)),
+			int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)),
+			int(counts.get("skipped", 0)), int(counts.get("remaining", 0)),
+			int(quotas.get("3", 0)), int(quotas.get("4", 0)), int(quotas.get("5", 0)),
+			int(actual.get("3", 0)), int(actual.get("4", 0)), int(actual.get("5", 0))]
+	if _activity_phase_label != null:
+		_activity_phase_label.text = "Loaded %d · Job %d · READY %d · Failed %d" % [loaded, total, int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+		_activity_phase_label.tooltip_text = summary
+	var summary_row := Label.new()
+	summary_row.name = "BatchCountsSummary"
+	summary_row.custom_minimum_size = Vector2(292, 46)
+	summary_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary_row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	summary_row.add_theme_font_size_override("font_size", 10)
+	summary_row.text = summary
+	_activity_rows.add_child(summary_row)
+	for item_variant in job.get("items", []):
+		if not item_variant is Dictionary:
+			continue
+		var item: Dictionary = item_variant
+		var status := str(item.get("status", "UNKNOWN"))
+		var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
+		var source_id := str(item.get("source_id", ""))
+		var columns := int(item.get("column_count", 0))
+		var reason := str(item.get("reason", ""))
+		if bool(item.get("reused_existing_ready", false)) or bool(item.get("recovered_after_interruption", false)):
+			status += " · EXISTING PROOF REUSED"
+		var row := Label.new()
+		row.name = "BatchResult_%03d" % int(item.get("index", 0))
+		row.custom_minimum_size = Vector2(292, 52)
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_theme_font_size_override("font_size", 10)
+		row.mouse_filter = Control.MOUSE_FILTER_STOP
+		row.text = "%s · %s\n%s · %d columns · %s%s" % [filename, source_id.right(12), "Attempted" if not str(item.get("attempt_id", "")).is_empty() else "Not attempted", columns, status, " · " + reason if not reason.is_empty() else ""]
+		row.tooltip_text = "Source %s\nAttempt %s\nActivity %s\nAssigned columns %d\n%s" % [source_id, str(item.get("attempt_id", "")), str(item.get("activity_run_id", "")), columns, reason]
+		row.add_theme_color_override("font_color", Color("#7bd6a2") if status.begins_with("READY") else Color("#f09a8a") if status.begins_with("FAILED") or status.begins_with("REJECTED") else Color("#c5d2e5"))
+		_activity_rows.add_child(row)
+	_activity_scroll.call_deferred("set_v_scroll", 0)
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -2395,35 +2516,36 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_refresh_activity_header()
 		_refresh_runtime_cards()
 		_refresh_live_data()
+		if not _batch_snapshot.is_empty() and _batch_snapshot.has("snapshot_source_count"):
+			_render_batch_item_results(_batch_snapshot)
+			if not _operation_running:
+				var batch_counts: Dictionary = _batch_snapshot.get("counts", {})
+				_activity_backend_disposition = "FINISHED WITH FAILURES" if int(batch_counts.get("failed", 0)) > 0 or int(batch_counts.get("rejected", 0)) > 0 else "READY" if str(_batch_snapshot.get("state", "")) == "COMPLETE" else "IDLE"
+				_activity_terminal_state = _activity_backend_disposition
+				_activity_message = "Loaded %d · Job %d · %d READY · %d FAILED" % [_gameplay_sources.size(), int(batch_counts.get("total", 0)), int(batch_counts.get("ready", 0)), int(batch_counts.get("failed", 0))]
+				_refresh_activity_header()
 		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
 		return
 
 
 func _bind_displayed_batch_to_source(source_id: String) -> void:
-	var batch_id := str(_source_batch_by_id.get(source_id, ""))
-	if batch_id.is_empty():
+	# Historical import membership is provenance only. Selecting a thumbnail is
+	# read-only and never rebinds or replaces a loaded-source batch snapshot.
+	if source_id.is_empty():
 		return
-	_batch_import_id = batch_id
-	var loaded := _extension("batch-load", {"batch_id": batch_id})
-	var manifest: Dictionary = loaded.get("batch", {})
-	_last_import_summary = {
-		"batch_id": batch_id,
-		"selected_count": manifest.get("items", []).size(),
-		"imported_count": int(manifest.get("counts", {}).get("success", 0)),
-		"reused_count": 0,
-	}
-	var association := _extension("png-batch-latest", {"batch_id": batch_id})
-	var job: Dictionary = association.get("job", {})
-	_batch_job_source_mismatch = str(association.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
-	if not job.is_empty():
-		_batch_job_id = str(job.get("job_id", ""))
-		_batch_snapshot = job
-	else:
-		_batch_job_id = ""
-		_batch_snapshot.clear()
-	if _batch_job_source_mismatch:
-		_report("BATCH_JOB_SOURCE_MISMATCH · The resumable job belongs to another imported batch. No batch will run from this thumbnail selection.")
 	_refresh_run_button_caption()
+
+
+func _batch_job_matches_loaded_sources() -> bool:
+	var items: Array = _batch_snapshot.get("items", [])
+	if items.size() != _gameplay_sources.size() or items.is_empty():
+		return false
+	for index in range(items.size()):
+		if not items[index] is Dictionary:
+			return false
+		if str(items[index].get("source_id", "")) != str(_gameplay_sources[index].get("source_id", "")):
+			return false
+	return true
 
 
 func _pinned_game_project_path() -> String:

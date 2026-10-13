@@ -273,8 +273,12 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.batch_import(request.get("paths", []))
         elif operation == "batch-load":
             payload = extensions.batch_load(str(request["batch_id"]))
+        elif operation == "loaded-png-batch-create":
+            payload = extensions.loaded_png_batch_create(request.get("source_ids", []))
         elif operation == "png-batch-create":
             payload = extensions.png_batch_create(str(request["batch_id"]), request.get("settings", {}))
+        elif operation == "png-batch-retry-failed":
+            payload = extensions.png_batch_retry_failed(str(request["job_id"]))
         elif operation == "png-batch-status":
             payload = extensions.png_batch_status(str(request["job_id"]))
         elif operation == "png-batch-latest":

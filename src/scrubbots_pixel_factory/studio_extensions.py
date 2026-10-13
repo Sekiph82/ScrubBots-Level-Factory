@@ -33,6 +33,7 @@ from .semantic.normalization.core import SUPPORTED_MEDIA_TYPE, _decode_raw
 EXTENSIONS_SCHEMA_VERSION = 1
 CATALOG_SCHEMA = "scrubbots-source-library-metadata"
 VALIDATION_SCHEMA = "scrubbots-owner-upload-validation"
+VALIDATION_POLICY = "SB-LFX-004-C001_CANONICAL_IMPORT_ANALYSIS_V2"
 PIPELINE_SCHEMA = "scrubbots-studio-pipeline-run"
 REVIEW_SCHEMA = "scrubbots-owner-review-evidence"
 PRESET_SCHEMA = "scrubbots-studio-preset"
@@ -90,6 +91,25 @@ def _write_json(path: Path, value: Mapping[str, object], *, immutable: bool = Fa
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_bytes(payload)
     temporary.replace(path)
+
+
+def _validation_evidence_path(source_id: str, source_sha256: str, report: Mapping[str, Any]) -> Path:
+    capability = report.get("void_capability", {})
+    suffix = ""
+    if isinstance(capability, Mapping) and report.get("alpha", {}).get("transparent_count", 0):
+        gate_head = str(capability.get("git_head", "unavailable"))[:12]
+        suffix = f"-void-{str(capability.get('state', 'closed')).lower()}-{gate_head}"
+    context = {
+        "policy": report.get("analysis_policy"),
+        "version": report.get("version"),
+        "source_id": source_id,
+        "source_sha256": source_sha256,
+        "source_record_sha256": report.get("source_authority", {}).get("source_record_sha256"),
+        "game_authority": report.get("game_authority"),
+        "void_contract": capability.get("void_contract", "NOT_USED") if isinstance(capability, Mapping) else "NOT_USED",
+    }
+    context_digest = _digest(context)[:20]
+    return extensions_root() / "validation" / f"{source_id}-{source_sha256}{suffix}-v2-{context_digest}.json"
 
 
 def _relative(path: Path) -> str:
@@ -305,7 +325,7 @@ def validate_owner_source(
         reason = str((capability or {}).get("reason", "")) if transparent and not gate_open else "Exact source does not satisfy the current logical LevelData contract."
         structural = {"disposition": disposition, "rejection_codes": reasons, "reason": reason}
     report = {
-        "schema": VALIDATION_SCHEMA, "version": 1, "analysis_policy": "SB-LFX-004-C001_CANONICAL_IMPORT_ANALYSIS_V1",
+        "schema": VALIDATION_SCHEMA, "version": 2, "analysis_policy": VALIDATION_POLICY,
         "source_id": source_id, "source_sha256": source["source_sha256"], "source_record_identity": _digest(source),
         "source_authority": {"source_id": source_id, "source_sha256": source["source_sha256"], "source_record_sha256": source_record_sha256, "verified_by": "IMMUTABLE_OWNER_SOURCE_RECORD"},
         "game_authority": ({"repository": capability.get("repository"), "commit": capability.get("git_head"), "tree": capability.get("git_tree"), "state": capability.get("state"), "void_contract": "PINNED_RUNTIME_V2"} if isinstance(capability, Mapping) else {"state": "NOT_REQUIRED", "void_contract": "NOT_USED"}),
@@ -323,11 +343,7 @@ def validate_owner_source(
         "claims": {"solver": "NOT AVAILABLE — canonical ZIP pipeline has not been executed", "difficulty": "NOT AVAILABLE — official Difficulty V1 evidence has not been produced", "owner_acceptance": "NOT AVAILABLE — validation is not acceptance"},
     }
     if persist:
-        suffix = ""
-        if transparent:
-            gate_head = str((capability or {}).get("git_head", "unavailable"))[:12]
-            suffix = f"-void-{(capability or {}).get('state', 'closed').lower()}-{gate_head}"
-        path = extensions_root() / "validation" / f"{source_id}-{source['source_sha256']}{suffix}.json"
+        path = _validation_evidence_path(source_id, str(source["source_sha256"]), report)
         _write_json(path, report, immutable=True)
         report = {**report, "evidence_path": _relative(path)}
     return report
@@ -1098,7 +1114,7 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
             "source_sha256": str(validation["source_sha256"]),
             "source_record_sha256": hashlib.sha256(source_record_path.read_bytes()).hexdigest(),
             "candidate_id": derived_candidate_id,
-            "candidate_artwork_sha256": bundle.artwork.sha256,
+            "candidate_artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
             "candidate_grid_hash": bundle.artwork.grid_hash,
         }
         payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE", activity_writer=activity_writer, owner_source_binding=source_binding)
@@ -1571,12 +1587,93 @@ def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
     return payload
 
 
+def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
+    """Create/reuse an immutable SHA-bound snapshot of the full loaded PNG gallery."""
+    if not isinstance(source_ids, Sequence) or isinstance(source_ids, (str, bytes)):
+        raise ValueError("loaded PNG source IDs must be a sequence")
+    if len(source_ids) > 150:
+        raise ValueError("loaded PNG snapshot exceeds the 150-source bound")
+    history: dict[str, list[dict[str, Any]]] = {}
+    batch_root = extensions_root() / "batches"
+    for path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
+        try:
+            prior = batch_load(path.stem)["batch"]
+        except (StudioExtensionError, OSError, ValueError):
+            continue
+        for prior_item in prior.get("items", []):
+            if not isinstance(prior_item, Mapping):
+                continue
+            identity = str(prior_item.get("source_id", ""))
+            if identity:
+                history.setdefault(identity, []).append({
+                    "batch_id": str(prior.get("batch_id", path.stem)),
+                    "index": int(prior_item.get("index", -1)),
+                    "disposition": str(prior_item.get("disposition", "")),
+                })
+    items: list[dict[str, Any]] = []
+    seen_sha: set[str] = set()
+    seen_ids: set[str] = set()
+    for index, raw_id in enumerate(source_ids):
+        source_id = str(raw_id)
+        item: dict[str, Any] = {
+            "index": index, "source_id": source_id, "display_path": "", "disposition": "REJECTED",
+            "error": "SOURCE_IDENTITY_INVALID", "import_provenance": history.get(source_id, []),
+        }
+        if source_id in seen_ids:
+            item["error"] = "DUPLICATE_SOURCE_ID"
+            items.append(item)
+            continue
+        seen_ids.add(source_id)
+        try:
+            source = verify_owner_source(source_id)
+            record_path, _png_path = _source_record_paths(source_id)
+            png_sha = str(source.get("source_sha256", ""))
+            record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
+            if source_id != f"owner-upload-{png_sha}" or len(png_sha) != 64:
+                raise StudioExtensionError("source ID does not match its verified PNG SHA-256")
+            item.update({
+                "display_path": str(source.get("original_filename", ""))[:240],
+                "disposition": "ALREADY_IMPORTED", "error": None,
+                "source_sha256": png_sha, "source_record_sha256": record_sha,
+            })
+            if png_sha in seen_sha:
+                item["disposition"] = "REJECTED"
+                item["error"] = "DUPLICATE_SOURCE_SHA256"
+            else:
+                seen_sha.add(png_sha)
+        except Exception as exc:
+            item["error"] = f"SOURCE_SNAPSHOT_VERIFICATION_FAILED: {str(exc)[:400]}"
+        items.append(item)
+    snapshot = {
+        "schema": BATCH_SCHEMA, "version": 2, "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT",
+        "items": items,
+        "counts": {
+            "success": sum(item["disposition"] in {"IMPORTED", "ALREADY_IMPORTED"} for item in items),
+            "failed": sum(item["disposition"] not in {"IMPORTED", "ALREADY_IMPORTED"} for item in items),
+        },
+    }
+    digest = _digest(snapshot)
+    batch_id = f"batch-loaded-{digest[:36]}"
+    payload = {**snapshot, "batch_id": batch_id, "snapshot_digest": digest}
+    _write_json(batch_root / f"{batch_id}.json", payload, immutable=True)
+    return payload
+
+
 def batch_load(batch_id: str) -> dict[str, Any]:
     if not _ID.fullmatch(batch_id): raise StudioExtensionError("batch ID is invalid")
     value = _read_json(extensions_root() / "batches" / f"{batch_id}.json")
-    if value.get("schema") != BATCH_SCHEMA or value.get("version") != 1 or value.get("batch_id") != batch_id or not isinstance(value.get("items"), list) or not isinstance(value.get("counts"), Mapping):
+    if value.get("schema") != BATCH_SCHEMA or value.get("version") not in {1, 2} or value.get("batch_id") != batch_id or not isinstance(value.get("items"), list) or not isinstance(value.get("counts"), Mapping):
         raise StudioExtensionError("batch evidence schema or identity is invalid")
+    if value.get("version") == 2:
+        unsigned = {key: item for key, item in value.items() if key not in {"batch_id", "snapshot_digest"}}
+        digest = _digest(unsigned)
+        if value.get("kind") != "COMPOSITE_LOADED_SOURCE_SNAPSHOT" or value.get("snapshot_digest") != digest or batch_id != f"batch-loaded-{digest[:36]}":
+            raise StudioExtensionError("composite loaded-source batch digest or identity is invalid")
     return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
+
+
+def loaded_png_batch_create(source_ids: Sequence[str]) -> dict[str, Any]:
+    return create_loaded_png_batch(source_ids)
 
 
 def png_batch_create(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1607,6 +1704,12 @@ def png_batch_run(job_id: str, expected_batch_id: str | None = None) -> dict[str
     from .png_batch import run_png_batch
 
     return run_png_batch(job_id, expected_batch_id=expected_batch_id)
+
+
+def png_batch_retry_failed(job_id: str) -> dict[str, Any]:
+    from .png_batch import retry_failed_png_batch
+
+    return retry_failed_png_batch(job_id)
 
 
 def owner_pages_snapshot() -> dict[str, Any]:
@@ -1870,5 +1973,5 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source", "validate_owner_review_chain",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "loaded_png_batch_create", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center", "png_batch_retry_failed",
 ]

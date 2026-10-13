@@ -311,7 +311,7 @@ def _candidate_has_source_lineage(candidate: Mapping[str, Any], source_id: str, 
         and lineage.get("source_id") == source_id
         and lineage.get("source_sha256") == source_sha256
         and lineage.get("derivation") == "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
-        and candidate.get("artwork_sha256") == bundle.artwork.sha256
+        and candidate.get("artwork_sha256") == hashlib.sha256(bundle.artwork_png).hexdigest()
         and candidate.get("grid_hash") == bundle.artwork.grid_hash
     )
 
@@ -371,6 +371,19 @@ def _verify_sources(items: Sequence[Mapping[str, Any]], settings: Mapping[str, A
             result.append(item)
             continue
         try:
+            proof = verify_owner_source(source_id, source_directory=settings.get("source_directory"))
+            source_sha = str(proof.get("source_sha256", ""))
+            if source_id != "owner-upload-" + source_sha or len(source_sha) != 64:
+                raise ValueError("source ID and verified PNG SHA-256 disagree")
+            from .studio_extensions import _source_record_paths
+
+            record_path, _source_path = _source_record_paths(source_id, settings.get("source_directory"))
+            record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
+            if raw.get("source_sha256") not in (None, source_sha):
+                raise ValueError("SOURCE_SNAPSHOT_PNG_SHA256_MISMATCH")
+            if raw.get("source_record_sha256") not in (None, record_sha):
+                raise ValueError("SOURCE_SNAPSHOT_RECORD_SHA256_MISMATCH")
+            item.update({"source_sha256": source_sha, "source_record_sha256": record_sha, "original_filename": str(proof.get("original_filename", display_name))[:240]})
             proof = validate_owner_source(
                 source_id, persist=False, game_project=settings.get("game_project"),
                 source_directory=settings.get("source_directory"),
@@ -379,15 +392,7 @@ def _verify_sources(items: Sequence[Mapping[str, Any]], settings: Mapping[str, A
                     or proof.get("structural", {}).get("disposition") != "PASS"
                     or proof.get("void_capability", {}).get("state") not in (None, "OPEN", "NOT_REQUIRED")):
                 raise ValueError(str(proof.get("reason", proof.get("structural", {}).get("reason", "CANONICAL_SOURCE_VALIDATION_FAILED"))))
-            proof = verify_owner_source(source_id, source_directory=settings.get("source_directory"))
-            source_sha = str(proof.get("source_sha256", ""))
-            if source_id != "owner-upload-" + source_sha or len(source_sha) != 64:
-                raise ValueError("source ID and verified PNG SHA-256 disagree")
-            from .studio_extensions import _source_record_paths
-
-            record_path, _source_path = _source_record_paths(source_id)
-            record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
-            item.update({"source_sha256": source_sha, "source_record_sha256": record_sha, "original_filename": str(proof.get("original_filename", display_name))[:240], "status": "QUEUED", "reason": ""})
+            item.update({"status": "QUEUED", "reason": ""})
             if source_sha in seen:
                 item.update({"status": "SKIPPED_DUPLICATE", "reason": "DUPLICATE_SOURCE_SHA256", "duplicate_of": seen[source_sha]})
             else:
@@ -427,6 +432,7 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     job = {
         "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": job_id,
         "import_batch_id": batch_id, "batch_digest": immutable_plan["batch_digest"],
+        "snapshot_source_count": len(imported["items"]),
         "plan_digest": plan_digest, "settings": snapshot, "state": "QUEUED",
         "created_at": _now(), "updated_at": _now(), "current_index": None,
         "items": source_items, "counts": _counts(source_items),
@@ -435,6 +441,69 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     }
     saved = _write_job(job)
     return {"state": "SUCCESS", "disposition": "CREATED", "job": saved}
+
+
+def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
+    """Create a separate deterministic retry job for FAILED items only."""
+    from .studio_extensions import _digest
+
+    original = _read_job(job_id)
+    if original.get("state") != "COMPLETE":
+        return {"state": "BLOCKED", "disposition": "BATCH_NOT_FINISHED", "job": original}
+    failed = [item for item in original.get("items", []) if item.get("status") == "FAILED"]
+    if not failed:
+        return {"state": "BLOCKED", "disposition": "NO_RETRYABLE_FAILURES", "job": original}
+    items: list[dict[str, Any]] = []
+    for index, previous in enumerate(failed):
+        items.append({
+            "index": index, "prior_item_index": previous.get("index"),
+            "source_id": previous.get("source_id"), "source_sha256": previous.get("source_sha256"),
+            "source_record_sha256": previous.get("source_record_sha256"),
+            "display_name": previous.get("display_name", previous.get("original_filename", "")),
+            "original_filename": previous.get("original_filename", previous.get("display_name", "")),
+            "status": "QUEUED", "reason": "", "column_count": previous.get("column_count"),
+            "prior_attempt": {key: previous.get(key) for key in (
+                "attempt_id", "activity_run_id", "run_id", "status", "reason", "started_at", "finished_at",
+            )},
+        })
+    retry_basis = {
+        "retry_of_job_id": job_id, "retry_of_state_digest": original.get("state_digest"),
+        "batch_digest": original.get("batch_digest"), "items": items,
+    }
+    plan_digest = _digest(retry_basis)
+    retry_id = f"png-batch-retry-{plan_digest[:32]}"
+    path = _job_path(retry_id)
+    if path.exists():
+        existing = _read_job(retry_id)
+        if existing.get("plan_digest") != plan_digest:
+            raise ValueError("retry job identity collides with a different failed-item snapshot")
+        return {"state": "SUCCESS", "disposition": "EXISTING_RETRY", "job": existing}
+    quotas = Counter(int(item["column_count"]) for item in items if item.get("column_count") in (3, 4, 5))
+    job = {
+        "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": retry_id,
+        "import_batch_id": original.get("import_batch_id"), "batch_digest": original.get("batch_digest"),
+        "parent_job_id": job_id, "parent_job_state_digest": original.get("state_digest"),
+        "retry_of_failed_only": True, "plan_digest": plan_digest,
+        "settings": dict(original.get("settings", {})), "state": "QUEUED",
+        "created_at": _now(), "updated_at": _now(), "current_index": None,
+        "items": items, "counts": _counts(items),
+        "planned_quotas": {str(columns): quotas[columns] for columns in (3, 4, 5)},
+        "ready_mix": {"3": 0, "4": 0, "5": 0},
+    }
+    return {"state": "SUCCESS", "disposition": "RETRY_CREATED", "job": _write_job(job)}
+
+
+def batch_terminal_message(job: Mapping[str, Any], loaded_count: int | None = None) -> str:
+    counts = job.get("counts", {})
+    total = int(counts.get("total", 0))
+    ready = int(counts.get("ready", 0))
+    failed = int(counts.get("failed", 0))
+    rejected = int(counts.get("rejected", 0))
+    skipped = int(counts.get("skipped", 0))
+    remaining = int(counts.get("remaining", 0))
+    loaded = int(job.get("snapshot_source_count", total) if loaded_count is None else loaded_count)
+    prefix = "FINISHED WITH FAILURES · " if job.get("state") == "COMPLETE" and (failed or rejected) else ""
+    return f"{prefix}Loaded {loaded} · Job {total} · {ready} READY · {failed} FAILED · {rejected} REJECTED · {skipped} SKIPPED · {remaining} remaining"
 
 
 def png_batch_status(job_id: str) -> dict[str, Any]:
@@ -610,7 +679,8 @@ def run_png_batch(
         if expected_batch_id is not None and expected_batch_id != job.get("import_batch_id"):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "reason": "Displayed import batch does not match this resumable job."}
         if job.get("state") == "COMPLETE":
-            return {"state": "SUCCESS", "disposition": "COMPLETE", "job": job, "mutated": False}
+            disposition = "FINISHED_WITH_FAILURES" if int(job.get("counts", {}).get("failed", 0)) or int(job.get("counts", {}).get("rejected", 0)) else "COMPLETE"
+            return {"state": "SUCCESS", "disposition": disposition, "job": job, "mutated": False}
         batch = extensions.batch_load(str(job.get("import_batch_id", "")))["batch"]
         if extensions._digest(batch) != job.get("batch_digest"):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job, "reason": "Import batch manifest digest changed after the immutable PNG solver plan was created."}
@@ -742,4 +812,5 @@ def run_png_batch(
         job["counts"] = _counts(job["items"])
         job["updated_at"] = _now()
         job = _write_job(job)
-        return {"state": "SUCCESS", "disposition": "COMPLETE", "job": job}
+        disposition = "FINISHED_WITH_FAILURES" if int(job.get("counts", {}).get("failed", 0)) or int(job.get("counts", {}).get("rejected", 0)) else "COMPLETE"
+        return {"state": "SUCCESS", "disposition": disposition, "job": job}
