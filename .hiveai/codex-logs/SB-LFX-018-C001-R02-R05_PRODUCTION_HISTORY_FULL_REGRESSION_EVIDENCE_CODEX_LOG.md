@@ -646,3 +646,10 @@ Document role: CODEX BUILDER LOG
 - Product commits: `41cca168bbaf05547986650ca4954d005a3cc400` and `07db9d837fe22e66a94d8e674345460f37d1080a`. The existing log is the only builder log changed; root TASKS, audits, prompts, owner files and all other tracker/control-plane paths remain unchanged.
 - Final diff summary, separate log commit, normal GitHub push, post-fetch parity and clean tracked status will be appended below after publication. Release source revision matches the launcher-fix product commit.
 - **Read-only command typo:** a final `rg` check mistakenly passed Git pathspec exclusion syntax to ripgrep and returned an invalid-path error. It made no changes; the adjacent `git diff --name-only` output showed only this builder log was modified at that checkpoint.
+
+### Publication checkpoint 1
+
+- **Final product diff:** responsive Level Factory dock/preview fit, authenticated batch thumbnail captions and subset centering, exact PID/project/title launcher guard, and one new focused R08 suite. Product commits `41cca168bbaf05547986650ca4954d005a3cc400` and `07db9d837fe22e66a94d8e674345460f37d1080a`; the builder log's initial R08 record was committed as `0e6c5a5aae06c2d5159c9ce587880549fea37a07`.
+- **Pre-push gate:** `git fetch --prune origin` found `origin/main=b2e71720894089f329a687b90d1dbe1e0f128b1b`; local HEAD `0e6c5a5aae06c2d5159c9ce587880549fea37a07` was a descendant, 3 ahead / 0 behind. `git merge-base --is-ancestor origin/main HEAD` passed.
+- **Push:** normal `git push origin HEAD:main` succeeded (`b2e7172..0e6c5a5`). Post-push `git fetch --prune origin` verified local HEAD and `origin/main` both `0e6c5a5aae06c2d5159c9ce587880549fea37a07`, 0 ahead / 0 behind, no tracked modifications. Existing untracked owner files were not staged or removed.
+- This checkpoint is committed; a final log-only push and its post-fetch parity will be recorded in the next checkpoint. No acceptance/audit status is asserted here.
