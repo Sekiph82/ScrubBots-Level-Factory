@@ -87,6 +87,19 @@ func _run_suite() -> void:
 		"state": "RUNNING", "items": [{"source_id": all_ids[0]}],
 	})
 	await process_frame
+	ui.call("_apply_responsive_layout")
+	await process_frame
+	var original_dock_rects := _dock_rect_snapshot(ui)
+	ui.size = Vector2(1200, 800)
+	viewport.size = Vector2i(1200, 800)
+	ui.call("_apply_responsive_layout")
+	await process_frame
+	ui.size = Vector2(1536, 864)
+	viewport.size = Vector2i(1536, 864)
+	ui.call("_apply_responsive_layout")
+	await process_frame
+	_check(_dock_rect_snapshot(ui) == original_dock_rects, "existing R04-R04 thumbnail dock geometry drifted after resize-back")
+	_check((ui.get_node("RuntimeBottomHeading") as Label).text.contains("9 PNG"), "gallery count does not show all nine loaded PNGs")
 
 	var second_page_wheel := InputEventMouseButton.new()
 	second_page_wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
@@ -156,3 +169,10 @@ func _run_suite() -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		_errors.append(message)
+
+
+func _dock_rect_snapshot(ui: Control) -> Dictionary:
+	var result := {}
+	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]:
+		result[node_name] = (ui.get_node(node_name) as Control).get_global_rect()
+	return result
