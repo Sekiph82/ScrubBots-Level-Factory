@@ -167,7 +167,7 @@ func _difficulty(level, eng, trace: Array, level_number: int) -> Dictionary:
 	if not raw.get("ok", false):
 		return {"ok": false, "error": raw.get("error", "measure failed")}
 	var sc: Dictionary = an.score(raw, level_number)
-	return {"ok": true, "challengeScore": sc["challengeScore"], "vector": sc["vector"],
+	return {"ok": true, "challengeScore": sc["challengeScore"], "vector": sc["vector"], "profile": sc.get("profile", {}),
 		"targetChallenge": sc["targetChallenge"], "sessionLoad": sc["sessionLoad"]["value"],
 		"B": sc["supporting"]["B"], "S": sc["supporting"]["S"], "U": sc["supporting"]["U"],
 		"path": raw["path"]}

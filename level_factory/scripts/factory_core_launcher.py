@@ -230,6 +230,12 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
                 persist=False,
                 game_project=request.get("game_project"),
             )
+        elif operation == "restore-source-run-readonly":
+            payload = extensions.restore_source_run(
+                str(request["source_id"]),
+                game_project=request.get("game_project"),
+                source_directory=request.get("source_directory"),
+            )
         elif operation == "candidate-inbox":
             payload = extensions.candidate_inbox()
         elif operation == "owner-review":

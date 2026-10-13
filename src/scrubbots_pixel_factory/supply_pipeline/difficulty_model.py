@@ -41,5 +41,5 @@ class DifficultyModel:
         Returns (class, score, basis)."""
         if official and official.get("ok"):
             d = float(official["challengeScore"])
-            return self.rules.classify(d), round(d, 2), "ScrubBots Difficulty V1 challengeScore (official analyzer)"
+            return self.rules.classify(d), d, "ScrubBots Difficulty V1 challengeScore (official analyzer)"
         return None, None, "UNAVAILABLE — official ScrubBots Difficulty V1 evidence is required"

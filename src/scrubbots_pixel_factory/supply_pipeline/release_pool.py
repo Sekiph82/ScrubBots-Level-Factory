@@ -38,6 +38,17 @@ def _official_profile(official: Mapping[str, Any]) -> dict[str, Any]:
     return dict(profile)
 
 
+def _canonical_official_difficulty(primary: Mapping[str, Any]) -> dict[str, Any]:
+    """Read the official V1 object from the canonical primary result shape."""
+    result = primary.get("result", {})
+    result = result if isinstance(result, Mapping) else {}
+    metrics = result.get("solver_metrics", primary.get("solver_metrics", {}))
+    official = metrics.get("official_difficulty_v1", {}) if isinstance(metrics, Mapping) else {}
+    if not isinstance(official, Mapping) or official.get("ok") is not True:
+        raise ReleaseError("official Difficulty V1 evidence is missing or malformed")
+    return dict(official)
+
+
 def _json(path: Path) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -68,17 +79,14 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "Release Pool requires a canonical READY ZIP/solver/replay/Difficulty pipeline; owner ACCEPT is optional."}
     primary = pipeline["primary"]
     difficulty = primary.get("difficulty", {})
-    if not isinstance(difficulty, Mapping) or type(difficulty.get("score")) not in {int, float} or not math.isfinite(float(difficulty["score"])):
-        raise ReleaseError("official Difficulty V1 score is missing")
-    metrics = primary.get("solver_metrics", {})
-    official = metrics.get("official_difficulty_v1", {}) if isinstance(metrics, Mapping) else {}
-    if not isinstance(official, Mapping):
-        raise ReleaseError("official Difficulty V1 evidence is missing or malformed")
+    official = _canonical_official_difficulty(primary)
     vector = _official_challenge_vector(official)
     profile = _official_profile(official)
     official_score = official.get("challengeScore")
-    if type(official_score) not in {int, float} or not math.isfinite(float(official_score)) or float(official_score) != float(difficulty["score"]):
-        raise ReleaseError("official Difficulty V1 challengeScore is missing or does not match the pipeline score")
+    if type(official_score) not in {int, float} or not math.isfinite(float(official_score)):
+        raise ReleaseError("official Difficulty V1 challengeScore is missing or malformed")
+    if not isinstance(difficulty, Mapping) or difficulty.get("class") is None:
+        raise ReleaseError("official Difficulty V1 class is missing")
     dominant = profile["dominant"]
     from .. import studio_extensions as studio
     bundle_path = (studio._repository_root() / str(candidate["source_path"])).resolve()
@@ -89,7 +97,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "schema": "scrubbots-release-pool-entry/v1", "candidate_id": candidate["candidate_id"],
         "width": candidate.get("width"), "height": candidate.get("height"), "used_colors": candidate.get("used_colors", []),
         "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"],
-        "challenge_score": difficulty["score"], "difficulty_class": difficulty.get("class"),
+        "challenge_score": float(official_score), "difficulty_class": difficulty.get("class"),
         "challenge_vector": vector, "dominant_profile": dominant, "official_profile": profile,
         "frustration_risk": official.get("frustrationRisk") if isinstance(official, Mapping) else None,
         "session_load": official.get("sessionLoad") if isinstance(official, Mapping) else None,

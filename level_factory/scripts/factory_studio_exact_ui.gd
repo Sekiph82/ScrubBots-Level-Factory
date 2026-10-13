@@ -15,6 +15,7 @@ var _screen := "PIXEL ART"
 var _last_candidate_id := ""
 var _last_source_id := ""
 var _last_pipeline: Dictionary = {}
+var _owner_review_status := ""
 var _selected_release_ids: Array[String] = []
 var _release_selection_manage_mode := false
 var _release_pool: Dictionary = {}
@@ -40,6 +41,11 @@ var _grid_enabled := false
 var _zoom := 1.0
 var _supply_expanded := false
 var _settings_dialog: AcceptDialog
+var _supply_dialog: AcceptDialog
+var _replay_dialog: AcceptDialog
+var _replay_step_label: RichTextLabel
+var _replay_trace: Array = []
+var _replay_step := 0
 var _prompt_dialog: ConfirmationDialog
 var _prompt_input: TextEdit
 var _settings_python: LineEdit
@@ -437,12 +443,14 @@ func _refresh_live_data() -> void:
 	elif _screen == "LEVEL FACTORY":
 		var primary: Dictionary = _last_pipeline.get("primary", {})
 		var monitor_failed := str(_last_pipeline.get("studio_monitor_validation", "")) == "FAILED_CLOSED"
-		var pipeline_state := "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "Awaiting pipeline")))
-		var pipeline_reason := str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
-		var solver_text := "ERROR · activity integrity failed" if monitor_failed else str(primary.get("state", pipeline_state)) if not primary.is_empty() else pipeline_state
-		var replay_text := str(primary.get("acceptance", {}).get("replay", "—")) if not primary.is_empty() and not monitor_failed else "—"
-		var difficulty_text := str(primary.get("difficulty", {}).get("class", "—")) if not primary.is_empty() and not monitor_failed else "—"
-		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\n%s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, solver_text, replay_text, difficulty_text, pipeline_reason, selected_source_text]
+		var selected_run := str(_last_pipeline.get("source_id", "")) == _selected_import_source_id
+		var active_run := _operation_running and _activity_source_id == _selected_import_source_id
+		var pipeline_state := "RUNNING" if active_run else "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "SOURCE_ONLY · Awaiting run"))) if selected_run else "SOURCE_ONLY · Awaiting run"
+		var pipeline_reason := "Pipeline: Running for selected source" if active_run else str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
+		var solver_text := "RUNNING · %s" % _activity_stage if active_run else "ERROR · activity integrity failed" if monitor_failed else str(primary.get("state", pipeline_state)) if selected_run and not primary.is_empty() else pipeline_state
+		var replay_text := str(primary.get("acceptance", {}).get("replay", "—")) if not active_run and selected_run and not primary.is_empty() and not monitor_failed else "—"
+		var difficulty_text := str(primary.get("difficulty", {}).get("class", "—")) if not active_run and selected_run and not primary.is_empty() and not monitor_failed else "—"
+		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\n%s%s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, solver_text, replay_text, difficulty_text, pipeline_reason, selected_source_text, "\nReview: " + _owner_review_status if not _owner_review_status.is_empty() else ""]
 	else:
 		var entries: Array = _release_pool.get("entries", [])
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
@@ -800,6 +808,8 @@ func _build_secondary_surfaces() -> void:
 func _show_screen(name: String) -> void:
 	if name not in master_names() or _canvas == null:
 		return
+	if name != "LEVEL FACTORY":
+		_hide_review_dialogs()
 	_screen = name
 	# Owner masters are reference-only. Runtime rendering is built from live Controls.
 	_canvas.texture = null
@@ -1172,14 +1182,6 @@ func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
 	_activity_source_id = _selected_import_source_id
-	if _activity_source_id != _PINNED_002_SOURCE_ID:
-		_pinned_source_preflight_ok = false
-		_pinned_source_preflight_message = "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
-		_activity_stage = "AUTHORITY"
-		_activity_message = _pinned_source_preflight_message
-		_refresh_activity_header()
-		_report(_pinned_source_preflight_message)
-		return
 	if not _pinned_source_preflight_ok:
 		_refresh_pinned_source_preflight()
 		if not _pinned_source_preflight_ok:
@@ -1195,6 +1197,7 @@ func _run_level_pipeline() -> void:
 		_report(_pinned_source_preflight_message)
 		return
 	_operation_running = true
+	_owner_review_status = "Current source run in progress; owner review is disabled."
 	var request: Dictionary = route["request"]
 	_activity_source_id = str(route["source_id"])
 	if _activity_source_id.is_empty() or not _activity_source_id.begins_with("owner-upload-"):
@@ -1355,7 +1358,7 @@ func _consume_activity_bytes(chunk: PackedByteArray) -> void:
 
 
 func _append_activity_row(body: Dictionary) -> void:
-	if _activity_rows == null:
+	if _activity_rows == null or str(body.get("source_id", _selected_import_source_id)) != _selected_import_source_id:
 		return
 	var scrollbar := _activity_scroll.get_v_scroll_bar()
 	var follow_latest := scrollbar.value >= scrollbar.max_value - scrollbar.page - 12.0
@@ -1396,6 +1399,15 @@ func _fail_activity_monitor(reason: String) -> void:
 
 func _refresh_activity_header() -> void:
 	if _activity_state_label == null:
+		return
+	var activity_matches_selection := _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
+	if not activity_matches_selection:
+		_activity_state_label.text = "SOURCE ONLY"
+		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(Color("#34425a"), Color("#536783")))
+		_activity_source_label.text = "%s · awaiting run" % _selected_import_filename().left(22)
+		_activity_source_label.tooltip_text = "Selected source %s; prior-source activity is hidden." % _selected_import_source_id
+		_activity_phase_label.text = "SOURCE ONLY · explicit Run Pipeline required"
+		_activity_phase_label.tooltip_text = "PNG selection and restoration are read-only."
 		return
 	var state := _activity_display_state()
 	_activity_state_label.text = state.replace("_", " ").left(13)
@@ -1447,12 +1459,15 @@ func _complete_local_pipeline_failure(reason: String) -> void:
 
 
 func _complete_level_pipeline(result: Dictionary) -> void:
-	_last_pipeline = result
+	var completed_source_id := str(result.get("source_id", ""))
+	var still_selected := completed_source_id == _selected_import_source_id and completed_source_id == _activity_source_id
+	if still_selected:
+		_last_pipeline = result
 	_operation_running = false
 	_activity_finished_msec = Time.get_ticks_msec()
 	if not _activity_pending_bytes.is_empty():
 		_fail_activity_monitor("Activity stream ended with an incomplete trailing event line.")
-	if not str(result.get("derived_candidate_id", "")).is_empty():
+	if still_selected and not str(result.get("derived_candidate_id", "")).is_empty():
 		_last_candidate_id = str(result["derived_candidate_id"])
 	var backend_state := str(result.get("disposition", result.get("state", "ERROR")))
 	var event_backend_disposition := _activity_event_backend_disposition
@@ -1472,7 +1487,7 @@ func _complete_level_pipeline(result: Dictionary) -> void:
 		_activity_message = backend_reason
 	if backend_state == "READY" and terminal_matches and _activity_integrity_error.is_empty():
 		_refresh_release_pool(false)
-	if backend_state == "READY" and (not terminal_matches or not _activity_integrity_error.is_empty()):
+	if still_selected and backend_state == "READY" and (not terminal_matches or not _activity_integrity_error.is_empty()):
 		_last_pipeline["studio_monitor_validation"] = "FAILED_CLOSED"
 		_last_pipeline["studio_monitor_reason"] = "Backend READY is withheld because activity integrity or the terminal event did not verify."
 	var run_button := get_node_or_null("RunLevelPipeline") as Button
@@ -1481,7 +1496,8 @@ func _complete_level_pipeline(result: Dictionary) -> void:
 	if solve_button != null: solve_button.disabled = false
 	_refresh_activity_header()
 	_refresh_live_data()
-	_report("Pipeline %s · %s" % [backend_state, backend_reason])
+	if still_selected:
+		_report("Pipeline %s · %s" % [backend_state, backend_reason])
 
 
 func _set_columns(columns: int) -> void:
@@ -1504,18 +1520,33 @@ func _save_level_number() -> void:
 
 
 func _review_candidate(disposition: String) -> void:
+	if _operation_running:
+		_report("Wait for the active source run to finish before recording owner review.")
+		return
 	if _last_candidate_id.is_empty():
 		_report("Select a candidate before recording owner review.")
 		return
-	if disposition == "ACCEPT":
-		var primary: Dictionary = _last_pipeline.get("primary", {})
-		if str(_last_pipeline.get("disposition", "")) != "READY" or str(primary.get("state", "")) != "READY":
-			_report("Accept is available only after the canonical solver, replay, Difficulty V1, and QA pipeline is READY.")
-			return
+	var primary: Dictionary = _last_pipeline.get("primary", {})
+	if str(_last_pipeline.get("source_id", "")) != _selected_import_source_id or str(_last_pipeline.get("disposition", "")) != "READY" or str(primary.get("state", "")) != "READY":
+		_report("Owner review requires the selected PNG's completed canonical READY run.")
+		return
 	var result := _extension("owner-review", {"candidate_id": _last_candidate_id, "disposition": disposition})
-	_report("Owner %s · %s" % [disposition, str(result.get("review_id", result.get("state", "UNAVAILABLE")))])
+	_refresh_release_pool(false)
+	var publication: Dictionary = result.get("publication", {})
+	var exact_readback := false
+	var candidate_in_pool := false
+	for entry_variant in _release_pool.get("entries", []):
+		if entry_variant is Dictionary and str(entry_variant.get("candidate_id", "")) == _last_candidate_id:
+			candidate_in_pool = true
+			if str(entry_variant.get("pipeline_run_id", "")) == str(_last_pipeline.get("run_id", "")):
+				exact_readback = true
+	var readback_ok := bool(publication.get("readback_verified", false)) and exact_readback if disposition == "ACCEPT" else str(publication.get("disposition", "")) == "EXCLUDED_FROM_RELEASE_POOL" and not candidate_in_pool
 	if disposition == "ACCEPT":
-		_refresh_release_pool()
+		_owner_review_status = "ACCEPTED / IN RELEASE POOL" if readback_ok else "ACCEPT_RECORDED_BUT_POOL_DENIED: %s" % str(publication.get("reason", "exact current candidate/run was not returned by Release Pool read-back"))
+	else:
+		_owner_review_status = "REJECTED / EXCLUDED FROM RELEASE POOL" if readback_ok else "REJECT_RECORDED_BUT_POOL_READBACK_FAILED: %s" % str(publication.get("reason", "candidate remained in the Release Pool"))
+	_refresh_live_data()
+	_report("%s · review %s" % [_owner_review_status, str(result.get("review_id", result.get("state", "UNAVAILABLE")))])
 
 
 func _refresh_release_pool(show_status: bool = true) -> void:
@@ -1793,10 +1824,35 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_last_source_id = source_id
 		_last_candidate_id = ""
 		_last_pipeline.clear()
+		_owner_review_status = ""
+		_hide_review_dialogs()
+		_activity_events.clear()
+		for child in _activity_rows.get_children(): child.queue_free()
+		_activity_stage = "SOURCE"
+		_activity_message = "Selected PNG is read-only until Run Pipeline is explicitly selected."
+		_activity_terminal_state = ""
+		_activity_integrity_error = ""
 		_imported_page = int(index / 8)
 		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
 		_refresh_pinned_source_preflight()
+		var restored := _extension("restore-source-run-readonly", {
+			"source_id": source_id,
+			"game_project": _pinned_game_project_path()
+		})
+		if str(restored.get("state", "")) == "READY" and str(restored.get("source_sha256", "")) == source_id.trim_prefix("owner-upload-"):
+			var restored_pipeline: Dictionary = restored.get("pipeline", {})
+			var restored_request: Dictionary = restored_pipeline.get("request", {})
+			if str(restored_request.get("source_id", "")) == source_id and str(restored_pipeline.get("disposition", "")) == "READY":
+				restored_pipeline["source_id"] = source_id
+				_last_pipeline = restored_pipeline
+				_last_candidate_id = str(restored.get("candidate_id", ""))
+				var restored_review: Dictionary = restored.get("owner_review_status", {})
+				if not restored_review.is_empty():
+					_owner_review_status = "%s · %s" % [str(restored_review.get("pool_state", "")), str(restored_review.get("reason", ""))]
+				_activity_stage = "RESTORED"
+				_activity_message = "Restored exact source-bound canonical READY result; no solver was run."
+		_refresh_activity_header()
 		_refresh_runtime_cards()
 		_refresh_live_data()
 		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
@@ -1808,8 +1864,8 @@ func _pinned_game_project_path() -> String:
 
 
 func _build_selected_source_pipeline_request() -> Dictionary:
-	if _selected_import_source_id != _PINNED_002_SOURCE_ID or not _pinned_source_preflight_ok:
-		return {"state": "BLOCKED", "reason": "PINNED_SOURCE_SCOPE_NOT_VERIFIED"}
+	if _selected_import_source_id.is_empty() or not _pinned_source_preflight_ok:
+		return {"state": "BLOCKED", "reason": _pinned_source_preflight_message}
 	return {
 		"state": "AUTHORIZED_SOURCE_SCOPE",
 		"source_id": _selected_import_source_id,
@@ -1829,8 +1885,8 @@ func _build_selected_source_pipeline_request() -> Dictionary:
 
 func _refresh_pinned_source_preflight() -> void:
 	_pinned_source_preflight_ok = false
-	if _selected_import_source_id != _PINNED_002_SOURCE_ID:
-		_pinned_source_preflight_message = "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
+	if _selected_import_source_id.is_empty():
+		_pinned_source_preflight_message = "Select a verified owner PNG."
 		_activity_stage = "AUTHORITY"
 		_activity_message = _pinned_source_preflight_message
 		_refresh_activity_header()
@@ -1841,19 +1897,21 @@ func _refresh_pinned_source_preflight() -> void:
 	})
 	var capability: Dictionary = result.get("void_capability", {})
 	var structural: Dictionary = result.get("structural", {})
+	var source_authority: Dictionary = result.get("source_authority", {})
 	_pinned_source_preflight_ok = (
-		str(result.get("source_sha256", "")) == _PINNED_002_SOURCE_ID.trim_prefix("owner-upload-")
+		str(result.get("source_sha256", "")) == _selected_import_source_id.trim_prefix("owner-upload-")
+		and str(source_authority.get("source_id", "")) == _selected_import_source_id
+		and str(source_authority.get("source_sha256", "")) == _selected_import_source_id.trim_prefix("owner-upload-")
 		and bool(result.get("exact_logical_source", false))
-		and str(capability.get("state", "")) == "OPEN"
+		and str(capability.get("state", "")) in ["OPEN", "NOT_REQUIRED"]
 		and str(structural.get("disposition", "")) == "PASS"
 	)
 	if _pinned_source_preflight_ok:
 		_pinned_source_preflight_message = "SOURCE/VOID PASS · NOT SHIPPING"
-		_activity_stage = "PINNED OFFLINE"
+		_activity_stage = "SOURCE VERIFIED"
 		_activity_message = _pinned_source_preflight_message
 	else:
-		var scope := str(capability.get("reason_code", ""))
-		_pinned_source_preflight_message = scope if scope == "PINNED_SOURCE_SCOPE_NOT_VERIFIED" else str(result.get("reason", result.get("error", "Pinned source preflight is unavailable.")))
+		_pinned_source_preflight_message = str(result.get("reason", result.get("error", capability.get("reason", "Source preflight is unavailable."))))
 		_activity_stage = "AUTHORITY"
 		_activity_message = _pinned_source_preflight_message
 	_refresh_activity_header()
@@ -1981,26 +2039,183 @@ func _solve_again() -> void:
 
 
 func _preview_replay() -> void:
-	var primary: Dictionary = _last_pipeline.get("primary", {})
-	var replay: Dictionary = primary.get("replay", primary.get("replay_verification", {}))
-	if replay.is_empty():
-		_report("Replay proof is not available")
+	if _supply_dialog != null:
+		_supply_dialog.hide()
+		_supply_expanded = false
+	var primary := _pipeline_primary_for_selected_source()
+	var verified := _verify_saved_solver_artifacts(primary)
+	if not verified.get("ok", false):
+		_report("REPLAY_EVIDENCE_MISSING · %s" % str(verified.get("reason", "Source-bound proof is unavailable.")))
 		return
-	var dialog := AcceptDialog.new()
-	dialog.title = "Replay Preview"
-	var text := JSON.stringify(replay, "  ")
-	var label := RichTextLabel.new(); label.custom_minimum_size = Vector2(700, 420); label.text = text; label.fit_content = true
-	dialog.add_child(label); add_child(dialog); dialog.confirmed.connect(func(): dialog.queue_free()); dialog.popup_centered()
+	var result: Dictionary = primary.get("result", {})
+	var replay: Dictionary = result.get("solution_replay", {})
+	_replay_trace = result.get("solution_trace", [])
+	if replay.is_empty() or _replay_trace.is_empty():
+		_report("REPLAY_EVIDENCE_MISSING · the canonical run has no recorded solution trace.")
+		return
+	var replay_won := bool(replay.get("ok", false)) and bool(replay.get("solved", false)) and int(replay.get("finalActive", -1)) == 0
+	if not replay_won:
+		_report("REPLAY_NOT_WIN · recorded replay does not prove WIN.")
+	if _replay_dialog != null and _replay_dialog.visible:
+		_replay_dialog.hide()
+		return
+	if _replay_dialog == null:
+		_replay_dialog = AcceptDialog.new()
+		_replay_dialog.title = "Replay Preview"
+		_replay_dialog.confirmed.connect(func(): _replay_dialog.hide())
+		var summary := Label.new()
+		summary.name = "ReplaySummary"
+		summary.custom_minimum_size = Vector2(680, 44)
+		summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		summary.text = "TRACE-ONLY · visual board states are not stored"
+		_replay_dialog.add_child(summary)
+		_replay_step_label = RichTextLabel.new()
+		_replay_step_label.custom_minimum_size = Vector2(680, 250)
+		_replay_dialog.add_child(_replay_step_label)
+		var controls := HBoxContainer.new()
+		var previous := Button.new()
+		previous.text = "Previous"
+		previous.pressed.connect(func(): _set_replay_step(_replay_step - 1))
+		var next := Button.new()
+		next.text = "Next"
+		next.pressed.connect(func(): _set_replay_step(_replay_step + 1))
+		controls.add_child(previous)
+		controls.add_child(next)
+		_replay_dialog.add_child(controls)
+		add_child(_replay_dialog)
+	_replay_step = 0
+	var replay_summary := _replay_dialog.get_node_or_null("ReplaySummary") as Label
+	if replay_summary != null:
+		replay_summary.text = "TRACE-ONLY · REPLAY_VISUAL_STATES_NOT_AVAILABLE · %s · %d steps · final active %s · source %s · run %s · activity %s" % [
+			"WIN" if replay_won else "REPLAY_NOT_WIN",
+			_replay_trace.size(), str(replay.get("finalActive", "?")), _selected_import_source_id,
+			str(_last_pipeline.get("run_id", "")), str(_last_pipeline.get("request", {}).get("activity_run_id", ""))
+		]
+	_set_replay_step(0)
+	_replay_dialog.popup_centered()
+
+
+func _set_replay_step(index: int) -> void:
+	if _replay_trace.is_empty() or _replay_step_label == null:
+		return
+	_replay_step = posmod(index, _replay_trace.size())
+	var step: Dictionary = _replay_trace[_replay_step]
+	var batch: Dictionary = step.get("batch", {})
+	_replay_step_label.text = "Step %d / %d\nColumn: %s\nBatch: %s × %s\nClears: %s\nPixels left: %s" % [
+		_replay_step + 1, _replay_trace.size(), str(step.get("column", "?")),
+		str(batch.get("color", "?")), str(batch.get("amount", "?")),
+		str(step.get("clears", "?")), str(step.get("pixels_left", "?"))
+	]
 
 
 func _toggle_supply_plan() -> void:
-	_supply_expanded = not _supply_expanded
-	var primary: Dictionary = _last_pipeline.get("primary", {})
-	var supply: Variant = primary.get("supply", primary.get("supply_plan", {}))
-	if _supply_expanded:
-		var dialog := AcceptDialog.new(); dialog.title = "Supply Plan"
-		var label := RichTextLabel.new(); label.custom_minimum_size = Vector2(520, 280); label.text = JSON.stringify(supply, "  "); label.fit_content = true
-		dialog.add_child(label); add_child(dialog); dialog.confirmed.connect(func(): dialog.queue_free()); dialog.popup_centered()
+	if _supply_dialog != null and _supply_dialog.visible:
+		_supply_dialog.hide()
+		_supply_expanded = false
+		return
+	if _replay_dialog != null:
+		_replay_dialog.hide()
+	var primary := _pipeline_primary_for_selected_source()
+	var verified := _verify_saved_solver_artifacts(primary)
+	if not verified.get("ok", false):
+		_report("SUPPLY_PLAN_HASH_INVALID · %s" % str(verified.get("reason", "Canonical supply evidence is unavailable.")))
+		return
+	var result: Dictionary = primary.get("result", {})
+	var columns: Array = result.get("supply_columns", [])
+	if columns.is_empty():
+		_report("SUPPLY_PLAN_MISSING · canonical result contains no supply columns.")
+		return
+	if _supply_dialog == null:
+		_supply_dialog = AcceptDialog.new()
+		_supply_dialog.title = "Supply Plan"
+		_supply_dialog.visibility_changed.connect(func(): _supply_expanded = _supply_dialog.visible)
+		_supply_dialog.confirmed.connect(func(): _supply_dialog.hide())
+		add_child(_supply_dialog)
+	for child in _supply_dialog.get_children():
+		_supply_dialog.remove_child(child)
+		child.queue_free()
+	var label := RichTextLabel.new()
+	label.custom_minimum_size = Vector2(720, 440)
+	label.fit_content = true
+	var totals: Array = result.get("column_pixel_totals", [])
+	var total_robots := 0
+	for column_variant in columns:
+		if column_variant is Array:
+			for batch_variant in column_variant:
+				if batch_variant is Dictionary:
+					total_robots += int(batch_variant.get("amount", 0))
+	var total_pixels := 0
+	for amount_variant in totals:
+		total_pixels += int(amount_variant)
+	var lines: PackedStringArray = ["%d columns · %d batches · preview depth %d · source %s" % [
+		columns.size(), int(result.get("total_batches", 0)), int(result.get("visible_preview_depth", 3)), _wrap_identity(_selected_import_source_id, 18)
+	]]
+	lines.append("Total robots: %d · total pixels: %d" % [total_robots, total_pixels])
+	for column_index in range(columns.size()):
+		var batch_lines: PackedStringArray = []
+		for batch_variant in columns[column_index]:
+			if batch_variant is Dictionary:
+				batch_lines.append("%s × %s" % [str(batch_variant.get("color", "?")), str(batch_variant.get("amount", "?"))])
+		lines.append("Column %d · %s pixels\n%s" % [
+			column_index + 1, str(totals[column_index]) if column_index < totals.size() else "?",
+			"  " + "\n  ".join(batch_lines)
+		])
+	var conservation: Dictionary = result.get("color_conservation_verification", {})
+	lines.append("Conservation: %s" % ("PASS" if conservation.get("all_ok", false) else "NOT VERIFIED"))
+	label.text = "\n\n".join(lines)
+	_supply_dialog.add_child(label)
+	_supply_dialog.popup_centered()
+
+
+func _pipeline_primary_for_selected_source() -> Dictionary:
+	if str(_last_pipeline.get("source_id", "")) != _selected_import_source_id or str(_last_pipeline.get("disposition", "")) != "READY":
+		return {}
+	var request: Dictionary = _last_pipeline.get("request", {})
+	if str(request.get("source_id", "")) != _selected_import_source_id or str(request.get("activity_source_sha256", "")) != _selected_import_source_id.trim_prefix("owner-upload-") or str(request.get("activity_run_id", "")).is_empty() or str(_last_pipeline.get("run_id", "")).is_empty():
+		return {}
+	return _last_pipeline.get("primary", {})
+
+
+func _verify_saved_solver_artifacts(primary: Dictionary) -> Dictionary:
+	if primary.is_empty():
+		return {"ok": false, "reason": "SOURCE_RUN_MISMATCH"}
+	var result: Dictionary = primary.get("result", {})
+	var identity: Dictionary = primary.get("solver_supply_identity", {})
+	if result.is_empty() or identity.is_empty() or result.get("solver_supply_identity") != identity:
+		return {"ok": false, "reason": "REPLAY_HASH_INVALID · solver/supply identity differs"}
+	var files: Dictionary = primary.get("files", {})
+	var paths := {
+		"level": str(files.get("level", "")),
+		"supply_plan": str(files.get("supply_plan", "")),
+		"result": str(files.get("result", ""))
+	}
+	var digests := {
+		"level": str(identity.get("level_data_sha256", "")),
+		"supply_plan": str(identity.get("supply_plan_sha256", ""))
+	}
+	for key in ["level", "supply_plan"]:
+		if paths[key].is_empty() or not FileAccess.file_exists(paths[key]):
+			return {"ok": false, "reason": "missing saved %s artifact" % key}
+		var bytes := FileAccess.get_file_as_bytes(paths[key])
+		var hash_ctx := HashingContext.new()
+		hash_ctx.start(HashingContext.HASH_SHA256)
+		hash_ctx.update(bytes)
+		if hash_ctx.finish().hex_encode() != digests[key]:
+			return {"ok": false, "reason": "%s SHA-256 differs from solver_supply_identity" % key}
+	if paths["result"].is_empty() or not FileAccess.file_exists(paths["result"]):
+		return {"ok": false, "reason": "missing saved canonical result"}
+	var result_data: Variant = JSON.parse_string(FileAccess.get_file_as_string(paths["result"]))
+	if not result_data is Dictionary or result_data != result:
+		return {"ok": false, "reason": "saved result differs from the source-bound pipeline trace"}
+	return {"ok": true}
+
+
+func _hide_review_dialogs() -> void:
+	if _supply_dialog != null:
+		_supply_dialog.hide()
+	_supply_expanded = false
+	if _replay_dialog != null:
+		_replay_dialog.hide()
 
 
 func _edit_release_search() -> void:

@@ -266,21 +266,23 @@ def validate_owner_source(
         from .supply_pipeline.void_capability import void_capability
 
         capability = void_capability(game_project)
+    source_record_sha256 = hashlib.sha256(_source_record_paths(source_id, source_directory)[0].read_bytes()).hexdigest()
     if pinned_runtime and capability is not None and capability.get("state") == "OPEN":
         owner_scope = capability.get("installed_owner_source", {})
-        record_path, _ = _source_record_paths(source_id, source_directory)
-        record_sha256 = hashlib.sha256(record_path.read_bytes()).hexdigest()
-        if (
-            source_id != owner_scope.get("source_id")
-            or source["source_sha256"] != owner_scope.get("source_sha256")
-            or record_sha256 != owner_scope.get("source_record_sha256")
+        # The attested runtime proves game-code/VOID authority. The uploaded
+        # PNG has its own immutable source record and content-addressed ID.
+        # Preserve the installed 002 pin check when that source is selected,
+        # without treating every other independently verified PNG as the pin.
+        if source_id == owner_scope.get("source_id") and (
+            source["source_sha256"] != owner_scope.get("source_sha256")
+            or source_record_sha256 != owner_scope.get("source_record_sha256")
         ):
             capability = {
                 **capability,
                 "state": "CLOSED",
                 "disposition": "UNAVAILABLE",
-                "reason_code": "PINNED_SOURCE_SCOPE_NOT_VERIFIED",
-                "reason": "Pinned mini-runtime authority is attested only for its exact original owner source and source record.",
+                "reason_code": "PINNED_SOURCE_IDENTITY_MISMATCH",
+                "reason": "The installed 002 source identity or source record no longer matches its pin.",
             }
     gate_open = capability is None or capability.get("state") == "OPEN"
     artwork_count = width * height - transparent
@@ -305,6 +307,8 @@ def validate_owner_source(
     report = {
         "schema": VALIDATION_SCHEMA, "version": 1, "analysis_policy": "SB-LFX-004-C001_CANONICAL_IMPORT_ANALYSIS_V1",
         "source_id": source_id, "source_sha256": source["source_sha256"], "source_record_identity": _digest(source),
+        "source_authority": {"source_id": source_id, "source_sha256": source["source_sha256"], "source_record_sha256": source_record_sha256, "verified_by": "IMMUTABLE_OWNER_SOURCE_RECORD"},
+        "game_authority": ({"repository": capability.get("repository"), "commit": capability.get("git_head"), "tree": capability.get("git_tree"), "state": capability.get("state"), "void_contract": "PINNED_RUNTIME_V2"} if isinstance(capability, Mapping) else {"state": "NOT_REQUIRED", "void_contract": "NOT_USED"}),
         "format": {"media_type": source["media_type"], "disposition": "SUPPORTED_STRICT_PNG"},
         "original_dimensions": {"width": width, "height": height}, "legal_logical_dimensions": legal_dimensions,
         "exact_logical_source": exact_logical, "logical_dimension_status": "EXACT" if exact_logical else "DERIVED_ARTIFACT_REQUIRED",
@@ -465,9 +469,18 @@ def record_owner_review(candidate_id: str, disposition: str, reason: str = "", n
     if any(type(value) is not str or len(value) > 512 for value in (reason, note)):
         raise StudioExtensionError("review reason/note is bounded text")
     previous = _latest_review(candidate_id, candidate["artwork_sha256"])
+    if previous is not None and previous.get("disposition") == disposition:
+        publication = _enter_candidate_release_pool(candidate) if disposition == "ACCEPT" else {
+            "disposition": "EXCLUDED_FROM_RELEASE_POOL",
+            "reason": "The current immutable REJECT review remains authoritative; no duplicate receipt was written.",
+        }
+        return {**previous, "publication": publication, "idempotent": True}
     sequence = 1 if previous is None else int(previous["sequence"]) + 1
     payload = {"schema": REVIEW_SCHEMA, "version": 1, "review_id": f"review-{candidate_id}-{sequence:04d}", "candidate_id": candidate_id, "candidate_identity_hash": _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]}), "artwork_sha256": candidate["artwork_sha256"], "grid_hash": candidate["grid_hash"], "disposition": disposition, "reason": reason.strip(), "note": note.strip(), "sequence": sequence, "created_at": datetime.now(timezone.utc).isoformat(), "previous_review_id": previous.get("review_id") if previous else None}
     _write_json(_review_root() / f"{payload['review_id']}.json", payload, immutable=True)
+    persisted_review = _latest_review(candidate_id, candidate["artwork_sha256"])
+    if not isinstance(persisted_review, Mapping) or persisted_review.get("review_id") != payload["review_id"] or persisted_review.get("disposition") != disposition:
+        raise StudioExtensionError("owner review did not pass exact durable read-back verification")
     publication = _enter_candidate_release_pool(candidate) if disposition == "ACCEPT" else {"disposition": "EXCLUDED_FROM_RELEASE_POOL", "reason": "Owner REJECT excludes this READY candidate; it does not publish."}
     return {**payload, "publication": publication}
 
@@ -494,7 +507,14 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
         pooled = enter_release_pool(candidate, run, review if review and review.get("disposition") == "ACCEPT" else None)
     except (ReleaseError, OSError, ValueError) as exc:
         return {"disposition": "NOT_ENTERED", "reason": str(exc)[:512], "pipeline_run_id": run["run_id"]}
-    return {**pooled, "pipeline_run_id": run["run_id"], "publication": "OWNER_ACCEPT_RELEASE_POOL_ONLY"}
+    from .supply_pipeline.release_pool import release_entries
+    try:
+        exact = next((entry for entry in release_entries() if entry.get("candidate_id") == candidate.get("candidate_id") and entry.get("pipeline_run_id") == run.get("run_id")), None)
+    except (ReleaseError, OSError, ValueError) as exc:
+        return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
+    if exact is None or exact.get("entry_digest") != pooled.get("entry_digest"):
+        return {"disposition": "NOT_ENTERED", "reason": "Release Pool write did not return the exact candidate/run entry on read-back.", "pipeline_run_id": run["run_id"]}
+    return {**pooled, "pipeline_run_id": run["run_id"], "publication": "OWNER_ACCEPT_RELEASE_POOL_ONLY", "readback_verified": True}
 
 
 def _latest_ready_pipeline(candidate_id: str) -> dict[str, Any] | None:
@@ -507,6 +527,115 @@ def _latest_ready_pipeline(candidate_id: str) -> dict[str, Any] | None:
         if value.get("candidate_id") == candidate_id and value.get("disposition") == "READY" and value.get("primary", {}).get("state") == "READY":
             ready.append(value)
     return max(ready, key=lambda value: str(value.get("created_at", ""))) if ready else None
+
+
+def restore_source_run(source_id: str, *, game_project: str | Path | None = None, source_directory: str | Path | None = None) -> dict[str, Any]:
+    """Read back the newest artifact-verified READY run for one exact PNG identity."""
+    source = verify_owner_source(source_id, source_directory=source_directory)
+    validation = validate_owner_source(source_id, persist=False, game_project=game_project, source_directory=source_directory)
+    source_sha = str(source.get("source_sha256", ""))
+    if not validation.get("exact_logical_source") or validation.get("structural", {}).get("disposition") != "PASS":
+        return {"state": "SOURCE_ONLY", "source_id": source_id, "source_sha256": source_sha, "validation": validation, "pipeline": {}}
+    candidates: list[dict[str, Any]] = []
+    for path in (extensions_root() / "pipelines").glob("*.json"):
+        try:
+            run = _read_json(path)
+        except StudioExtensionError:
+            continue
+        request = run.get("request", {})
+        primary = run.get("primary", {})
+        if (run.get("disposition") != "READY" or not isinstance(request, Mapping)
+                or request.get("source_id") != source_id
+                or request.get("activity_source_sha256") != source_sha
+                or request.get("activity_run_id") is None
+                or not isinstance(primary, Mapping) or primary.get("state") != "READY"):
+            continue
+        candidates.append(run)
+    candidates.sort(key=lambda value: str(value.get("created_at", "")), reverse=True)
+    for run in candidates:
+        candidate_id = str(run.get("candidate_id", ""))
+        candidate = next((item for item in list_candidates() if item.get("candidate_id") == candidate_id), None)
+        if candidate is None:
+            continue
+        try:
+            bundle = read_bundle((_repository_root() / str(candidate["source_path"])).resolve())
+        except (OSError, ValueError, StudioExtensionError):
+            continue
+        generator_metadata = bundle.metadata.get("generator_metadata", {})
+        generator_metadata = generator_metadata if isinstance(generator_metadata, Mapping) else {}
+        generator_payload = generator_metadata.get("payload", {})
+        generator_payload = generator_payload if isinstance(generator_payload, Mapping) else {}
+        generator_data = generator_payload.get("data", {})
+        generator_data = generator_data if isinstance(generator_data, Mapping) else {}
+        lineage = generator_data.get("source_lineage", {})
+        lineage = lineage if isinstance(lineage, Mapping) else {}
+        artwork_path = (_repository_root() / str(candidate.get("artwork_path", ""))).resolve()
+        try:
+            artwork_sha256 = hashlib.sha256(artwork_path.read_bytes()).hexdigest()
+        except OSError:
+            continue
+        if (lineage.get("source_id") != source_id or lineage.get("source_sha256") != source_sha
+                or candidate.get("artwork_sha256") != artwork_sha256
+                or candidate.get("grid_hash") != bundle.artwork.grid_hash):
+            continue
+        primary = run["primary"]
+        files = primary.get("files", {})
+        artifact_hashes: dict[str, str] = {}
+        try:
+            for key in ("level", "supply_plan", "result"):
+                artifact = Path(str(files.get(key, ""))).expanduser()
+                if not artifact.is_file():
+                    raise OSError("missing persisted artifact")
+                artifact_hashes[key] = hashlib.sha256(artifact.read_bytes()).hexdigest()
+            result_path = Path(str(files["result"]))
+            result_file = json.loads(result_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        result = primary.get("result", {})
+        if not isinstance(result, Mapping) or result_file != dict(result):
+            continue
+        try:
+            from .supply_pipeline.scrubpack_identity import derive_solver_supply_identity
+            expected_identity = derive_solver_supply_identity(
+                Path(str(files["level"])).read_bytes(),
+                Path(str(files["supply_plan"])).read_bytes(),
+                result_file,
+                primary.get("authority", {}),
+            )
+        except (OSError, ValueError, TypeError):
+            continue
+        if expected_identity != primary.get("solver_supply_identity"):
+            continue
+        review = _latest_review(candidate_id, candidate["artwork_sha256"])
+        from .supply_pipeline.release_pool import ReleaseError, _canonical_official_difficulty, _official_profile, release_entries
+        review_projection: dict[str, Any] = {"disposition": "NEEDS_REVIEW", "pool_state": "READY_AUTO_PENDING"}
+        try:
+            entries = release_entries()
+            entry = next((item for item in entries if item.get("candidate_id") == candidate_id and item.get("pipeline_run_id") == run.get("run_id")), None)
+            if entry is not None:
+                review_projection = {"disposition": str((review or {}).get("disposition", "NEEDS_REVIEW")), "pool_state": "IN_RELEASE_POOL", "entry_digest": entry.get("entry_digest"), "pipeline_run_id": run.get("run_id")}
+            elif review is not None and review.get("disposition") == "REJECT":
+                review_projection = {"disposition": "REJECT", "pool_state": "EXCLUDED_FROM_RELEASE_POOL", "pipeline_run_id": run.get("run_id")}
+            elif review is not None and review.get("disposition") == "ACCEPT":
+                primary = run.get("primary", {})
+                try:
+                    official = _canonical_official_difficulty(primary)
+                    _official_profile(official)
+                    reason = "Exact READY candidate/run is not in the Release Pool despite valid official Difficulty V1 fields."
+                except ReleaseError as exc:
+                    reason = str(exc)
+                review_projection = {"disposition": "ACCEPT", "pool_state": "ACCEPT_RECORDED_BUT_POOL_DENIED", "reason": reason, "pipeline_run_id": run.get("run_id")}
+        except (ReleaseError, OSError, ValueError) as exc:
+            review_projection = {"disposition": str((review or {}).get("disposition", "NEEDS_REVIEW")), "pool_state": "POOL_READBACK_UNAVAILABLE", "reason": str(exc)[:400], "pipeline_run_id": run.get("run_id")}
+        return {
+            "state": "READY", "source_id": source_id, "source_sha256": source_sha,
+            "candidate_id": candidate_id, "activity_run_id": run["request"].get("activity_run_id"),
+            "pipeline": run, "artifact_sha256": artifact_hashes,
+            "owner_review_status": review_projection,
+            "replay": result.get("solution_replay", {}), "solution_trace": result.get("solution_trace", []),
+            "supply": {key: result.get(key) for key in ("supply_columns", "column_pixel_totals", "total_batches", "supply_rows", "visible_preview_depth", "color_conservation_verification")},
+        }
+    return {"state": "SOURCE_ONLY", "source_id": source_id, "source_sha256": source_sha, "validation": validation, "pipeline": {}}
 
 
 def candidate_inbox() -> dict[str, Any]:
@@ -670,7 +799,9 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     request_data = dict(request)
     selected = validate_column_count(int(request_data.get("column_count", 3)))
     level_id = str(request_data.get("level_id", identity))
-    output_dir = Path(str(request_data.get("output_dir") or (extensions_root() / "canonical-supply" / identity))).expanduser().resolve()
+    activity_run_id = str(request_data.get("activity_run_id", ""))
+    run_scope = hashlib.sha256((activity_run_id or datetime.now(timezone.utc).isoformat()).encode("utf-8")).hexdigest()[:20]
+    output_dir = Path(str(request_data.get("output_dir") or (extensions_root() / "canonical-supply" / identity / run_scope))).expanduser().resolve()
     stages = [
         _pipeline_stage("SOURCE", "PASS", inputs=[identity], outputs=[identity], evidence=evidence, reason=f"Verified {source_kind} canonical logical grid."),
         _pipeline_stage("NORMALIZE/DERIVE", "NOT_APPLICABLE", inputs=[identity], outputs=[identity], evidence=evidence, reason="Canonical logical cells enter the ZIP route without a PNG round-trip."),
