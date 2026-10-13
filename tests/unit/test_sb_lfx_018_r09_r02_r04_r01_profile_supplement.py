@@ -29,6 +29,15 @@ def test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tam
     source_record = repository / "level_factory" / "output" / "owner-uploads" / source_id / "source.json"
     source_record.parent.mkdir(parents=True)
     source_record.write_text('{"source_id":"owner-upload-test-source"}', encoding="utf-8")
+    candidate_bundle = repository / "level_factory" / "output" / "studio-derived-candidates" / candidate_id
+    candidate_bundle.mkdir(parents=True)
+    metadata = {"generator_metadata": {"payload": {"data": {"source_lineage": {
+        "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+        "source_id": source_id,
+        "source_sha256": source_id.removeprefix("owner-upload-"),
+        "source_record": f"level_factory/output/owner-uploads/{source_id}/source.json",
+    }}}}}
+    (candidate_bundle / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     extensions = repository / "level_factory" / "output" / "studio-extensions"
     pipeline_path = extensions / "pipelines" / f"{run_id}.json"
     pipeline_path.parent.mkdir(parents=True)
@@ -47,7 +56,7 @@ def test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tam
         },
     }
     pipeline_path.write_text(json.dumps(pipeline, sort_keys=True), encoding="utf-8")
-    candidate = {"candidate_id": candidate_id, "source_id": source_id}
+    candidate = {"candidate_id": candidate_id, "source_path": f"level_factory/output/studio-derived-candidates/{candidate_id}"}
     with patch.object(studio_extensions, "_repository_root", return_value=repository), \
          patch.object(studio_extensions, "extensions_root", return_value=extensions), \
          patch.object(studio_extensions, "_pipeline_path", return_value=pipeline_path), \

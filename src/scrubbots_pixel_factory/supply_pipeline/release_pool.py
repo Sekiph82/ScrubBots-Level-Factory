@@ -49,6 +49,22 @@ def _supplement_path(run_id: str) -> Path:
     return studio.extensions_root() / "official-profile-supplements" / f"{safe}.json"
 
 
+def _candidate_source_lineage(candidate: Mapping[str, Any]) -> dict[str, Any]:
+    from .. import studio_extensions as studio
+    bundle = (studio._repository_root() / str(candidate.get("source_path", ""))).resolve()
+    repository = studio._repository_root().resolve()
+    if not bundle.is_relative_to(repository) or bundle.name != str(candidate.get("candidate_id", "")):
+        raise ReleaseError("candidate source lineage path is invalid")
+    metadata = _json(bundle / "metadata.json")
+    generator = metadata.get("generator_metadata", {})
+    payload = generator.get("payload", {}) if isinstance(generator, Mapping) else {}
+    data = payload.get("data", {}) if isinstance(payload, Mapping) else {}
+    lineage = data.get("source_lineage", {}) if isinstance(data, Mapping) else {}
+    if not isinstance(lineage, Mapping) or lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE":
+        raise ReleaseError("candidate lacks its exact owner-upload source lineage")
+    return dict(lineage)
+
+
 def _pinned_profile_from_godot(vector: list[float]) -> tuple[dict[str, Any], str]:
     from .game_rules import find_godot
     from . import pinned_game_source
@@ -93,6 +109,7 @@ def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[st
     pipeline_path = studio._pipeline_path(str(pipeline.get("run_id", "")))
     pipeline_sha = _hash(pipeline_path.read_bytes()) if pipeline_path.is_file() else None
     source_id = pipeline.get("request", {}).get("source_id") if isinstance(pipeline.get("request"), Mapping) else None
+    lineage = _candidate_source_lineage(candidate)
     source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
     source_record_sha = _hash(source_record.read_bytes()) if source_record.is_file() else None
     vector = _official_challenge_vector(official)
@@ -104,7 +121,9 @@ def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[st
     except (OSError, ValueError) as exc:
         raise ReleaseError("pinned game runtime authority is unavailable for historical profile proof") from exc
     analyzer_sha = next((item.get("sha256") for item in attestation["source_files"] if item.get("path") == "scripts/difficulty/level_difficulty_analyzer_v1.gd"), None)
-    if (not source_id or candidate.get("source_id") != source_id or source_record_sha is None
+    if (not source_id or lineage.get("source_id") != source_id or source_record_sha is None
+            or lineage.get("source_record") != f"level_factory/output/owner-uploads/{source_id}/source.json"
+            or lineage.get("source_sha256") != str(source_id).removeprefix("owner-upload-")
             or not isinstance(authority, Mapping)
             or authority.get("git_head") != attestation.get("source_commit")
             or authority.get("git_tree") != attestation.get("tree_sha")):
@@ -159,9 +178,12 @@ def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: 
     attestation = pinned_game_source.verify_attested_runtime(runtime)
     analyzer_sha = next(item["sha256"] for item in attestation["source_files"] if item["path"] == "scripts/difficulty/level_difficulty_analyzer_v1.gd")
     source_id = pipeline.get("request", {}).get("source_id")
+    lineage = _candidate_source_lineage(candidate)
     source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
     authority = pipeline.get("primary", {}).get("authority", {})
-    if (not source_id or candidate.get("source_id") != source_id or not source_record.is_file()
+    if (not source_id or lineage.get("source_id") != source_id or not source_record.is_file()
+            or lineage.get("source_record") != f"level_factory/output/owner-uploads/{source_id}/source.json"
+            or lineage.get("source_sha256") != str(source_id).removeprefix("owner-upload-")
             or not isinstance(authority, Mapping)
             or authority.get("git_head") != attestation.get("source_commit")
             or authority.get("git_tree") != attestation.get("tree_sha")):
