@@ -278,11 +278,11 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "png-batch-status":
             payload = extensions.png_batch_status(str(request["job_id"]))
         elif operation == "png-batch-latest":
-            payload = extensions.png_batch_latest()
+            payload = extensions.png_batch_latest(request.get("batch_id"))
         elif operation == "png-batch-control":
             payload = extensions.png_batch_control(str(request["job_id"]), str(request["action"]))
         elif operation == "png-batch-run":
-            payload = extensions.png_batch_run(str(request["job_id"]))
+            payload = extensions.png_batch_run(str(request["job_id"]), request.get("expected_batch_id"))
         elif operation == "session-save":
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":

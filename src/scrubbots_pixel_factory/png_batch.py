@@ -180,7 +180,15 @@ def _counts(items: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     }
 
 
-def _has_ready_pipeline_proof(pipeline: Mapping[str, Any], source_id: str) -> bool:
+def _has_ready_pipeline_proof(
+    pipeline: Mapping[str, Any],
+    source_id: str,
+    *,
+    expected_columns: int | None = None,
+    source_record_sha256: str | None = None,
+    job: Mapping[str, Any] | None = None,
+    item: Mapping[str, Any] | None = None,
+) -> bool:
     """Require canonical solver, replay, Difficulty V1, load-check, and QA proof."""
     primary = pipeline.get("primary", {})
     if not isinstance(primary, Mapping):
@@ -199,9 +207,40 @@ def _has_ready_pipeline_proof(pipeline: Mapping[str, Any], source_id: str) -> bo
         isinstance(stage, Mapping) and stage.get("stage") == "QA" and stage.get("disposition") == "PASS"
         for stage in stages
     )
+    request = pipeline.get("request", {})
+    if not isinstance(request, Mapping):
+        return False
+    if pipeline.get("source_id") not in (None, source_id) or request.get("source_id") != source_id:
+        return False
+    if item is not None and request.get("activity_source_sha256") != str(item.get("source_sha256", "")):
+        return False
+    if item is not None and request.get("activity_source_record_sha256") not in (None, item.get("source_record_sha256")):
+        return False
+    if source_record_sha256 is not None:
+        binding = pipeline.get("owner_source_binding")
+        if binding is not None and (
+            not isinstance(binding, Mapping)
+            or binding.get("source_id") != source_id
+            or binding.get("source_sha256") != item.get("source_sha256")
+            or binding.get("source_record_sha256") != source_record_sha256
+        ):
+            return False
+    if job is not None and (
+        request.get("png_batch_job_id") != job.get("job_id")
+        or request.get("png_batch_item_index") != item.get("index")
+        or request.get("png_batch_attempt_id") != item.get("attempt_id")
+        or request.get("column_count") != item.get("column_count")
+        or not request.get("activity_run_id")
+    ):
+        return False
+    actual_columns = result.get("column_count")
+    if actual_columns is None:
+        actual_columns = primary.get("column_count")
+    if expected_columns is not None and actual_columns != expected_columns:
+        return False
     return (
         pipeline.get("disposition") == "READY"
-        and pipeline.get("source_id") == source_id
+        and bool(pipeline.get("candidate_id"))
         and primary.get("state") == "READY"
         and result.get("solver_status") == "SOLVED"
         and result.get("solution_final") == "WIN"
@@ -214,8 +253,112 @@ def _has_ready_pipeline_proof(pipeline: Mapping[str, Any], source_id: str) -> bo
     )
 
 
-def _verify_sources(items: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    from .studio_extensions import verify_owner_source
+def _verify_column_artifacts(pipeline: Mapping[str, Any], expected_columns: int) -> bool:
+    """Verify the persisted result and supply-plan agree with the assigned quota."""
+    primary = pipeline.get("primary", {})
+    result = primary.get("result", {}) if isinstance(primary, Mapping) else {}
+    files = primary.get("files", {}) if isinstance(primary, Mapping) else {}
+    if not isinstance(result, Mapping) or not isinstance(files, Mapping):
+        return False
+    if result.get("column_count") != expected_columns or primary.get("column_count") != expected_columns:
+        return False
+    try:
+        result_path = Path(str(files.get("result", "")))
+        plan_path = Path(str(files.get("supply_plan", "")))
+        level_path = Path(str(files.get("level", "")))
+        if not result_path.is_file() or not plan_path.is_file() or not level_path.is_file():
+            return False
+        stored_result = json.loads(result_path.read_text(encoding="utf-8"))
+        supply_plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        artifact_hashes = {
+            "level": hashlib.sha256(level_path.read_bytes()).hexdigest(),
+            "supply_plan": hashlib.sha256(plan_path.read_bytes()).hexdigest(),
+            "result": hashlib.sha256(result_path.read_bytes()).hexdigest(),
+        }
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        return False
+    saved_hashes = primary.get("artifact_sha256")
+    if saved_hashes is not None and saved_hashes != artifact_hashes:
+        return False
+    if stored_result != dict(result) or supply_plan.get("columnCount") != expected_columns:
+        return False
+    try:
+        from .supply_pipeline.scrubpack_identity import derive_solver_supply_identity
+
+        identity = derive_solver_supply_identity(
+            level_path.read_bytes(), plan_path.read_bytes(), stored_result, primary.get("authority", {}),
+        )
+    except (OSError, ValueError, TypeError):
+        return False
+    return identity == primary.get("solver_supply_identity")
+
+
+def _candidate_has_source_lineage(candidate: Mapping[str, Any], source_id: str, source_sha256: str) -> bool:
+    from .studio_extensions import _repository_root
+    from .output.bundle import read_bundle
+
+    try:
+        bundle_path = (_repository_root() / str(candidate.get("source_path", ""))).resolve()
+        bundle = read_bundle(bundle_path)
+    except (OSError, ValueError, KeyError):
+        return False
+    metadata = bundle.metadata.get("generator_metadata", {})
+    payload = metadata.get("payload", {}) if isinstance(metadata, Mapping) else {}
+    data = payload.get("data", {}) if isinstance(payload, Mapping) else {}
+    lineage = data.get("source_lineage", {}) if isinstance(data, Mapping) else {}
+    return (
+        isinstance(lineage, Mapping)
+        and lineage.get("source_id") == source_id
+        and lineage.get("source_sha256") == source_sha256
+        and lineage.get("derivation") == "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
+        and candidate.get("artwork_sha256") == bundle.artwork.sha256
+        and candidate.get("grid_hash") == bundle.artwork.grid_hash
+    )
+
+
+def _pool_row_matches(run: Mapping[str, Any], candidate: Mapping[str, Any], source_id: str, expected_columns: int) -> bool:
+    from .studio_extensions import _read_json, extensions_root
+    from .supply_pipeline.release_pool import release_entries
+
+    run_id = run.get("run_id")
+    candidate_id = candidate.get("candidate_id")
+    try:
+        entries = release_entries()
+        entry = next((row for row in entries if row.get("candidate_id") == candidate_id and row.get("pipeline_run_id") == run_id), None)
+        if entry is None:
+            return False
+        if entry.get("source_id", source_id) != source_id or entry.get("column_count", expected_columns) != expected_columns:
+            return False
+        binding = run.get("owner_source_binding", {})
+        if binding and binding.get("source_id") != source_id:
+            return False
+        files = run.get("primary", {}).get("files", {})
+        plan = json.loads(Path(str(files.get("supply_plan", ""))).read_text(encoding="utf-8"))
+        if plan.get("columnCount") != expected_columns:
+            return False
+        row = next(
+            path for path in (extensions_root() / "release-pool").glob("*.json")
+            if _read_json(path).get("candidate_id") == candidate_id
+            and _read_json(path).get("pipeline_run_id") == run_id
+        )
+        saved = _read_json(row)
+        pipeline_path = extensions_root() / "pipelines" / f"{run_id}.json"
+        if not pipeline_path.is_file() or saved.get("pipeline_sha256") != hashlib.sha256(pipeline_path.read_bytes()).hexdigest():
+            return False
+        return (
+            saved.get("entry_digest") == entry.get("entry_digest")
+            and saved.get("candidate_id") == candidate_id
+            and saved.get("pipeline_run_id") == run_id
+            and saved.get("source_id", source_id) == source_id
+            and saved.get("column_count", expected_columns) == expected_columns
+            and all(saved.get("files", {}).get(key, {}).get("sha256") == hashlib.sha256(Path(str(files.get(key, ""))).read_bytes()).hexdigest() for key in ("level", "supply_plan"))
+        )
+    except (OSError, ValueError, StopIteration, TypeError, KeyError, AttributeError, json.JSONDecodeError):
+        return False
+
+
+def _verify_sources(items: Sequence[Mapping[str, Any]], settings: Mapping[str, Any]) -> list[dict[str, Any]]:
+    from .studio_extensions import validate_owner_source, verify_owner_source
 
     result: list[dict[str, Any]] = []
     seen: dict[str, str] = {}
@@ -228,7 +371,15 @@ def _verify_sources(items: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
             result.append(item)
             continue
         try:
-            proof = verify_owner_source(source_id)
+            proof = validate_owner_source(
+                source_id, persist=False, game_project=settings.get("game_project"),
+                source_directory=settings.get("source_directory"),
+            )
+            if (not proof.get("exact_logical_source")
+                    or proof.get("structural", {}).get("disposition") != "PASS"
+                    or proof.get("void_capability", {}).get("state") not in (None, "OPEN", "NOT_REQUIRED")):
+                raise ValueError(str(proof.get("reason", proof.get("structural", {}).get("reason", "CANONICAL_SOURCE_VALIDATION_FAILED"))))
+            proof = verify_owner_source(source_id, source_directory=settings.get("source_directory"))
             source_sha = str(proof.get("source_sha256", ""))
             if source_id != "owner-upload-" + source_sha or len(source_sha) != 64:
                 raise ValueError("source ID and verified PNG SHA-256 disagree")
@@ -253,17 +404,17 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     imported = batch_load(batch_id)["batch"]
     if not isinstance(imported.get("items"), list) or len(imported["items"]) > MAX_BATCH_ITEMS:
         raise ValueError(f"an imported PNG batch must contain at most {MAX_BATCH_ITEMS} entries")
-    source_items = _verify_sources(imported["items"])
-    eligible = [item for item in source_items if item["status"] == "QUEUED"]
-    assignments = assign_columns([str(item["source_id"]) for item in eligible])
-    assignment_by_id = {str(item["source_id"]): columns for item, columns in zip(eligible, assignments, strict=True)}
-    for item in source_items:
-        item["column_count"] = assignment_by_id.get(str(item["source_id"]))
     snapshot = dict(settings or {})
     # The UI may configure only canonical bounded pipeline request fields.
     allowed = {"game_project", "source_directory", "background_intent", "seed", "candidates", "verify_top", "screen_budget", "metric_top", "viability_budget", "real_max_visited", "solver_timeout_seconds"}
     if set(snapshot) - allowed:
         raise ValueError("PNG batch settings include unsupported fields")
+    source_items = _verify_sources(imported["items"], snapshot)
+    eligible = [item for item in source_items if item["status"] == "QUEUED"]
+    assignments = assign_columns([str(item["source_id"]) for item in eligible])
+    assignment_by_id = {str(item["source_id"]): columns for item, columns in zip(eligible, assignments, strict=True)}
+    for item in source_items:
+        item["column_count"] = assignment_by_id.get(str(item["source_id"]))
     immutable_plan = {"batch_id": batch_id, "batch_digest": _digest(imported), "settings": snapshot, "items": source_items}
     plan_digest = _digest(immutable_plan)
     job_id = f"png-batch-{plan_digest[:32]}"
@@ -293,7 +444,7 @@ def png_batch_status(job_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "STATUS", "job": public}
 
 
-def png_batch_latest() -> dict[str, Any]:
+def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     job_root = _root() / "jobs"
     if job_root.exists():
@@ -303,7 +454,26 @@ def png_batch_latest() -> dict[str, Any]:
             except (OSError, ValueError, json.JSONDecodeError):
                 continue
     resumable = next((job for job in jobs if job.get("state") not in {"COMPLETE", "STOPPED"}), None)
-    return {"state": "SUCCESS", "disposition": "LATEST", "job": resumable, "jobs": jobs, "mutated": False}
+    if batch_id is None:
+        return {"state": "SUCCESS", "disposition": "LATEST", "job": resumable, "jobs": jobs, "mutated": False}
+    from .studio_extensions import _digest, batch_load
+
+    try:
+        expected_digest = _digest(batch_load(batch_id)["batch"])
+    except (OSError, ValueError, KeyError):
+        return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": None, "mismatch_job": resumable, "jobs": jobs, "mutated": False}
+    matching = next((
+        job for job in jobs
+        if job.get("import_batch_id") == batch_id and job.get("batch_digest") == expected_digest
+        and job.get("state") not in {"COMPLETE", "STOPPED"}
+    ), None)
+    mismatch = resumable if resumable is not None and matching is None else None
+    return {
+        "state": "SUCCESS" if matching is not None or mismatch is None else "BLOCKED",
+        "disposition": "MATCHED" if matching is not None else "BATCH_JOB_SOURCE_MISMATCH" if mismatch is not None else "NO_MATCHING_JOB",
+        "job": matching, "mismatch_job": mismatch, "jobs": jobs, "batch_id": batch_id,
+        "batch_digest": expected_digest, "mutated": False,
+    }
 
 
 def png_batch_control(job_id: str, action: str) -> dict[str, Any]:
@@ -351,21 +521,41 @@ def _recover_attempt(job: Mapping[str, Any], item: Mapping[str, Any]) -> dict[st
             if (request.get("png_batch_job_id") == job.get("job_id")
                     and request.get("png_batch_item_index") == item.get("index")
                     and request.get("png_batch_attempt_id") == item.get("attempt_id")
-                    and payload.get("source_id") == item.get("source_id")):
+                    and request.get("source_id") == item.get("source_id")
+                    and request.get("activity_source_sha256") == item.get("source_sha256")
+                    and request.get("activity_run_id") == item.get("activity_run_id")
+                    and request.get("column_count") == item.get("column_count")
+                    and payload.get("source_id") in (None, item.get("source_id"))):
                 matches.append(payload)
     if len(matches) > 1:
         raise ValueError("multiple canonical runs match the interrupted batch item; refusing ambiguous resume")
     if not matches:
         return None
     run = matches[0]
-    if not _has_ready_pipeline_proof(run, str(item.get("source_id", ""))):
+    source_id = str(item.get("source_id", ""))
+    source_sha = str(item.get("source_sha256", ""))
+    source_record_sha = str(item.get("source_record_sha256", ""))
+    binding = run.get("owner_source_binding")
+    if binding is not None and (
+        not isinstance(binding, Mapping)
+        or binding.get("source_id") != source_id
+        or binding.get("source_sha256") != source_sha
+        or binding.get("source_record_sha256") != source_record_sha
+    ):
+        return None
+    if (not _has_ready_pipeline_proof(
+            run, source_id, expected_columns=int(item.get("column_count", 0)),
+            source_record_sha256=source_record_sha, job=job, item=item)
+            or not _verify_column_artifacts(run, int(item.get("column_count", 0)))):
         return None
     candidate_id = str(run.get("candidate_id", ""))
     candidate = next((row for row in list_candidates() if row.get("candidate_id") == candidate_id), None)
     if candidate is None:
         raise ValueError("interrupted READY run has no exact canonical candidate")
+    if not _candidate_has_source_lineage(candidate, source_id, source_sha):
+        raise ValueError("interrupted READY run candidate lineage does not match the immutable imported source")
     pool = _enter_candidate_release_pool(candidate, pipeline=run)
-    if not pool.get("readback_verified"):
+    if not pool.get("readback_verified") or not _pool_row_matches(run, candidate, source_id, int(item.get("column_count", 0))):
         raise ValueError("interrupted READY run could not be verified in Release Pool")
     return {"pipeline": run, "release_pool": pool, "recovered_after_interruption": True}
 
@@ -384,11 +574,21 @@ def _reuse_existing_ready(job: Mapping[str, Any], item: Mapping[str, Any]) -> di
     if restored.get("owner_review_status", {}).get("pool_state") == "EXCLUDED_FROM_RELEASE_POOL":
         return {"rejected": True, "reason": "SOURCE_CANDIDATE_IS_OWNER_REJECTED"}
     pipeline = restored.get("pipeline", {})
-    if not _has_ready_pipeline_proof(pipeline, str(item.get("source_id", ""))):
+    source_id = str(item.get("source_id", ""))
+    columns = int(item.get("column_count", 0))
+    source_record_sha = str(item.get("source_record_sha256", ""))
+    if (not _has_ready_pipeline_proof(
+            pipeline, source_id, expected_columns=columns,
+            source_record_sha256=source_record_sha, item=item)
+            or not _verify_column_artifacts(pipeline, columns)):
         return None
     candidate_id = str(restored.get("candidate_id", ""))
     candidate = next((row for row in list_candidates() if row.get("candidate_id") == candidate_id), None)
     if candidate is None:
+        return None
+    if not _candidate_has_source_lineage(candidate, source_id, str(item.get("source_sha256", ""))):
+        return None
+    if not _pool_row_matches(pipeline, candidate, source_id, columns):
         return None
     pool = _enter_candidate_release_pool(candidate, pipeline=pipeline)
     if not pool.get("readback_verified"):
@@ -396,17 +596,24 @@ def _reuse_existing_ready(job: Mapping[str, Any], item: Mapping[str, Any]) -> di
     return {"pipeline": pipeline, "release_pool": pool}
 
 
-def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]] | None = None) -> dict[str, Any]:
+def run_png_batch(
+    job_id: str,
+    *,
+    expected_batch_id: str | None = None,
+    pipeline_runner: Callable[..., dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     from . import studio_extensions as extensions
 
     runner = pipeline_runner or extensions.run_pipeline
     with _job_lock(job_id):
         job = _read_job(job_id)
+        if expected_batch_id is not None and expected_batch_id != job.get("import_batch_id"):
+            return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "reason": "Displayed import batch does not match this resumable job."}
         if job.get("state") == "COMPLETE":
             return {"state": "SUCCESS", "disposition": "COMPLETE", "job": job, "mutated": False}
         batch = extensions.batch_load(str(job.get("import_batch_id", "")))["batch"]
         if extensions._digest(batch) != job.get("batch_digest"):
-            raise ValueError("import batch manifest changed after the immutable PNG solver plan was created")
+            return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job, "reason": "Import batch manifest digest changed after the immutable PNG solver plan was created."}
         _clear_control(job_id)
         job["state"] = "RUNNING"
         job["updated_at"] = _now()
@@ -422,6 +629,27 @@ def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]]
                 _clear_control(job_id)
                 job = _write_job(job)
                 return {"state": "SUCCESS", "disposition": job["state"], "job": job}
+            try:
+                proof = extensions.validate_owner_source(
+                    str(item["source_id"]), persist=False,
+                    game_project=job.get("settings", {}).get("game_project"),
+                    source_directory=job.get("settings", {}).get("source_directory"),
+                )
+                if (proof.get("source_sha256") != item.get("source_sha256")
+                        or proof.get("structural", {}).get("disposition") != "PASS"
+                        or not proof.get("exact_logical_source")):
+                    raise ValueError("source changed or failed canonical pinned-runtime validation")
+                record_path, _source_path = extensions._source_record_paths(
+                    str(item["source_id"]), job.get("settings", {}).get("source_directory"))
+                if hashlib.sha256(record_path.read_bytes()).hexdigest() != item.get("source_record_sha256"):
+                    raise ValueError("source record SHA-256 changed after batch planning")
+            except Exception as exc:
+                item.update({"status": "REJECTED", "reason": f"SOURCE_REVALIDATION_FAILED: {str(exc)[:400]}", "finished_at": _now()})
+                job["counts"] = _counts(job["items"])
+                job["current_index"] = None
+                job["updated_at"] = _now()
+                job = _write_job(job)
+                continue
             if item.get("status") == "RUNNING":
                 recovered = _recover_attempt(job, item)
                 if recovered is not None:
@@ -437,20 +665,6 @@ def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]]
                 item["reason"] = "PRIOR_ATTEMPT_INTERRUPTED_WITHOUT_COMPLETE_CANONICAL_RUN"
                 job["updated_at"] = _now()
                 job = _write_job(job)
-            try:
-                proof = extensions.verify_owner_source(str(item["source_id"]))
-                if proof.get("source_sha256") != item.get("source_sha256"):
-                    raise ValueError("source SHA-256 changed after import")
-                record_path, _source_path = extensions._source_record_paths(str(item["source_id"]))
-                if hashlib.sha256(record_path.read_bytes()).hexdigest() != item.get("source_record_sha256"):
-                    raise ValueError("source record SHA-256 changed after batch planning")
-            except Exception as exc:
-                item.update({"status": "REJECTED", "reason": f"SOURCE_REVALIDATION_FAILED: {str(exc)[:400]}", "finished_at": _now()})
-                job["counts"] = _counts(job["items"])
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                continue
             item.update({"status": "VERIFYING_EXISTING", "reason": "Checking for already complete artifact-verified READY evidence."})
             job["current_index"] = item_index
             job["updated_at"] = _now()
@@ -482,7 +696,7 @@ def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]]
             job = _write_job(job)
             attempt_id = "batch-%s-%03d-%s" % (job_id.removeprefix("png-batch-")[:12], item_index + 1, uuid.uuid4().hex[:12])
             activity_id = "pipeline-ui-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + hashlib.sha256(attempt_id.encode()).hexdigest()[:12]
-            item.update({"status": "RUNNING", "attempt_id": attempt_id, "started_at": _now(), "reason": ""})
+            item.update({"status": "RUNNING", "attempt_id": attempt_id, "activity_run_id": activity_id, "started_at": _now(), "reason": ""})
             job["state"] = "RUNNING"
             job["current_index"] = item_index
             job["counts"] = _counts(job["items"])
@@ -496,6 +710,7 @@ def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]]
                 "png_batch_attempt_id": attempt_id,
                 "activity_run_id": activity_id,
                 "activity_source_sha256": str(item["source_sha256"]),
+                "activity_source_record_sha256": str(item["source_record_sha256"]),
                 "candidates": min(int(request.get("candidates", 300)), 300),
                 "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
                 "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 90)), 90),
@@ -504,7 +719,13 @@ def run_png_batch(job_id: str, *, pipeline_runner: Callable[..., dict[str, Any]]
                 pipeline = runner(source_id=str(item["source_id"]), request=request)
                 primary = pipeline.get("primary", {}) if isinstance(pipeline, Mapping) else {}
                 pool = pipeline.get("release_pool", {}) if isinstance(pipeline, Mapping) else {}
-                ready = _has_ready_pipeline_proof(pipeline, str(item["source_id"])) and pool.get("readback_verified") is True
+                ready = (
+                    _has_ready_pipeline_proof(
+                        pipeline, str(item["source_id"]), expected_columns=int(item["column_count"]),
+                        source_record_sha256=str(item["source_record_sha256"]), job=job, item=item)
+                    and _verify_column_artifacts(pipeline, int(item["column_count"]))
+                    and pool.get("readback_verified") is True
+                )
                 if ready:
                     item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": primary.get("files", {}), "release_pool": pool, "finished_at": _now()})
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1

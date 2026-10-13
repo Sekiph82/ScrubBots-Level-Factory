@@ -58,6 +58,7 @@ var _results_run_id := ""
 var _batch_job_id := ""
 var _batch_import_id := ""
 var _batch_snapshot: Dictionary = {}
+var _batch_job_source_mismatch := false
 var _batch_last_read_msec := 0
 var _batch_pause_button: Button
 var _batch_stop_button: Button
@@ -82,6 +83,7 @@ var _active_preview_path := ""
 var _preview_paths_by_screen := {"PIXEL ART": "", "LEVEL FACTORY": "", "RELEASE POOL": ""}
 var _imported_sources: Array[Dictionary] = []
 var _gameplay_sources: Array[Dictionary] = []
+var _source_batch_by_id: Dictionary = {}
 var _rejected_imports: Array[Dictionary] = []
 var _imported_page := 0
 var _selected_import_source_id := ""
@@ -730,7 +732,7 @@ func _refresh_run_button_caption() -> void:
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
-		button.text = "Batch complete" if state == "COMPLETE" else "Resume Batch" if not _batch_job_id.is_empty() else "Run Entire Batch (%d)" % imported_count
+		button.text = "Batch mismatch" if _batch_job_source_mismatch else "Batch complete" if state == "COMPLETE" else "Resume Batch" if not _batch_job_id.is_empty() else "Run Entire Batch (%d)" % imported_count
 		button.disabled = state == "COMPLETE"
 	else:
 		button.text = "Run Pipeline"
@@ -818,8 +820,18 @@ func _restore_imported_sources() -> void:
 	var order_ids: Array[String] = []
 	var history := _extension("owner-pages", {})
 	var batches: Array = history.get("batches", [])
+	_source_batch_by_id.clear()
 	if not batches.is_empty() and batches[0] is Dictionary:
 		_batch_import_id = str(batches[0].get("batch_id", ""))
+	for batch_variant in batches:
+		if not batch_variant is Dictionary:
+			continue
+		var batch_identity := str(batch_variant.get("batch_id", ""))
+		for batch_item in batch_variant.get("items", []):
+			if batch_item is Dictionary:
+				var source_identity := str(batch_item.get("source_id", ""))
+				if not source_identity.is_empty() and not _source_batch_by_id.has(source_identity):
+					_source_batch_by_id[source_identity] = batch_identity
 	for batch_index in range(batches.size() - 1, -1, -1):
 		if not batches[batch_index] is Dictionary:
 			continue
@@ -844,15 +856,6 @@ func _restore_imported_sources() -> void:
 	if not selected_is_gameplay:
 		_selected_import_source_id = _PINNED_002_SOURCE_ID if _gameplay_source_index(_PINNED_002_SOURCE_ID) >= 0 else str(_gameplay_sources[0].get("source_id", ""))
 	_select_imported_source_by_id(_selected_import_source_id)
-	if not _batch_import_id.is_empty():
-		var imported_batch := _extension("batch-load", {"batch_id": _batch_import_id})
-		var imported_manifest: Dictionary = imported_batch.get("batch", {})
-		_last_import_summary = {"batch_id": _batch_import_id, "selected_count": imported_manifest.get("items", []).size(), "imported_count": int(imported_manifest.get("counts", {}).get("success", 0)), "reused_count": 0}
-	var latest_job := _extension("png-batch-latest", {})
-	var resumable_job: Dictionary = latest_job.get("job", {})
-	if not resumable_job.is_empty():
-		_batch_job_id = str(resumable_job.get("job_id", ""))
-		_batch_snapshot = resumable_job
 	_refresh_runtime_cards()
 
 
@@ -1258,7 +1261,20 @@ func _import_pngs(paths: Array) -> void:
 	if new_batch_id != _batch_import_id:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
+		_batch_job_source_mismatch = false
 	_batch_import_id = new_batch_id
+	for imported_item in result.get("items", []):
+		if imported_item is Dictionary and not str(imported_item.get("source_id", "")).is_empty():
+			_source_batch_by_id[str(imported_item["source_id"])] = new_batch_id
+	var batch_jobs := _extension("png-batch-latest", {"batch_id": _batch_import_id})
+	_batch_job_source_mismatch = str(batch_jobs.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
+	if _batch_job_source_mismatch:
+		_report("BATCH_JOB_SOURCE_MISMATCH · A resumable job belongs to another imported batch. No batch will run until the matching batch is displayed.")
+	else:
+		var matching_job: Dictionary = batch_jobs.get("job", {})
+		if not matching_job.is_empty():
+			_batch_job_id = str(matching_job.get("job_id", ""))
+			_batch_snapshot = matching_job
 	var items: Array = result.get("items", [])
 	var lines: Array[String] = []
 	var item_records: Array[Dictionary] = []
@@ -1585,11 +1601,14 @@ func _run_png_batch() -> void:
 	if _batch_import_id.is_empty():
 		_report("Import a multi-PNG batch before starting sequential processing.")
 		return
-	if not _pinned_source_preflight_ok:
-		_refresh_pinned_source_preflight()
-		if not _pinned_source_preflight_ok:
-			_report(_pinned_source_preflight_message)
-			return
+	if _batch_job_source_mismatch:
+		_report("BATCH_JOB_SOURCE_MISMATCH · The resumable job does not belong to the currently displayed imported batch.")
+		return
+	if not _batch_job_id.is_empty() and str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
+		_batch_job_source_mismatch = true
+		_refresh_run_button_caption()
+		_report("BATCH_JOB_SOURCE_MISMATCH · Refusing to resume a job for another imported batch.")
+		return
 	if _batch_job_id.is_empty():
 		var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
 		var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
@@ -1608,7 +1627,7 @@ func _run_png_batch() -> void:
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
 		_report("Canonical async PNG batch gateway is unavailable.")
 		return
-	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "png-batch-run", {"job_id": _batch_job_id})
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "png-batch-run", {"job_id": _batch_job_id, "expected_batch_id": _batch_import_id})
 	if prepared.is_empty():
 		_report("Canonical Python Factory Core cannot start the PNG batch.")
 		return
@@ -1692,6 +1711,15 @@ func _refresh_batch_progress() -> void:
 func _complete_png_batch(result: Dictionary) -> void:
 	_operation_running = false
 	_activity_finished_msec = Time.get_ticks_msec()
+	if str(result.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH":
+		_batch_job_source_mismatch = true
+		_activity_stage = "BATCH_JOB_SOURCE_MISMATCH"
+		_activity_backend_disposition = _activity_stage
+		_activity_terminal_state = _activity_stage
+		_activity_message = "The resumable job no longer matches the displayed imported batch. No source was run."
+		_refresh_run_button_caption()
+		_refresh_activity_header()
+		return
 	_batch_snapshot = result.get("job", _batch_snapshot)
 	_activity_stage = str(_batch_snapshot.get("state", result.get("disposition", "ERROR")))
 	_activity_backend_disposition = _activity_stage
@@ -2288,6 +2316,7 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		var imported: Dictionary = _gameplay_sources[index]
 		if str(imported.get("source_id", "")) != source_id:
 			continue
+		_bind_displayed_batch_to_source(source_id)
 		_selected_import_source_id = source_id
 		_selected_art_path = str(imported.get("path", ""))
 		_last_source_id = source_id
@@ -2326,6 +2355,33 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_refresh_live_data()
 		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
 		return
+
+
+func _bind_displayed_batch_to_source(source_id: String) -> void:
+	var batch_id := str(_source_batch_by_id.get(source_id, ""))
+	if batch_id.is_empty():
+		return
+	_batch_import_id = batch_id
+	var loaded := _extension("batch-load", {"batch_id": batch_id})
+	var manifest: Dictionary = loaded.get("batch", {})
+	_last_import_summary = {
+		"batch_id": batch_id,
+		"selected_count": manifest.get("items", []).size(),
+		"imported_count": int(manifest.get("counts", {}).get("success", 0)),
+		"reused_count": 0,
+	}
+	var association := _extension("png-batch-latest", {"batch_id": batch_id})
+	var job: Dictionary = association.get("job", {})
+	_batch_job_source_mismatch = str(association.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
+	if not job.is_empty():
+		_batch_job_id = str(job.get("job_id", ""))
+		_batch_snapshot = job
+	else:
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+	if _batch_job_source_mismatch:
+		_report("BATCH_JOB_SOURCE_MISMATCH · The resumable job belongs to another imported batch. No batch will run from this thumbnail selection.")
+	_refresh_run_button_caption()
 
 
 func _pinned_game_project_path() -> String:

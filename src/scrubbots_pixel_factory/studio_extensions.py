@@ -803,7 +803,8 @@ def _canonical_run_output_dir(identity: str, activity_run_id: str) -> Path:
 
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
                                  evidence: str, request: Mapping[str, Any], source_kind: str,
-                                 activity_writer: Any = None) -> dict[str, Any]:
+                                 activity_writer: Any = None,
+                                 owner_source_binding: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Run generated and OWNER_UPLOAD logical grids through the identical ZIP backend."""
 
     from .supply_pipeline.contracts import validate_column_count
@@ -895,6 +896,13 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             "authority": rules.authority, "acceptance": {"solver": "ScrubBots SolvabilitySolver", "replay": result["solution_final"], "difficulty": result["difficulty_basis"], "solver_status": result["solver_status"]},
             "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "load_check": load_check, "solver_supply_identity": solver_supply_identity, "result": {key: value for key, value in result.items() if not key.startswith("_")},
         }
+        primary["artifact_sha256"] = {
+            key: hashlib.sha256(Path(str(files[key])).read_bytes()).hexdigest()
+            for key in ("level", "supply_plan", "result")
+            if files.get(key) and Path(str(files[key])).is_file()
+        }
+        if set(primary["artifact_sha256"]) != {"level", "supply_plan", "result"}:
+            raise StudioExtensionError("canonical READY run is missing a SHA-bound level, supply plan, or result artifact")
         disposition = "READY"
     except (FileNotFoundError, NoValidSupply, OSError, RuntimeError, ValueError, StudioExtensionError) as exc:
         emit("SOLVE", "UNAVAILABLE", "Canonical pipeline stopped before complete solver evidence.")
@@ -907,7 +915,10 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         primary = {"schema": "scrubbots-primary-supply-pipeline/v1", "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "level_id": level_id, "column_count": selected, "visible_preview_depth": 3, "reason": str(exc)[:512]}
         disposition = "UNAVAILABLE"
     run_id = f"pipeline-{_digest({'identity': identity, 'request': request_data, 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
-    payload = {"schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id, "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": identity if source_kind == "OWNER_UPLOAD" else None, "candidate_id": identity if source_kind == "CANDIDATE" else None, "request": request_data, "stages": stages, "disposition": disposition, "primary": primary, "created_at": datetime.now(timezone.utc).isoformat()}
+    binding = dict(owner_source_binding or {})
+    source_identity = binding.get("source_id", identity if source_kind == "OWNER_UPLOAD" else None)
+    candidate_identity = identity if source_kind == "CANDIDATE" else None
+    payload = {"schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id, "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": source_identity, "candidate_id": candidate_identity, "derived_candidate_id": candidate_identity if binding else None, "source_lineage": request_data.get("source_lineage") if binding else None, "owner_source_binding": binding or None, "request": request_data, "stages": stages, "disposition": disposition, "primary": primary, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_json(_pipeline_path(run_id), payload, immutable=True)
     if disposition == "READY":
         candidate = next((item for item in list_candidates() if item.get("candidate_id") == identity), None)
@@ -1078,14 +1089,19 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
         _source_record, source_png = _source_record_paths(source_id, request_data.get("source_directory"))
         derived_candidate_id, derived_bundle = _derive_owner_candidate(source_id, validation, source_png)
         bundle = read_bundle(derived_bundle)
-        derived_request = dict(request or {})
+        derived_request = dict(request_data)
         derived_request["source_id"] = source_id
         derived_request["source_lineage"] = bundle.metadata.get("generator_metadata", {})
-        payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE", activity_writer=activity_writer)
-        payload["source_id"] = source_id
-        payload["candidate_id"] = derived_candidate_id
-        payload["derived_candidate_id"] = derived_candidate_id
-        payload["source_lineage"] = derived_request["source_lineage"]
+        source_record_path, _source_png_path = _source_record_paths(source_id, request_data.get("source_directory"))
+        source_binding = {
+            "source_id": source_id,
+            "source_sha256": str(validation["source_sha256"]),
+            "source_record_sha256": hashlib.sha256(source_record_path.read_bytes()).hexdigest(),
+            "candidate_id": derived_candidate_id,
+            "candidate_artwork_sha256": bundle.artwork.sha256,
+            "candidate_grid_hash": bundle.artwork.grid_hash,
+        }
+        payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE", activity_writer=activity_writer, owner_source_binding=source_binding)
         return payload
     if candidate_id is not None and candidate is not None and quality_disposition == "PASS":
         return _run_canonical_artwork_route(identity=candidate_id, cells=candidate_bundle.artwork.cells, width=candidate_bundle.artwork.width, height=candidate_bundle.artwork.height, evidence=candidate["source_path"], request=request or {}, source_kind="CANDIDATE")
@@ -1575,10 +1591,10 @@ def png_batch_status(job_id: str) -> dict[str, Any]:
     return read_png_batch_status(job_id)
 
 
-def png_batch_latest() -> dict[str, Any]:
+def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
     from .png_batch import png_batch_latest as read_latest_png_batch
 
-    return read_latest_png_batch()
+    return read_latest_png_batch(batch_id)
 
 
 def png_batch_control(job_id: str, action: str) -> dict[str, Any]:
@@ -1587,10 +1603,10 @@ def png_batch_control(job_id: str, action: str) -> dict[str, Any]:
     return send_png_batch_control(job_id, action)
 
 
-def png_batch_run(job_id: str) -> dict[str, Any]:
+def png_batch_run(job_id: str, expected_batch_id: str | None = None) -> dict[str, Any]:
     from .png_batch import run_png_batch
 
-    return run_png_batch(job_id)
+    return run_png_batch(job_id, expected_batch_id=expected_batch_id)
 
 
 def owner_pages_snapshot() -> dict[str, Any]:
