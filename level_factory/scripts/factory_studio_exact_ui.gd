@@ -310,6 +310,48 @@ func _apply_responsive_layout() -> void:
 			_batch_pause_button.size = Vector2(action_width, 30.0 * scale_y)
 			_batch_stop_button.position = Vector2(_batch_pause_button.position.x + action_width + button_gap, 80.0 * scale_y)
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
+	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
+
+
+func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -> void:
+	var dock := get_node_or_null("RuntimeBottomStrip") as Control
+	var heading := get_node_or_null("RuntimeBottomHeading") as Label
+	if dock == null or heading == null:
+		return
+	var slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]
+	var horizontal_padding := 8.0
+	var vertical_padding := 8.0
+	var card_gap := clampf(6.0 * center_scale, 3.0, 6.0)
+	var heading_height := clampf(15.0 * scale_y, 13.0, 18.0)
+	var heading_gap := maxf(2.0, 3.0 * scale_y)
+	var content_width := maxf(0.0, dock.size.x - horizontal_padding * 2.0)
+	var card_width := (content_width - card_gap * float(slots.size() - 1)) / float(slots.size())
+	var card_height := dock.size.y - vertical_padding * 2.0 - heading_height - heading_gap
+	if card_width <= 0.0 or card_height <= 0.0:
+		return
+	# These controls are siblings of the dock, so add its local position exactly once.
+	heading.position = dock.position + Vector2(horizontal_padding, vertical_padding)
+	heading.size = Vector2(content_width, heading_height)
+	heading.add_theme_font_size_override("font_size", clampi(roundi(12.0 * center_scale), 10, 12))
+	var card_font_size := clampi(roundi(12.0 * minf(center_scale, scale_y)), 9, 12)
+	for index in range(slots.size()):
+		var button := get_node_or_null(slots[index]) as Button
+		if button == null:
+			continue
+		var x := horizontal_padding + float(index) * (card_width + card_gap)
+		button.position = dock.position + Vector2(x, vertical_padding + heading_height + heading_gap)
+		button.size = Vector2(card_width, card_height)
+		button.add_theme_font_size_override("font_size", card_font_size)
+		for state in ["normal", "hover", "pressed", "focus"]:
+			var current_style := button.get_theme_stylebox(state) as StyleBoxFlat
+			if current_style == null:
+				continue
+			var compact_style := current_style.duplicate() as StyleBoxFlat
+			compact_style.content_margin_left = 2.0
+			compact_style.content_margin_right = 2.0
+			compact_style.content_margin_top = 2.0
+			compact_style.content_margin_bottom = 2.0
+			button.add_theme_stylebox_override(state, compact_style)
 
 
 func responsive_layout_snapshot() -> Dictionary:
@@ -2459,7 +2501,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not mouse.pressed or mouse.button_index not in [MOUSE_BUTTON_WHEEL_UP, MOUSE_BUTTON_WHEEL_DOWN]:
 		return
 	var strip := get_node_or_null("RuntimeBottomStrip") as Control
-	if strip == null or not strip.get_global_rect().has_point(get_global_mouse_position()):
+	if strip == null or not strip.get_global_rect().has_point(mouse.global_position):
 		return
 	_page_imported_sources(-1 if mouse.button_index == MOUSE_BUTTON_WHEEL_UP else 1)
 	get_viewport().set_input_as_handled()
