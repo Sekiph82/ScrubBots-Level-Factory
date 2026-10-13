@@ -1587,8 +1587,8 @@ def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
     return payload
 
 
-def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
-    """Create/reuse an immutable SHA-bound snapshot of the full loaded PNG gallery."""
+def _loaded_png_batch_payload(source_ids: Sequence[str]) -> dict[str, Any]:
+    """Build the deterministic source snapshot; import-event history is provenance only."""
     if not isinstance(source_ids, Sequence) or isinstance(source_ids, (str, bytes)):
         raise ValueError("loaded PNG source IDs must be a sequence")
     if len(source_ids) > 150:
@@ -1599,6 +1599,9 @@ def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
         try:
             prior = batch_load(path.stem)["batch"]
         except (StudioExtensionError, OSError, ValueError):
+            continue
+        # A composite snapshot is derived evidence, never an original import event.
+        if prior.get("version") != 1 or prior.get("kind") == "COMPOSITE_LOADED_SOURCE_SNAPSHOT":
             continue
         for prior_item in prior.get("items", []):
             if not isinstance(prior_item, Mapping):
@@ -1646,17 +1649,86 @@ def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
         items.append(item)
     snapshot = {
         "schema": BATCH_SCHEMA, "version": 2, "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT",
+        "provenance_policy": "ORIGINAL_V1_IMPORT_MEMBERSHIP_SOURCE_IDENTITY_V1",
         "items": items,
         "counts": {
             "success": sum(item["disposition"] in {"IMPORTED", "ALREADY_IMPORTED"} for item in items),
             "failed": sum(item["disposition"] not in {"IMPORTED", "ALREADY_IMPORTED"} for item in items),
         },
     }
-    digest = _digest(snapshot)
+    snapshot["provenance_digest"] = _loaded_png_provenance_digest(snapshot)
+    # Keep source+record identity stable when the same PNG is imported again.
+    digest = _loaded_png_batch_digest(snapshot)
     batch_id = f"batch-loaded-{digest[:36]}"
-    payload = {**snapshot, "batch_id": batch_id, "snapshot_digest": digest}
-    _write_json(batch_root / f"{batch_id}.json", payload, immutable=True)
+    return {**snapshot, "batch_id": batch_id, "snapshot_digest": digest}
+
+
+def _loaded_png_batch_digest(value: Mapping[str, Any]) -> str:
+    identity = {key: item for key, item in value.items() if key not in {"batch_id", "snapshot_digest", "provenance_digest"}}
+    if identity.get("provenance_policy") == "ORIGINAL_V1_IMPORT_MEMBERSHIP_SOURCE_IDENTITY_V1":
+        identity["items"] = [
+            {key: item for key, item in row.items() if key != "import_provenance"}
+            if isinstance(row, Mapping) else row
+            for row in identity.get("items", [])
+        ]
+    return _digest(identity)
+
+
+def _loaded_png_provenance_digest(value: Mapping[str, Any]) -> str:
+    provenance = [
+        {"source_id": str(row.get("source_id", "")), "import_provenance": row.get("import_provenance", [])}
+        for row in value.get("items", []) if isinstance(row, Mapping)
+    ]
+    return _digest(provenance)
+
+
+def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
+    """Create or reuse a stable SHA-bound snapshot of the loaded PNG gallery."""
+    payload = _loaded_png_batch_payload(source_ids)
+    path = extensions_root() / "batches" / f"{payload['batch_id']}.json"
+    if path.exists():
+        existing = batch_load(str(payload["batch_id"]))["batch"]
+        if _loaded_png_batch_digest(existing) != payload["snapshot_digest"]:
+            raise StudioExtensionError("existing composite snapshot does not match the current immutable source identity")
+        return existing
+    _write_json(path, payload, immutable=True)
     return payload
+
+
+def find_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
+    """Read-only lookup for the exact stable composite represented by loaded sources."""
+    payload = _loaded_png_batch_payload(source_ids)
+    path = extensions_root() / "batches" / f"{payload['batch_id']}.json"
+    if not path.exists():
+        source_signature = [
+            (str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")))
+            for item in payload.get("items", []) if isinstance(item, Mapping)
+        ]
+        legacy_matches: list[dict[str, Any]] = []
+        batch_root = extensions_root() / "batches"
+        for legacy_path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
+            try:
+                legacy = batch_load(legacy_path.stem)["batch"]
+            except (StudioExtensionError, OSError, ValueError):
+                continue
+            if legacy.get("version") != 2 or legacy.get("kind") != "COMPOSITE_LOADED_SOURCE_SNAPSHOT":
+                continue
+            legacy_signature = [
+                (str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")))
+                for item in legacy.get("items", []) if isinstance(item, Mapping)
+            ]
+            if legacy_signature == source_signature:
+                legacy_matches.append(legacy)
+        if len(legacy_matches) == 1:
+            return {"state": "SUCCESS", "disposition": "LEGACY_EXACT_MATCH", "batch": legacy_matches[0], "mutated": False}
+        if len(legacy_matches) > 1:
+            return {"state": "BLOCKED", "disposition": "LEGACY_COMPOSITE_AMBIGUOUS", "batch": None,
+                    "candidate_batch_ids": [str(item.get("batch_id", "")) for item in legacy_matches], "mutated": False}
+        return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None, "mutated": False}
+    existing = batch_load(str(payload["batch_id"]))["batch"]
+    if _loaded_png_batch_digest(existing) != payload["snapshot_digest"]:
+        return {"state": "BLOCKED", "disposition": "SOURCE_SNAPSHOT_MISMATCH", "batch": None, "mutated": False}
+    return {"state": "SUCCESS", "disposition": "MATCHED", "batch": existing, "mutated": False}
 
 
 def batch_load(batch_id: str) -> dict[str, Any]:
@@ -1665,15 +1737,21 @@ def batch_load(batch_id: str) -> dict[str, Any]:
     if value.get("schema") != BATCH_SCHEMA or value.get("version") not in {1, 2} or value.get("batch_id") != batch_id or not isinstance(value.get("items"), list) or not isinstance(value.get("counts"), Mapping):
         raise StudioExtensionError("batch evidence schema or identity is invalid")
     if value.get("version") == 2:
-        unsigned = {key: item for key, item in value.items() if key not in {"batch_id", "snapshot_digest"}}
-        digest = _digest(unsigned)
+        digest = _loaded_png_batch_digest(value)
         if value.get("kind") != "COMPOSITE_LOADED_SOURCE_SNAPSHOT" or value.get("snapshot_digest") != digest or batch_id != f"batch-loaded-{digest[:36]}":
             raise StudioExtensionError("composite loaded-source batch digest or identity is invalid")
+        if (value.get("provenance_policy") == "ORIGINAL_V1_IMPORT_MEMBERSHIP_SOURCE_IDENTITY_V1"
+                and value.get("provenance_digest") != _loaded_png_provenance_digest(value)):
+            raise StudioExtensionError("composite original-import provenance digest is invalid")
     return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
 
 
 def loaded_png_batch_create(source_ids: Sequence[str]) -> dict[str, Any]:
     return create_loaded_png_batch(source_ids)
+
+
+def loaded_png_batch_find(source_ids: Sequence[str]) -> dict[str, Any]:
+    return find_loaded_png_batch(source_ids)
 
 
 def png_batch_create(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -1973,5 +2051,5 @@ def canonical_cost_center(scope: str | None = None, provider: str | None = None)
 __all__ = [
     "StudioExtensionError", "extensions_root", "verify_owner_source", "save_library_metadata", "library_refresh", "validate_owner_source", "validate_owner_review_chain",
     "list_candidates", "record_owner_review", "candidate_inbox", "discover_records", "compare_candidates", "run_pipeline", "save_preset", "load_preset", "delete_preset", "expand_preset",
-    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "loaded_png_batch_create", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center", "png_batch_retry_failed",
+    "readiness_card", "reproduce_capability", "reproduce_exact", "create_revision", "revision_create", "revision_list", "revision_compare", "revision_load", "list_revisions", "load_revision", "compare_revisions", "record_failure", "retry_failure", "list_failures", "batch_import", "batch_load", "loaded_png_batch_create", "loaded_png_batch_find", "save_session", "restore_session", "resume_pipeline", "similarity", "similarity_canonical", "cost_center", "canonical_cost_center", "png_batch_retry_failed",
 ]

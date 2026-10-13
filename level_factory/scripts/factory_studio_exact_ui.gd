@@ -58,6 +58,8 @@ var _results_run_id := ""
 var _batch_job_id := ""
 var _batch_import_id := ""
 var _batch_snapshot: Dictionary = {}
+var _batch_composite_snapshot: Dictionary = {}
+var _batch_legacy_reconciliation := false
 var _batch_job_source_mismatch := false
 var _batch_last_read_msec := 0
 var _batch_pause_button: Button
@@ -776,6 +778,9 @@ func _refresh_run_button_caption() -> void:
 		if _batch_job_source_mismatch:
 			button.text = "Batch mismatch"
 			button.disabled = true
+		elif state in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"] and _batch_job_matches_loaded_sources():
+			button.text = "Review & Resume Legacy Batch" if _batch_legacy_reconciliation else "Resume Batch · %d remaining" % int(counts.get("remaining", 0))
+			button.disabled = false
 		elif state == "COMPLETE" and (int(counts.get("failed", 0)) > 0 or int(counts.get("rejected", 0)) > 0):
 			if int(counts.get("failed", 0)) > 0 and _batch_job_matches_loaded_sources():
 				button.text = "Retry Failed (%d)" % int(counts.get("failed", 0))
@@ -918,7 +923,69 @@ func _restore_imported_sources() -> void:
 	if not selected_is_gameplay:
 		_selected_import_source_id = _PINNED_002_SOURCE_ID if _gameplay_source_index(_PINNED_002_SOURCE_ID) >= 0 else str(_gameplay_sources[0].get("source_id", ""))
 	_select_imported_source_by_id(_selected_import_source_id)
+	_restore_loaded_png_batch_readonly()
 	_refresh_runtime_cards()
+
+
+func _restore_loaded_png_batch_readonly() -> void:
+	if _gateway == null or _gameplay_sources.is_empty():
+		return
+	var source_ids: Array[String] = []
+	for source in _gameplay_sources:
+		var source_id := str(source.get("source_id", ""))
+		if source_id.is_empty() or source_id in source_ids:
+			return
+		source_ids.append(source_id)
+	var resolved := _extension("loaded-png-batch-find", {"source_ids": source_ids})
+	var composite: Dictionary = resolved.get("batch", {})
+	var resolution := str(resolved.get("disposition", ""))
+	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH"] or composite.is_empty():
+		if resolution not in ["NO_MATCHING_COMPOSITE", ""]:
+			_batch_job_source_mismatch = true
+			_report("Loaded PNG batch provenance could not be verified; resume and retry are blocked.")
+		return
+	_batch_legacy_reconciliation = resolution == "LEGACY_EXACT_MATCH"
+	_batch_composite_snapshot = composite
+	_batch_import_id = str(composite.get("batch_id", ""))
+	if _batch_import_id.is_empty():
+		_batch_composite_snapshot.clear()
+		return
+	var latest := _extension("png-batch-latest", {"batch_id": _batch_import_id})
+	var job: Dictionary = latest.get("job", {})
+	_batch_job_source_mismatch = str(latest.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
+	if _batch_job_source_mismatch:
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+		_report("A persisted PNG job has a different composite authority; it was not resumed.")
+		return
+	if job.is_empty():
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+		return
+	_batch_snapshot = job
+	_batch_job_id = str(job.get("job_id", ""))
+	if str(job.get("state", "")) == "RUNNING":
+		# Display the crash state locally. The durable job remains unchanged until
+		# the owner explicitly presses Resume Batch.
+		_batch_snapshot["state"] = "INTERRUPTED"
+		_activity_stage = "INTERRUPTED"
+		_activity_backend_disposition = "INTERRUPTED"
+		_activity_terminal_state = "INTERRUPTED"
+		_activity_message = "Previous batch worker stopped with the application. Resume is available; no solver was started."
+	elif str(job.get("state", "")) in ["PAUSED", "STOPPED", "QUEUED"]:
+		_activity_stage = str(job.get("state", ""))
+		_activity_backend_disposition = _activity_stage
+		_activity_terminal_state = _activity_stage
+		_activity_message = "Batch is %s. Press Resume Batch to continue this saved job." % _activity_stage.to_lower()
+	else:
+		var counts: Dictionary = job.get("counts", {})
+		_activity_stage = "FINISHED WITH FAILURES" if int(counts.get("failed", 0)) > 0 or int(counts.get("rejected", 0)) > 0 else "READY"
+		_activity_backend_disposition = _activity_stage
+		_activity_terminal_state = _activity_stage
+		_activity_message = "Restored %s · %d/%d READY · %d FAILED · no solver was run." % [str(job.get("state", "")), int(counts.get("ready", 0)), int(counts.get("total", 0)), int(counts.get("failed", 0))]
+	_render_batch_item_results(_batch_snapshot)
+	_refresh_activity_header()
+	_refresh_run_button_caption()
 
 
 func _refresh_runtime_cards() -> void:
@@ -1323,7 +1390,9 @@ func _import_pngs(paths: Array) -> void:
 	if new_batch_id != _batch_import_id and not _operation_running:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
+		_batch_composite_snapshot.clear()
 		_batch_job_source_mismatch = false
+		_batch_legacy_reconciliation = false
 	_batch_import_id = new_batch_id
 	for imported_item in result.get("items", []):
 		if imported_item is Dictionary and not str(imported_item.get("source_id", "")).is_empty():
@@ -1333,7 +1402,9 @@ func _import_pngs(paths: Array) -> void:
 	if not _operation_running:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
+		_batch_composite_snapshot.clear()
 		_batch_job_source_mismatch = false
+		_batch_legacy_reconciliation = false
 	var items: Array = result.get("items", [])
 	var lines: Array[String] = []
 	var item_records: Array[Dictionary] = []
@@ -1659,6 +1730,11 @@ func _run_single_level_pipeline() -> void:
 func _run_png_batch() -> void:
 	if _gateway == null or _operation_running:
 		return
+	if not _batch_job_id.is_empty() and _batch_job_matches_loaded_sources() and str(_batch_snapshot.get("state", "")) in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"]:
+		if _batch_legacy_reconciliation:
+			_activity_message = "Explicit owner resume requested for the SHA-matched legacy composite."
+		_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
+		return
 	if _gameplay_sources.size() < 2:
 		_report("Run Entire Loaded Batch requires at least two verified loaded PNGs.")
 		return
@@ -1678,6 +1754,7 @@ func _run_png_batch() -> void:
 	if _batch_import_id.is_empty():
 		_report("Loaded PNG snapshot could not be verified: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
 		return
+	_batch_composite_snapshot = composite
 	var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
 	var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
 	var job: Dictionary = created.get("job", {})
@@ -1793,7 +1870,16 @@ func _refresh_batch_progress() -> void:
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not parsed is Dictionary or str(parsed.get("schema", "")) != "scrubbots-studio-png-sequential-batch" or str(parsed.get("job_id", "")) != _batch_job_id:
 		return
+	if not _operation_running and str(parsed.get("state", "")) == "RUNNING":
+		parsed["state"] = "INTERRUPTED"
 	if parsed != _batch_snapshot:
+		if str(parsed.get("state", "")) == "COMPLETE" and parsed.has("parent_job_id"):
+			var verified_latest := _extension("png-batch-latest", {"batch_id": str(parsed.get("import_batch_id", ""))})
+			var verified_job: Dictionary = verified_latest.get("job", {})
+			if str(verified_job.get("job_id", "")) == str(parsed.get("job_id", "")):
+				parsed = verified_job
+			else:
+				parsed["lineage_verified"] = false
 		_batch_snapshot = parsed
 		if _operation_running:
 			var current_index: Variant = parsed.get("current_index")
@@ -2538,12 +2624,32 @@ func _bind_displayed_batch_to_source(source_id: String) -> void:
 
 func _batch_job_matches_loaded_sources() -> bool:
 	var items: Array = _batch_snapshot.get("items", [])
-	if items.size() != _gameplay_sources.size() or items.is_empty():
+	var composite_items: Array = _batch_composite_snapshot.get("items", [])
+	if items.is_empty() or composite_items.is_empty() or str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
+		return false
+	var source_by_id: Dictionary = {}
+	for item_variant in composite_items:
+		if item_variant is Dictionary:
+			source_by_id[str(item_variant.get("source_id", ""))] = item_variant
+	var is_retry := _batch_snapshot.has("parent_job_id")
+	if is_retry and not bool(_batch_snapshot.get("lineage_verified", false)):
+		return false
+	if not is_retry and items.size() != composite_items.size():
 		return false
 	for index in range(items.size()):
 		if not items[index] is Dictionary:
 			return false
-		if str(items[index].get("source_id", "")) != str(_gameplay_sources[index].get("source_id", "")):
+		var item: Dictionary = items[index]
+		var source_id := str(item.get("source_id", ""))
+		if not source_by_id.has(source_id):
+			return false
+		var source: Dictionary = source_by_id[source_id]
+		if (str(item.get("source_sha256", "")) != str(source.get("source_sha256", ""))
+				or str(item.get("source_record_sha256", "")) != str(source.get("source_record_sha256", ""))):
+			return false
+		if is_retry and int(item.get("column_count", 0)) not in [3, 4, 5]:
+			return false
+		if not is_retry and str(item.get("source_id", "")) != str(composite_items[index].get("source_id", "")):
 			return false
 	return true
 

@@ -445,7 +445,7 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
 
 def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
     """Create a separate deterministic retry job for FAILED items only."""
-    from .studio_extensions import _digest
+    from .studio_extensions import _digest, _source_record_paths, batch_load, verify_owner_source
 
     original = _read_job(job_id)
     if original.get("state") != "COMPLETE":
@@ -453,6 +453,52 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
     failed = [item for item in original.get("items", []) if item.get("status") == "FAILED"]
     if not failed:
         return {"state": "BLOCKED", "disposition": "NO_RETRYABLE_FAILURES", "job": original}
+    batch_id = str(original.get("import_batch_id", ""))
+    batch = batch_load(batch_id)["batch"]
+    if _digest(batch) != original.get("batch_digest"):
+        return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": original,
+                "reason": "Original immutable composite digest no longer matches this retry chain."}
+    if not _job_lineage_matches_snapshot(original, batch):
+        return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
+                "reason": "Retry ancestry or original source membership is not SHA-authenticated."}
+    if original.get("parent_job_id"):
+        parent = _read_job(str(original.get("parent_job_id", "")))
+        if (parent.get("state") != "COMPLETE"
+                or parent.get("state_digest") != original.get("parent_job_state_digest")
+                or parent.get("import_batch_id") != batch_id
+                or parent.get("batch_digest") != original.get("batch_digest")):
+            return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
+                    "reason": "Retry parent state or source authority changed; failed subset was not retried."}
+        parent_by_index = {str(item.get("index")): item for item in parent.get("items", []) if isinstance(item, Mapping)}
+        for item in original.get("items", []):
+            if not isinstance(item, Mapping):
+                return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original}
+            parent_item = parent_by_index.get(str(item.get("prior_item_index")))
+            if (parent_item is None
+                    or parent_item.get("source_id") != item.get("source_id")
+                    or parent_item.get("source_sha256") != item.get("source_sha256")
+                    or parent_item.get("source_record_sha256") != item.get("source_record_sha256")
+                    or parent_item.get("column_count") != item.get("column_count")):
+                return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
+                        "reason": "Retry item no longer matches its SHA-bound parent assignment."}
+    batch_items = {str(item.get("source_id", "")): item for item in batch.get("items", []) if isinstance(item, Mapping)}
+    for item in failed:
+        source_id = str(item.get("source_id", ""))
+        source = batch_items.get(source_id)
+        try:
+            current = verify_owner_source(source_id, source_directory=original.get("settings", {}).get("source_directory"))
+            record_path, _png_path = _source_record_paths(source_id, original.get("settings", {}).get("source_directory"))
+            record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
+        except Exception as exc:
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "job": original,
+                    "reason": f"Current source could not be reverified: {str(exc)[:240]}"}
+        if (source is None
+                or current.get("source_sha256") != item.get("source_sha256")
+                or source.get("source_sha256") != item.get("source_sha256")
+                or source.get("source_record_sha256") != item.get("source_record_sha256")
+                or record_sha != item.get("source_record_sha256")):
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "job": original,
+                    "reason": "Current PNG or source-record SHA differs from the original nine-source composite."}
     items: list[dict[str, Any]] = []
     for index, previous in enumerate(failed):
         items.append({
@@ -513,11 +559,106 @@ def png_batch_status(job_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "STATUS", "job": public}
 
 
+def _job_lineage_matches_snapshot(job: Mapping[str, Any], batch: Mapping[str, Any]) -> bool:
+    """Validate the whole persisted retry chain against the immutable composite."""
+    from .studio_extensions import _digest, batch_load
+
+    batch_id = str(job.get("import_batch_id", ""))
+    try:
+        exact_batch = batch_load(batch_id)["batch"]
+    except Exception:
+        return False
+    expected_digest = _digest(exact_batch)
+    if (job.get("batch_digest") != expected_digest
+            or job.get("import_batch_id") != batch.get("batch_id")):
+        return False
+    current = dict(job)
+    visited: set[str] = set()
+    while current.get("parent_job_id"):
+        parent_id = str(current.get("parent_job_id", ""))
+        if parent_id in visited:
+            return False
+        visited.add(parent_id)
+        try:
+            parent = _read_job(parent_id)
+        except Exception:
+            return False
+        if (parent.get("state") != "COMPLETE"
+                or parent.get("state_digest") != current.get("parent_job_state_digest")
+                or parent.get("import_batch_id") != batch_id
+                or parent.get("batch_digest") != expected_digest):
+            return False
+        parent_items = {str(item.get("index")): item for item in parent.get("items", []) if isinstance(item, Mapping)}
+        expected_failed = [str(item.get("index")) for item in parent.get("items", [])
+                           if isinstance(item, Mapping) and item.get("status") == "FAILED"]
+        actual_parent_indexes = [str(item.get("prior_item_index", "")) for item in current.get("items", [])
+                                 if isinstance(item, Mapping)]
+        if actual_parent_indexes != expected_failed:
+            return False
+        for item in current.get("items", []):
+            if not isinstance(item, Mapping):
+                return False
+            previous = parent_items.get(str(item.get("prior_item_index")))
+            if (previous is None or previous.get("status") != "FAILED"
+                    or previous.get("source_id") != item.get("source_id")
+                    or previous.get("source_sha256") != item.get("source_sha256")
+                    or previous.get("source_record_sha256") != item.get("source_record_sha256")
+                    or previous.get("column_count") != item.get("column_count")
+                    or item.get("prior_attempt", {}).get("status") != "FAILED"):
+                return False
+        current = parent
+    rows = [item for item in exact_batch.get("items", []) if isinstance(item, Mapping)]
+    root_items = current.get("items", [])
+    if (current.get("snapshot_source_count") != len(rows)
+            or len(root_items) != len(rows)
+            or [str(item.get("source_id", "")) for item in root_items] != [str(row.get("source_id", "")) for row in rows]):
+        return False
+    is_composite = exact_batch.get("version") == 2 and exact_batch.get("kind") == "COMPOSITE_LOADED_SOURCE_SNAPSHOT"
+    eligible_ids = [str(item.get("source_id", "")) for item in root_items if item.get("column_count") in (3, 4, 5)]
+    assignments = dict(zip(eligible_ids, assign_columns(eligible_ids), strict=True)) if is_composite else {}
+    for root_item, row in zip(root_items, rows, strict=True):
+        if root_item.get("source_id") != row.get("source_id"):
+            return False
+        if is_composite and (root_item.get("source_sha256") != row.get("source_sha256")
+                or root_item.get("source_record_sha256") != row.get("source_record_sha256")
+                or root_item.get("column_count") != assignments.get(str(row.get("source_id", "")))):
+            return False
+        if not is_composite and root_item.get("column_count") not in (None, 3, 4, 5):
+            return False
+    return True
+
+
+def _record_legacy_resume_choice(job: Mapping[str, Any], batch: Mapping[str, Any]) -> None:
+    """Append immutable evidence only after an explicit owner resume request."""
+    if (batch.get("version") != 2 or batch.get("kind") != "COMPOSITE_LOADED_SOURCE_SNAPSHOT"
+            or batch.get("provenance_policy") == "ORIGINAL_V1_IMPORT_MEMBERSHIP_SOURCE_IDENTITY_V1"):
+        return
+    basis = {"job_id": job.get("job_id"), "batch_id": batch.get("batch_id"),
+             "batch_digest": job.get("batch_digest"), "owner_action": "EXPLICIT_RESUME"}
+    choice_id = hashlib.sha256(_canonical(basis)).hexdigest()
+    payload = {"schema": "scrubbots-png-batch-legacy-reconciliation", "version": 1,
+               "choice_id": choice_id, **basis, "recorded_at": _now()}
+    path = _root() / "reconciliations" / f"legacy-resume-{choice_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    encoded = _canonical(payload)
+    if path.exists():
+        if path.read_bytes() != encoded:
+            # The first explicit choice is immutable; don't overwrite it with a new timestamp.
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if any(existing.get(key) != value for key, value in {"schema": payload["schema"], **basis, "choice_id": choice_id}.items()):
+                raise ValueError("legacy reconciliation evidence conflicts with the current SHA-bound owner choice")
+        return
+    path.write_bytes(encoded)
+
+
 def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
     jobs: list[dict[str, Any]] = []
     job_root = _root() / "jobs"
     if job_root.exists():
-        for path in sorted(job_root.glob("png-batch-*.json"), key=lambda item: item.stat().st_mtime, reverse=True)[:20]:
+        candidates = sorted(job_root.glob("png-batch-*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
+        if batch_id is None:
+            candidates = candidates[:20]
+        for path in candidates:
             try:
                 jobs.append(_read_job(path.stem))
             except (OSError, ValueError, json.JSONDecodeError):
@@ -529,18 +670,22 @@ def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
 
     try:
         expected_digest = _digest(batch_load(batch_id)["batch"])
-    except (OSError, ValueError, KeyError):
+    except Exception:
         return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": None, "mismatch_job": resumable, "jobs": jobs, "mutated": False}
-    matching = next((
+    matching_candidates = [
         job for job in jobs
         if job.get("import_batch_id") == batch_id and job.get("batch_digest") == expected_digest
-        and job.get("state") not in {"COMPLETE", "STOPPED"}
-    ), None)
+    ]
+    matching = max(matching_candidates, key=lambda job: str(job.get("updated_at", "")), default=None)
     mismatch = resumable if resumable is not None and matching is None else None
+    if matching is not None and not _job_lineage_matches_snapshot(matching, batch_load(batch_id)["batch"]):
+        return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": None,
+                "mismatch_job": matching, "jobs": jobs, "batch_id": batch_id,
+                "batch_digest": expected_digest, "mutated": False}
     return {
         "state": "SUCCESS" if matching is not None or mismatch is None else "BLOCKED",
         "disposition": "MATCHED" if matching is not None else "BATCH_JOB_SOURCE_MISMATCH" if mismatch is not None else "NO_MATCHING_JOB",
-        "job": matching, "mismatch_job": mismatch, "jobs": jobs, "batch_id": batch_id,
+        "job": ({**matching, "lineage_verified": True} if matching is not None else None), "mismatch_job": mismatch, "jobs": jobs, "batch_id": batch_id,
         "batch_digest": expected_digest, "mutated": False,
     }
 
@@ -684,6 +829,10 @@ def run_png_batch(
         batch = extensions.batch_load(str(job.get("import_batch_id", "")))["batch"]
         if extensions._digest(batch) != job.get("batch_digest"):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job, "reason": "Import batch manifest digest changed after the immutable PNG solver plan was created."}
+        if batch.get("version") == 2 and batch.get("kind") == "COMPOSITE_LOADED_SOURCE_SNAPSHOT" and not _job_lineage_matches_snapshot(job, batch):
+            return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job,
+                    "reason": "Persisted plan or retry parent does not match the exact SHA-bound source snapshot."}
+        _record_legacy_resume_choice(job, batch)
         _clear_control(job_id)
         job["state"] = "RUNNING"
         job["updated_at"] = _now()
