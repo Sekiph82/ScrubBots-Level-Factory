@@ -659,3 +659,4 @@ Document role: CODEX BUILDER LOG
 - **Remote verification before final log commit:** `git fetch --prune origin` succeeded; local HEAD and `origin/main` both resolved to `b5b48a73f16b6742b350de5e267a843044f72d76`, with 0 ahead / 0 behind and no tracked modifications. This confirms the prior normal push carrying product commits and publication checkpoint 1 was accepted.
 - **Final log update:** this R08-only append records the verified push state. No product files, tracker, audits, prompts, or owner-local paths were changed.
 - **Timestamp:** 2026-10-13 22:05:45 UTC.
+- **Checkpoint command correction:** the first log-commit command stopped because it tested stale `$LASTEXITCODE` after PowerShell `Add-Content`; inspection confirmed the append was present and `git diff --check` passed. The retry staged and committed only this log successfully as `38c747e`. No product or owner files were affected.
