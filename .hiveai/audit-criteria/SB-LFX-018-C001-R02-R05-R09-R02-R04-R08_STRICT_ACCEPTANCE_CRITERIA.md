@@ -1,0 +1,12 @@
+# R04-R08 | GPT independent strict criteria
+Authority: R07 owner five-slot/Release Pool decision, GPT R08 preaudit, R08 single master prompt.
+
+1. The Level Factory bottom dock must ACTUALLY grow in pixel height relative to R07's unchanged 106*scale_y, and main preview host/canvas must shrink accordingly. Five substantially taller cards at 1536x960, responsive 1536x864/1024, 1920x1080 and 1100x720. No cropping/overlap/hidden sixth slot. Release Pool and Pixel Art preserve their separate layout.
+2. The five cards must use the current authenticated job source ID + PNG SHA + record SHA and per-item status/column, not legacy imported-source disposition. Active 005 displays exactly [003,004,005,006,007], center 005; 006 RUNNING means 006 sprite, activity, Details, selected card and caption are all 006. Actual READY/FAILED/QUEUED/REUSED states must match persisted job proof, not previous 002 history.
+3. Reload, pause, finish, fast transitions and retry subset must retain honest synchronized active source and labels, without solver dispatch from UI changes.
+4. The unchanged shortcut's Godot (DEBUG) title mismatch must be diagnosed and repaired narrowly: bind PID/main HWND to exact approved project and Godot4 executable, accept no arbitrary window title, retain user-visible intended title when possible; no false error for valid app, genuine invalid app still errors. No unexplained .lnk changes.
+5. Release Pool 14-15 rows, unlimited vertical scrolling, bottom three management controls, 3+Add selected cards below art, eight Help buttons and authentic retained activity must not regress. No fake stages, no automatic publishing.
+6. Focused RED/GREEN geometry and item-status tests use actual global rects and mocked nine-item job; only directly affected Godot scripts. Zero real solver, replay, load-check, new PNG batch, cloud, R2, STAGING, PRODUCTION. Protect 9/9 READY, 4/4/1 column proof, original 002 Pool and all owner source files.
+7. Safe ff-only GitHub, builder only appends the single existing R05 log and never edits root TASKS. No install/hot patch while Studio is running. On owner normal close install only required changed modules with SHA backup, preserve shortcut/owner outputs. Native owner screenshots after install required before GUI PASS.
+
+FAIL when dock stays 106*scale_y, card displays IMPORTED during actual RUNNING, or untrusted launch window can pass identity gate.
