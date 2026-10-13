@@ -1,0 +1,32 @@
+# R09-R02-R04-R01 Authentic Profile + Release Pool — GPT Independent Strict Audit V01
+
+**Date:** 2026-10-13. **Repository:** `Sekiph82/ScrubBots-Level-Factory`. **Reviewed remote tip:** `b719a5495e2e3fc63c92d3604dcecad5bfcb8e33`. **Result:** **CONDITIONAL NARROW TECHNICAL PASS / OWNER WINDOWS VISUAL PENDING / R04 PARENT NOT CLOSED**.
+
+## Independently examined
+
+- GitHub commit metadata, diffs and changed-file lists for `f624321edb61c80a037ff9b6a22f14878c97da5c`, `6e1065ce0b1bbb2018f2756a29bb08ed6ef796da`, `b37d4f3d41307879a0bdd122aa69e8eb7fba9437`, and builder-log/parity commits ending `b719a549...`.
+- Full current tracked `release_pool.py`, modified `studio_extensions.py` excerpt, new `difficulty_profile_probe.gd`, three new focused Python test modules and existing R04 UI binding.
+- Existing single R05 builder-log R04-R01 portion with concrete source hashes, source lineages, test commands, supplement digest, Release manifest and shortcut proof. **Local owner Release bytes/supplement JSON/pool entries were not accessible to ChatGPT**, so these hashes, runtime test outcomes and exact one-entry pool are builder-reported, not independently byte-read.
+- Pinned Scrubbots game at source commit `aef60a616d4ac401e9dfac15df6fe56e671c0053`: independently inspected `scripts/difficulty/level_difficulty_analyzer_v1.gd` which returns `"profile": profile(vec)` in `score()`, and static `profile(v)` at lines ~623-636. This is real official source, not an invented difficulty label.
+
+## Findings by acceptance gate
+
+| Gate | Independent verdict | Basis |
+| --- | --- | --- |
+| Provenance and exact source game authority | **SOURCE TECHNICAL PASS; local SHA claims builder-only** | Supplement binds original source ID, record SHA, candidate source lineage, old pipeline bytes hash, exact official seven-axis vector, solver/supply identity, pinned game tree/commit and analyzer SHA. Original 002 PNG SHA claimed unchanged: `49667ba3...`. |
+| Historical authentic Difficulty V1 profile | **SOURCE TECHNICAL PASS** | New `_pinned_profile_from_godot()` launches attested Godot GDScript `profile(vector)` twice; saver checks repeatability and records separate `AUTHENTIC_V1_PROFILE_DERIVED_LATER` supplement without editing original run. For stored vector, `COLOR` is consistent with independent original source formula and builder-reported scores; unverified original run bytes remain a local readback gate. |
+| Release Pool one-entry actual readback | **BUILDER-REPORTED PASS, remote-source contract inspected; local runtime not independently verified** | `enter_release_pool`, `release_entries`, and `_enter_candidate_release_pool` now enforce existing acceptance, official profile and score/class, existing artifacts, current review, latest READY candidate/run and exact entry digests. Builder reports single entry for `pipeline-b2b1503e7821a9c9e82f8841` with `dominant_profile=COLOR`, `eligibility_source=OWNER_ACCEPT`, idempotent original ACCEPT. No R2/STAGING/PRODUCTION. |
+| Legacy score compatibility | **SOURCE PASS** | `_validate_score_and_class()`: derived historical score must equal `round(official_score, 2)`, direct new run must equal unrounded score, class equals pinned `GameRules.classify`. |
+| Per-run output isolation | **SOURCE PASS WITH LIMITED MOCK COVERAGE** | `_canonical_run_output_dir()` creates per-activity hashed paths; mocked two-run 3/4-column test 1/1 demonstrates separated paths. Existing 002 original files preserved by builder report; output collision avoided for future distinct activity IDs. |
+| Focused tests | **REVIEWED TEST DESIGN; EXECUTION BUILDER-ONLY** | Four positive/negative pool tests, one live pinned-script supplement test, one 3/4 fake-output test, headless Godot native static profile reported pass; no official solver/load-check. Existing `--basetemp` error from prior cycle remains `PREEXISTING_BASETEMP_BYTES_UNVERIFIED`; R01 reported unique new test temp dirs. |
+| Installed Studio and UI | **OWNER WINDOWS VISUAL PENDING** | Builder claims correct Release overlay `sourceRevision=6e1065...`, manifest SHA `60029908...`, 2315 managed files, shortcut + launcher unchanged, Studio open PID 10332; screenshots showing the updated owner UI and exact Release Pool membership are still absent. |
+| Full-game shipping proof and cloud | **OPEN** | CPX-002 current-full-game replay, Family APK, release preflight/STAGING/production/rollout not authorized or audited. |
+
+## Explicit limitations and security/quality follow-up
+
+1. Hash-valid supplements are *self-checks*, not publisher signatures. `_resolve_official_profile()` checks expected fields and digest but **does not rerun the original `profile(v)` algorithm on every subsequent pool read**. A party able to modify the supplement and recompute its digest could evade the simple self-hash check. The current single installed-owner eligibility can proceed to **owner visual review**, but the future **CPX-002 / production promotion gate** must independently recompute/validate the exact pinned official profile at trust boundary or use stronger authenticated proof before treating it as publication authority. This does not negate the builder's reported two real Godot profile computations at *supplement creation*.
+2. Positive pool tests use simplified/mocked fixtures, including mocked `GameRules.classify`; they do not constitute an independently executed real production shipping replay. This is explicitly outside current R01 scope.
+3. The next owner interaction should NOT spend another 70–90 sec solver run. Use the *already open* installed Studio, select 002 and inspect Details, Supply Plan, Replay Preview, then Release Pool (expect one 002 entry); select 003 and verify `SOURCE_ONLY` without inherited READY. Owner screenshots or precise outcomes close the Windows visual gate. 003 native solver remains **NOT RUN** and has no READY claim.
+4. Historical 3-column run with stale supply hash remains excluded; no manufactured replay or overwritten original evidence. Previous untrusted `.m17` temp directory byte parity remains `UNVERIFIED` and protected.
+
+**Decision:** No new Codex corrective work dispatched pending owner visual evidence. R04-R01 implementation earns a **CONDITIONAL NARROW TECHNICAL PASS**; **R04/R05 parent remain OPEN** pending Windows evidence and later separately scoped full regression/publication controls. Treat exact pool entry status as *builder reported until owner GUI is observed*, and never equate eligibility with published game content.
