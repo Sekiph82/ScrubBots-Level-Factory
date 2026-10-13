@@ -101,14 +101,18 @@ func _run_suite() -> void:
 	_check(_dock_rect_snapshot(ui) == original_dock_rects, "existing R04-R04 thumbnail dock geometry drifted after resize-back")
 	_check((ui.get_node("RuntimeBottomHeading") as Label).text.contains("9 PNG"), "gallery count does not show all nine loaded PNGs")
 
-	var second_page_wheel := InputEventMouseButton.new()
-	second_page_wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
-	second_page_wheel.pressed = true
-	second_page_wheel.global_position = (ui.get_node("RuntimeBottomStrip") as Control).get_global_rect().get_center()
-	ui.call("_unhandled_input", second_page_wheel)
-	_check(int(ui.get("_imported_page")) == 1, "nine-source gallery did not expose its second page")
-	(ui.get_node("LevelVariation1") as Button).emit_signal("pressed")
-	_check(str(ui.get("_selected_import_source_id")) == all_ids[8], "second-page thumbnail did not select the ninth source")
+	var dock_center := (ui.get_node("RuntimeBottomStrip") as Control).get_global_rect().get_center()
+	for _step in range(4):
+		var wheel := InputEventMouseButton.new()
+		wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+		wheel.pressed = true
+		wheel.global_position = dock_center
+		ui.call("_unhandled_input", wheel)
+	_check(int(ui.get("_imported_window_start")) == 4, "nine-source gallery did not slide to the clamped five-source window")
+	_check((ui.get_node("RuntimeBottomHeading") as Label).text.contains("9 PNG") and not (ui.get_node("RuntimeBottomHeading") as Label).text.contains("1/2"), "gallery still exposes page-based navigation")
+	_check((ui.get_node("LevelVariation5") as Button).text.contains("010"), "ninth source is not visible in the fifth thumbnail slot")
+	(ui.get_node("LevelVariation5") as Button).emit_signal("pressed")
+	_check(str(ui.get("_selected_import_source_id")) == all_ids[8], "sliding-window thumbnail did not select the ninth source")
 	_check(str(ui.get("_batch_job_id")) == "png-batch-historical-four", "thumbnail selection replaced the active historical job identity")
 	_check(str(ui.get("_batch_snapshot").get("import_batch_id", "")) == "batch-import-historical-four", "thumbnail selection rewrote the active job snapshot")
 	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) in ["loaded-png-batch-create", "png-batch-create", "pipeline", "png-batch-run"]), "thumbnail selection created a batch or dispatched pipeline work")
@@ -136,7 +140,8 @@ func _run_suite() -> void:
 	ui.set("_activity_rows", activity_rows)
 	ui.call("_render_batch_item_results", gateway.planned_job)
 	await process_frame
-	_check(activity_rows.get_node_or_null("BatchCountsSummary") != null, "batch evidence summary was not rendered")
+	var phase := ui.get("_activity_phase_label") as Label
+	_check(phase != null and phase.tooltip_text.contains("Planned 3/4/5 4/4/1"), "batch quota summary was not retained with the activity status")
 	for index in range(9):
 		var row := activity_rows.get_node_or_null("BatchResult_%03d" % index) as Label
 		_check(row != null, "result row %d is missing" % index)
@@ -173,6 +178,6 @@ func _check(condition: bool, message: String) -> void:
 
 func _dock_rect_snapshot(ui: Control) -> Dictionary:
 	var result := {}
-	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]:
+	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]:
 		result[node_name] = (ui.get_node(node_name) as Control).get_global_rect()
 	return result

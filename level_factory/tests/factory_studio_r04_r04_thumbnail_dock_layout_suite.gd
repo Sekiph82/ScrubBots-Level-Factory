@@ -85,7 +85,7 @@ func _run_suite() -> void:
 		_check(preview_rect.end.y <= strip_rect.position.y + 0.5, "preview canvas reaches or overlaps the bottom dock at %s: preview=%s dock=%s" % [client, preview_rect, strip_rect])
 		_check(preview_rect.position.y >= center_rect.position.y - 0.5 and preview_rect.end.y <= center_rect.end.y + 0.5, "preview host escaped central canvas at %s" % client)
 		var cards: Array[Rect2] = []
-		for index in range(8):
+		for index in range(5):
 			var button := ui.get_node("LevelVariation%d" % (index + 1)) as Button
 			var button_rect := button.get_global_rect()
 			_check(button.visible, "Level Factory slot %d is not visible at %s" % [index + 1, client])
@@ -101,7 +101,7 @@ func _run_suite() -> void:
 			_check(_dock_rect_snapshot(ui) == initial_rects, "resize-back changed dock control geometry")
 
 	var heading_label := ui.get_node("RuntimeBottomHeading") as Label
-	_check(heading_label.text.contains("9 PNG") and heading_label.text.ends_with("1/2"), "Level Factory dock heading does not show the nine-source first page: %s" % heading_label.text)
+	_check(heading_label.text.contains("9 PNG") and not heading_label.text.contains("1/2"), "Level Factory dock heading still exposes page-based gallery navigation: %s" % heading_label.text)
 	var first := ui.get_node("LevelVariation1") as Button
 	var second := ui.get_node("LevelVariation2") as Button
 	first.emit_signal("pressed")
@@ -109,15 +109,16 @@ func _run_suite() -> void:
 	second.emit_signal("pressed")
 	_check(str(ui.get("_selected_import_source_id")) == SOURCE_003, "second thumbnail did not select the distinct 003 source")
 	var strip_for_wheel := (ui.get_node("RuntimeBottomStrip") as Control).get_global_rect()
-	var wheel := InputEventMouseButton.new()
-	wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
-	wheel.pressed = true
-	wheel.global_position = strip_for_wheel.get_center()
-	ui.call("_unhandled_input", wheel)
-	_check(int(ui.get("_imported_page")) == 1, "wheel over the bottom dock did not advance to page 2")
-	_check(heading_label.text.ends_with("2/2"), "dock heading did not show page 2/2 after wheel paging: %s" % heading_label.text)
-	_check((ui.get_node("LevelVariation1") as Button).text.contains("source-09"), "page 2 did not show the ninth PNG in the first slot")
-	(ui.get_node("LevelVariation1") as Button).emit_signal("pressed")
+	for _step in range(4):
+		var wheel := InputEventMouseButton.new()
+		wheel.button_index = MOUSE_BUTTON_WHEEL_DOWN
+		wheel.pressed = true
+		wheel.global_position = strip_for_wheel.get_center()
+		ui.call("_unhandled_input", wheel)
+	_check(int(ui.get("_imported_window_start")) == 4, "wheel over the bottom dock did not slide the five-source window")
+	_check(heading_label.text.contains("9 PNG") and not heading_label.text.contains("2/2"), "sliding window heading exposes old page numbering: %s" % heading_label.text)
+	_check((ui.get_node("LevelVariation5") as Button).text.contains("source-09"), "last source is not visible in slot five of the clamped five-wide window")
+	(ui.get_node("LevelVariation5") as Button).emit_signal("pressed")
 	_check(str(ui.get("_selected_import_source_id")) == "owner-upload-r04dock-09", "page 2 first thumbnail did not select source 9")
 	for call in gateway.calls:
 		var operation := str(call.get("operation", ""))
@@ -149,7 +150,7 @@ func _contains_with_padding(outer: Rect2, inner: Rect2, padding: float) -> bool:
 
 func _dock_rect_snapshot(ui: Control) -> Dictionary:
 	var result := {}
-	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]:
+	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]:
 		result[node_name] = (ui.get_node(node_name) as Control).get_global_rect()
 	return result
 

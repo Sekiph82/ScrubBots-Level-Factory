@@ -87,7 +87,7 @@ var _imported_sources: Array[Dictionary] = []
 var _gameplay_sources: Array[Dictionary] = []
 var _source_batch_by_id: Dictionary = {}
 var _rejected_imports: Array[Dictionary] = []
-var _imported_page := 0
+var _imported_window_start := 0
 var _selected_import_source_id := ""
 var _seed := ""
 var _background_intent := "TRANSPARENT"
@@ -128,6 +128,19 @@ var _activity_finished_msec := 0
 var _activity_seen_sequence := 0
 var _activity_read_offset := 0
 var _activity_pending_bytes := PackedByteArray()
+var _batch_follow_item: Dictionary = {}
+var _batch_follow_pipeline: Dictionary = {}
+var _batch_follow_token := ""
+var _batch_observed_item_states: Dictionary = {}
+var _release_candidate_scroll: ScrollContainer
+var _release_candidate_rows: VBoxContainer
+var _release_candidate_signature := ""
+var _release_candidate_row_height := 36.0
+var _release_activity_title: Label
+var _release_activity_scroll: ScrollContainer
+var _release_activity_rows: VBoxContainer
+var _release_activity_events: Array[Dictionary] = []
+var _release_help_dialog: AcceptDialog
 var _activity_previous_sha256 := "0000000000000000000000000000000000000000000000000000000000000000"
 var _activity_stage := "IDLE"
 var _activity_message := "Select an imported PNG, then run the pipeline."
@@ -313,6 +326,7 @@ func _apply_responsive_layout() -> void:
 			_batch_stop_button.position = Vector2(_batch_pause_button.position.x + action_width + button_gap, 80.0 * scale_y)
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
 	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
+	_layout_release_pool_dashboard(left_scale, right_start, float(geometry.get("right_width", 313.0)), scale_y)
 
 
 func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -> void:
@@ -320,7 +334,7 @@ func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -
 	var heading := get_node_or_null("RuntimeBottomHeading") as Label
 	if dock == null or heading == null:
 		return
-	var slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]
+	var slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	var horizontal_padding := 8.0
 	var vertical_padding := 8.0
 	var card_gap := clampf(6.0 * center_scale, 3.0, 6.0)
@@ -354,6 +368,91 @@ func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -
 			compact_style.content_margin_top = 2.0
 			compact_style.content_margin_bottom = 2.0
 			button.add_theme_stylebox_override(state, compact_style)
+
+
+func _layout_release_pool_dashboard(left_scale: float, right_start: float, right_width: float, scale_y: float) -> void:
+	var left_panel := get_node_or_null("RuntimeLeftPanel") as Control
+	var dock := get_node_or_null("RuntimeBottomStrip") as Control
+	if left_panel != null and _release_candidate_scroll != null:
+		var bottom := left_panel.position.y + left_panel.size.y
+		var outer_padding := 8.0 * left_scale
+		var button_gap := 6.0 * scale_y
+		var select_height := 36.0 * scale_y
+		var manage_height := 36.0 * scale_y
+		var controls_bottom := bottom - 8.0 * scale_y
+		var clear_y := controls_bottom - select_height
+		var manage_y := clear_y - button_gap - manage_height
+		var controls_x := left_panel.position.x + outer_padding
+		var controls_width := maxf(160.0, left_panel.size.x - outer_padding * 2.0)
+		var manage := get_node_or_null("ManageSelection") as Control
+		var select_all := get_node_or_null("SelectAllRelease") as Control
+		var clear := get_node_or_null("ClearRelease") as Control
+		if manage != null:
+			manage.position = Vector2(controls_x, manage_y)
+			manage.size = Vector2(controls_width, manage_height)
+		if select_all != null:
+			select_all.position = Vector2(controls_x, clear_y)
+			select_all.size = Vector2((controls_width - button_gap) * 0.5, select_height)
+		if clear != null:
+			clear.position = Vector2(controls_x + (controls_width + button_gap) * 0.5, clear_y)
+			clear.size = Vector2((controls_width - button_gap) * 0.5, select_height)
+		var list_top := 292.0 * scale_y
+		_release_candidate_scroll.position = Vector2(controls_x, list_top)
+		_release_candidate_scroll.size = Vector2(controls_width, maxf(80.0, manage_y - list_top - button_gap))
+		_release_candidate_row_height = clampf((_release_candidate_scroll.size.y - 42.0) / 15.0, 29.0 * scale_y, 42.0 * scale_y)
+		_release_candidate_signature = ""
+		_refresh_release_candidate_rows()
+	if dock == null:
+		return
+	var heading := get_node_or_null("RuntimeBottomHeading") as Label
+	if heading != null:
+		heading.text = "SELECTED FOR RELEASE" if _screen == "RELEASE POOL" else "VARIATIONS  /  RECENT ITEMS · %d PNG" % _gameplay_sources.size()
+	var names := ["SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "AddMoreLevels"]
+	var removals := ["RemoveSelected1", "RemoveSelected2", "RemoveSelected3"]
+	var pad := 8.0 * maxf(0.75, float(dock.size.x) / 804.0)
+	var gap := 8.0 * maxf(0.75, float(dock.size.x) / 804.0)
+	var heading_gap := 28.0 * scale_y
+	var row_height := maxf(34.0, dock.size.y - heading_gap - 8.0 * scale_y)
+	var row_width := maxf(50.0, (dock.size.x - pad * 2.0 - gap * 3.0) / 4.0)
+	var row_y := dock.position.y + heading_gap
+	if heading != null:
+		heading.position = dock.position + Vector2(8.0, 12.0 * scale_y)
+		heading.size = Vector2(dock.size.x - 16.0, 20.0 * scale_y)
+	for index in range(names.size()):
+		var control := get_node_or_null(names[index]) as Control
+		if control == null:
+			continue
+		var x := dock.position.x + pad + float(index) * (row_width + gap)
+		control.position = Vector2(x, row_y)
+		control.size = Vector2(row_width, row_height)
+		if index < removals.size():
+			var remove := get_node_or_null(removals[index]) as Control
+			if remove != null:
+				remove.position = Vector2(x + row_width - 28.0 * scale_y, row_y + 2.0 * scale_y)
+				remove.size = Vector2(24.0 * scale_y, 24.0 * scale_y)
+	var release_help_names := ["ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
+	var action_names := ["ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest"]
+	for index in range(action_names.size()):
+		var action := get_node_or_null(action_names[index]) as Control
+		var info := get_node_or_null(release_help_names[index]) as Control
+		if action == null or info == null:
+			continue
+		var info_width := minf(32.0 * scale_y, action.size.x * 0.16)
+		info.position = Vector2(action.position.x + action.size.x - info_width, action.position.y)
+		info.size = Vector2(info_width, action.size.y)
+		action.size.x = maxf(80.0, action.size.x - info_width - 4.0 * scale_y)
+	if _release_activity_title != null and _release_activity_scroll != null:
+		var panel_bottom := size.y - 18.0 * scale_y
+		var min_top := (get_node_or_null("PreviewReleaseManifest") as Control).position.y + (get_node_or_null("PreviewReleaseManifest") as Control).size.y + 8.0 * scale_y
+		var activity_top := maxf(min_top, panel_bottom - 220.0 * scale_y)
+		_release_activity_title.position = Vector2(right_start + 2.0, activity_top)
+		_release_activity_title.size = Vector2(maxf(200.0, right_width - 4.0), 18.0 * scale_y)
+		_release_activity_scroll.position = Vector2(right_start + 2.0, activity_top + 20.0 * scale_y)
+		_release_activity_scroll.size = Vector2(maxf(200.0, right_width - 4.0), maxf(60.0, panel_bottom - _release_activity_scroll.position.y - 2.0 * scale_y))
+		_release_activity_title.visible = _screen == "RELEASE POOL"
+		_release_activity_scroll.visible = _screen == "RELEASE POOL"
+		_release_candidate_scroll.visible = _screen == "RELEASE POOL"
+	_refresh_release_pool_activity()
 
 
 func responsive_layout_snapshot() -> Dictionary:
@@ -450,6 +549,9 @@ func _control_caption(control_name: String) -> String:
 		"ReleaseProduction": "PRODUCTION", "PreflightRelease": "Preflight", "ValidateReleaseAssets": "Validate Assets",
 		"BuildReleasePack": "Build Scrubpack", "UploadR2Status": "Upload Status",
 		"UploadSelected": "Upload Selected", "PreviewReleaseManifest": "Preview Manifest",
+		"ReleaseStagingHelp": "ⓘ", "ReleaseProductionHelp": "ⓘ", "PreflightReleaseHelp": "ⓘ",
+		"ValidateReleaseAssetsHelp": "ⓘ", "BuildReleasePackHelp": "ⓘ", "UploadR2StatusHelp": "ⓘ",
+		"UploadSelectedHelp": "ⓘ", "PreviewReleaseManifestHelp": "ⓘ",
 		"AddMoreLevels": "Add More Levels"
 	}
 	return str(captions.get(control_name, control_name.replace("_", " ")))
@@ -588,8 +690,121 @@ func _build_live_chrome() -> void:
 	_activity_rows.add_theme_constant_override("separation", 4)
 	_activity_scroll.add_child(_activity_rows)
 	_activity_panel.visible = false
+	_build_release_pool_dashboard()
 	_refresh_activity_header()
 	_refresh_live_data()
+
+
+func _build_release_pool_dashboard() -> void:
+	_release_candidate_scroll = ScrollContainer.new()
+	_release_candidate_scroll.name = "ReleaseCandidateScroll"
+	_release_candidate_scroll.position = Vector2(25, 292)
+	_release_candidate_scroll.size = Vector2(335, 480)
+	_release_candidate_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_release_candidate_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_release_candidate_scroll.visible = false
+	add_child(_release_candidate_scroll)
+	_release_candidate_rows = VBoxContainer.new()
+	_release_candidate_rows.name = "ReleaseCandidateRows"
+	_release_candidate_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_release_candidate_rows.add_theme_constant_override("separation", 3)
+	_release_candidate_scroll.add_child(_release_candidate_rows)
+	_release_activity_title = Label.new()
+	_release_activity_title.name = "ReleasePoolActivityTitle"
+	_release_activity_title.position = Vector2(1207, 774)
+	_release_activity_title.size = Vector2(291, 20)
+	_release_activity_title.text = "RELEASE POOL ACTIVITY"
+	_release_activity_title.add_theme_font_size_override("font_size", 11)
+	_release_activity_title.add_theme_color_override("font_color", Color("#91a7c5"))
+	_release_activity_title.visible = false
+	add_child(_release_activity_title)
+	_release_activity_scroll = ScrollContainer.new()
+	_release_activity_scroll.name = "ReleasePoolActivityScroll"
+	_release_activity_scroll.position = Vector2(1207, 796)
+	_release_activity_scroll.size = Vector2(291, 128)
+	_release_activity_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_release_activity_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_release_activity_scroll.visible = false
+	add_child(_release_activity_scroll)
+	_release_activity_rows = VBoxContainer.new()
+	_release_activity_rows.name = "ReleasePoolActivityRows"
+	_release_activity_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_release_activity_rows.add_theme_constant_override("separation", 4)
+	_release_activity_scroll.add_child(_release_activity_rows)
+	_release_help_dialog = AcceptDialog.new()
+	_release_help_dialog.name = "ReleasePoolActionHelp"
+	_release_help_dialog.title = "Release Pool Help"
+	_release_help_dialog.dialog_text = ""
+	_release_help_dialog.ok_button_text = "Close"
+	add_child(_release_help_dialog)
+
+
+func _append_release_pool_activity(action: String, state: String, detail: String, candidate_ids: Array = []) -> void:
+	var timestamp := Time.get_datetime_string_from_system(true, true)
+	var selected := candidate_ids.duplicate(true) if not candidate_ids.is_empty() else _selected_release_ids.duplicate()
+	var full_text := "%s | %s | %s | target=%s | candidates=%s | %s" % [
+		timestamp, action, state, _release_target, ", ".join(selected), detail
+	]
+	_release_activity_events.append({
+		"timestamp_utc": timestamp,
+		"action": action,
+		"state": state,
+		"target": _release_target,
+		"candidate_ids": selected,
+		"detail": detail,
+		"full_text": full_text,
+	})
+	if _release_activity_events.size() > 200:
+		_release_activity_events.pop_front()
+	_refresh_release_pool_activity()
+
+
+func _release_activity_result_detail(result: Dictionary) -> String:
+	var safe := {}
+	for key in ["state", "disposition", "target", "manifest_sha256", "candidate_manifest_sha256", "content_version", "receipt_id", "candidate_count", "error", "reason"]:
+		if result.has(key):
+			var value := str(result.get(key, ""))
+			if key in ["error", "reason"]:
+				var redact := RegEx.new()
+				redact.compile("(?i)(token|secret|password|authorization)(\\s*[:=]\\s*)[^\\s,;]+")
+				value = redact.sub(value, "$1$2[redacted]", true)
+			safe[key] = value
+	return JSON.stringify(safe)
+
+
+func _refresh_release_pool_activity() -> void:
+	if _release_activity_rows == null:
+		return
+	var scroll := _release_activity_scroll.get_v_scroll_bar() if _release_activity_scroll != null else null
+	var follow_tail := scroll == null or _release_activity_scroll.scroll_vertical >= scroll.max_value - 2
+	for child in _release_activity_rows.get_children():
+		child.queue_free()
+	if _release_activity_events.is_empty():
+		var empty := Label.new()
+		empty.text = "No Release Pool actions in this session."
+		empty.custom_minimum_size.y = 32
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		empty.add_theme_font_size_override("font_size", 10)
+		_release_activity_rows.add_child(empty)
+	else:
+		for event in _release_activity_events:
+			var row := RichTextLabel.new()
+			row.bbcode_enabled = false
+			row.selection_enabled = true
+			row.fit_content = true
+			row.scroll_active = false
+			row.custom_minimum_size = Vector2(265, 40)
+			row.text = str(event.get("full_text", ""))
+			row.tooltip_text = row.text
+			row.add_theme_font_size_override("normal_font_size", 10)
+			_release_activity_rows.add_child(row)
+	if follow_tail and _release_activity_scroll != null:
+		call_deferred("_scroll_release_pool_activity_to_tail")
+
+
+func _scroll_release_pool_activity_to_tail() -> void:
+	if _release_activity_scroll != null:
+		_release_activity_scroll.scroll_vertical = int(_release_activity_scroll.get_v_scroll_bar().max_value)
 
 
 func _build_inline_results() -> void:
@@ -705,6 +920,9 @@ func _update_live_chrome() -> void:
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
 	if _activity_panel != null: _activity_panel.visible = _screen == "LEVEL FACTORY"
+	if _release_candidate_scroll != null: _release_candidate_scroll.visible = _screen == "RELEASE POOL"
+	if _release_activity_title != null: _release_activity_title.visible = _screen == "RELEASE POOL"
+	if _release_activity_scroll != null: _release_activity_scroll.visible = _screen == "RELEASE POOL"
 	if _preview_host != null:
 		_preview_host.position = Vector2(401, 160)
 		_preview_host.size = Vector2(780, 640)
@@ -729,6 +947,9 @@ func _refresh_live_data() -> void:
 		var monitor_failed := str(_last_pipeline.get("studio_monitor_validation", "")) == "FAILED_CLOSED"
 		var selected_run := str(_last_pipeline.get("source_id", "")) == _selected_import_source_id
 		var active_run := _operation_running and _activity_source_id == _selected_import_source_id
+		var batch_following := not _batch_follow_item.is_empty() and str(_batch_follow_item.get("source_id", "")) == _selected_import_source_id and not _batch_follow_token.is_empty()
+		var batch_item_state := str(_batch_follow_item.get("status", "")) if batch_following else ""
+		var batch_active := batch_following and _operation_running and str(_batch_snapshot.get("state", "")) == "RUNNING"
 		var pipeline_state := "RUNNING" if active_run else "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "SOURCE_ONLY · Awaiting run"))) if selected_run else "SOURCE_ONLY · Awaiting run"
 		var pipeline_reason := "Pipeline: Running for selected source" if active_run else str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
 		var solver_text := "RUNNING" if active_run else "ERROR" if monitor_failed else str(primary.get("state", pipeline_state)) if selected_run and not primary.is_empty() else pipeline_state
@@ -740,6 +961,17 @@ func _refresh_live_data() -> void:
 		if not _batch_snapshot.is_empty():
 			var counts: Dictionary = _batch_snapshot.get("counts", {})
 			batch_caption = "%d loaded / %d job · %d READY · %d failed" % [_gameplay_sources.size(), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+		if batch_following:
+			var item_release: Dictionary = _batch_follow_item.get("release_pool", {})
+			var follow_primary: Dictionary = _batch_follow_pipeline.get("primary", {})
+			pipeline_state = "RUNNING" if batch_active else batch_item_state if not batch_item_state.is_empty() else str(_batch_snapshot.get("state", "UNKNOWN"))
+			pipeline_reason = str(_batch_follow_item.get("reason", ""))
+			solver_text = str(follow_primary.get("state", "RUNNING" if batch_active else "—"))
+			replay_text = str(follow_primary.get("acceptance", {}).get("replay", "—"))
+			difficulty_text = str(follow_primary.get("difficulty", {}).get("class", "—"))
+			columns = int(_batch_follow_item.get("column_count", 0))
+			pool_status = str(item_release.get("disposition", "NOT ENTERED" if batch_item_state == "READY" else "—"))
+			batch_caption = "%d/%d · %s · %s" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING", str(_batch_follow_item.get("run_id", "no run ID"))]
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
@@ -881,6 +1113,7 @@ func _restore_imported_sources() -> void:
 			continue
 		source_by_id[catalog_source_id] = {
 			"path": png_path, "source_id": catalog_source_id, "source_sha256": expected_sha,
+			"source_record_sha256": _source_record_sha256_for_id(catalog_source_id),
 			"disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png")),
 			"width": image.get_width(), "height": image.get_height()
 		}
@@ -984,6 +1217,7 @@ func _restore_loaded_png_batch_readonly() -> void:
 		_activity_terminal_state = _activity_stage
 		_activity_message = "Restored %s · %d/%d READY · %d FAILED · no solver was run." % [str(job.get("state", "")), int(counts.get("ready", 0)), int(counts.get("total", 0)), int(counts.get("failed", 0))]
 	_render_batch_item_results(_batch_snapshot)
+	_sync_verified_batch_follow(_batch_snapshot)
 	_refresh_activity_header()
 	_refresh_run_button_caption()
 
@@ -993,7 +1227,7 @@ func _refresh_runtime_cards() -> void:
 	var inbox := _extension("candidate-inbox", {})
 	var candidates: Array = inbox.get("candidates", [])
 	var pixel_slots := ["ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3"]
-	var level_slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]
+	var level_slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	for index in range(pixel_slots.size()):
 		if index < candidates.size():
 			var candidate: Dictionary = candidates[index]
@@ -1002,13 +1236,14 @@ func _refresh_runtime_cards() -> void:
 			_set_runtime_button(pixel_slots[index], caption.left(18), image_path)
 		else:
 			_set_runtime_button(pixel_slots[index], "No artwork", "")
-	var page_count := maxi(1, ceili(float(_gameplay_sources.size()) / float(level_slots.size())))
-	_imported_page = clampi(_imported_page, 0, page_count - 1)
+	var max_start := maxi(0, _gameplay_sources.size() - level_slots.size())
+	_imported_window_start = clampi(_imported_window_start, 0, max_start)
 	var bottom_heading := get_node_or_null("RuntimeBottomHeading") as Label
 	if bottom_heading != null:
-		bottom_heading.text = "VARIATIONS  /  RECENT ITEMS · %d PNG · %d/%d" % [_gameplay_sources.size(), _imported_page + 1, page_count] if _screen == "LEVEL FACTORY" else "VARIATIONS  /  RECENT ITEMS"
+		bottom_heading.text = "VARIATIONS  /  RECENT ITEMS · %d PNG" % _gameplay_sources.size() if _screen == "LEVEL FACTORY" else "SELECTED FOR RELEASE" if _screen == "RELEASE POOL" else "VARIATIONS  /  RECENT ITEMS"
 	for index in range(level_slots.size()):
-		var source_index := _imported_page * level_slots.size() + index
+		var source_index := _imported_window_start + index
+		var button := get_node_or_null(level_slots[index]) as Button
 		if source_index < _gameplay_sources.size():
 			var imported: Dictionary = _gameplay_sources[source_index]
 			var source_id := str(imported.get("source_id", ""))
@@ -1017,33 +1252,27 @@ func _refresh_runtime_cards() -> void:
 			var status_caption := "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
 			var caption := ("● " if source_id == _selected_import_source_id else "") + filename.get_basename().left(9) + "\n" + status_caption
 			_set_runtime_button(level_slots[index], caption, str(imported.get("path", "")))
-			var button := get_node_or_null(level_slots[index]) as Button
 			if button != null:
 				button.tooltip_text = "%s\n%s\n%s" % [filename, disposition, _wrap_identity(source_id, 24)]
+				button.disabled = _operation_running and not _batch_job_id.is_empty()
 		else:
-			_set_runtime_button(level_slots[index], "—", "")
+			if button != null:
+				button.disabled = true
+			_set_runtime_button(level_slots[index], "No PNG", "")
 	if _gameplay_sources.is_empty():
 		for index in range(level_slots.size()):
+			var button := get_node_or_null(level_slots[index]) as Button
 			if index < candidates.size():
 				var candidate: Dictionary = candidates[index]
 				_set_runtime_button(level_slots[index], str(candidate.get("candidate_id", "Level %d" % (index + 1))).left(12), str(candidate.get("artwork_path", "")))
+				if button != null:
+					button.disabled = false
 			else:
-				_set_runtime_button(level_slots[index], "—", "")
-	var release_slots := ["SelectReleaseLevel", "ReleaseRow2", "ReleaseRow3", "ReleaseRow4", "ReleaseRow5", "ReleaseRow6", "ReleaseRow7", "ReleaseRow8"]
+				if button != null:
+					button.disabled = true
+				_set_runtime_button(level_slots[index], "No artwork", "")
+	_refresh_release_candidate_rows()
 	var entries: Array = _release_pool.get("entries", [])
-	for index in range(release_slots.size()):
-		if index < _visible_release_ids.size():
-			var candidate_id := _visible_release_ids[index]
-			var entry: Dictionary = {}
-			for value in entries:
-				if str(value.get("candidate_id", "")) == candidate_id:
-					entry = value
-					break
-			var title := str(entry.get("level_id", entry.get("name", candidate_id)))
-			var artwork := str(entry.get("files", {}).get("artwork", {}).get("path", entry.get("artwork_path", "")))
-			_set_runtime_button(release_slots[index], title.left(25), artwork)
-		else:
-			_set_runtime_button(release_slots[index], "No READY level", "")
 	for index in range(3):
 		var card := "SelectedReleaseCard%d" % (index + 1)
 		if index < _selected_release_ids.size():
@@ -1058,6 +1287,15 @@ func _refresh_runtime_cards() -> void:
 			_set_runtime_button(card, title.left(20), artwork)
 		else:
 			_set_runtime_button(card, "Empty selection", "")
+			var card_button := get_node_or_null(card) as Button
+			if card_button != null:
+				card_button.disabled = index >= _selected_release_ids.size()
+		var remove_button := get_node_or_null("RemoveSelected%d" % (index + 1)) as Button
+		if remove_button != null:
+			remove_button.disabled = index >= _selected_release_ids.size()
+	var add_more := get_node_or_null("AddMoreLevels") as Button
+	if add_more != null:
+		add_more.disabled = false
 
 
 func _build_master_controls() -> void:
@@ -1114,27 +1352,16 @@ func _build_master_controls() -> void:
 	_place_control("LevelVariation3", Rect2(597, 864, 88, 58), _select_variation.bind(2))
 	_place_control("LevelVariation4", Rect2(693, 864, 88, 58), _select_variation.bind(3))
 	_place_control("LevelVariation5", Rect2(789, 864, 88, 58), _select_variation.bind(4))
-	_place_control("LevelVariation6", Rect2(885, 864, 88, 58), _select_variation.bind(5))
-	_place_control("LevelVariation7", Rect2(981, 864, 88, 58), _select_variation.bind(6))
-	_place_control("LevelVariation8", Rect2(1077, 864, 88, 58), _select_variation.bind(7))
 	_place_control("AcceptLevel", Rect2(1304, 362, 94, 38), _review_candidate.bind("ACCEPT"))
 	_place_control("RejectLevel", Rect2(1401, 362, 97, 38), _review_candidate.bind("REJECT"))
 	# RELEASE POOL uses canonical pool, campaign, and staging operations.
 	_place_control("RefreshReleasePool", Rect2(27, 202, 330, 40), _refresh_release_pool)
-	_place_control("SelectReleaseLevel", Rect2(25, 292, 335, 55), _select_first_release)
 	_place_control("ReleaseSearch", Rect2(25, 154, 335, 44), _edit_release_search)
 	_place_control("DifficultyFilter", Rect2(25, 249, 165, 38), _open_release_filters)
 	_place_control("ColumnsFilter", Rect2(196, 249, 164, 38), _open_release_filters)
-	_place_control("ReleaseRow2", Rect2(25, 353, 335, 55), _select_release_row.bind(1))
-	_place_control("ReleaseRow3", Rect2(25, 414, 335, 55), _select_release_row.bind(2))
-	_place_control("ReleaseRow4", Rect2(25, 475, 335, 55), _select_release_row.bind(3))
-	_place_control("ReleaseRow5", Rect2(25, 536, 335, 55), _select_release_row.bind(4))
-	_place_control("ReleaseRow6", Rect2(25, 597, 335, 55), _select_release_row.bind(5))
-	_place_control("ReleaseRow7", Rect2(25, 658, 335, 55), _select_release_row.bind(6))
-	_place_control("ReleaseRow8", Rect2(25, 719, 335, 55), _select_release_row.bind(7))
-	_place_control("ManageSelection", Rect2(25, 784, 335, 42), _manage_release_selection)
-	_place_control("SelectAllRelease", Rect2(25, 837, 164, 42), _select_all_release)
-	_place_control("ClearRelease", Rect2(198, 837, 162, 42), _clear_release_selection)
+	_place_control("ManageSelection", Rect2(25, 784, 335, 36), _manage_release_selection)
+	_place_control("SelectAllRelease", Rect2(25, 826, 164, 36), _select_all_release)
+	_place_control("ClearRelease", Rect2(196, 826, 164, 36), _clear_release_selection)
 	_place_control("SelectedReleaseCard1", Rect2(405, 888, 190, 35), _select_release_card.bind(0))
 	_place_control("SelectedReleaseCard2", Rect2(611, 888, 190, 35), _select_release_card.bind(1))
 	_place_control("SelectedReleaseCard3", Rect2(817, 888, 190, 35), _select_release_card.bind(2))
@@ -1150,7 +1377,41 @@ func _build_master_controls() -> void:
 	_place_control("UploadR2Status", Rect2(1207, 606, 291, 36), _show_publish_stage.bind("UPLOAD_R2"))
 	_place_control("UploadSelected", Rect2(1207, 648, 291, 54), _upload_selected)
 	_place_control("PreviewReleaseManifest", Rect2(1207, 713, 291, 50), _preview_release_manifest)
+	_place_release_help_control("ReleaseStagingHelp", "ReleaseStaging", Rect2(1466, 398, 32, 36))
+	_place_release_help_control("ReleaseProductionHelp", "ReleaseProduction", Rect2(1466, 438, 32, 36))
+	_place_release_help_control("PreflightReleaseHelp", "PreflightRelease", Rect2(1466, 485, 32, 40))
+	_place_release_help_control("ValidateReleaseAssetsHelp", "ValidateReleaseAssets", Rect2(1466, 530, 32, 36))
+	_place_release_help_control("BuildReleasePackHelp", "BuildReleasePack", Rect2(1466, 568, 32, 36))
+	_place_release_help_control("UploadR2StatusHelp", "UploadR2Status", Rect2(1466, 606, 32, 36))
+	_place_release_help_control("UploadSelectedHelp", "UploadSelected", Rect2(1466, 648, 32, 54))
+	_place_release_help_control("PreviewReleaseManifestHelp", "PreviewReleaseManifest", Rect2(1466, 713, 32, 50))
 	_update_master_control_visibility()
+
+
+func _place_release_help_control(node_name: String, action_name: String, rect: Rect2) -> void:
+	var info := _place_control(node_name, rect, _show_release_action_help.bind(action_name))
+	info.text = "ⓘ"
+	info.tooltip_text = "Help: %s" % _control_caption(action_name)
+	info.add_theme_font_size_override("font_size", 14)
+
+
+func _show_release_action_help(action_name: String) -> void:
+	var descriptions := {
+		"ReleaseStaging": "Selects STAGING as the next release target. This does not upload or publish anything.",
+		"ReleaseProduction": "Selects PRODUCTION as the target. A real promotion still requires a verified STAGING manifest and explicit owner confirmation.",
+		"PreflightRelease": "Runs the canonical release preflight for the currently selected READY candidate IDs and target. A passing result is shown only when returned by the backend.",
+		"ValidateReleaseAssets": "Status only: displays the most recent preflight validation state. It does not start asset validation.",
+		"BuildReleasePack": "Status only: displays the most recent preflight pack-build state. It does not build or upload a pack.",
+		"UploadR2Status": "Status only: displays the most recent preflight upload state. It does not upload to R2.",
+		"UploadSelected": "Submits the selected READY candidate IDs to the selected target. STAGING uploads through the canonical publisher; PRODUCTION requires the exact owner-confirmation flow.",
+		"PreviewReleaseManifest": "Shows the most recent verified preflight manifest. It does not run preflight or publish; run Preflight separately first."
+	}
+	var description := str(descriptions.get(action_name, "Shows current Release Pool action information."))
+	_append_release_pool_activity("HELP · %s" % _control_caption(action_name), "READ ONLY", description)
+	if _release_help_dialog != null:
+		_release_help_dialog.title = "%s · Help" % _control_caption(action_name)
+		_release_help_dialog.dialog_text = description
+		_release_help_dialog.popup_centered(Vector2i(560, 180))
 
 
 func _place_control(node_name: String, rect: Rect2, action: Callable) -> Button:
@@ -1255,7 +1516,11 @@ func _show_screen(name: String) -> void:
 		_present_active_preview()
 	_refresh_live_data()
 	if name == "LEVEL FACTORY":
+		if not _batch_snapshot.is_empty():
+			_sync_verified_batch_follow(_batch_snapshot)
 		_refresh_activity_header()
+	if name == "RELEASE POOL":
+		_refresh_release_pool_activity()
 
 
 func _update_master_control_visibility() -> void:
@@ -1263,8 +1528,8 @@ func _update_master_control_visibility() -> void:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "NativeMinimize", "NativeMaximize", "NativeClose", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
 	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "RandomSeed", "GenerationStyle", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
-	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5", "LevelVariation6", "LevelVariation7", "LevelVariation8"]
-	var release := ["RefreshReleasePool", "SelectReleaseLevel", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ReleaseRow2", "ReleaseRow3", "ReleaseRow4", "ReleaseRow5", "ReleaseRow6", "ReleaseRow7", "ReleaseRow8", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "NativeMinimize", "NativeMaximize", "NativeClose"]
+	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
+	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp", "NativeMinimize", "NativeMaximize", "NativeClose"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
 	if _screen == "PIXEL ART":
@@ -1276,6 +1541,12 @@ func _update_master_control_visibility() -> void:
 		if batch_path != null: batch_path.visible = _generation_mode == "BATCH"
 		if run_batch != null: run_batch.visible = _generation_mode == "BATCH"
 		if batch_select != null: batch_select.visible = false
+	if _release_candidate_scroll != null:
+		_release_candidate_scroll.visible = _screen == "RELEASE POOL"
+	if _release_activity_title != null:
+		_release_activity_title.visible = _screen == "RELEASE POOL"
+	if _release_activity_scroll != null:
+		_release_activity_scroll.visible = _screen == "RELEASE POOL"
 	_refresh_run_button_caption()
 
 
@@ -1483,6 +1754,12 @@ func _upsert_imported_source(record: Dictionary) -> void:
 	var source_id := str(record.get("source_id", ""))
 	if source_id.is_empty():
 		return
+	var identity_sha := source_id.trim_prefix("owner-upload-")
+	if source_id.begins_with("owner-upload-") and identity_sha.length() == 64:
+		record["source_sha256"] = identity_sha
+		var canonical_record_sha := _source_record_sha256_for_id(source_id)
+		if not canonical_record_sha.is_empty():
+			record["source_record_sha256"] = canonical_record_sha
 	var image_path := str(record.get("path", ""))
 	if int(record.get("width", 0)) <= 0 and not image_path.is_empty():
 		var image := Image.new()
@@ -1492,7 +1769,7 @@ func _upsert_imported_source(record: Dictionary) -> void:
 	for index in range(_imported_sources.size()):
 		if str(_imported_sources[index].get("source_id", "")) == source_id:
 			var existing: Dictionary = _imported_sources[index]
-			for key in ["path", "source_sha256", "display_filename", "width", "height"]:
+			for key in ["path", "source_sha256", "source_record_sha256", "display_filename", "width", "height"]:
 				if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
 			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
 			_imported_sources[index] = existing
@@ -1500,6 +1777,37 @@ func _upsert_imported_source(record: Dictionary) -> void:
 			return
 	_imported_sources.append(record.duplicate(true))
 	_refresh_gameplay_sources()
+
+
+func _source_record_sha256_for_id(source_id: String) -> String:
+	if not source_id.begins_with("owner-upload-"):
+		return ""
+	var source_sha := source_id.trim_prefix("owner-upload-")
+	if source_sha.length() != 64:
+		return ""
+	var app_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
+	var relative_record := "level_factory/output/owner-uploads/%s/source.json" % source_id
+	var record_paths := [
+		app_root.path_join(relative_record),
+		app_root.path_join("Release/ScrubBots Factory Studio").path_join(relative_record),
+	]
+	for record_path in record_paths:
+		if not FileAccess.file_exists(record_path):
+			continue
+		var record_bytes := FileAccess.get_file_as_bytes(record_path)
+		var parsed: Variant = JSON.parse_string(record_bytes.get_string_from_utf8())
+		if not parsed is Dictionary:
+			continue
+		if (str(parsed.get("source_id", "")) != source_id
+				or str(parsed.get("source_sha256", "")) != source_sha
+				or str(parsed.get("immutable_relative_path", "")) != "owner-uploads/%s/source.png" % source_id):
+			continue
+		var hashing := HashingContext.new()
+		if hashing.start(HashingContext.HASH_SHA256) != OK:
+			return ""
+		hashing.update(record_bytes)
+		return hashing.finish().hex_encode()
+	return ""
 
 
 func _refresh_gameplay_sources() -> void:
@@ -1864,35 +2172,162 @@ func _refresh_batch_progress() -> void:
 	if _batch_job_id.is_empty() or Time.get_ticks_msec() - _batch_last_read_msec < 750:
 		return
 	_batch_last_read_msec = Time.get_ticks_msec()
-	var path := ProjectSettings.globalize_path("res://output/studio-extensions/png-batches/jobs").path_join(_batch_job_id + ".json")
-	if not FileAccess.file_exists(path):
+	var verified := _extension("png-batch-latest", {"batch_id": _batch_import_id})
+	if str(verified.get("disposition", "")) != "MATCHED":
+		if str(verified.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH":
+			_batch_job_source_mismatch = true
+			_activity_message = "Saved batch lineage could not be authenticated. Keeping the last verified source view."
+			_refresh_activity_header()
 		return
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not parsed is Dictionary or str(parsed.get("schema", "")) != "scrubbots-studio-png-sequential-batch" or str(parsed.get("job_id", "")) != _batch_job_id:
+	var parsed: Dictionary = verified.get("job", {})
+	if parsed.is_empty() or str(parsed.get("job_id", "")) != _batch_job_id:
 		return
-	if not _operation_running and str(parsed.get("state", "")) == "RUNNING":
-		parsed["state"] = "INTERRUPTED"
-	if parsed != _batch_snapshot:
-		if str(parsed.get("state", "")) == "COMPLETE" and parsed.has("parent_job_id"):
-			var verified_latest := _extension("png-batch-latest", {"batch_id": str(parsed.get("import_batch_id", ""))})
-			var verified_job: Dictionary = verified_latest.get("job", {})
-			if str(verified_job.get("job_id", "")) == str(parsed.get("job_id", "")):
-				parsed = verified_job
-			else:
-				parsed["lineage_verified"] = false
-		_batch_snapshot = parsed
-		if _operation_running:
-			var current_index: Variant = parsed.get("current_index")
-			var items: Array = parsed.get("items", [])
-			if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
-				var current: Dictionary = items[current_index]
-				_activity_source_filename = str(current.get("original_filename", current.get("display_name", "Selected PNG")))
-				_activity_source_id = str(current.get("source_id", ""))
-				_activity_stage = "CANONICAL PIPELINE"
-				_activity_message = "Processing source %d of %d · %d columns" % [current_index + 1, items.size(), int(current.get("column_count", 0))]
+	var previous_snapshot := _batch_snapshot
+	_batch_snapshot = parsed.duplicate(true)
+	if not _batch_job_matches_loaded_sources():
+		_batch_snapshot = previous_snapshot
+		_batch_job_source_mismatch = true
+		_activity_message = "Saved batch source hashes do not match the loaded gallery. Keeping the last verified source view."
 		_refresh_activity_header()
-		_refresh_live_data()
-		_refresh_run_button_caption()
+		return
+	_batch_job_source_mismatch = false
+	if not _operation_running and str(parsed.get("state", "")) == "RUNNING":
+		_batch_snapshot["state"] = "INTERRUPTED"
+	_record_verified_batch_item_progress(_batch_snapshot)
+	_sync_verified_batch_follow(_batch_snapshot)
+	_refresh_activity_header()
+	_refresh_live_data()
+	_refresh_run_button_caption()
+
+
+func _batch_follow_index(job: Dictionary) -> int:
+	var items: Array = job.get("items", [])
+	if items.is_empty():
+		return -1
+	var current: Variant = job.get("current_index")
+	if current is int and current >= 0 and current < items.size():
+		return current
+	for index in range(items.size() - 1, -1, -1):
+		if items[index] is Dictionary and str(items[index].get("status", "")) in ["READY", "FAILED", "REJECTED", "SKIPPED"]:
+			return index
+	return -1
+
+
+func _record_verified_batch_item_progress(job: Dictionary) -> void:
+	var items: Array = job.get("items", [])
+	for index in range(items.size()):
+		if not items[index] is Dictionary:
+			continue
+		var item: Dictionary = items[index]
+		var attempt_id := str(item.get("attempt_id", ""))
+		var state := str(item.get("status", ""))
+		if attempt_id.is_empty() or state not in ["READY", "FAILED", "REJECTED", "SKIPPED"]:
+			continue
+		if str(_batch_observed_item_states.get(attempt_id, "")) == state:
+			continue
+		_batch_observed_item_states[attempt_id] = state
+		if _activity_rows == null:
+			continue
+		var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
+		var reason := str(item.get("reason", ""))
+		var line := "%s · columns %d · %s · %s%s" % [filename, int(item.get("column_count", 0)), state, str(item.get("run_id", "no run ID")), " · " + reason if not reason.is_empty() else ""]
+		var row := Label.new()
+		row.name = "BatchResult_%03d" % int(item.get("index", index))
+		row.text = line
+		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.custom_minimum_size.y = 34
+		row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), index, attempt_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
+		row.add_theme_font_size_override("font_size", 10)
+		row.add_theme_color_override("font_color", Color("#dce8f8"))
+		_activity_rows.add_child(row)
+
+
+func _source_png_sha256(path: String) -> String:
+	if path.is_empty() or not FileAccess.file_exists(path):
+		return ""
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return ""
+	var hashing := HashingContext.new()
+	if hashing.start(HashingContext.HASH_SHA256) != OK:
+		file.close()
+		return ""
+	while not file.eof_reached():
+		hashing.update(file.get_buffer(65536))
+	file.close()
+	return hashing.finish().hex_encode()
+
+
+func _sync_verified_batch_follow(job: Dictionary) -> void:
+	if not _batch_job_matches_loaded_sources():
+		return
+	var items: Array = job.get("items", [])
+	var item_index := _batch_follow_index(job)
+	if item_index < 0 or item_index >= items.size() or not items[item_index] is Dictionary:
+		return
+	var item: Dictionary = items[item_index]
+	var source_id := str(item.get("source_id", ""))
+	var source_sha := str(item.get("source_sha256", ""))
+	var record_sha := str(item.get("source_record_sha256", ""))
+	var attempt_id := str(item.get("attempt_id", ""))
+	var column_count := int(item.get("column_count", 0))
+	if (str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
+			or int(item.get("index", -1)) != item_index
+			or source_id.trim_prefix("owner-upload-") != source_sha
+			or record_sha.length() != 64 or attempt_id.is_empty() or column_count not in [3, 4, 5]):
+		return
+	var source_index := _gameplay_source_index(source_id)
+	if source_index < 0:
+		return
+	var source: Dictionary = _gameplay_sources[source_index]
+	var path := str(source.get("path", ""))
+	if (str(source.get("source_sha256", source_id.trim_prefix("owner-upload-"))) != source_sha
+			or str(source.get("source_record_sha256", "")) != record_sha
+			or _source_png_sha256(path) != source_sha):
+		return
+	var token := "%s|%d|%s|%s|%s|%d|%s|%s" % [str(job.get("job_id", "")), item_index, source_id, source_sha, attempt_id, column_count, str(item.get("status", "")), str(item.get("run_id", ""))]
+	if token == _batch_follow_token:
+		_batch_follow_item = item.duplicate(true)
+		return
+	# Commit all source-facing regions from one exact persisted job item.
+	_batch_follow_token = token
+	_batch_follow_item = item.duplicate(true)
+	_batch_follow_pipeline.clear()
+	_selected_import_source_id = source_id
+	_selected_art_path = path
+	_last_source_id = source_id
+	_last_candidate_id = ""
+	_last_pipeline.clear()
+	_owner_review_status = ""
+	_imported_window_start = clampi(item_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+	_activity_source_id = source_id
+	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
+	var job_state := str(job.get("state", ""))
+	var item_state := str(item.get("status", ""))
+	_activity_stage = "RUNNING" if _operation_running and job_state == "RUNNING" else item_state if not item_state.is_empty() else job_state
+	_activity_backend_disposition = _activity_stage
+	_activity_terminal_state = "" if _operation_running else _activity_stage
+	_activity_message = "Batch item %d/%d · %s · %d columns" % [item_index + 1, items.size(), _activity_source_filename, column_count]
+	_preview_paths_by_screen["LEVEL FACTORY"] = path
+	_load_selected_art_preview(path, "LEVEL FACTORY")
+	if item_state == "READY" and not str(item.get("run_id", "")).is_empty():
+		var restored := _extension("restore-source-run-readonly", {"source_id": source_id, "game_project": _pinned_game_project_path()})
+		var pipeline: Dictionary = restored.get("pipeline", {})
+		var request: Dictionary = pipeline.get("request", {})
+		var saved_run_id := str(restored.get("run_id", pipeline.get("run_id", "")))
+		if (str(restored.get("state", "")) == "READY"
+				and str(restored.get("source_sha256", "")) == source_sha
+				and str(request.get("source_id", "")) == source_id
+				and int(request.get("column_count", 0)) == column_count
+				and str(pipeline.get("run_id", saved_run_id)) == str(item.get("run_id", ""))):
+			pipeline["source_id"] = source_id
+			_batch_follow_pipeline = pipeline.duplicate(true)
+			_last_pipeline = pipeline.duplicate(true)
+			var review: Dictionary = restored.get("owner_review_status", {})
+			_owner_review_status = str(review.get("pool_state", review.get("disposition", ""))) if not review.is_empty() else str(item.get("release_pool", {}).get("disposition", ""))
+	_refresh_activity_header()
+	_refresh_runtime_cards()
+	_refresh_live_data()
 
 
 func _complete_png_batch(result: Dictionary) -> void:
@@ -1946,8 +2381,6 @@ func _render_batch_item_results(job: Dictionary) -> void:
 	if _activity_rows == null:
 		return
 	if _activity_panel != null: _activity_panel.visible = true
-	for child in _activity_rows.get_children():
-		child.queue_free()
 	var counts: Dictionary = job.get("counts", {})
 	var loaded := int(job.get("snapshot_source_count", _gameplay_sources.size()))
 	var total := int(counts.get("total", 0))
@@ -1962,37 +2395,7 @@ func _render_batch_item_results(job: Dictionary) -> void:
 	if _activity_phase_label != null:
 		_activity_phase_label.text = "Loaded %d · Job %d · READY %d · Failed %d" % [loaded, total, int(counts.get("ready", 0)), int(counts.get("failed", 0))]
 		_activity_phase_label.tooltip_text = summary
-	var summary_row := Label.new()
-	summary_row.name = "BatchCountsSummary"
-	summary_row.custom_minimum_size = Vector2(292, 46)
-	summary_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	summary_row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	summary_row.add_theme_font_size_override("font_size", 10)
-	summary_row.text = summary
-	_activity_rows.add_child(summary_row)
-	for item_variant in job.get("items", []):
-		if not item_variant is Dictionary:
-			continue
-		var item: Dictionary = item_variant
-		var status := str(item.get("status", "UNKNOWN"))
-		var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
-		var source_id := str(item.get("source_id", ""))
-		var columns := int(item.get("column_count", 0))
-		var reason := str(item.get("reason", ""))
-		if bool(item.get("reused_existing_ready", false)) or bool(item.get("recovered_after_interruption", false)):
-			status += " · EXISTING PROOF REUSED"
-		var row := Label.new()
-		row.name = "BatchResult_%03d" % int(item.get("index", 0))
-		row.custom_minimum_size = Vector2(292, 52)
-		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		row.add_theme_font_size_override("font_size", 10)
-		row.mouse_filter = Control.MOUSE_FILTER_STOP
-		row.text = "%s · %s\n%s · %d columns · %s%s" % [filename, source_id.right(12), "Attempted" if not str(item.get("attempt_id", "")).is_empty() else "Not attempted", columns, status, " · " + reason if not reason.is_empty() else ""]
-		row.tooltip_text = "Source %s\nAttempt %s\nActivity %s\nAssigned columns %d\n%s" % [source_id, str(item.get("attempt_id", "")), str(item.get("activity_run_id", "")), columns, reason]
-		row.add_theme_color_override("font_color", Color("#7bd6a2") if status.begins_with("READY") else Color("#f09a8a") if status.begins_with("FAILED") or status.begins_with("REJECTED") else Color("#c5d2e5"))
-		_activity_rows.add_child(row)
-	_activity_scroll.call_deferred("set_v_scroll", 0)
+	_record_verified_batch_item_progress(job)
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -2296,9 +2699,13 @@ func _review_candidate(disposition: String) -> void:
 
 
 func _refresh_release_pool(show_status: bool = true) -> void:
+	if show_status:
+		_append_release_pool_activity("REFRESH POOL", "STARTED", "read-only Release Pool projection", _selected_release_ids)
 	_release_pool = _extension("release-pool", {})
 	_apply_release_projection()
 	if show_status:
+		var entries: Array = _release_pool.get("entries", [])
+		_append_release_pool_activity("REFRESH POOL", str(_release_pool.get("state", _release_pool.get("disposition", "UNAVAILABLE"))), "entries=%d; visible after filters=%d" % [entries.size(), _visible_release_ids.size()], _selected_release_ids)
 		_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
 
 
@@ -2315,28 +2722,36 @@ func _select_first_release() -> void:
 
 func _preflight_release() -> void:
 	if _selected_release_ids.is_empty():
+		_append_release_pool_activity("PREFLIGHT", "BLOCKED", "Select one or more READY levels first.", [])
 		_report("Select one or more READY levels first.")
 		return
+	_append_release_pool_activity("PREFLIGHT", "STARTED", "canonical preflight requested", _selected_release_ids)
 	var result := _extension("scrubbots-publish", {
 		"action": "preflight", "candidate_ids": _selected_release_ids,
 		"pack_id": "factory-studio-release",
 		"created_at_utc": Time.get_datetime_string_from_system(true, false) + "Z",
 	})
 	_release_pool["publish_preflight"] = result
+	_append_release_pool_activity("PREFLIGHT", str(result.get("state", result.get("disposition", "UNAVAILABLE"))), _release_activity_result_detail(result), _selected_release_ids)
 	_report("Preflight: %s" % str(result.get("state", result.get("disposition", "UNAVAILABLE"))))
 
 
 func _show_publish_stage(stage: String) -> void:
 	var preflight: Dictionary = _release_pool.get("publish_preflight", {})
-	_report("%s · %s" % [stage, str(preflight.get("state", "NOT_RUN"))])
+	var state := str(preflight.get("state", "NOT_RUN"))
+	var detail := "%s is status-only here; last verified preflight=%s. This click did not run the stage." % [stage, state]
+	_append_release_pool_activity(stage, "STATUS ONLY · %s" % state, detail)
+	_report("%s · status only · %s" % [stage, state])
 
 
 func _publish_staging() -> void:
 	var preflight: Dictionary = _release_pool.get("publish_preflight", {})
 	var reviewed: Dictionary = preflight.get("reviewed_identity", {})
 	if reviewed.is_empty():
+		_append_release_pool_activity("STAGING UPLOAD", "BLOCKED", "Run publish preflight before STAGING upload.", _selected_release_ids)
 		_report("Run publish preflight before STAGING upload.")
 		return
+	_append_release_pool_activity("STAGING UPLOAD", "STARTED", "canonical STAGING publish requested", _selected_release_ids)
 	var result := _extension("scrubbots-publish", {
 		"action": "publish-staging", "candidate_ids": _selected_release_ids,
 		"pack_id": "factory-studio-release",
@@ -2344,6 +2759,7 @@ func _publish_staging() -> void:
 		"created_at_utc": str(reviewed.get("created_at_utc", "")),
 		"reviewed_identity": reviewed,
 	})
+	_append_release_pool_activity("STAGING UPLOAD", str(result.get("state", result.get("disposition", "UNAVAILABLE"))), _release_activity_result_detail(result), _selected_release_ids)
 	_report("STAGING: %s" % str(result.get("state", result.get("disposition", "UNAVAILABLE"))))
 
 
@@ -2552,7 +2968,9 @@ func _page_artwork(direction: int) -> void:
 
 func _select_variation(index: int) -> void:
 	if not _gameplay_sources.is_empty():
-		var queue_index := _imported_page * 8 + index
+		if _operation_running and not _batch_job_id.is_empty():
+			return
+		var queue_index := _imported_window_start + index
 		if index >= 0 and queue_index < _gameplay_sources.size():
 			_select_imported_source_by_id(str(_gameplay_sources[queue_index].get("source_id", "")))
 		return
@@ -2573,13 +2991,13 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_last_pipeline.clear()
 		_owner_review_status = ""
 		_hide_review_dialogs()
-		_activity_events.clear()
-		for child in _activity_rows.get_children(): child.queue_free()
 		_activity_stage = "SOURCE"
 		_activity_message = "Selected PNG is read-only until Run Pipeline is explicitly selected."
 		_activity_terminal_state = ""
 		_activity_integrity_error = ""
-		_imported_page = int(index / 8)
+		_imported_window_start = clampi(index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+		_activity_source_id = source_id
+		_activity_source_filename = str(imported.get("display_filename", "Selected PNG"))
 		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
 		_refresh_pinned_source_preflight()
@@ -2713,15 +3131,14 @@ func _refresh_pinned_source_preflight() -> void:
 
 
 func _page_imported_sources(direction: int) -> void:
-	var page_count := maxi(1, ceili(float(_gameplay_sources.size()) / 8.0))
-	if page_count <= 1:
+	if _operation_running and not _batch_job_id.is_empty():
 		return
-	_imported_page = posmod(_imported_page + direction, page_count)
+	_imported_window_start = clampi(_imported_window_start + direction, 0, maxi(0, _gameplay_sources.size() - 5))
 	_refresh_runtime_cards()
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _screen != "LEVEL FACTORY" or _gameplay_sources.size() <= 8 or _preview_host == null:
+	if _screen != "LEVEL FACTORY" or _gameplay_sources.size() <= 5 or _preview_host == null:
 		return
 	if not event is InputEventMouseButton:
 		return
@@ -3000,7 +3417,13 @@ func _hide_review_dialogs() -> void:
 func _edit_release_search() -> void:
 	_release_search.text = _release_query
 	var dialog := ConfirmationDialog.new(); dialog.title = "Search Levels"; dialog.add_child(_release_search)
-	dialog.confirmed.connect(func(): _release_query = _release_search.text; _apply_release_projection(); dialog.remove_child(_release_search); dialog.queue_free())
+	dialog.confirmed.connect(func():
+		_release_query = _release_search.text
+		_apply_release_projection()
+		_append_release_pool_activity("SEARCH", "APPLIED", "query=%s; visible=%d" % [_release_query, _visible_release_ids.size()])
+		dialog.remove_child(_release_search)
+		dialog.queue_free()
+	)
 	dialog.canceled.connect(func(): dialog.remove_child(_release_search); dialog.queue_free())
 	add_child(dialog); dialog.popup_centered()
 
@@ -3015,6 +3438,7 @@ func _apply_release_filters() -> void:
 	_difficulty_filter = _filter_difficulty.get_item_text(_filter_difficulty.selected)
 	_columns_filter = _filter_columns.get_item_text(_filter_columns.selected)
 	_apply_release_projection()
+	_append_release_pool_activity("FILTERS", "APPLIED", "difficulty=%s; columns=%s; visible=%d" % [_difficulty_filter, _columns_filter, _visible_release_ids.size()])
 
 
 func _apply_release_projection() -> void:
@@ -3031,22 +3455,89 @@ func _apply_release_projection() -> void:
 		if _columns_filter != "All Columns" and columns != _columns_filter.get_slice(" ", 0): continue
 		if not candidate_id.is_empty(): _visible_release_ids.append(candidate_id)
 	_refresh_live_data()
+	_release_candidate_signature = ""
+	_refresh_release_candidate_rows()
+
+
+func _release_entry_for_id(candidate_id: String) -> Dictionary:
+	for entry_variant in _release_pool.get("entries", []):
+		if entry_variant is Dictionary and str(entry_variant.get("candidate_id", "")) == candidate_id:
+			return entry_variant
+	return {}
+
+
+func _refresh_release_candidate_rows() -> void:
+	if _release_candidate_rows == null:
+		return
+	var signature_parts := PackedStringArray()
+	for candidate_id in _visible_release_ids:
+		var entry := _release_entry_for_id(candidate_id)
+		var primary: Dictionary = entry.get("pipeline", {}).get("primary", {})
+		signature_parts.append("%s:%s:%s" % [candidate_id, str(primary.get("disposition", primary.get("state", "READY"))), "1" if candidate_id in _selected_release_ids else "0"])
+	var signature := "%s|%.2f" % [";".join(signature_parts), _release_candidate_row_height]
+	if signature == _release_candidate_signature and _release_candidate_rows.get_child_count() == _visible_release_ids.size():
+		return
+	_release_candidate_signature = signature
+	for child in _release_candidate_rows.get_children():
+		_release_candidate_rows.remove_child(child)
+		child.free()
+	for index in range(_visible_release_ids.size()):
+		var candidate_id := _visible_release_ids[index]
+		var entry := _release_entry_for_id(candidate_id)
+		if entry.is_empty():
+			continue
+		var primary: Dictionary = entry.get("pipeline", {}).get("primary", {})
+		var state := str(primary.get("disposition", primary.get("state", "READY"))).to_upper()
+		if state.is_empty():
+			state = "READY"
+		var title := str(entry.get("level_id", entry.get("name", entry.get("candidate", {}).get("level_id", candidate_id))))
+		var artwork := str(entry.get("files", {}).get("artwork", {}).get("path", entry.get("artwork_path", "")))
+		var selected_mark := "✓ " if candidate_id in _selected_release_ids else ""
+		var row := Button.new()
+		row.name = "ReleaseCandidate_%d_%d" % [_release_activity_events.size(), index]
+		row.text = "%s%s  ·  %s" % [selected_mark, title.left(28), state.left(12)]
+		row.icon = _runtime_png_texture(artwork) if not artwork.is_empty() else null
+		row.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		row.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
+		row.expand_icon = not artwork.is_empty()
+		row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.custom_minimum_size = Vector2(0, _release_candidate_row_height)
+		row.focus_mode = Control.FOCUS_ALL
+		row.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+		row.tooltip_text = "Candidate %s\nRun %s\nPipeline SHA-256 %s\nPool entry SHA-256 %s" % [candidate_id, str(entry.get("pipeline_run_id", "UNKNOWN")), str(entry.get("pipeline_sha256", "UNKNOWN")), str(entry.get("entry_digest", "UNKNOWN"))]
+		row.add_theme_font_size_override("font_size", 11)
+		row.add_theme_color_override("font_color", Color("#dce8f8"))
+		row.add_theme_stylebox_override("normal", _control_style(Color("#17243a"), Color("#30415e")))
+		row.add_theme_stylebox_override("hover", _control_style(Color("#233651"), Color("#6b8bb9")))
+		row.pressed.connect(_select_release_candidate_id.bind(candidate_id))
+		_release_candidate_rows.add_child(row)
+
+
+func _select_release_candidate_id(candidate_id: String) -> void:
+	if _release_entry_for_id(candidate_id).is_empty():
+		return
+	var changed := false
+	if _release_selection_manage_mode:
+		if candidate_id in _selected_release_ids:
+			_selected_release_ids.erase(candidate_id)
+		else:
+			_selected_release_ids.append(candidate_id)
+		changed = true
+	_selected_release_id = candidate_id
+	_select_release_entry(candidate_id)
+	_release_candidate_signature = ""
+	_refresh_release_candidate_rows()
+	_append_release_pool_activity("CANDIDATE SELECTION" if changed else "CANDIDATE PREVIEW", "UPDATED" if changed else "READ ONLY", "candidate_id=%s" % candidate_id, [candidate_id])
 
 
 func _select_release_row(index: int) -> void:
 	if index < 0 or index >= _visible_release_ids.size(): return
-	var candidate_id := _visible_release_ids[index]
-	if _release_selection_manage_mode:
-		if _selected_release_ids.has(candidate_id):
-			_selected_release_ids.erase(candidate_id)
-		else:
-			_selected_release_ids.append(candidate_id)
-	_selected_release_id = candidate_id
-	_select_release_entry(candidate_id)
+	_select_release_candidate_id(_visible_release_ids[index])
 
 
 func _manage_release_selection() -> void:
 	_release_selection_manage_mode = not _release_selection_manage_mode
+	_append_release_pool_activity("MANAGE SELECTION", "OPEN" if _release_selection_manage_mode else "CLOSED", "candidate IDs remain bound to the canonical filtered list")
 	_report("Manage selection %s" % ("active" if _release_selection_manage_mode else "closed"))
 
 
@@ -3054,10 +3545,16 @@ func _select_all_release() -> void:
 	_selected_release_ids.clear()
 	for candidate_id in _visible_release_ids:
 		if candidate_id not in _selected_release_ids: _selected_release_ids.append(candidate_id)
+	_release_candidate_signature = ""
+	_refresh_release_candidate_rows()
+	_append_release_pool_activity("SELECT ALL FILTERED", "SELECTED %d" % _selected_release_ids.size(), "selected every candidate in the filtered result set")
 
 
 func _clear_release_selection() -> void:
 	_selected_release_ids.clear()
+	_release_candidate_signature = ""
+	_refresh_release_candidate_rows()
+	_append_release_pool_activity("CLEAR SELECTION", "CLEARED", "all selected candidate IDs were removed")
 
 
 func _select_release_card(index: int) -> void:
@@ -3079,17 +3576,25 @@ func _select_release_entry(candidate_id: String) -> void:
 
 
 func _remove_release_selection(index: int) -> void:
-	if index >= 0 and index < _selected_release_ids.size(): _selected_release_ids.remove_at(index)
+	if index >= 0 and index < _selected_release_ids.size():
+		var removed := _selected_release_ids[index]
+		_selected_release_ids.remove_at(index)
+		_release_candidate_signature = ""
+		_refresh_release_candidate_rows()
+		_refresh_live_data()
+		_append_release_pool_activity("REMOVE SELECTION", "REMOVED", "candidate_id=%s" % removed, [removed])
 
 
 func _set_release_target(target: String) -> void:
 	_release_target = target if target in ["STAGING", "PRODUCTION"] else "STAGING"
+	_append_release_pool_activity("TARGET", "SELECTED", "target=%s; no publish was started" % _release_target)
 	if target == "PRODUCTION":
 		_report("PRODUCTION requires a verified STAGING manifest and exact owner approval")
 
 
 func _upload_selected() -> void:
 	if _selected_release_ids.is_empty():
+		_append_release_pool_activity("UPLOAD SELECTED", "BLOCKED", "Select one or more READY levels before uploading.", [])
 		_report("Select one or more READY levels before uploading.")
 		return
 	if _release_target == "STAGING":
@@ -3100,9 +3605,11 @@ func _upload_selected() -> void:
 	var manifest_sha := str(reviewed.get("candidate_manifest_sha256", ""))
 	var version := int(reviewed.get("content_version", 0))
 	if preflight.get("state") != "PREFLIGHT_READY" or manifest_sha.length() != 64 or version < 2:
+		_append_release_pool_activity("PRODUCTION PROMOTION", "BLOCKED", "Current verified preflight and manifest identity are required.", _selected_release_ids)
 		_report("Run a current publish preflight before requesting PRODUCTION confirmation.")
 		return
 	_pending_production_confirmation = {"manifest_sha256": manifest_sha, "content_version": version}
+	_append_release_pool_activity("PRODUCTION PROMOTION", "OWNER CONFIRMATION REQUIRED", "Exact manifest SHA-256 %s; content version %d" % [manifest_sha, version], _selected_release_ids)
 	_release_confirmation.dialog_text = "Promote this exact reviewed release?\n\nManifest SHA-256: %s\nContent version: %d\nTarget: PRODUCTION\n\nThe canonical publisher will verify STAGING bytes and current-main replay before promotion." % [manifest_sha, version]
 	_release_confirmation.popup_centered()
 
@@ -3114,6 +3621,7 @@ func _publish_production_confirmed() -> void:
 	var owner_id := OS.get_environment("USERNAME").strip_edges()
 	if owner_id.is_empty(): owner_id = OS.get_environment("USER").strip_edges()
 	if owner_id.is_empty():
+		_append_release_pool_activity("PRODUCTION PUBLISH", "BLOCKED", "Owner identity is unavailable; no publisher call was made.", _selected_release_ids)
 		_report("Production approval cannot be attributed to the current local owner session.")
 		_pending_production_confirmation.clear()
 		return
@@ -3121,22 +3629,28 @@ func _publish_production_confirmed() -> void:
 		"manifest_sha256": _pending_production_confirmation.get("manifest_sha256", ""),
 		"content_version": _pending_production_confirmation.get("content_version", 0), "target": "PRODUCTION"}
 	if confirmation.manifest_sha256 != reviewed.get("candidate_manifest_sha256") or confirmation.content_version != reviewed.get("content_version"):
+		_append_release_pool_activity("PRODUCTION PUBLISH", "BLOCKED", "Reviewed manifest identity changed; no publisher call was made.", _selected_release_ids)
 		_report("Reviewed production identity changed. Run preflight again.")
 		_pending_production_confirmation.clear()
 		return
+	_append_release_pool_activity("PRODUCTION PUBLISH", "STARTED", "explicit owner confirmation submitted", _selected_release_ids)
 	var result := _extension("scrubbots-publish", {"action": "publish-production",
 		"candidate_ids": _selected_release_ids, "pack_id": "factory-studio-release",
 		"content_version": int(reviewed.get("content_version", 0)),
 		"created_at_utc": str(reviewed.get("created_at_utc", "")),
 		"reviewed_identity": reviewed, "owner_confirmation": confirmation})
 	_pending_production_confirmation.clear()
+	_append_release_pool_activity("PRODUCTION PUBLISH", str(result.get("state", result.get("disposition", "UNAVAILABLE"))), _release_activity_result_detail(result), _selected_release_ids)
 	_report("PRODUCTION: %s · %s" % [str(result.get("state", "UNAVAILABLE")), str(result.get("production", ""))])
 
 
 func _preview_release_manifest() -> void:
 	if _release_pool.get("publish_preflight", {}).is_empty():
-		_preflight_release()
+		_append_release_pool_activity("PREVIEW MANIFEST", "BLOCKED", "No preflight manifest is available. Run Preflight explicitly first.", _selected_release_ids)
+		_report("No preflight manifest. Run Preflight explicitly first.")
+		return
 	var result: Dictionary = _release_pool.get("publish_preflight", {})
+	_append_release_pool_activity("PREVIEW MANIFEST", str(result.get("state", "UNAVAILABLE")), "read-only preview of the last preflight response", _selected_release_ids)
 	var dialog := AcceptDialog.new(); dialog.title = "Release Manifest Preview"
 	var label := RichTextLabel.new(); label.custom_minimum_size = Vector2(680, 380); label.text = JSON.stringify(result, "  "); label.fit_content = true
 	dialog.add_child(label); add_child(dialog); dialog.confirmed.connect(func(): dialog.queue_free()); dialog.popup_centered()
