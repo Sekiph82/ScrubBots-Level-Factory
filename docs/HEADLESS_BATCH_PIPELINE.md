@@ -51,3 +51,16 @@ The CLI reports newline-delimited JSON progress events and one final summary
 with `READY`, `REJECTED`, and `FAILED` counts. READY means the candidate is
 visible in Studio's owner Review Queue and remains `NEEDS_REVIEW`; the CLI never
 records an owner decision or publishes content.
+
+## Factory Studio owner PNG batch
+
+The 2026-10-13 owner-approved Studio flow is a separate explicit-click
+orchestrator over the existing `studio_extensions.run_pipeline` entry point.
+It uses immutable `batch-import` manifests, assigns each eligible unique PNG a
+persisted 3/4/5-column plan, and checkpoints one item at a time. PNG selection,
+startup, tab changes, and restore remain read-only. One explicit `Run Entire
+Batch` starts the sequential run; its canonical READY pipeline uses the current
+READY_AUTO Release Pool contract and verifies exact Pool read-back. It never
+records owner ACCEPT, assigns permanent campaign numbers, or publishes to
+STAGING/PRODUCTION/R2. The historical P3 CLI still ends at the review queue and
+is not a substitute for this Studio-specific READY_AUTO path.

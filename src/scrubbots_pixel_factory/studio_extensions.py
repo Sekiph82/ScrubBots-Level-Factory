@@ -1563,6 +1563,36 @@ def batch_load(batch_id: str) -> dict[str, Any]:
     return {"state": "SUCCESS", "disposition": "RELOADED", "batch": value}
 
 
+def png_batch_create(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from .png_batch import create_png_batch
+
+    return create_png_batch(batch_id, settings)
+
+
+def png_batch_status(job_id: str) -> dict[str, Any]:
+    from .png_batch import png_batch_status as read_png_batch_status
+
+    return read_png_batch_status(job_id)
+
+
+def png_batch_latest() -> dict[str, Any]:
+    from .png_batch import png_batch_latest as read_latest_png_batch
+
+    return read_latest_png_batch()
+
+
+def png_batch_control(job_id: str, action: str) -> dict[str, Any]:
+    from .png_batch import png_batch_control as send_png_batch_control
+
+    return send_png_batch_control(job_id, action)
+
+
+def png_batch_run(job_id: str) -> dict[str, Any]:
+    from .png_batch import run_png_batch
+
+    return run_png_batch(job_id)
+
+
 def owner_pages_snapshot() -> dict[str, Any]:
     """Build a read-only owner-page view from validated canonical records.
 

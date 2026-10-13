@@ -61,7 +61,7 @@ Canonical campaign/release planning resolves contiguous final level numbers agai
 
 ## Visual rule
 
-Do not change the three master compositions for this functional change.
+The three master compositions remain the visual identity authority. The direct owner responsive override in `docs/decisions/OWNER_FACTORY_STUDIO_LEVEL_FACTORY_COMPACT_BATCH_20261013_V01.md` permits full-client adaptive geometry and compact inline results on LEVEL FACTORY only; it does not change PIXEL ART / RELEASE POOL compositions or create a fourth production screen.
 
 Use existing master-defined regions/controls.
 

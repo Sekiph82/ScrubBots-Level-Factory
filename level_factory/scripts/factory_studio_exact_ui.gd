@@ -46,6 +46,21 @@ var _replay_dialog: AcceptDialog
 var _replay_step_label: RichTextLabel
 var _replay_trace: Array = []
 var _replay_step := 0
+var _details_rows: Array[Label] = []
+var _results_panel: Panel
+var _results_summary: Label
+var _results_scroll: ScrollContainer
+var _results_rows: VBoxContainer
+var _results_nav: HBoxContainer
+var _results_mode := ""
+var _results_source_id := ""
+var _results_run_id := ""
+var _batch_job_id := ""
+var _batch_import_id := ""
+var _batch_snapshot: Dictionary = {}
+var _batch_last_read_msec := 0
+var _batch_pause_button: Button
+var _batch_stop_button: Button
 var _prompt_dialog: ConfirmationDialog
 var _prompt_input: TextEdit
 var _settings_python: LineEdit
@@ -73,6 +88,12 @@ var _selected_import_source_id := ""
 var _seed := ""
 var _background_intent := "TRANSPARENT"
 const _REFERENCE_SIZE := Vector2(1536.0, 1024.0)
+const _OWNER_PALETTE_SWATCHES := {
+	"C01": "#FF4500", "C02": "#FFA800", "C03": "#FFD635", "C04": "#00CC78",
+	"C05": "#00CCC0", "C06": "#51E9F4", "C07": "#3690EA", "C08": "#2450A4",
+	"C09": "#6A5CFF", "C10": "#FF3881", "C11": "#9C6926", "C12": "#FFF8B8",
+	"C13": "#D4D7D9", "C14": "#515252", "C15": "#FFFFFF", "C16": "#000000"
+}
 var _responsive_nodes: Array[CanvasItem] = []
 var _responsive_base: Dictionary = {}
 var _responsive_scale := 1.0
@@ -171,6 +192,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if not _batch_job_id.is_empty():
+		_refresh_batch_progress()
 	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
 		_poll_pipeline_activity()
 		_refresh_activity_header()
@@ -206,8 +229,15 @@ func _apply_responsive_layout() -> void:
 	if _responsive_nodes.is_empty() or size.x <= 0.0 or size.y <= 0.0:
 		return
 	var geometry := responsive_geometry(size)
-	_responsive_scale = float(geometry.get("scale", 1.0))
-	_responsive_offset = geometry.get("offset", Vector2.ZERO)
+	_responsive_scale = 1.0
+	_responsive_offset = Vector2.ZERO
+	var scale_x := float(geometry.get("scale_x", 1.0))
+	var scale_y := float(geometry.get("scale_y", 1.0))
+	var center_start := float(geometry.get("center_start", 389.0))
+	var right_start := float(geometry.get("right_start", 1205.0))
+	var left_scale := float(geometry.get("left_scale", 1.0))
+	var center_scale := float(geometry.get("center_scale", 1.0))
+	var right_scale := float(geometry.get("right_scale", 1.0))
 	for node in _responsive_nodes:
 		if not is_instance_valid(node):
 			continue
@@ -216,13 +246,68 @@ func _apply_responsive_layout() -> void:
 			continue
 		if node is Control:
 			var control := node as Control
-			control.position = _responsive_offset + base.position * _responsive_scale
-			control.size = base.size
-			control.scale = base.scale * _responsive_scale
+			var position: Vector2 = base.position
+			var item_scale := center_scale
+			if position.y < 100.0:
+				position.x *= scale_x
+				item_scale = scale_x
+			elif position.x < 380.0:
+				position.x = 18.0 + (position.x - 18.0) * left_scale
+				item_scale = left_scale
+			elif position.x >= 1193.0:
+				position.x = right_start + (position.x - 1205.0) * right_scale
+				item_scale = right_scale
+			else:
+				position.x = center_start + (position.x - 389.0) * center_scale
+			control.position = Vector2(position.x, position.y * scale_y)
+			control.size = Vector2(base.size.x * item_scale, base.size.y * scale_y)
+			control.scale = base.scale
 		elif node is Line2D:
 			var line := node as Line2D
-			line.position = _responsive_offset + base.position * _responsive_scale
-			line.scale = base.scale * _responsive_scale
+			line.position = Vector2(base.position.x * scale_x, base.position.y * scale_y)
+			line.scale = base.scale * Vector2(scale_x, scale_y)
+	# Anchor long panels and the image strip to the real client bottom; no 1536x1024 letterbox remains.
+	var bottom_margin := 18.0 * scale_y
+	var main_top := 116.0 * scale_y
+	var bottom_y := size.y - bottom_margin - 106.0 * scale_y
+	var left_panel := get_node_or_null("RuntimeLeftPanel") as Control
+	var details_panel := get_node_or_null("RuntimeDetailsPanel") as Control
+	var center_panel := get_node_or_null("RuntimeCanvasPanel") as Control
+	var bottom_panel := get_node_or_null("RuntimeBottomStrip") as Control
+	var background := get_node_or_null("RuntimeBackground") as Control
+	var header_panel := get_node_or_null("RuntimeHeader") as Control
+	if background != null: background.size = size
+	if header_panel != null: header_panel.size.x = size.x
+	if left_panel != null: left_panel.size.y = maxf(220.0, size.y - left_panel.position.y - bottom_margin)
+	if details_panel != null: details_panel.size.y = maxf(220.0, size.y - details_panel.position.y - bottom_margin)
+	if bottom_panel != null:
+		bottom_panel.position.y = bottom_y
+		bottom_panel.size.y = 106.0 * scale_y
+	if center_panel != null:
+		center_panel.size.x = maxf(300.0, right_start - center_start - 16.0)
+		center_panel.size.y = maxf(220.0, bottom_y - main_top - 12.0 * scale_y)
+	if _preview_host != null:
+		_preview_host.position = Vector2(center_start + 12.0 * center_scale, 160.0 * scale_y)
+		_preview_host.size = Vector2(maxf(280.0, center_panel.size.x - 24.0 * center_scale), maxf(180.0, bottom_y - _preview_host.position.y - 24.0 * scale_y))
+		_preview_content.pivot_offset = _preview_host.size * 0.5
+		if _preview_rect != null:
+			_preview_rect.size = _preview_host.size
+			_preview_rect.pivot_offset = _preview_host.size * 0.5
+	if _results_panel != null:
+		var panel_bottom := size.y - bottom_margin
+		_results_panel.size.y = maxf(180.0, panel_bottom - _results_panel.position.y)
+	if _activity_panel != null:
+		_activity_panel.size.y = maxf(220.0, size.y - _activity_panel.position.y - bottom_margin)
+		if _activity_scroll != null:
+			_activity_scroll.position = Vector2(10.0 * left_scale, 116.0 * scale_y)
+			_activity_scroll.size = Vector2(maxf(120.0, _activity_panel.size.x - 20.0 * left_scale), maxf(80.0, _activity_panel.size.y - _activity_scroll.position.y - 10.0 * scale_y))
+		if _batch_pause_button != null and _batch_stop_button != null:
+			var button_gap := 5.0 * left_scale
+			var action_width := maxf(70.0, (_activity_panel.size.x - 20.0 * left_scale - button_gap) * 0.5)
+			_batch_pause_button.position = Vector2(10.0 * left_scale, 80.0 * scale_y)
+			_batch_pause_button.size = Vector2(action_width, 30.0 * scale_y)
+			_batch_stop_button.position = Vector2(_batch_pause_button.position.x + action_width + button_gap, 80.0 * scale_y)
+			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
 
 
 func responsive_layout_snapshot() -> Dictionary:
@@ -231,10 +316,24 @@ func responsive_layout_snapshot() -> Dictionary:
 
 func responsive_geometry(viewport_size: Vector2) -> Dictionary:
 	if viewport_size.x <= 0.0 or viewport_size.y <= 0.0:
-		return {"scale": 1.0, "offset": Vector2.ZERO, "content_size": _REFERENCE_SIZE}
-	var scale_factor := minf(viewport_size.x / _REFERENCE_SIZE.x, viewport_size.y / _REFERENCE_SIZE.y)
-	var content_size := _REFERENCE_SIZE * scale_factor
-	return {"scale": scale_factor, "offset": (viewport_size - content_size) * 0.5, "content_size": content_size}
+		return {"scale": 1.0, "scale_x": 1.0, "scale_y": 1.0, "offset": Vector2.ZERO, "content_size": _REFERENCE_SIZE}
+	var margin := minf(18.0, viewport_size.x * 0.02)
+	var gap := minf(16.0, viewport_size.x * 0.018)
+	var left_width := clampf(viewport_size.x * 0.23, 285.0, 354.0)
+	var right_width := clampf(viewport_size.x * 0.204, 300.0, 420.0)
+	var usable := maxf(300.0, viewport_size.x - margin * 2.0 - gap * 2.0)
+	var center_width := maxf(300.0, usable - left_width - right_width)
+	var center_start := margin + left_width + gap
+	var right_start := center_start + center_width + gap
+	var scale_y := clampf(viewport_size.y / _REFERENCE_SIZE.y, 0.72, 1.12)
+	return {
+		"scale": 1.0, "scale_x": viewport_size.x / _REFERENCE_SIZE.x, "scale_y": scale_y,
+		"offset": Vector2.ZERO, "content_size": viewport_size,
+		"left_scale": left_width / 354.0, "center_scale": center_width / 804.0,
+		"right_scale": right_width / 313.0, "center_start": center_start,
+		"right_start": right_start, "left_width": left_width, "center_width": center_width,
+		"right_width": right_width, "minimum_supported_size": Vector2(1100.0, 720.0),
+	}
 
 
 func last_import_snapshot() -> Dictionary:
@@ -352,11 +451,22 @@ func _build_live_chrome() -> void:
 	var live := Label.new()
 	live.name = "RuntimeLiveData"
 	live.position = Vector2(1222, 170)
-	live.size = Vector2(270, 198)
+	live.size = Vector2(270, 120)
 	live.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	live.add_theme_font_size_override("font_size", 13)
 	live.add_theme_color_override("font_color", Color("#dce8f8"))
 	add_child(live)
+	for row_index in range(5):
+		var row := Label.new()
+		row.name = "RuntimeDetailsRow%d" % (row_index + 1)
+		row.position = Vector2(1222, 170 + row_index * 28)
+		row.size = Vector2(270, 24)
+		row.clip_text = true
+		row.add_theme_font_size_override("font_size", 11)
+		row.add_theme_color_override("font_color", Color("#dce8f8"))
+		add_child(row)
+		_details_rows.append(row)
+	_build_inline_results()
 	_activity_panel = Panel.new()
 	_activity_panel.name = "PipelineActivityPanel"
 	_activity_panel.position = Vector2(27, 412)
@@ -403,8 +513,26 @@ func _build_live_chrome() -> void:
 	_activity_panel.add_child(_activity_phase_label)
 	_activity_scroll = ScrollContainer.new()
 	_activity_scroll.name = "PipelineActivityScroll"
-	_activity_scroll.position = Vector2(10, 80)
-	_activity_scroll.size = Vector2(314, 406)
+	_batch_pause_button = Button.new()
+	_batch_pause_button.name = "PauseAfterCurrent"
+	_batch_pause_button.text = "Pause after current"
+	_batch_pause_button.position = Vector2(10, 80)
+	_batch_pause_button.size = Vector2(151, 30)
+	_batch_pause_button.focus_mode = Control.FOCUS_ALL
+	_batch_pause_button.pressed.connect(_request_batch_pause)
+	_batch_pause_button.visible = false
+	_activity_panel.add_child(_batch_pause_button)
+	_batch_stop_button = Button.new()
+	_batch_stop_button.name = "StopAfterCurrent"
+	_batch_stop_button.text = "Stop after current"
+	_batch_stop_button.position = Vector2(166, 80)
+	_batch_stop_button.size = Vector2(158, 30)
+	_batch_stop_button.focus_mode = Control.FOCUS_ALL
+	_batch_stop_button.pressed.connect(_request_batch_stop)
+	_batch_stop_button.visible = false
+	_activity_panel.add_child(_batch_stop_button)
+	_activity_scroll.position = Vector2(10, 116)
+	_activity_scroll.size = Vector2(314, 370)
 	_activity_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_activity_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	_activity_panel.add_child(_activity_scroll)
@@ -416,6 +544,112 @@ func _build_live_chrome() -> void:
 	_activity_panel.visible = false
 	_refresh_activity_header()
 	_refresh_live_data()
+
+
+func _build_inline_results() -> void:
+	_results_panel = Panel.new()
+	_results_panel.name = "LevelFactoryInlineResults"
+	_results_panel.position = Vector2(1207, 410)
+	_results_panel.size = Vector2(291, 500)
+	_results_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	_results_panel.visible = false
+	_results_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
+	add_child(_results_panel)
+	var layout := VBoxContainer.new()
+	layout.name = "InlineResultsLayout"
+	layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	layout.offset_left = 8
+	layout.offset_top = 8
+	layout.offset_right = -8
+	layout.offset_bottom = -8
+	layout.add_theme_constant_override("separation", 6)
+	_results_panel.add_child(layout)
+	_results_summary = Label.new()
+	_results_summary.name = "InlineResultsSummary"
+	_results_summary.custom_minimum_size = Vector2(0, 34)
+	_results_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_results_summary.add_theme_font_size_override("font_size", 11)
+	_results_summary.add_theme_color_override("font_color", Color("#dce8f8"))
+	layout.add_child(_results_summary)
+	_results_nav = HBoxContainer.new()
+	_results_nav.name = "ReplayNavigation"
+	_results_nav.add_theme_constant_override("separation", 3)
+	for definition in [["First", -2147483647], ["Previous", -1], ["Next", 1], ["Last", 2147483647]]:
+		var button := Button.new()
+		button.name = str(definition[0])
+		button.text = str(definition[0])
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.custom_minimum_size = Vector2(0, 32)
+		button.focus_mode = Control.FOCUS_ALL
+		button.pressed.connect(_on_replay_navigation.bind(int(definition[1])))
+		_results_nav.add_child(button)
+	layout.add_child(_results_nav)
+	_results_scroll = ScrollContainer.new()
+	_results_scroll.name = "InlineResultsScroll"
+	_results_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_results_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_results_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_results_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	layout.add_child(_results_scroll)
+	_results_rows = VBoxContainer.new()
+	_results_rows.name = "InlineResultsRows"
+	_results_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_results_rows.add_theme_constant_override("separation", 5)
+	_results_scroll.add_child(_results_rows)
+	_results_nav.visible = false
+
+
+func _add_result_row(text_value: String, tooltip: String = "") -> Label:
+	var row := Label.new()
+	row.text = text_value
+	row.tooltip_text = tooltip if not tooltip.is_empty() else text_value
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.custom_minimum_size = Vector2(0, 22)
+	row.add_theme_font_size_override("font_size", 11)
+	row.add_theme_color_override("font_color", Color("#dce8f8"))
+	_results_rows.add_child(row)
+	return row
+
+
+func _add_supply_batch_row(color_id: String, amount: int) -> void:
+	var line := HBoxContainer.new()
+	line.name = "SupplyBatch_%s" % color_id
+	line.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	line.add_theme_constant_override("separation", 7)
+	var swatch := ColorRect.new()
+	swatch.name = "CanonicalColorSwatch"
+	swatch.custom_minimum_size = Vector2(13, 13)
+	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	if _OWNER_PALETTE_SWATCHES.has(color_id):
+		swatch.color = Color(_OWNER_PALETTE_SWATCHES[color_id])
+	else:
+		swatch.color = Color("#7f8792")
+	line.add_child(swatch)
+	var caption := Label.new()
+	caption.text = "%s × %d" % [color_id, amount]
+	caption.tooltip_text = "Canonical palette color %s, quantity %d" % [color_id, amount]
+	caption.add_theme_font_size_override("font_size", 11)
+	caption.add_theme_color_override("font_color", Color("#dce8f8"))
+	line.add_child(caption)
+	_results_rows.add_child(line)
+
+
+func _clear_result_rows() -> void:
+	if _results_rows == null:
+		return
+	for child in _results_rows.get_children():
+		_results_rows.remove_child(child)
+		child.queue_free()
+
+
+func _on_replay_navigation(direction: int) -> void:
+	if direction == -2147483647:
+		_set_replay_step(0)
+	elif direction == 2147483647:
+		_set_replay_step(_replay_trace.size() - 1)
+	else:
+		_set_replay_step(_replay_step + direction)
 
 
 func _update_live_chrome() -> void:
@@ -435,9 +669,13 @@ func _update_live_chrome() -> void:
 func _refresh_live_data() -> void:
 	var live := get_node_or_null("RuntimeLiveData") as Label
 	if live == null: return
+	var level_factory_screen := _screen == "LEVEL FACTORY"
+	live.visible = not level_factory_screen
+	for row in _details_rows:
+		row.visible = level_factory_screen
 	var selected_source_text := ""
 	if _screen == "LEVEL FACTORY" and not _selected_import_source_id.is_empty():
-		selected_source_text = "\nPNG: %s\nSource:\n%s" % [_selected_import_filename(), _wrap_identity(_selected_import_source_id, 18)]
+		selected_source_text = _selected_import_filename()
 	if _screen == "PIXEL ART":
 		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nSeed: %s\nBatch: %d complete · %d failed · %d remaining" % [_provider_model, _generation_mode, _width, _height, _seed if not _seed.is_empty() else "Auto", _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining]
 	elif _screen == "LEVEL FACTORY":
@@ -447,14 +685,60 @@ func _refresh_live_data() -> void:
 		var active_run := _operation_running and _activity_source_id == _selected_import_source_id
 		var pipeline_state := "RUNNING" if active_run else "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "SOURCE_ONLY · Awaiting run"))) if selected_run else "SOURCE_ONLY · Awaiting run"
 		var pipeline_reason := "Pipeline: Running for selected source" if active_run else str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
-		var solver_text := "RUNNING · %s" % _activity_stage if active_run else "ERROR · activity integrity failed" if monitor_failed else str(primary.get("state", pipeline_state)) if selected_run and not primary.is_empty() else pipeline_state
+		var solver_text := "RUNNING" if active_run else "ERROR" if monitor_failed else str(primary.get("state", pipeline_state)) if selected_run and not primary.is_empty() else pipeline_state
 		var replay_text := str(primary.get("acceptance", {}).get("replay", "—")) if not active_run and selected_run and not primary.is_empty() and not monitor_failed else "—"
 		var difficulty_text := str(primary.get("difficulty", {}).get("class", "—")) if not active_run and selected_run and not primary.is_empty() and not monitor_failed else "—"
-		live.text = "Level: %s\nColumns: %d\nBackground: %s\nSolver: %s\nReplay: %s\nDifficulty V1: %s\n%s%s%s" % ["Auto" if not _manual_level_override else str(_level_number), _column_count, _background_intent, solver_text, replay_text, difficulty_text, pipeline_reason, selected_source_text, "\nReview: " + _owner_review_status if not _owner_review_status.is_empty() else ""]
+		var columns := int(primary.get("column_count", _column_count)) if selected_run and not primary.is_empty() else _selected_batch_column()
+		var pool_status := _owner_review_status if not _owner_review_status.is_empty() else "—"
+		var batch_caption := ""
+		if not _batch_snapshot.is_empty():
+			var counts: Dictionary = _batch_snapshot.get("counts", {})
+			batch_caption = "%d/%d · %d ready · %d failed" % [int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0)), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+		var facts := [
+			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
+			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
+			"Solver %s   |   Replay %s" % [solver_text.left(10), replay_text.left(8)],
+			"Difficulty %s   |   Pool %s" % [difficulty_text.left(10), pool_status.left(12)],
+			"PNG %s   |   Batch %s" % [selected_source_text.left(23) if not selected_source_text.is_empty() else "—", batch_caption if not batch_caption.is_empty() else "—"],
+		]
+		for row_index in range(_details_rows.size()):
+			var row := _details_rows[row_index]
+			row.text = facts[row_index]
+			row.tooltip_text = facts[row_index] + ("\n" + pipeline_reason if row_index == 1 and not pipeline_reason.is_empty() else "")
+		if _results_panel != null:
+			_results_panel.visible = not _results_mode.is_empty()
 	else:
+		if _results_panel != null: _results_panel.visible = false
 		var entries: Array = _release_pool.get("entries", [])
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
+	_refresh_run_button_caption()
 	_refresh_runtime_cards()
+
+
+func _refresh_run_button_caption() -> void:
+	var button := get_node_or_null("RunLevelPipeline") as Button
+	if button == null or _screen != "LEVEL FACTORY":
+		return
+	var imported_count := int(_last_import_summary.get("imported_count", 0)) + int(_last_import_summary.get("reused_count", 0))
+	if imported_count == 0 and not _batch_snapshot.is_empty():
+		imported_count = int(_batch_snapshot.get("counts", {}).get("total", 0))
+	var batch_mode := imported_count > 1 and not _batch_import_id.is_empty()
+	if _operation_running and not _batch_job_id.is_empty():
+		var counts: Dictionary = _batch_snapshot.get("counts", {})
+		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
+		button.text = "Running %d/%d" % [completed + (1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", imported_count))]
+		button.disabled = true
+	elif batch_mode:
+		var state := str(_batch_snapshot.get("state", ""))
+		button.text = "Batch complete" if state == "COMPLETE" else "Resume Batch" if not _batch_job_id.is_empty() else "Run Entire Batch (%d)" % imported_count
+		button.disabled = state == "COMPLETE"
+	else:
+		button.text = "Run Pipeline"
+		button.disabled = false
+	if _batch_pause_button != null:
+		_batch_pause_button.visible = _operation_running and not _batch_job_id.is_empty()
+	if _batch_stop_button != null:
+		_batch_stop_button.visible = _operation_running and not _batch_job_id.is_empty()
 
 
 func _set_runtime_button(button_name: String, caption: String, image_path: String = "") -> void:
@@ -534,6 +818,8 @@ func _restore_imported_sources() -> void:
 	var order_ids: Array[String] = []
 	var history := _extension("owner-pages", {})
 	var batches: Array = history.get("batches", [])
+	if not batches.is_empty() and batches[0] is Dictionary:
+		_batch_import_id = str(batches[0].get("batch_id", ""))
 	for batch_index in range(batches.size() - 1, -1, -1):
 		if not batches[batch_index] is Dictionary:
 			continue
@@ -558,6 +844,15 @@ func _restore_imported_sources() -> void:
 	if not selected_is_gameplay:
 		_selected_import_source_id = _PINNED_002_SOURCE_ID if _gameplay_source_index(_PINNED_002_SOURCE_ID) >= 0 else str(_gameplay_sources[0].get("source_id", ""))
 	_select_imported_source_by_id(_selected_import_source_id)
+	if not _batch_import_id.is_empty():
+		var imported_batch := _extension("batch-load", {"batch_id": _batch_import_id})
+		var imported_manifest: Dictionary = imported_batch.get("batch", {})
+		_last_import_summary = {"batch_id": _batch_import_id, "selected_count": imported_manifest.get("items", []).size(), "imported_count": int(imported_manifest.get("counts", {}).get("success", 0)), "reused_count": 0}
+	var latest_job := _extension("png-batch-latest", {})
+	var resumable_job: Dictionary = latest_job.get("job", {})
+	if not resumable_job.is_empty():
+		_batch_job_id = str(resumable_job.get("job_id", ""))
+		_batch_snapshot = resumable_job
 	_refresh_runtime_cards()
 
 
@@ -679,9 +974,9 @@ func _build_master_controls() -> void:
 	_place_control("MaxRobotsAuto", Rect2(172, 253, 190, 38), _keep_auto_robot_cap)
 	_place_control("BackgroundIntent", Rect2(172, 297, 190, 38), _toggle_background)
 	_place_control("RunLevelPipeline", Rect2(26, 347, 335, 52), _run_level_pipeline)
-	_place_control("SolveAgain", Rect2(1207, 625, 291, 50), _solve_again)
-	_place_control("PreviewReplay", Rect2(1368, 390, 130, 38), _preview_replay)
-	_place_control("ExpandSupplyPlan", Rect2(1207, 485, 291, 42), _toggle_supply_plan)
+	_place_control("PreviewReplay", Rect2(1207, 316, 142, 38), _preview_replay)
+	_place_control("ExpandSupplyPlan", Rect2(1356, 316, 142, 38), _toggle_supply_plan)
+	_place_control("SolveAgain", Rect2(1207, 362, 94, 38), _solve_again)
 	_place_control("LevelVariation1", Rect2(405, 864, 88, 58), _select_variation.bind(0))
 	_place_control("LevelVariation2", Rect2(501, 864, 88, 58), _select_variation.bind(1))
 	_place_control("LevelVariation3", Rect2(597, 864, 88, 58), _select_variation.bind(2))
@@ -690,8 +985,8 @@ func _build_master_controls() -> void:
 	_place_control("LevelVariation6", Rect2(885, 864, 88, 58), _select_variation.bind(5))
 	_place_control("LevelVariation7", Rect2(981, 864, 88, 58), _select_variation.bind(6))
 	_place_control("LevelVariation8", Rect2(1077, 864, 88, 58), _select_variation.bind(7))
-	_place_control("AcceptLevel", Rect2(1207, 686, 138, 50), _review_candidate.bind("ACCEPT"))
-	_place_control("RejectLevel", Rect2(1360, 686, 138, 50), _review_candidate.bind("REJECT"))
+	_place_control("AcceptLevel", Rect2(1304, 362, 94, 38), _review_candidate.bind("ACCEPT"))
+	_place_control("RejectLevel", Rect2(1401, 362, 97, 38), _review_candidate.bind("REJECT"))
 	# RELEASE POOL uses canonical pool, campaign, and staging operations.
 	_place_control("RefreshReleasePool", Rect2(27, 202, 330, 40), _refresh_release_pool)
 	_place_control("SelectReleaseLevel", Rect2(25, 292, 335, 55), _select_first_release)
@@ -849,6 +1144,7 @@ func _update_master_control_visibility() -> void:
 		if batch_path != null: batch_path.visible = _generation_mode == "BATCH"
 		if run_batch != null: run_batch.visible = _generation_mode == "BATCH"
 		if batch_select != null: batch_select.visible = false
+	_refresh_run_button_caption()
 
 
 func _report(message: String) -> void:
@@ -958,6 +1254,11 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 
 func _import_pngs(paths: Array) -> void:
 	var result := _extension("batch-import", {"paths": paths})
+	var new_batch_id := str(result.get("batch_id", ""))
+	if new_batch_id != _batch_import_id:
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+	_batch_import_id = new_batch_id
 	var items: Array = result.get("items", [])
 	var lines: Array[String] = []
 	var item_records: Array[Dictionary] = []
@@ -993,7 +1294,7 @@ func _import_pngs(paths: Array) -> void:
 			item_records.append(rejected.duplicate(true))
 	_last_import_summary = {
 		"selected_count": paths.size(), "imported_count": imported_count, "reused_count": reused_count,
-		"rejected_count": rejected_count, "batch_id": str(result.get("batch_id", "")),
+		"rejected_count": rejected_count, "batch_id": new_batch_id,
 		"preview_source_id": preview_source_id, "preview_path": preview_path,
 		"accepted_source_count": _imported_sources.size(), "solver_calls": 0,
 		"items": lines.duplicate(), "item_records": item_records.duplicate(true), "rejected": _rejected_imports.duplicate(true)
@@ -1181,6 +1482,16 @@ func _send_to_level_factory() -> void:
 func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
+	var imported_count := int(_last_import_summary.get("imported_count", 0)) + int(_last_import_summary.get("reused_count", 0))
+	if imported_count > 1 and not _batch_import_id.is_empty():
+		_run_png_batch()
+		return
+	_run_single_level_pipeline()
+
+
+func _run_single_level_pipeline() -> void:
+	if _gateway == null or _operation_running:
+		return
 	_activity_source_id = _selected_import_source_id
 	if not _pinned_source_preflight_ok:
 		_refresh_pinned_source_preflight()
@@ -1265,6 +1576,146 @@ func _run_level_pipeline() -> void:
 	_activity_message = "Waiting for the first backend stage."
 	_activity_stage = "STARTING"
 	_refresh_activity_header()
+	_refresh_run_button_caption()
+
+
+func _run_png_batch() -> void:
+	if _gateway == null or _operation_running:
+		return
+	if _batch_import_id.is_empty():
+		_report("Import a multi-PNG batch before starting sequential processing.")
+		return
+	if not _pinned_source_preflight_ok:
+		_refresh_pinned_source_preflight()
+		if not _pinned_source_preflight_ok:
+			_report(_pinned_source_preflight_message)
+			return
+	if _batch_job_id.is_empty():
+		var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
+		var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
+		var job: Dictionary = created.get("job", {})
+		if job.is_empty():
+			_report("PNG batch plan could not be verified: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
+			return
+		_batch_job_id = str(job.get("job_id", ""))
+		_batch_snapshot = job
+		if _batch_job_id.is_empty():
+			_report("PNG batch planner returned no durable job identity.")
+			return
+	if str(_batch_snapshot.get("state", "")) == "COMPLETE":
+		_report("This PNG batch is complete. Import a new batch to start another run.")
+		return
+	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
+		_report("Canonical async PNG batch gateway is unavailable.")
+		return
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "png-batch-run", {"job_id": _batch_job_id})
+	if prepared.is_empty():
+		_report("Canonical Python Factory Core cannot start the PNG batch.")
+		return
+	_pipeline_mutex.lock()
+	_pipeline_worker_done = false
+	_pipeline_worker_result.clear()
+	_pipeline_mutex.unlock()
+	_pipeline_thread = Thread.new()
+	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
+	if thread_error != OK:
+		_pipeline_thread = null
+		_report("PNG batch worker could not start.")
+		return
+	_operation_running = true
+	for control_name in ["SolveAgain", "AcceptLevel", "RejectLevel"]:
+		var guarded := get_node_or_null(control_name) as Button
+		if guarded != null: guarded.disabled = true
+	_activity_run_id = ""
+	_activity_source_id = _selected_import_source_id
+	_activity_stage = "BATCH QUEUED"
+	_activity_message = "Explicit sequential PNG batch is running through canonical pipeline workers."
+	_activity_backend_disposition = ""
+	_activity_finished_msec = 0
+	_activity_started_msec = Time.get_ticks_msec()
+	_activity_source_filename = _selected_import_filename()
+	_activity_terminal_state = ""
+	if _activity_rows != null:
+		for child in _activity_rows.get_children(): child.queue_free()
+	_refresh_activity_header()
+	_refresh_run_button_caption()
+	if _batch_pause_button != null: _batch_pause_button.visible = true
+	if _batch_stop_button != null: _batch_stop_button.visible = true
+	_append_activity_row({"seq": 1, "elapsed_ms": 0, "stage": "BATCH", "state": "RUNNING", "message": "Owner explicitly started the sequential PNG batch."})
+
+
+func _request_batch_pause() -> void:
+	_request_batch_control("PAUSE_AFTER_CURRENT")
+
+
+func _request_batch_stop() -> void:
+	_request_batch_control("STOP_AFTER_CURRENT")
+
+
+func _request_batch_control(action: String) -> void:
+	if _gateway == null or _batch_job_id.is_empty() or not _operation_running:
+		return
+	var result: Dictionary = _gateway.call("run_studio_extension", "png-batch-control", {"job_id": _batch_job_id, "action": action})
+	if str(result.get("state", "")) != "SUCCESS":
+		_report("Batch control request failed: %s" % str(result.get("error", "UNAVAILABLE")))
+	else:
+		_activity_message = "Pause/stop requested after the current source finishes."
+		_refresh_activity_header()
+
+
+func _refresh_batch_progress() -> void:
+	if _batch_job_id.is_empty() or Time.get_ticks_msec() - _batch_last_read_msec < 750:
+		return
+	_batch_last_read_msec = Time.get_ticks_msec()
+	var path := ProjectSettings.globalize_path("res://output/studio-extensions/png-batches/jobs").path_join(_batch_job_id + ".json")
+	if not FileAccess.file_exists(path):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not parsed is Dictionary or str(parsed.get("schema", "")) != "scrubbots-studio-png-sequential-batch" or str(parsed.get("job_id", "")) != _batch_job_id:
+		return
+	if parsed != _batch_snapshot:
+		_batch_snapshot = parsed
+		if _operation_running:
+			var current_index: Variant = parsed.get("current_index")
+			var items: Array = parsed.get("items", [])
+			if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
+				var current: Dictionary = items[current_index]
+				_activity_source_filename = str(current.get("original_filename", current.get("display_name", "Selected PNG")))
+				_activity_source_id = str(current.get("source_id", ""))
+				_activity_stage = "CANONICAL PIPELINE"
+				_activity_message = "Processing source %d of %d · %d columns" % [current_index + 1, items.size(), int(current.get("column_count", 0))]
+		_refresh_activity_header()
+		_refresh_live_data()
+		_refresh_run_button_caption()
+
+
+func _complete_png_batch(result: Dictionary) -> void:
+	_operation_running = false
+	_activity_finished_msec = Time.get_ticks_msec()
+	_batch_snapshot = result.get("job", _batch_snapshot)
+	_activity_stage = str(_batch_snapshot.get("state", result.get("disposition", "ERROR")))
+	_activity_backend_disposition = _activity_stage
+	_activity_terminal_state = _activity_stage
+	_activity_message = "Batch %s · %s READY · %s failed · %s remaining" % [
+		_activity_stage, str(_batch_snapshot.get("counts", {}).get("ready", 0)),
+		str(_batch_snapshot.get("counts", {}).get("failed", 0)),
+		str(_batch_snapshot.get("counts", {}).get("remaining", 0))
+	]
+	if _pipeline_thread != null:
+		_pipeline_thread = null
+	var run_button := get_node_or_null("RunLevelPipeline") as Button
+	if run_button != null: run_button.disabled = false
+	for control_name in ["SolveAgain", "AcceptLevel", "RejectLevel"]:
+		var guarded := get_node_or_null(control_name) as Button
+		if guarded != null: guarded.disabled = false
+	if _batch_pause_button != null: _batch_pause_button.visible = false
+	if _batch_stop_button != null: _batch_stop_button.visible = false
+	_refresh_release_pool(false)
+	_refresh_activity_header()
+	_refresh_live_data()
+	_append_activity_row({"seq": _activity_events.size() + 1, "elapsed_ms": max(0, Time.get_ticks_msec() - _activity_started_msec), "stage": "BATCH", "state": _activity_stage, "message": _activity_message})
+	_refresh_run_button_caption()
+	_report(_activity_message)
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -1400,6 +1851,21 @@ func _fail_activity_monitor(reason: String) -> void:
 func _refresh_activity_header() -> void:
 	if _activity_state_label == null:
 		return
+	if not _batch_job_id.is_empty() and _operation_running:
+		var counts: Dictionary = _batch_snapshot.get("counts", {})
+		var current_index: Variant = _batch_snapshot.get("current_index")
+		var items: Array = _batch_snapshot.get("items", [])
+		var current_caption := "Starting next verified PNG"
+		if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
+			var current: Dictionary = items[current_index]
+			current_caption = "%s · %d columns" % [str(current.get("original_filename", current.get("display_name", "Selected PNG"))).left(24), int(current.get("column_count", 0))]
+		_activity_state_label.text = "RUNNING"
+		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(Color("#245478"), Color("#6b8bb9")))
+		_activity_source_label.text = "%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + (1 if current_index is int else 0), int(counts.get("total", 0))]
+		_activity_source_label.tooltip_text = "Sequential batch %s" % _batch_job_id
+		_activity_phase_label.text = "Canonical pipeline · %d READY · %d failed" % [int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+		_activity_phase_label.tooltip_text = _activity_message
+		return
 	var activity_matches_selection := _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
 	if not activity_matches_selection:
 		_activity_state_label.text = "SOURCE ONLY"
@@ -1459,6 +1925,9 @@ func _complete_local_pipeline_failure(reason: String) -> void:
 
 
 func _complete_level_pipeline(result: Dictionary) -> void:
+	if not _batch_job_id.is_empty() and _activity_run_id.is_empty():
+		_complete_png_batch(result)
+		return
 	var completed_source_id := str(result.get("source_id", ""))
 	var still_selected := completed_source_id == _selected_import_source_id and completed_source_id == _activity_source_id
 	if still_selected:
@@ -2035,108 +2504,72 @@ func _toggle_background() -> void:
 
 
 func _solve_again() -> void:
-	_run_level_pipeline()
+	_run_single_level_pipeline()
 
 
 func _preview_replay() -> void:
-	if _supply_dialog != null:
-		_supply_dialog.hide()
-		_supply_expanded = false
 	var primary := _pipeline_primary_for_selected_source()
 	var verified := _verify_saved_solver_artifacts(primary)
 	if not verified.get("ok", false):
-		_report("REPLAY_EVIDENCE_MISSING · %s" % str(verified.get("reason", "Source-bound proof is unavailable.")))
+		_show_inline_result_error("REPLAY_EVIDENCE_MISSING · %s" % str(verified.get("reason", "Source-bound proof is unavailable.")))
 		return
 	var result: Dictionary = primary.get("result", {})
 	var replay: Dictionary = result.get("solution_replay", {})
 	_replay_trace = result.get("solution_trace", [])
 	if replay.is_empty() or _replay_trace.is_empty():
-		_report("REPLAY_EVIDENCE_MISSING · the canonical run has no recorded solution trace.")
+		_show_inline_result_error("REPLAY_EVIDENCE_MISSING · the canonical run has no recorded solution trace.")
 		return
 	var replay_won := bool(replay.get("ok", false)) and bool(replay.get("solved", false)) and int(replay.get("finalActive", -1)) == 0
-	if not replay_won:
-		_report("REPLAY_NOT_WIN · recorded replay does not prove WIN.")
-	if _replay_dialog != null and _replay_dialog.visible:
-		_replay_dialog.hide()
-		return
-	if _replay_dialog == null:
-		_replay_dialog = AcceptDialog.new()
-		_replay_dialog.title = "Replay Preview"
-		_replay_dialog.confirmed.connect(func(): _replay_dialog.hide())
-		var summary := Label.new()
-		summary.name = "ReplaySummary"
-		summary.custom_minimum_size = Vector2(680, 44)
-		summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		summary.text = "TRACE-ONLY · visual board states are not stored"
-		_replay_dialog.add_child(summary)
-		_replay_step_label = RichTextLabel.new()
-		_replay_step_label.custom_minimum_size = Vector2(680, 250)
-		_replay_dialog.add_child(_replay_step_label)
-		var controls := HBoxContainer.new()
-		var previous := Button.new()
-		previous.text = "Previous"
-		previous.pressed.connect(func(): _set_replay_step(_replay_step - 1))
-		var next := Button.new()
-		next.text = "Next"
-		next.pressed.connect(func(): _set_replay_step(_replay_step + 1))
-		controls.add_child(previous)
-		controls.add_child(next)
-		_replay_dialog.add_child(controls)
-		add_child(_replay_dialog)
+	_results_mode = "REPLAY"
+	_results_source_id = _selected_import_source_id
+	_results_run_id = str(_last_pipeline.get("run_id", ""))
+	_clear_result_rows()
+	_results_nav.visible = true
+	_results_panel.visible = true
 	_replay_step = 0
-	var replay_summary := _replay_dialog.get_node_or_null("ReplaySummary") as Label
-	if replay_summary != null:
-		replay_summary.text = "TRACE-ONLY · REPLAY_VISUAL_STATES_NOT_AVAILABLE · %s · %d steps · final active %s · source %s · run %s · activity %s" % [
-			"WIN" if replay_won else "REPLAY_NOT_WIN",
-			_replay_trace.size(), str(replay.get("finalActive", "?")), _selected_import_source_id,
-			str(_last_pipeline.get("run_id", "")), str(_last_pipeline.get("request", {}).get("activity_run_id", ""))
-		]
+	_results_summary.text = "TRACE-ONLY · %s · %d steps" % ["WIN" if replay_won else "REPLAY_NOT_WIN", _replay_trace.size()]
+	_results_summary.tooltip_text = "Source %s\nRun %s\nActivity %s\nRecorded trace only; visual board states are not stored." % [
+		_results_source_id, _results_run_id, str(_last_pipeline.get("request", {}).get("activity_run_id", ""))
+	]
+	if not replay_won:
+		_add_result_row("Replay did not prove WIN.")
 	_set_replay_step(0)
-	_replay_dialog.popup_centered()
+	_refresh_live_data()
 
 
 func _set_replay_step(index: int) -> void:
-	if _replay_trace.is_empty() or _replay_step_label == null:
+	if _replay_trace.is_empty() or _results_mode != "REPLAY" or _selected_import_source_id != _results_source_id or str(_last_pipeline.get("run_id", "")) != _results_run_id:
 		return
 	_replay_step = posmod(index, _replay_trace.size())
 	var step: Dictionary = _replay_trace[_replay_step]
 	var batch: Dictionary = step.get("batch", {})
-	_replay_step_label.text = "Step %d / %d\nColumn: %s\nBatch: %s × %s\nClears: %s\nPixels left: %s" % [
-		_replay_step + 1, _replay_trace.size(), str(step.get("column", "?")),
-		str(batch.get("color", "?")), str(batch.get("amount", "?")),
-		str(step.get("clears", "?")), str(step.get("pixels_left", "?"))
-	]
+	_clear_result_rows()
+	_add_result_row("Step %d / %d" % [_replay_step + 1, _replay_trace.size()])
+	_add_result_row("Column: %s" % str(step.get("column", "?")))
+	_add_result_row("Batch: %s × %s" % [str(batch.get("color", "?")), str(batch.get("amount", "?"))])
+	_add_result_row("Clears: %s" % str(step.get("clears", "?")))
+	_add_result_row("Pixels left: %s" % str(step.get("pixels_left", "?")))
+	_results_scroll.scroll_vertical = 0
+	_results_summary.text = "TRACE-ONLY · Step %d / %d" % [_replay_step + 1, _replay_trace.size()]
 
 
 func _toggle_supply_plan() -> void:
-	if _supply_dialog != null and _supply_dialog.visible:
-		_supply_dialog.hide()
-		_supply_expanded = false
-		return
-	if _replay_dialog != null:
-		_replay_dialog.hide()
 	var primary := _pipeline_primary_for_selected_source()
 	var verified := _verify_saved_solver_artifacts(primary)
 	if not verified.get("ok", false):
-		_report("SUPPLY_PLAN_HASH_INVALID · %s" % str(verified.get("reason", "Canonical supply evidence is unavailable.")))
+		_show_inline_result_error("SUPPLY_PLAN_HASH_INVALID · %s" % str(verified.get("reason", "Canonical supply evidence is unavailable.")))
 		return
 	var result: Dictionary = primary.get("result", {})
 	var columns: Array = result.get("supply_columns", [])
 	if columns.is_empty():
-		_report("SUPPLY_PLAN_MISSING · canonical result contains no supply columns.")
+		_show_inline_result_error("SUPPLY_PLAN_MISSING · canonical result contains no supply columns.")
 		return
-	if _supply_dialog == null:
-		_supply_dialog = AcceptDialog.new()
-		_supply_dialog.title = "Supply Plan"
-		_supply_dialog.visibility_changed.connect(func(): _supply_expanded = _supply_dialog.visible)
-		_supply_dialog.confirmed.connect(func(): _supply_dialog.hide())
-		add_child(_supply_dialog)
-	for child in _supply_dialog.get_children():
-		_supply_dialog.remove_child(child)
-		child.queue_free()
-	var label := RichTextLabel.new()
-	label.custom_minimum_size = Vector2(720, 440)
-	label.fit_content = true
+	_results_mode = "SUPPLY"
+	_results_source_id = _selected_import_source_id
+	_results_run_id = str(_last_pipeline.get("run_id", ""))
+	_results_nav.visible = false
+	_results_panel.visible = true
+	_clear_result_rows()
 	var totals: Array = result.get("column_pixel_totals", [])
 	var total_robots := 0
 	for column_variant in columns:
@@ -2147,24 +2580,39 @@ func _toggle_supply_plan() -> void:
 	var total_pixels := 0
 	for amount_variant in totals:
 		total_pixels += int(amount_variant)
-	var lines: PackedStringArray = ["%d columns · %d batches · preview depth %d · source %s" % [
-		columns.size(), int(result.get("total_batches", 0)), int(result.get("visible_preview_depth", 3)), _wrap_identity(_selected_import_source_id, 18)
-	]]
-	lines.append("Total robots: %d · total pixels: %d" % [total_robots, total_pixels])
+	_results_summary.text = "%d columns · %d batches · preview depth %d" % [columns.size(), int(result.get("total_batches", 0)), int(result.get("visible_preview_depth", 3))]
+	_results_summary.tooltip_text = "Source %s\nRun %s" % [_results_source_id, _results_run_id]
+	_add_result_row("Total robots: %d · total pixels: %d" % [total_robots, total_pixels])
 	for column_index in range(columns.size()):
-		var batch_lines: PackedStringArray = []
+		_add_result_row("Column %d · %s pixels" % [column_index + 1, str(totals[column_index]) if column_index < totals.size() else "?"])
 		for batch_variant in columns[column_index]:
 			if batch_variant is Dictionary:
-				batch_lines.append("%s × %s" % [str(batch_variant.get("color", "?")), str(batch_variant.get("amount", "?"))])
-		lines.append("Column %d · %s pixels\n%s" % [
-			column_index + 1, str(totals[column_index]) if column_index < totals.size() else "?",
-			"  " + "\n  ".join(batch_lines)
-		])
+				_add_supply_batch_row(str(batch_variant.get("color", "?")), int(batch_variant.get("amount", 0)))
 	var conservation: Dictionary = result.get("color_conservation_verification", {})
-	lines.append("Conservation: %s" % ("PASS" if conservation.get("all_ok", false) else "NOT VERIFIED"))
-	label.text = "\n\n".join(lines)
-	_supply_dialog.add_child(label)
-	_supply_dialog.popup_centered()
+	_add_result_row("Conservation: %s" % ("PASS" if conservation.get("all_ok", false) else "NOT VERIFIED"))
+	_results_scroll.scroll_vertical = 0
+	_refresh_live_data()
+
+
+func _show_inline_result_error(message: String) -> void:
+	_results_mode = "ERROR"
+	_results_source_id = _selected_import_source_id
+	_results_run_id = str(_last_pipeline.get("run_id", "")) if str(_last_pipeline.get("source_id", "")) == _selected_import_source_id else ""
+	_results_nav.visible = false
+	_results_panel.visible = true
+	_clear_result_rows()
+	_results_summary.text = "Results unavailable"
+	_results_summary.tooltip_text = message
+	_add_result_row(message)
+	_report(message)
+
+
+func _selected_batch_column() -> int:
+	var items: Array = _batch_snapshot.get("items", [])
+	for item_variant in items:
+		if item_variant is Dictionary and str(item_variant.get("source_id", "")) == _selected_import_source_id:
+			return int(item_variant.get("column_count", 0))
+	return 0
 
 
 func _pipeline_primary_for_selected_source() -> Dictionary:
@@ -2216,6 +2664,11 @@ func _hide_review_dialogs() -> void:
 	_supply_expanded = false
 	if _replay_dialog != null:
 		_replay_dialog.hide()
+	if _results_panel != null:
+		_results_panel.visible = false
+	_results_mode = ""
+	_results_source_id = ""
+	_results_run_id = ""
 
 
 func _edit_release_search() -> void:

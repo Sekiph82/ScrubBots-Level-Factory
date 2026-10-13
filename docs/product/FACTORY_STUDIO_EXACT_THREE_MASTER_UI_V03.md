@@ -90,6 +90,12 @@ For backend truth/safety, existing canonical pipeline, solver, review, publisher
 
 If an old UI document, old prompt, screenshot, placeholder or legacy workspace conflicts with these three masters, it is superseded for owner-facing layout.
 
+## Direct owner responsive override — 2026-10-13
+
+The owner-approved decision `docs/decisions/OWNER_FACTORY_STUDIO_LEVEL_FACTORY_COMPACT_BATCH_20261013_V01.md` supersedes only the Level Factory screen's old fixed 1536×1024 letterboxed placement and the right-side Details / Replay / Supply layout. Level Factory must use the actual full client rectangle with adaptive left, Visual Review, and right regions; the thumbnail strip docks to the bottom. Details use at most five compact paired rows, followed by the existing two Replay/Supply actions, the existing three review/run actions, and one clipped, scrollable inline Results panel. Replay and Supply do not open modal windows.
+
+The three production screen identities, navigation order, source/gallery interactions, artwork behavior, and PIXEL ART / RELEASE POOL compositions remain governed by their corresponding masters. The responsive override changes layout geometry and Level Factory results placement only; it does not introduce a fourth screen or alter backend evidence.
+
 ## No-explanation rule
 
 The three main screens show only:
