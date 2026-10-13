@@ -653,3 +653,9 @@ Document role: CODEX BUILDER LOG
 - **Pre-push gate:** `git fetch --prune origin` found `origin/main=b2e71720894089f329a687b90d1dbe1e0f128b1b`; local HEAD `0e6c5a5aae06c2d5159c9ce587880549fea37a07` was a descendant, 3 ahead / 0 behind. `git merge-base --is-ancestor origin/main HEAD` passed.
 - **Push:** normal `git push origin HEAD:main` succeeded (`b2e7172..0e6c5a5`). Post-push `git fetch --prune origin` verified local HEAD and `origin/main` both `0e6c5a5aae06c2d5159c9ce587880549fea37a07`, 0 ahead / 0 behind, no tracked modifications. Existing untracked owner files were not staged or removed.
 - This checkpoint is committed; a final log-only push and its post-fetch parity will be recorded in the next checkpoint. No acceptance/audit status is asserted here.
+
+### Final publication checkpoint
+
+- **Remote verification before final log commit:** `git fetch --prune origin` succeeded; local HEAD and `origin/main` both resolved to `b5b48a73f16b6742b350de5e267a843044f72d76`, with 0 ahead / 0 behind and no tracked modifications. This confirms the prior normal push carrying product commits and publication checkpoint 1 was accepted.
+- **Final log update:** this R08-only append records the verified push state. No product files, tracker, audits, prompts, or owner-local paths were changed.
+- **Timestamp:** 2026-10-13 22:05:45 UTC.
