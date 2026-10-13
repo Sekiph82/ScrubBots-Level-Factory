@@ -5,6 +5,11 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Get-FullPathForIdentity {
+    param([Parameter(Mandatory)][string]$Path)
+    return [IO.Path]::GetFullPath($Path).TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar)
+}
+
 function Test-Godot4Executable {
     param([Parameter(Mandatory)][string]$Candidate)
 
@@ -65,10 +70,12 @@ try {
         return
     }
 
+    $godotSha256 = (Get-FileHash -LiteralPath $godotPath -Algorithm SHA256).Hash
     $quotedProjectPath = '"{0}"' -f $projectPath
     $studioProcess = Start-Process -FilePath $godotPath -ArgumentList @('--path', $quotedProjectPath) -WorkingDirectory $repoRoot -PassThru
     $studioProcessId = $studioProcess.Id
     $windowTitle = 'ScrubBots Factory Studio'
+    $allowedWindowTitles = @($windowTitle, "$windowTitle (DEBUG)")
     if (-not ('FactoryStudioNativeWindowTitle' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;
@@ -76,38 +83,63 @@ using System.Runtime.InteropServices;
 public static class FactoryStudioNativeWindowTitle {
     [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "SetWindowTextW", SetLastError = true)]
     public static extern bool SetWindowText(IntPtr windowHandle, string windowTitle);
+    [DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId", SetLastError = true)]
+    public static extern uint GetWindowThreadProcessId(IntPtr windowHandle, out uint processId);
 }
 '@
     }
 
     $windowHandle = [IntPtr]::Zero
+    $titleVerified = $false
+    $titleSetAttempted = $false
+    $lastWindowTitle = ''
+    $processIdentityVerified = $false
+    $expectedProjectPath = Get-FullPathForIdentity $projectPath
+    $projectArgumentPattern = '(?i)(?:^|\s)--path\s+"' + [regex]::Escape($expectedProjectPath) + '"(?:\s|$)'
     for ($attempt = 0; $attempt -lt 80; $attempt++) {
         $studioProcess = Get-Process -Id $studioProcessId -ErrorAction Stop
         if ($studioProcess.HasExited) {
             throw 'Godot exited before the Studio window was ready.'
         }
+        if (-not $processIdentityVerified) {
+            $processIdentity = Get-CimInstance -ClassName Win32_Process -Filter "ProcessId = $studioProcessId" -ErrorAction Stop
+            if ($null -eq $processIdentity -or -not (Test-Path -LiteralPath $processIdentity.ExecutablePath -PathType Leaf)) {
+                throw 'Factory Studio process executable identity could not be read.'
+            }
+            if (-not (Test-Godot4Executable -Candidate $processIdentity.ExecutablePath) -or
+                    (Get-FileHash -LiteralPath $processIdentity.ExecutablePath -Algorithm SHA256).Hash -ne $godotSha256) {
+                throw 'Factory Studio process did not start from the exact approved Godot 4 executable.'
+            }
+            if ($processIdentity.CommandLine -notmatch $projectArgumentPattern) {
+                throw 'Factory Studio process was not launched with the exact approved Release project path.'
+            }
+            $processIdentityVerified = $true
+        }
         $windowHandle = $studioProcess.MainWindowHandle
         if ($windowHandle -ne [IntPtr]::Zero) {
-            break
+            [uint32]$windowProcessId = 0
+            [void][FactoryStudioNativeWindowTitle]::GetWindowThreadProcessId($windowHandle, [ref]$windowProcessId)
+            if ([int]$windowProcessId -ne $studioProcessId) {
+                throw 'Factory Studio main window handle belongs to a different process.'
+            }
+            $studioProcess.Refresh()
+            $lastWindowTitle = $studioProcess.MainWindowTitle
+            if ($allowedWindowTitles -ccontains $lastWindowTitle) {
+                $titleVerified = $true
+                break
+            }
+            if (-not $titleSetAttempted) {
+                [void][FactoryStudioNativeWindowTitle]::SetWindowText($windowHandle, $windowTitle)
+                $titleSetAttempted = $true
+            }
         }
         Start-Sleep -Milliseconds 125
     }
     if ($windowHandle -eq [IntPtr]::Zero) {
         throw 'Factory Studio did not create a main window within 10 seconds.'
     }
-    Start-Sleep -Seconds 5
-    $studioProcess = Get-Process -Id $studioProcessId -ErrorAction Stop
-    $windowHandle = $studioProcess.MainWindowHandle
-    if ($windowHandle -eq [IntPtr]::Zero) {
-        throw 'Factory Studio main window closed before its title was verified.'
-    }
-    if (-not [FactoryStudioNativeWindowTitle]::SetWindowText($windowHandle, $windowTitle)) {
-        throw 'Could not set the Factory Studio window title.'
-    }
-    Start-Sleep -Milliseconds 300
-    $studioProcess.Refresh()
-    if ($studioProcess.MainWindowTitle -ne $windowTitle) {
-        throw 'Factory Studio window title did not match the owner-approved title.'
+    if (-not $titleVerified) {
+        throw "Factory Studio window title was not an approved exact title. Last title: '$lastWindowTitle'."
     }
 }
 catch {

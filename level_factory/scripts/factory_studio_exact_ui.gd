@@ -286,7 +286,10 @@ func _apply_responsive_layout() -> void:
 	# Anchor long panels and the image strip to the real client bottom; no 1536x1024 letterbox remains.
 	var bottom_margin := 18.0 * scale_y
 	var main_top := 116.0 * scale_y
-	var bottom_y := size.y - bottom_margin - 106.0 * scale_y
+	var dock_height := 106.0 * scale_y
+	if _screen == "LEVEL FACTORY":
+		dock_height = clampf(164.0 * scale_y, 128.0, 182.0)
+	var bottom_y := size.y - bottom_margin - dock_height
 	var left_panel := get_node_or_null("RuntimeLeftPanel") as Control
 	var details_panel := get_node_or_null("RuntimeDetailsPanel") as Control
 	var center_panel := get_node_or_null("RuntimeCanvasPanel") as Control
@@ -299,7 +302,7 @@ func _apply_responsive_layout() -> void:
 	if details_panel != null: details_panel.size.y = maxf(220.0, size.y - details_panel.position.y - bottom_margin)
 	if bottom_panel != null:
 		bottom_panel.position.y = bottom_y
-		bottom_panel.size.y = 106.0 * scale_y
+		bottom_panel.size.y = dock_height
 	if center_panel != null:
 		center_panel.size.x = maxf(300.0, right_start - center_start - 16.0)
 		center_panel.size.y = maxf(220.0, bottom_y - main_top - 12.0 * scale_y)
@@ -307,9 +310,7 @@ func _apply_responsive_layout() -> void:
 		_preview_host.position = Vector2(center_start + 12.0 * center_scale, 160.0 * scale_y)
 		_preview_host.size = Vector2(maxf(280.0, center_panel.size.x - 24.0 * center_scale), maxf(180.0, bottom_y - _preview_host.position.y - 24.0 * scale_y))
 		_preview_content.pivot_offset = _preview_host.size * 0.5
-		if _preview_rect != null:
-			_preview_rect.size = _preview_host.size
-			_preview_rect.pivot_offset = _preview_host.size * 0.5
+		_fit_preview_image_to_host()
 	if _results_panel != null:
 		var panel_bottom := size.y - bottom_margin
 		_results_panel.size.y = maxf(180.0, panel_bottom - _results_panel.position.y)
@@ -362,12 +363,34 @@ func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -
 			var current_style := button.get_theme_stylebox(state) as StyleBoxFlat
 			if current_style == null:
 				continue
+			if (is_equal_approx(current_style.content_margin_left, 2.0)
+					and is_equal_approx(current_style.content_margin_right, 2.0)
+					and is_equal_approx(current_style.content_margin_top, 2.0)
+					and is_equal_approx(current_style.content_margin_bottom, 2.0)):
+				continue
 			var compact_style := current_style.duplicate() as StyleBoxFlat
 			compact_style.content_margin_left = 2.0
 			compact_style.content_margin_right = 2.0
 			compact_style.content_margin_top = 2.0
 			compact_style.content_margin_bottom = 2.0
 			button.add_theme_stylebox_override(state, compact_style)
+
+
+func _fit_preview_image_to_host() -> void:
+	if _preview_host == null or _preview_rect == null or _preview_content == null:
+		return
+	if _preview_rect.texture == null:
+		return
+	var texture_size := _preview_rect.texture.get_size()
+	if texture_size.x <= 0.0 or texture_size.y <= 0.0:
+		return
+	var fit_scale := minf(_preview_host.size.x / texture_size.x, _preview_host.size.y / texture_size.y)
+	var fitted_size := texture_size * fit_scale
+	_preview_rect.size = fitted_size
+	_preview_rect.position = (_preview_host.size - fitted_size) * 0.5
+	_preview_rect.pivot_offset = fitted_size * 0.5
+	_preview_content.size = _preview_host.size
+	_preview_content.pivot_offset = _preview_host.size * 0.5
 
 
 func _layout_release_pool_dashboard(left_scale: float, right_start: float, right_width: float, scale_y: float) -> void:
@@ -949,6 +972,8 @@ func _refresh_live_data() -> void:
 		var active_run := _operation_running and _activity_source_id == _selected_import_source_id
 		var batch_following := not _batch_follow_item.is_empty() and str(_batch_follow_item.get("source_id", "")) == _selected_import_source_id and not _batch_follow_token.is_empty()
 		var batch_item_state := str(_batch_follow_item.get("status", "")) if batch_following else ""
+		if batch_following and batch_item_state == "RUNNING" and str(_batch_snapshot.get("state", "")) in ["PAUSED", "INTERRUPTED"]:
+			batch_item_state = str(_batch_snapshot.get("state", ""))
 		var batch_active := batch_following and _operation_running and str(_batch_snapshot.get("state", "")) == "RUNNING"
 		var pipeline_state := "RUNNING" if active_run else "ERROR" if monitor_failed else str(_last_pipeline.get("disposition", _last_pipeline.get("state", "SOURCE_ONLY · Awaiting run"))) if selected_run else "SOURCE_ONLY · Awaiting run"
 		var pipeline_reason := "Pipeline: Running for selected source" if active_run else str(_last_pipeline.get("studio_monitor_reason", _pipeline_stop_reason(_last_pipeline))) if monitor_failed else _pipeline_stop_reason(_last_pipeline)
@@ -1249,11 +1274,11 @@ func _refresh_runtime_cards() -> void:
 			var source_id := str(imported.get("source_id", ""))
 			var filename := str(imported.get("display_filename", "image.png"))
 			var disposition := str(imported.get("disposition", "IMPORTED"))
-			var status_caption := "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
+			var status_caption := _runtime_source_status_caption(source_id, disposition)
 			var caption := ("● " if source_id == _selected_import_source_id else "") + filename.get_basename().left(9) + "\n" + status_caption
 			_set_runtime_button(level_slots[index], caption, str(imported.get("path", "")))
 			if button != null:
-				button.tooltip_text = "%s\n%s\n%s" % [filename, disposition, _wrap_identity(source_id, 24)]
+				button.tooltip_text = _runtime_source_status_tooltip(imported, filename, source_id, disposition)
 				button.disabled = _operation_running and not _batch_job_id.is_empty()
 		else:
 			if button != null:
@@ -1296,6 +1321,78 @@ func _refresh_runtime_cards() -> void:
 	var add_more := get_node_or_null("AddMoreLevels") as Button
 	if add_more != null:
 		add_more.disabled = false
+
+
+func _runtime_source_status_caption(source_id: String, disposition: String) -> String:
+	var item := _verified_batch_item_for_source(source_id)
+	if item.is_empty():
+		return "UNVERIFIED" if _batch_snapshot.has("items") and _batch_job_contains_source(source_id) else "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
+	var status := str(item.get("status", ""))
+	if str(_batch_snapshot.get("state", "")) == "INTERRUPTED" and status == "RUNNING" and not _operation_running:
+		status = "INTERRUPTED"
+	elif str(_batch_snapshot.get("state", "")) == "PAUSED" and status == "RUNNING":
+		status = "PAUSED"
+	if status == "READY" and bool(item.get("reused_existing_ready", false)):
+		return "READY · REUSED PROOF · %d COL" % int(item.get("column_count", 0))
+	return "%s · %d COL" % [status, int(item.get("column_count", 0))]
+
+
+func _runtime_source_status_tooltip(imported: Dictionary, filename: String, source_id: String, disposition: String) -> String:
+	var item := _verified_batch_item_for_source(source_id)
+	if item.is_empty():
+		return "%s\n%s\n%s" % [filename, "UNVERIFIED BATCH ITEM" if _batch_job_contains_source(source_id) else disposition, _wrap_identity(source_id, 24)]
+	var reason := str(item.get("reason", ""))
+	var details := "%s\nBatch %s · item %d\n%s · %d columns · attempt %s · run %s" % [filename, str(_batch_snapshot.get("job_id", "")), int(item.get("index", 0)) + 1, str(item.get("status", "")), int(item.get("column_count", 0)), str(item.get("attempt_id", "reused proof")), str(item.get("run_id", "—"))]
+	if bool(item.get("reused_existing_ready", false)):
+		details += "\nREADY · REUSED PROOF"
+	if not reason.is_empty():
+		details += "\nReason: %s" % reason
+	return "%s\n%s" % [details, _wrap_identity(source_id, 24)]
+
+
+func _batch_job_contains_source(source_id: String) -> bool:
+	for item_variant in _batch_snapshot.get("items", []):
+		if item_variant is Dictionary and str(item_variant.get("source_id", "")) == source_id:
+			return true
+	return false
+
+
+func _verified_batch_item_for_source(source_id: String) -> Dictionary:
+	if (source_id.is_empty() or _batch_snapshot.is_empty() or _batch_job_source_mismatch
+			or not _batch_job_matches_loaded_sources()):
+		return {}
+	var items: Array = _batch_snapshot.get("items", [])
+	for index in range(items.size()):
+		if not items[index] is Dictionary:
+			continue
+		var item: Dictionary = items[index]
+		if str(item.get("source_id", "")) != source_id:
+			continue
+		var source_index := _gameplay_source_index(source_id)
+		if source_index < 0:
+			return {}
+		var source: Dictionary = _gameplay_sources[source_index]
+		var source_sha := str(item.get("source_sha256", ""))
+		var record_sha := str(item.get("source_record_sha256", ""))
+		var status := str(item.get("status", ""))
+		var reused_ready := status == "READY" and bool(item.get("reused_existing_ready", false)) and not str(item.get("run_id", "")).is_empty()
+		var attempt_value: Variant = item.get("attempt_id", "")
+		var attempt_ok := (attempt_value != null and not str(attempt_value).is_empty()) or reused_ready
+		if (str(item.get("job_id", _batch_snapshot.get("job_id", ""))) != str(_batch_snapshot.get("job_id", ""))
+				or int(item.get("index", -1)) != index
+				or source_id.trim_prefix("owner-upload-") != source_sha
+				or str(source.get("source_sha256", source_id.trim_prefix("owner-upload-"))) != source_sha
+				or str(source.get("source_record_sha256", "")) != record_sha
+				or record_sha.length() != 64 or not attempt_ok
+				or int(item.get("column_count", 0)) not in [3, 4, 5]
+				or status not in ["QUEUED", "RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]):
+			return {}
+		if status == "READY" and str(item.get("run_id", "")).is_empty():
+			return {}
+		if _source_png_sha256(str(source.get("path", ""))) != source_sha:
+			return {}
+		return item.duplicate(true)
+	return {}
 
 
 func _build_master_controls() -> void:
@@ -2269,12 +2366,14 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	var source_id := str(item.get("source_id", ""))
 	var source_sha := str(item.get("source_sha256", ""))
 	var record_sha := str(item.get("source_record_sha256", ""))
-	var attempt_id := str(item.get("attempt_id", ""))
+	var attempt_value: Variant = item.get("attempt_id", "")
+	var attempt_id := "" if attempt_value == null else str(attempt_value)
 	var column_count := int(item.get("column_count", 0))
+	var reused_ready := str(item.get("status", "")) == "READY" and bool(item.get("reused_existing_ready", false)) and not str(item.get("run_id", "")).is_empty()
 	if (str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
 			or int(item.get("index", -1)) != item_index
 			or source_id.trim_prefix("owner-upload-") != source_sha
-			or record_sha.length() != 64 or attempt_id.is_empty() or column_count not in [3, 4, 5]):
+			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready) or column_count not in [3, 4, 5]):
 		return
 	var source_index := _gameplay_source_index(source_id)
 	if source_index < 0:
@@ -2299,12 +2398,13 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_last_candidate_id = ""
 	_last_pipeline.clear()
 	_owner_review_status = ""
-	_imported_window_start = clampi(item_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+	_imported_window_start = clampi(source_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
 	_activity_source_id = source_id
 	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
 	var job_state := str(job.get("state", ""))
 	var item_state := str(item.get("status", ""))
-	_activity_stage = "RUNNING" if _operation_running and job_state == "RUNNING" else item_state if not item_state.is_empty() else job_state
+	var visible_item_state := job_state if item_state == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else item_state
+	_activity_stage = "RUNNING" if _operation_running and job_state == "RUNNING" else visible_item_state if not visible_item_state.is_empty() else job_state
 	_activity_backend_disposition = _activity_stage
 	_activity_terminal_state = "" if _operation_running else _activity_stage
 	_activity_message = "Batch item %d/%d · %s · %d columns" % [item_index + 1, items.size(), _activity_source_filename, column_count]
@@ -2903,13 +3003,7 @@ func _load_selected_art_preview(path: String, screen_name: String = "") -> void:
 
 func _render_preview_image(image: Image, path: String = "") -> void:
 	_preview_rect.texture = ImageTexture.create_from_image(image)
-	var fit_scale := minf(_preview_host.size.x / float(image.get_width()), _preview_host.size.y / float(image.get_height()))
-	var fitted_size := Vector2(image.get_width(), image.get_height()) * fit_scale
-	_preview_rect.size = fitted_size
-	_preview_rect.position = (_preview_host.size - fitted_size) * 0.5
-	_preview_rect.pivot_offset = fitted_size * 0.5
-	_preview_content.size = _preview_host.size
-	_preview_content.pivot_offset = _preview_content.size * 0.5
+	_fit_preview_image_to_host()
 	_preview_content.scale = Vector2.ONE * _zoom
 	_preview_rect.visible = true
 	_active_preview_path = path
