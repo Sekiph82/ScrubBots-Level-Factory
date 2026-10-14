@@ -29,6 +29,7 @@ from .. import (
     logical_grid_hash,
     write_review_pack,
 )
+from ..assets import AssetArtifactError, build_asset_artifacts, write_asset_artifacts
 from ..core.request import RequestContractError
 from ..core.result import GenerationResult
 from ..generators.mask import MaskCandidate
@@ -386,6 +387,30 @@ def _semantic_normalize(args: argparse.Namespace) -> ExitCode:
     except (OSError, TypeError, ValueError) as exc:
         raise CLIError(f"could not normalize local image: {exc}", ExitCode.INVALID_REQUEST) from exc
     print(f"NORMALIZED source={input_path} output={output_path} artifact_digest={artifact.digest()} dimensions={artifact.target_width}x{artifact.target_height}")
+    return ExitCode.SUCCESS
+
+
+def _asset_export(args: argparse.Namespace) -> ExitCode:
+    try:
+        source = args.input.read_bytes()
+        frames = tuple(path.read_bytes() for path in args.frame)
+        direction_frames: dict[str, bytes] = {}
+        for item in args.direction_file:
+            direction, separator, raw_path = item.partition("=")
+            if not separator or not raw_path:
+                raise AssetArtifactError("--direction-file must use DIRECTION=PATH")
+            if direction in direction_frames:
+                raise AssetArtifactError("--direction-file directions must be unique")
+            direction_frames[direction] = Path(raw_path).read_bytes()
+        artifacts, _manifest = build_asset_artifacts(
+            source, source_name=args.input.name, directions=args.direction,
+            direction_frames=direction_frames, animation_frames=frames,
+            frame_duration_ms=args.frame_duration_ms,
+        )
+        paths = write_asset_artifacts(args.output_dir, artifacts)
+    except (AssetArtifactError, OSError, TypeError, ValueError) as exc:
+        raise CLIError(f"could not export local PNG assets: {exc}", ExitCode.INVALID_REQUEST) from exc
+    print(f"ASSET_EXPORT artifacts={len(paths)} manifest={args.output_dir / next(name for name in artifacts if name.endswith('_asset_manifest.json'))}")
     return ExitCode.SUCCESS
 
 
@@ -981,6 +1006,16 @@ def _parser() -> argparse.ArgumentParser:
     normalize.add_argument("--palette-policy", choices=(ASSET_PALETTE_POLICY, "SCRUBBOTS_C01_C16"), default=ASSET_PALETTE_POLICY)
     normalize.add_argument("--output", type=Path)
     normalize.set_defaults(handler=_semantic_normalize)
+
+    assets = sub.add_parser("asset-export", help="export deterministic local PNG variants and animation frames")
+    assets.add_argument("input", type=Path, help="read-only source PNG")
+    assets.add_argument("--output-dir", type=Path, required=True, help="new directory; existing files are never overwritten")
+    assets.add_argument("--direction", action="append", choices=("N", "NE", "E", "SE", "S", "SW", "W", "NW"), default=[])
+    assets.add_argument("--direction-file", action="append", default=[], metavar="DIRECTION=PATH",
+                        help="explicit artwork for a direction, required for diagonals; repeat as needed")
+    assets.add_argument("--frame", action="append", type=Path, default=[], help="animation frame PNG, repeat in playback order")
+    assets.add_argument("--frame-duration-ms", type=int, default=100)
+    assets.set_defaults(handler=_asset_export)
 
     supply_optimize = sub.add_parser("supply-optimize", help="run the primary offline ZIP-derived supply/solve/difficulty pipeline")
     supply_optimize.add_argument("--image", type=Path, required=True, help="local palette-exact logical PNG")
