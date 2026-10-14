@@ -14,6 +14,7 @@ import base64
 import hashlib
 import json
 import re
+from pathlib import Path
 
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$")
@@ -140,6 +141,55 @@ def render_jsonl(records: Iterable[OperationRecord]) -> bytes:
     if any(not isinstance(item, OperationRecord) for item in checked):
         raise OperationsEvidenceError("all JSONL entries must be validated OperationRecord values")
     return b"".join(item.canonical_bytes() + b"\n" for item in checked)
+
+
+def write_local_operation_evidence(
+    output_dir: Path,
+    records: Iterable[OperationRecord],
+    *,
+    week_start: date,
+    week_end: date,
+) -> tuple[Path, Path]:
+    """Write one new, bounded local evidence directory without replacing owner data.
+
+    If a write fails, rollback is confined to files and the directory created by
+    this call. A pre-existing path is never opened or removed.
+    """
+    if (not isinstance(output_dir, Path) or not output_dir.parent.is_dir()
+            or output_dir.exists() or output_dir.is_symlink()):
+        raise OperationsEvidenceError("operation evidence destination must be a new directory")
+    checked = tuple(records)
+    jsonl = render_jsonl(checked)
+    summary = weekly_batch_summary(checked, week_start, week_end)
+    summary_bytes = _canonical(summary) + b"\n"
+    if len(jsonl) > 1024 * 1024 or len(summary_bytes) > 1024 * 1024:
+        raise OperationsEvidenceError("local operation evidence exceeds the 1 MiB per-file bound")
+    created: list[Path] = []
+    made_directory = False
+    try:
+        output_dir.mkdir(parents=True, exist_ok=False)
+        made_directory = True
+        for name, payload in (("operations.jsonl", jsonl), ("weekly-summary.json", summary_bytes)):
+            target = output_dir / name
+            with target.open("xb") as stream:
+                created.append(target)
+                stream.write(payload)
+                stream.flush()
+        return output_dir / "operations.jsonl", output_dir / "weekly-summary.json"
+    except Exception as exc:
+        for target in reversed(created):
+            try:
+                target.unlink()
+            except OSError:
+                pass
+        if made_directory:
+            try:
+                output_dir.rmdir()
+            except OSError:
+                pass
+        if isinstance(exc, OperationsEvidenceError):
+            raise
+        raise OperationsEvidenceError("local operation evidence write failed and created output was rolled back") from exc
 
 
 def weekly_batch_summary(records: Iterable[OperationRecord], week_start: date, week_end: date) -> dict[str, object]:
