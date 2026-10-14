@@ -40,7 +40,7 @@ class PipelineActivityWriter:
     def emit(self, stage: str, state: str, message: str, *, backend_disposition: str | None = None) -> None:
         if not re.fullmatch(r"[A-Z][A-Z /_-]{0,47}", stage) or not re.fullmatch(r"[A-Z_]{1,24}", state):
             raise ValueError("pipeline activity stage or state is invalid")
-        if stage == "PIPELINE" and self.terminal_emitted:
+        if stage == "PIPELINE" and getattr(self, "terminal_emitted", False):
             raise ValueError("pipeline activity terminal event was already emitted")
         self.sequence += 1
         body: dict[str, Any] = {

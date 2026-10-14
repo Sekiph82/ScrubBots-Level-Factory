@@ -59,7 +59,8 @@ def test_launcher_resolves_from_script_location_and_runs_project_not_editor() ->
     assert "'--path', $quotedProjectPath" in launcher
     assert "SetWindowText" in launcher
     assert "$windowTitle = 'ScrubBots Factory Studio'" in launcher
-    assert "$studioProcess.MainWindowTitle -ne $windowTitle" in launcher
+    assert "$allowedWindowTitles = @($windowTitle, \"$windowTitle (DEBUG)\")" in launcher
+    assert "$allowedWindowTitles -ccontains $lastWindowTitle" in launcher
     assert "--editor" not in launcher
     assert "$ResolveOnly" in launcher
 
