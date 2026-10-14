@@ -929,3 +929,10 @@ The classes below distinguish code defects from missing authority and contaminat
 - **Publication checkpoint:** Product commit 5b5f3f74629c4097561c076c2c7ac48306048bb0 and evidence commit c6c8f690dd0d15d78fe99cffd4ba96cd4b069800 were pushed normally to main; GitHub accepted 61cc85f..c6c8f69. Post-push git fetch --prune origin verified local HEAD and origin/main both c6c8f690dd0d15d78fe99cffd4ba96cd4b069800, 0 ahead / 0 behind. This parity note is appended at 2026-10-14 20:28:40 UTC.
 
 - **Log formatting correction:** The first parity-note append encoded newline escapes literally and converted one tests/ prefix to a tab; this append restores the intended Markdown newlines and path spelling while preserving the previously committed log bytes.
+
+## C001-R03 continuation - deterministic CP08 observed-object validation
+
+- **Finding:** `verify_content_health` accepted arbitrary runtime mapping keys despite its string-path contract, then sorted unexpected keys. Mixed key types could raise an incidental `TypeError`; unsafe path keys could be emitted as evidence.
+- **Fix:** Validate every observed key with the same bounded relative-path validator used for expected and backup object keys before comparison or sorting. Malformed types and traversal paths now fail with `OperationsEvidenceError`; safe but unexpected keys remain reported and yield `FAIL`.
+- **New affected test only:** Added `test_health_verifier_rejects_malformed_observed_keys_before_sorting_in_memory` to the existing new CP08 pure-test module. Ran that function directly with `python -B -c` and `runpy`; result `CP08 malformed observed-object key pure in-memory test: PASS`. The test checks integer and traversal keys reject, and a valid unexpected path is reported deterministically. No pytest, TEMP, filesystem fixture, provider, remote read, or cache was used. Existing successful tests were not repeated.
+- **Commit:** product correction `9a980f01f5e2cb82320dfcb3fbb37289048be703`, two files changed, 40 insertions. The existing R05 aggregate remains 1,813 passed / 43 failed / 3 errors / 17 skipped; this focused fix does not change that aggregate or close CP08/R05 tracker state.
