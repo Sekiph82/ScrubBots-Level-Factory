@@ -130,6 +130,16 @@ class PublicationPlan:
             "remote_mutation_performed": False,
         }
 
+    def to_operation_record(self, *, operation_id: str, occurred_at: str):
+        """Convert this local plan into fixed-schema CP08 evidence in memory."""
+        from .operations import operation_record_from_publication_plan
+
+        return operation_record_from_publication_plan(
+            self,
+            operation_id=operation_id,
+            occurred_at=occurred_at,
+        )
+
 
 def serialize_publication_plan(plan: PublicationPlan) -> str:
     """Serialize the fixed plan schema deterministically; no input mapping is echoed."""

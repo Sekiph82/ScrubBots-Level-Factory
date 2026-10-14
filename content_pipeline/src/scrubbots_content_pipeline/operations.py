@@ -135,6 +135,51 @@ class OperationRecord:
         return hashlib.sha256(self.canonical_bytes()).hexdigest()
 
 
+def operation_record_from_publication_plan(
+    plan: object,
+    *,
+    operation_id: str,
+    occurred_at: str,
+) -> OperationRecord:
+    """Adapt a CP03 publication plan into fixed-field local operation evidence.
+
+    This pure in-memory bridge never treats a plan as a completed publication
+    and refuses plans that claim a remote mutation. It records only the opaque
+    content ID, disposition, and a bounded reason code; payloads, target IDs,
+    credentials, and free-form messages are excluded.
+    """
+    from .publication_plan import PlanCheck, PublicationPlan
+
+    if not isinstance(plan, PublicationPlan):
+        raise OperationsEvidenceError("publication receipt must be a validated PublicationPlan")
+    if plan.remote_mutation_performed is not False:
+        raise OperationsEvidenceError("publication plan cannot claim a remote mutation")
+    if plan.target_environment not in {"LOCAL", "STAGING", "PRODUCTION"}:
+        raise OperationsEvidenceError("publication plan environment is invalid")
+    if type(plan.accepted) is not bool or type(plan.complete) is not bool:
+        raise OperationsEvidenceError("publication plan disposition is invalid")
+    if not isinstance(plan.checks, tuple) or any(
+        not isinstance(check, PlanCheck)
+        or type(check.check_id) is not str
+        or type(check.accepted) is not bool
+        or type(check.reason_code) is not str
+        for check in plan.checks
+    ):
+        raise OperationsEvidenceError("publication plan checks are malformed")
+    failed = next((check for check in plan.checks if check.accepted is False), None)
+    ready = plan.accepted is True and plan.complete is True and failed is None
+    reason_code = "PREFLIGHT_READY" if ready else (failed.reason_code if failed else "PREFLIGHT_BLOCKED")
+    return OperationRecord(
+        operation_id=operation_id,
+        occurred_at=occurred_at,
+        kind="BATCH",
+        environment=plan.target_environment,
+        outcome="PREPARED" if ready else "BLOCKED",
+        reason_code=reason_code,
+        batch_id=plan.content_id,
+    )
+
+
 def render_jsonl(records: Iterable[OperationRecord]) -> bytes:
     """Serialize only validated fields, with no email or credential payload field."""
     checked = tuple(records)

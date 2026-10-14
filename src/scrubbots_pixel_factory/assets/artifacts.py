@@ -70,7 +70,12 @@ def build_asset_artifacts(
     if type(source_name) is not str or not source_name.strip() or Path(source_name).name != source_name:
         raise AssetArtifactError("source_name must be one filename, not a path")
     source = _decode_png(source_png, "source")
-    requested = tuple(directions)
+    requested_list: list[str] = []
+    for direction in directions:
+        if len(requested_list) >= len(_ALL_DIRECTIONS):
+            raise AssetArtifactError("directions may contain at most the eight supported labels")
+        requested_list.append(direction)
+    requested = tuple(requested_list)
     if any(type(item) is not str or item not in _ALL_DIRECTIONS for item in requested):
         raise AssetArtifactError("directions must use N, NE, E, SE, S, SW, W, or NW")
     if len(requested) != len(set(requested)):
@@ -82,9 +87,11 @@ def build_asset_artifacts(
         raise AssetArtifactError("explicit direction frames must match requested direction labels")
     if type(frame_duration_ms) is not int or not 1 <= frame_duration_ms <= 60_000:
         raise AssetArtifactError("frame_duration_ms must be an integer in 1..60000")
-    frames_raw = tuple(animation_frames)
-    if len(frames_raw) > MAX_FRAMES:
-        raise AssetArtifactError(f"animation may contain at most {MAX_FRAMES} frames")
+    frames_raw: list[bytes] = []
+    for frame in animation_frames:
+        if len(frames_raw) >= MAX_FRAMES:
+            raise AssetArtifactError(f"animation may contain at most {MAX_FRAMES} frames")
+        frames_raw.append(frame)
     stem = _SAFE_STEM.sub("_", Path(source_name).stem).strip("._-") or "artwork"
     files: dict[str, bytes] = {}
     entries: list[dict[str, object]] = []
@@ -118,15 +125,25 @@ def build_asset_artifacts(
                         "sha256": hashlib.sha256(payload).hexdigest()})
 
     if frames_raw:
-        decoded = [_decode_png(item, f"animation frame {index}") for index, item in enumerate(frames_raw)]
-        frame_size = (decoded[0].width, decoded[0].height)
-        if any((image.width, image.height) != frame_size for image in decoded):
-            raise AssetArtifactError("animation frames must have identical dimensions; resizing is not permitted")
-        palette = set(decoded[0].getdata())
-        if any(set(image.getdata()) != palette for image in decoded[1:]):
-            raise AssetArtifactError("animation frames must preserve one identical RGBA palette")
-        if frame_size[0] * frame_size[1] * len(decoded) > MAX_IMAGE_PIXELS:
-            raise AssetArtifactError("animation sheet exceeds the bounded pixel count")
+        decoded: list[Image.Image] = []
+        frame_size: tuple[int, int] | None = None
+        palette: set[tuple[int, int, int, int]] | None = None
+        total_frame_pixels = 0
+        for index, raw in enumerate(frames_raw):
+            image = _decode_png(raw, f"animation frame {index}")
+            image_size = (image.width, image.height)
+            if frame_size is None:
+                frame_size = image_size
+                palette = set(image.getdata())
+            elif image_size != frame_size:
+                raise AssetArtifactError("animation frames must have identical dimensions; resizing is not permitted")
+            total_frame_pixels += image.width * image.height
+            if total_frame_pixels > MAX_IMAGE_PIXELS:
+                raise AssetArtifactError("animation sheet exceeds the bounded pixel count")
+            if set(image.getdata()) != palette:
+                raise AssetArtifactError("animation frames must preserve one identical RGBA palette")
+            decoded.append(image)
+        assert frame_size is not None
         sheet = Image.new("RGBA", (frame_size[0] * len(decoded), frame_size[1]), (0, 0, 0, 0))
         for index, image in enumerate(decoded):
             sheet.alpha_composite(image, (index * frame_size[0], 0))
@@ -155,7 +172,144 @@ def build_asset_artifacts(
             "artifacts": entries}
     body["asset_set_sha256"] = hashlib.sha256(_canonical_json(body)).hexdigest()
     files[f"{stem}_asset_manifest.json"] = _canonical_json(body) + b"\n"
+    validate_asset_artifact_set(files, files[f"{stem}_asset_manifest.json"])
     return files, _canonical_json(body) + b"\n"
+
+
+def validate_asset_artifact_set(artifacts: Mapping[str, bytes], manifest_bytes: bytes) -> bool:
+    """Verify a derivative set and manifest entirely in memory.
+
+    This verifies byte identity and structural bounds only. It does not infer
+    semantic direction, owner approval, or game-import readiness.
+    """
+    if not isinstance(artifacts, Mapping) or not artifacts or type(manifest_bytes) is not bytes:
+        raise AssetArtifactError("asset set and manifest bytes are required")
+    try:
+        document = json.loads(manifest_bytes)
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise AssetArtifactError("asset manifest is not valid UTF-8 JSON") from exc
+    if not isinstance(document, dict) or set(document) != {
+        "schema", "schema_version", "source", "source_orientation_assumption",
+        "pixel_policy", "frame_duration_ms", "artifacts", "asset_set_sha256",
+    }:
+        raise AssetArtifactError("asset manifest fields do not match the supported schema")
+    if document.get("schema") != "scrubbots-pixel-art-asset-set" or document.get("schema_version") != 1:
+        raise AssetArtifactError("asset manifest schema or version is unsupported")
+    if (document.get("source_orientation_assumption") != "input_is_north_facing; rotations_are_mechanical_not_semantic"
+            or document.get("pixel_policy") != "nearest_pixel_transform_only_no_resampling_alpha_preserved"):
+        raise AssetArtifactError("asset manifest pixel or orientation policy is unsupported")
+    if manifest_bytes != _canonical_json(document) + b"\n":
+        raise AssetArtifactError("asset manifest bytes are not canonical JSON")
+    body = {key: value for key, value in document.items() if key != "asset_set_sha256"}
+    expected_set_sha = document.get("asset_set_sha256")
+    if type(expected_set_sha) is not str or hashlib.sha256(_canonical_json(body)).hexdigest() != expected_set_sha:
+        raise AssetArtifactError("asset manifest digest does not match its canonical fields")
+    source = document.get("source")
+    if not isinstance(source, dict) or set(source) != {"name", "sha256", "width", "height"}:
+        raise AssetArtifactError("asset manifest source identity is malformed")
+    if type(source["name"]) is not str or Path(source["name"]).name != source["name"]:
+        raise AssetArtifactError("asset manifest source name is unsafe")
+    if type(source["sha256"]) is not str or re.fullmatch(r"[0-9a-f]{64}", source["sha256"]) is None:
+        raise AssetArtifactError("asset manifest source digest is malformed")
+    if any(type(source[key]) is not int or source[key] < 1 for key in ("width", "height")):
+        raise AssetArtifactError("asset manifest source dimensions are malformed")
+    if source["width"] * source["height"] > MAX_IMAGE_PIXELS:
+        raise AssetArtifactError("asset manifest source exceeds the bounded pixel count")
+    entries = document.get("artifacts")
+    if not isinstance(entries, list) or not entries:
+        raise AssetArtifactError("asset manifest must contain at least one derivative")
+    referenced: set[str] = set()
+    artifact_images: dict[str, Image.Image] = {}
+    direction_rows: list[Mapping[str, object]] = []
+    frame_rows: list[Mapping[str, object]] = []
+    sheet_rows: list[Mapping[str, object]] = []
+    for entry in entries:
+        if not isinstance(entry, dict) or type(entry.get("path")) is not str:
+            raise AssetArtifactError("asset manifest entry is malformed")
+        path = entry["path"]
+        if Path(path).name != path or path in referenced or path not in artifacts:
+            raise AssetArtifactError("asset manifest path is unsafe, duplicated, or missing")
+        referenced.add(path)
+        payload = artifacts[path]
+        if type(payload) is not bytes or type(entry.get("sha256")) is not str:
+            raise AssetArtifactError("asset artifact bytes or digest are malformed")
+        if hashlib.sha256(payload).hexdigest() != entry["sha256"]:
+            raise AssetArtifactError("asset artifact bytes do not match the manifest digest")
+        image = _decode_png(payload, f"artifact {path}")
+        artifact_images[path] = image
+        if (type(entry.get("width")) is not int or type(entry.get("height")) is not int
+                or (image.width, image.height) != (entry["width"], entry["height"])):
+            raise AssetArtifactError("asset artifact dimensions do not match the manifest")
+        kind = entry.get("kind")
+        if kind == "direction_variant":
+            direction_rows.append(entry)
+        elif kind == "animation_frame":
+            frame_rows.append(entry)
+        elif kind == "sprite_sheet":
+            sheet_rows.append(entry)
+        else:
+            raise AssetArtifactError("asset manifest entry kind is unsupported")
+    manifest_names = [name for name in artifacts if name.endswith("_asset_manifest.json")]
+    if len(manifest_names) != 1 or artifacts[manifest_names[0]] != manifest_bytes:
+        raise AssetArtifactError("asset set must contain the exact matching manifest bytes")
+    if set(artifacts) - referenced != {manifest_names[0]}:
+        raise AssetArtifactError("asset set contains unreferenced files")
+    if (not frame_rows and sheet_rows) or (frame_rows and len(sheet_rows) != 1):
+        raise AssetArtifactError("animation frame and sprite sheet membership is inconsistent")
+    directions_seen: set[str] = set()
+    for row in direction_rows:
+        direction = row.get("direction")
+        transform = row.get("transform")
+        if (type(direction) is not str or direction not in _ALL_DIRECTIONS or direction in directions_seen
+                or row.get("identity_review") != "OWNER_REVIEW_REQUIRED"):
+            raise AssetArtifactError("direction entry identity or review gate is invalid")
+        directions_seen.add(direction)
+        input_sha = row.get("input_sha256")
+        if type(input_sha) is not str or re.fullmatch(r"[0-9a-f]{64}", input_sha) is None:
+            raise AssetArtifactError("direction entry input digest is malformed")
+        if transform == "PIXEL_ROTATION":
+            if direction not in _DIRECTIONS or row.get("rotation_degrees_clockwise") != _ROTATION_DEGREES[direction]:
+                raise AssetArtifactError("direction rotation is not a supported cardinal pixel transform")
+        elif transform == "SOURCE_COPY":
+            if direction != "N" or row.get("rotation_degrees_clockwise") != 0:
+                raise AssetArtifactError("source-copy transform is valid only for north")
+        elif transform == "EXPLICIT_DIRECTION_PNG":
+            if row.get("rotation_degrees_clockwise") is not None:
+                raise AssetArtifactError("explicit direction art cannot claim a mechanical rotation")
+        else:
+            raise AssetArtifactError("direction transform is unsupported")
+    if frame_rows:
+        if any(type(row.get("index")) is not int for row in frame_rows) or len(frame_rows) > MAX_FRAMES:
+            raise AssetArtifactError("animation frame ordering or count is invalid")
+        frame_rows.sort(key=lambda row: row["index"])
+        if [row.get("index") for row in frame_rows] != list(range(len(frame_rows))):
+            raise AssetArtifactError("animation frame ordering or count is invalid")
+        durations = [row.get("duration_ms") for row in frame_rows]
+        if (any(type(item) is not int for item in durations) or len(set(durations)) != 1
+                or not 1 <= durations[0] <= 60_000):
+            raise AssetArtifactError("animation frame duration is invalid")
+        sheet = sheet_rows[0]
+        if type(sheet.get("frame_count")) is not int or sheet.get("frame_count") != len(frame_rows):
+            raise AssetArtifactError("sprite sheet frame count does not match the animation")
+        frame_size = (frame_rows[0].get("width"), frame_rows[0].get("height"))
+        if any((row.get("width"), row.get("height")) != frame_size for row in frame_rows):
+            raise AssetArtifactError("animation frame dimensions are inconsistent")
+        frame_images = [artifact_images[row["path"]] for row in frame_rows]
+        frame_palette = set(frame_images[0].getdata())
+        if any(set(image.getdata()) != frame_palette for image in frame_images[1:]):
+            raise AssetArtifactError("animation frames do not preserve one identical RGBA palette")
+        if (sheet.get("frame_width"), sheet.get("frame_height")) != frame_size:
+            raise AssetArtifactError("sprite sheet frame dimensions do not match the animation")
+        if sheet.get("width") != frame_size[0] * len(frame_rows) or sheet.get("height") != frame_size[1]:
+            raise AssetArtifactError("sprite sheet dimensions do not match its ordered frames")
+        if frame_size[0] * frame_size[1] * len(frame_rows) > MAX_IMAGE_PIXELS:
+            raise AssetArtifactError("animation sheet exceeds the bounded pixel count")
+        expected_sheet = Image.new("RGBA", (frame_size[0] * len(frame_rows), frame_size[1]), (0, 0, 0, 0))
+        for index, image in enumerate(frame_images):
+            expected_sheet.alpha_composite(image, (index * frame_size[0], 0))
+        if list(expected_sheet.getdata()) != list(artifact_images[sheet["path"]].getdata()):
+            raise AssetArtifactError("sprite sheet pixels do not match the ordered animation frames")
+    return True
 
 
 def write_asset_artifacts(output_dir: Path, artifacts: Mapping[str, bytes]) -> tuple[Path, ...]:
