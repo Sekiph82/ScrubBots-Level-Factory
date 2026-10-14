@@ -209,7 +209,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	if not _batch_job_id.is_empty():
+	if not _batch_job_id.is_empty() and not _batch_job_source_mismatch:
 		_refresh_batch_progress()
 	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
 		_poll_pipeline_activity()
@@ -1241,8 +1241,9 @@ func _restore_loaded_png_batch_readonly() -> void:
 		_activity_backend_disposition = _activity_stage
 		_activity_terminal_state = _activity_stage
 		_activity_message = "Restored %s · %d/%d READY · %d FAILED · no solver was run." % [str(job.get("state", "")), int(counts.get("ready", 0)), int(counts.get("total", 0)), int(counts.get("failed", 0))]
-	_render_batch_item_results(_batch_snapshot)
 	_sync_verified_batch_follow(_batch_snapshot)
+	_record_verified_batch_item_progress(_batch_snapshot)
+	_render_batch_item_results(_batch_snapshot)
 	_refresh_activity_header()
 	_refresh_run_button_caption()
 
@@ -2266,7 +2267,7 @@ func _request_batch_control(action: String) -> void:
 
 
 func _refresh_batch_progress() -> void:
-	if _batch_job_id.is_empty() or Time.get_ticks_msec() - _batch_last_read_msec < 750:
+	if _batch_job_id.is_empty() or not _batch_job_matches_loaded_sources() or Time.get_ticks_msec() - _batch_last_read_msec < 750:
 		return
 	_batch_last_read_msec = Time.get_ticks_msec()
 	var verified := _extension("png-batch-latest", {"batch_id": _batch_import_id})
@@ -2290,8 +2291,8 @@ func _refresh_batch_progress() -> void:
 	_batch_job_source_mismatch = false
 	if not _operation_running and str(parsed.get("state", "")) == "RUNNING":
 		_batch_snapshot["state"] = "INTERRUPTED"
-	_record_verified_batch_item_progress(_batch_snapshot)
 	_sync_verified_batch_follow(_batch_snapshot)
+	_record_verified_batch_item_progress(_batch_snapshot)
 	_refresh_activity_header()
 	_refresh_live_data()
 	_refresh_run_button_caption()
@@ -2311,32 +2312,36 @@ func _batch_follow_index(job: Dictionary) -> int:
 
 
 func _record_verified_batch_item_progress(job: Dictionary) -> void:
+	if _activity_rows == null or not _batch_job_matches_loaded_sources():
+		return
+	var displayed_source_id := _activity_source_id if not _activity_source_id.is_empty() else _selected_import_source_id
 	var items: Array = job.get("items", [])
 	for index in range(items.size()):
 		if not items[index] is Dictionary:
 			continue
 		var item: Dictionary = items[index]
+		var source_id := str(item.get("source_id", ""))
+		if source_id != displayed_source_id:
+			continue
+		var source_index := _gameplay_source_index(source_id)
+		if source_index < 0:
+			continue
+		var source: Dictionary = _gameplay_sources[source_index]
+		if (int(item.get("index", -1)) != index
+				or str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
+				or str(item.get("source_sha256", "")) != str(source.get("source_sha256", ""))
+				or str(item.get("source_record_sha256", "")) != str(source.get("source_record_sha256", ""))):
+			continue
 		var attempt_id := str(item.get("attempt_id", ""))
 		var state := str(item.get("status", ""))
 		if attempt_id.is_empty() or state not in ["READY", "FAILED", "REJECTED", "SKIPPED"]:
 			continue
+		if state == "READY" and (str(item.get("run_id", "")).is_empty() or str(_last_pipeline.get("run_id", "")) != str(item.get("run_id", "")) or str(_last_pipeline.get("source_id", "")) != source_id):
+			continue
 		if str(_batch_observed_item_states.get(attempt_id, "")) == state:
 			continue
 		_batch_observed_item_states[attempt_id] = state
-		if _activity_rows == null:
-			continue
-		var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
-		var reason := str(item.get("reason", ""))
-		var line := "%s · columns %d · %s · %s%s" % [filename, int(item.get("column_count", 0)), state, str(item.get("run_id", "no run ID")), " · " + reason if not reason.is_empty() else ""]
-		var row := Label.new()
-		row.name = "BatchResult_%03d" % int(item.get("index", index))
-		row.text = line
-		row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		row.custom_minimum_size.y = 34
-		row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), index, attempt_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
-		row.add_theme_font_size_override("font_size", 10)
-		row.add_theme_color_override("font_color", Color("#dce8f8"))
-		_activity_rows.add_child(row)
+		_append_batch_item_activity_row(item, job, true)
 
 
 func _source_png_sha256(path: String) -> String:
@@ -2384,10 +2389,24 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 			or str(source.get("source_record_sha256", "")) != record_sha
 			or _source_png_sha256(path) != source_sha):
 		return
-	var token := "%s|%d|%s|%s|%s|%d|%s|%s" % [str(job.get("job_id", "")), item_index, source_id, source_sha, attempt_id, column_count, str(item.get("status", "")), str(item.get("run_id", ""))]
+	var job_state := str(job.get("state", ""))
+	var token := "%s|%d|%s|%s|%s|%d|%s|%s|%s" % [str(job.get("job_id", "")), item_index, source_id, source_sha, attempt_id, column_count, str(item.get("status", "")), str(item.get("run_id", "")), job_state]
 	if token == _batch_follow_token:
 		_batch_follow_item = item.duplicate(true)
 		return
+	if _activity_source_id != source_id:
+		_clear_activity_rows()
+		_activity_run_id = ""
+		_activity_file_path = ""
+		_activity_source_sha256 = ""
+		_activity_stream_reader_override = null
+		_activity_started_msec = 0
+		_activity_finished_msec = 0
+		_activity_event_backend_disposition = ""
+		_activity_read_offset = 0
+		_activity_seen_sequence = 0
+		_activity_pending_bytes.clear()
+		_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 	# Commit all source-facing regions from one exact persisted job item.
 	_batch_follow_token = token
 	_batch_follow_item = item.duplicate(true)
@@ -2401,7 +2420,6 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_imported_window_start = clampi(source_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
 	_activity_source_id = source_id
 	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
-	var job_state := str(job.get("state", ""))
 	var item_state := str(item.get("status", ""))
 	var visible_item_state := job_state if item_state == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else item_state
 	_activity_stage = "RUNNING" if _operation_running and job_state == "RUNNING" else visible_item_state if not visible_item_state.is_empty() else job_state
@@ -2460,6 +2478,8 @@ func _complete_png_batch(result: Dictionary) -> void:
 		_activity_backend_disposition = "RETRY READY" if _batch_snapshot.has("parent_job_id") else "READY"
 		_activity_message = "%s · %d/%d READY · %d loaded" % ["RETRY FINISHED" if _batch_snapshot.has("parent_job_id") else "BATCH READY", ready, total, loaded]
 	_activity_terminal_state = _activity_backend_disposition
+	_sync_verified_batch_follow(_batch_snapshot)
+	_record_verified_batch_item_progress(_batch_snapshot)
 	_render_batch_item_results(_batch_snapshot)
 	if _pipeline_thread != null:
 		_pipeline_thread = null
@@ -2477,25 +2497,78 @@ func _complete_png_batch(result: Dictionary) -> void:
 	_report(_activity_message)
 
 
-func _render_batch_item_results(job: Dictionary) -> void:
-	if _activity_rows == null:
+func _render_batch_item_results(job: Dictionary, force_selected_item: bool = false) -> void:
+	if _activity_rows == null or not _batch_job_matches_loaded_sources():
 		return
 	if _activity_panel != null: _activity_panel.visible = true
-	var counts: Dictionary = job.get("counts", {})
-	var loaded := int(job.get("snapshot_source_count", _gameplay_sources.size()))
-	var total := int(counts.get("total", 0))
-	var quotas: Dictionary = job.get("planned_quotas", {})
-	var actual: Dictionary = job.get("ready_mix", {})
-	var summary := "Loaded %d · Job %d · Eligible %d · READY %d · Failed %d · Rejected %d · Skipped %d · Remaining %d\nPlanned 3/4/5 %d/%d/%d · READY %d/%d/%d" % [
-			loaded, total, int(quotas.get("3", 0)) + int(quotas.get("4", 0)) + int(quotas.get("5", 0)),
-			int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)),
-			int(counts.get("skipped", 0)), int(counts.get("remaining", 0)),
-			int(quotas.get("3", 0)), int(quotas.get("4", 0)), int(quotas.get("5", 0)),
-			int(actual.get("3", 0)), int(actual.get("4", 0)), int(actual.get("5", 0))]
-	if _activity_phase_label != null:
-		_activity_phase_label.text = "Loaded %d · Job %d · READY %d · Failed %d" % [loaded, total, int(counts.get("ready", 0)), int(counts.get("failed", 0))]
-		_activity_phase_label.tooltip_text = summary
-	_record_verified_batch_item_progress(job)
+	var source_id := _activity_source_id if not _activity_source_id.is_empty() else _selected_import_source_id
+	var items: Array = job.get("items", [])
+	for index in range(items.size()):
+		if not items[index] is Dictionary:
+			continue
+		var item: Dictionary = items[index]
+		if str(item.get("source_id", "")) != source_id:
+			continue
+		var source_index := _gameplay_source_index(source_id)
+		if source_index < 0:
+			return
+		var source: Dictionary = _gameplay_sources[source_index]
+		if (int(item.get("index", -1)) != index
+				or str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
+				or str(item.get("source_sha256", "")) != str(source.get("source_sha256", ""))
+				or str(item.get("source_record_sha256", "")) != str(source.get("source_record_sha256", ""))):
+			return
+		var status := str(item.get("status", ""))
+		if status == "READY":
+			var run_id := str(item.get("run_id", ""))
+			if run_id.is_empty() or str(_last_pipeline.get("source_id", "")) != source_id or str(_last_pipeline.get("run_id", "")) != run_id:
+				return
+			_activity_backend_disposition = "READY"
+			_activity_terminal_state = "READY"
+			_activity_stage = "READY"
+			_activity_message = "Verified source-bound batch result restored; no solver was run."
+		elif status in ["FAILED", "REJECTED", "SKIPPED"]:
+			_activity_backend_disposition = status
+			_activity_terminal_state = status
+			_activity_stage = status
+			_activity_message = str(item.get("reason", "Batch item %s." % status.to_lower()))
+		elif status in ["QUEUED", "RUNNING"]:
+			var job_state := str(job.get("state", ""))
+			var display_state := job_state if status == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else status
+			_activity_backend_disposition = display_state
+			_activity_terminal_state = "" if _operation_running else display_state
+			_activity_stage = display_state
+			_activity_message = "Current source item · %d columns" % int(item.get("column_count", 0))
+		if force_selected_item:
+			_append_batch_item_activity_row(item, job, true)
+		if _activity_phase_label != null:
+			_activity_phase_label.text = "%s · %s · %d columns" % [str(item.get("original_filename", "PNG")), status, int(item.get("column_count", 0))]
+			_activity_phase_label.tooltip_text = "job_id=%s · item=%d · source_id=%s · source_sha256=%s · source_record_sha256=%s" % [str(job.get("job_id", "")), index, source_id, str(item.get("source_sha256", "")), str(item.get("source_record_sha256", ""))]
+		return
+
+
+func _append_batch_item_activity_row(item: Dictionary, job: Dictionary, force: bool = false) -> void:
+	if _activity_rows == null or str(item.get("source_id", "")) != _activity_source_id:
+		return
+	var state := str(item.get("status", ""))
+	var attempt_id := str(item.get("attempt_id", ""))
+	if not force and not attempt_id.is_empty() and str(_batch_observed_item_states.get(attempt_id, "")) == state:
+		return
+	if not attempt_id.is_empty():
+		_batch_observed_item_states[attempt_id] = state
+	var reason := str(item.get("reason", ""))
+	var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
+	var run_id := str(item.get("run_id", "no run ID"))
+	var line := "%s · columns %d · %s · %s%s" % [filename, int(item.get("column_count", 0)), state, run_id, " · " + reason if not reason.is_empty() else ""]
+	var row := Label.new()
+	row.name = "BatchResult_%03d" % int(item.get("index", 0))
+	row.text = line
+	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.custom_minimum_size.y = 34
+	row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), int(item.get("index", 0)), attempt_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
+	row.add_theme_font_size_override("font_size", 10)
+	row.add_theme_color_override("font_color", Color("#dce8f8"))
+	_activity_rows.add_child(row)
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -2618,6 +2691,15 @@ func _append_activity_row(body: Dictionary) -> void:
 		_activity_scroll.call_deferred("set_v_scroll", 999999)
 
 
+func _clear_activity_rows() -> void:
+	_activity_events.clear()
+	if _activity_rows == null:
+		return
+	for child in _activity_rows.get_children():
+		_activity_rows.remove_child(child)
+		child.queue_free()
+
+
 func _fail_activity_monitor(reason: String) -> void:
 	if not _activity_integrity_error.is_empty():
 		return
@@ -2635,12 +2717,15 @@ func _refresh_activity_header() -> void:
 		var counts: Dictionary = _batch_snapshot.get("counts", {})
 		var current_index: Variant = _batch_snapshot.get("current_index")
 		var items: Array = _batch_snapshot.get("items", [])
+		var job_state := str(_batch_snapshot.get("state", ""))
+		var activity_state := job_state if job_state in ["PAUSED", "INTERRUPTED", "STOPPED"] else "RUNNING"
 		var current_caption := "Starting next verified PNG"
 		if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
 			var current: Dictionary = items[current_index]
 			current_caption = "%s · %d columns" % [str(current.get("original_filename", current.get("display_name", "Selected PNG"))).left(24), int(current.get("column_count", 0))]
-		_activity_state_label.text = "RUNNING"
-		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(Color("#245478"), Color("#6b8bb9")))
+		_activity_state_label.text = activity_state
+		var activity_color := Color("#245478") if activity_state == "RUNNING" else Color("#7a5824") if activity_state in ["PAUSED", "STOPPED"] else Color("#743d3c")
+		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(activity_color, activity_color.lightened(0.22)))
 		_activity_source_label.text = "%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + (1 if current_index is int else 0), int(counts.get("total", 0))]
 		_activity_source_label.tooltip_text = "Sequential batch %s" % _batch_job_id
 		_activity_phase_label.text = "Canonical pipeline · %d READY · %d failed" % [int(counts.get("ready", 0)), int(counts.get("failed", 0))]
@@ -3078,6 +3163,19 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		if str(imported.get("source_id", "")) != source_id:
 			continue
 		_bind_displayed_batch_to_source(source_id)
+		_clear_activity_rows()
+		_activity_run_id = ""
+		_activity_file_path = ""
+		_activity_source_sha256 = ""
+		_activity_stream_reader_override = null
+		_activity_started_msec = 0
+		_activity_finished_msec = 0
+		_activity_event_backend_disposition = ""
+		_activity_integrity_error = ""
+		_activity_seen_sequence = 0
+		_activity_read_offset = 0
+		_activity_pending_bytes.clear()
+		_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
 		_selected_import_source_id = source_id
 		_selected_art_path = str(imported.get("path", ""))
 		_last_source_id = source_id
@@ -3085,16 +3183,22 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_last_pipeline.clear()
 		_owner_review_status = ""
 		_hide_review_dialogs()
-		_activity_stage = "SOURCE"
+		_activity_stage = "SOURCE ONLY"
 		_activity_message = "Selected PNG is read-only until Run Pipeline is explicitly selected."
-		_activity_terminal_state = ""
+		_activity_backend_disposition = "SOURCE ONLY"
+		_activity_terminal_state = "SOURCE ONLY"
 		_activity_integrity_error = ""
 		_imported_window_start = clampi(index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
 		_activity_source_id = source_id
 		_activity_source_filename = str(imported.get("display_filename", "Selected PNG"))
+		_batch_follow_item.clear()
+		_batch_follow_pipeline.clear()
+		_batch_follow_token = ""
+		var batch_scope_matches := not _batch_snapshot.is_empty() and _batch_job_matches_loaded_sources()
 		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
 		_refresh_pinned_source_preflight()
+		var restored_source_run := false
 		var restored := _extension("restore-source-run-readonly", {
 			"source_id": source_id,
 			"game_project": _pinned_game_project_path()
@@ -3111,17 +3215,15 @@ func _select_imported_source_by_id(source_id: String) -> void:
 					_owner_review_status = "%s · %s" % [str(restored_review.get("pool_state", "")), str(restored_review.get("reason", ""))]
 				_activity_stage = "RESTORED"
 				_activity_message = "Restored exact source-bound canonical READY result; no solver was run."
+				_activity_backend_disposition = "READY"
+				_activity_terminal_state = "READY"
+				_append_activity_row({"seq": 1, "elapsed_ms": 0, "stage": "RESTORED", "state": "READY", "message": _activity_message, "source_id": source_id})
+				restored_source_run = true
+		if not restored_source_run and batch_scope_matches:
+			_render_batch_item_results(_batch_snapshot, true)
 		_refresh_activity_header()
 		_refresh_runtime_cards()
 		_refresh_live_data()
-		if not _batch_snapshot.is_empty() and _batch_snapshot.has("snapshot_source_count"):
-			_render_batch_item_results(_batch_snapshot)
-			if not _operation_running:
-				var batch_counts: Dictionary = _batch_snapshot.get("counts", {})
-				_activity_backend_disposition = "FINISHED WITH FAILURES" if int(batch_counts.get("failed", 0)) > 0 or int(batch_counts.get("rejected", 0)) > 0 else "READY" if str(_batch_snapshot.get("state", "")) == "COMPLETE" else "IDLE"
-				_activity_terminal_state = _activity_backend_disposition
-				_activity_message = "Loaded %d · Job %d · %d READY · %d FAILED" % [_gameplay_sources.size(), int(batch_counts.get("total", 0)), int(batch_counts.get("ready", 0)), int(batch_counts.get("failed", 0))]
-				_refresh_activity_header()
 		_report("Selected %s · %s" % [str(imported.get("display_filename", "image.png")), _wrap_identity(source_id, 24)])
 		return
 
@@ -3139,6 +3241,17 @@ func _batch_job_matches_loaded_sources() -> bool:
 	var composite_items: Array = _batch_composite_snapshot.get("items", [])
 	if items.is_empty() or composite_items.is_empty() or str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
 		return false
+	if composite_items.size() != _gameplay_sources.size():
+		return false
+	for source_index in range(composite_items.size()):
+		if not composite_items[source_index] is Dictionary:
+			return false
+		var composite_source: Dictionary = composite_items[source_index]
+		var loaded_source: Dictionary = _gameplay_sources[source_index]
+		if (str(composite_source.get("source_id", "")) != str(loaded_source.get("source_id", ""))
+				or str(composite_source.get("source_sha256", "")) != str(loaded_source.get("source_sha256", ""))
+				or str(composite_source.get("source_record_sha256", "")) != str(loaded_source.get("source_record_sha256", ""))):
+			return false
 	var source_by_id: Dictionary = {}
 	for item_variant in composite_items:
 		if item_variant is Dictionary:
