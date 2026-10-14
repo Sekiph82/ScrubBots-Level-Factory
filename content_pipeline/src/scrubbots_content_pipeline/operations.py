@@ -294,6 +294,8 @@ def verify_content_health(
         return {"status": "UNKNOWN", "reason": "OBJECT_BYTES_NOT_OBSERVED", "observed_manifest_sha256": actual_manifest, "objects": []}
     if not isinstance(observed_objects, Mapping):
         raise OperationsEvidenceError("observed_objects must be an explicit key-to-bytes mapping or None")
+    for key in observed_objects:
+        _object_key(key, "observed object key")
     results: list[dict[str, object]] = []
     for key, expected in sorted(checked_expected.items()):
         observed = observed_objects.get(key)
