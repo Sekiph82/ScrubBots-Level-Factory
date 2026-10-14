@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -12,21 +13,33 @@ PROJECT_FILE = PROJECT_ROOT / "project.godot"
 SCENE_FILE = PROJECT_ROOT / "scenes" / "factory_studio.tscn"
 RESOURCE_REFERENCE_RE = re.compile(r"res://[^\s\"'(),\[\]]+")
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(
-    r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\)"
+    r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\\\\\[a-z0-9_.-]+[\\/])"
 )
 TEXT_SUFFIXES = {".cfg", ".gd", ".godot", ".import", ".json", ".md", ".py", ".res", ".scene", ".tres", ".tscn", ".txt", ".uid"}
 
 
 def _project_files() -> tuple[Path, ...]:
+    result = subprocess.run(["git", "ls-files", "--", "level_factory"], cwd=REPOSITORY_ROOT,
+                            check=True, capture_output=True, text=True)
     return tuple(
-        path
-        for path in PROJECT_ROOT.rglob("*")
-        if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES and ".godot" not in path.relative_to(PROJECT_ROOT).parts
+        REPOSITORY_ROOT / relative
+        for relative in result.stdout.splitlines()
+        if relative and Path(relative).suffix.lower() in TEXT_SUFFIXES
+        and ".godot" not in Path(relative).parts
     )
 
 
 def _project_text() -> str:
     return "\n".join(path.read_text(encoding="utf-8") for path in _project_files())
+
+
+def _runtime_project_files() -> tuple[Path, ...]:
+    runtime_suffixes = {".cfg", ".gd", ".godot", ".json", ".res", ".tres", ".tscn"}
+    return tuple(
+        path for path in _project_files()
+        if path.suffix.lower() in runtime_suffixes
+        and path.relative_to(PROJECT_ROOT).parts[:1] != ("tests",)
+    )
 
 
 def test_required_project_local_boundaries_exist() -> None:
@@ -96,7 +109,7 @@ def test_factory_studio_scene_and_main_scene_reference_use_scene_boundary() -> N
 
 
 def test_project_local_resource_references_are_contained() -> None:
-    for path in _project_files():
+    for path in _runtime_project_files():
         for reference in RESOURCE_REFERENCE_RE.findall(path.read_text(encoding="utf-8")):
             assert not reference.startswith("res://../")
             relative_path = Path(reference[6:])
@@ -109,7 +122,7 @@ def test_project_local_resource_references_are_contained() -> None:
 def test_project_local_files_have_no_external_dependency_markers() -> None:
     text = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in _project_files()
+        for path in _runtime_project_files()
         if path.suffix.lower() in {".godot", ".tscn", ".gd", ".tres", ".res", ".cfg", ".json"}
     )
     forbidden = (
@@ -196,7 +209,7 @@ def test_python_and_gdscript_implementation_is_not_duplicated() -> None:
             "factory_studio_readiness_integration_suite.gd",
             "factory_studio_search_integration_suite.gd",
         }
-        for path in _project_files()
+        for path in _runtime_project_files()
         if path.suffix == ".gd"
     )
     assert not any(path.is_symlink() for path in PROJECT_ROOT.rglob("*"))

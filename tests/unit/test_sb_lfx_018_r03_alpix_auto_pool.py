@@ -163,7 +163,7 @@ def test_master_ui_uses_auto_batch_numbering_and_exact_owner_production_confirma
     root = Path(__file__).resolve().parents[2]
     ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
 
-    assert '_level_number_label.text = "Auto"' in ui
+    assert 'return "Level: %s" % (str(_level_number) if _manual_level_override else "Auto")' in ui
     assert 'PackedStringArray(["artwork_path", "supply_columns", "background_intent"])' in ui
     assert '"action": "publish-production"' in ui
     assert 'Confirm Production Promotion' in ui

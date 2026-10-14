@@ -31,6 +31,8 @@ class MemoryPath:
         return self.entries
 
     def exists(self):
+        if self.name.endswith(".json"):
+            return self.name in self.files
         return bool(self.entries) or self.name.rsplit("/", 1)[-1] in self.files
 
     def mkdir(self, **_kwargs):
@@ -103,6 +105,8 @@ def test_loaded_snapshot_unions_import_events_and_binds_both_hashes(monkeypatch)
     root = MemoryPath("extensions", entries=[old_event, new_event])
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: root)
     monkeypatch.setattr(studio_extensions, "batch_load", lambda batch_id: {"batch": {
+        "schema": studio_extensions.BATCH_SCHEMA,
+        "version": 1,
         "batch_id": batch_id,
         "items": ([{"index": i, "source_id": source_id, "disposition": "IMPORTED"} for i, source_id in enumerate(ids[:4])]
                   if batch_id == "old-event" else

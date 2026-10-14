@@ -42,11 +42,11 @@ def test_generation_values_and_csv_use_the_same_real_generation_entrypoint() -> 
 def test_pipeline_review_and_replay_bind_to_canonical_studio_operations() -> None:
     assert '"column_count": _column_count' in UI
     assert '"level_number": _level_number' in UI
-    assert '_extension("pipeline", pipeline_request)' in UI
+    assert 'prepare_studio_extension_call", "pipeline", pipeline_request' in UI
     assert '_extension("owner-review", {"candidate_id": _last_candidate_id, "disposition": disposition})' in UI
     assert 'str(_last_pipeline.get("disposition", "")) != "READY"' in UI
     assert '_last_pipeline.get("primary", {})' in UI
-    assert 'primary.get("replay", primary.get("replay_verification", {}))' in UI
+    assert 'result.get("solution_replay", {})' in UI
     assert 'func _solve_again()' in UI and '_run_level_pipeline()' in UI
 
 
@@ -72,7 +72,7 @@ def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None
         assert f'"{control}"' in UI
     assert "func _set_zoom" in UI
     assert "func _toggle_grid" in UI
-    assert "_preview_rect.scale" in UI
+    assert "_preview_content.scale" in UI
     assert "line.visible = _grid_enabled" in UI
 
 
@@ -108,13 +108,16 @@ def test_production_screens_are_native_controls_and_master_textures_are_not_live
 def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_source_order() -> None:
     single = UI.split("func _on_file_selected", 1)[1].split("func _on_files_selected", 1)[0]
     multiple = UI.split("func _on_files_selected", 1)[1].split("func _set_generation_mode", 1)[0]
+    imported = UI.split("func _import_pngs", 1)[1].split("func _show_import_results", 1)[0]
     csv = UI.split("func _process_level_csv", 1)[1].split("func _minimize_window", 1)[0]
-    assert '"batch-import", {"paths": [path]}' in single
-    assert '"batch-import", {"paths": Array(paths)}' in multiple
+    assert "_import_pngs([path])" in single
+    assert "_import_pngs(Array(paths))" in multiple
+    assert '"batch-import", {"paths": paths}' in imported
+    assert '"solver_calls": 0' in imported
+    assert '"pipeline"' not in imported
     assert '"batch-import", {"paths": [artwork_path]}' in csv
-    assert 'for item in items:' in multiple and '"pipeline", {"source_id": source_id' in multiple
     assert 'while not file.eof_reached():' in csv and '"pipeline", {"source_id": source_id' in csv
-    assert '"column_count": _column_count' in multiple
+    assert '"column_count": _column_count' in UI
     assert '"column_count": int(row[col_index])' in csv
     assert '"background_intent": _background_intent' in multiple
     assert '"background_intent": row[bg_index]' in csv

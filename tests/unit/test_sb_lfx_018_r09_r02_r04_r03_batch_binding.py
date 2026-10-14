@@ -398,8 +398,10 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
 def test_batch_ui_does_not_gate_on_selected_thumbnail_preflight() -> None:
     source = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
     run_batch = source.split("func _run_png_batch() -> void:", 1)[1].split("func _pipeline_worker", 1)[0]
+    dispatch = source.split("func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:", 1)[1].split("func _request_batch_pause", 1)[0]
 
     assert "_pinned_source_preflight_ok" not in run_batch
-    assert '"expected_batch_id": _batch_import_id' in run_batch
+    assert "_dispatch_png_batch_job(_batch_job_id, _batch_import_id)" in run_batch
+    assert '"expected_batch_id": batch_id' in dispatch
     assert "BATCH_JOB_SOURCE_MISMATCH" in run_batch
 

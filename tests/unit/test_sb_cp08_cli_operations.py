@@ -70,3 +70,16 @@ def test_failed_write_rolls_back_only_the_new_operation_directory(monkeypatch, t
     with pytest.raises(OperationsEvidenceError, match="rolled back"):
         write_local_operation_evidence(target, (record,), week_start=date(2026, 10, 14), week_end=date(2026, 10, 15))
     assert not target.exists()
+
+
+@pytest.mark.parametrize("protected", [".hiveai/audits/new-evidence", ".git/objects/new-evidence", "TASKS.md"])
+def test_operation_output_refuses_protected_repository_paths(tmp_path, protected) -> None:
+    target = tmp_path.joinpath(*protected.split("/"))
+    with pytest.raises(OperationsEvidenceError, match="protected repository control files"):
+        write_local_operation_evidence(
+            target,
+            (),
+            week_start=date(2026, 10, 14),
+            week_end=date(2026, 10, 15),
+        )
+    assert not target.exists()

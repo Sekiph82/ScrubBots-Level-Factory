@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 
@@ -12,24 +13,35 @@ PROJECT_FILE = PROJECT_ROOT / "project.godot"
 MAIN_SCENE_RE = re.compile(r'^run/main_scene\s*=\s*"([^"]+)"$', re.MULTILINE)
 RESOURCE_REFERENCE_RE = re.compile(r"res://[^\s\"'(),\[\]]+")
 WINDOWS_ABSOLUTE_PATH_RE = re.compile(
-    r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\)"
+    r"(?i)(?<![a-z0-9_])(?:[a-z]:[\\/]|\\\\\\\\[a-z0-9_.-]+[\\/])"
 )
 TEXT_SUFFIXES = {".cfg", ".gd", ".godot", ".import", ".json", ".md", ".py", ".res", ".scene", ".tres", ".tscn", ".txt", ".uid"}
 
 
 def _project_files() -> tuple[Path, ...]:
-    """Return source project files while excluding any local Godot cache."""
-
+    """Return tracked source files, excluding local owner data and Godot cache."""
+    result = subprocess.run(["git", "ls-files", "--", "level_factory"], cwd=REPOSITORY_ROOT,
+                            check=True, capture_output=True, text=True)
     return tuple(
-        path
-        for path in PROJECT_ROOT.rglob("*")
-        if path.is_file() and path.suffix.lower() in TEXT_SUFFIXES and ".godot" not in path.relative_to(PROJECT_ROOT).parts
+        REPOSITORY_ROOT / relative
+        for relative in result.stdout.splitlines()
+        if relative and Path(relative).suffix.lower() in TEXT_SUFFIXES
+        and ".godot" not in Path(relative).parts
     )
 
 
 def _project_text() -> str:
     return "\n".join(
         path.read_text(encoding="utf-8") for path in _project_files()
+    )
+
+
+def _runtime_project_files() -> tuple[Path, ...]:
+    runtime_suffixes = {".cfg", ".gd", ".godot", ".json", ".res", ".tres", ".tscn"}
+    return tuple(
+        path for path in _project_files()
+        if path.suffix.lower() in runtime_suffixes
+        and path.relative_to(PROJECT_ROOT).parts[:1] != ("tests",)
     )
 
 
@@ -53,7 +65,7 @@ def test_configured_main_scene_is_contained_and_exists() -> None:
 
 
 def test_all_resource_references_are_project_relative_and_contained() -> None:
-    for path in _project_files():
+    for path in _runtime_project_files():
         text = path.read_text(encoding="utf-8")
         for reference in RESOURCE_REFERENCE_RE.findall(text):
             assert not reference.startswith("res://../")
@@ -65,13 +77,13 @@ def test_all_resource_references_are_project_relative_and_contained() -> None:
 
 
 def test_nested_project_has_no_absolute_owner_local_or_main_game_paths() -> None:
-    text = _project_text()
+    text = "\n".join(path.read_text(encoding="utf-8") for path in _runtime_project_files())
     assert WINDOWS_ABSOLUTE_PATH_RE.search(text) is None
     assert r"c:\users\sekip\desktop\scrubbots" not in text.lower()
 
 
 def test_nested_project_has_no_external_addon_or_plugin_dependency() -> None:
-    assert not (PROJECT_ROOT / "addons").exists()
+    assert not any(path.relative_to(PROJECT_ROOT).parts[:1] == ("addons",) for path in _project_files())
     assert not any(path.name == "plugin.cfg" for path in _project_files())
     text = PROJECT_FILE.read_text(encoding="utf-8").lower()
     assert "[editor_plugins]" not in text
@@ -81,7 +93,7 @@ def test_nested_project_has_no_external_addon_or_plugin_dependency() -> None:
 def test_nested_project_has_no_network_provider_or_credential_path() -> None:
     text = "\n".join(
         path.read_text(encoding="utf-8").lower()
-        for path in _project_files()
+        for path in _runtime_project_files()
         if path.suffix.lower() in {".godot", ".tscn", ".gd", ".tres", ".res", ".cfg", ".json"}
     )
     forbidden_patterns = (

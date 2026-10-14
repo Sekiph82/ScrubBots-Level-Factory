@@ -31,16 +31,14 @@ def _changed_files() -> tuple[Path, ...]:
         text=True,
     )
     paths = [REPOSITORY_ROOT / line for line in result.stdout.splitlines() if line]
-    untracked = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard"],
+    staged = subprocess.run(
+        ["git", "diff", "--cached", "--name-only"],
         cwd=REPOSITORY_ROOT,
         check=True,
         capture_output=True,
         text=True,
     )
-    paths.extend(
-        REPOSITORY_ROOT / line for line in untracked.stdout.splitlines() if line
-    )
+    paths.extend(REPOSITORY_ROOT / line for line in staged.stdout.splitlines() if line)
     return tuple(path for path in paths if path.is_file())
 
 

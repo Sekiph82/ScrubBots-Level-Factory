@@ -155,8 +155,12 @@ def write_local_operation_evidence(
     If a write fails, rollback is confined to files and the directory created by
     this call. A pre-existing path is never opened or removed.
     """
-    if (not isinstance(output_dir, Path) or not output_dir.parent.is_dir()
-            or output_dir.exists() or output_dir.is_symlink()):
+    if not isinstance(output_dir, Path):
+        raise OperationsEvidenceError("operation evidence destination must be a Path")
+    resolved_parts = {part.casefold() for part in output_dir.resolve(strict=False).parts}
+    if resolved_parts & {".hiveai", ".git", "tasks.md", "agents.md", "governance.md", "handoff.md"}:
+        raise OperationsEvidenceError("operation evidence destination overlaps protected repository control files")
+    if not output_dir.parent.is_dir() or output_dir.exists() or output_dir.is_symlink():
         raise OperationsEvidenceError("operation evidence destination must be a new directory")
     checked = tuple(records)
     jsonl = render_jsonl(checked)
