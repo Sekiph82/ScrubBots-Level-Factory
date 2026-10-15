@@ -7,6 +7,7 @@ from io import BytesIO
 import importlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -492,3 +493,133 @@ def test_art_first_transparent_source_stays_unavailable_without_current_void_att
     result = _run(request)
     assert result.is_success is False
     assert "VOID_CAPABILITY_REQUIRED" in result.failure_reason
+
+
+def _review_root_memory_setup(reparse_path: Path | None = None, configured_root: Path | None = None):
+    patch = pytest.MonkeyPatch()
+    output_root = Path("C:/virtual/art-first-output")
+    extensions_path = output_root / "studio-extensions"
+    review_path = extensions_path / "owner-review"
+    enumerated: list[Path] = []
+    safe_reads: list[Path] = []
+
+    patch.setattr(art_first, "owner_upload_root", lambda: output_root / "owner-uploads")
+    patch.setattr(art_first, "extensions_root", lambda: configured_root or extensions_path)
+    patch.setattr(art_first, "_path_is_reparse_point", lambda path: path == reparse_path)
+    patch.setattr(Path, "is_dir", lambda self: True)
+    patch.setattr(Path, "resolve", lambda self, strict=False: self)
+    patch.setattr(Path, "iterdir", lambda self: (enumerated.append(self), iter(()))[1])
+    patch.setattr(art_first, "_safe_file", lambda path, *args: (safe_reads.append(path), b"")[1])
+    return patch, extensions_path, review_path, enumerated, safe_reads
+
+
+def test_art_first_rejects_studio_extensions_reparse_before_review_access():
+    marker = Path("C:/virtual/art-first-output/studio-extensions")
+    patch, _, _, enumerated, safe_reads = _review_root_memory_setup(reparse_path=marker)
+    try:
+        with pytest.raises(art_first.ArtFirstUnavailable, match="Studio extensions root.*unsafe"):
+            art_first._validated_review_root()
+        assert enumerated == []
+        assert safe_reads == []
+    finally:
+        patch.undo()
+
+
+def test_art_first_rejects_owner_review_reparse_before_review_access():
+    marker = Path("C:/virtual/art-first-output/studio-extensions/owner-review")
+    patch, _, _, enumerated, safe_reads = _review_root_memory_setup(reparse_path=marker)
+    try:
+        with pytest.raises(art_first.ArtFirstUnavailable, match="safe durable owner-review"):
+            art_first._validated_review_root()
+        assert enumerated == []
+        assert safe_reads == []
+    finally:
+        patch.undo()
+
+
+def test_art_first_rejects_noncanonical_injected_extensions_root():
+    patch, _, _, enumerated, safe_reads = _review_root_memory_setup(
+        configured_root=Path("C:/external/owner-review-authority")
+    )
+    try:
+        with pytest.raises(art_first.ArtFirstUnavailable, match="configured Studio extensions root is not canonical"):
+            art_first._validated_review_root()
+        assert enumerated == []
+        assert safe_reads == []
+    finally:
+        patch.undo()
+
+
+def test_art_first_accepts_canonical_memory_review_root():
+    patch, _, expected_review_root, enumerated, safe_reads = _review_root_memory_setup()
+    try:
+        assert art_first._validated_review_root() == expected_review_root
+        assert enumerated == []
+        assert safe_reads == []
+    finally:
+        patch.undo()
+
+
+def _candidate_flow_reparse_setup(reparse_path: Path):
+    patch = pytest.MonkeyPatch()
+    output_root = Path("C:/virtual/art-first-output")
+    owner_root = output_root / "owner-uploads"
+    extensions_path = output_root / "studio-extensions"
+    source_sha = "a" * 64
+    source_id = f"owner-upload-{source_sha}"
+    candidate_id = f"candidate-owner-{source_sha[:48]}"
+    record_bytes = b"synthetic immutable source record"
+    record_sha = hashlib.sha256(record_bytes).hexdigest()
+    source_record_path = owner_root / source_id / "source.json"
+    lineage = {
+        "source_id": source_id,
+        "source_sha256": source_sha,
+        "source_record": str(source_record_path),
+        "source_bytes_unchanged": True,
+        "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+    }
+    bundle = SimpleNamespace(
+        artwork=SimpleNamespace(candidate_id=candidate_id, grid_hash="synthetic-grid"),
+        metadata={
+            "generation": {"result": {"generator": {"mode": "MASK", "id": "owner-upload-canonical-derive", "version": "1"}}},
+            "generator_metadata": {
+                "payload": {"namespace": "owner-upload", "data": {"source_lineage": lineage}},
+                "classification": {"candidate_class": "PRODUCTION_CANDIDATE"},
+            },
+        },
+    )
+    safe_reads: list[tuple[Path, str]] = []
+    enumerated: list[Path] = []
+
+    patch.setattr(art_first, "owner_upload_root", lambda: owner_root)
+    patch.setattr(art_first, "extensions_root", lambda: extensions_path)
+    patch.setattr(art_first, "_path_is_reparse_point", lambda path: path == reparse_path)
+    patch.setattr(art_first, "_safe_file", lambda path, root, limit, label: (safe_reads.append((path, label)), record_bytes)[1])
+    patch.setattr(art_first, "read_bundle", lambda candidate_dir: bundle)
+    patch.setattr(Path, "is_dir", lambda self: True)
+    patch.setattr(Path, "is_file", lambda self: True)
+    patch.setattr(Path, "exists", lambda self: False)
+    patch.setattr(Path, "resolve", lambda self, strict=False: self)
+    patch.setattr(Path, "iterdir", lambda self: (enumerated.append(self), iter(()))[1])
+    return patch, source_sha, record_sha, source_id, candidate_id, safe_reads, enumerated
+
+
+def test_art_first_candidate_flow_rejects_review_reparse_before_review_access():
+    for marker in (
+        Path("C:/virtual/art-first-output/studio-extensions"),
+        Path("C:/virtual/art-first-output/studio-extensions/owner-review"),
+    ):
+        patch, source_sha, record_sha, source_id, candidate_id, safe_reads, enumerated = _candidate_flow_reparse_setup(marker)
+        try:
+            with pytest.raises(art_first.ArtFirstUnavailable, match="reparse|unsafe|safe durable"):
+                art_first._candidate_and_review(
+                    {"source_sha256": source_sha},
+                    record_sha,
+                    source_id,
+                    candidate_id,
+                    f"review-{candidate_id}-0001",
+                )
+            assert enumerated == []
+            assert all("owner-review" not in str(path) for path, _ in safe_reads)
+        finally:
+            patch.undo()

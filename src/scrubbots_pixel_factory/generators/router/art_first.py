@@ -86,6 +86,49 @@ def _safe_file(path: Path, root: Path, limit: int, label: str) -> bytes:
         raise ArtFirstUnavailable(f"UNAVAILABLE: {label} is unreadable") from exc
 
 
+def _validated_review_root() -> Path:
+    """Return only the canonical, non-reparse ART_FIRST owner-review root."""
+    output_root = owner_upload_root().parent
+    expected_extensions_root = output_root / "studio-extensions"
+    if _path_is_reparse_point(expected_extensions_root) or not expected_extensions_root.is_dir():
+        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: canonical Studio extensions root is missing or unsafe")
+    try:
+        resolved_output_root = output_root.resolve(strict=True)
+        resolved_extensions_root = expected_extensions_root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: canonical Studio extensions root cannot be resolved") from exc
+    expected_resolved_extensions_root = resolved_output_root / "studio-extensions"
+    if (
+        resolved_extensions_root.parent != resolved_output_root
+        or resolved_extensions_root != expected_resolved_extensions_root
+    ):
+        raise ArtFirstUnavailable("UNAVAILABLE: canonical Studio extensions root escaped its output directory")
+
+    # Keep the existing import injectable for source-backed tests, but never let
+    # it select a different review authority than the raw canonical path above.
+    try:
+        configured_extensions_root = extensions_root().resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: configured Studio extensions root cannot be resolved") from exc
+    if configured_extensions_root != resolved_extensions_root:
+        raise ArtFirstUnavailable("UNAVAILABLE: configured Studio extensions root is not canonical")
+
+    raw_review_root = expected_extensions_root / "owner-review"
+    if _path_is_reparse_point(raw_review_root) or not raw_review_root.is_dir():
+        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: no safe durable owner-review chain exists")
+    try:
+        resolved_review_root = raw_review_root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: canonical owner-review root cannot be resolved") from exc
+    expected_resolved_review_root = resolved_extensions_root / "owner-review"
+    if (
+        resolved_review_root.parent != resolved_extensions_root
+        or resolved_review_root != expected_resolved_review_root
+    ):
+        raise ArtFirstUnavailable("UNAVAILABLE: owner-review root escaped canonical Studio extensions")
+    return resolved_review_root
+
+
 def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) -> tuple[dict[str, object], bytes, tuple[str, ...], int, int]:
     match = _SOURCE_ID.fullmatch(source_id)
     if match is None or not _SHA256.fullmatch(expected_sha) or not _SHA256.fullmatch(expected_record_sha):
@@ -239,9 +282,7 @@ def _candidate_and_review(
     if source_record_sha != _sha256(_safe_file(owner_upload_root() / source_id / "source.json", owner_upload_root() / source_id, 64 * 1024, "source record")):
         raise ArtFirstUnavailable("UNAVAILABLE: immutable source record changed during ART_FIRST validation")
 
-    review_root = extensions_root() / "owner-review"
-    if review_root.is_symlink() or not review_root.is_dir():
-        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: no durable owner-review chain exists")
+    review_root = _validated_review_root()
     prefix = f"review-{expected_candidate_id}-"
     try:
         paths = sorted(path for path in review_root.iterdir() if path.name.startswith(prefix) and path.suffix == ".json")
