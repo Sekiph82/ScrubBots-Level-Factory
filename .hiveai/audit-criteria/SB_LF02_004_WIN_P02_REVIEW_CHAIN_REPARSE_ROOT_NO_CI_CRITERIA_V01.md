@@ -1,0 +1,12 @@
+# SB-LF02-004 WIN-P02 | GPT independent acceptance criteria V01
+
+Scope: one ART_FIRST owner-review root trust-boundary correction after the P01 independent F01. Owner locked **zero Actions, CI, workflow edits, hosted tests, OS TEMP/writably generated scratch, elevated permissions**.
+
+1. A *raw*, not already resolved, expected `studio-extensions` root is anchored beneath the independently verified canonical `owner_upload_root().parent` output root, and neither its own reparse tag nor its strict resolved parent can be redirected. `owner-review` is rejected if a symlink/junction/reparse point, and its resolved parent must equal the validated studio-extensions root. No user-given review root external to that canonical layout can authorize ACCEPT.
+2. `_safe_file` enforces per-record path/size, and the existing `validate_owner_review_chain` current ACCEPT binding, original PNG/hash/grid/dimension checks and TEST/PREVIEW output remain untouched. No forged owner/source approvals or AI-as-owner recategorization.
+3. Two in-memory negative reparse mocks **both** source-approved chain roots (`studio-extensions` and `owner-review`), plus wrong external injected root if relevant, are tested without real NTFS fixture or owner file reads. No changes to `owner_upload`, Release Pool or installed UI without demonstrated need. Identify whether a previously valid canonical path still functions via safe no-new-scratch evidence or explicitly mark whole path NOT RUN.
+4. Builder accurately distinguishes mocked path tests and the 3 earlier native Windows *path-type classifications* from genuine NTFS test through ART_FIRST (still NOT RUN), and notes Python path APIs do not give race-free handle proof.
+5. Git compare proves limited source/tests/log diff and no workflow changes. All reported 3,220 untracked paths preserved (16 known task pytest scratch entries deletion policy-blocked). Source SHA, focused commands and pass/fail counts visible. No CI run or full suite claim.
+6. No owner 140 PNG, accepted 002, 9 READY, installed 3-screen Studio, launcher, native ScrubBots game, R2, live provider touched. R05 native/owner/game production stays DEFERRED OPEN and authentic AI upstream creator identity stays UNVERIFIED.
+
+Decision after independent GPT GitHub source review: P02 source PASS only if physical review root gate F01 is closed and evidence is appropriately scoped. Native Windows app-path and race-free handle gates remain unverified unless independently demonstrated with permitted genuine native proof; do not mark them passed based on source.
