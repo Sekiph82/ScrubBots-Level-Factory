@@ -375,9 +375,15 @@ def test_selected_plan_revalidation_uses_same_filtered_owner_source_gate(
         "pipeline": {"disposition": "READY"},
         "source_bundle": candidate["source_path"],
     }
+    plan_path = tmp_path / "studio-extensions" / "release" / "campaign_plan.json"
+    original_json = release_pool._json
     monkeypatch.setattr(release_pool, "discover_game_project", lambda _game: tmp_path)
     monkeypatch.setattr(studio, "extensions_root", lambda: tmp_path / "studio-extensions")
-    monkeypatch.setattr(release_pool, "_json", lambda _path: plan)
+    monkeypatch.setattr(
+        release_pool,
+        "_json",
+        lambda path: plan if Path(path) == plan_path else original_json(path),
+    )
     monkeypatch.setattr(release_pool, "_production_release_entries", lambda: [entry])
     monkeypatch.setattr(studio, "_latest_review", lambda _candidate_id: _owner_accept(candidate))
     monkeypatch.setattr(release_pool, "_game_authority", lambda _game: ({}, {}))
