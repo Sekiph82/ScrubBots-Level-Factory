@@ -258,8 +258,6 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
 
     # Positive control reaches the next Pool stage with a synthetic canonical
     # READY record; stop before official game/runtime proof is evaluated.
-    lineage = candidate["metadata"]["generator_metadata"]["payload"]["data"]["source_lineage"]
-
     class ProvenancePassed(Exception):
         pass
 
@@ -357,6 +355,43 @@ def test_owner_source_candidate_path_escape_fails_closed(tmp_path: Path, monkeyp
         release_pool._verify_candidate_source_grid_binding(
             candidate, candidate["metadata"]["generator_metadata"]["classification"]
         )
+
+
+def test_selected_plan_revalidation_uses_same_filtered_owner_source_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from scrubbots_pixel_factory import studio_extensions as studio
+
+    cells = tuple(("C01", "C02", "C03")[index % 3] for index in range(400))
+    source_png = _filtered_owner_png(cells, filters=(1, 2, 4), ancillary=True)
+    candidate = _candidate(owner_source=True, source_cells=cells, source_png=source_png)
+    _install_fake_owner_source(candidate, source_png, tmp_path, monkeypatch)
+    classification = candidate["metadata"]["generator_metadata"]["classification"]
+    plan = {"plan_hash": "synthetic-filtered-plan", "K": 1, "slots": [{"n": 1, "chosen_id": candidate["candidate_id"]}]}
+    entry = {
+        "candidate_id": candidate["candidate_id"],
+        "candidate_classification": classification,
+        "candidate": candidate,
+        "pipeline": {"disposition": "READY"},
+        "source_bundle": candidate["source_path"],
+    }
+    monkeypatch.setattr(release_pool, "discover_game_project", lambda _game: tmp_path)
+    monkeypatch.setattr(studio, "extensions_root", lambda: tmp_path / "studio-extensions")
+    monkeypatch.setattr(release_pool, "_json", lambda _path: plan)
+    monkeypatch.setattr(release_pool, "_production_release_entries", lambda: [entry])
+    monkeypatch.setattr(studio, "_latest_review", lambda _candidate_id: _owner_accept(candidate))
+    monkeypatch.setattr(release_pool, "_game_authority", lambda _game: ({}, {}))
+    monkeypatch.setattr(
+        release_pool,
+        "build_campaign_plan",
+        lambda **_kwargs: {"plan_hash": "synthetic-filtered-plan"},
+    )
+
+    validated = release_pool.validate_release_plan(
+        plan_hash="synthetic-filtered-plan", game_project=tmp_path
+    )
+    assert validated["prefix"] == plan["slots"]
+    assert validated["items"][0]["candidate"]["candidate_id"] == candidate["candidate_id"]
 
 
 def _release_entry(candidate_id: str, *, production: bool) -> dict[str, object]:
