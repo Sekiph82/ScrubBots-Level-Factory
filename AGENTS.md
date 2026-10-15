@@ -1,5 +1,15 @@
 # H!veAI TASKS-only control-plane adapter
 
+## OWNER COST LOCK — 2026-10-15 — ZERO GITHUB ACTIONS / ZERO CI
+
+The owner has exhausted GitHub Actions minutes and prohibited additional CI spending. **Until the owner explicitly reverses this rule, neither Codex nor GPT may start, schedule, request, dispatch, or recommend executing a GitHub Actions run, including `workflow_dispatch`, reusable workflows, self-hosted runners, or automatic CI triggers.** Do not substitute another hosted CI provider or paid test service. Do not create or edit workflow files to enable CI as a test path.
+
+Ordinary Git fetch, local edits, commits, and normal main pushes are allowed. The repository's only current workflow, `.github/workflows/c001-r09-safe-regression.yml`, is manual `workflow_dispatch` only, so normal pushes do not invoke it. Recheck the actual workflow triggers before every future push if workflow definitions change; if a push might automatically run billable CI, do not push and report the blocker instead.
+
+Verification uses bounded, explicit **local** source/type/syntax checks and focused in-memory unit tests on the canonical Desktop checkout with no Windows system TEMP pytest process, no worktree/clone and no mass regression. Prevent Python bytecode/pytest cache generation; do not run test suites requiring unapproved scratch directories or touching 140 owner PNG/installed Release/native game. If a test genuinely requires temporary filesystem space, first use a narrow bounded owner-safe repository-local test fixture approach only where permitted by the existing Desktop-only/no-TEMP owner policy, otherwise mark the test **NOT RUN** and continue safe code work. Record exact commands, counts, failures, environment and unrun CI/native gates. **Do not represent local static review as hosted CI or independent full-suite PASS.**
+
+This standing owner cost lock overrides conflicting hosted-run language in historical prompts, criteria, builder logs, or standing instructions. No new alternative CI is authorized.
+
 Before doing project work, read the root `TASKS.md` as the sole current
 task-state authority and read the authoritative prompt URL supplied in the
 handoff. The tracked GitHub branch is current-state authority; local folders
