@@ -61,6 +61,8 @@ def _candidate(
         "candidate_id": bundle.artwork.candidate_id,
         "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
         "grid_hash": bundle.artwork.grid_hash,
+        "width": bundle.artwork.width,
+        "height": bundle.artwork.height,
         "metadata": bundle.metadata,
         "source_path": f"level_factory/output/studio-derived-candidates/{candidate_id}",
         "source_png": source_png,
