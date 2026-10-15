@@ -12,6 +12,11 @@ from scrubbots_pixel_factory.quality import QualityPolicy, evaluate_grid
 
 
 def _request(seed="m02-01-seed", *, budget=2, quality_policy=None, width=20, height=20, color_count=3):
+    policy_payload = (
+        quality_policy.as_dict() if isinstance(quality_policy, QualityPolicy)
+        else quality_policy if quality_policy is not None
+        else QualityPolicy(max_largest_region_ratio=0.6).as_dict()
+    )
     return GenerationRequest(
         seed=seed, width=width, height=height, generator_mode="AUTO",
         palette_subset=tuple(f"C{index:02d}" for index in range(1, color_count + 1)),
@@ -22,7 +27,7 @@ def _request(seed="m02-01-seed", *, budget=2, quality_policy=None, width=20, hei
                 "evaluator_guided": {
                     "version": 1,
                     "proposal_budget": budget,
-                    "quality_policy": (quality_policy or QualityPolicy(max_largest_region_ratio=0.6)).as_dict(),
+                    "quality_policy": policy_payload,
                 },
             },
         ),
@@ -199,9 +204,10 @@ def test_non_opt_in_auto_keeps_existing_fallback_contract():
 
 
 def test_m07_legacy_difficulty_api_remains_available():
-    report = evaluate_grid(38, 38, _grid(False, 38, 38), policy=QualityPolicy(difficulty="EASY"))
-    assert report.accepted is False
-    assert "DIMENSION_MISMATCH" in report.rejection_codes
+    five_colors = ("C01", "C02", "C03", "C04", "C05")
+    report = evaluate_grid(24, 24, _grid(False, 24, 24, five_colors), policy=QualityPolicy(difficulty="VERY_HARD"))
+    assert report.accepted is True
+    assert not report.rejection_codes
 
 
 def test_evaluator_guided_bundle_rejects_tampered_winner_identity():
