@@ -1,0 +1,13 @@
+# M02.01 / SB-LF02-001 | GPT independent audit criteria V01
+
+Acceptance strictly for a **local offline evaluator-guided candidate path**, not production/official solver, owner acceptance or release.
+
+1. **Real implementation integration:** Opt-in versioned evaluator proposal/selection at the existing generation or preview API/CLI; existing default deterministic generator calls untouched. Not docs-only or a disconnected experiment.
+2. **Nontrivial evaluator effect:** Uses real stable existing M07 structural quality/rejection metrics to select among independent generated candidate proposals. Deterministic seeds/config/attempt budget/policy and tie-break. Positive valid-vs-invalid choice at same ingress must prove choice changes for quality, not just random first-success. Bounded proposals/evaluation and explicit no-valid candidate exit. 20..59 including 59x59, rectangles, 3..12 palette.
+3. **Proof/provenance:** Persist candidate request ID/hash, generator ID/version, seed, attempted generator modes, evaluator policy/version, per-attempt quality/reasons, selected result identity and stable canonical digest. No forged evidence fields, no owner-original artwork relabel, no classification upgrade beyond TEST/development.
+4. **Strict separation:** Structural artifact quality != canonical legal moves, ProofState, solver, official Difficulty V1, fun, owner acceptance, READY_AUTO, Release Pool. Unknown source/game contract explicitly UNAVAILABLE. Never modify or simulate production approval.
+5. **Test expectations:** Focused deterministic replay same seed => same candidate source and metadata bytes; alternate seed, invalid metric/policy, all-rejected, attempt budget, actual-guided win, identity tamper/relabel and fail-closed no-game. Builder reports precise test SHA/count/skips, failures retained; isolated synthetic GH-hosted execution only if needed, no Windows TEMP. Unrelated 1848 suite not automatically repeated.
+6. **Safety:** Preserve 3,204 local owner paths and prior nine READY/4-4-1, accepted 002, 140 PNG and installed Studio, no R2, game writes or Release/shortcut modifications, no paid APIs or new runtime network requirements. GitHub tracked source/test/log change only via ff-only main; no TASKS/audits by Codex.
+7. **Governance:** GPT alone source-audits and closes exact `SB-LF02-001` checkbox. Partial source behavior means PARTIAL/Open, not a technical PASS. Any separate M02.01 LF02-004 or M02.02 LF02-008 must have its own genuine independent evidence and closure, not inherited from LF02-001.
+
+Parent M01.03 source-contract acceptance `.hiveai/audits/SB_LF01_009_R02_INDEPENDENT_FINAL_SCOPE_AUDIT_V01.md` remains final; native R05 is deferred/open and unwaived.
