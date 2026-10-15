@@ -381,7 +381,7 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     plan = tmp_path / "plan.json"
     result = tmp_path / "result.json"
     level.write_text("{}", encoding="utf-8")
-    plan.write_text(json.dumps({"columnCount": 4}), encoding="utf-8")
+    plan.write_text(json.dumps({"columnCount": 3}), encoding="utf-8")
     result.write_text("{}", encoding="utf-8")
     pipeline = {"run_id": run_id, "candidate_id": "candidate-exact", "primary": {"files": {"level": str(level), "supply_plan": str(plan), "result": str(result)}}}
     pipeline_path = root / "pipelines" / f"{run_id}.json"
@@ -389,12 +389,15 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     pipeline_sha = hashlib.sha256(pipeline_path.read_bytes()).hexdigest()
     pool_row = {
         "candidate_id": "candidate-exact", "pipeline_run_id": run_id, "pipeline_sha256": pipeline_sha,
-        "entry_digest": "entry-exact",
+        "source_id": source_id, "column_count": 3,
         "files": {
             "level": {"sha256": hashlib.sha256(level.read_bytes()).hexdigest()},
             "supply_plan": {"sha256": hashlib.sha256(plan.read_bytes()).hexdigest()},
         },
     }
+    pool_row["entry_digest"] = hashlib.sha256(json.dumps(
+        pool_row, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
     (pool_root / "entry.json").write_text(json.dumps(pool_row), encoding="utf-8")
     monkeypatch.setattr(extensions, "extensions_root", lambda: root)
     monkeypatch.setattr(extensions, "_read_json", lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
@@ -403,35 +406,79 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     monkeypatch.setattr(release_pool, "release_entries", lambda: [pool_row])
     candidate = {"candidate_id": "candidate-exact"}
 
-    assert png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
-    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
+    assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
+    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
+
+    # Isolate pipeline-byte drift from the missing-entry case.
     pipeline_path.write_text(json.dumps({**pipeline, "changed": True}), encoding="utf-8")
-    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
+    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
+
+    # Restore the exact valid pipeline/Pool binding and prove the control again
+    # immediately before changing only release_entries() to represent an empty Pool.
+    pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
+    pool_row["pipeline_sha256"] = hashlib.sha256(pipeline_path.read_bytes()).hexdigest()
+    pool_row["files"]["level"]["sha256"] = hashlib.sha256(level.read_bytes()).hexdigest()
+    pool_row["files"]["supply_plan"]["sha256"] = hashlib.sha256(plan.read_bytes()).hexdigest()
+    pool_row.pop("entry_digest")
+    pool_row["entry_digest"] = hashlib.sha256(json.dumps(
+        pool_row, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
+    ).encode("utf-8")).hexdigest()
+    (pool_root / "entry.json").write_text(json.dumps(pool_row), encoding="utf-8")
+    monkeypatch.setattr(release_pool, "release_entries", lambda: [pool_row])
+    assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
     monkeypatch.setattr(release_pool, "release_entries", lambda: [])
-    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
+    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
 
 
 def test_column_artifact_gate_rejects_wrong_columns_missing_files_and_digest_drift(tmp_path: Path) -> None:
+    from scrubbots_pixel_factory.supply_pipeline.scrubpack_identity import derive_solver_supply_identity
+
     level = tmp_path / "level.json"
     plan = tmp_path / "plan.json"
     result_path = tmp_path / "result.json"
-    level.write_text("{}", encoding="utf-8")
-    plan.write_text(json.dumps({"columnCount": 3}), encoding="utf-8")
-    result = {"column_count": 3}
-    result_path.write_text(json.dumps(result), encoding="utf-8")
-    pipeline = {"primary": {"column_count": 3, "result": result, "files": {
-        "level": str(level), "supply_plan": str(plan), "result": str(result_path),
-    }}}
+    level_bytes = json.dumps({"id": "synthetic-level", "version": 1, "cells": [0, 1]}, sort_keys=True).encode("utf-8")
+    plan_bytes = json.dumps({
+        "schema": "scrubbots.level_supply_plan.v1", "version": 1, "levelId": "synthetic-level",
+        "columnCount": 3, "visiblePreviewDepth": 1, "maxRobotsPerBatch": 1,
+        "columns": [[{"batchId": f"batch-{index}", "cid": f"C{index:02d}", "robots": 1}]
+                    for index in range(1, 4)],
+    }, sort_keys=True).encode("utf-8")
+    authority = {"repository": "Sekiph82/Scrubbots", "branch": "main", "git_head": "a" * 40}
+    result = {
+        "solver_status": "SOLVED", "solution_final": "WIN", "column_count": 3,
+        "solution_replay": {"ok": True, "solved": True, "finalActive": 0},
+        "color_conservation_verification": {"all_ok": True},
+        "solver_metrics": {"official_difficulty_v1": {"ok": True}},
+    }
+    result_bytes = json.dumps(result, sort_keys=True).encode("utf-8")
+    level.write_bytes(level_bytes)
+    plan.write_bytes(plan_bytes)
+    result_path.write_bytes(result_bytes)
+    artifacts = {
+        "level": hashlib.sha256(level_bytes).hexdigest(),
+        "supply_plan": hashlib.sha256(plan_bytes).hexdigest(),
+        "result": hashlib.sha256(result_bytes).hexdigest(),
+    }
+    pipeline = {"primary": {
+        "column_count": 3, "result": result, "authority": authority,
+        "solver_supply_identity": derive_solver_supply_identity(level_bytes, plan_bytes, result, authority),
+        "artifact_sha256": artifacts,
+        "files": {"level": str(level), "supply_plan": str(plan), "result": str(result_path)},
+    }}
 
-    # Real SHA/identity authority is intentionally not synthesized here; the
-    # negative assertions stop earlier on exact independently verifiable gates.
-    assert not png_batch._verify_column_artifacts(pipeline, 4)
-    assert not png_batch._verify_column_artifacts({"primary": {**pipeline["primary"], "files": {
+    # This pure synthetic control exercises the real identity derivation
+    # contract; it is not evidence of a pinned runtime or an authentic solve.
+    assert png_batch._verify_column_artifacts(pipeline, 3) is True
+    assert png_batch._verify_column_artifacts(pipeline, 4) is False
+    assert png_batch._verify_column_artifacts({"primary": {**pipeline["primary"], "files": {
         **pipeline["primary"]["files"], "result": str(tmp_path / "missing.json"),
-    }}}, 3)
-    assert not png_batch._verify_column_artifacts({"primary": {
-        **pipeline["primary"], "artifact_sha256": {"level": "0" * 64},
-    }}, 3)
+    }}}, 3) is False
+    assert png_batch._verify_column_artifacts({"primary": {
+        **pipeline["primary"], "artifact_sha256": {**artifacts, "result": "0" * 64},
+    }}, 3) is False
+    assert png_batch._verify_column_artifacts({"primary": {
+        **pipeline["primary"], "solver_supply_identity": {"schema": "mismatched"},
+    }}, 3) is False
 
 
 def test_candidate_source_lineage_gate_fails_closed_on_bad_bundle_and_identity_claims(
