@@ -1410,3 +1410,8 @@ Document role: CODEX BUILDER LOG
 ## SB-LF02-004-WIN-P02 builder-log preservation correction
 
 - 2026-10-16T02:27:05+03:00: Review of the first log commit found that text-mode rewriting had normalized a pre-existing carriage-return control in an older archived paragraph. Restored the prior committed log blob byte-for-byte and retained the P02 chronology as an append. This follow-up changes only the builder log and records the correction; no earlier task content is intentionally rewritten.
+
+
+## SB-LF02-004-WIN-P02 first publication receipt
+
+- 2026-10-16T02:28:14+03:00: Normal git push origin HEAD:main succeeded and published source commit 1231673df8d8ff5ab3c8f93420dc3c15c9efdaa2, evidence commit 7de4e600de29abb6f63edb4423b5312c15be921b, and preservation correction 0ea9ff9b5d09e9366a4063c89386181ed92d75a9. The first post-push check fetched origin and observed HEAD=origin/main=0ea9ff9b5d09e9366a4063c89386181ed92d75a9, 0 ahead / 0 behind, tracked clean, 3,220 untracked. Its initial PowerShell assertion failed only because it compared the tab-separated divergence output as an exact string; the check was corrected to parse both counts numerically and passed with the same state. No Actions or CI was started. A final log-only receipt commit follows.
