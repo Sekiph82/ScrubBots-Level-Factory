@@ -14,7 +14,7 @@ class WFCContractError(ValueError):
 
 
 EXEMPLAR_ROLES = ("TRAINING_MOTIF", "PRODUCTION_ARTIFACT")
-OWNERSHIP_CLASSES = ("SYNTHETIC_TEST_ONLY", "OWNER_SUPPLIED_UNAPPROVED", "OWNER_APPROVED")
+OWNERSHIP_CLASSES = ("SYNTHETIC_TEST_ONLY", "OWNER_SUPPLIED_UNAPPROVED")
 DIRECTIONS = ("LEFT", "RIGHT", "UP", "DOWN")
 
 
@@ -63,12 +63,8 @@ class Exemplar:
             raise WFCContractError("unknown exemplar ownership/use classification")
         _require_text(self.provenance_type, "provenance_type")
         _require_text(self.provenance_description, "provenance_description")
-        if self.ownership == "SYNTHETIC_TEST_ONLY" and self.approved_by is not None:
-            raise WFCContractError("synthetic test exemplars cannot be owner-approved")
-        if self.ownership == "OWNER_APPROVED":
-            _require_text(self.approved_by, "approved_by")
-        elif self.approved_by is not None:
-            raise WFCContractError("approved_by is only valid for owner-approved exemplars")
+        if self.approved_by is not None:
+            raise WFCContractError("owner approval requires canonical source and current-review evidence")
         if self.role == "PRODUCTION_ARTIFACT":
             _require_text(self.production_difficulty, "production_difficulty")
             try:
@@ -124,7 +120,11 @@ class ExemplarRegistry:
             raise WFCContractError("unknown WFC exemplar") from exc
 
     def eligible(self) -> tuple[Exemplar, ...]:
-        return tuple(exemplar for exemplar in self._exemplars if exemplar.ownership in {"SYNTHETIC_TEST_ONLY", "OWNER_APPROVED"})
+        # Exemplar JSON is caller-controlled and carries no canonical owner
+        # source/review proof. Only synthetic test fixtures are eligible until
+        # WFC consumes the same verified source and current-review chain as the
+        # owner-upload pipeline.
+        return tuple(exemplar for exemplar in self._exemplars if exemplar.ownership == "SYNTHETIC_TEST_ONLY")
 
 
 @dataclass(frozen=True, slots=True)

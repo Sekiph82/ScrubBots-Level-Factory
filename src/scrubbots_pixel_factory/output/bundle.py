@@ -17,7 +17,9 @@ from typing import Any
 from ..contracts.candidate_provenance import (
     CandidateProvenanceError,
     build_candidate_classification,
+    build_verified_owner_upload_classification,
     validate_candidate_classification,
+    validate_verified_owner_upload_classification,
 )
 from ..core import DeterministicRNG, GenerationResult, ResultStatus
 from ..quality import QualityPolicy, QualityReport, evaluate_grid, logical_grid_hash
@@ -132,17 +134,91 @@ def _quality_binding(report: QualityReport, artwork: ArtworkArtifact) -> dict[st
     }
 
 
+def _verified_owner_upload_sha256(
+    result: Mapping[str, object],
+    candidate_id: str,
+    artwork: ArtworkArtifact,
+    generator_payload: Mapping[str, object],
+) -> str | None:
+    """Verify owner-upload source bytes before export can carry production class."""
+
+    if generator_payload.get("namespace") != "owner-upload":
+        return None
+    data = _mapping_copy(generator_payload.get("data"), "owner-upload generator metadata.data")
+    lineage = _mapping_copy(data.get("source_lineage"), "owner-upload source lineage")
+    source_id = lineage.get("source_id")
+    source_sha256 = lineage.get("source_sha256")
+    if (
+        type(source_id) is not str
+        or type(source_sha256) is not str
+        or not _DIGEST.fullmatch(source_sha256)
+        or source_id != f"owner-upload-{source_sha256}"
+        or lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
+        or lineage.get("source_bytes_unchanged") is not True
+        or candidate_id != f"candidate-owner-{source_sha256[:48]}"
+    ):
+        raise OutputContractError("owner-upload classification lacks canonical source identity")
+
+    try:
+        # Import lazily: studio_extensions itself uses the bundle reader for
+        # source-library projections.
+        from .. import studio_extensions as studio
+
+        verified = studio.verify_owner_source(source_id)
+        source_path = Path(str(verified["source_path"]))
+        if not source_path.is_absolute():
+            source_path = studio._repository_root() / source_path
+        source_bytes = source_path.read_bytes()
+        width, height, source_cells, foreign, semi_alpha, _transparent, _used = studio._owner_source_grid(source_bytes)
+    except (KeyError, OSError, TypeError, ValueError) as exc:
+        raise OutputContractError("canonical OWNER_UPLOAD source bytes could not be verified") from exc
+
+    request = _mapping_copy(result.get("request"), "generation result request")
+    request_seed = _mapping_copy(request.get("seed"), "generation result request seed")
+    generator = _mapping_copy(result.get("generator"), "generation result generator")
+    if (
+        verified.get("source_id") != source_id
+        or verified.get("source_sha256") != source_sha256
+        or verified.get("source_bytes_sha256") != source_sha256
+        or verified.get("record_path") != lineage.get("source_record")
+        or request_seed.get("value") != source_sha256
+        or request_seed.get("type") != "string"
+        or generator.get("id") != "owner-upload-canonical-derive"
+        or generator.get("version") != "1"
+        or request.get("generator_mode") != "MASK"
+        or (width, height) != (artwork.width, artwork.height)
+        or (width, height) != (verified.get("original_width"), verified.get("original_height"))
+        or foreign != 0
+        or semi_alpha != 0
+        or source_cells != artwork.cells
+    ):
+        raise OutputContractError("owner-upload lineage does not match the exact canonical source bytes and artwork")
+    return source_sha256
+
+
 def _metadata_for(result: GenerationResult, artwork: ArtworkArtifact, generator_metadata: Mapping[str, object], quality_report: QualityReport) -> dict[str, object]:
     result_dict = _mapping_copy(result.canonical_dict(), "generation_result")
     if result_dict.get("status") != ResultStatus.SUCCESS.value:
         raise OutputContractError("only successful GenerationResult values can be exported")
     generator_payload = _mapping_copy(generator_metadata, "generator_metadata")
-    classification = build_candidate_classification(
-        result_dict,
-        candidate_id=artwork.candidate_id,
-        grid_hash=artwork.grid_hash,
-        generator_metadata=generator_payload,
+    owner_source_sha256 = _verified_owner_upload_sha256(
+        result_dict, artwork.candidate_id, artwork, generator_payload
     )
+    if owner_source_sha256 is not None:
+        classification = build_verified_owner_upload_classification(
+            result_dict,
+            candidate_id=artwork.candidate_id,
+            grid_hash=artwork.grid_hash,
+            generator_metadata=generator_payload,
+            verified_source_sha256=owner_source_sha256,
+        )
+    else:
+        classification = build_candidate_classification(
+            result_dict,
+            candidate_id=artwork.candidate_id,
+            grid_hash=artwork.grid_hash,
+            generator_metadata=generator_payload,
+        )
     return {
         "schema": METADATA_SCHEMA,
         "schema_version": METADATA_SCHEMA_VERSION,
@@ -629,15 +705,34 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
     ):
         raise OutputContractError("generator metadata binding is invalid")
     classification = generator_metadata.get("classification")
+    payload = _mapping_copy(generator_metadata["payload"], "metadata.generator_metadata.payload")
+    owner_source_sha256 = _verified_owner_upload_sha256(
+        _mapping_copy(_mapping_copy(value["generation"], "metadata.generation").get("result"), "metadata.generation.result"),
+        artwork.candidate_id,
+        artwork,
+        payload,
+    )
+    if owner_source_sha256 is not None and classification is None:
+        raise OutputContractError("verified owner-upload bundle must carry its candidate classification")
     if classification is not None:
         try:
-            validate_candidate_classification(
-                classification,
-                result_dict,
-                candidate_id=artwork.candidate_id,
-                grid_hash=artwork.grid_hash,
-                generator_metadata=generator_metadata["payload"],
-            )
+            if owner_source_sha256 is None:
+                validate_candidate_classification(
+                    classification,
+                    result_dict,
+                    candidate_id=artwork.candidate_id,
+                    grid_hash=artwork.grid_hash,
+                    generator_metadata=payload,
+                )
+            else:
+                validate_verified_owner_upload_classification(
+                    classification,
+                    result_dict,
+                    candidate_id=artwork.candidate_id,
+                    grid_hash=artwork.grid_hash,
+                    generator_metadata=payload,
+                    verified_source_sha256=owner_source_sha256,
+                )
         except CandidateProvenanceError as exc:
             raise OutputContractError(str(exc)) from exc
     generator_mode = generation.get("generator_mode")

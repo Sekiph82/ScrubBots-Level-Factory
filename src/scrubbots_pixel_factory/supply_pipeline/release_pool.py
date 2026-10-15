@@ -11,7 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from ..contracts.candidate_provenance import CandidateClass, CandidateProvenanceError, validate_candidate_classification
+from ..contracts.candidate_provenance import CandidateClass, CandidateProvenanceError, validate_verified_owner_upload_classification
 from .campaign_builder import CampaignError, build_campaign_plan, write_campaign_plan
 from .game_publisher import PublicationError, discover_game_project, publish_batch
 from .progression import load_progression_authority
@@ -25,7 +25,7 @@ _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALAN
 
 
 def validate_pool_candidate_provenance(
-    candidate: Mapping[str, Any], review: Mapping[str, Any] | None, *, verify_source_grid: bool = True
+    candidate: Mapping[str, Any], review: Mapping[str, Any] | None
 ) -> dict[str, Any]:
     """Require verified owner-source provenance and current owner ACCEPT."""
 
@@ -40,13 +40,18 @@ def validate_pool_candidate_provenance(
     generator_metadata = generator_metadata if isinstance(generator_metadata, Mapping) else {}
     payload = generator_metadata.get("payload")
     payload = payload if isinstance(payload, Mapping) else {}
+    classification = generator_metadata.get("classification")
+    if not isinstance(classification, Mapping):
+        raise ReleaseError("candidate has no verified owner-upload classification")
     try:
-        candidate_class = validate_candidate_classification(
-            generator_metadata.get("classification"),
+        verified_source_sha256 = _verify_candidate_source_grid_binding(candidate, classification)
+        candidate_class = validate_verified_owner_upload_classification(
+            classification,
             result,
             candidate_id=str(candidate.get("candidate_id", "")),
             grid_hash=str(candidate.get("grid_hash", "")),
             generator_metadata=payload,
+            verified_source_sha256=verified_source_sha256,
         )
     except CandidateProvenanceError as exc:
         raise ReleaseError(str(exc)) from exc
@@ -64,9 +69,7 @@ def validate_pool_candidate_provenance(
             or review.get("candidate_id") != candidate.get("candidate_id")
             or review.get("artwork_sha256") != candidate.get("artwork_sha256")):
         raise ReleaseError("production candidate requires an exact current owner ACCEPT review")
-    if verify_source_grid:
-        _verify_candidate_source_grid_binding(candidate, generator_metadata["classification"])
-    return dict(generator_metadata["classification"])
+    return dict(classification)
 
 
 def _validate_source_grid_bytes(
@@ -122,7 +125,7 @@ def _validate_source_grid_bytes(
         raise ReleaseError("candidate logical artwork grid does not equal the exact OWNER_UPLOAD-derived grid")
 
 
-def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classification: Mapping[str, Any]) -> None:
+def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classification: Mapping[str, Any]) -> str:
     """Read and compare only this candidate's canonical source and artwork bytes."""
 
     from .. import studio_extensions as studio
@@ -155,6 +158,7 @@ def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classifi
     except (OSError, TypeError, ValueError) as exc:
         raise ReleaseError("exact OWNER_UPLOAD source or candidate artwork bytes could not be read") from exc
     _validate_source_grid_bytes(candidate, classification, lineage, source_record, source_png, candidate_png)
+    return str(lineage["source_sha256"])
 
 
 def _official_challenge_vector(official: Mapping[str, Any]) -> list[float]:
@@ -505,7 +509,7 @@ def release_entries() -> list[dict[str, Any]]:
             if value.get("eligibility_source") != "OWNER_ACCEPT" or not isinstance(latest, Mapping) or latest.get("disposition") != "ACCEPT":
                 continue
             try:
-                classification = validate_pool_candidate_provenance(current_candidate, latest, verify_source_grid=False)
+                classification = validate_pool_candidate_provenance(current_candidate, latest)
             except ReleaseError:
                 continue
             if value.get("candidate_classification") != classification:

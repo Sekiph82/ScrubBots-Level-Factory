@@ -11,12 +11,13 @@ import pytest
 from scrubbots_pixel_factory.contracts.candidate_provenance import (
     CandidateClass,
     CandidateProvenanceError,
+    build_candidate_classification,
     validate_candidate_classification,
 )
 from scrubbots_pixel_factory.core import DeterministicRNG, GenerationRequest, GenerationResult, RNG_ALGORITHM
 from scrubbots_pixel_factory.contracts import CANONICAL_PALETTE
 from scrubbots_pixel_factory.contracts.palette import VOID_CELL_ID
-from scrubbots_pixel_factory.output.bundle import build_export_bundle
+from scrubbots_pixel_factory.output.bundle import OutputContractError, build_export_bundle
 from scrubbots_pixel_factory.output.png import PNGContractError, decode_logical_png, encode_logical_png
 from scrubbots_pixel_factory.quality import evaluate_grid
 from scrubbots_pixel_factory.supply_pipeline import release_pool
@@ -26,6 +27,7 @@ from scrubbots_pixel_factory.supply_pipeline.release_pool import ReleaseError, e
 def _candidate(
     *, owner_source: bool, source_cells: tuple[str, ...] | None = None,
     candidate_cells: tuple[str, ...] | None = None, source_png: bytes | None = None,
+    source_root: Path | None = None, monkeypatch: pytest.MonkeyPatch | None = None,
 ) -> dict[str, object]:
     cells = candidate_cells or tuple(("C01", "C02", "C03")[index % 3] for index in range(400))
     source_cells = source_cells or cells
@@ -49,6 +51,27 @@ def _candidate(
     )
     metadata = None
     if owner_source:
+        if source_root is None or monkeypatch is None:
+            raise ValueError("owner-source fixture requires a bounded repository-local root")
+        from scrubbots_pixel_factory import studio_extensions as studio
+
+        repository = source_root.resolve()
+        owner_root = repository / "level_factory" / "output" / "owner-uploads"
+        monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+        monkeypatch.setattr(studio, "owner_upload_root", lambda: owner_root)
+        source_directory = owner_root / f"owner-upload-{source_sha}"
+        source_directory.mkdir(parents=True, exist_ok=True)
+        (source_directory / "source.png").write_bytes(source_png)
+        (source_directory / "source.json").write_text(json.dumps({
+            "schema": "scrubbots-owner-upload-source", "version": 1,
+            "source_id": f"owner-upload-{source_sha}", "origin": "OWNER_UPLOAD",
+            "source_sha256": source_sha, "byte_length": len(source_png),
+            "media_type": "image/png", "original_filename": "source.png",
+            "original_width": 20, "original_height": 20,
+            "immutable_relative_path": f"owner-uploads/owner-upload-{source_sha}/source.png",
+            "source_record_relative_path": f"owner-uploads/owner-upload-{source_sha}/source.json",
+            "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
+        }, sort_keys=True), encoding="utf-8")
         metadata = {
             "namespace": "owner-upload",
             "data": {
@@ -150,18 +173,24 @@ def _install_fake_owner_source(candidate: dict[str, object], source_png: bytes, 
     lineage = metadata["generator_metadata"]["payload"]["data"]["source_lineage"]
     source_id = lineage["source_id"]
     source_directory = owner_root / source_id
-    source_directory.mkdir(parents=True)
-    (source_directory / "source.png").write_bytes(source_png)
-    (source_directory / "source.json").write_text(json.dumps({
-        "schema": "scrubbots-owner-upload-source", "version": 1,
-        "source_id": source_id, "origin": "OWNER_UPLOAD",
-        "source_sha256": hashlib.sha256(source_png).hexdigest(), "byte_length": len(source_png),
-        "media_type": "image/png", "original_filename": "source.png",
-        "original_width": width, "original_height": height,
-        "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
-        "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
-        "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
-    }, sort_keys=True), encoding="utf-8")
+    source_directory.mkdir(parents=True, exist_ok=True)
+    source_file = source_directory / "source.png"
+    if not source_file.exists():
+        source_file.write_bytes(source_png)
+    elif source_file.read_bytes() != source_png:
+        raise AssertionError("owner source fixture changed between export and Pool checks")
+    record_file = source_directory / "source.json"
+    if not record_file.exists():
+        record_file.write_text(json.dumps({
+            "schema": "scrubbots-owner-upload-source", "version": 1,
+            "source_id": source_id, "origin": "OWNER_UPLOAD",
+            "source_sha256": hashlib.sha256(source_png).hexdigest(), "byte_length": len(source_png),
+            "media_type": "image/png", "original_filename": "source.png",
+            "original_width": width, "original_height": height,
+            "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
+            "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+            "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
+        }, sort_keys=True), encoding="utf-8")
     candidate_root = repository / str(candidate["source_path"])
     candidate_root.mkdir(parents=True)
     (candidate_root / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
@@ -208,6 +237,44 @@ def test_generated_candidate_defaults_to_test_and_is_request_bound() -> None:
         )
 
 
+def test_owner_upload_metadata_without_source_bytes_cannot_create_production_export() -> None:
+    source_sha = hashlib.sha256(b"missing owner source fixture SB-LF02-008").hexdigest()
+    request = GenerationRequest(
+        seed=source_sha, width=20, height=20, generator_mode="MASK",
+        palette_subset=("C01", "C02", "C03"),
+    )
+    cells = tuple(("C01", "C02", "C03")[index % 3] for index in range(400))
+    rng = DeterministicRNG(request.seed)
+    result = GenerationResult.success(
+        request=request, width=20, height=20, logical_grid=cells,
+        generator_id="owner-upload-canonical-derive", generator_version="1",
+        rng_algorithm=RNG_ALGORITHM, provenance={"stage_seeds": rng.stage_seeds()},
+    )
+    generator_metadata = {
+        "namespace": "owner-upload",
+        "data": {"source_lineage": {
+            "source_id": f"owner-upload-{source_sha}",
+            "source_sha256": source_sha,
+            "source_record": f"level_factory/output/owner-uploads/owner-upload-{source_sha}/source.json",
+            "source_bytes_unchanged": True,
+            "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+        }},
+    }
+    classification = build_candidate_classification(
+        result.canonical_dict(),
+        candidate_id=f"candidate-owner-{source_sha[:48]}",
+        grid_hash=hashlib.sha256(b"grid hash is bound by the bundle").hexdigest(),
+        generator_metadata=generator_metadata,
+    )
+    assert classification["candidate_class"] == CandidateClass.TEST.value
+    with pytest.raises(OutputContractError, match="canonical OWNER_UPLOAD source bytes could not be verified"):
+        build_export_bundle(
+            result,
+            f"candidate-owner-{source_sha[:48]}",
+            generator_metadata=generator_metadata,
+        )
+
+
 @pytest.mark.parametrize(
     "candidate_class",
     [
@@ -246,7 +313,7 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
     width, height, decoded_pixels = studio._validation_pixels(source_png)
     assert (width, height) == (20, 20)
     assert len(decoded_pixels) == 20 * 20 * 4
-    candidate = _candidate(owner_source=True, source_cells=cells, candidate_cells=cells, source_png=source_png)
+    candidate = _candidate(owner_source=True, source_cells=cells, candidate_cells=cells, source_png=source_png, source_root=tmp_path, monkeypatch=monkeypatch)
     _install_fake_owner_source(candidate, source_png, tmp_path, monkeypatch)
     classification = validate_pool_candidate_provenance(
         candidate,
@@ -296,20 +363,11 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
     # decoded cell grid differs from the selected candidate's artwork.
     mismatched_cells = tuple(("C04", "C05", "C06")[index % 3] for index in range(400))
     mismatched_source = _filtered_owner_png(mismatched_cells, filters=(4, 1, 2), ancillary=True)
-    forged = _candidate(
-        owner_source=True, source_cells=mismatched_cells,
-        candidate_cells=tuple(("C01", "C02", "C03")[index % 3] for index in range(400)),
-        source_png=mismatched_source,
-    )
-    mismatched_source = forged["source_png"]
-    _install_fake_owner_source(forged, mismatched_source, tmp_path / "mismatch", monkeypatch)
-    with pytest.raises(ReleaseError, match="does not equal the exact OWNER_UPLOAD-derived grid"):
-        validate_pool_candidate_provenance(forged, _owner_accept(forged))
-    with pytest.raises(ReleaseError, match="does not equal the exact OWNER_UPLOAD-derived grid"):
-        enter_release_pool(
-            forged,
-            {"disposition": "READY", "primary": {"state": "READY"}},
-            _owner_accept(forged),
+    with pytest.raises(OutputContractError, match="exact canonical source bytes and artwork"):
+        _candidate(
+            owner_source=True, source_cells=mismatched_cells,
+            candidate_cells=tuple(("C01", "C02", "C03")[index % 3] for index in range(400)),
+            source_png=mismatched_source, source_root=tmp_path / "mismatch", monkeypatch=monkeypatch,
         )
 
 
@@ -330,25 +388,17 @@ def test_owner_source_noncanonical_or_oversized_png_fails_real_pool_gate(
             foreign_color_at=17 if invalid_kind == "foreign-color" else None,
         )
         source_width, source_height = 20, 20
-    candidate = _candidate(owner_source=True, source_cells=cells[:400], source_png=source_png)
-    _install_fake_owner_source(
-        candidate, source_png, tmp_path, monkeypatch,
-        width=source_width, height=source_height,
-    )
-    with pytest.raises(ReleaseError):
-        validate_pool_candidate_provenance(candidate, _owner_accept(candidate))
-    with pytest.raises(ReleaseError):
-        enter_release_pool(
-            candidate,
-            {"disposition": "READY", "primary": {"state": "READY"}},
-            _owner_accept(candidate),
+    with pytest.raises(OutputContractError):
+        _candidate(
+            owner_source=True, source_cells=cells[:400], source_png=source_png,
+            source_root=tmp_path, monkeypatch=monkeypatch,
         )
 
 
 def test_owner_source_candidate_path_escape_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as studio
 
-    candidate = _candidate(owner_source=True)
+    candidate = _candidate(owner_source=True, source_root=tmp_path, monkeypatch=monkeypatch)
     candidate["source_path"] = "../outside-candidate"
     monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path.resolve())
     with pytest.raises(ReleaseError, match="candidate source lineage path is invalid"):
@@ -364,7 +414,7 @@ def test_selected_plan_revalidation_uses_same_filtered_owner_source_gate(
 
     cells = tuple(("C01", "C02", "C03")[index % 3] for index in range(400))
     source_png = _filtered_owner_png(cells, filters=(1, 2, 4), ancillary=True)
-    candidate = _candidate(owner_source=True, source_cells=cells, source_png=source_png)
+    candidate = _candidate(owner_source=True, source_cells=cells, source_png=source_png, source_root=tmp_path, monkeypatch=monkeypatch)
     _install_fake_owner_source(candidate, source_png, tmp_path, monkeypatch)
     classification = candidate["metadata"]["generator_metadata"]["classification"]
     plan = {"plan_hash": "synthetic-filtered-plan", "K": 1, "slots": [{"n": 1, "chosen_id": candidate["candidate_id"]}]}

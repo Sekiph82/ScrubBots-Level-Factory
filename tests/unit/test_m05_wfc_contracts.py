@@ -1,6 +1,7 @@
 import pytest
 
-from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCConfig, WFCContractError
+from scrubbots_pixel_factory.core import GenerationRequest
+from scrubbots_pixel_factory.generators.wfc import Exemplar, ExemplarRegistry, WFCConfig, WFCContractError, WFCGenerator
 
 
 def _exemplar(ownership="SYNTHETIC_TEST_ONLY", role="TRAINING_MOTIF", approved_by=None, difficulty=None):
@@ -33,11 +34,21 @@ def test_registry_is_ordered_and_production_default_is_empty() -> None:
     assert registry.eligible() == registry.exemplars
 
 
-def test_owner_approval_and_production_difficulty_are_explicit() -> None:
+def test_caller_claimed_owner_approval_is_not_wfc_source_authority() -> None:
     with pytest.raises(WFCContractError):
         _exemplar(ownership="OWNER_APPROVED")
-    approved = _exemplar(ownership="OWNER_APPROVED", approved_by="owner")
-    assert approved in ExemplarRegistry((approved,)).eligible()
+    with pytest.raises(WFCContractError, match="unknown exemplar ownership"):
+        _exemplar(ownership="OWNER_APPROVED", approved_by="owner")
+    with pytest.raises(WFCContractError, match="canonical source and current-review evidence"):
+        _exemplar(ownership="OWNER_SUPPLIED_UNAPPROVED", approved_by="owner")
+    supplied = _exemplar(ownership="OWNER_SUPPLIED_UNAPPROVED")
+    assert ExemplarRegistry((supplied,)).eligible() == ()
+    request = GenerationRequest(width=20, height=20, seed=1, generator_mode="WFC", style=supplied.exemplar_id)
+    with pytest.raises(WFCContractError, match="canonical source and current-review evidence"):
+        WFCGenerator(ExemplarRegistry((supplied,)))._select_exemplar(request)
+
+
+def test_production_difficulty_validation_remains_explicit() -> None:
     with pytest.raises(WFCContractError):
         _exemplar(role="PRODUCTION_ARTIFACT")
 
@@ -46,7 +57,7 @@ def _production(width: int, height: int, difficulty: str) -> Exemplar:
     return Exemplar(
         "scrubbots-wfc-exemplar", 1, f"production-{difficulty}-{width}x{height}", "PRODUCTION_ARTIFACT", width, height,
         tuple(("C01", "C02", "C03")[(x + y) % 3] for y in range(height) for x in range(width)),
-        "owner", "owner-locked validation fixture", "OWNER_APPROVED", "test-owner", difficulty,
+        "owner", "owner-locked validation fixture", "OWNER_SUPPLIED_UNAPPROVED", None, difficulty,
     )
 
 

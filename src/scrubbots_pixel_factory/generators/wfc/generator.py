@@ -76,8 +76,8 @@ class WFCGenerator:
             if len(eligible) != 1:
                 raise WFCContractError("WFC requests without style require exactly one eligible exemplar")
             exemplar = eligible[0]
-        if exemplar.ownership not in {"SYNTHETIC_TEST_ONLY", "OWNER_APPROVED"}:
-            raise WFCContractError("exemplar is not eligible for WFC generation")
+        if exemplar.ownership != "SYNTHETIC_TEST_ONLY":
+            raise WFCContractError("WFC owner exemplar requires canonical source and current-review evidence")
         return exemplar
 
     def generate_candidate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> WFCCandidate | GenerationResult:

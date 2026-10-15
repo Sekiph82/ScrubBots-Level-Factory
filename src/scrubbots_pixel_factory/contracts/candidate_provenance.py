@@ -47,9 +47,12 @@ def build_candidate_classification(
 ) -> dict[str, object]:
     """Classify a bundle from its actual request and source lineage.
 
-    Ordinary generated bundles are TEST by default. Only the exact owner-upload
-    derivation receives PRODUCTION_CANDIDATE; it still requires a separate valid
-    owner ACCEPT at the Release Pool boundary.
+    This metadata projection is not source authority. Ordinary generated
+    bundles, including bundles carrying owner-upload-shaped caller metadata,
+    remain TEST here. The export boundary can elevate a verified owner-upload
+    derivation only after it reads the canonical source record and proves the
+    exported logical grid equals the decoded source bytes. Release Pool still
+    requires a separate valid owner ACCEPT.
     """
 
     request = _mapping(result.get("request"), "generation request")
@@ -60,27 +63,8 @@ def build_candidate_classification(
         raise CandidateProvenanceError("candidate identity or logical source hash is invalid")
     request_hash = _digest(request)
     generation_payload = _mapping(generator_metadata or {}, "generator metadata")
-    data = generation_payload.get("data", {})
-    data = _mapping(data, "generator metadata data")
-    lineage = data.get("source_lineage")
     candidate_class = CandidateClass.TEST
     source_hash = grid_hash
-    if generation_payload.get("namespace") == "owner-upload":
-        lineage = _mapping(lineage, "owner-upload source lineage")
-        if (lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
-                or lineage.get("source_bytes_unchanged") is not True
-                or type(lineage.get("source_id")) is not str
-                or not lineage.get("source_id")
-                or type(lineage.get("source_sha256")) is not str
-                or _SHA256.fullmatch(lineage["source_sha256"]) is None
-                or lineage["source_sha256"] != str(_mapping(request.get("seed"), "generation request seed").get("value", ""))
-                or generator.get("id") != "owner-upload-canonical-derive"
-                or generator.get("version") != "1"
-                or request.get("generator_mode") != "MASK"
-                or candidate_id != f"candidate-owner-{lineage['source_sha256'][:48]}"):
-            raise CandidateProvenanceError("owner-upload classification lacks exact request-bound source lineage")
-        candidate_class = CandidateClass.PRODUCTION_CANDIDATE
-        source_hash = lineage["source_sha256"]
     retry_seeds = rng_provenance.get("retry_seeds", {})
     if not isinstance(retry_seeds, Mapping):
         raise CandidateProvenanceError("retry attempt provenance is malformed")
@@ -118,6 +102,72 @@ def validate_candidate_classification(
     if dict(actual) != expected:
         raise CandidateProvenanceError("candidate classification does not match request, source, generator, attempt, and candidate identity")
     return CandidateClass(expected["candidate_class"])
+
+
+def build_verified_owner_upload_classification(
+    result: Mapping[str, Any],
+    *,
+    candidate_id: str,
+    grid_hash: str,
+    generator_metadata: Mapping[str, Any],
+    verified_source_sha256: str,
+) -> dict[str, object]:
+    """Project production-candidate class after a caller verified source bytes/grid."""
+
+    if not _SHA256.fullmatch(verified_source_sha256):
+        raise CandidateProvenanceError("verified owner-upload source hash is malformed")
+    request = _mapping(result.get("request"), "generation request")
+    request_seed = _mapping(request.get("seed"), "generation request seed")
+    generator = _mapping(result.get("generator"), "generation identity")
+    data = _mapping(generator_metadata.get("data"), "generator metadata data")
+    lineage = _mapping(data.get("source_lineage"), "owner-upload source lineage")
+    if (
+        generator_metadata.get("namespace") != "owner-upload"
+        or lineage.get("source_id") != f"owner-upload-{verified_source_sha256}"
+        or lineage.get("source_sha256") != verified_source_sha256
+        or lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
+        or lineage.get("source_bytes_unchanged") is not True
+        or request_seed.get("type") != "string"
+        or request_seed.get("value") != verified_source_sha256
+        or request.get("generator_mode") != "MASK"
+        or generator.get("id") != "owner-upload-canonical-derive"
+        or generator.get("version") != "1"
+        or candidate_id != f"candidate-owner-{verified_source_sha256[:48]}"
+    ):
+        raise CandidateProvenanceError("owner-upload classification does not match verified source evidence")
+    classification = build_candidate_classification(
+        result,
+        candidate_id=candidate_id,
+        grid_hash=grid_hash,
+        generator_metadata=generator_metadata,
+    )
+    classification["candidate_class"] = CandidateClass.PRODUCTION_CANDIDATE.value
+    classification["source_sha256"] = verified_source_sha256
+    return classification
+
+
+def validate_verified_owner_upload_classification(
+    value: object,
+    result: Mapping[str, Any],
+    *,
+    candidate_id: str,
+    grid_hash: str,
+    generator_metadata: Mapping[str, Any],
+    verified_source_sha256: str,
+) -> CandidateClass:
+    """Validate the classification projection against caller-verified source evidence."""
+
+    actual = _mapping(value, "candidate classification")
+    expected = build_verified_owner_upload_classification(
+        result,
+        candidate_id=candidate_id,
+        grid_hash=grid_hash,
+        generator_metadata=generator_metadata,
+        verified_source_sha256=verified_source_sha256,
+    )
+    if dict(actual) != expected:
+        raise CandidateProvenanceError("owner-upload classification does not match verified source evidence")
+    return CandidateClass.PRODUCTION_CANDIDATE
 
 
 __all__ = [
