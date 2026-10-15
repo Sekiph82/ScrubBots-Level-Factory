@@ -449,11 +449,17 @@ def _validate_evaluator_guided_metadata(data: Mapping[str, object], result_dict:
                 raise OutputContractError("evaluator-guided failed proposal evidence is malformed")
             continue
         proposal = _mapping_copy(raw_result, f"evaluator_guided.attempts[{index}].result")
+        if set(proposal) != {"schema", "schema_version", "status", "request", "resolved_dimensions", "logical_grid", "used_palette", "generator", "seed", "rng"} or proposal.get("status") != "SUCCESS":
+            raise OutputContractError("evaluator-guided proposal result has unsupported or incomplete fields")
         if hashlib.sha256(canonical_json_bytes(proposal)).hexdigest() != attempt.get("result_digest"):
             raise OutputContractError("evaluator-guided proposal result digest is invalid")
         typed_proposal_seed = proposal.get("seed")
         if _typed_seed_value(typed_proposal_seed, "proposal.seed") != expected_seed:
             raise OutputContractError("evaluator-guided proposal result is bound to another seed")
+        proposal_request = _mapping_copy(proposal.get("request"), "proposal.request")
+        proposal_generator = _mapping_copy(proposal.get("generator"), "proposal.generator")
+        if _typed_seed_value(proposal_request.get("seed"), "proposal.request.seed") != expected_seed or proposal_request.get("generator_mode") != attempt.get("mode") or proposal_generator.get("mode") != attempt.get("mode"):
+            raise OutputContractError("evaluator-guided proposal request or engine identity is inconsistent")
         proposal_grid = proposal.get("logical_grid")
         dimensions = proposal.get("resolved_dimensions")
         if not isinstance(dimensions, Mapping):

@@ -79,6 +79,9 @@ def test_evaluator_guided_replay_is_byte_identical_and_selects_quality_winner():
     assert first.metadata["selected_index"] == 1
     assert first.metadata["attempts"][0]["quality"]["accepted"] is False
     assert first.metadata["attempts"][1]["quality"]["accepted"] is True
+    alternate_request = _request("m02-01-alternate-seed")
+    alternate = _router(alternate_request).generate_candidate(alternate_request)
+    assert first.metadata["attempts"][0]["seed"] != alternate.metadata["attempts"][0]["seed"]
     bundle = build_export_bundle(first, "m02-01-test")
     replay_bundle = build_export_bundle(replay, "m02-01-test")
     assert bundle.metadata_json == replay_bundle.metadata_json
@@ -111,6 +114,17 @@ def test_evaluator_guided_bundle_rejects_tampered_winner_identity():
     tampered = replace(candidate, metadata=metadata)
     with pytest.raises(OutputContractError):
         build_export_bundle(tampered, "m02-01-tampered")
+
+
+def test_evaluator_guided_bundle_rejects_gameplay_claim_fields():
+    request = _request()
+    candidate = _router(request).generate_candidate(request)
+    assert isinstance(candidate, AutoCandidate)
+    metadata = dict(candidate.metadata)
+    metadata["solver_evidence"] = {"solvable": True}
+    tampered = replace(candidate, metadata=metadata)
+    with pytest.raises(OutputContractError):
+        build_export_bundle(tampered, "m02-01-game-claim")
 
 
 def test_evaluator_guided_59_square_budget_remains_bounded():
