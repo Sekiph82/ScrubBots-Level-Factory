@@ -245,7 +245,11 @@ def _candidate_and_review(
     except StudioExtensionError as exc:
         raise ArtFirstUnavailable("UNAVAILABLE: canonical owner-review chain validation failed") from exc
     if invalid or len(chain) != len(records) or not chain:
-        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: owner-review history is incomplete or invalid")
+        invalid_ids = ",".join(invalid[:8]) or "none"
+        raise ArtFirstUnavailable(
+            "UNAVAILABLE/NEEDS_OWNER_ACCEPT: owner-review history is incomplete or invalid "
+            f"(valid={len(chain)}, records={len(records)}, invalid={invalid_ids})"
+        )
     current = chain[-1]
     if current.get("disposition") != "ACCEPT":
         raise ArtFirstUnavailable("UNAVAILABLE/OWNER_REJECTED: the current review does not accept this artwork")

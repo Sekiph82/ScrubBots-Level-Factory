@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from io import BytesIO
+import importlib
 import json
 from pathlib import Path
 
@@ -13,9 +14,9 @@ from PIL import Image
 from scrubbots_pixel_factory.core import DeterministicRNG, GenerationRequest, GenerationResult
 from scrubbots_pixel_factory.core.rng import RNG_ALGORITHM
 from scrubbots_pixel_factory.contracts import CANONICAL_PALETTE
-from scrubbots_pixel_factory.generators.router import art_first
+cli_module = importlib.import_module("scrubbots_pixel_factory.cli.main")
+import scrubbots_pixel_factory.generators.router.art_first as art_first
 from scrubbots_pixel_factory.generators.router.art_first import _check_mask_constraints
-from scrubbots_pixel_factory.generators.router.router import ArtFirstCandidate, GeneratorRouter
 from scrubbots_pixel_factory.output.bundle import OutputContractError, export_candidate, read_bundle
 from scrubbots_pixel_factory.output.png import encode_logical_png
 from scrubbots_pixel_factory.quality import logical_grid_hash
@@ -28,7 +29,7 @@ def _json_bytes(value: object, *, newline: bool = False) -> bytes:
 
 
 def _review_record(candidate_id: str, artwork_sha: str, grid_hash: str, disposition: str, sequence: int, previous: str | None) -> dict[str, object]:
-    identity = hashlib.sha256(_json_bytes({"candidate_id": candidate_id, "grid_hash": grid_hash})).hexdigest()
+    identity = hashlib.sha256(_json_bytes({"candidate_id": candidate_id, "grid_hash": grid_hash}, newline=True)).hexdigest()
     return {
         "schema": "scrubbots-owner-review-evidence",
         "version": 1,
@@ -66,11 +67,12 @@ def _source_record(source_id: str, source_sha: str, raw: bytes, width: int, heig
 
 
 def _fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, width: int = 20, height: int = 20, color_count: int = 3, review_disposition: str = "ACCEPT"):
+    art_first_module = importlib.import_module("scrubbots_pixel_factory.generators.router.art_first")
     owner_root = tmp_path / "level_factory" / "output" / "owner-uploads"
     extensions_root = tmp_path / "level_factory" / "output" / "studio-extensions"
     derived_root = tmp_path / "level_factory" / "output" / "studio-derived-candidates"
-    monkeypatch.setattr(art_first, "owner_upload_root", lambda: owner_root)
-    monkeypatch.setattr(art_first, "extensions_root", lambda: extensions_root)
+    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda: owner_root)
+    monkeypatch.setattr(art_first_module, "extensions_root", lambda: extensions_root)
     monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda: owner_root)
     monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: owner_root)
 
@@ -168,14 +170,20 @@ def _fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, width: int = 20, h
 
 
 def _run(request: GenerationRequest):
-    return GeneratorRouter().generate_candidate(request)
+    router_module = importlib.import_module("scrubbots_pixel_factory.generators.router.router")
+    return router_module.GeneratorRouter().generate_candidate(request)
+
+
+def _is_art_first_candidate(candidate: object) -> bool:
+    router_module = importlib.import_module("scrubbots_pixel_factory.generators.router.router")
+    return isinstance(candidate, router_module.ArtFirstCandidate)
 
 
 @pytest.mark.parametrize(("width", "height", "color_count"), [(20, 59, 3), (38, 24, 5)])
 def test_art_first_copies_approved_logical_source_exactly_without_resampling(monkeypatch, tmp_path, width, height, color_count):
     fixture = _fixture(monkeypatch, tmp_path, width, height, color_count)
     candidate = _run(fixture["request"])
-    assert isinstance(candidate, ArtFirstCandidate)
+    assert _is_art_first_candidate(candidate)
     assert candidate.result.logical_grid == fixture["cells"]
     assert (candidate.result.width, candidate.result.height) == (width, height)
     assert candidate.metadata["source_role"] == "VERIFIED_IMPORTED_ORIGIN_UNVERIFIED"
@@ -189,13 +197,19 @@ def test_art_first_replay_and_bundle_read_revalidate_current_acceptance(monkeypa
     fixture = _fixture(monkeypatch, tmp_path)
     first = _run(fixture["request"])
     replay = _run(fixture["request"])
-    assert isinstance(first, ArtFirstCandidate) and isinstance(replay, ArtFirstCandidate)
+    assert _is_art_first_candidate(first) and _is_art_first_candidate(replay)
     assert first.result.digest() == replay.result.digest()
     assert dict(first.metadata) == dict(replay.metadata)
     output = export_candidate(first, f"candidate-{fixture['request'].digest()}", tmp_path / "preview-output")
     exported = read_bundle(output)
     assert exported.artwork.cells == fixture["cells"]
     assert exported.metadata["generator_metadata"]["classification"]["candidate_class"] == "TEST"
+    monkeypatch.setattr(
+        cli_module,
+        "_router",
+        lambda _registry: importlib.import_module("scrubbots_pixel_factory.generators.router.router").GeneratorRouter(),
+    )
+    assert cli_module.main(["reproduce", str(output / "metadata.json")]) == 0
 
     review = fixture["review_record"]
     rejected = _review_record(
@@ -306,16 +320,21 @@ def test_art_first_rejects_foreign_and_semi_alpha_png_pixels(monkeypatch, tmp_pa
 def test_art_first_rejects_symlinked_source_and_bad_logical_dimensions(monkeypatch, tmp_path):
     fixture = _fixture(monkeypatch, tmp_path)
     png_path = fixture["source_dir"] / "source.png"
-    outside = tmp_path / "outside.png"
-    outside.write_bytes(png_path.read_bytes())
-    png_path.unlink()
-    png_path.symlink_to(outside)
+    original_is_symlink = Path.is_symlink
+
+    def is_symlink(path: Path) -> bool:
+        # Windows may deny creating a real symlink without elevated privilege;
+        # this synthetic marker exercises the production fail-closed branch.
+        return path == png_path or original_is_symlink(path)
+
+    monkeypatch.setattr(Path, "is_symlink", is_symlink)
     symlink_result = _run(fixture["request"])
     assert symlink_result.is_success is False
     assert "symlink" in symlink_result.failure_reason.lower()
 
     owner_root = tmp_path / "bad-dimensions" / "level_factory" / "output" / "owner-uploads"
-    monkeypatch.setattr(art_first, "owner_upload_root", lambda: owner_root)
+    art_first_module = importlib.import_module("scrubbots_pixel_factory.generators.router.art_first")
+    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda: owner_root)
     monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda: owner_root)
     monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: owner_root)
     bad_cells = tuple(("C01", "C02", "C03")[index % 3] for index in range(19 * 20))
