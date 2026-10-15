@@ -206,7 +206,11 @@ def _owner_accept(candidate: dict[str, object]) -> dict[str, object]:
     }
 
 
-def test_generated_candidate_defaults_to_test_and_is_request_bound() -> None:
+def test_generated_candidate_defaults_to_test_and_is_request_bound(monkeypatch: pytest.MonkeyPatch) -> None:
+    def reject_source_verification(_candidate: object, _classification: object) -> str:
+        pytest.fail("TEST candidates must be rejected before owner-source verification")
+
+    monkeypatch.setattr(release_pool, "_verify_candidate_source_grid_binding", reject_source_verification)
     candidate = _candidate(owner_source=False)
     metadata = candidate["metadata"]
     assert isinstance(metadata, dict)
@@ -235,6 +239,46 @@ def test_generated_candidate_defaults_to_test_and_is_request_bound() -> None:
             {"disposition": "READY", "primary": {"state": "READY"}},
             {"disposition": "ACCEPT", "candidate_id": candidate["candidate_id"], "artwork_sha256": candidate["artwork_sha256"]},
         )
+
+
+def test_forged_production_class_still_requires_owner_source_verification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = _candidate(owner_source=False)
+    metadata = candidate["metadata"]
+    generator = metadata["generator_metadata"]
+    classification = generator["classification"]
+    classification["candidate_class"] = CandidateClass.PRODUCTION_CANDIDATE.value
+    verification_calls: list[tuple[object, object]] = []
+
+    def require_source_verification(candidate_arg: object, classification_arg: object) -> str:
+        verification_calls.append((candidate_arg, classification_arg))
+        raise ReleaseError("canonical OWNER_UPLOAD source verification required")
+
+    monkeypatch.setattr(release_pool, "_verify_candidate_source_grid_binding", require_source_verification)
+    with pytest.raises(ReleaseError, match="canonical OWNER_UPLOAD source verification required"):
+        validate_pool_candidate_provenance(candidate, None)
+    assert verification_calls == [(candidate, classification)]
+
+
+@pytest.mark.parametrize(
+    ("malformed_class", "message"),
+    [(None, "no valid production candidate class"), ("OWNER_APPROVED", "invalid production candidate class")],
+)
+def test_malformed_candidate_class_fails_closed_before_owner_source_verification(
+    malformed_class: object, message: str, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    candidate = _candidate(owner_source=False)
+    metadata = candidate["metadata"]
+    classification = metadata["generator_metadata"]["classification"]
+    classification["candidate_class"] = malformed_class
+    monkeypatch.setattr(
+        release_pool,
+        "_verify_candidate_source_grid_binding",
+        lambda *_args: pytest.fail("malformed classification must fail before owner-source verification"),
+    )
+    with pytest.raises(ReleaseError, match=message):
+        validate_pool_candidate_provenance(candidate, None)
 
 
 def test_owner_upload_metadata_without_source_bytes_cannot_create_production_export() -> None:

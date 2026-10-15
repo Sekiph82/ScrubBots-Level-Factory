@@ -43,6 +43,15 @@ def validate_pool_candidate_provenance(
     classification = generator_metadata.get("classification")
     if not isinstance(classification, Mapping):
         raise ReleaseError("candidate has no verified owner-upload classification")
+    claimed_class = classification.get("candidate_class")
+    if type(claimed_class) is not str:
+        raise ReleaseError("candidate has no valid production candidate class")
+    try:
+        claimed_class = CandidateClass(claimed_class)
+    except ValueError:
+        raise ReleaseError("candidate has an invalid production candidate class") from None
+    if claimed_class is not CandidateClass.PRODUCTION_CANDIDATE:
+        raise ReleaseError(f"{claimed_class.value} candidate cannot enter the production Release Pool")
     try:
         verified_source_sha256 = _verify_candidate_source_grid_binding(candidate, classification)
         candidate_class = validate_verified_owner_upload_classification(
