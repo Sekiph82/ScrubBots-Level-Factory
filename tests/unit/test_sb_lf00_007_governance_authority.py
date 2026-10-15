@@ -101,20 +101,19 @@ def _next_action_links_to_active_scope(
         return True
 
     prompt_name = Path(current_prompt).name
-    prompt_key = re.search(r"([A-Z]\d{3}[_-]R\d{2})", prompt_name, re.IGNORECASE)
     heading = re.search(r"(?m)^#\s+([^|\n]+)", prompt_text)
-    if prompt_key is None or heading is None:
+    project_key = re.search(r"SB-[A-Z0-9]+-\d{3}", current_task_id, re.IGNORECASE)
+    cycle_key = re.search(r"C\d{3}", current_task_id, re.IGNORECASE)
+    round_key = re.search(r"R\d{2}", current_task_id, re.IGNORECASE)
+    if not prompt_name or heading is None or project_key is None or cycle_key is None or round_key is None:
         return False
-    marker = prompt_key.group(1).upper().replace("_", "-")
     heading_text = heading.group(1).upper().replace("_", "-")
-    if not re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", heading_text):
+    task_markers = [project_key.group(0).upper(), cycle_key.group(0).upper(), round_key.group(0).upper()]
+    if not all(re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", heading_text) for marker in task_markers):
         return False
-    if re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", normalized_action):
-        return True
-    cycle, round_id = marker.split("-")
     return all(
-        re.search(rf"(?<![A-Z0-9]){re.escape(part)}(?![A-Z0-9])", normalized_action)
-        for part in (cycle, round_id)
+        re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", normalized_action)
+        for marker in task_markers[1:]
     )
 
 
@@ -276,9 +275,10 @@ def test_next_action_link_accepts_active_owner_audit_notes_without_suffix_lock()
     prompt = ".hiveai/prompts/C001_R10_POST_GREEN_RESIDUAL_GATES_AND_COVERAGE_MASTER_PROMPT.md"
     prompt_text = "# C001-R10 | POST-GREEN Independent Residual Gates and Test Contract Hardening"
     note = (
-        "GPT's C001-R10 residual-gate review preserves the existing owner audit notes; "
-        "remaining Release authority is still open."
+        "GPT's C001 R05 audit continuation covers C001-R10 residual gates and preserves "
+        "owner notes; remaining Release authority is still open."
     )
+    prompt_text = "# SB-LFX-018-C001-R05 | R05 owner audit continuation"
 
     assert _next_action_links_to_active_scope(
         note, "SB-LFX-018-R05-LFCP-OPEN-CLOSURE-C001", prompt, prompt_text
