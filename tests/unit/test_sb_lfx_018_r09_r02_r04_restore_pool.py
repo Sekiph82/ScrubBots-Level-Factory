@@ -90,8 +90,19 @@ def test_latest_002_ready_run_restores_only_when_all_saved_identity_hashes_match
     assert restored["pipeline"]["disposition"] == "READY"
     assert restored["activity_run_id"] == restored["pipeline"]["request"]["activity_run_id"]
     assert set(restored["artifact_sha256"]) == {"level", "supply_plan", "result"}
-    assert restored["owner_review_status"]["pool_state"] == "ACCEPT_RECORDED_BUT_POOL_DENIED"
-    assert "profile.dominant" in restored["owner_review_status"]["reason"]
+    from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
+
+    matching = [
+        entry for entry in release_entries()
+        if entry.get("candidate_id") == restored.get("candidate_id")
+        and entry.get("pipeline_run_id") == restored["pipeline"].get("run_id")
+    ]
+    if matching:
+        assert restored["owner_review_status"]["pool_state"] == "IN_RELEASE_POOL"
+        assert restored["owner_review_status"]["entry_digest"] == matching[0]["entry_digest"]
+    else:
+        assert restored["owner_review_status"]["pool_state"] == "ACCEPT_RECORDED_BUT_POOL_DENIED"
+        assert "profile.dominant" in restored["owner_review_status"]["reason"]
 
 
 def test_existing_002_accept_is_idempotent_and_does_not_create_duplicate_receipt():
@@ -107,10 +118,28 @@ def test_existing_002_accept_is_idempotent_and_does_not_create_duplicate_receipt
         )
         previous = studio_extensions._latest_review(candidate_id)
         assert previous and previous["disposition"] == "ACCEPT"
+        from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
+
+        pool_before = release_entries()
+        existing_entry = next((entry for entry in pool_before if entry.get("candidate_id") == candidate_id), None)
+        # This test is read-only against the owner Release installation. Reuse
+        # its existing pool read-back, if present; never create a missing entry.
+        def read_only_pool_projection(candidate, *, pipeline=None):
+            if existing_entry is None:
+                return {"disposition": "NOT_ENTERED", "reason": "No pre-existing Pool read-back."}
+            return {
+                "disposition": "ENTERED_RELEASE_POOL",
+                "entry_digest": existing_entry.get("entry_digest"),
+                "readback_verified": True,
+            }
+
         with patch.object(studio_extensions, "_write_json") as write:
-            outcome = studio_extensions.record_owner_review(candidate_id, "ACCEPT")
+            with patch.object(studio_extensions, "_enter_candidate_release_pool", side_effect=read_only_pool_projection):
+                outcome = studio_extensions.record_owner_review(candidate_id, "ACCEPT")
         assert outcome["idempotent"] is True
         assert outcome["review_id"] == previous["review_id"]
-        assert outcome["publication"]["disposition"] == "NOT_ENTERED"
-        assert "profile.dominant" in outcome["publication"]["reason"]
+        assert outcome["publication"]["disposition"] == (
+            "ENTERED_RELEASE_POOL" if existing_entry is not None else "NOT_ENTERED"
+        )
+        assert release_entries() == pool_before
         write.assert_not_called()

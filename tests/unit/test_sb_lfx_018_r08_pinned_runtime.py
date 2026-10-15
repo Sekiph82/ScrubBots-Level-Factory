@@ -145,7 +145,7 @@ def test_attested_solver_timeout_terminates_and_keeps_jobs_in_project_output(
     solver = ScrubBotsSolver(rules, godot="fake-godot")
     level = {"id": "bounded", "width": 1, "height": 1, "palette": ["#000000FF"], "cells": [0]}
     with pytest.raises(RuntimeError, match="timed out"):
-        solver.run(level, [], timeout=0.1)
+        solver.run(level, [{"id": "bounded-timeout-candidate"}], stop_after=1, max_visited=25_000, timeout=0.1)
     assert captured["process"].terminated is True
     temp_env = captured["process"].kwargs["env"]
     assert temp_env["TEMP"].startswith(str(tmp_path))

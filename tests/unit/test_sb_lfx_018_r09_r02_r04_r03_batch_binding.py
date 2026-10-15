@@ -53,7 +53,8 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
     source_dir.mkdir(parents=True)
     record_path = source_dir / "source.json"
     source_path = source_dir / "source.png"
-    source_path.write_bytes(b"owner source png")
+    source_png_bytes = b"owner source png"
+    source_path.write_bytes(source_png_bytes)
     record_path.write_text("immutable source record", encoding="utf-8")
     candidate_id = "candidate-owner-" + source_sha[:48]
     lineage = {
@@ -66,6 +67,7 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
     bundle = SimpleNamespace(
         metadata={"generator_metadata": {"payload": {"data": {"source_lineage": lineage}}}},
         artwork=SimpleNamespace(width=20, height=20, cells=["C01"] * 400, sha256="a" * 64, grid_hash="b" * 64),
+        artwork_png=source_png_bytes,
     )
     output_root = tmp_path / "factory-output"
     monkeypatch.setattr(extensions, "extensions_root", lambda: output_root)
@@ -143,7 +145,7 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
         "source_sha256": source_sha,
         "source_record_sha256": hashlib.sha256(record_path.read_bytes()).hexdigest(),
         "candidate_id": candidate_id,
-        "candidate_artwork_sha256": "a" * 64,
+        "candidate_artwork_sha256": hashlib.sha256(source_png_bytes).hexdigest(),
         "candidate_grid_hash": "b" * 64,
     }
     assert png_batch._verify_column_artifacts(result, 3)
@@ -336,8 +338,18 @@ def test_run_rejects_job_for_different_displayed_batch_without_mutation(monkeypa
 def test_restart_lookup_selects_only_job_bound_to_displayed_batch_digest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(png_batch, "_root", lambda: tmp_path / "png-batches")
     batches = {
-        "batch-A": {"batch_id": "batch-A", "items": [{"source_id": "owner-upload-a"}]},
-        "batch-B": {"batch_id": "batch-B", "items": [{"source_id": "owner-upload-b"}]},
+        batch_id: {
+            "schema": "scrubbots-owner-upload-batch",
+            "version": 2,
+            "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT",
+            "batch_id": batch_id,
+            "items": [{
+                "source_id": source_id,
+                "source_sha256": source_id.removeprefix("owner-upload-"),
+                "source_record_sha256": hashlib.sha256((batch_id + "-record").encode()).hexdigest(),
+            }],
+        }
+        for batch_id, source_id in (("batch-A", "owner-upload-" + "a" * 64), ("batch-B", "owner-upload-" + "b" * 64))
     }
     monkeypatch.setattr(extensions, "batch_load", lambda batch_id: {"batch": batches[batch_id]})
     for job_id, batch_id in (("png-batch-a", "batch-A"), ("png-batch-b", "batch-B")):

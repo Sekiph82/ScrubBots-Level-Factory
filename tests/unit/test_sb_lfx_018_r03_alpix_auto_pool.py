@@ -170,7 +170,7 @@ def test_master_ui_uses_auto_batch_numbering_and_exact_owner_production_confirma
     assert '"production-promotion"' not in ui
 
 
-def test_ready_auto_enters_pool_reject_excludes_and_accept_restores_without_publish(tmp_path: Path, monkeypatch) -> None:
+def test_incomplete_synthetic_ready_auto_proof_never_enters_pool(tmp_path: Path, monkeypatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as studio
     from scrubbots_pixel_factory.supply_pipeline import game_publisher
     from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
@@ -199,15 +199,17 @@ def test_ready_auto_enters_pool_reject_excludes_and_accept_restores_without_publ
     monkeypatch.setattr(studio, "list_candidates", lambda: [candidate])
     monkeypatch.setattr(game_publisher, "publish_level", lambda **_kwargs: (_ for _ in ()).throw(AssertionError("pool actions never publish")))
 
+    # These synthetic artifacts deliberately lack canonical source/request,
+    # solver/replay, load-check, QA, and persisted Pool evidence. A READY label
+    # alone must not manufacture READY_AUTO eligibility.
     included = studio._enter_candidate_release_pool(candidate, pipeline=pipeline)
-    assert included["disposition"] == "ENTERED_RELEASE_POOL"
-    assert release_entries()[0]["eligibility_source"] == "READY_AUTO"
+    assert included["disposition"] == "NOT_ENTERED"
+    assert release_entries() == []
 
     rejected = studio.record_owner_review(candidate["candidate_id"], "REJECT", "exclude", "")
     assert rejected["publication"]["disposition"] == "EXCLUDED_FROM_RELEASE_POOL"
     assert release_entries() == []
 
     accepted = studio.record_owner_review(candidate["candidate_id"], "ACCEPT", "restore", "")
-    assert accepted["publication"]["disposition"] == "ENTERED_RELEASE_POOL"
-    pool = release_entries()
-    assert len(pool) == 1 and pool[0]["eligibility_source"] == "OWNER_ACCEPT"
+    assert accepted["publication"]["disposition"] == "NOT_ENTERED"
+    assert release_entries() == []

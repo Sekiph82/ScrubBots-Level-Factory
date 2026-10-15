@@ -55,22 +55,39 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
         "verify_owner_source",
         lambda source_id: {"source_sha256": by_id[source_id]["sha"], "original_filename": f"{source_id[-4:]}.png"},
     )
-    monkeypatch.setattr(extensions, "_source_record_paths", lambda source_id: (Path(by_id[source_id]["record"]), Path("unused.png")))
+    monkeypatch.setattr(extensions, "validate_owner_source", lambda source_id, **_kwargs: {
+        "source_sha256": by_id[source_id]["sha"],
+        "exact_logical_source": True,
+        "structural": {"disposition": "PASS"},
+    })
+    monkeypatch.setattr(extensions, "_source_record_paths", lambda source_id, *_args, **_kwargs: (Path(by_id[source_id]["record"]), Path("unused.png")))
     monkeypatch.setattr(extensions, "restore_source_run", lambda *args, **kwargs: {"state": "SOURCE_ONLY"})
+    # This harness exercises sequencing/checkpoint state only. Persisted
+    # artifact bytes are covered by the separate source-binding contract tests.
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     return "batch-test", items
 
 
-def _ready_result(source_id: str, run_id: str) -> dict[str, object]:
+def _ready_result(source_id: str, run_id: str, request: dict[str, object] | None = None) -> dict[str, object]:
+    bound_request = dict(request or {})
+    bound_request.update({
+        "source_id": source_id,
+        "activity_source_sha256": source_id.removeprefix("owner-upload-"),
+    })
+    bound_request.setdefault("activity_run_id", f"activity-{run_id}")
+    columns = int(bound_request.get("column_count", 3))
     return {
         "disposition": "READY",
         "source_id": source_id,
         "candidate_id": "candidate-" + source_id[-8:],
         "run_id": run_id,
+        "request": bound_request,
         "primary": {
             "state": "READY",
+            "column_count": columns,
             "result": {
                 "solver_status": "SOLVED", "solution_final": "WIN", "difficulty_basis": "ScrubBots Difficulty V1",
-                "solution_replay": {"ok": True, "solved": True, "finalActive": 0},
+                "solution_replay": {"ok": True, "solved": True, "finalActive": 0}, "column_count": columns,
             },
             "load_check": {"state": "READY"},
             "files": {"result": f"{run_id}.json"},
@@ -91,7 +108,7 @@ def test_sequential_runner_passes_persisted_columns_and_continues_failures(tmp_p
         calls.append((source_id, int(request["column_count"])))
         if source_id == str(items[1]["source_id"]):
             return {"disposition": "UNAVAILABLE", "source_id": source_id, "reason": "bounded fake failure"}
-        return _ready_result(source_id, f"run-{len(calls)}")
+        return _ready_result(source_id, f"run-{len(calls)}", request)
 
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=fake_runner)
@@ -131,7 +148,7 @@ def test_resume_keeps_completed_items_and_retries_only_interrupted_item(tmp_path
         calls.append(source_id)
         if len(calls) == 2:
             raise KeyboardInterrupt("simulated process loss after durable RUNNING checkpoint")
-        return _ready_result(source_id, f"run-{len(calls)}")
+        return _ready_result(source_id, f"run-{len(calls)}", request)
 
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     with pytest.raises(KeyboardInterrupt):
@@ -141,7 +158,7 @@ def test_resume_keeps_completed_items_and_retries_only_interrupted_item(tmp_path
     assert interrupted["items"][1]["status"] == "RUNNING"
     resumed = png_batch.run_png_batch(
         str(job["job_id"]),
-        pipeline_runner=lambda **args: (calls.append(str(args["source_id"])) or _ready_result(str(args["source_id"]), f"resume-{len(calls)}")),
+        pipeline_runner=lambda **args: (calls.append(str(args["source_id"])) or _ready_result(str(args["source_id"]), f"resume-{len(calls)}", args["request"])),
     )
     assert resumed["disposition"] == "COMPLETE"
     assert calls.count(str(interrupted["items"][0]["source_id"])) == 1
@@ -156,7 +173,7 @@ def test_pause_after_current_is_durable_and_does_not_start_next_source(tmp_path:
     def pausing_runner(*, source_id: str, request: dict[str, object]) -> dict[str, object]:
         calls.append(source_id)
         png_batch.png_batch_control(str(job["job_id"]), "PAUSE_AFTER_CURRENT")
-        return _ready_result(source_id, "run-one")
+        return _ready_result(source_id, "run-one", request)
 
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     paused = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=pausing_runner)
@@ -169,11 +186,19 @@ def test_interrupted_ready_run_recovers_exact_pool_proof_without_solver_retry(mo
     from scrubbots_pixel_factory import studio_extensions as extensions
 
     source_id = "owner-upload-" + "a" * 64
-    pipeline = _ready_result(source_id, "run-exact")
+    pipeline = _ready_result(source_id, "run-exact", {
+        "source_id": source_id, "activity_source_sha256": "a" * 64,
+        "activity_run_id": "activity-exact", "column_count": 3,
+    })
     pipeline["request"] = {
+        "source_id": source_id,
+        "activity_source_sha256": "a" * 64,
+        "activity_source_record_sha256": "b" * 64,
+        "activity_run_id": "activity-exact",
         "png_batch_job_id": "png-batch-exact",
         "png_batch_item_index": 0,
         "png_batch_attempt_id": "attempt-exact",
+        "column_count": 3,
     }
 
     class PipelineRoot:
@@ -190,10 +215,15 @@ def test_interrupted_ready_run_recovers_exact_pool_proof_without_solver_retry(mo
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda candidate, *, pipeline: {"readback_verified": True, "entry_digest": "exact"})
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
+    monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
+    monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
 
     recovered = png_batch._recover_attempt(
         {"job_id": "png-batch-exact"},
-        {"index": 0, "attempt_id": "attempt-exact", "source_id": source_id},
+        {"index": 0, "attempt_id": "attempt-exact", "activity_run_id": "activity-exact",
+         "source_id": source_id, "source_sha256": "a" * 64, "source_record_sha256": "b" * 64,
+         "column_count": 3},
     )
 
     assert recovered is not None
@@ -206,9 +236,16 @@ def test_interrupted_run_missing_qa_proof_is_not_recovered_as_ready(monkeypatch:
     from scrubbots_pixel_factory import studio_extensions as extensions
 
     source_id = "owner-upload-" + "c" * 64
-    pipeline = _ready_result(source_id, "run-without-qa")
+    pipeline = _ready_result(source_id, "run-without-qa", {
+        "source_id": source_id, "activity_source_sha256": "c" * 64,
+        "activity_run_id": "activity-proof-gap", "column_count": 3,
+    })
     pipeline["stages"] = [{"stage": "REPLAY", "disposition": "PASS"}]
     pipeline["request"] = {
+        "source_id": source_id,
+        "activity_source_sha256": "c" * 64,
+        "activity_run_id": "activity-proof-gap",
+        "column_count": 3,
         "png_batch_job_id": "png-batch-proof-gap",
         "png_batch_item_index": 0,
         "png_batch_attempt_id": "attempt-proof-gap",
@@ -230,7 +267,9 @@ def test_interrupted_run_missing_qa_proof_is_not_recovered_as_ready(monkeypatch:
 
     recovered = png_batch._recover_attempt(
         {"job_id": "png-batch-proof-gap"},
-        {"index": 0, "attempt_id": "attempt-proof-gap", "source_id": source_id},
+        {"index": 0, "attempt_id": "attempt-proof-gap", "activity_run_id": "activity-proof-gap",
+         "source_id": source_id, "source_sha256": "c" * 64,
+         "source_record_sha256": "d" * 64, "column_count": 3},
     )
 
     assert recovered is None
@@ -240,7 +279,10 @@ def test_existing_artifact_verified_ready_reuses_only_with_pool_readback(monkeyp
     from scrubbots_pixel_factory import studio_extensions as extensions
 
     source_id = "owner-upload-" + "b" * 64
-    pipeline = _ready_result(source_id, "already-ready")
+    pipeline = _ready_result(source_id, "already-ready", {
+        "source_id": source_id, "activity_source_sha256": "b" * 64,
+        "activity_run_id": "activity-existing-ready", "column_count": 3,
+    })
     restored = {
         "state": "READY",
         "source_sha256": "b" * 64,
@@ -251,6 +293,9 @@ def test_existing_artifact_verified_ready_reuses_only_with_pool_readback(monkeyp
     monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: restored)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda candidate, *, pipeline: {"readback_verified": True, "entry_digest": "exact"})
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
+    monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
+    monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
 
     reused = png_batch._reuse_existing_ready(
         {"settings": {}},
@@ -276,7 +321,7 @@ def test_150_item_fake_campaign_is_sequential_bounded_and_fully_checkpoints(tmp_
         calls += 1
         assert int(request["column_count"]) in (3, 4, 5)
         active -= 1
-        return _ready_result(source_id, f"run-{calls}")
+        return _ready_result(source_id, f"run-{calls}", request)
 
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=fake_runner)
