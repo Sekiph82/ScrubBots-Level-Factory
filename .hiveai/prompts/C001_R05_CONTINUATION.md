@@ -1,0 +1,3 @@
+# C001 R05
+
+Read TASKS.md and the existing R05 builder log. Continue completing all independently feasible Level Factory and Content Platform tasks. Verify the corrected publication-plan evidence boundary. Use source inspection and memory-only tests that create no TEMP. Preserve the owner's 140 images, existing nine READY levels and Release. Do not perform cloud publication. Append evidence to the existing builder log; GPT owns TASKS.md.
