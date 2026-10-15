@@ -20,7 +20,7 @@ from ..contracts.candidate_provenance import (
     validate_candidate_classification,
 )
 from ..core import DeterministicRNG, GenerationResult, ResultStatus
-from ..quality import QualityPolicy, QualityReport, evaluate_grid
+from ..quality import QualityPolicy, QualityReport, evaluate_grid, logical_grid_hash
 from .artwork import ArtworkArtifact, ArtworkContractError, canonical_json_bytes
 from .png import PNGContractError, decode_logical_png, decode_png, encode_logical_png, encode_preview_png
 
