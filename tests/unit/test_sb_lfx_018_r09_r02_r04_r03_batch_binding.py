@@ -189,7 +189,7 @@ def test_legacy_null_source_recovers_only_exact_attempt_and_same_source(monkeypa
     assert recovered["pipeline"]["request"]["png_batch_attempt_id"] == item["attempt_id"]
 
 
-def test_crash_after_immutable_pipeline_write_recovers_without_runner_or_double_quota(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_crash_recovery_orchestration_only_uses_isolated_evidence_gate_stubs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_sha = "a" * 64
     source_id = "owner-upload-" + source_sha
     pipeline = _ready_pipeline(source_id)
@@ -219,6 +219,8 @@ def test_crash_after_immutable_pipeline_write_recovers_without_runner_or_double_
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [candidate])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda *_args, **_kwargs: {"readback_verified": True, "entry_digest": "persisted-pool"})
+    # This is strictly a restart/attempt/quota state test. It does not prove
+    # the real artifact, candidate-lineage, or persisted Pool validators.
     monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda *_args: True)
     monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
@@ -405,6 +407,85 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
     pipeline_path.write_text(json.dumps({**pipeline, "changed": True}), encoding="utf-8")
     assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
+    monkeypatch.setattr(release_pool, "release_entries", lambda: [])
+    assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 4)
+
+
+def test_column_artifact_gate_rejects_wrong_columns_missing_files_and_digest_drift(tmp_path: Path) -> None:
+    level = tmp_path / "level.json"
+    plan = tmp_path / "plan.json"
+    result_path = tmp_path / "result.json"
+    level.write_text("{}", encoding="utf-8")
+    plan.write_text(json.dumps({"columnCount": 3}), encoding="utf-8")
+    result = {"column_count": 3}
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    pipeline = {"primary": {"column_count": 3, "result": result, "files": {
+        "level": str(level), "supply_plan": str(plan), "result": str(result_path),
+    }}}
+
+    # Real SHA/identity authority is intentionally not synthesized here; the
+    # negative assertions stop earlier on exact independently verifiable gates.
+    assert not png_batch._verify_column_artifacts(pipeline, 4)
+    assert not png_batch._verify_column_artifacts({"primary": {**pipeline["primary"], "files": {
+        **pipeline["primary"]["files"], "result": str(tmp_path / "missing.json"),
+    }}}, 3)
+    assert not png_batch._verify_column_artifacts({"primary": {
+        **pipeline["primary"], "artifact_sha256": {"level": "0" * 64},
+    }}, 3)
+
+
+def test_candidate_source_lineage_gate_fails_closed_on_bad_bundle_and_identity_claims(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import hashlib
+    from types import SimpleNamespace
+
+    source_sha = "a" * 64
+    source_id = "owner-upload-" + source_sha
+    root = tmp_path / "repo"
+    (root / "bundle").mkdir(parents=True)
+    monkeypatch.setattr(extensions, "_repository_root", lambda: root)
+    candidate = {
+        "candidate_id": "candidate-lineage",
+        "source_path": "bundle",
+        "artwork_sha256": hashlib.sha256(b"canonical artwork").hexdigest(),
+        "grid_hash": "grid-exact",
+    }
+
+    # Exercise the actual bundle parser's corrupt/incomplete bundle rejection.
+    assert not png_batch._candidate_has_source_lineage(candidate, source_id, source_sha)
+
+    from scrubbots_pixel_factory.output import bundle as bundle_module
+
+    good_lineage = {
+        "source_id": source_id,
+        "source_sha256": source_sha,
+        "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+    }
+    parsed = SimpleNamespace(
+        metadata={"generator_metadata": {"payload": {"data": {"source_lineage": good_lineage}}}},
+        artwork_png=b"canonical artwork",
+        artwork=SimpleNamespace(grid_hash="grid-exact"),
+    )
+    monkeypatch.setattr(bundle_module, "read_bundle", lambda _path: parsed)
+    assert png_batch._candidate_has_source_lineage(candidate, source_id, source_sha)
+
+    for field, wrong in (
+        ("source_id", "owner-upload-" + "b" * 64),
+        ("source_sha256", "b" * 64),
+        ("derivation", "RESAMPLED_OR_UNATTESTED"),
+    ):
+        lineage = {**good_lineage, field: wrong}
+        parsed.metadata["generator_metadata"]["payload"]["data"]["source_lineage"] = lineage
+        assert not png_batch._candidate_has_source_lineage(candidate, source_id, source_sha)
+
+    parsed.metadata["generator_metadata"]["payload"]["data"]["source_lineage"] = good_lineage
+    assert not png_batch._candidate_has_source_lineage(
+        {**candidate, "artwork_sha256": "0" * 64}, source_id, source_sha,
+    )
+    assert not png_batch._candidate_has_source_lineage(
+        {**candidate, "grid_hash": "wrong-grid"}, source_id, source_sha,
+    )
 
 
 def test_batch_ui_does_not_gate_on_selected_thumbnail_preflight() -> None:

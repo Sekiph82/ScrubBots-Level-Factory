@@ -31,6 +31,11 @@ def test_assignments_are_deterministic_interleaved_and_exact() -> None:
 
 
 def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: int = 4) -> tuple[str, list[dict[str, object]]]:
+    """Build synthetic inputs for batch-orchestration contracts only.
+
+    Source-record validation is stubbed here, so tests using this helper do not
+    prove real owner-source eligibility or canonical READY evidence.
+    """
     root = tmp_path / "png-batches"
     monkeypatch.setattr(png_batch, "_root", lambda: root)
     records = tmp_path / "owner-uploads"
@@ -62,9 +67,6 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
     })
     monkeypatch.setattr(extensions, "_source_record_paths", lambda source_id, *_args, **_kwargs: (Path(by_id[source_id]["record"]), Path("unused.png")))
     monkeypatch.setattr(extensions, "restore_source_run", lambda *args, **kwargs: {"state": "SOURCE_ONLY"})
-    # This harness exercises sequencing/checkpoint state only. Persisted
-    # artifact bytes are covered by the separate source-binding contract tests.
-    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     return "batch-test", items
 
 
@@ -97,10 +99,13 @@ def _ready_result(source_id: str, run_id: str, request: dict[str, object] | None
     }
 
 
-def test_sequential_runner_passes_persisted_columns_and_continues_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sequential_runner_orchestration_only_passes_columns_and_continues_failures(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     batch_id, items = _make_batch(tmp_path, monkeypatch, 9)
     from scrubbots_pixel_factory import studio_extensions as extensions
 
+    # Fake runner outputs exercise batch ordering/checkpoint bookkeeping only.
+    # Real source, artifact, lineage, and Pool gates are tested independently.
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]
     calls: list[tuple[str, int]] = []
 
@@ -125,7 +130,7 @@ def test_sequential_runner_passes_persisted_columns_and_continues_failures(tmp_p
     assert extensions._digest(extensions.batch_load(batch_id)["batch"]) == stored["batch_digest"]
 
 
-def test_duplicate_source_is_not_scheduled_twice(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_duplicate_source_scheduling_orchestration_only_deduplicates_identity(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     batch_id, items = _make_batch(tmp_path, monkeypatch, 3)
     from scrubbots_pixel_factory import studio_extensions as extensions
 
@@ -139,8 +144,9 @@ def test_duplicate_source_is_not_scheduled_twice(tmp_path: Path, monkeypatch: py
     assert job["items"][-1]["duplicate_of"] == items[0]["source_id"]
 
 
-def test_resume_keeps_completed_items_and_retries_only_interrupted_item(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_resume_orchestration_only_retries_the_interrupted_item(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     batch_id, _items = _make_batch(tmp_path, monkeypatch, 3)
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]
     calls: list[str] = []
 
@@ -165,8 +171,9 @@ def test_resume_keeps_completed_items_and_retries_only_interrupted_item(tmp_path
     assert [item["status"] for item in resumed["job"]["items"]] == ["READY", "READY", "READY"]
 
 
-def test_pause_after_current_is_durable_and_does_not_start_next_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pause_orchestration_only_does_not_start_the_next_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     batch_id, _items = _make_batch(tmp_path, monkeypatch, 3)
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]
     calls: list[str] = []
 
@@ -182,7 +189,7 @@ def test_pause_after_current_is_durable_and_does_not_start_next_source(tmp_path:
     assert paused["job"]["counts"]["remaining"] == 2
 
 
-def test_interrupted_ready_run_recovers_exact_pool_proof_without_solver_retry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_interrupted_ready_recovery_orchestration_only_uses_isolated_gate_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as extensions
 
     source_id = "owner-upload-" + "a" * 64
@@ -215,6 +222,8 @@ def test_interrupted_ready_run_recovers_exact_pool_proof_without_solver_retry(mo
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda candidate, *, pipeline: {"readback_verified": True, "entry_digest": "exact"})
+    # This test proves attempt lookup and no-retry bookkeeping only. These
+    # stubs do not prove artifact, candidate-lineage, or Pool authority.
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
     monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
@@ -275,7 +284,7 @@ def test_interrupted_run_missing_qa_proof_is_not_recovered_as_ready(monkeypatch:
     assert recovered is None
 
 
-def test_existing_artifact_verified_ready_reuses_only_with_pool_readback(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_existing_ready_reuse_orchestration_only_uses_isolated_gate_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as extensions
 
     source_id = "owner-upload-" + "b" * 64
@@ -293,6 +302,8 @@ def test_existing_artifact_verified_ready_reuses_only_with_pool_readback(monkeyp
     monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: restored)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda candidate, *, pipeline: {"readback_verified": True, "entry_digest": "exact"})
+    # This test exercises reuse orchestration only; real proof gates have
+    # separate fail-closed contract coverage.
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
     monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
@@ -307,8 +318,9 @@ def test_existing_artifact_verified_ready_reuses_only_with_pool_readback(monkeyp
     assert reused["release_pool"]["readback_verified"] is True
 
 
-def test_150_item_fake_campaign_is_sequential_bounded_and_fully_checkpoints(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_150_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     batch_id, _items = _make_batch(tmp_path, monkeypatch, 150)
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]
     active = 0
     peak = 0

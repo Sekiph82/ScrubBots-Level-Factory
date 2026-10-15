@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from PIL import Image
+import pytest
 
 from scrubbots_pixel_factory import alpix_batch
 
@@ -213,3 +214,39 @@ def test_incomplete_synthetic_ready_auto_proof_never_enters_pool(tmp_path: Path,
     accepted = studio.record_owner_review(candidate["candidate_id"], "ACCEPT", "restore", "")
     assert accepted["publication"]["disposition"] == "NOT_ENTERED"
     assert release_entries() == []
+
+
+def test_existing_ready_auto_pool_positive_path_is_evidence_gated_and_read_only() -> None:
+    """Inspect an authentic current READY_AUTO entry when its authority exists.
+
+    This deliberately does not manufacture a solver result or mutate reviews,
+    Pool state, or the owner's accepted 002 evidence. The ACCEPT/REJECT policy
+    itself is covered by the isolated release-pool authority contract.
+    """
+    from scrubbots_pixel_factory import studio_extensions as studio
+    from scrubbots_pixel_factory.supply_pipeline import pinned_game_source, release_pool
+
+    try:
+        pinned_game_source.verify_attested_runtime(pinned_game_source.expected_runtime_root())
+    except pinned_game_source.PinnedGameSourceError as exc:
+        pytest.skip(f"POSITIVE_PATH_OWNER_OR_GAME_AUTHORITY_GATE: {exc}")
+    entries = release_pool.release_entries()
+
+    candidates = {row["candidate_id"]: row for row in studio.list_candidates()}
+    ready_auto = [row for row in entries if row.get("eligibility_source") == "READY_AUTO"]
+    if not ready_auto:
+        pytest.skip("POSITIVE_PATH_OWNER_OR_GAME_AUTHORITY_GATE: no current proof-validated READY_AUTO entry exists")
+
+    for entry in ready_auto:
+        candidate_id = str(entry["candidate_id"])
+        candidate = candidates.get(candidate_id)
+        pipeline = studio._latest_ready_pipeline(candidate_id)
+        assert candidate is not None
+        assert pipeline is not None
+        assert pipeline["run_id"] == entry["pipeline_run_id"]
+        assert entry.get("candidate") == candidate
+        assert entry.get("pipeline") == pipeline
+        assert entry.get("review_id") is None
+        assert release_pool._eligibility_matches_current_review(
+            entry, studio._latest_review(candidate_id, candidate.get("artwork_sha256")),
+        )
