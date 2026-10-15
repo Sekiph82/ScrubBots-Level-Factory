@@ -7,7 +7,7 @@ on:
         description: "Run affected groups first or the final comparable suite"
         required: true
         type: choice
-        options: [m01-03, focused, full]
+        options: [m01-03, m02-01, focused, full]
         default: full
 
 permissions:
@@ -184,6 +184,10 @@ jobs:
           if [[ '${{ inputs.suite }}' == 'm01-03' ]]; then
             python -m pytest -q \
               tests/unit/test_sb_lf01_009_010_candidate_and_semantic_contracts.py \
+              "${common[@]}" 2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+          elif [[ '${{ inputs.suite }}' == 'm02-01' ]]; then
+            python -m pytest -q \
+              tests/unit/test_sb_lf02_001_evaluator_guided.py \
               "${common[@]}" 2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
           elif [[ '${{ inputs.suite }}' == 'focused' ]]; then
             python -m pytest -q \

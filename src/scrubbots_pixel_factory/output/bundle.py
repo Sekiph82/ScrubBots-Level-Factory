@@ -342,6 +342,9 @@ def _validate_hybrid_metadata(data: Mapping[str, object], result_dict: Mapping[s
 
 
 def _validate_auto_metadata(data: Mapping[str, object], result_dict: Mapping[str, object], artwork: ArtworkArtifact) -> None:
+    if data.get("schema") == "scrubbots-evaluator-guided-metadata":
+        _validate_evaluator_guided_metadata(data, result_dict, artwork)
+        return
     if data.get("schema") != "scrubbots-auto-metadata" or data.get("version") != 1:
         raise OutputContractError("AUTO generator metadata schema/version is invalid")
     request, options = _request_parts(result_dict)
@@ -388,6 +391,94 @@ def _validate_auto_metadata(data: Mapping[str, object], result_dict: Mapping[str
     generator = _mapping_copy(result_dict.get("generator"), "generation.result.generator")
     if selected.get("engine_id") != generator.get("id") or selected.get("engine_version") != generator.get("version"):
         raise OutputContractError("AUTO selected engine does not match the exported result")
+
+
+def _validate_evaluator_guided_metadata(data: Mapping[str, object], result_dict: Mapping[str, object], artwork: ArtworkArtifact) -> None:
+    required_metadata = {
+        "schema", "version", "request_digest", "policy", "policy_digest", "candidate_order",
+        "fallback_on_failure", "attempts", "selected_index", "selected_result_digest",
+        "selected_grid_hash", "selected_quality", "selected_engine_id", "selected_engine_version",
+        "selection_class",
+    }
+    if set(data) != required_metadata or data.get("schema") != "scrubbots-evaluator-guided-metadata":
+        raise OutputContractError("evaluator-guided metadata has unsupported or missing fields")
+    if data.get("version") != 1 or data.get("selection_class") != "TEST":
+        raise OutputContractError("evaluator-guided metadata version or candidate class is invalid")
+    request, options = _request_parts(result_dict)
+    raw_policy = options.get("evaluator_guided")
+    policy = _mapping_copy(raw_policy, "AUTO evaluator policy")
+    if set(policy) != {"version", "proposal_budget", "quality_policy"} or type(policy.get("version")) is not int or policy.get("version") != 1:
+        raise OutputContractError("evaluator-guided policy is malformed")
+    budget = policy.get("proposal_budget")
+    if type(budget) is not int or not 2 <= budget <= 8:
+        raise OutputContractError("evaluator-guided proposal budget is invalid")
+    if data.get("request_digest") != hashlib.sha256(canonical_json_bytes(request)).hexdigest():
+        raise OutputContractError("evaluator-guided request digest is invalid")
+    if data.get("policy") != policy or data.get("candidate_order") != options.get("candidates", ["MASK", "RULES"]):
+        raise OutputContractError("evaluator-guided policy or generator order differs from request")
+    fallback = options.get("fallback_on_failure", False)
+    if type(fallback) is not bool or data.get("fallback_on_failure") != fallback:
+        raise OutputContractError("evaluator-guided fallback binding is invalid")
+    policy_digest = hashlib.sha256(canonical_json_bytes(policy)).hexdigest()
+    if data.get("policy_digest") != policy_digest:
+        raise OutputContractError("evaluator-guided policy digest is invalid")
+    try:
+        quality_policy = QualityPolicy(**dict(_mapping_copy(policy.get("quality_policy"), "M07 policy")))
+    except (TypeError, ValueError) as exc:
+        raise OutputContractError(f"evaluator-guided M07 policy is invalid: {exc}") from exc
+    attempts = data.get("attempts")
+    if not isinstance(attempts, list) or len(attempts) != budget:
+        raise OutputContractError("evaluator-guided attempt count differs from bounded budget")
+    seed = _typed_seed_value(result_dict.get("seed"), "generation.result.seed")
+    candidates = data.get("candidate_order")
+    if not isinstance(candidates, list) or not candidates:
+        raise OutputContractError("evaluator-guided generator order is malformed")
+    eligible: list[tuple[tuple[object, ...], int, Mapping[str, object]]] = []
+    for index, raw in enumerate(attempts):
+        attempt = _mapping_copy(raw, f"evaluator_guided.attempts[{index}]")
+        if set(attempt) != {"index", "mode", "seed", "result", "result_digest", "quality", "failure_code"}:
+            raise OutputContractError("evaluator-guided attempt has unsupported or missing fields")
+        if attempt.get("index") != index or attempt.get("mode") != candidates[index % len(candidates)]:
+            raise OutputContractError("evaluator-guided attempt order is invalid")
+        expected_seed = DeterministicRNG(seed).child(f"evaluator-guided/proposal/{index}").next_bytes(32).hex()
+        if attempt.get("seed") != expected_seed:
+            raise OutputContractError("evaluator-guided proposal seed is not derived from the request seed")
+        raw_result = attempt.get("result")
+        if raw_result is None:
+            if attempt.get("quality") is not None or not attempt.get("failure_code") or attempt.get("result_digest") is not None:
+                raise OutputContractError("evaluator-guided failed proposal evidence is malformed")
+            continue
+        proposal = _mapping_copy(raw_result, f"evaluator_guided.attempts[{index}].result")
+        if hashlib.sha256(canonical_json_bytes(proposal)).hexdigest() != attempt.get("result_digest"):
+            raise OutputContractError("evaluator-guided proposal result digest is invalid")
+        typed_proposal_seed = proposal.get("seed")
+        if _typed_seed_value(typed_proposal_seed, "proposal.seed") != expected_seed:
+            raise OutputContractError("evaluator-guided proposal result is bound to another seed")
+        proposal_grid = proposal.get("logical_grid")
+        dimensions = proposal.get("resolved_dimensions")
+        if not isinstance(dimensions, Mapping):
+            raise OutputContractError("evaluator-guided proposal dimensions are missing")
+        report = evaluate_grid(dimensions.get("width"), dimensions.get("height"), proposal_grid, policy=quality_policy)
+        if report.as_dict() != attempt.get("quality"):
+            raise OutputContractError("evaluator-guided M07 evidence does not match proposal grid and policy")
+        if report.accepted:
+            metrics = report.analysis.metrics if report.analysis is not None else None
+            rank = (len(report.rejection_codes), metrics.tiny_region_count, metrics.isolated_occupied_count, abs(metrics.occupied_ratio - 0.45), -metrics.aggregate_symmetry_score, logical_grid_hash(dimensions["width"], dimensions["height"], proposal_grid))
+            eligible.append((rank, index, proposal))
+    if not eligible:
+        raise OutputContractError("evaluator-guided metadata has no accepted proposal")
+    _, winner_index, winner = min(eligible, key=lambda item: item[0])
+    if data.get("selected_index") != winner_index or data.get("selected_result_digest") != attempts[winner_index].get("result_digest"):
+        raise OutputContractError("evaluator-guided selection is not the deterministic quality winner")
+    winner_grid = winner.get("logical_grid")
+    generator = _mapping_copy(result_dict.get("generator"), "generation.result.generator")
+    winner_generator = _mapping_copy(winner.get("generator"), "proposal.generator")
+    if winner_grid != result_dict.get("logical_grid") or winner_generator.get("id") != generator.get("id") or winner_generator.get("version") != generator.get("version"):
+        raise OutputContractError("evaluator-guided selected proposal differs from exported result")
+    if data.get("selected_grid_hash") != artwork.grid_hash or data.get("selected_quality") != attempts[winner_index].get("quality"):
+        raise OutputContractError("evaluator-guided winner hash or quality evidence is not bound to artwork")
+    if data.get("selected_engine_id") != generator.get("id") or data.get("selected_engine_version") != generator.get("version"):
+        raise OutputContractError("evaluator-guided selected generator identity is invalid")
 
 
 @dataclass(frozen=True, slots=True)
