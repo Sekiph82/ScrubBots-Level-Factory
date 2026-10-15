@@ -105,8 +105,17 @@ def test_publication_plan_maps_to_secret_free_preflight_record_in_memory() -> No
     assert production.environment == "PRODUCTION"
     assert production.outcome == "PREPARED"
 
+    forged_truncated = _plan(accepted=True, check=PlanCheck("payload_validation", True, "ACCEPTED"))
+    assert forged_truncated.accepted and forged_truncated.complete
+    assert not forged_truncated.owner_approved and not forged_truncated.mutation_eligible_in_principle
+    assert all(check.accepted for check in forged_truncated.checks)
+    # This is the exact old predicate that produced the false PREPARED result.
+    assert forged_truncated.accepted and forged_truncated.complete and not any(
+        check.accepted is False for check in forged_truncated.checks
+    )
+
     for forged_plan in (
-        _plan(accepted=True, check=PlanCheck("payload_validation", True, "ACCEPTED")),
+        forged_truncated,
         replace(ready_plan, checks=ready_plan.checks[:-1]),
         replace(ready_plan, checks=(ready_plan.checks[0], *ready_plan.checks[:-1])),
         replace(ready_plan, owner_approved=False),
