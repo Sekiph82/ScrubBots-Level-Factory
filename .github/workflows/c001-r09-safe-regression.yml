@@ -1,0 +1,149 @@
+name: C001-R09 safe regression
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c001-r09-safe-regression
+  cancel-in-progress: false
+
+jobs:
+  regression:
+    name: Python 3.12 and Godot 4.7.2 safe suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - name: Check out LF source without persisting credentials
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Enforce isolated runner boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import subprocess
+
+          forbidden = {
+              "SCRUBBOTS_PROJECT",
+              "SCRUBBOTS_CANONICAL_CHECKOUT",
+              "SCRUBBOTS_FACTORY_RUNTIME_ROOT",
+              "SCRUBBOTS_GODOT",
+              "LFX_R09_R02_R02_INSTALLED_TEST",
+              "R2_ENDPOINT_URL",
+              "R2_ACCOUNT_ID",
+              "R2_ACCESS_KEY_ID",
+              "R2_SECRET_ACCESS_KEY",
+              "CLOUDFLARE_API_TOKEN",
+              "AWS_ACCESS_KEY_ID",
+              "AWS_SECRET_ACCESS_KEY",
+          }
+          present = sorted(forbidden.intersection(os.environ))
+          if present:
+              raise SystemExit(f"unsafe authority/provider variables are set: {present}")
+          if Path("Release").exists():
+              raise SystemExit("owner Release directory unexpectedly exists in CI checkout")
+          for relative in (
+              "level_factory/output/owner-uploads",
+              "level_factory/output/current-game-runtime",
+          ):
+              if Path(relative).exists():
+                  raise SystemExit(f"owner source/runtime data unexpectedly exists in CI checkout: {relative}")
+          sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          if sha != os.environ["GITHUB_SHA"]:
+              raise SystemExit(f"checkout SHA mismatch: {sha} != {os.environ['GITHUB_SHA']}")
+          print(f"SAFE_RUNNER_BOUNDARY=PASS sha={sha} owner_release=absent owner_runtime=absent provider_credentials=absent")
+          PY
+
+      - name: Install checksum-verified Godot 4.7.2 headless binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=4.7.2
+          base="https://github.com/godotengine/godot/releases/download/${version}-stable"
+          sums="$RUNNER_TEMP/SHA512-SUMS.txt"
+          archive="$RUNNER_TEMP/Godot_v${version}-stable_linux.x86_64.zip"
+          curl --fail --location --silent --show-error "$base/SHA512-SUMS.txt" -o "$sums"
+          printf '%s  %s\n' 'b8bdff6704f833e7a021df16ec08e1478edd5a285c1f894929b91a7f74a5c7c0' "$sums" | sha256sum --check --status
+          curl --fail --location --silent --show-error "$base/Godot_v${version}-stable_linux.x86_64.zip" -o "$archive"
+          expected="$(awk -v asset="Godot_v${version}-stable_linux.x86_64.zip" '$2 == asset {print $1}' "$sums")"
+          test -n "$expected"
+          printf '%s  %s\n' "$expected" "$archive" | sha512sum --check --status
+          mkdir -p "$RUNNER_TEMP/godot" "$RUNNER_TEMP/bin"
+          unzip -q "$archive" -d "$RUNNER_TEMP/godot"
+          binary="$RUNNER_TEMP/godot/Godot_v${version}-stable_linux.x86_64"
+          test -f "$binary"
+          chmod +x "$binary"
+          ln -s "$binary" "$RUNNER_TEMP/bin/godot"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          echo "GODOT_BINARY=$binary" >> "$GITHUB_ENV"
+          "$binary" --version
+
+      - name: Install declared test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check --no-input -e '.[test]' -e './content_pipeline'
+          python -m pip check
+
+      - name: Record environment and exact regression command
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            printf 'commit=%s\n' "$GITHUB_SHA"
+            printf 'runner=%s\n' "$RUNNER_OS / $ImageOS"
+            printf 'python='; python --version
+            printf 'pytest='; python -m pytest --version
+            printf 'godot='; godot --version
+            printf '%s\n' 'dependency_lock=repository has no tracked Python lockfile; install uses bounded project pyproject.toml constraints'
+            printf '%s\n' 'command=python -m pytest -q tests/unit tests/integration tests/property tests/acceptance tests/golden -p no:cacheprovider -o tmp_path_retention_policy=all --tb=short -ra -r fEs --junitxml=$RUNNER_TEMP/c001-r09-junit.xml [six historical exclusions listed below]'
+            printf '%s\n' 'ignore=tests/integration/test_release_route_a_authentic_verifier.py'
+            printf '%s\n' 'ignore=tests/integration/test_sb_cpx_002_current_main_godot_integration.py'
+            printf '%s\n' 'ignore=tests/integration/test_sb_lfx_019_void_game_parity.py'
+            printf '%s\n' 'ignore=tests/integration/test_release_batch_level_catalog.py'
+            printf '%s\n' 'ignore=tests/integration/test_p3_headless_pipeline_parity.py'
+            printf '%s\n' 'ignore=tests/integration/test_sb_cp07_006_r2_live_roundtrip.py'
+          } > "$RUNNER_TEMP/c001-r09-metadata.txt"
+          python -m pip freeze --all >> "$RUNNER_TEMP/c001-r09-metadata.txt"
+
+      - name: Run final comparable safe regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pytest -q \
+            tests/unit tests/integration tests/property tests/acceptance tests/golden \
+            -p no:cacheprovider \
+            -o tmp_path_retention_policy=all \
+            --tb=short -ra -r fEs \
+            --junitxml="$RUNNER_TEMP/c001-r09-junit.xml" \
+            --ignore=tests/integration/test_release_route_a_authentic_verifier.py \
+            --ignore=tests/integration/test_sb_cpx_002_current_main_godot_integration.py \
+            --ignore=tests/integration/test_sb_lfx_019_void_game_parity.py \
+            --ignore=tests/integration/test_release_batch_level_catalog.py \
+            --ignore=tests/integration/test_p3_headless_pipeline_parity.py \
+            --ignore=tests/integration/test_sb_cp07_006_r2_live_roundtrip.py \
+            2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+
+      - name: Upload JUnit and console evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: c001-r09-regression-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/c001-r09-junit.xml
+            ${{ runner.temp }}/c001-r09-pytest.log
+            ${{ runner.temp }}/c001-r09-metadata.txt
+          if-no-files-found: warn
+          retention-days: 7
