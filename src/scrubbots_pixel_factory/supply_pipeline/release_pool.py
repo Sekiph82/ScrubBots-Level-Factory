@@ -81,6 +81,7 @@ def _validate_source_grid_bytes(
 
     from ..output.png import PNGContractError, decode_logical_png
     from ..quality.core import logical_grid_hash
+    from .. import studio_extensions as studio
 
     source_id = lineage.get("source_id")
     source_sha256 = lineage.get("source_sha256")
@@ -96,18 +97,26 @@ def _validate_source_grid_bytes(
             or hashlib.sha256(source_png).hexdigest() != source_sha256):
         raise ReleaseError("candidate source lineage does not match the exact immutable OWNER_UPLOAD bytes")
     try:
-        source = decode_logical_png(source_png)
-        artwork = decode_logical_png(candidate_png)
+        source_width, source_height, source_cells, foreign, semi_alpha, _transparent, _used = (
+            studio._owner_source_grid(source_png)
+        )
     except (PNGContractError, TypeError, ValueError) as exc:
         raise ReleaseError("OWNER_UPLOAD or candidate artwork is not a canonical logical PNG") from exc
-    if (source.width != source_record.get("original_width")
-            or source.height != source_record.get("original_height")
-            or (artwork.width, artwork.height) != (source.width, source.height)
-            or (candidate.get("width"), candidate.get("height")) != (source.width, source.height)):
+    if foreign or semi_alpha:
+        raise ReleaseError("OWNER_UPLOAD source contains noncanonical color or alpha values")
+    try:
+        artwork = decode_logical_png(candidate_png)
+    except (PNGContractError, TypeError, ValueError) as exc:
+        raise ReleaseError("candidate artwork is not a canonical logical PNG") from exc
+    if (not 20 <= source_width <= 59 or not 20 <= source_height <= 59
+            or source_width != source_record.get("original_width")
+            or source_height != source_record.get("original_height")
+            or (artwork.width, artwork.height) != (source_width, source_height)
+            or (candidate.get("width"), candidate.get("height")) != (source_width, source_height)):
         raise ReleaseError("OWNER_UPLOAD and candidate logical dimensions do not match exactly")
-    source_grid_hash = logical_grid_hash(source.width, source.height, source.cells)
+    source_grid_hash = logical_grid_hash(source_width, source_height, source_cells)
     candidate_grid_hash = logical_grid_hash(artwork.width, artwork.height, artwork.cells)
-    if (artwork.cells != source.cells or candidate_grid_hash != source_grid_hash
+    if (artwork.cells != source_cells or candidate_grid_hash != source_grid_hash
             or candidate_grid_hash != candidate.get("grid_hash")
             or hashlib.sha256(candidate_png).hexdigest() != candidate.get("artwork_sha256")):
         raise ReleaseError("candidate logical artwork grid does not equal the exact OWNER_UPLOAD-derived grid")

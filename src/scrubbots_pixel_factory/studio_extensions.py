@@ -239,18 +239,9 @@ def _validation_pixels(raw: bytes) -> tuple[int, int, bytes]:
     return decoded.width, decoded.height, decoded.pixels
 
 
-def validate_owner_source(
-    source_id: str,
-    *,
-    persist: bool = True,
-    game_project: str | Path | None = None,
-    source_directory: str | Path | None = None,
-) -> dict[str, Any]:
-    source = verify_owner_source(source_id, source_directory=source_directory)
-    source_path = Path(source["source_path"])
-    if not source_path.is_absolute():
-        source_path = _repository_root() / source_path
-    raw = source_path.read_bytes()
+def _owner_source_grid(raw: bytes) -> tuple[int, int, tuple[str, ...], int, int, int, set[str]]:
+    """Decode OWNER_UPLOAD bytes with Studio's strict PNG and palette rules."""
+
     width, height, pixels = _validation_pixels(raw)
     foreign = 0
     semi_alpha = 0
@@ -263,7 +254,7 @@ def validate_owner_source(
             transparent += 1
             cells.append(VOID_CELL_ID)
             continue
-        elif alpha != 255:
+        if alpha != 255:
             semi_alpha += 1
             cells.append("INVALID_ALPHA")
             continue
@@ -275,6 +266,22 @@ def validate_owner_source(
         if color_id != "FOREIGN":
             used.add(color_id)
         cells.append(color_id)
+    return width, height, tuple(cells), foreign, semi_alpha, transparent, used
+
+
+def validate_owner_source(
+    source_id: str,
+    *,
+    persist: bool = True,
+    game_project: str | Path | None = None,
+    source_directory: str | Path | None = None,
+) -> dict[str, Any]:
+    source = verify_owner_source(source_id, source_directory=source_directory)
+    source_path = Path(source["source_path"])
+    if not source_path.is_absolute():
+        source_path = _repository_root() / source_path
+    raw = source_path.read_bytes()
+    width, height, cells, foreign, semi_alpha, transparent, used = _owner_source_grid(raw)
     legal_dimensions = 20 <= width <= 59 and 20 <= height <= 59
     capability = None
     pinned_runtime = False
@@ -774,16 +781,11 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
     from .core.rng import RNG_ALGORITHM, DeterministicRNG
     from .output.bundle import export_result
 
-    width, height, pixels = _validation_pixels(source_png.read_bytes())
-    cells: list[str] = []
-    for index in range(width * height):
-        red, green, blue, alpha = pixels[index * 4 : index * 4 + 4]
-        if alpha == 0:
-            cells.append(VOID_CELL_ID)
-            continue
-        if alpha != 255:
-            raise StudioExtensionError("semi-alpha OWNER_UPLOAD cannot form a logical candidate")
-        cells.append(CANONICAL_PALETTE.id_for_rgb((red, green, blue)))
+    width, height, cells, foreign, semi_alpha, _transparent, _used = _owner_source_grid(source_png.read_bytes())
+    if semi_alpha:
+        raise StudioExtensionError("semi-alpha OWNER_UPLOAD cannot form a logical candidate")
+    if foreign:
+        raise StudioExtensionError("foreign-color OWNER_UPLOAD cannot form a canonical logical candidate")
     candidate_id = f"candidate-owner-{validation['source_sha256'][:48]}"
     transparent = VOID_CELL_ID in cells
     if transparent and validation.get("void_capability", {}).get("state") != "OPEN":
