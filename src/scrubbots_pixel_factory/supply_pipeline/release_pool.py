@@ -84,7 +84,9 @@ def _validate_source_grid_bytes(
 
     source_id = lineage.get("source_id")
     source_sha256 = lineage.get("source_sha256")
-    if (type(source_id) is not str or source_record.get("source_id") != source_id
+    if (lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
+            or lineage.get("source_bytes_unchanged") is not True
+            or type(source_id) is not str or source_record.get("source_id") != source_id
             or source_record.get("origin") != "OWNER_UPLOAD"
             or source_record.get("status") != "SOURCE_ONLY"
             or source_record.get("validation_state") != "UNVALIDATED"
@@ -122,16 +124,23 @@ def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classifi
     if lineage.get("source_record") != expected_record:
         raise ReleaseError("candidate source record path is not the canonical OWNER_UPLOAD path")
     try:
-        source_record = studio.verify_owner_source(str(source_id))
         record_path, source_path = studio._source_record_paths(str(source_id))
         repository = studio._repository_root().resolve()
         candidate_root = (repository / str(candidate.get("source_path", ""))).resolve()
+        candidate_artwork = candidate_root / "artwork.png"
         if (not record_path.is_relative_to(repository) or not source_path.is_relative_to(repository)
                 or not candidate_root.is_relative_to(repository)
+                or not candidate_artwork.resolve().is_relative_to(repository)
+                or record_path.is_symlink() or source_path.is_symlink() or candidate_artwork.is_symlink()
                 or candidate_root.name != str(candidate.get("candidate_id", ""))):
             raise ReleaseError("candidate or OWNER_UPLOAD source path escaped the canonical repository")
+        from ..semantic.normalization.core import RAW_ARTIFACT_MAX_BYTES
+        if (source_path.stat().st_size > RAW_ARTIFACT_MAX_BYTES
+                or candidate_artwork.stat().st_size > RAW_ARTIFACT_MAX_BYTES):
+            raise ReleaseError("OWNER_UPLOAD or candidate artwork exceeds the bounded PNG byte policy")
+        source_record = studio.verify_owner_source(str(source_id))
         source_png = source_path.read_bytes()
-        candidate_png = (candidate_root / "artwork.png").read_bytes()
+        candidate_png = candidate_artwork.read_bytes()
     except ReleaseError:
         raise
     except (OSError, TypeError, ValueError) as exc:
