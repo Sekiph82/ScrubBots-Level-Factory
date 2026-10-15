@@ -12,6 +12,7 @@ from scrubbots_pixel_factory.quality import QualityPolicy
 def _request(seed="m02-01-seed", *, budget=2, quality_policy=None):
     return GenerationRequest(
         seed=seed, width=20, height=20, generator_mode="AUTO",
+        palette_subset=("C01", "C02", "C03"),
         generator_options=GeneratorOptions(
             "auto", 1,
             {
@@ -115,6 +116,7 @@ def test_evaluator_guided_bundle_rejects_tampered_winner_identity():
 def test_evaluator_guided_59_square_budget_remains_bounded():
     request = GenerationRequest(
         seed="m02-01-59", width=59, height=59, generator_mode="AUTO",
+        palette_subset=("C01", "C02", "C03"),
         generator_options=GeneratorOptions("auto", 1, {
             "candidates": ["MASK"],
             "evaluator_guided": {"version": 1, "proposal_budget": 2, "quality_policy": QualityPolicy(max_largest_region_ratio=0.6).as_dict()},
