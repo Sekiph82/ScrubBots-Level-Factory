@@ -48,4 +48,3 @@ Scope: the Level Factory content pipeline and a future SCRUBBOTS client that con
 - `content_pipeline/src/scrubbots_content_pipeline/operations.py`
 - `docs/security/MOBILE_STORE_POLICY_BOUNDARY_V01.md`
 - `docs/security/MOBILE_STORE_POLICY_RECHECK_2026-10-14.md`
-
