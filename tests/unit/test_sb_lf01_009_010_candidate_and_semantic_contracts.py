@@ -166,6 +166,29 @@ def test_owner_source_requires_exact_current_owner_accept_at_pool_boundary(monke
     assert classification["candidate_class"] == CandidateClass.PRODUCTION_CANDIDATE.value
     assert classification["source_sha256"]
 
+    # Positive control reaches the next Pool stage with a synthetic canonical
+    # READY record; stop before official game/runtime proof is evaluated.
+    from scrubbots_pixel_factory import studio_extensions as studio
+
+    lineage = candidate["metadata"]["generator_metadata"]["payload"]["data"]["source_lineage"]
+    monkeypatch.setattr(release_pool, "_candidate_source_lineage", lambda _item: lineage)
+    monkeypatch.setattr(studio, "verify_owner_source", lambda _source_id: _source_record(candidate, source_png))
+
+    class ProvenancePassed(Exception):
+        pass
+
+    monkeypatch.setattr(
+        release_pool,
+        "_canonical_official_difficulty",
+        lambda _primary: (_ for _ in ()).throw(ProvenancePassed()),
+    )
+    with pytest.raises(ProvenancePassed):
+        enter_release_pool(
+            candidate,
+            {"disposition": "READY", "primary": {"state": "READY"}},
+            _owner_accept(candidate),
+        )
+
     with pytest.raises(ReleaseError, match="exact current owner ACCEPT"):
         validate_pool_candidate_provenance(candidate, None)
     with pytest.raises(ReleaseError, match="exact current owner ACCEPT"):
@@ -200,6 +223,12 @@ def test_owner_source_requires_exact_current_owner_accept_at_pool_boundary(monke
     )
     with pytest.raises(ReleaseError, match="does not equal the exact OWNER_UPLOAD-derived grid"):
         validate_pool_candidate_provenance(forged, _owner_accept(forged))
+    with pytest.raises(ReleaseError, match="does not equal the exact OWNER_UPLOAD-derived grid"):
+        enter_release_pool(
+            forged,
+            {"disposition": "READY", "primary": {"state": "READY"}},
+            _owner_accept(forged),
+        )
 
 
 def _release_entry(candidate_id: str, *, production: bool) -> dict[str, object]:
