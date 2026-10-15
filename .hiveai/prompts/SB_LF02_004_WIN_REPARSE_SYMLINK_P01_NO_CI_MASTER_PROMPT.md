@@ -1,0 +1,30 @@
+# SB-LF02-004-WIN-P01 | Native Windows symbolic link and reparse safety | NO CI
+
+Date: 2026-10-16 Europe/Istanbul
+Role: CODEX BUILDER / LOCAL WINDOWS SECURITY PROBE
+Repository: `Sekiph82/ScrubBots-Level-Factory`
+Canonical root: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+
+## 0. Exact authority
+Read the current root `TASKS.md` (sole tracker), `AGENTS.md`, `GOVERNANCE.md`, `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`, `docs/LEVEL_ART_SEMANTIC_NORMALIZATION_OWNER_DECISION_V02.md`, `.hiveai/audits/SB_LF02_004_R00_ART_FIRST_NO_CI_INDEPENDENT_SOURCE_AUDIT_V01.md`, and `.hiveai/audits/SB_LF02_008_R01_FINAL_NO_CI_SOURCE_CONTRACT_AUDIT_V01.md`. This is a **bounded local follow-up security proof** to an already source-closed ART_FIRST, not a retroactive reopening of unrelated milestone, a production owner acceptance, R05 solver/game run or a Source Library cleanup task. No new tracker.
+
+**PERMANENT UNTIL OWNER CHANGES IT: ZERO GITHUB ACTIONS, ZERO CI, ZERO WORKFLOW EDITS, ZERO BILLABLE HOSTED TESTS.** Do not launch or dispatch GitHub Actions or another hosted runner. Do not use admin privileges, Developer Mode changes, registry writes, OS security-policy modifications, endpoint changes, symlink privilege escalation or alternate OS denial bypass. If runtime privilege `WinError 1314` persists, label real symlink creation **BLOCKED/NOT RUN**, not PASS.
+
+## 1. Read-only canonical workspace preflight
+Verify exact canonical Desktop repo/origin/branch, remote main and local HEAD, tracked status and prior safety ref. `git fetch --prune origin`; ff-only if safe and no untracked collisions. Preserve all 3,220 current builder-reported untracked paths: 3,204 earlier owner paths plus 16 known `.pytest-scratch-sb-lf02-008-20261015/` task files left after policy-denied deletion. **Do not attempt to delete or rename any of those 16 again, do not add files under that path, do not create a TEMP clone/worktree or extra test scratch.** Read-only inspect Windows build/Python version/Developer Mode effective state and symlink capability without changing them. Do not enumerate user personal files or infer owner permissions. Record reported Windows/OS context only.
+
+## 2. Threat map and actual read-only reparse evidence
+Inspect `src/scrubbots_pixel_factory/generators/router/art_first.py::_safe_file/_load_source/_candidate_and_review`, `studio_extensions.py::_source_record_paths/verify_owner_source`, `output/bundle.py::_verified_owner_upload_sha256`, `supply_pipeline/release_pool.py::_verify_candidate_source_grid_binding`, and any accepted alternate `source_directory` path contract. Analyze Windows native **file symlink, directory symlink, junction, mount point and other reparse-point** handling versus actual code checks for `Path.is_symlink`, `Path.is_junction` (Python version support), `resolve(strict=True)`, canonical root and file identity. Clearly distinguish a real native Windows symlink test from monkeypatched test of `Path.is_symlink` branch. Do not accidentally assert `is_symlink()` covers junctions.
+
+For existing OS-provided sample symlinks/junctions, use **read-only harmless path-type interrogation only**, without changing, reading data within or traversing private directories. If none is clearly trusted/available, record NATIVE PROBE UNAVAILABLE. Never create links to owner PNG/Release/Game/R2 or untrusted system destinations.
+
+## 3. Native probe only if safely permitted, without scratch growth
+Perform an actual symlink-create/read test **only if** it is possible without elevation/Developer Mode change, without a new temporary directory, without touching any owner files and with a proven owner-permitted cleanup path. **Never work around blocked deletion**. If those prerequisites are not all met, do **not** create anything: record native test `NOT RUN` and continue read-only code hardening / in-memory simulations. A synthetic `Path.is_symlink` monkeypatch test is code-branch evidence only, not proof of NTFS native behavior. Do not count blocked/NOT RUN as a failure of source logic.
+
+## 4. Targeted corrective implementation only for proven bug
+If a concrete reachable reparse/junction escape is found, fix only that root/path trust boundary with strict fail-closed semantics, using Windows `is_junction`/reparse data when available and safe POSIX fallback. Protect existing import/Pool/ART_FIRST parity; no new arbitrary path input, no canonical source forgery. No writes to installed 3-screen Factory Studio, 140 original owner PNGs, accepted 002, 9 READY, game runtime, Release, shortcut, 16 denied scratch, R2/cloud. Do not add dependencies or broad feature work. If there is no source-backed bypass, make no speculative product edit: record the precise native blocker.
+
+Focused tests: in-memory Python cases for symlink/junction classification and `resolve(strict=True)` bounding (mocking if necessary), ensuring no source file is read for obvious invalid path; only local Godot headless if relevant to the exact bug and without creating new native caches. `python -B`, `PYTHONDONTWRITEBYTECODE=1`, `ast.parse`, `git diff --check`, no pytest filesystem fixtures or new scratch. Report any NOT RUN gates; no broad regression or CI.
+
+## 5. GitHub handoff
+Append concise chronology, exact source SHA and read-only results to existing `.hiveai/codex-logs/SB-LFX-018-C001-R02-R05_PRODUCTION_HISTORY_FULL_REGRESSION_EVIDENCE_CODEX_LOG.md`. Do not edit GPT-owned `TASKS.md`, audits, prompts, HANDOFF or workflows. If needed, commit only scoped path security code/in-memory tests separately, then builder log. Normal push only after origin/main ancestor proof and manual-only workflow trigger/diff check; no force/rebase/reset/clean/stash, no worktrees. Confirm final head/remote parity and 3,220 preserved untracked entries. If read-only audit only, log-only commit is legitimate. Report native symlink gate as **PASS only on actual native Windows evidence** or **BLOCKED/UNVERIFIED** when permission/policy prevents it. Leave real game/R05 production and authentic AI provider creator proof OPEN.
