@@ -2,6 +2,13 @@ name: C001-R09 safe regression
 
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: "Run affected groups first or the final comparable suite"
+        required: true
+        type: choice
+        options: [focused, full]
+        default: full
 
 permissions:
   contents: read
@@ -20,6 +27,7 @@ jobs:
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Set up Python 3.12
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -86,9 +94,17 @@ jobs:
           test -f "$binary"
           chmod +x "$binary"
           ln -s "$binary" "$RUNNER_TEMP/bin/godot"
+          ln -s "$binary" "$RUNNER_TEMP/bin/godot_console.exe"
           echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
           echo "GODOT_BINARY=$binary" >> "$GITHUB_ENV"
           "$binary" --version
+
+      - name: Import tracked Godot resources without launching Studio
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot --headless --editor --path level_factory --quit 2>&1 | tee "$RUNNER_TEMP/c001-r09-godot-import.log"
+          if grep -E '(^| )Parse Error|SCRIPT ERROR|ERROR: .*referenced non-existent resource' "$RUNNER_TEMP/c001-r09-godot-import.log"; then exit 1; fi
 
       - name: Install declared test dependencies
         shell: bash
@@ -108,33 +124,89 @@ jobs:
             printf 'pytest='; python -m pytest --version
             printf 'godot='; godot --version
             printf '%s\n' 'dependency_lock=repository has no tracked Python lockfile; install uses bounded project pyproject.toml constraints'
-            printf '%s\n' 'command=python -m pytest -q tests/unit tests/integration tests/property tests/acceptance tests/golden -p no:cacheprovider -o tmp_path_retention_policy=all --tb=short -ra -r fEs --junitxml=$RUNNER_TEMP/c001-r09-junit.xml [six historical exclusions listed below]'
+            printf 'suite=%s\n' '${{ inputs.suite }}'
+            printf '%s\n' 'command=affected groups first or final comparable suite; 19 exact owner/game authority nodes are deselected and listed below'
             printf '%s\n' 'ignore=tests/integration/test_release_route_a_authentic_verifier.py'
             printf '%s\n' 'ignore=tests/integration/test_sb_cpx_002_current_main_godot_integration.py'
             printf '%s\n' 'ignore=tests/integration/test_sb_lfx_019_void_game_parity.py'
             printf '%s\n' 'ignore=tests/integration/test_release_batch_level_catalog.py'
             printf '%s\n' 'ignore=tests/integration/test_p3_headless_pipeline_parity.py'
             printf '%s\n' 'ignore=tests/integration/test_sb_cp07_006_r2_live_roundtrip.py'
+            printf '%s\n' 'authority_blocked=tests/unit/test_r09_r02_r03_solver_contract.py::StudioSolverContractTests::test_actual_release_authority_and_source_are_read_only'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_pinned_runtime_is_hash_bound_and_not_full_game_or_publish_authority'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_attestation_rejects_modified_git_blob'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_release_owner_source_root_is_read_only_and_preserves_same_identity'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r01_continuation.py::test_r09_r02_shared_dry_preflight_is_read_only_and_never_invokes_native'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r01_continuation.py::test_original_blocked_receipts_are_sha_bound_and_leave_all_six_native_calls'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_installed_release_pin_and_002_source_preflight_are_read_only'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_pinned_runtime_cannot_authorize_a_different_owner_upload'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_installed_gameplay_catalog_filters_by_content_dimensions_without_mutation'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_pinned_file_manifest_and_release_root_fail_closed_when_tampered_or_stale'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r04_r01_profile_supplement.py::test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tamper_evident'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_release_adapter_reads_real_002_nested_official_difficulty_and_fails_closed_without_profile'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_source_003_uses_independent_identity_and_attested_void_authority_without_persisting'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_latest_002_ready_run_restores_only_when_all_saved_identity_hashes_match'
+            printf '%s\n' 'authority_blocked=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_existing_002_accept_is_idempotent_and_does_not_create_duplicate_receipt'
+            printf '%s\n' 'authority_blocked=tests/integration/test_sb_cpx_001_solver_identity_pack.py::test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_drift'
+            printf '%s\n' 'authority_blocked=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_explicit_current_accept_membership_builds_deterministic_solver_pack'
+            printf '%s\n' 'authority_blocked=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_requires_explicit_nonduplicated_membership_and_current_acceptance'
+            printf '%s\n' 'authority_blocked=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_current_release_pool_projection_is_an_accepted_pack_source'
           } > "$RUNNER_TEMP/c001-r09-metadata.txt"
           python -m pip freeze --all >> "$RUNNER_TEMP/c001-r09-metadata.txt"
 
-      - name: Run final comparable safe regression
+      - name: Run affected groups or final comparable safe regression
         shell: bash
         run: |
           set -euo pipefail
-          python -m pytest -q \
-            tests/unit tests/integration tests/property tests/acceptance tests/golden \
-            -p no:cacheprovider \
-            -o tmp_path_retention_policy=all \
-            --tb=short -ra -r fEs \
-            --junitxml="$RUNNER_TEMP/c001-r09-junit.xml" \
-            --ignore=tests/integration/test_release_route_a_authentic_verifier.py \
-            --ignore=tests/integration/test_sb_cpx_002_current_main_godot_integration.py \
-            --ignore=tests/integration/test_sb_lfx_019_void_game_parity.py \
-            --ignore=tests/integration/test_release_batch_level_catalog.py \
-            --ignore=tests/integration/test_p3_headless_pipeline_parity.py \
-            --ignore=tests/integration/test_sb_cp07_006_r2_live_roundtrip.py \
-            2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+          common=(
+            -p no:cacheprovider -o tmp_path_retention_policy=all --tb=short -ra -r fEs
+            --junitxml="$RUNNER_TEMP/c001-r09-junit.xml"
+            --deselect=tests/unit/test_r09_r02_r03_solver_contract.py::StudioSolverContractTests::test_actual_release_authority_and_source_are_read_only
+            --deselect=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_pinned_runtime_is_hash_bound_and_not_full_game_or_publish_authority
+            --deselect=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_attestation_rejects_modified_git_blob
+            --deselect=tests/unit/test_sb_lfx_018_r08_pinned_runtime.py::test_release_owner_source_root_is_read_only_and_preserves_same_identity
+            --deselect=tests/unit/test_sb_lfx_018_r09_r01_continuation.py::test_r09_r02_shared_dry_preflight_is_read_only_and_never_invokes_native
+            --deselect=tests/unit/test_sb_lfx_018_r09_r01_continuation.py::test_original_blocked_receipts_are_sha_bound_and_leave_all_six_native_calls
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_installed_release_pin_and_002_source_preflight_are_read_only
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_pinned_runtime_cannot_authorize_a_different_owner_upload
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_installed_gameplay_catalog_filters_by_content_dimensions_without_mutation
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r02_pinned_release.py::test_pinned_file_manifest_and_release_root_fail_closed_when_tampered_or_stale
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r04_r01_profile_supplement.py::test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tamper_evident
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_release_adapter_reads_real_002_nested_official_difficulty_and_fails_closed_without_profile
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_source_003_uses_independent_identity_and_attested_void_authority_without_persisting
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_latest_002_ready_run_restores_only_when_all_saved_identity_hashes_match
+            --deselect=tests/unit/test_sb_lfx_018_r09_r02_r04_restore_pool.py::test_existing_002_accept_is_idempotent_and_does_not_create_duplicate_receipt
+            --deselect=tests/integration/test_sb_cpx_001_solver_identity_pack.py::test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_drift
+            --deselect=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_explicit_current_accept_membership_builds_deterministic_solver_pack
+            --deselect=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_requires_explicit_nonduplicated_membership_and_current_acceptance
+            --deselect=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_current_release_pool_projection_is_an_accepted_pack_source
+          )
+          if [[ '${{ inputs.suite }}' == 'focused' ]]; then
+            python -m pytest -q \
+              tests/unit/test_sb_lf00_007_governance_authority.py \
+              tests/unit/test_sb_lf06_012_factory_studio_editor_smoke_and_headless_core_test_gate.py \
+              tests/unit/test_sb_lfx_001_factory_operations_dashboard.py \
+              tests/unit/test_sb_lfx_002_owner_upload.py \
+              tests/unit/test_sb_lfx_004_import_validation.py \
+              tests/unit/test_sb_lfx_005_pipeline.py \
+              tests/unit/test_sb_lfx_006_candidate_review.py \
+              tests/unit/test_sb_lfx_018_r08_pinned_runtime.py \
+              tests/unit/test_sb_lfx_018_r09_r01_continuation.py \
+              tests/unit/test_sb_lfx_018_r09_r02_r04_r02_png_batch.py \
+              tests/unit/test_sb_lfx_018_r09_r02_r04_r03_batch_binding.py \
+              "${common[@]}" 2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+          else
+            python -m pytest -q \
+              tests/unit tests/integration tests/property tests/acceptance tests/golden \
+              "${common[@]}" \
+              --ignore=tests/integration/test_release_route_a_authentic_verifier.py \
+              --ignore=tests/integration/test_sb_cpx_002_current_main_godot_integration.py \
+              --ignore=tests/integration/test_sb_lfx_019_void_game_parity.py \
+              --ignore=tests/integration/test_release_batch_level_catalog.py \
+              --ignore=tests/integration/test_p3_headless_pipeline_parity.py \
+              --ignore=tests/integration/test_sb_cp07_006_r2_live_roundtrip.py \
+              2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+          fi
 
       - name: Upload JUnit and console evidence
         if: always()

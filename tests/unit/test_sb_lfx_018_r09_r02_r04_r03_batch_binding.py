@@ -49,7 +49,9 @@ def _ready_pipeline(source_id: str, *, columns: int = 3) -> dict[str, object]:
 def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_sha = hashlib.sha256(b"owner source png").hexdigest()
     source_id = "owner-upload-" + source_sha
-    source_dir = tmp_path / "owner" / source_id
+    # Keep the fixture's repository-relative source record inside the isolated
+    # synthetic repository so the real path-containment check remains active.
+    source_dir = tmp_path / "level_factory" / "output" / "owner-uploads" / source_id
     source_dir.mkdir(parents=True)
     record_path = source_dir / "source.json"
     source_path = source_dir / "source.png"
@@ -71,6 +73,7 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
     )
     output_root = tmp_path / "factory-output"
     monkeypatch.setattr(extensions, "extensions_root", lambda: output_root)
+    monkeypatch.setattr(extensions, "_repository_root", lambda: tmp_path)
     monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args, **_kwargs: (record_path, source_path))
     monkeypatch.setattr(extensions, "validate_owner_source", lambda *_args, **_kwargs: {
         "source_sha256": source_sha, "record_path": str(record_path), "evidence_path": str(record_path),
@@ -356,11 +359,18 @@ def test_restart_lookup_selects_only_job_bound_to_displayed_batch_digest(tmp_pat
     monkeypatch.setattr(extensions, "batch_load", lambda batch_id: {"batch": batches[batch_id]})
     for job_id, batch_id in (("png-batch-a", "batch-A"), ("png-batch-b", "batch-B")):
         imported = batches[batch_id]
+        row = imported["items"][0]
         png_batch._write_job({
             "schema": png_batch.JOB_SCHEMA, "version": png_batch.JOB_VERSION, "job_id": job_id,
             "import_batch_id": batch_id, "batch_digest": extensions._digest(imported), "plan_digest": job_id,
             "settings": {}, "state": "PAUSED", "created_at": "now", "updated_at": "now",
-            "current_index": None, "items": [], "counts": {}, "planned_quotas": {}, "ready_mix": {},
+            "snapshot_source_count": 1,
+            "current_index": None,
+            "items": [{
+                "index": 0, "source_id": row["source_id"], "source_sha256": row["source_sha256"],
+                "source_record_sha256": row["source_record_sha256"], "column_count": 3, "status": "QUEUED",
+            }],
+            "counts": {}, "planned_quotas": {"3": 1, "4": 0, "5": 0}, "ready_mix": {"3": 0, "4": 0, "5": 0},
         })
 
     association = png_batch.png_batch_latest("batch-B")

@@ -27,11 +27,13 @@ def test_pipeline_records_truthful_owner_upload_stop_and_preserves_source(tmp_pa
         assert run["schema"] == "scrubbots-studio-pipeline-run"
         dispositions = {stage["stage"]: stage["disposition"] for stage in run["stages"]}
         assert dispositions["SOURCE"] == "PASS"
-        assert run["disposition"] == "READY"
-        assert dispositions["CANDIDATE"] == "PASS"
-        assert dispositions["SOLVE"] == "PASS"
-        assert dispositions["DIFFICULTY"] == "PASS"
-        assert dispositions["QA"] == "PASS"
+        # A logical source does not prove pinned game authority or a real
+        # solver run. Keep the contract truthful at that authority boundary.
+        assert run["disposition"] == "UNAVAILABLE"
+        assert dispositions["CANDIDATE"] == "BLOCKED"
+        assert dispositions["SOLVE"] == "NOT_AVAILABLE"
+        assert dispositions["DIFFICULTY"] == "NOT_AVAILABLE"
+        assert dispositions["QA"] == "NOT_AVAILABLE"
         assert (owner_upload.owner_upload_root() / source_id / "source.png").read_bytes() == source_bytes
     finally:
         root = owner_upload.owner_upload_root() / source_id

@@ -102,6 +102,7 @@ def test_attested_solver_timeout_terminates_and_keeps_jobs_in_project_output(
 ) -> None:
     class FakeProcess:
         def __init__(self, _args, **kwargs):
+            self.pid = 12345
             self.returncode = None
             self.stdout = io.StringIO("fake godot started\n")
             self.kwargs = kwargs

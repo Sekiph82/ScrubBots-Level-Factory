@@ -3,10 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 import struct
 import zlib
+import pytest
 
 from scrubbots_pixel_factory.owner_upload import import_owner_upload, owner_upload_root
 from scrubbots_pixel_factory.output.png import _encode_rgb_png, encode_logical_png
 from scrubbots_pixel_factory.studio_extensions import extensions_root, validate_owner_source
+
+
+@pytest.fixture(autouse=True)
+def isolate_owner_upload_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep mutable import and validation evidence inside each test sandbox."""
+    from scrubbots_pixel_factory import owner_upload, studio_extensions
+
+    repository = tmp_path / "isolated-repository"
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
 
 
 def _cleanup(source_id: str) -> None:

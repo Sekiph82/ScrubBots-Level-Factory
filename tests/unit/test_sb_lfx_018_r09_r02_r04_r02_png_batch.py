@@ -58,7 +58,7 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
     monkeypatch.setattr(
         extensions,
         "verify_owner_source",
-        lambda source_id: {"source_sha256": by_id[source_id]["sha"], "original_filename": f"{source_id[-4:]}.png"},
+        lambda source_id, **_kwargs: {"source_sha256": by_id[source_id]["sha"], "original_filename": f"{source_id[-4:]}.png"},
     )
     monkeypatch.setattr(extensions, "validate_owner_source", lambda source_id, **_kwargs: {
         "source_sha256": by_id[source_id]["sha"],

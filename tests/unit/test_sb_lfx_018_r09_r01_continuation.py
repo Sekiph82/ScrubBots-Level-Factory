@@ -71,19 +71,40 @@ def test_original_blocked_receipts_are_sha_bound_and_leave_all_six_native_calls(
     assert proof["predecessor_job_entry_count"] == 0
 
 
-def test_missing_or_ambiguous_predecessor_fails_closed():
-    with pytest.raises(r09.R09Blocked, match="historical predecessor is unreadable"):
-        r09_campaign._historical_r09_predecessor_proof(ROOT / "missing-r09-predecessor")
+def test_missing_or_ambiguous_predecessor_fails_closed(tmp_path: Path):
+    from scrubbots_pixel_factory.supply_pipeline.r09_solver_attempts import MAX_NATIVE_TIMEOUT_SECONDS, MAX_NATIVE_VISITED
 
-    summary = json.loads((PREDECESSOR / "summary.json").read_text(encoding="utf-8"))
-    attempt = json.loads((PREDECESSOR / "attempt-01.json").read_text(encoding="utf-8"))
+    with pytest.raises(r09.R09Blocked, match="historical predecessor is unreadable"):
+        r09_campaign._historical_r09_predecessor_proof(tmp_path / "missing-r09-predecessor")
+
+    isolated_root = tmp_path / "repository"
+    predecessor = isolated_root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
+    predecessor.mkdir(parents=True)
+    job = isolated_root / "level_factory" / "output" / "current-game-runtime" / GAME_SHA / ".lf_solver_jobs" / r09_campaign.R09_PRENATIVE_JOB_NAME
+    job.mkdir(parents=True)
+    summary = {
+        "status": "BLOCKED", "game_sha": GAME_SHA, "source_sha256": SOURCE_SHA,
+        "attempts_run": 1, "primary_invocations": 0, "optional_load_check_invocations": 0,
+    }
+    attempt = {
+        "attempt_index": 1, "candidate_id": r09_campaign.EXPECTED_R09_RANKED_PLANS[0][0],
+        "candidate_plan_sha256": r09_campaign.EXPECTED_R09_RANKED_PLANS[0][2],
+        "source_sha256": SOURCE_SHA, "game_sha": GAME_SHA, "max_visited": MAX_NATIVE_VISITED,
+        "timeout_seconds": MAX_NATIVE_TIMEOUT_SECONDS, "status": "BLOCKED", "process": None,
+        "reason": "tuple indices must be integers or slices, not str",
+    }
+    (predecessor / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+    (predecessor / "attempt-01.json").write_text(json.dumps(attempt), encoding="utf-8")
+    proof = r09_campaign._historical_r09_predecessor_proof(isolated_root)
+    assert proof["native_primary_calls_consumed"] == 0
+
     attempt["process"] = {"native_solve_started": False}
     with pytest.raises(r09.R09Blocked, match="zero native starts"):
-        r09_campaign._validate_predecessor_records(summary, attempt, PREDECESSOR, 0)
+        r09_campaign._validate_predecessor_records(summary, attempt, predecessor, 0)
     attempt["process"] = None
     summary["primary_invocations"] = 1
     with pytest.raises(r09.R09Blocked, match="zero native starts"):
-        r09_campaign._validate_predecessor_records(summary, attempt, PREDECESSOR, 0)
+        r09_campaign._validate_predecessor_records(summary, attempt, predecessor, 0)
 
 
 def test_original_six_candidate_order_scores_and_plan_hashes_are_required():
@@ -97,11 +118,14 @@ def test_original_six_candidate_order_scores_and_plan_hashes_are_required():
         r09_campaign._assert_original_queue_identity(list(reversed(ranked)))
 
 
-def test_continuation_has_exact_separate_path_and_rejects_existing_output():
-    continuation_path = ROOT / "level_factory" / "output" / f"r09-r01-continuation-{SOURCE_SHA}-{GAME_SHA}"
-    assert continuation_path != PREDECESSOR
+def test_continuation_has_exact_separate_path_and_rejects_existing_output(tmp_path: Path):
+    predecessor = tmp_path / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
+    continuation_path = tmp_path / f"r09-r01-continuation-{SOURCE_SHA}-{GAME_SHA}"
+    assert continuation_path != predecessor
+    r09_campaign._assert_continuation_output_available(continuation_path)
+    continuation_path.mkdir()
     with pytest.raises(r09.R09Blocked, match="already exists"):
-        r09_campaign._assert_continuation_output_available(PREDECESSOR)
+        r09_campaign._assert_continuation_output_available(continuation_path)
 
 
 def test_tuple_plan_is_validated_and_marshaled_as_native_batch_objects():

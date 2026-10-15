@@ -38,7 +38,7 @@ def test_candidate_inbox_uses_real_bundle_and_review_history_is_append_only(tmp_
             item.unlink()
 
 
-def test_ready_owner_accept_enters_release_pool_without_publication(tmp_path: Path, monkeypatch) -> None:
+def test_incomplete_run_cannot_enter_release_pool_on_owner_accept(tmp_path: Path, monkeypatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as studio
     from scrubbots_pixel_factory.supply_pipeline import game_publisher
     from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
@@ -51,21 +51,16 @@ def test_ready_owner_accept_enters_release_pool_without_publication(tmp_path: Pa
     level_file = tmp_path / "level.json"; level_file.write_text("{}", encoding="utf-8")
     supply_file = tmp_path / "supply.json"; supply_file.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(studio, "list_candidates", lambda: [candidate])
-    pipeline = {"schema": studio.PIPELINE_SCHEMA, "version": 2, "run_id": "pipeline-ready", "candidate_id": candidate["candidate_id"], "request": {}, "disposition": "READY", "primary": {"state": "READY", "difficulty": {"score": 50.0, "class": "EASY"}, "files": {"level": str(level_file), "supply_plan": str(supply_file)}, "solver_metrics": {"official_difficulty_v1": {"ok": True, "vector": [0.1] * 7, "challengeScore": 50.0, "sessionLoad": 20, "profile": {"dominant": "FLOW", "scores": {"FLOW": 0.8}, "runnerUp": "COLOR"}}}}}
+    pipeline = {"schema": studio.PIPELINE_SCHEMA, "version": 2, "run_id": "pipeline-incomplete", "candidate_id": candidate["candidate_id"], "request": {}, "disposition": "UNAVAILABLE", "primary": {"state": "UNAVAILABLE", "difficulty": {"score": 50.0, "class": "EASY"}, "files": {"level": str(level_file), "supply_plan": str(supply_file)}}}
     pipeline_path = studio._pipeline_path(pipeline["run_id"])
     pipeline_path.parent.mkdir(parents=True, exist_ok=True)
     pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
     monkeypatch.setattr(game_publisher, "publish_level", lambda **_kwargs: pytest.fail("ACCEPT must not publish"))
 
     accepted = studio.record_owner_review(candidate["candidate_id"], "ACCEPT", "approved", "")
-    assert accepted["publication"]["publication"] == "OWNER_ACCEPT_RELEASE_POOL_ONLY"
-    assert accepted["publication"]["disposition"] == "ENTERED_RELEASE_POOL"
+    assert accepted["publication"]["disposition"] == "NOT_ENTERED_NOT_READY"
     pool = release_entries()
-    assert len(pool) == 1
-    assert pool[0]["candidate_id"] == candidate["candidate_id"]
-    assert pool[0]["challenge_vector"] == [0.1] * 7
-    assert pool[0]["dominant_profile"] == "FLOW"
-    assert pool[0]["official_profile"] == pipeline["primary"]["solver_metrics"]["official_difficulty_v1"]["profile"]
+    assert not any(entry.get("candidate_id") == candidate["candidate_id"] for entry in pool)
 
 
 def test_ready_owner_accept_without_official_nested_profile_fails_closed(tmp_path: Path, monkeypatch) -> None:

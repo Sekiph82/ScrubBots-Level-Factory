@@ -18,7 +18,7 @@ PROJECT_STATUS_LABELS = (
     "Current Sprint:",
     "Current Task:",
     "Current Task Status:",
-    "Next Task/Action:",
+    "Next Task/Action",
     "Required Actor:",
 )
 NORMALIZATION_BASE_REF = "1952657cfa1832d90f4e077e67f4b6a2917b8861"
@@ -218,7 +218,9 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     sprint = re.search(r"(?m)^- Current Sprint:\s+(.+)$", current)
     assert sprint is not None
     assert current_id in sprint.group(1) or current_id.rsplit("-", 1)[0] in sprint.group(1)
-    next_action = re.search(r"(?m)^- Next Task/Action:\s+(.+)$", current)
+    # The current tracker records this field as `Next Task/Action [date ...]:`;
+    # accept its live format without freezing owner-maintained task text.
+    next_action = re.search(r"(?m)^- Next Task/Action(?:\s+\[[^\]]+\])?:\s+(.+)$", current)
     assert next_action is not None
     identity_parts = current_id.split("-")
     action_parts = set(re.findall(r"[A-Z][A-Z0-9]*", next_action.group(1).upper()))
