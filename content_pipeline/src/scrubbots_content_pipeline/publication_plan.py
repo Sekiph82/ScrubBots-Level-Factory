@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from typing import Any
 
@@ -18,6 +19,39 @@ from .secret_refs import _contains_obvious_secret, redact_for_evidence
 
 PUBLICATION_PLAN_VERSION = "1.0"
 _SHA256 = re.compile(r"^[a-f0-9]{64}$")
+_PUBLICATION_PLAN_BUILDER_TOKEN = object()
+_COMMON_PUBLICATION_CHECK_IDS = (
+    "payload_validation", "target_binding", "release_replay", "content_binding",
+    "release_state", "provider_capability", "capability_negotiation",
+    "owner_approval", "secret_free_inputs",
+)
+_FAILED_REASON_BY_CHECK_ID = {
+    "payload_validation": "UNVALIDATED_PAYLOAD",
+    "target_binding": "INVALID_TARGET",
+    "release_replay": "INVALID_REPLAY",
+    "content_binding": "CONTENT_MISMATCH",
+    "release_state": "STATE_MISMATCH",
+    "provider_capability": "INVALID_CAPABILITY",
+    "capability_negotiation": "INVALID_CAPABILITY",
+    "owner_approval": "OWNER_APPROVAL_REQUIRED",
+    "secret_free_inputs": "SECRET_BEARING_INPUT",
+    "production_promotion_source": "PROMOTION_REQUIRED",
+    "staging_capability": "INVALID_CAPABILITY",
+}
+
+
+def _required_publication_check_ids(environment: str) -> tuple[str, ...] | None:
+    if environment == Environment.STAGING.value:
+        return (*_COMMON_PUBLICATION_CHECK_IDS, "staging_capability")
+    if environment == Environment.PRODUCTION.value:
+        return (*_COMMON_PUBLICATION_CHECK_IDS, "production_promotion_source")
+    return None
+
+
+def _publication_check_reason(check_id: str, accepted: bool) -> str | None:
+    if accepted:
+        return PlanReasonCode.ACCEPTED.value
+    return _FAILED_REASON_BY_CHECK_ID.get(check_id)
 
 
 class PlanReasonCode(StrEnum):
@@ -84,6 +118,8 @@ class PublicationPlan:
     owner_approved: bool
     mutation_eligible_in_principle: bool
     remote_mutation_performed: bool = False
+    _builder_token: object | None = field(default=None, repr=False, compare=False)
+    _builder_fingerprint: str | None = field(default=None, repr=False, compare=False)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -127,7 +163,7 @@ class PublicationPlan:
             },
             "owner_approved": self.owner_approved,
             "mutation_eligible_in_principle": self.mutation_eligible_in_principle,
-            "remote_mutation_performed": False,
+            "remote_mutation_performed": self.remote_mutation_performed,
         }
 
     def to_operation_record(self, *, operation_id: str, occurred_at: str):
@@ -144,6 +180,32 @@ class PublicationPlan:
 def serialize_publication_plan(plan: PublicationPlan) -> str:
     """Serialize the fixed plan schema deterministically; no input mapping is echoed."""
     return json.dumps(plan.to_dict(), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n"
+
+
+def _publication_plan_fingerprint(plan: PublicationPlan) -> str:
+    payload = json.dumps(
+        PublicationPlan.to_dict(plan), ensure_ascii=False, sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def _seal_publication_plan(plan: PublicationPlan) -> PublicationPlan:
+    """Attach process-local provenance to plans returned by the canonical builder."""
+    sealed = replace(plan, _builder_token=_PUBLICATION_PLAN_BUILDER_TOKEN)
+    return replace(sealed, _builder_fingerprint=_publication_plan_fingerprint(sealed))
+
+
+def _has_publication_plan_builder_provenance(plan: object) -> bool:
+    """Reject manually constructed or modified plans at evidence-adapter boundaries."""
+    if (type(plan) is not PublicationPlan
+            or plan._builder_token is not _PUBLICATION_PLAN_BUILDER_TOKEN
+            or not isinstance(plan._builder_fingerprint, str)):
+        return False
+    try:
+        return plan._builder_fingerprint == _publication_plan_fingerprint(plan)
+    except (TypeError, ValueError, RecursionError):
+        return False
 
 
 def _snapshot(replay: ReleaseReplayResult, current: ReleaseStateSnapshot | None) -> ExpectedReleaseState:
@@ -286,7 +348,7 @@ def build_publication_plan(
     environment_value = target.environment.value if isinstance(target, EnvironmentTarget) else "invalid"
     target_id = target.logical_target_id if valid_target and _safe_identifier(target.logical_target_id) else "invalid-target"
     expected = _snapshot(replay, current_state) if isinstance(replay, ReleaseReplayResult) else ExpectedReleaseState("1.0", None, None, None, "unknown", None, 0)
-    return PublicationPlan(
+    plan = PublicationPlan(
         PUBLICATION_PLAN_VERSION, accepted, True, environment_value, target_id,
         capability.capability_id if capability_ok else None,
         capability.capability_version if capability_ok else None,
@@ -297,6 +359,10 @@ def build_publication_plan(
         content_id, content_digest, (operation,), tuple(checks), expected,
         approval_ok, accepted and approval_ok and promotion_ok, False,
     )
+    required_checks = _required_publication_check_ids(environment_value)
+    if required_checks is not None and tuple(item.check_id for item in plan.checks) != required_checks:
+        raise RuntimeError("publication plan builder check sequence differs from its canonical contract")
+    return _seal_publication_plan(plan)
 
 
 def validate_plan_current(

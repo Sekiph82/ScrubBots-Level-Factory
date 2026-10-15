@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+from pathlib import Path
+import runpy
 
 from scrubbots_content_pipeline.operations import (
     OperationsEvidenceError,
@@ -47,8 +49,33 @@ def _plan(*, accepted: bool, check: PlanCheck) -> PublicationPlan:
     )
 
 
+def _canonical_plan(*, owner_approved: bool = True, environment: str = "staging") -> PublicationPlan:
+    """Build authentic in-memory plans through the existing CP03 test fixture."""
+    fixture_module = runpy.run_path(str(Path(__file__).with_name("test_sb_cp00_007_publication_plan.py")))
+    descriptor, payload, result = fixture_module["_content"]()
+    if environment == "production":
+        attributes = descriptor["attributes"]
+        replay = fixture_module["_staged_history"](attributes["level_id"], attributes["payload_sha256"])
+        current_state = next(item for item in replay.snapshots if item.state.value == "STAGED")
+        target = fixture_module["PRODUCTION_TARGET"]
+    else:
+        replay = fixture_module["replay_release_events"]([])
+        current_state = None
+        target = fixture_module["STAGING_TARGET"]
+    return fixture_module["build_publication_plan"](
+        descriptor=descriptor,
+        payload=payload,
+        payload_result=result,
+        target=target,
+        replay=replay,
+        current_state=current_state,
+        capability=fixture_module["_capability"](),
+        owner_approved=owner_approved,
+    )
+
+
 def test_publication_plan_maps_to_secret_free_preflight_record_in_memory() -> None:
-    ready_plan = _plan(accepted=True, check=PlanCheck("payload_validation", True, "ACCEPTED"))
+    ready_plan = _canonical_plan()
     ready = ready_plan.to_operation_record(
         operation_id="preflight-001",
         occurred_at="2026-10-14T12:00:00Z",
@@ -57,10 +84,10 @@ def test_publication_plan_maps_to_secret_free_preflight_record_in_memory() -> No
     assert ready.environment == "STAGING"
     assert ready.outcome == "PREPARED"
     assert ready.reason_code == "PREFLIGHT_READY"
-    assert ready.batch_id == "batch-2026-10-14"
+    assert ready.batch_id == ready_plan.content_id
     assert ready.manifest_sha256 is None
 
-    blocked_plan = _plan(accepted=False, check=PlanCheck("owner_approval", False, "OWNER_APPROVAL_REQUIRED"))
+    blocked_plan = _canonical_plan(owner_approved=False)
     blocked = operation_record_from_publication_plan(
         blocked_plan,
         operation_id="preflight-002",
@@ -70,16 +97,34 @@ def test_publication_plan_maps_to_secret_free_preflight_record_in_memory() -> No
     assert blocked.reason_code == "OWNER_APPROVAL_REQUIRED"
     assert "fake-provider" not in blocked.canonical_bytes().decode("utf-8")
 
-    try:
-        operation_record_from_publication_plan(
-            replace(ready_plan, remote_mutation_performed=True),
-            operation_id="preflight-003",
-            occurred_at="2026-10-14T12:00:00Z",
-        )
-    except OperationsEvidenceError:
-        pass
-    else:
-        raise AssertionError("a plan claiming remote mutation must not be converted as a local preflight")
+    production_plan = _canonical_plan(environment="production")
+    production = production_plan.to_operation_record(
+        operation_id="preflight-prod-001",
+        occurred_at="2026-10-14T12:00:00Z",
+    )
+    assert production.environment == "PRODUCTION"
+    assert production.outcome == "PREPARED"
+
+    for forged_plan in (
+        _plan(accepted=True, check=PlanCheck("payload_validation", True, "ACCEPTED")),
+        replace(ready_plan, checks=ready_plan.checks[:-1]),
+        replace(ready_plan, checks=(ready_plan.checks[0], *ready_plan.checks[:-1])),
+        replace(ready_plan, owner_approved=False),
+        replace(ready_plan, mutation_eligible_in_principle=False),
+        replace(ready_plan, plan_version="2.0"),
+        replace(ready_plan, target_environment="LOCAL"),
+        replace(ready_plan, remote_mutation_performed=True),
+    ):
+        try:
+            operation_record_from_publication_plan(
+                forged_plan,
+                operation_id="preflight-forged",
+                occurred_at="2026-10-14T12:00:00Z",
+            )
+        except OperationsEvidenceError:
+            pass
+        else:
+            raise AssertionError("unattested or altered plans must not produce operation evidence")
 
 
 def test_health_verifier_rejects_malformed_observed_keys_before_sorting_in_memory() -> None:

@@ -148,24 +148,60 @@ def operation_record_from_publication_plan(
     content ID, disposition, and a bounded reason code; payloads, target IDs,
     credentials, and free-form messages are excluded.
     """
-    from .publication_plan import PlanCheck, PublicationPlan
+    from .publication_plan import (
+        PUBLICATION_PLAN_VERSION,
+        PlanCheck,
+        PublicationPlan,
+        _has_publication_plan_builder_provenance,
+        _publication_check_reason,
+        _required_publication_check_ids,
+    )
 
-    if not isinstance(plan, PublicationPlan):
-        raise OperationsEvidenceError("publication receipt must be a validated PublicationPlan")
-    if plan.remote_mutation_performed is not False:
-        raise OperationsEvidenceError("publication plan cannot claim a remote mutation")
-    if plan.target_environment not in {"LOCAL", "STAGING", "PRODUCTION"}:
-        raise OperationsEvidenceError("publication plan environment is invalid")
-    if type(plan.accepted) is not bool or type(plan.complete) is not bool:
+    if type(plan) is not PublicationPlan or not _has_publication_plan_builder_provenance(plan):
+        raise OperationsEvidenceError("publication plan lacks intact canonical builder provenance")
+    if plan.plan_version != PUBLICATION_PLAN_VERSION or plan.remote_mutation_performed is not False:
+        raise OperationsEvidenceError("publication plan version or mutation disposition is invalid")
+    if plan.target_environment not in {"staging", "production"}:
+        raise OperationsEvidenceError("publication plan environment must be staging or production")
+    if (type(plan.accepted) is not bool or type(plan.complete) is not bool
+            or plan.complete is not True or type(plan.owner_approved) is not bool
+            or type(plan.mutation_eligible_in_principle) is not bool):
         raise OperationsEvidenceError("publication plan disposition is invalid")
+    required_check_ids = _required_publication_check_ids(plan.target_environment)
+    if required_check_ids is None:
+        raise OperationsEvidenceError("publication plan environment has no canonical check contract")
     if not isinstance(plan.checks, tuple) or any(
-        not isinstance(check, PlanCheck)
+        type(check) is not PlanCheck
         or type(check.check_id) is not str
         or type(check.accepted) is not bool
         or type(check.reason_code) is not str
         for check in plan.checks
     ):
         raise OperationsEvidenceError("publication plan checks are malformed")
+    check_ids = tuple(check.check_id for check in plan.checks)
+    if check_ids != required_check_ids or len(set(check_ids)) != len(required_check_ids):
+        raise OperationsEvidenceError("publication plan required checks are incomplete, duplicated, or out of contract")
+    if any(check.reason_code != _publication_check_reason(check.check_id, check.accepted)
+           for check in plan.checks):
+        raise OperationsEvidenceError("publication plan check reason does not match its disposition")
+    if plan.accepted is not all(check.accepted for check in plan.checks):
+        raise OperationsEvidenceError("publication plan accepted flag contradicts its checks")
+    approval_check = next(check for check in plan.checks if check.check_id == "owner_approval")
+    if approval_check.accepted is not plan.owner_approved:
+        raise OperationsEvidenceError("publication plan owner approval contradicts its check")
+    if plan.mutation_eligible_in_principle is not (plan.accepted and plan.owner_approved):
+        raise OperationsEvidenceError("publication plan mutation eligibility contradicts its checks")
+    if (not isinstance(plan.content_id, str) or not _IDENTIFIER.fullmatch(plan.content_id)
+            or not isinstance(plan.content_digest, str) or not _SHA256.fullmatch(plan.content_digest)
+            or not isinstance(plan.target_id, str) or not _IDENTIFIER.fullmatch(plan.target_id)):
+        raise OperationsEvidenceError("publication plan content or target identity is invalid")
+    expected_operation = "promote_staged_record" if plan.target_environment == "production" else "publish_to_staging"
+    if (not isinstance(plan.operations, tuple) or len(plan.operations) != 1
+            or plan.operations[0].sequence != 1
+            or plan.operations[0].operation != expected_operation
+            or plan.operations[0].content_id != plan.content_id
+            or plan.operations[0].content_digest != plan.content_digest):
+        raise OperationsEvidenceError("publication plan operation does not match its environment and content")
     failed = next((check for check in plan.checks if check.accepted is False), None)
     ready = plan.accepted is True and plan.complete is True and failed is None
     reason_code = "PREFLIGHT_READY" if ready else (failed.reason_code if failed else "PREFLIGHT_BLOCKED")
@@ -173,7 +209,7 @@ def operation_record_from_publication_plan(
         operation_id=operation_id,
         occurred_at=occurred_at,
         kind="BATCH",
-        environment=plan.target_environment,
+        environment=plan.target_environment.upper(),
         outcome="PREPARED" if ready else "BLOCKED",
         reason_code=reason_code,
         batch_id=plan.content_id,
