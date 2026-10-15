@@ -126,7 +126,7 @@ def test_sequential_runner_orchestration_only_passes_columns_and_continues_failu
         item = next(row for row in stored["items"] if row["source_id"] == source_id)
         assert item["column_count"] == column_count
     repeat = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=lambda **_args: pytest.fail("completed items must never rerun"))
-    assert repeat["disposition"] == "COMPLETE" and repeat.get("mutated") is False
+    assert repeat["disposition"] == "FINISHED_WITH_FAILURES" and repeat.get("mutated") is False
     assert extensions._digest(extensions.batch_load(batch_id)["batch"]) == stored["batch_digest"]
 
 
