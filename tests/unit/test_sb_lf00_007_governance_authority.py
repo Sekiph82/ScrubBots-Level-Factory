@@ -88,6 +88,36 @@ def _exact_relative_exists(relative: str) -> bool:
     return True
 
 
+def _next_action_links_to_active_scope(
+    next_action: str,
+    current_task_id: str,
+    current_prompt: str,
+    prompt_text: str,
+) -> bool:
+    """Require the next action to name the declared task or its active prompt."""
+    normalized_action = next_action.upper().replace("_", "-")
+    task_marker = re.escape(current_task_id.upper().replace("_", "-"))
+    if re.search(rf"(?<![A-Z0-9]){task_marker}(?![A-Z0-9])", normalized_action):
+        return True
+
+    prompt_name = Path(current_prompt).name
+    prompt_key = re.search(r"([A-Z]\d{3}[_-]R\d{2})", prompt_name, re.IGNORECASE)
+    heading = re.search(r"(?m)^#\s+([^|\n]+)", prompt_text)
+    if prompt_key is None or heading is None:
+        return False
+    marker = prompt_key.group(1).upper().replace("_", "-")
+    heading_text = heading.group(1).upper().replace("_", "-")
+    if not re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", heading_text):
+        return False
+    if re.search(rf"(?<![A-Z0-9]){re.escape(marker)}(?![A-Z0-9])", normalized_action):
+        return True
+    cycle, round_id = marker.split("-")
+    return all(
+        re.search(rf"(?<![A-Z0-9]){re.escape(part)}(?![A-Z0-9])", normalized_action)
+        for part in (cycle, round_id)
+    )
+
+
 def _parse_rows(text: str) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for line_number, line in enumerate(text.splitlines(), 1):
@@ -236,6 +266,35 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     assert current_criteria and current_criteria.group(1).startswith(".hiveai/audit-criteria/")
     assert _exact_relative_exists(current_prompt.group(1))
     assert _exact_relative_exists(current_criteria.group(1))
+    prompt_text = (REPOSITORY_ROOT / current_prompt.group(1)).read_text(encoding="utf-8")
+    assert _next_action_links_to_active_scope(
+        next_action.group(1), current_id, current_prompt.group(1), prompt_text
+    )
+
+
+def test_next_action_link_accepts_active_owner_audit_notes_without_suffix_lock() -> None:
+    prompt = ".hiveai/prompts/C001_R10_POST_GREEN_RESIDUAL_GATES_AND_COVERAGE_MASTER_PROMPT.md"
+    prompt_text = "# C001-R10 | POST-GREEN Independent Residual Gates and Test Contract Hardening"
+    note = (
+        "GPT's C001-R10 residual-gate review preserves the existing owner audit notes; "
+        "remaining Release authority is still open."
+    )
+
+    assert _next_action_links_to_active_scope(
+        note, "SB-LFX-018-R05-LFCP-OPEN-CLOSURE-C001", prompt, prompt_text
+    )
+
+
+def test_next_action_link_rejects_unrelated_task_even_when_owner_note_is_nonempty() -> None:
+    prompt = ".hiveai/prompts/C001_R10_POST_GREEN_RESIDUAL_GATES_AND_COVERAGE_MASTER_PROMPT.md"
+    prompt_text = "# C001-R10 | POST-GREEN Independent Residual Gates and Test Contract Hardening"
+
+    assert not _next_action_links_to_active_scope(
+        "Continue M17 rollback scheduling and its independent UI acceptance.",
+        "SB-LFX-018-R05-LFCP-OPEN-CLOSURE-C001",
+        prompt,
+        prompt_text,
+    )
 
 
 def test_level_factory_governance_defers_to_root_without_second_tracker() -> None:
