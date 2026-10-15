@@ -21,7 +21,13 @@ from ...core import DeterministicRNG, FailureCode, GenerationRequest, Generation
 from ...core.request import LegacyGenerationRequest
 from ...core.rng import RNG_ALGORITHM
 from ...generators.mask.model import MaskDefinition, MaskCellState
-from ...owner_upload import OWNER_UPLOAD_ORIGIN, OWNER_UPLOAD_STATUS, OWNER_UPLOAD_VALIDATION_STATE, owner_upload_root
+from ...owner_upload import (
+    OWNER_UPLOAD_ORIGIN,
+    OWNER_UPLOAD_STATUS,
+    OWNER_UPLOAD_VALIDATION_STATE,
+    _path_is_reparse_point,
+    owner_upload_root,
+)
 from ...quality import logical_grid_hash
 from ...semantic.normalization.core import RAW_ARTIFACT_MAX_BYTES, SUPPORTED_MEDIA_TYPE
 from ...studio_extensions import (
@@ -66,8 +72,8 @@ def _sha256(raw: bytes) -> str:
 
 
 def _safe_file(path: Path, root: Path, limit: int, label: str) -> bytes:
-    if path.is_symlink() or not path.is_file():
-        raise ArtFirstUnavailable(f"UNAVAILABLE: {label} is missing or is a symlink")
+    if _path_is_reparse_point(path) or not path.is_file():
+        raise ArtFirstUnavailable(f"UNAVAILABLE: {label} is missing or is a reparse point")
     try:
         resolved_root = root.resolve(strict=True)
         resolved = path.resolve(strict=True)
@@ -76,7 +82,7 @@ def _safe_file(path: Path, root: Path, limit: int, label: str) -> bytes:
         if path.stat().st_size > limit:
             raise ArtFirstUnavailable(f"UNAVAILABLE: {label} exceeds the bounded byte policy")
         return path.read_bytes()
-    except OSError as exc:
+    except (OSError, RuntimeError) as exc:
         raise ArtFirstUnavailable(f"UNAVAILABLE: {label} is unreadable") from exc
 
 
@@ -87,15 +93,18 @@ def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) ->
     if match.group(1) != expected_sha:
         raise ArtFirstUnavailable("UNAVAILABLE: source ID does not match the requested source hash")
     root = owner_upload_root()
-    if root.is_symlink() or not root.is_dir():
+    if _path_is_reparse_point(root) or not root.is_dir():
         raise ArtFirstUnavailable("UNAVAILABLE: canonical owner-upload store is missing or unsafe")
     source_dir = root / source_id
-    if source_dir.is_symlink() or not source_dir.is_dir():
-        raise ArtFirstUnavailable("UNAVAILABLE: source directory is missing or is a symlink")
+    if _path_is_reparse_point(source_dir) or not source_dir.is_dir():
+        raise ArtFirstUnavailable("UNAVAILABLE: source directory is missing or is a reparse point")
     try:
-        if not source_dir.resolve(strict=True).is_relative_to(root.resolve(strict=True)):
+        resolved_root = root.resolve(strict=True)
+        resolved_source = source_dir.resolve(strict=True)
+        if resolved_source.parent != resolved_root or not resolved_source.is_relative_to(resolved_root):
             raise ArtFirstUnavailable("UNAVAILABLE: source directory escaped the canonical owner-upload store")
-    except OSError as exc:
+        source_dir = resolved_source
+    except (OSError, RuntimeError) as exc:
         raise ArtFirstUnavailable("UNAVAILABLE: source directory cannot be resolved") from exc
 
     record_path = source_dir / "source.json"
@@ -167,11 +176,26 @@ def _candidate_and_review(
         raise ArtFirstUnavailable("UNAVAILABLE: candidate or review identity does not match this exact source")
     output_root = owner_upload_root().parent
     candidate_store = output_root / "studio-derived-candidates"
-    if candidate_store.is_symlink() or not candidate_store.is_dir():
-        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: no canonical owner-source candidate exists")
+    if _path_is_reparse_point(candidate_store) or not candidate_store.is_dir():
+        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: candidate store is missing or is a reparse point")
+    try:
+        resolved_output_root = output_root.resolve(strict=True)
+        resolved_candidate_store = candidate_store.resolve(strict=True)
+        if resolved_candidate_store.parent != resolved_output_root:
+            raise ArtFirstUnavailable("UNAVAILABLE: candidate store escaped the canonical output directory")
+        candidate_store = resolved_candidate_store
+    except (OSError, RuntimeError) as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: canonical candidate store cannot be resolved") from exc
     candidate_dir = candidate_store / expected_candidate_id
-    if candidate_dir.is_symlink() or not candidate_dir.is_dir():
-        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: no canonical owner-source candidate exists")
+    if _path_is_reparse_point(candidate_dir) or not candidate_dir.is_dir():
+        raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: candidate directory is missing or is a reparse point")
+    try:
+        resolved_candidate_dir = candidate_dir.resolve(strict=True)
+        if resolved_candidate_dir.parent != candidate_store:
+            raise ArtFirstUnavailable("UNAVAILABLE: reviewed candidate directory escaped its canonical store")
+        candidate_dir = resolved_candidate_dir
+    except (OSError, RuntimeError) as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: reviewed candidate directory cannot be resolved") from exc
     for name, limit in (("artwork.json", 256 * 1024), ("metadata.json", 1024 * 1024), ("artwork.png", 1024 * 1024), ("artwork.preview.png", 4 * 1024 * 1024)):
         if (candidate_dir / name).exists():
             _safe_file(candidate_dir / name, candidate_dir, limit, f"reviewed candidate {name}")

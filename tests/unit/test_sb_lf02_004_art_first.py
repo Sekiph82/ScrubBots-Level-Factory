@@ -317,6 +317,99 @@ def test_art_first_rejects_foreign_and_semi_alpha_png_pixels(monkeypatch, tmp_pa
     assert "foreign or semi-alpha" in result.failure_reason
 
 
+def test_owner_upload_root_rejects_reparse_component_without_reading_source(monkeypatch):
+    repository = owner_upload._repository_root()
+    output_root = repository / "level_factory" / "output"
+    original_check = owner_upload._path_is_reparse_point
+
+    def mark_output_as_reparse(path: Path) -> bool:
+        return path == output_root or original_check(path)
+
+    monkeypatch.setattr(owner_upload, "_path_is_reparse_point", mark_output_as_reparse)
+    with pytest.raises(owner_upload.OwnerUploadError, match="reparse point"):
+        owner_upload.owner_upload_root()
+
+
+def test_art_first_rejects_junctioned_owner_source_directory_before_file_reads(monkeypatch):
+    source_sha = "c" * 64
+    source_id = f"owner-upload-{source_sha}"
+    source_dir = owner_upload.owner_upload_root() / source_id
+    original_reparse_check = art_first._path_is_reparse_point
+    original_is_dir = Path.is_dir
+
+    def mark_source_dir_as_junction(path: Path) -> bool:
+        return path == source_dir or original_reparse_check(path)
+
+    def mark_source_dir_as_existing(path: Path) -> bool:
+        return True if path == source_dir else original_is_dir(path)
+
+    monkeypatch.setattr(art_first, "_path_is_reparse_point", mark_source_dir_as_junction)
+    monkeypatch.setattr(Path, "is_dir", mark_source_dir_as_existing)
+    with pytest.raises(art_first.ArtFirstUnavailable, match="source directory.*reparse point"):
+        art_first._load_source(source_id, source_sha, "d" * 64)
+
+
+def test_art_first_rejects_junctioned_candidate_store_before_file_reads(monkeypatch):
+    source_sha = "e" * 64
+    candidate_id = f"candidate-owner-{source_sha[:48]}"
+    candidate_store = owner_upload.owner_upload_root().parent / "studio-derived-candidates"
+    original_reparse_check = art_first._path_is_reparse_point
+
+    def mark_candidate_store_as_junction(path: Path) -> bool:
+        return path == candidate_store or original_reparse_check(path)
+
+    monkeypatch.setattr(art_first, "_path_is_reparse_point", mark_candidate_store_as_junction)
+    with pytest.raises(art_first.ArtFirstUnavailable, match="candidate store.*reparse point"):
+        art_first._candidate_and_review(
+            {"source_sha256": source_sha},
+            "f" * 64,
+            f"owner-upload-{source_sha}",
+            candidate_id,
+            f"review-{candidate_id}-0001",
+        )
+
+
+def test_art_first_rejects_junctioned_candidate_directory_before_file_reads(monkeypatch):
+    source_sha = "a" * 64
+    candidate_id = f"candidate-owner-{source_sha[:48]}"
+    candidate_store = owner_upload.owner_upload_root().parent / "studio-derived-candidates"
+    candidate_dir = candidate_store / candidate_id
+    original_reparse_check = art_first._path_is_reparse_point
+    original_is_dir = Path.is_dir
+
+    def mark_candidate_dir_as_junction(path: Path) -> bool:
+        return path == candidate_dir or original_reparse_check(path)
+
+    def mark_candidate_dir_as_existing(path: Path) -> bool:
+        return True if path == candidate_dir else original_is_dir(path)
+
+    monkeypatch.setattr(art_first, "_path_is_reparse_point", mark_candidate_dir_as_junction)
+    monkeypatch.setattr(Path, "is_dir", mark_candidate_dir_as_existing)
+    with pytest.raises(art_first.ArtFirstUnavailable, match="candidate directory.*reparse point"):
+        art_first._candidate_and_review(
+            {"source_sha256": source_sha},
+            "b" * 64,
+            f"owner-upload-{source_sha}",
+            candidate_id,
+            f"review-{candidate_id}-0001",
+        )
+
+
+def test_art_first_safe_file_rejects_resolved_escape_before_read(monkeypatch):
+    path = Path(__file__).resolve()
+    root = path.parent
+    escaped = root.parent / "outside-art-first-test.py"
+    original_resolve = Path.resolve
+
+    def resolve_path(candidate: Path, strict: bool = False) -> Path:
+        return escaped if candidate == path else original_resolve(candidate, strict=strict)
+
+    monkeypatch.setattr(Path, "resolve", resolve_path)
+    monkeypatch.setattr(Path, "read_bytes", lambda *_args, **_kwargs: pytest.fail("escaped file must not be read"))
+    with pytest.raises(art_first.ArtFirstUnavailable, match="escaped its canonical source directory"):
+        art_first._safe_file(path, root, 1024, "synthetic path")
+
+
 def test_art_first_rejects_symlinked_source_and_bad_logical_dimensions(monkeypatch, tmp_path):
     fixture = _fixture(monkeypatch, tmp_path)
     png_path = fixture["source_dir"] / "source.png"

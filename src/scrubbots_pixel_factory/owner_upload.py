@@ -11,6 +11,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import stat
 
 from .semantic.normalization.core import (
     RAW_ARTIFACT_MAX_BYTES,
@@ -59,8 +60,39 @@ def _repository_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
+def _path_is_reparse_point(path: Path) -> bool:
+    """Detect symlinks and Windows reparse points without following the final path."""
+
+    try:
+        info = path.lstat()
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return True
+    if stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400):
+        return True
+    is_junction = getattr(path, "is_junction", None)
+    if callable(is_junction):
+        try:
+            return bool(is_junction())
+        except OSError:
+            return True
+    return False
+
+
 def owner_upload_root() -> Path:
-    return (_repository_root() / "level_factory" / "output" / "owner-uploads").resolve()
+    repository = _repository_root().resolve()
+    root = repository / "level_factory" / "output" / "owner-uploads"
+    for component in (repository / "level_factory", repository / "level_factory" / "output", root):
+        if _path_is_reparse_point(component):
+            raise OwnerUploadError("canonical OWNER_UPLOAD path contains a symlink or reparse point")
+    try:
+        resolved_root = root.resolve()
+    except (OSError, RuntimeError) as exc:
+        raise OwnerUploadError("canonical OWNER_UPLOAD path cannot be resolved safely") from exc
+    if resolved_root != root or not resolved_root.is_relative_to(repository):
+        raise OwnerUploadError("canonical OWNER_UPLOAD path escaped its repository root")
+    return resolved_root
 
 
 def _error(message: str) -> dict[str, object]:
