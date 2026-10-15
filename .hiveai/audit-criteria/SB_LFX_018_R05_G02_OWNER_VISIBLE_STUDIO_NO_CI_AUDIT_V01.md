@@ -1,0 +1,14 @@
+# SB-LFX-018-R05-G02 | GPT independent native owner visual audit criteria V01
+
+Date: 2026-10-16 Europe/Istanbul
+Decision type: one **owner-controlled installed Factory Studio 3-screen and launcher visual gate** only. NOT full R05/game/CPX-002/production clearance.
+
+1. Compare actual installed `.factory-studio-install-manifest.json`, `sourceRevision`, installed `launch_factory_studio.ps1` SHA and exact title allowlist/identity checks, installed Godot project name/UI SHA, actual .lnk target/arguments/workdir against source. A manifest self-hash match alone does NOT prove current revision/launch. Current tracked source explicitly permits `ScrubBots Factory Studio (DEBUG)`; do not invent current title error from historical screenshot; verify against installed script and actual owner-visible title or popup.
+2. Owner, not Codex/assistant, performs normal Desktop-shortcut launch/view or observes already-running window. Require actual screenshots of title/window and each **PIXEL ART | LEVEL FACTORY | RELEASE POOL** tab, literal popup text if failure, and explicit owner acceptance. No screenshot = VISUAL NOT RUN, not PASS.
+3. Screens show genuine current installed app, not mocked GitHub Godot tests, docs, image previews, generated design or historical saved 9 READY/Pool metadata. Check source-count and Pool UI state as shown, without automatically running, retrying, accepting, publishing or changing source/pool records.
+4. Any DEBUG-title problem must have proven exact installed launcher/process-identity/title mismatch; do not weaken pinned executable SHA/args/PID/window guards just to make window launch green. If title already allowed, inspect other root cause rather than changing project title speculatively.
+5. No actual Godot native solver, load-check, full game CPX-002, 140 owner PNG byte access, nine-item batch rerun, installer/release update, cleanup, Scrubbots game edits, cloud/R2/Family APK, Actions or CI. The four historical R05 gating categories and skip/deselection counts remain OPEN until separately authorized.
+6. Existing 3,220 untracked paths preserved, including 16 prior deletion-denied scratch files. Log-only GitHub change, manual-only workflow, normal ancestry-safe push if necessary. GPT independently inspects submitted owner screenshots and installed metadata evidence and marks G02 PASS/CLOSED or FAIL/OPEN only within this visual scope.
+7. Native Windows real NTFS ART_FIRST guard behavior/atomic race-free handle security and authentic AI upstream artist/owner identity are independent UNVERIFIED items even if G02 passes.
+
+Current GitHub game remote main was independently read at `6da836684c3dc74df8bc07ba0bd312d0c71a1d72` (75 commits after pinned `aef60a...`) on 2026-10-16; this is a dynamic checkpoint and must not be mistaken for the builder's local game checkout at `54f408...` (74 commits after pin).
