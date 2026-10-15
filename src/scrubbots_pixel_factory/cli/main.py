@@ -70,7 +70,8 @@ _SEED_VALUE_PATTERN = re.compile(r"^-?(?:0|[1-9][0-9]*)$")
 _MANIFEST_SCHEMA = "scrubbots-batch-manifest"
 _MANIFEST_VERSION = 2
 _SUPPORTED_MANIFEST_VERSIONS = {1, _MANIFEST_VERSION}
-_BATCH_MODES = {mode.value for mode in GeneratorMode}
+_BATCH_MODES = {mode.value for mode in GeneratorMode if mode is not GeneratorMode.ART_FIRST}
+_GENERATION_MODES = {mode.value for mode in GeneratorMode}
 _CANDIDATE_TYPES = (MaskCandidate, RuleCandidate, WFCCandidate, HybridCandidate, AutoCandidate)
 _ATTEMPT_FIELDS = {
     "attempt_index", "attempt_seed", "status", "failure_code", "quality_decision",
@@ -345,12 +346,12 @@ def _summary(result: GenerationResult, candidate_id: str, output: Path, *, prefi
 def _generate(args: argparse.Namespace) -> ExitCode:
     registry = _load_exemplars(args.exemplar_json)
     request = _request_from_args(args)
-    if request.background_intent == "TRANSPARENT":
+    if request.background_intent == "TRANSPARENT" and request.generator_mode != GeneratorMode.ART_FIRST.value:
         raise CLIError("TRANSPARENT is preserved for imported/source artwork; procedural current generation has no alpha-capable engine")
     candidate = _router(registry).generate_candidate(request)
     result = _candidate_result(candidate)
     if not result.is_success:
-        print(f"GENERATION_FAILURE code={result.failure_code.value if result.failure_code else 'GENERATION_FAILED'}", file=sys.stderr)
+        print(f"GENERATION_FAILURE code={result.failure_code.value if result.failure_code else 'GENERATION_FAILED'} reason={result.failure_reason or ''}", file=sys.stderr)
         return ExitCode.GENERATION_FAILURE
     report = evaluate_grid(result.width, result.height, result.logical_grid, policy=_quality_policy_from_json(args.quality_policy_json, request))  # type: ignore[arg-type]
     if not report.accepted:
@@ -968,7 +969,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="scrubbots-pixel", description="Offline deterministic SCRUBBOTS logical-pixel generator")
     sub = parser.add_subparsers(dest="command", required=True)
     generate = sub.add_parser("generate", help="generate one accepted candidate bundle")
-    _add_request_flags(generate, required=True)
+    _add_request_flags(generate, required=True, modes=_GENERATION_MODES)
     generate.add_argument("--seed", help="canonical decimal integer token or string; omitted uses local OS entropy")
     generate.add_argument("--output", type=Path, default=Path("output"))
     generate.add_argument("--candidate-id")
@@ -985,7 +986,7 @@ def _parser() -> argparse.ArgumentParser:
 
     batch = sub.add_parser("batch", help="run or resume a finite deterministic batch")
     batch.add_argument("--resume", type=Path)
-    _add_request_flags(batch, required=False)
+    _add_request_flags(batch, required=False, modes=_BATCH_MODES)
     batch.add_argument("--seed")
     batch.add_argument("--count", type=int)
     batch.add_argument("--max-attempts", type=int)
@@ -1048,8 +1049,8 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _add_request_flags(parser: argparse.ArgumentParser, *, required: bool) -> None:
-    parser.add_argument("--mode", required=required, choices=tuple(sorted(_BATCH_MODES)))
+def _add_request_flags(parser: argparse.ArgumentParser, *, required: bool, modes: set[str]) -> None:
+    parser.add_argument("--mode", required=required, choices=tuple(sorted(modes)))
     parser.add_argument("--width", type=int, required=required)
     parser.add_argument("--height", type=int, required=required)
     parser.add_argument("--style")

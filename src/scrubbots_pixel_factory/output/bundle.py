@@ -29,8 +29,8 @@ METADATA_SCHEMA = "scrubbots-output-metadata"
 METADATA_SCHEMA_VERSION = 1
 GENERATOR_METADATA_SCHEMA = "scrubbots-generator-metadata"
 GENERATOR_METADATA_VERSION = 1
-_RICH_MODES = {"WFC", "HYBRID", "AUTO"}
-_RICH_NAMESPACES = {"WFC": "wfc", "HYBRID": "hybrid", "AUTO": "auto"}
+_RICH_MODES = {"WFC", "HYBRID", "AUTO", "ART_FIRST"}
+_RICH_NAMESPACES = {"WFC": "wfc", "HYBRID": "hybrid", "AUTO": "auto", "ART_FIRST": "art_first"}
 
 
 class OutputContractError(ValueError):
@@ -79,7 +79,7 @@ def _candidate_payload(candidate: object, explicit_metadata: Mapping[str, object
         raise OutputContractError("failed GenerationResult cannot be exported as a successful bundle")
     candidate_payload: dict[str, object] | None = None
     if not isinstance(candidate, GenerationResult):
-        for property_name in ("wfc_metadata", "hybrid_metadata", "auto_metadata"):
+        for property_name in ("wfc_metadata", "hybrid_metadata", "auto_metadata", "art_first_metadata"):
             payload = getattr(candidate, property_name, None)
             if isinstance(payload, Mapping):
                 candidate_payload = {"namespace": property_name.removesuffix("_metadata"), "data": _mapping_copy(payload, property_name)}
@@ -651,6 +651,10 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
             _validate_wfc_metadata(data, result_dict, artwork)
         elif generator_mode == "HYBRID":
             _validate_hybrid_metadata(data, result_dict, artwork)
+        elif generator_mode == "ART_FIRST":
+            from ..generators.router.art_first import validate_art_first_bundle
+
+            validate_art_first_bundle(result_dict, payload, artwork.as_dict())
         else:
             _validate_auto_metadata(data, result_dict, artwork)
     preview = _mapping_copy(value["preview"], "metadata.preview")

@@ -15,6 +15,7 @@ from ..mask import MaskCandidate, MaskSpriteGenerator
 from ..rules import RuleCandidate, RuleShapeGenerator
 from ..wfc import WFCCandidate, WFCGenerator
 from .hybrid import HybridCandidate, HybridGenerator, _child_request, _stage_seed
+from .art_first import ArtFirstCandidate, ArtFirstGenerator
 
 
 def _freeze(value: object) -> object:
@@ -65,11 +66,12 @@ class AutoCandidate:
 class GeneratorRouter:
     """Route explicit modes without fallback; AUTO fallback is opt-in."""
 
-    def __init__(self, mask_generator=None, rules_generator=None, wfc_generator=None, hybrid_generator=None) -> None:
+    def __init__(self, mask_generator=None, rules_generator=None, wfc_generator=None, hybrid_generator=None, art_first_generator=None) -> None:
         self.mask_generator = mask_generator or MaskSpriteGenerator()
         self.rules_generator = rules_generator or RuleShapeGenerator()
         self.wfc_generator = wfc_generator or WFCGenerator()
         self.hybrid_generator = hybrid_generator or HybridGenerator(self.mask_generator, self.rules_generator, self.wfc_generator)
+        self.art_first_generator = art_first_generator or ArtFirstGenerator()
 
     @staticmethod
     def _failure(code: FailureCode, reason: str, request: GenerationRequest | None) -> GenerationResult:
@@ -136,6 +138,7 @@ class GeneratorRouter:
             GeneratorMode.RULES.value: self.rules_generator,
             GeneratorMode.WFC.value: self.wfc_generator,
             GeneratorMode.HYBRID.value: self.hybrid_generator,
+            GeneratorMode.ART_FIRST.value: self.art_first_generator,
         }[mode]
 
     def _auto_child(self, outer: GenerationRequest, mode: str, seed: str, width: int, height: int, palette: tuple[str, ...], config: Mapping[str, object]) -> GenerationRequest:
@@ -264,4 +267,4 @@ class GeneratorRouter:
 
     def generate(self, request: GenerationRequest, rng: DeterministicRNG | None = None) -> GenerationResult:
         candidate = self.generate_candidate(request, rng)
-        return candidate.result if isinstance(candidate, (MaskCandidate, RuleCandidate, WFCCandidate, HybridCandidate, AutoCandidate)) else candidate
+        return candidate.result if isinstance(candidate, (MaskCandidate, RuleCandidate, WFCCandidate, HybridCandidate, AutoCandidate, ArtFirstCandidate)) else candidate

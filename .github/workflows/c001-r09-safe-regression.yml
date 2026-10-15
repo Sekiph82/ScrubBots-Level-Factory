@@ -188,6 +188,7 @@ jobs:
           elif [[ '${{ inputs.suite }}' == 'm02-01' ]]; then
             python -m pytest -q \
               tests/unit/test_sb_lf02_001_evaluator_guided.py \
+              tests/unit/test_sb_lf02_004_art_first.py \
               "${common[@]}" 2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
           elif [[ '${{ inputs.suite }}' == 'focused' ]]; then
             python -m pytest -q \
