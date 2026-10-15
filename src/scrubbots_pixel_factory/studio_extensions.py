@@ -379,6 +379,7 @@ def list_candidates() -> list[dict[str, Any]]:
                 "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
                 "quality": dict(quality), "metadata": metadata,
                 "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
+                "candidate_classification": dict(generator_metadata.get("classification", {})) if isinstance(generator_metadata.get("classification", {}), Mapping) else None,
                 "background_intent": request_payload.get("background_intent", "BACKGROUND"),
             })
         except Exception:

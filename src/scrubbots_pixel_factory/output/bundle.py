@@ -14,6 +14,11 @@ import shutil
 import tempfile
 from typing import Any
 
+from ..contracts.candidate_provenance import (
+    CandidateProvenanceError,
+    build_candidate_classification,
+    validate_candidate_classification,
+)
 from ..core import DeterministicRNG, GenerationResult, ResultStatus
 from ..quality import QualityPolicy, QualityReport, evaluate_grid
 from .artwork import ArtworkArtifact, ArtworkContractError, canonical_json_bytes
@@ -131,6 +136,13 @@ def _metadata_for(result: GenerationResult, artwork: ArtworkArtifact, generator_
     result_dict = _mapping_copy(result.canonical_dict(), "generation_result")
     if result_dict.get("status") != ResultStatus.SUCCESS.value:
         raise OutputContractError("only successful GenerationResult values can be exported")
+    generator_payload = _mapping_copy(generator_metadata, "generator_metadata")
+    classification = build_candidate_classification(
+        result_dict,
+        candidate_id=artwork.candidate_id,
+        grid_hash=artwork.grid_hash,
+        generator_metadata=generator_payload,
+    )
     return {
         "schema": METADATA_SCHEMA,
         "schema_version": METADATA_SCHEMA_VERSION,
@@ -159,7 +171,8 @@ def _metadata_for(result: GenerationResult, artwork: ArtworkArtifact, generator_
             "schema": GENERATOR_METADATA_SCHEMA,
             "version": GENERATOR_METADATA_VERSION,
             "present": bool(generator_metadata),
-            "payload": _mapping_copy(generator_metadata, "generator_metadata"),
+            "payload": generator_payload,
+            "classification": classification,
         },
         "quality": _quality_binding(quality_report, artwork),
     }
@@ -513,6 +526,18 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
         or generator_metadata.get("present") != bool(generator_metadata["payload"])
     ):
         raise OutputContractError("generator metadata binding is invalid")
+    classification = generator_metadata.get("classification")
+    if classification is not None:
+        try:
+            validate_candidate_classification(
+                classification,
+                result_dict,
+                candidate_id=artwork.candidate_id,
+                grid_hash=artwork.grid_hash,
+                generator_metadata=generator_metadata["payload"],
+            )
+        except CandidateProvenanceError as exc:
+            raise OutputContractError(str(exc)) from exc
     generator_mode = generation.get("generator_mode")
     if generator_mode in _RICH_MODES:
         payload = generator_metadata["payload"]

@@ -37,16 +37,46 @@ def level_request(**changes: object) -> SemanticGenerationRequest:
     return SemanticGenerationRequest(**values)
 
 
-def test_level_art_is_bound_to_existing_difficulty_dimensions() -> None:
+def test_level_art_uses_current_dimensions_independent_of_difficulty_band() -> None:
     request = level_request()
     assert request.output_class is OutputClass.LEVEL_ART
     assert request.resolved_dimensions() == (20, 21)
     assert request.canonical_dict()["difficulty"] == "EASY"
 
+    assert level_request(difficulty="VERY_HARD", width=24, height=24).resolved_dimensions() == (24, 24)
+    assert level_request(difficulty="EASY", width=38, height=38).resolved_dimensions() == (38, 38)
+
     with pytest.raises(SemanticRequestError):
         level_request(width=16, height=16)
     with pytest.raises(SemanticRequestError):
         level_request(difficulty=None)
+
+
+def test_semantic_request_v1_migration_requires_explicit_dimensions_and_current_fields() -> None:
+    current = level_request().canonical_dict()
+    assert current["schema_version"] == 2
+    restored = SemanticGenerationRequest.from_dict(current)
+    assert restored.canonical_dict() == current
+
+    legacy = {**current, "schema_version": 1}
+    migrated = SemanticGenerationRequest.from_dict(legacy)
+    assert migrated.schema_version == 2
+    assert migrated.resolved_dimensions() == (20, 21)
+
+    ambiguous = {**legacy, "width": None, "height": None}
+    ambiguous["resolved_dimensions"] = {"width": 20, "height": 20}
+    with pytest.raises(SemanticRequestError):
+        SemanticGenerationRequest.from_dict(ambiguous)
+    with pytest.raises(SemanticRequestError):
+        SemanticGenerationRequest.from_dict({**current, "board_size": 24})
+    with pytest.raises(SemanticRequestError):
+        SemanticGenerationRequest.from_dict({**current, "schema_version": 99})
+    with pytest.raises(SemanticRequestError):
+        SemanticGenerationRequest.from_dict({**current, "resolved_dimensions": {"width": 59, "height": 59}})
+    unversioned = dict(current)
+    unversioned.pop("schema_version")
+    with pytest.raises(SemanticRequestError):
+        SemanticGenerationRequest.from_dict(unversioned)
 
 
 def test_asset_art_supports_explicit_sizes_without_fake_difficulty() -> None:

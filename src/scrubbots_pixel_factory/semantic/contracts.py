@@ -18,12 +18,13 @@ import re
 from types import MappingProxyType
 from typing import Any
 
-from ..contracts import Difficulty, parse_difficulty, resolve_dimensions, validate_dimensions
+from ..contracts import Difficulty, parse_difficulty, resolve_current_dimensions
 from ..core.rng import DeterministicRNG
 
 
 SEMANTIC_REQUEST_SCHEMA = "scrubbots-semantic-generation-request"
-SEMANTIC_REQUEST_SCHEMA_VERSION = 1
+SEMANTIC_REQUEST_SCHEMA_VERSION = 2
+LEGACY_SEMANTIC_REQUEST_SCHEMA_VERSION = 1
 SEMANTIC_CANDIDATE_SCHEMA = "scrubbots-semantic-image-candidate"
 SEMANTIC_CANDIDATE_SCHEMA_VERSION = 1
 SEMANTIC_CAPABILITIES_SCHEMA = "scrubbots-semantic-provider-capabilities"
@@ -334,7 +335,7 @@ class SemanticGenerationRequest:
             if difficulty is None:
                 raise SemanticRequestError("LEVEL_ART requires a ScrubBots difficulty")
             try:
-                resolve_dimensions(difficulty, width, height, seed=DeterministicRNG(seed).stage_seed("dimension"))
+                resolve_current_dimensions(width, height, seed=DeterministicRNG(seed).stage_seed("dimension"))
             except (TypeError, ValueError) as exc:
                 raise SemanticRequestError(str(exc)) from exc
         else:
@@ -371,7 +372,7 @@ class SemanticGenerationRequest:
     def resolved_dimensions(self) -> tuple[int, int]:
         if self.output_class is OutputClass.ASSET_ART:
             return self.width, self.height  # type: ignore[return-value]
-        return resolve_dimensions(self.difficulty, self.width, self.height, seed=DeterministicRNG(self.seed).stage_seed("dimension"))  # type: ignore[arg-type]
+        return resolve_current_dimensions(self.width, self.height, seed=DeterministicRNG(self.seed).stage_seed("dimension"))
 
     @property
     def requested_dimensions(self) -> tuple[int, int]:
@@ -408,6 +409,64 @@ class SemanticGenerationRequest:
     def canonical_dict(self) -> dict[str, object]:
         width, height = self.resolved_dimensions()
         return {"schema": SEMANTIC_REQUEST_SCHEMA, "schema_version": self.schema_version, "output_class": self.output_class.value, "description": self.description, "negative_description": self.negative_description, "semantic_category": self.semantic_category, "difficulty": self.difficulty.value if self.difficulty is not None else None, "width": self.width, "height": self.height, "resolved_dimensions": {"width": width, "height": height}, "seed": {"type": "int" if isinstance(self.seed, int) else "string", "value": self.seed}, "no_background": self.no_background, "outline": self.outline, "shading": self.shading, "detail": self.detail, "view": self.view, "direction": self.direction, "isometric": self.isometric, "coverage_percentage": self.coverage_percentage, "reference_images": [image.canonical_dict() for image in self.reference_images], "style_image": self.style_image.canonical_dict() if self.style_image is not None else None, "style_strength": self.style_strength, "init_image": self.init_image.canonical_dict() if self.init_image is not None else None, "init_strength": self.init_strength, "color_reference": self.color_reference.canonical_dict() if self.color_reference is not None else None, "provider_id": self.provider_id, "provider_workflow_version": self.provider_workflow_version, "provider_model": self.provider_model, "provider_config_version": self.provider_config_version, "desired_candidate_count": self.desired_candidate_count}
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "SemanticGenerationRequest":
+        """Decode the canonical schema, migrating only explicit v1 dimensions."""
+
+        if not isinstance(value, Mapping):
+            raise SemanticRequestError("semantic request JSON root must be an object")
+        required = {
+            "schema", "schema_version", "output_class", "description", "negative_description",
+            "semantic_category", "difficulty", "width", "height", "resolved_dimensions", "seed",
+            "no_background", "outline", "shading", "detail", "view", "direction", "isometric",
+            "coverage_percentage", "reference_images", "style_image", "style_strength", "init_image",
+            "init_strength", "color_reference", "provider_id", "provider_workflow_version",
+            "provider_model", "provider_config_version", "desired_candidate_count",
+        }
+        if set(value) != required or value.get("schema") != SEMANTIC_REQUEST_SCHEMA:
+            raise SemanticRequestError("semantic request fields or schema are unsupported")
+        version = value.get("schema_version")
+        if type(version) is not int or version not in {LEGACY_SEMANTIC_REQUEST_SCHEMA_VERSION, SEMANTIC_REQUEST_SCHEMA_VERSION}:
+            raise SemanticRequestError("unsupported semantic request schema version")
+        output_class = OutputClass.parse(value.get("output_class"))
+        width, height = value.get("width"), value.get("height")
+        if version == LEGACY_SEMANTIC_REQUEST_SCHEMA_VERSION and output_class is OutputClass.LEVEL_ART:
+            if type(width) is not int or type(height) is not int:
+                raise SemanticRequestError("legacy LEVEL_ART dimensions are ambiguous; explicit width and height are required for migration")
+        typed_seed = value.get("seed")
+        if not isinstance(typed_seed, Mapping) or set(typed_seed) != {"type", "value"}:
+            raise SemanticRequestError("semantic request seed must use the canonical typed representation")
+        seed_type = typed_seed.get("type")
+        seed_value = typed_seed.get("value")
+        if seed_type == "int" and type(seed_value) is int:
+            seed: int | str = seed_value
+        elif seed_type == "string" and type(seed_value) is str:
+            seed = seed_value
+        else:
+            raise SemanticRequestError("semantic request seed type and value do not match")
+        image_lists: dict[str, object] = {}
+        for name in ("reference_images", "style_image", "init_image", "color_reference"):
+            raw = value.get(name)
+            if name == "reference_images":
+                if not isinstance(raw, (list, tuple)):
+                    raise SemanticRequestError("reference_images must be an array")
+                image_lists[name] = tuple(ImageInputDescriptor(**item) if isinstance(item, Mapping) else item for item in raw)
+            elif isinstance(raw, Mapping):
+                image_lists[name] = ImageInputDescriptor(**raw)
+            else:
+                image_lists[name] = raw
+        arguments = {key: value[key] for key in required if key not in {"schema", "schema_version", "resolved_dimensions", "seed", "reference_images", "style_image", "init_image", "color_reference"}}
+        arguments.update(image_lists)
+        arguments["seed"] = seed
+        arguments["schema_version"] = SEMANTIC_REQUEST_SCHEMA_VERSION
+        request = cls(**arguments)
+        resolved = value.get("resolved_dimensions")
+        if (not isinstance(resolved, Mapping) or set(resolved) != {"width", "height"}
+                or resolved.get("width") != request.resolved_dimensions()[0]
+                or resolved.get("height") != request.resolved_dimensions()[1]):
+            raise SemanticRequestError("resolved dimensions do not match the migrated semantic request")
+        return request
 
     def canonical_bytes(self) -> bytes:
         return _canonical_bytes(self.canonical_dict())
@@ -597,5 +656,5 @@ SemanticResult = SemanticImageCandidate
 
 
 __all__ = [
-    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_RAW_RASTER_MAX_DIMENSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
+    "CandidateStatus", "DETAIL_VALUES", "DIRECTION_VALUES", "ImageDescriptor", "ImageInputDescriptor", "ImageInputRole", "OUTLINE_VALUES", "OutputClass", "ProviderResult", "ProviderUnavailableError", "SEMANTIC_CANDIDATE_SCHEMA", "SEMANTIC_CANDIDATE_SCHEMA_VERSION", "SEMANTIC_CAPABILITIES_SCHEMA", "SEMANTIC_CAPABILITIES_SCHEMA_VERSION", "SEMANTIC_RAW_RASTER_MAX_DIMENSION", "SEMANTIC_REQUEST_SCHEMA", "SEMANTIC_REQUEST_SCHEMA_VERSION", "LEGACY_SEMANTIC_REQUEST_SCHEMA_VERSION", "SemanticCandidateError", "SemanticContractError", "SemanticGenerationRequest", "SemanticImageCandidate", "SemanticImageInputDescriptor", "SemanticNormalizationRequiredError", "SemanticOutputClass", "SemanticProviderCapabilities", "SemanticProviderError", "SemanticProvenanceError", "SemanticProviderResult", "SemanticRequestError", "SemanticResult", "SemanticCapabilities", "SHADING_VALUES", "UnsupportedCapabilityError", "VIEW_VALUES",
 ]

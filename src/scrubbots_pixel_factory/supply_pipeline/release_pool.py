@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from ..contracts.candidate_provenance import CandidateClass, CandidateProvenanceError, validate_candidate_classification
 from .campaign_builder import CampaignError, build_campaign_plan, write_campaign_plan
 from .game_publisher import PublicationError, discover_game_project, publish_batch
 from .progression import load_progression_authority
@@ -21,6 +22,47 @@ class ReleaseError(ValueError):
 
 
 _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALANCED"}
+
+
+def validate_pool_candidate_provenance(candidate: Mapping[str, Any], review: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Require verified owner-source provenance and current owner ACCEPT."""
+
+    metadata = candidate.get("metadata")
+    if not isinstance(metadata, Mapping):
+        raise ReleaseError("candidate has no verifiable bundle metadata; production classification is unavailable")
+    generation = metadata.get("generation")
+    generation = generation if isinstance(generation, Mapping) else {}
+    result = generation.get("result")
+    result = result if isinstance(result, Mapping) else {}
+    generator_metadata = metadata.get("generator_metadata")
+    generator_metadata = generator_metadata if isinstance(generator_metadata, Mapping) else {}
+    payload = generator_metadata.get("payload")
+    payload = payload if isinstance(payload, Mapping) else {}
+    try:
+        candidate_class = validate_candidate_classification(
+            generator_metadata.get("classification"),
+            result,
+            candidate_id=str(candidate.get("candidate_id", "")),
+            grid_hash=str(candidate.get("grid_hash", "")),
+            generator_metadata=payload,
+        )
+    except CandidateProvenanceError as exc:
+        raise ReleaseError(str(exc)) from exc
+    if candidate_class is not CandidateClass.PRODUCTION_CANDIDATE:
+        raise ReleaseError(f"{candidate_class.value} candidate cannot enter the production Release Pool")
+    data = payload.get("data")
+    data = data if isinstance(data, Mapping) else {}
+    lineage = data.get("source_lineage")
+    if (payload.get("namespace") != "owner-upload" or not isinstance(lineage, Mapping)
+            or lineage.get("source_sha256") != generator_metadata["classification"].get("source_sha256")
+            or lineage.get("source_bytes_unchanged") is not True
+            or lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"):
+        raise ReleaseError("production candidate is not bound to unchanged canonical OWNER_UPLOAD source bytes")
+    if (not isinstance(review, Mapping) or review.get("disposition") != "ACCEPT"
+            or review.get("candidate_id") != candidate.get("candidate_id")
+            or review.get("artwork_sha256") != candidate.get("artwork_sha256")):
+        raise ReleaseError("production candidate requires an exact current owner ACCEPT review")
+    return dict(generator_metadata["classification"])
 
 
 def _official_challenge_vector(official: Mapping[str, Any]) -> list[float]:
@@ -276,9 +318,19 @@ def _pool_root() -> Path:
 
 
 def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], review: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    if (pipeline.get("disposition") != "READY" or pipeline.get("primary", {}).get("state") != "READY"
-            or (review is not None and review.get("disposition") != "ACCEPT")):
-        return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "Release Pool requires a canonical READY ZIP/solver/replay/Difficulty pipeline; owner ACCEPT is optional."}
+    if pipeline.get("disposition") != "READY" or pipeline.get("primary", {}).get("state") != "READY":
+        return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "Release Pool requires a canonical READY ZIP/solver/replay/Difficulty pipeline."}
+    classification = validate_pool_candidate_provenance(candidate, review)
+    from .. import studio_extensions as studio
+    lineage = _candidate_source_lineage(candidate)
+    source_id = lineage.get("source_id")
+    try:
+        source_record = studio.verify_owner_source(str(source_id))
+    except (OSError, ValueError, TypeError) as exc:
+        raise ReleaseError("canonical OWNER_UPLOAD source record and bytes could not be reverified") from exc
+    if (source_record.get("source_sha256") != classification.get("source_sha256")
+            or source_record.get("source_bytes_sha256") != classification.get("source_sha256")):
+        raise ReleaseError("candidate classification does not match the current immutable OWNER_UPLOAD bytes")
     primary = pipeline["primary"]
     difficulty = primary.get("difficulty", {})
     official = _canonical_official_difficulty(primary)
@@ -291,7 +343,6 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     if not isinstance(difficulty, Mapping) or difficulty.get("class") is None:
         raise ReleaseError("official Difficulty V1 class is missing")
     dominant = profile["dominant"]
-    from .. import studio_extensions as studio
     bundle_path = (studio._repository_root() / str(candidate["source_path"])).resolve()
     paths = {"artwork": bundle_path / "artwork.png", "level": Path(str(primary.get("files", {}).get("level", ""))).expanduser(), "supply_plan": Path(str(primary.get("files", {}).get("supply_plan", ""))).expanduser()}
     if any(not path.is_file() for path in paths.values()): raise ReleaseError("Release Pool requires existing canonical artwork, level, and supply files")
@@ -308,7 +359,8 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
         "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
         "review_id": review.get("review_id") if review is not None else None,
-        "eligibility_source": "OWNER_ACCEPT" if review is not None else "READY_AUTO",
+        "eligibility_source": "OWNER_ACCEPT",
+        "candidate_classification": classification,
         "source_bundle": candidate["source_path"], "candidate": dict(candidate), "pipeline": dict(pipeline),
     }
     payload["entry_digest"] = _hash(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
@@ -355,6 +407,25 @@ def release_entries() -> list[dict[str, Any]]:
         current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
         if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
             raise ReleaseError(f"Release Pool candidate identity changed or disappeared: {path.name}")
+        # Existing pre-classification entries remain read-only historical evidence.
+        # Newly created entries always carry classification and must revalidate it.
+        if value.get("candidate_classification") is not None:
+            if value.get("eligibility_source") != "OWNER_ACCEPT" or not isinstance(latest, Mapping) or latest.get("disposition") != "ACCEPT":
+                continue
+            try:
+                classification = validate_pool_candidate_provenance(current_candidate, latest)
+            except ReleaseError:
+                continue
+            if value.get("candidate_classification") != classification:
+                raise ReleaseError(f"Release Pool candidate classification changed or disappeared: {path.name}")
+            lineage = _candidate_source_lineage(current_candidate)
+            try:
+                source_record = studio.verify_owner_source(str(lineage.get("source_id", "")))
+            except (OSError, ValueError, TypeError) as exc:
+                raise ReleaseError(f"Release Pool OWNER_UPLOAD source is no longer verifiable: {path.name}") from exc
+            if (source_record.get("source_sha256") != classification.get("source_sha256")
+                    or source_record.get("source_bytes_sha256") != classification.get("source_sha256")):
+                raise ReleaseError(f"Release Pool OWNER_UPLOAD source bytes no longer match classification: {path.name}")
         for name, file_record in value.get("files", {}).items():
             evidence_file = Path(str(file_record.get("path", "")))
             if not evidence_file.is_file() or _hash(evidence_file.read_bytes()) != file_record.get("sha256"):
