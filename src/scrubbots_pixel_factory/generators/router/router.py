@@ -119,9 +119,15 @@ class GeneratorRouter:
             if set(quality_policy) != allowed_quality:
                 raise ValueError("AUTO evaluator quality_policy requires the exact versioned M07 policy fields")
             try:
-                QualityPolicy(**dict(quality_policy))
+                normalized_policy = QualityPolicy(**dict(quality_policy))
             except (TypeError, ValueError) as exc:
                 raise ValueError(f"AUTO evaluator quality_policy is invalid: {exc}") from exc
+            if normalized_policy.difficulty is not None:
+                raise ValueError("AUTO evaluator quality_policy.difficulty must be null for modern LEVEL_ART")
+            supplied_policy = dict(quality_policy)
+            canonical_policy = normalized_policy.as_dict()
+            if json.dumps(canonical_policy, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")) != json.dumps(supplied_policy, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")):
+                raise ValueError("AUTO evaluator quality_policy must use its canonical M07 representation")
         return candidates, configs, fallback
 
     def _engine(self, mode: str):

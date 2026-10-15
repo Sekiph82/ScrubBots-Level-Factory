@@ -423,9 +423,14 @@ def _validate_evaluator_guided_metadata(data: Mapping[str, object], result_dict:
     if data.get("policy_digest") != policy_digest:
         raise OutputContractError("evaluator-guided policy digest is invalid")
     try:
-        quality_policy = QualityPolicy(**dict(_mapping_copy(policy.get("quality_policy"), "M07 policy")))
+        policy_values = _mapping_copy(policy.get("quality_policy"), "M07 policy")
+        quality_policy = QualityPolicy(**policy_values)
     except (TypeError, ValueError) as exc:
         raise OutputContractError(f"evaluator-guided M07 policy is invalid: {exc}") from exc
+    if quality_policy.difficulty is not None:
+        raise OutputContractError("evaluator-guided M07 policy difficulty must be null for modern LEVEL_ART")
+    if canonical_json_bytes(quality_policy.as_dict()) != canonical_json_bytes(policy_values):
+        raise OutputContractError("evaluator-guided M07 policy must use its canonical representation")
     attempts = data.get("attempts")
     if not isinstance(attempts, list) or len(attempts) != budget:
         raise OutputContractError("evaluator-guided attempt count differs from bounded budget")

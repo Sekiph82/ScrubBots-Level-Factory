@@ -1,4 +1,6 @@
 from dataclasses import replace
+import hashlib
+import json
 
 import pytest
 
@@ -6,13 +8,13 @@ from scrubbots_pixel_factory import DeterministicRNG, GenerationRequest, Generat
 from scrubbots_pixel_factory.core.rng import RNG_ALGORITHM
 from scrubbots_pixel_factory.generators.router import AutoCandidate, GeneratorRouter
 from scrubbots_pixel_factory.output import OutputContractError, build_export_bundle
-from scrubbots_pixel_factory.quality import QualityPolicy
+from scrubbots_pixel_factory.quality import QualityPolicy, evaluate_grid
 
 
-def _request(seed="m02-01-seed", *, budget=2, quality_policy=None):
+def _request(seed="m02-01-seed", *, budget=2, quality_policy=None, width=20, height=20, color_count=3):
     return GenerationRequest(
-        seed=seed, width=20, height=20, generator_mode="AUTO",
-        palette_subset=("C01", "C02", "C03"),
+        seed=seed, width=width, height=height, generator_mode="AUTO",
+        palette_subset=tuple(f"C{index:02d}" for index in range(1, color_count + 1)),
         generator_options=GeneratorOptions(
             "auto", 1,
             {
@@ -27,19 +29,25 @@ def _request(seed="m02-01-seed", *, budget=2, quality_policy=None):
     )
 
 
-def _grid(slab, width=20, height=20):
+def _grid(slab, width=20, height=20, colors=("C01", "C02", "C03")):
     cells = ["C01"] * (width * height)
     if slab:
         for y in range(1, height - 1):
             for x in range(1, width - 1):
-                cells[y * width + x] = "C02"
-        cells[(height // 2) * width + width // 2] = "C03"
+                cells[y * width + x] = colors[1]
+        cells[(height // 2) * width + width // 2] = colors[2]
     else:
         for y in range(5, min(10, height - 1)):
             for x in range(5, min(10, width - 1)):
-                cells[y * width + x] = "C02"
+                cells[y * width + x] = colors[1]
             for x in range(11, min(16, width - 1)):
-                cells[y * width + x] = "C03"
+                cells[y * width + x] = colors[2]
+        for color_index, color in enumerate(colors[3:], start=0):
+            start_x = 5 + color_index * 6
+            start_y = 12
+            for y in range(start_y, min(start_y + 3, height - 1)):
+                for x in range(start_x, min(start_x + 3, width - 1)):
+                    cells[y * width + x] = color
     return tuple(cells)
 
 
@@ -58,7 +66,21 @@ class SyntheticMask:
         index = self.seeds[request.seed]
         return GenerationResult.success(
             request=request, width=request.width, height=request.height,
-            logical_grid=_grid(self.reject_all or index == 0, request.width, request.height),
+            logical_grid=_grid(self.reject_all or index == 0, request.width, request.height, request.palette_subset),
+            generator_id=self.generator_id, generator_version=self.generator_version,
+            generator_mode="MASK", seed=request.seed, rng_algorithm=RNG_ALGORITHM,
+            provenance={"stage_seeds": rng.stage_seeds(), "retry_seeds": {}},
+        )
+
+
+class OnePassMask:
+    generator_id = "one-pass-mask"
+    generator_version = "1.0"
+
+    def generate_candidate(self, request, rng):
+        return GenerationResult.success(
+            request=request, width=request.width, height=request.height,
+            logical_grid=_grid(False, request.width, request.height, request.palette_subset),
             generator_id=self.generator_id, generator_version=self.generator_version,
             generator_mode="MASK", seed=request.seed, rng_algorithm=RNG_ALGORITHM,
             provenance={"stage_seeds": rng.stage_seeds(), "retry_seeds": {}},
@@ -103,6 +125,83 @@ def test_evaluator_guided_rejects_invalid_budget(budget):
     result = GeneratorRouter().generate_candidate(request)
     assert isinstance(result, GenerationResult)
     assert result.failure_code.value == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize("difficulty", ["EASY", "MEDIUM", "VERY_HARD"])
+def test_evaluator_guided_rejects_legacy_difficulty_policy(difficulty):
+    policy = QualityPolicy(difficulty=difficulty, max_largest_region_ratio=0.6).as_dict()
+    request = _request(quality_policy=policy, width=38, height=38)
+    result = GeneratorRouter().generate_candidate(request)
+    assert isinstance(result, GenerationResult)
+    assert result.failure_code.value == "INVALID_REQUEST"
+
+
+def test_evaluator_guided_rejects_noncanonical_policy_round_trip():
+    policy = QualityPolicy(max_largest_region_ratio=0.6).as_dict()
+    policy["max_isolated_ratio"] = 0.200000001
+    request = _request(quality_policy=policy)
+    result = GeneratorRouter().generate_candidate(request)
+    assert isinstance(result, GenerationResult)
+    assert result.failure_code.value == "INVALID_REQUEST"
+
+
+@pytest.mark.parametrize("width,height,color_count", [(38, 38, 3), (24, 24, 5), (38, 24, 3)])
+def test_modern_dimensions_and_colors_are_difficulty_independent(width, height, color_count):
+    request = _request(
+        f"modern-envelope-{width}-{color_count}",
+        width=width, height=height, color_count=color_count,
+        quality_policy=QualityPolicy(max_largest_region_ratio=0.6).as_dict(),
+    )
+    candidate = _router(request).generate_candidate(request)
+    assert isinstance(candidate, AutoCandidate)
+    assert candidate.result.is_success
+    assert len(candidate.result.used_palette) == color_count
+    assert candidate.metadata["selected_quality"]["accepted"] is True
+    assert build_export_bundle(candidate, f"modern-{width}-{color_count}").artwork.width == width
+
+
+def test_evaluator_guided_bundle_rejects_forged_nonnull_difficulty():
+    request = _request(width=38, height=38)
+    candidate = _router(request).generate_candidate(request)
+    assert isinstance(candidate, AutoCandidate)
+    original_policy = dict(candidate.metadata["policy"])
+    invalid_quality_policy = dict(original_policy["quality_policy"])
+    invalid_quality_policy["difficulty"] = "EASY"
+    invalid_policy = {**original_policy, "quality_policy": invalid_quality_policy}
+    invalid_request = _request(seed=request.seed, width=38, height=38, quality_policy=QualityPolicy(difficulty="EASY", max_largest_region_ratio=0.6).as_dict())
+    bad_result = GenerationResult.success(
+        request=invalid_request, width=candidate.result.width, height=candidate.result.height,
+        logical_grid=candidate.result.logical_grid, generator_id=candidate.result.generator_id,
+        generator_version=candidate.result.generator_version, generator_mode="AUTO",
+        seed=invalid_request.seed, rng_algorithm=candidate.result.rng_algorithm,
+        provenance=candidate.result.provenance,
+    )
+    metadata = dict(candidate.metadata)
+    metadata["policy"] = invalid_policy
+    metadata["request_digest"] = invalid_request.digest()
+    metadata["policy_digest"] = hashlib.sha256(json.dumps(invalid_policy, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    forged = replace(candidate, result=bad_result, metadata=metadata)
+    with pytest.raises(OutputContractError, match="difficulty must be null"):
+        build_export_bundle(forged, "m02-01-legacy-policy")
+
+
+def test_non_opt_in_auto_keeps_existing_fallback_contract():
+    request = GenerationRequest(
+        seed="non-opt-in-auto", width=20, height=20, generator_mode="AUTO",
+        palette_subset=("C01", "C02", "C03"),
+        generator_options=GeneratorOptions("auto", 1, {"candidates": ["MASK"]}),
+    )
+    candidate = GeneratorRouter(mask_generator=OnePassMask()).generate_candidate(request)
+    assert isinstance(candidate, AutoCandidate)
+    assert candidate.metadata["schema"] == "scrubbots-auto-metadata"
+    assert "evaluator_guided" not in request.options.values
+    assert build_export_bundle(candidate, "non-opt-in-auto").metadata["generator_metadata"]["payload"]["data"]["schema"] == "scrubbots-auto-metadata"
+
+
+def test_m07_legacy_difficulty_api_remains_available():
+    report = evaluate_grid(38, 38, _grid(False, 38, 38), policy=QualityPolicy(difficulty="EASY"))
+    assert report.accepted is False
+    assert "DIMENSION_MISMATCH" in report.rejection_codes
 
 
 def test_evaluator_guided_bundle_rejects_tampered_winner_identity():
