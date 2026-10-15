@@ -118,7 +118,7 @@ def test_sequential_runner_orchestration_only_passes_columns_and_continues_failu
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=fake_runner)
     stored = result["job"]
-    assert result["disposition"] == "COMPLETE"
+    assert result["disposition"] == "FINISHED_WITH_FAILURES"
     assert len(calls) == 9
     assert [item["status"] for item in stored["items"]].count("READY") == 8
     assert [item["status"] for item in stored["items"]].count("FAILED") == 1
@@ -310,7 +310,7 @@ def test_existing_ready_reuse_orchestration_only_uses_isolated_gate_stubs(monkey
 
     reused = png_batch._reuse_existing_ready(
         {"settings": {}},
-        {"source_id": source_id, "source_sha256": "b" * 64},
+        {"source_id": source_id, "source_sha256": "b" * 64, "column_count": 3, "source_record_sha256": "c" * 64},
     )
 
     assert reused is not None

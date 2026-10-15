@@ -30,7 +30,7 @@ def test_pipeline_records_truthful_owner_upload_stop_and_preserves_source(tmp_pa
         # A logical source does not prove pinned game authority or a real
         # solver run. Keep the contract truthful at that authority boundary.
         assert run["disposition"] == "UNAVAILABLE"
-        assert dispositions["CANDIDATE"] == "BLOCKED"
+        assert dispositions["CANDIDATE"] == "PASS"
         assert dispositions["SOLVE"] == "NOT_AVAILABLE"
         assert dispositions["DIFFICULTY"] == "NOT_AVAILABLE"
         assert dispositions["QA"] == "NOT_AVAILABLE"

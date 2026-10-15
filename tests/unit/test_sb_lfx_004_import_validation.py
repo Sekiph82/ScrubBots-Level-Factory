@@ -7,6 +7,7 @@ import pytest
 
 from scrubbots_pixel_factory.owner_upload import import_owner_upload, owner_upload_root
 from scrubbots_pixel_factory.output.png import _encode_rgb_png, encode_logical_png
+from scrubbots_pixel_factory import studio_extensions
 from scrubbots_pixel_factory.studio_extensions import extensions_root, validate_owner_source
 
 
@@ -82,11 +83,11 @@ def test_validation_alpha_failure_and_tampered_source_or_evidence_fail_closed(tm
     source_root = owner_upload_root() / source_id
     source_path = source_root / "source.png"
     record_path = source_root / "source.json"
-    validation_path = extensions_root() / "validation" / f"{source_id}-{result['source_sha256']}.json"
     before_source = source_path.read_bytes()
     before_record = record_path.read_bytes()
     try:
         report = validate_owner_source(source_id)
+        validation_path = studio_extensions._repository_root() / report["evidence_path"]
         assert report["exact_logical_source"] is False
         assert report["alpha"]["semi_alpha_count"] == 400
         assert "ALPHA_CONTRACT" in report["structural"]["rejection_codes"]

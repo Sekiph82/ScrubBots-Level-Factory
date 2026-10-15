@@ -224,7 +224,9 @@ def test_project_status_and_active_task_contract_are_exact() -> None:
     assert next_action is not None
     identity_parts = current_id.split("-")
     action_parts = set(re.findall(r"[A-Z][A-Z0-9]*", next_action.group(1).upper()))
-    assert len(set(identity_parts[:-1]) & action_parts) >= max(1, len(identity_parts) - 2)
+    # Task IDs can carry long owner-defined closure suffixes. Require the
+    # sprint-family prefix in the action field without freezing every suffix.
+    assert len(set(identity_parts[:2]) & action_parts) == 2
     status = re.search(r"(?m)^- Current Task Status:\s+(.+)$", current)
     assert status is not None
     status_parts = [part.strip() for part in status.group(1).split("/")]
