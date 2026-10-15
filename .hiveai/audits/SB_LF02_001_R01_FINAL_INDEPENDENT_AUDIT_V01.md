@@ -1,0 +1,25 @@
+# SB-LF02-001-R01 | GPT independent source/CI closure audit V01
+
+Date: 2026-10-15 Europe/Istanbul
+Repository: `Sekiph82/ScrubBots-Level-Factory`
+Scope: `SB-LF02-001` M02.01 opt-in bounded evaluator-guided AUTO and R01 strict policy parity. Predecessor audit: `.hiveai/audits/SB_LF02_001_M02_01_INDEPENDENT_SOURCE_AND_CI_AUDIT_V01.md`.
+
+## Independently retrieved evidence
+
+At audit read, `main` was `f55f434a6b0692c732d85795fb6dd35a43bcf79e`. Independently fetched GitHub compare `0d04f30ff954acdc8736fea7c704a839c543d4ae...f55f434a6b0692c732d85795fb6dd35a43bcf79e`, exact code/test changes and current authoritative contracts. Two implementation/test commits: `e877bd98e6e2622f62d5afc284fdfb59f11015c3`, `dd581c79436192dda8a34e5679d31e7b863a7e1f`. Last commit `f55f434a6b0692c732d85795fb6dd35a43bcf79e` modifies only the builder log. GitHub Actions run `38791660937` completed **success** at exact tested source SHA `dd581c79436192dda8a34e5679d31e7b863a7e1f`; its only job `116617491040`, Python 3.12/Godot 4.7.2 safe suite, regression stage and artifact stage all report success. Artifact ID `11999719280` has published SHA256 digest `755e896b54c63ad37f6430ed6c9035a7103ed16cf689d28dff521940d87c3fd3`, expiry 2026-10-22T19:10:36Z. **19 passed / no failures** is the builder log's pytest result for the targeted `m02-01` selection; raw JUnit ZIP was not independently downloaded or executed. First run `38791359522` was red (9 fail/10 pass) due to test helper/legacy expectation; these failures are preserved in the builder log, and the corrected test source is tied to the green run. No full regression rerun.
+
+## Independent source verdict
+
+**F01: PASS/CLOSED.** `src/scrubbots_pixel_factory/generators/router/router.py::_auto_config` now validates the current exact M07 policy fields, constructs `QualityPolicy`, rejects any `normalized_policy.difficulty is not None`, and requires exact canonical policy JSON parity. `output/bundle.py::_validate_evaluator_guided_metadata` independently applies the same strict difficulty-null/canonical-roundtrip checks on replay/bundle validation. Thus a custom opt-in policy cannot smuggle a historical difficulty class into the modern `LEVEL_ART` selection path, even by forging bundle metadata; non-opt-in AUTO is unchanged.
+
+Added focused controls exercise EASY/MEDIUM/VERY_HARD rejection, forged bundle rejection, noncanonical float-roundtrip rejection, modern 38x38 three-color / 24x24 five-color / 38x24 rectangle candidates, unchanged non-opt-in AUTO, and historical M07 API compatibility. The original nine-case `SB-LF02-001` focused suite previously verified opt-in deterministic proposal seeds, 2..8 bounded budget, M07-driven non-first winner selection, winner/bundle evidence, explicit QUALITY_REJECTED, TEST classification, tamper detection and bounded 59x59. No `READY`, owner acceptance, canonical game, Difficulty V1 score, solver, native Studio/release or cloud claim is established by these tests.
+
+**Important correction to prior GPT audit:** the prior audit stated that `quality/core.py::_quality_codes` would necessarily enforce historical EASY 20..29 etc. Current `contracts/difficulty.py::validate_dimensions` defaults to dimension schema v2, which already allows independent 20..59; current `validate_used_color_count` also uses modern independent 3..12. Thus the earlier causal explanation that supplied difficulty labels certainly reintroduced those class-specific bands was **too strong/incorrect** for current source. The concrete audit finding that the *modern guided policy contract admitted a non-null obsolete class selector* was real, and R01 now rejects it. No actual default modern dimension/color failure from the previous code was established. This correction does not weaken the current acceptance decision.
+
+## Decision / exclusions
+
+**SB-LF02-001: GPT independently SOURCE-CONTRACT PASS / CLOSED.** This accepts the opt-in offline deterministic M07 structural candidate selection and strict metadata/policy replay within the narrow focused scope; it is not a statement of player-perceived pixel-art quality, authoritative game solvability, owner acceptance, or installed release readiness. R05/SB-LFX-018 remains **DEFERRED_OPEN** with 19 deselected, 19 skipped, six ignored modules and native/game authority not waived. No genuine 140 source PNG solver, user data, installed Release or owner filesystem hashes were independently inspected. GitHub success does not prove the builder's claimed Windows local `HEAD==origin/main` parity or 3,204 untouched untracked owner paths; those remain builder-reported.
+
+## Next task selection
+
+Read literal current root `TASKS.md`: `SB-LF02-004` means **ART_FIRST mode consuming owner/AI-approved pixel art/masks** and is PARTIAL. It is not generic evaluator comparison. Next prompt should take this real scope, retain source immutability and provenance roles, and avoid conflating locally generated/AI image art with owner-original. Start with code-supported synthetic verified-source ingestion and explicit classification; external owner acceptance or actual 140 owner art must stay outside synthetic task authority.
