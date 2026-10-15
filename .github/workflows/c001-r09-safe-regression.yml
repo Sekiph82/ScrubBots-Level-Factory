@@ -7,7 +7,7 @@ on:
         description: "Run affected groups first or the final comparable suite"
         required: true
         type: choice
-        options: [focused, full]
+        options: [m01-03, focused, full]
         default: full
 
 permissions:
@@ -181,7 +181,11 @@ jobs:
             --deselect=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_requires_explicit_nonduplicated_membership_and_current_acceptance
             --deselect=tests/integration/test_sb_cp03_002_factory_candidate_pack.py::test_current_release_pool_projection_is_an_accepted_pack_source
           )
-          if [[ '${{ inputs.suite }}' == 'focused' ]]; then
+          if [[ '${{ inputs.suite }}' == 'm01-03' ]]; then
+            python -m pytest -q \
+              tests/unit/test_sb_lf01_009_010_candidate_and_semantic_contracts.py \
+              "${common[@]}" 2>&1 | tee "$RUNNER_TEMP/c001-r09-pytest.log"
+          elif [[ '${{ inputs.suite }}' == 'focused' ]]; then
             python -m pytest -q \
               tests/unit/test_sb_lf00_007_governance_authority.py \
               tests/unit/test_sb_lf06_012_factory_studio_editor_smoke_and_headless_core_test_gate.py \

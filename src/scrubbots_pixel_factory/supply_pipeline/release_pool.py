@@ -24,7 +24,9 @@ class ReleaseError(ValueError):
 _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALANCED"}
 
 
-def validate_pool_candidate_provenance(candidate: Mapping[str, Any], review: Mapping[str, Any] | None) -> dict[str, Any]:
+def validate_pool_candidate_provenance(
+    candidate: Mapping[str, Any], review: Mapping[str, Any] | None, *, verify_source_grid: bool = True
+) -> dict[str, Any]:
     """Require verified owner-source provenance and current owner ACCEPT."""
 
     metadata = candidate.get("metadata")
@@ -62,7 +64,79 @@ def validate_pool_candidate_provenance(candidate: Mapping[str, Any], review: Map
             or review.get("candidate_id") != candidate.get("candidate_id")
             or review.get("artwork_sha256") != candidate.get("artwork_sha256")):
         raise ReleaseError("production candidate requires an exact current owner ACCEPT review")
+    if verify_source_grid:
+        _verify_candidate_source_grid_binding(candidate, generator_metadata["classification"])
     return dict(generator_metadata["classification"])
+
+
+def _validate_source_grid_bytes(
+    candidate: Mapping[str, Any],
+    classification: Mapping[str, Any],
+    lineage: Mapping[str, Any],
+    source_record: Mapping[str, Any],
+    source_png: bytes,
+    candidate_png: bytes,
+) -> None:
+    """Prove one selected candidate's logical cells equal its exact OWNER_UPLOAD PNG."""
+
+    from ..output.png import PNGContractError, decode_logical_png
+    from ..quality.core import logical_grid_hash
+
+    source_id = lineage.get("source_id")
+    source_sha256 = lineage.get("source_sha256")
+    if (type(source_id) is not str or source_record.get("source_id") != source_id
+            or source_record.get("origin") != "OWNER_UPLOAD"
+            or source_record.get("status") != "SOURCE_ONLY"
+            or source_record.get("validation_state") != "UNVALIDATED"
+            or source_sha256 != classification.get("source_sha256")
+            or source_record.get("source_sha256") != source_sha256
+            or source_record.get("source_bytes_sha256") != source_sha256
+            or hashlib.sha256(source_png).hexdigest() != source_sha256):
+        raise ReleaseError("candidate source lineage does not match the exact immutable OWNER_UPLOAD bytes")
+    try:
+        source = decode_logical_png(source_png)
+        artwork = decode_logical_png(candidate_png)
+    except (PNGContractError, TypeError, ValueError) as exc:
+        raise ReleaseError("OWNER_UPLOAD or candidate artwork is not a canonical logical PNG") from exc
+    if (source.width != source_record.get("original_width")
+            or source.height != source_record.get("original_height")
+            or (artwork.width, artwork.height) != (source.width, source.height)
+            or (candidate.get("width"), candidate.get("height")) != (source.width, source.height)):
+        raise ReleaseError("OWNER_UPLOAD and candidate logical dimensions do not match exactly")
+    source_grid_hash = logical_grid_hash(source.width, source.height, source.cells)
+    candidate_grid_hash = logical_grid_hash(artwork.width, artwork.height, artwork.cells)
+    if (artwork.cells != source.cells or candidate_grid_hash != source_grid_hash
+            or candidate_grid_hash != candidate.get("grid_hash")
+            or hashlib.sha256(candidate_png).hexdigest() != candidate.get("artwork_sha256")):
+        raise ReleaseError("candidate logical artwork grid does not equal the exact OWNER_UPLOAD-derived grid")
+
+
+def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classification: Mapping[str, Any]) -> None:
+    """Read and compare only this candidate's canonical source and artwork bytes."""
+
+    from .. import studio_extensions as studio
+
+    lineage = _candidate_source_lineage(candidate)
+    source_id = lineage.get("source_id")
+    expected_record = f"level_factory/output/owner-uploads/{source_id}/source.json"
+    if lineage.get("source_record") != expected_record:
+        raise ReleaseError("candidate source record path is not the canonical OWNER_UPLOAD path")
+    try:
+        source_record = studio.verify_owner_source(str(source_id))
+        record_path, source_path = studio._source_record_paths(str(source_id))
+        repository = studio._repository_root().resolve()
+        candidate_root = (repository / str(candidate.get("source_path", ""))).resolve()
+        if (not record_path.is_relative_to(repository) or not source_path.is_relative_to(repository)
+                or not candidate_root.is_relative_to(repository)
+                or candidate_root.name != str(candidate.get("candidate_id", ""))):
+            raise ReleaseError("candidate or OWNER_UPLOAD source path escaped the canonical repository")
+        source_png = source_path.read_bytes()
+        candidate_png = (candidate_root / "artwork.png").read_bytes()
+    except ReleaseError:
+        raise
+    except (OSError, TypeError, ValueError) as exc:
+        raise ReleaseError("exact OWNER_UPLOAD source or candidate artwork bytes could not be read") from exc
+    _validate_source_grid_bytes(candidate, classification, lineage, source_record, source_png, candidate_png)
 
 
 def _official_challenge_vector(official: Mapping[str, Any]) -> list[float]:
@@ -413,19 +487,13 @@ def release_entries() -> list[dict[str, Any]]:
             if value.get("eligibility_source") != "OWNER_ACCEPT" or not isinstance(latest, Mapping) or latest.get("disposition") != "ACCEPT":
                 continue
             try:
-                classification = validate_pool_candidate_provenance(current_candidate, latest)
+                classification = validate_pool_candidate_provenance(current_candidate, latest, verify_source_grid=False)
             except ReleaseError:
                 continue
             if value.get("candidate_classification") != classification:
                 raise ReleaseError(f"Release Pool candidate classification changed or disappeared: {path.name}")
-            lineage = _candidate_source_lineage(current_candidate)
-            try:
-                source_record = studio.verify_owner_source(str(lineage.get("source_id", "")))
-            except (OSError, ValueError, TypeError) as exc:
-                raise ReleaseError(f"Release Pool OWNER_UPLOAD source is no longer verifiable: {path.name}") from exc
-            if (source_record.get("source_sha256") != classification.get("source_sha256")
-                    or source_record.get("source_bytes_sha256") != classification.get("source_sha256")):
-                raise ReleaseError(f"Release Pool OWNER_UPLOAD source bytes no longer match classification: {path.name}")
+            if value.get("candidate", {}).get("candidate_id") != candidate_id:
+                raise ReleaseError(f"Release Pool candidate payload identity changed: {path.name}")
         for name, file_record in value.get("files", {}).items():
             evidence_file = Path(str(file_record.get("path", "")))
             if not evidence_file.is_file() or _hash(evidence_file.read_bytes()) != file_record.get("sha256"):
@@ -456,6 +524,28 @@ def _eligibility_matches_current_review(entry: Mapping[str, Any], latest_review:
             and latest_review.get("review_id") == review_id
         )
     return False
+
+
+def _production_release_entries() -> list[dict[str, Any]]:
+    """Return only explicitly classified, currently owner-accepted production entries."""
+
+    from .. import studio_extensions as studio
+
+    eligible: list[dict[str, Any]] = []
+    for entry in release_entries():
+        classification = entry.get("candidate_classification")
+        candidate_id = str(entry.get("candidate_id", ""))
+        latest = studio._latest_review(candidate_id)
+        if (not isinstance(classification, Mapping)
+                or classification.get("candidate_class") != CandidateClass.PRODUCTION_CANDIDATE.value
+                or entry.get("eligibility_source") != "OWNER_ACCEPT"
+                or not _eligibility_matches_current_review(entry, latest)
+                or entry.get("review_id") != latest.get("review_id")
+                or not isinstance(entry.get("candidate"), Mapping)
+                or entry["candidate"].get("candidate_id") != candidate_id):
+            continue
+        eligible.append(entry)
+    return eligible
 
 
 def _game_authority(game: Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -575,7 +665,7 @@ def _game_authority(game: Path) -> tuple[dict[str, Any], dict[str, Any]]:
 def build_release_plan(*, game_project: str | Path | None = None, k: int = 100, locks: Mapping[int, str] | None = None) -> dict[str, Any]:
     game = discover_game_project(game_project)
     catalog, authority = _game_authority(game)
-    entries = release_entries()
+    entries = _production_release_entries()
     plan = build_campaign_plan(catalog=catalog, authority=authority, pool=entries, k=k, locks=locks)
     from .. import studio_extensions as studio
     plan_path = studio.extensions_root() / "release" / "campaign_plan.json"
@@ -592,13 +682,16 @@ def validate_release_plan(*, plan_hash: str, game_project: str | Path | None = N
     plan_path = studio.extensions_root() / "release" / "campaign_plan.json"
     plan = _json(plan_path)
     if plan.get("plan_hash") != plan_hash: raise ReleaseError("APPROVE requires the current exact campaign plan hash")
-    entries = {entry["candidate_id"]: entry for entry in release_entries()}
+    entries = {entry["candidate_id"]: entry for entry in _production_release_entries()}
     rows = plan.get("slots", [])
     prefix = []
     for row in rows:
         if not row.get("chosen_id"): break
         prefix.append(row)
     if not prefix: raise ReleaseError("campaign plan has no publishable contiguous prefix")
+    missing = [str(row.get("chosen_id", "")) for row in prefix if str(row.get("chosen_id", "")) not in entries]
+    if missing:
+        raise ReleaseError("campaign plan selected a legacy or no-longer-eligible Pool entry")
     numbers = [int(row["n"]) for row in prefix]
     if numbers != list(range(numbers[0], numbers[0] + len(numbers))): raise ReleaseError("campaign plan prefix is not contiguous")
     catalog, authority = _game_authority(game)
@@ -609,6 +702,13 @@ def validate_release_plan(*, plan_hash: str, game_project: str | Path | None = N
     for row in prefix:
         entry = entries[str(row["chosen_id"])]
         bundle = (studio._repository_root() / str(entry["source_bundle"])).resolve()
+        latest = studio._latest_review(str(row["chosen_id"]))
+        try:
+            classification = validate_pool_candidate_provenance(entry["candidate"], latest)
+        except (KeyError, TypeError, ReleaseError) as exc:
+            raise ReleaseError("selected campaign candidate failed current OWNER_UPLOAD provenance revalidation") from exc
+        if classification != entry.get("candidate_classification"):
+            raise ReleaseError("selected campaign candidate classification changed since Pool entry")
         items.append({"candidate": entry["candidate"], "pipeline": entry["pipeline"], "source_bundle": bundle, "level_number": int(row["n"])})
     return {"game_project": game, "plan": plan, "prefix": prefix, "items": items}
 
