@@ -1,0 +1,36 @@
+# SB-LFX-018-R05-G02-R04 | CLEANUP FIRST, then minimal UI overlay | CODEX MASTER PROMPT
+
+Date: 2026-10-16. Repository: Sekiph82/ScrubBots-Level-Factory, main.
+Canonical working directory: C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator.
+
+## Owner decision
+The owner authorizes deleting **genuinely unnecessary old test/install byproducts before coding** and expressly forbids leaving disk-consuming residue. This is NOT blanket permission to remove owner files, required test source, evidence, an active installed Studio or previous deletion-policy-denied files. Owner also authorizes creating one small single-controller updater for the already-approved Factory Studio layout fixes. Proceed continuously without repeated normal-close questions; real safety conflicts are stop conditions.
+
+Read LIVE root TASKS.md (only tracker), AGENTS.md, GOVERNANCE.md, docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md, and .hiveai/audits/SB_LFX_018_R05_G02_R03_SCOPED_INSTALLER_CAPABILITY_GAP_INDEPENDENT_AUDIT_V01.md.
+
+### Phase 1, compulsory disk hygiene BEFORE product edits
+- Check canonical checkout origin, branch, clean tracked status; fetch and use ff-only ONLY if HEAD ancestor and no untracked collision. No reset, rebase, merge commit, stash, force, clone, worktree or new TEMP.
+- Inventory **existing** Factory-specific disposable leftovers by exact full path and on-disk bytes: obsolete test output, stale build/install stage, duplicate installer bundles and known failed test scratch. Check no running process uses them, no owner data or current Release dependency, no original PNG, no protected source or historical audit evidence. Use metadata/hash/diff, not unbounded content scans.
+- Delete **only** proven disposable files safely by the normal permitted operation, with explicit exact-path scope. Record before/after disk free bytes, individually removed paths/sizes, and paths preserved. Do not touch other projects, other APPDATA/TEMP, user Downloads, stashes, linked worktrees, the active 2,316-file Release, launcher/shortcut, original 140 PNG, accepted 002, nine READY records, or required Git source tests. **The 16 files under .pytest-scratch-sb-lf02-008-20261015 were previously deletion-policy-blocked: DO NOT retry, rename, relocate or circumvent that denial.** No broad recursive folder deletion and no mass 'git clean'. Any ambiguous, denied or currently needed file stays; report retained reason, then continue if storage adequate. It is better to retain a small uncertain file than delete real owner content.
+- Do not create disk-backed test logs, new cache, snapshots, archive, extra duplicate installation folders or evidence PNG copies. Existing project caches are reused if safe. Report honestly if deletions were impossible or nothing was proved disposable; do not invent free-space gains.
+
+### Phase 2, build tiny isolated installer
+Existing scripts/install_factory_studio_shortcut.ps1 is FULL installer: it stages 2,331 tracked files, changes shortcut and drops manifest overlay fields. **Do not invoke or edit it.** Implement a NEW SMALL tracked updater scripts/install_factory_studio_ui_overlay.ps1 with dry-run/read-only preflight and explicit apply mode, accepting ONLY:
+Release/ScrubBots Factory Studio/level_factory/scripts/factory_studio_exact_ui.gd
+and Release/ScrubBots Factory Studio/.factory-studio-install-manifest.json.
+
+The approved source contains R01 eight uniform Release Pool action/help buttons and activity under last action, plus R02 1100x720 four-card dock fix (source commits aaad0f1 and aded2fd). Do NOT edit UI/game logic or rerun broad UI/game suites.
+
+Preflight requires: clean published main, exact installed Studio process ABSENT (other game's Godot processes irrelevant), owner normal X-close already attested, canonical path with no symlinks/junctions, actual installed controller and manifest matching their prior manifest SHA, controller included exactly once in managedFiles and approved nine overlayPaths, 2,316 current managed entries and all existing manifest fields preserved, unrelated launcher/project/shortcut unchanged, and target source SHA newly verified. Unexpected owner change, conflict or policy denial -> STOP WITHOUT INSTALL.
+
+Apply must update exactly the approved controller and its v1 manifest entry, leave installationMode, baseRevision, sourceRevision, overlayPaths and all other managed SHA values unchanged. Record new controller commit/SHA as a distinct overlay receipt (baseRevision/sourceRevision continue representing older installed base, not new main). Use a **tiny bounded rollback mechanism** for just old controller+old manifest, with hash checks and safe restoration if interrupted; do not stage/copy/reinstall 2,331 files, create new backup directories, use OS TEMP, modify Desktop shortcut or keep multiple copies of the app. You may create at most TWO small recovery copies in the existing installed Release root, with exact names and sizes logged. They remain ONLY while needed for the owner's AFTER visual acceptance; in a later separately audited cleanup, safely remove these two exact task-created recovery copies once successful installation and user acceptance make them redundant. Do not delete them prematurely and leave rollback impossible.
+No other new Release files or folders may remain. If safe transactional update cannot be assured or writing is denied, report INSTALL BLOCKED and leave old Release untouched, without improvising other methods.
+
+### Phase 3, bounded verification, publication and installed handoff
+- Only small static/read-only and in-memory manifest tests, no new test output files. Test refusal on altered hashes, missing overlay approval, already-installed state, preserved fields/count and rollback path. Check script parsing and git diff --check if safe. **NO GitHub Actions/CI, hosted tests, workflow edits/dispatch, solver/game replay, 140-item batch, R2, cloud, production publish or current-game CPX-002.**
+- Commit updater (and minimal in-memory validation if necessary), append concise audit-friendly chronology to ONLY existing .hiveai/codex-logs/SB-LFX-018-C001-R02-R05_PRODUCTION_HISTORY_FULL_REGRESSION_EVIDENCE_CODEX_LOG.md. Do not modify GPT-owned TASKS/audits/prompts/criteria. Publish clean fast-forward-safe main via normal push, recheck synced HEAD/origin main.
+- Run updater preflight after publication, then apply ONLY if all security gates pass and no exact installed Studio process running; do not ask owner to confirm X-close again. No launch/close of Studio by Codex.
+- Recheck installed controller SHA equals source, new manifest overlay receipt and preserved fields, 2,316 entries, project/launcher/shortcut unmodified; document exact backup paths/sizes and unavoidable footprint. Report new untracked recovery files separately from original 3,220 paths; do not falsely assert all untracked unchanged if anything was intentionally removed/added.
+- Owner manually opens existing shortcut and sends ONE AFTER RELEASE POOL screenshot. Until then mark INSTALLED HASH VERIFIED (if true) / OWNER VISUAL PENDING; full R05 real game/production OPEN.
+
+If deletion is blocked, never bypass policy; continue if capacity permits. If insufficient storage, stop with measured requirement rather than creating a heavy staging area.
