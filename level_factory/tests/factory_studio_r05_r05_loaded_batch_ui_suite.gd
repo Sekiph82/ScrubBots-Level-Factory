@@ -11,11 +11,12 @@ class ReadOnlyGateway extends RefCounted:
 
 	func run_studio_extension(operation: String, request: Dictionary) -> Dictionary:
 		calls.append({"operation": operation, "request": request.duplicate(true)})
+		if operation == "loaded-png-batch-create":
+			source_ids = request.get("source_ids", []).duplicate()
 		if extension_responses.has(operation):
 			var response: Variant = extension_responses[operation]
 			return response.duplicate(true) if response is Dictionary else response
 		if operation == "loaded-png-batch-create":
-			source_ids = request.get("source_ids", []).duplicate()
 			return {"batch_id": "batch-loaded-fixture", "counts": {"success": source_ids.size(), "failed": 0}}
 		if operation == "png-batch-create":
 			return {"job": planned_job.duplicate(true)}
@@ -59,17 +60,30 @@ func _run_suite() -> void:
 	var gateway := ReadOnlyGateway.new()
 	var all_ids: Array[String] = []
 	for index in range(9):
-		var source_id := "owner-upload-" + ("%064x" % (index + 1))
+		var source_id := "owner-upload-" + ("%064x" % (0x7fffffff00000000 + index))
 		all_ids.append(source_id)
 		ui.call("_upsert_imported_source", {
 			"path": "", "source_id": source_id,
+			"source_record_sha256": "%064x" % (0x100 + index),
 			"display_filename": "%03d_32x32px.png" % (index + 2),
 			"width": 32, "height": 32, "disposition": "IMPORTED",
 		})
+	var gameplay_sources: Array = ui.get("_gameplay_sources")
+	var composite_items: Array[Dictionary] = []
+	for index in range(all_ids.size()):
+		var source: Dictionary = gameplay_sources[index]
+		composite_items.append({
+			"source_id": all_ids[index],
+			"source_sha256": str(source.get("source_sha256", "")),
+			"source_record_sha256": str(source.get("source_record_sha256", "")),
+		})
 	var result_items: Array[Dictionary] = []
 	for index in range(all_ids.size()):
+		var source: Dictionary = gameplay_sources[index]
 		result_items.append({
 			"index": index, "source_id": all_ids[index],
+			"source_sha256": str(source.get("source_sha256", "")),
+			"source_record_sha256": str(source.get("source_record_sha256", "")),
 			"original_filename": "%03d_32x32px.png" % (index + 2),
 			"column_count": 3 if index < 4 else 4 if index < 8 else 5,
 			"status": "FAILED", "reason": "fixture reason %d" % (index + 1),
@@ -81,6 +95,13 @@ func _run_suite() -> void:
 		"items": result_items,
 		"counts": {"total": 9, "ready": 0, "failed": 9, "rejected": 0, "skipped": 0, "remaining": 9},
 		"planned_quotas": {"3": 4, "4": 4, "5": 1}, "ready_mix": {"3": 0, "4": 0, "5": 0},
+	}
+	gateway.extension_responses = {
+		"loaded-png-batch-create": {
+			"batch_id": "batch-loaded-fixture",
+			"items": composite_items.duplicate(true),
+			"counts": {"success": all_ids.size(), "failed": 0},
+		},
 	}
 	ui.call("configure_gateway", gateway)
 	ui.call("_show_screen", "LEVEL FACTORY")
@@ -142,16 +163,36 @@ func _run_suite() -> void:
 	ui.set("_activity_panel", activity_panel)
 	ui.set("_activity_scroll", activity_scroll)
 	ui.set("_activity_rows", activity_rows)
-	ui.call("_render_batch_item_results", gateway.planned_job)
+	ui.set("_activity_source_id", all_ids[8])
+	_check(bool(ui.call("_batch_job_matches_loaded_sources")), "synthetic nine-source job did not match its composite and loaded SHA identities")
+	_check((gateway.planned_job["planned_quotas"] as Dictionary) == {"3": 4, "4": 4, "5": 1}, "planned 3/4/5 quota metadata was not preserved as 4/4/1")
+	_check((gateway.planned_job["items"] as Array).size() == 9, "planned job did not preserve all nine source items")
+	ui.call("_render_batch_item_results", gateway.planned_job, true)
 	await process_frame
 	var phase := ui.get("_activity_phase_label") as Label
-	_check(phase != null and phase.tooltip_text.contains("Planned 3/4/5 4/4/1"), "batch quota summary was not retained with the activity status")
-	for index in range(9):
-		var row := activity_rows.get_node_or_null("BatchResult_%03d" % index) as Label
-		_check(row != null, "result row %d is missing" % index)
-		if row != null:
-			_check(row.text.contains("FAILED") and row.text.contains("fixture reason %d" % (index + 1)), "result row %d omitted its failed status or reason" % index)
-			_check(row.tooltip_text.contains(all_ids[index]), "result row %d omitted the bound source identity" % index)
+	_check(phase != null and phase.text.contains("FAILED") and phase.tooltip_text.contains(str(gateway.planned_job["items"][8]["source_sha256"])) and phase.tooltip_text.contains(str(gateway.planned_job["items"][8]["source_record_sha256"])), "selected-source activity did not retain its SHA-bound failed status")
+	for index in range(8):
+		_check(activity_rows.get_node_or_null("BatchResult_%03d" % index) == null, "unselected result row %d leaked into selected-source Activity" % index)
+	var selected_row := activity_rows.get_node_or_null("BatchResult_008") as Label
+	_check(selected_row != null, "selected source result row was not rendered")
+	if selected_row != null:
+		_check(selected_row.text.contains("FAILED") and selected_row.text.contains("fixture reason 9"), "selected result row omitted its failed status or reason")
+		_check(selected_row.tooltip_text.contains(all_ids[8]) and selected_row.tooltip_text.contains(str(gateway.planned_job["items"][8]["source_sha256"])) and selected_row.tooltip_text.contains(str(gateway.planned_job["items"][8]["source_record_sha256"])), "selected result row omitted its source or record SHA binding")
+	for mismatch_key in ["source_sha256", "source_record_sha256"]:
+		for child in activity_rows.get_children():
+			activity_rows.remove_child(child)
+			child.free()
+		var mismatched_job: Dictionary = gateway.planned_job.duplicate(true)
+		var mismatched_items: Array = mismatched_job["items"]
+		var mismatched_item: Dictionary = mismatched_items[8]
+		mismatched_item[mismatch_key] = "0".repeat(64)
+		mismatched_items[8] = mismatched_item
+		mismatched_job["items"] = mismatched_items
+		ui.set("_batch_snapshot", mismatched_job)
+		_check(not bool(ui.call("_batch_job_matches_loaded_sources")), "mismatched %s did not fail closed" % mismatch_key)
+		ui.call("_render_batch_item_results", mismatched_job, true)
+		_check(activity_rows.get_child_count() == 0, "mismatched %s leaked an Activity result" % mismatch_key)
+	ui.set("_batch_snapshot", gateway.planned_job.duplicate(true))
 	var rejected_job := gateway.planned_job.duplicate(true)
 	rejected_job["state"] = "COMPLETE"
 	rejected_job["counts"] = {"total": 9, "ready": 8, "failed": 0, "rejected": 1, "skipped": 0, "remaining": 0}
