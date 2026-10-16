@@ -455,23 +455,40 @@ func _layout_release_pool_dashboard(left_scale: float, right_start: float, right
 				remove.size = Vector2(24.0 * scale_y, 24.0 * scale_y)
 	var release_help_names := ["ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	var action_names := ["ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest"]
+	var details_panel := get_node_or_null("RuntimeDetailsPanel") as Control
+	var panel_rect := details_panel.get_global_rect() if details_panel != null else Rect2(right_start, 116.0 * scale_y, right_width, size.y - 134.0 * scale_y)
+	var right_scale := panel_rect.size.x / 313.0
+	var action_inset := 10.0 * right_scale
+	var help_width := 30.0 * right_scale
+	var help_gap := 5.0 * right_scale
+	var action_x := panel_rect.position.x + action_inset
+	var action_width := maxf(120.0, panel_rect.size.x - action_inset * 2.0 - help_width - help_gap)
+	var release_action_row_height := clampf(34.0 * scale_y, 28.0, 36.0)
+	var row_gap := clampf(6.0 * scale_y, 4.0, 7.0)
+	var actions_top := 398.0 * scale_y
 	for index in range(action_names.size()):
 		var action := get_node_or_null(action_names[index]) as Control
 		var info := get_node_or_null(release_help_names[index]) as Control
 		if action == null or info == null:
 			continue
-		var info_width := minf(32.0 * scale_y, action.size.x * 0.16)
-		info.position = Vector2(action.position.x + action.size.x - info_width, action.position.y)
-		info.size = Vector2(info_width, action.size.y)
-		action.size.x = maxf(80.0, action.size.x - info_width - 4.0 * scale_y)
+		var action_y := actions_top + float(index) * (release_action_row_height + row_gap)
+		action.position = Vector2(action_x, action_y)
+		action.size = Vector2(action_width, release_action_row_height)
+		info.position = Vector2(action_x + action_width + help_gap, action_y)
+		info.size = Vector2(help_width, release_action_row_height)
 	if _release_activity_title != null and _release_activity_scroll != null:
-		var panel_bottom := size.y - 18.0 * scale_y
-		var min_top := (get_node_or_null("PreviewReleaseManifest") as Control).position.y + (get_node_or_null("PreviewReleaseManifest") as Control).size.y + 8.0 * scale_y
-		var activity_top := maxf(min_top, panel_bottom - 220.0 * scale_y)
-		_release_activity_title.position = Vector2(right_start + 2.0, activity_top)
-		_release_activity_title.size = Vector2(maxf(200.0, right_width - 4.0), 18.0 * scale_y)
-		_release_activity_scroll.position = Vector2(right_start + 2.0, activity_top + 20.0 * scale_y)
-		_release_activity_scroll.size = Vector2(maxf(200.0, right_width - 4.0), maxf(60.0, panel_bottom - _release_activity_scroll.position.y - 2.0 * scale_y))
+		var last_action := get_node_or_null("PreviewReleaseManifest") as Control
+		var last_help := get_node_or_null("PreviewReleaseManifestHelp") as Control
+		var last_row_bottom := maxf(last_action.get_global_rect().end.y, last_help.get_global_rect().end.y) if last_action != null and last_help != null else actions_top
+		var activity_top := last_row_bottom + 8.0 * scale_y
+		var activity_x := panel_rect.position.x + action_inset
+		var activity_width := panel_rect.size.x - action_inset * 2.0
+		var title_height := clampf(18.0 * scale_y, 16.0, 20.0)
+		var activity_bottom := panel_rect.end.y - 8.0 * scale_y
+		_release_activity_title.position = Vector2(activity_x, activity_top)
+		_release_activity_title.size = Vector2(activity_width, title_height)
+		_release_activity_scroll.position = Vector2(activity_x, activity_top + title_height + 3.0 * scale_y)
+		_release_activity_scroll.size = Vector2(activity_width, maxf(80.0, activity_bottom - _release_activity_scroll.position.y))
 		_release_activity_title.visible = _screen == "RELEASE POOL"
 		_release_activity_scroll.visible = _screen == "RELEASE POOL"
 		_release_candidate_scroll.visible = _screen == "RELEASE POOL"

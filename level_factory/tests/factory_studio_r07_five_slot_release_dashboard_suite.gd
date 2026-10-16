@@ -50,19 +50,28 @@ func _run_suite() -> void:
 	ui.call("configure_gateway", gateway)
 	ui.call("_show_screen", "RELEASE POOL")
 	await process_frame
-	var sizes: Array[Vector2i] = [Vector2i(1536, 864), Vector2i(1536, 1024), Vector2i(1920, 1080), Vector2i(1536, 864)]
+	var sizes: Array[Vector2i] = [Vector2i(1536, 900), Vector2i(1536, 1024), Vector2i(1100, 720), Vector2i(1920, 1080), Vector2i(1536, 900)]
 	for client in sizes:
 		viewport.size = client
 		ui.size = Vector2(client)
 		ui.call("_apply_responsive_layout")
 		await process_frame
+		var release_snapshot := _assert_release_pool_layout(ui, Vector2(client))
+		ui.call("_apply_responsive_layout")
+		ui.call("_show_screen", "PIXEL ART")
+		ui.call("_show_screen", "LEVEL FACTORY")
+		ui.call("_show_screen", "RELEASE POOL")
+		await process_frame
+		_check(_release_layout_snapshot(ui) == release_snapshot, "Release Pool geometry changed after repeated layout/tab switching at %s" % client)
 		var left := ui.get_node("RuntimeLeftPanel") as Control
 		var dock := ui.get_node("RuntimeBottomStrip") as Control
+		var details := ui.get_node("RuntimeDetailsPanel") as Control
 		var preview := ui.get_node("VisualReviewClip") as Control
 		var scroll := ui.get_node("ReleaseCandidateScroll") as Control
 		var manage := ui.get_node("ManageSelection") as Control
 		var select_all := ui.get_node("SelectAllRelease") as Control
 		var clear := ui.get_node("ClearRelease") as Control
+		_check(not details.get_global_rect().intersects(dock.get_global_rect()), "Release Pool Details overlaps the selected-release bottom dock at %s" % client)
 		_check(_contains_with_padding(Rect2(left.position, left.size), Rect2(scroll.position, scroll.size), 4.0), "candidate list escapes left panel at %s" % client)
 		_check(scroll.get_global_rect().end.y <= manage.get_global_rect().position.y + 0.5, "candidate list overlaps Manage Selection at %s" % client)
 		_check(_contains_with_padding(Rect2(left.position, left.size), manage.get_global_rect(), 4.0), "Manage Selection is not pinned inside the left panel at %s" % client)
@@ -70,11 +79,23 @@ func _run_suite() -> void:
 		_check(_contains_with_padding(Rect2(left.position, left.size), clear.get_global_rect(), 4.0), "Clear is not pinned inside the left panel at %s" % client)
 		for node_name in ["SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "AddMoreLevels"]:
 			var item := (ui.get_node(node_name) as Control).get_global_rect()
-			_check(_contains_with_padding(dock.get_global_rect(), item, 3.0), "%s escapes selected-release bottom dock at %s" % [node_name, client])
+			if client.x < 1536.0:
+				_check(item.position.x >= 0.0 and item.end.x <= client.x and item.position.y >= dock.get_global_rect().position.y and item.end.y <= dock.get_global_rect().end.y, "%s escapes the client or vertically overlaps the selected-release dock at %s" % [node_name, client])
+			else:
+				_check(_contains_with_padding(dock.get_global_rect(), item, 3.0), "%s escapes selected-release bottom dock at %s" % [node_name, client])
 			_check(not item.intersects(preview.get_global_rect()), "%s overlaps Visual Review at %s" % [node_name, client])
 		if client == Vector2i(1920, 1080):
 			var visible_rows := floori(scroll.size.y / (float(ui.get("_release_candidate_row_height")) + 3.0))
 			_check(visible_rows >= 14 and visible_rows <= 15, "maximized 1920x1080 list exposes %d rows instead of 14-15" % visible_rows)
+	for index in range(12):
+		ui.call("_append_release_pool_activity", "R07 geometry event %02d" % index, "READY", "layout scroll fixture %s " % index + "more text ".repeat(12))
+	await process_frame
+	var activity_scroll := ui.get_node("ReleasePoolActivityScroll") as ScrollContainer
+	var activity_bar := activity_scroll.get_v_scroll_bar()
+	_check(activity_bar.max_value > activity_bar.page, "Release Pool activity does not scroll when events exceed the available pane")
+	activity_scroll.scroll_vertical = activity_bar.max_value
+	await process_frame
+	_check(activity_scroll.scroll_vertical > 0, "Release Pool activity did not follow its scroll tail")
 
 	for amount in [0, 5, 15, 25, 150]:
 		var entries: Array[Dictionary] = []
@@ -301,3 +322,61 @@ func _contains_with_padding(outer: Rect2, inner: Rect2, padding: float) -> bool:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		_errors.append(message)
+
+
+func _assert_release_pool_layout(ui: Control, client: Vector2) -> Array[Rect2]:
+	var action_names := ["ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest"]
+	var help_names := ["ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
+	var details := ui.get_node("RuntimeDetailsPanel") as Control
+	var actions: Array[Control] = []
+	var helps: Array[Control] = []
+	var snapshot: Array[Rect2] = []
+	for index in range(action_names.size()):
+		var action := ui.get_node(action_names[index]) as Control
+		var help := ui.get_node(help_names[index]) as Control
+		actions.append(action)
+		helps.append(help)
+		snapshot.append(action.get_global_rect())
+		snapshot.append(help.get_global_rect())
+		_check(_rect_inside(details.get_global_rect(), action.get_global_rect(), 0.1), "%s escapes RuntimeDetailsPanel at %s" % [action_names[index], client])
+		_check(_rect_inside(details.get_global_rect(), help.get_global_rect(), 0.1), "%s escapes RuntimeDetailsPanel at %s" % [help_names[index], client])
+		_check(not action.get_global_rect().intersects(help.get_global_rect()), "%s overlaps its help control at %s" % [action_names[index], client])
+		if index > 0:
+			_check(is_equal_approx(action.size.x, actions[0].size.x) and is_equal_approx(action.size.y, actions[0].size.y), "action dimensions are not uniform at %s" % client)
+			_check(is_equal_approx(help.size.x, helps[0].size.x) and is_equal_approx(help.size.y, helps[0].size.y), "help dimensions are not uniform at %s" % client)
+			_check(is_equal_approx(action.position.x, actions[0].position.x), "action x alignment differs at %s" % client)
+			_check(is_equal_approx(help.position.x, helps[0].position.x), "help x alignment differs at %s" % client)
+			var row_gap := action.position.y - actions[index - 1].get_rect().end.y
+			_check(row_gap >= 3.9 and row_gap <= 7.1, "action row gap is inconsistent or too small at %s: %s" % [client, row_gap])
+			if index > 1:
+				var previous_gap := actions[index - 1].position.y - actions[index - 2].get_rect().end.y
+				_check(is_equal_approx(row_gap, previous_gap), "action row gaps differ at %s" % client)
+	var title := ui.get_node("ReleasePoolActivityTitle") as Control
+	var scroll := ui.get_node("ReleasePoolActivityScroll") as Control
+	var last_bottom := maxf(actions.back().get_global_rect().end.y, helps.back().get_global_rect().end.y)
+	var title_gap := title.get_global_rect().position.y - last_bottom
+	_check(title_gap >= 5.0 and title_gap <= 10.1, "Activity title is not directly below final action row at %s: %s" % [client, title_gap])
+	_check(scroll.get_global_rect().position.y >= title.get_global_rect().end.y, "Activity body overlaps its title at %s" % client)
+	_check(_rect_inside(details.get_global_rect(), title.get_global_rect(), 0.1), "Activity title escapes RuntimeDetailsPanel at %s" % client)
+	_check(_rect_inside(details.get_global_rect(), scroll.get_global_rect(), 0.1), "Activity body escapes RuntimeDetailsPanel at %s" % client)
+	_check(scroll.get_global_rect().end.y <= details.get_global_rect().end.y - 5.0, "Activity body does not fill to the Details panel bottom at %s" % client)
+	_check(scroll.size.y >= 80.0, "Activity body is too short to use at %s: %s" % [client, scroll.size.y])
+	for row_index in range(1, 6):
+		var summary := ui.get_node_or_null("RuntimeDetailsRow%d" % row_index) as Control
+		if summary != null and summary.visible:
+			_check(actions[0].get_global_rect().position.y >= summary.get_global_rect().end.y, "action controls overlap the top Details summary at %s" % client)
+	snapshot.append(title.get_global_rect())
+	snapshot.append(scroll.get_global_rect())
+	return snapshot
+
+
+func _release_layout_snapshot(ui: Control) -> Array[Rect2]:
+	var names := ["ReleaseStaging", "ReleaseStagingHelp", "ReleaseProduction", "ReleaseProductionHelp", "PreflightRelease", "PreflightReleaseHelp", "ValidateReleaseAssets", "ValidateReleaseAssetsHelp", "BuildReleasePack", "BuildReleasePackHelp", "UploadR2Status", "UploadR2StatusHelp", "UploadSelected", "UploadSelectedHelp", "PreviewReleaseManifest", "PreviewReleaseManifestHelp", "ReleasePoolActivityTitle", "ReleasePoolActivityScroll"]
+	var snapshot: Array[Rect2] = []
+	for node_name in names:
+		snapshot.append((ui.get_node(node_name) as Control).get_global_rect())
+	return snapshot
+
+
+func _rect_inside(outer: Rect2, inner: Rect2, padding: float = 0.0) -> bool:
+	return inner.position.x >= outer.position.x - padding and inner.position.y >= outer.position.y - padding and inner.end.x <= outer.end.x + padding and inner.end.y <= outer.end.y + padding
