@@ -67,7 +67,9 @@ function Invoke-Git([string[]]$Arguments) {
 
 function Assert-PublishedSource {
     if ($script:RepoRoot -ine $script:ExpectedRepoRoot) { throw "Unexpected repository root: $script:RepoRoot" }
-    if ((Invoke-Git @('rev-parse', '--show-toplevel')) -ine $script:ExpectedRepoRoot) { throw 'Git root does not match canonical Desktop checkout.' }
+    $gitRoot = (Invoke-Git @('rev-parse', '--show-toplevel')).Replace('/', '\').TrimEnd('\')
+    $canonicalRoot = [IO.Path]::GetFullPath($script:ExpectedRepoRoot).TrimEnd('\')
+    if (-not [StringComparer]::OrdinalIgnoreCase.Equals($gitRoot, $canonicalRoot)) { throw 'Git root does not match canonical Desktop checkout.' }
     if ((Invoke-Git @('branch', '--show-current')) -cne 'main') { throw 'Updater requires branch main.' }
     $head = Invoke-Git @('rev-parse', 'HEAD')
     $origin = Invoke-Git @('rev-parse', 'origin/main')
