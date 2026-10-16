@@ -436,11 +436,30 @@ func _layout_release_pool_dashboard(left_scale: float, right_start: float, right
 	var gap := 8.0 * maxf(0.75, float(dock.size.x) / 804.0)
 	var heading_gap := 28.0 * scale_y
 	var row_height := maxf(34.0, dock.size.y - heading_gap - 8.0 * scale_y)
-	var row_width := maxf(50.0, (dock.size.x - pad * 2.0 - gap * 3.0) / 4.0)
+	var row_width := (dock.size.x - pad * 2.0 - gap * 3.0) / float(names.size())
+	if row_width <= 0.0:
+		return
 	var row_y := dock.position.y + heading_gap
 	if heading != null:
 		heading.position = dock.position + Vector2(8.0, 12.0 * scale_y)
 		heading.size = Vector2(dock.size.x - 16.0, 20.0 * scale_y)
+	var card_controls: Array[Button] = []
+	for node_name in names:
+		var button := get_node_or_null(node_name) as Button
+		if button != null:
+			card_controls.append(button)
+	var card_font_size := 9
+	for candidate_font_size in range(12, 8, -1):
+		var all_captions_fit := true
+		for button in card_controls:
+			button.add_theme_font_size_override("font_size", candidate_font_size)
+			if button.get_combined_minimum_size().x > row_width:
+				all_captions_fit = false
+		if all_captions_fit:
+			card_font_size = candidate_font_size
+			break
+	for button in card_controls:
+		button.add_theme_font_size_override("font_size", card_font_size)
 	for index in range(names.size()):
 		var control := get_node_or_null(names[index]) as Control
 		if control == null:

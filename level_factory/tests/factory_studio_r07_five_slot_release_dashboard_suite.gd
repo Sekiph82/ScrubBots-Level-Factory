@@ -77,12 +77,23 @@ func _run_suite() -> void:
 		_check(_contains_with_padding(Rect2(left.position, left.size), manage.get_global_rect(), 4.0), "Manage Selection is not pinned inside the left panel at %s" % client)
 		_check(_contains_with_padding(Rect2(left.position, left.size), select_all.get_global_rect(), 4.0), "Select All is not pinned inside the left panel at %s" % client)
 		_check(_contains_with_padding(Rect2(left.position, left.size), clear.get_global_rect(), 4.0), "Clear is not pinned inside the left panel at %s" % client)
-		for node_name in ["SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "AddMoreLevels"]:
+		var card_names := ["SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "AddMoreLevels"]
+		var previous_card: Rect2
+		var previous_gap := -1.0
+		for card_index in range(card_names.size()):
+			var node_name: String = card_names[card_index]
 			var item := (ui.get_node(node_name) as Control).get_global_rect()
-			if client.x < 1536.0:
-				_check(item.position.x >= 0.0 and item.end.x <= client.x and item.position.y >= dock.get_global_rect().position.y and item.end.y <= dock.get_global_rect().end.y, "%s escapes the client or vertically overlaps the selected-release dock at %s" % [node_name, client])
-			else:
-				_check(_contains_with_padding(dock.get_global_rect(), item, 3.0), "%s escapes selected-release bottom dock at %s" % [node_name, client])
+			_check(_contains_with_padding(dock.get_global_rect(), item, 3.0), "%s escapes selected-release bottom dock at %s: item=%s dock=%s" % [node_name, client, item, dock.get_global_rect()])
+			if card_index > 0:
+				_check(is_equal_approx(item.size.x, previous_card.size.x), "%s width differs from its previous selected-release card at %s" % [node_name, client])
+				var current_gap := item.position.x - previous_card.end.x
+				if previous_gap >= 0.0:
+					_check(absf(current_gap - previous_gap) <= 0.1, "%s horizontal gap differs from the other selected-release cards at %s" % [node_name, client])
+				previous_gap = current_gap
+			previous_card = item
+			if card_index < 3:
+				var remove := (ui.get_node("RemoveSelected%d" % (card_index + 1)) as Control).get_global_rect()
+				_check(_contains_with_padding(item, remove, 0.0), "RemoveSelected%d escapes its card at %s" % [card_index + 1, client])
 			_check(not item.intersects(preview.get_global_rect()), "%s overlaps Visual Review at %s" % [node_name, client])
 		if client == Vector2i(1920, 1080):
 			var visible_rows := floori(scroll.size.y / (float(ui.get("_release_candidate_row_height")) + 3.0))
