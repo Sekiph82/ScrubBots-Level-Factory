@@ -1487,3 +1487,8 @@ Document role: CODEX BUILDER LOG
 - Product/test commit `aded2fd5473ebd4af59e677451ee9eb26a1408bd` (`Fix selected-release dock containment at narrow width`) contains exactly the two prompt-authorized source/test files. Builder chronology is being committed separately in this log.
 - Before log commit/publication, fresh `git fetch --prune origin` left `origin/main=59b2370d5bed14d331ed7e6ba976a5da51ae9c78`; local main is 1 ahead / 0 behind and origin/main is an ancestor. `git diff --name-only origin/main...HEAD -- .github/workflows` is empty. The only workflow remains manual `workflow_dispatch`; no Actions/CI run will be started. There are 3,220 untracked paths and no tracked product changes remain outside the product commit.
 - Pre-receipt builder-log SHA-256: `BE7E845518461FBD30C00951A9A1F1D97ED64FD0C27E133302847F601F5BB38C`. Normal push and post-push parity verification are pending.
+
+## SB-LFX-018-R05-G02-R02 publication receipt | 2026-10-16
+
+- Pre-push fresh fetch confirmed `origin/main=59b2370d5bed14d331ed7e6ba976a5da51ae9c78`, local `HEAD=cafc1a5f62375bface4da30a0011c0153f4ccdef`, 2 ahead / 0 behind, origin is an ancestor, workflow diff empty and the only workflow remains manual `workflow_dispatch`. Normal `git push origin HEAD:main` succeeded, publishing product/test commit `aded2fd5473ebd4af59e677451ee9eb26a1408bd` and builder-evidence commit `cafc1a5f62375bface4da30a0011c0153f4ccdef`.
+- Post-push `git fetch --prune origin` confirmed local HEAD == origin/main `cafc1a5f62375bface4da30a0011c0153f4ccdef`, 0 ahead / 0 behind, tracked worktree clean, and 3,220 untracked owner paths preserved. This receipt is a separate log-only change; its commit and second normal push are pending.
