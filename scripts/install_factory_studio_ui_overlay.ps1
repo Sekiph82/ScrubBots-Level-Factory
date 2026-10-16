@@ -258,7 +258,12 @@ function Assert-Preflight {
         if (-not (Test-Path -LiteralPath $item.Path -PathType Leaf) -or (Get-FileSha256 $item.Path) -cne $item.Sha) { throw "Unrelated launcher/project/icon/shortcut hash changed: $($item.Path)" }
     }
     $tasks = Get-Content -LiteralPath (Join-Path $script:RepoRoot 'TASKS.md') -Raw
-    if ($tasks -notmatch 'STUDIO_OWNER_NORMAL_X_CLOSED_ATTESTED') { throw 'Published TASKS does not contain the recorded normal X-close attestation.' }
+    if ($tasks -notmatch 'SB-LFX-018-R05-MASTER-M01') { throw 'The active M01 task is not present in published TASKS.md.' }
+    $promptPath = Join-Path $script:RepoRoot '.hiveai\prompts\SB_LFX_018_R05_MASTER_M01_OWNER_GUI_BOOT_RECOVERY_AND_REAL_GAME_READINESS_NO_CI.md'
+    Assert-NoReparsePath $promptPath
+    if (-not (Test-Path -LiteralPath $promptPath -PathType Leaf)) { throw 'The authoritative M01 prompt is missing.' }
+    $prompt = Get-Content -LiteralPath $promptPath -Raw
+    if ($prompt -notmatch 'owner approved overlay entry' -or $prompt -notmatch 'Only update Release if preflight AND tests PASS') { throw 'The active prompt does not authorize this scoped controller overlay.' }
     $processes = @(Get-InstalledStudioProcesses)
     if ($processes.Count -ne 0) { throw 'An exact installed Factory Studio Godot process is running.' }
     if ((Test-Path -LiteralPath $script:RollbackController) -or (Test-Path -LiteralPath $script:RollbackManifest)) { throw 'A recovery path already exists; refusing to overwrite or create extra copies.' }
