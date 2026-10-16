@@ -1,0 +1,15 @@
+# SB-LFX-018-R05-G02-R02 | GPT independent criteria: 1100px bottom dock + installed native visual V01
+
+Date: 2026-10-16 Europe/Istanbul. No GitHub Actions, CI, hosted testing, new OS TEMP/worktree/clone/scratch or owner cleanup.
+
+**F01/F02 preserved:** previously GPT source-audited G02-R01 eight equal-sized aligned Release Pool right action/help rows and ACTIVITY immediately under Preview Manifest with real scroll to Details panel bottom must remain unchanged in form/function and pass numeric Godot tests at 1100x720, 1536x900, 1536x1024 and 1920x1080, plus repeated resize/tab switch. No changes to production actions/publish, Level Factory gameplay, Pixel Art layout.
+
+**F03 1100x720 bottom dock:** existing nine-pixel out-of-dock AddMoreLevels spill is corrected at narrow width, not hidden, moved outside viewport or waived. All four SelectedReleaseCard1/2/3/AddMoreLevels rectangles are fully within RuntimeBottomStrip with a small tested margin, matching widths/gaps, remove-X controls stay within corresponding cards. Reinstate strict actual-dock containment checks for **all sizes**, not only client-window containment below 1536. No new overflow introduced, and items do not overlap center canvas or right panel.
+
+**Affected tests:** real bounded Godot 4.7.2 focused suite final PASS at all four requested sizes and repeat cycle, plus activity scroll. Report genuine counts, test SHA and any intermediate red runs. Not independently executed by GPT until real remote code evidence is inspected. No full 1,848 Python regression required under no-scratch owner lock; do not claim historical failures waived.
+
+**Installer/native gate:** Codex checks exact installed manifest sourceRevision and controller bytes before any edit, verifies owner *normally* closed existing Studio, and only then performs existing owner-approved narrow controller overlay (with safe manifest/backups as required and allowed). No hot patch of live app, no forced process closing, no duplicate installer, no launcher or Desktop shortcut change, no owner art/READY/Pool or R2 content changes. If closure unknown/open, **do not install**; label INSTALL PENDING and retain intact old Release. Current owner BEFORE photos are not new installed proof.
+
+**Owner AFTER visual:** owner manually launches preexisting Studio Desktop shortcut and supplies RELEASE POOL screenshot confirming eight equal rows, ACTIVITY immediately beneath buttons to bottom, no new overlap, nine READY rows and zero accidental release operation. Owner explicit acceptance required for G02 visual PASS; source-test PASS alone does not close G02. Avoid speculative DEBUG title alteration: installed tracked launcher accepts exact DEBUG suffix.
+
+**Other gates:** owner-reported protected 3,220 untracked including 16 deletion-policy-denied scratch intact; 140 original PNG, 002 accepted, historical nine READY 4/4/1 preserved. Full current ScrubBots game/CPX-002 native solve/replay, R05 production, AI upstream creator identity and real Windows symlink-through-ART_FIRST/TOCTOU race-free handle verification stay OPEN.
