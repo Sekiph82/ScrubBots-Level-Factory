@@ -1,0 +1,24 @@
+# SB-LFX-018 R05-G02-R02 | Independent GPT source audit V01
+
+Date: 2026-10-16 Europe/Istanbul
+Repository: `Sekiph82/ScrubBots-Level-Factory`
+Baseline `59b2370d5bed14d331ed7e6ba976a5da51ae9c78`; builder product/test SHA `aded2fd5473ebd4af59e677451ee9eb26a1408bd`; final builder HEAD `850ce951808633618e6065730bfe46629601beb7`.
+**VERDICT: R02 F03 dock code/affected focused Godot evidence PASS / CLOSED. Physical installed Release update NOT RUN; owner AFTER screenshot and G02 full visual acceptance OPEN. Parent R05 game/production OPEN.**
+
+## Independent GitHub inspection
+GPT fetched GitHub main at `850ce951808633618e6065730bfe46629601beb7`, verified linear comparison from `59b2370d...` with exactly 3 additional commits (`aded2fd` source/tests, `cafc1a5` builder chronology, `850ce95` receipt). Net changes are precisely `level_factory/scripts/factory_studio_exact_ui.gd`, `level_factory/tests/factory_studio_r07_five_slot_release_dashboard_suite.gd`, and existing single chronological builder log. No net workflow change; current manual-only GitHub workflow preserved. GitHub Actions/CI NOT run by GPT or according to builder report.
+
+Builder confirms ancestor-check `git merge-base --is-ancestor HEAD origin/main` and standard `git merge --ff-only origin/main`, no new merge commit; after push, local `main=origin/main=850ce95`, 0 ahead/behind, tracked clean, 3,220 untracked paths unchanged (local state **builder-reported**, not independently accessed from GPT).
+
+## F03 narrow-width implementation and focused proof
+- At 1100x720 the reported 9–10 px overflow of `AddMoreLevels` came from a minimum text/button width of 120 px versus the 108 px available equal-card width. Controller now computes `row_width=(dock.size.x - 2*pad - 3*gap) / names.size()`, with a nonpositive-size guard, and chooses **one common font size 9..12** for all four buttons after measuring each caption's combined minimum. This maintains equal width and gap and prevents only the fourth button's caption from forcing a wider rectangle. Per-card selected actions and three remove-X controls remain unchanged.
+- The focused Godot suite now restores strict `_contains_with_padding(dock.global_rect, card.global_rect, 3)` for **every card at every size** and checks equal widths, equal spacing within 0.1px rounding, each remove icon inside its card and no canvas overlap. The prior small-screen client-only exemption was removed, not merely disguised.
+- Builder states **Godot 4.7.2** headless focused suite exit 0 and PASS for 1536x900, 1536x1024, 1100x720, 1920x1080, repeated 1536x900 + switch/scroll. There was an intermediate overly-strict floating-point gap equality failure (~0.00012px); corrected tolerance to <=0.1px, re-ran and PASS. AST or broad gameplay suites not claimed. GPT independently inspected final source/test diff but did **not execute** local Godot.
+- The exact R01 right eight equal action+help rows and ACTIVITY beneath buttons to Details bottom is unchanged by the R02 diff. No Pool/publish callbacks, Pixel Art, Level Factory source, game repo, original 140 PNGs or R2 modified.
+
+## Installation and visual gates (OPEN)
+- Existing installed Factory Studio Release manifest is builder-reported SHA256 `c7ab656d263a5c5dbf77f0400a41da45c86ca8f830272872923f19251e300995`, source revision `89d74c9fe758ad0766f7ff5290154a1f56548b14`, 2,316 managed entries, nine approved overlay paths, installed controller SHA256 `65a2eafee2620c8d35fafc84a8fb3748ad60d37a7a8bd9d33e634bed3e054c0c`. Current installed controller predates R01/R02. No native Studio process was closed or launched by builder. No installed files changed: `INSTALL PENDING OWNER NORMAL CLOSE`.
+- Existing owner screenshots at 02:56/02:57 are **BEFORE**. Without verified naturally closed Studio, approved safe narrow manifest-backed overlay and a new genuine owner RELEASE POOL screenshot, **G02 owner native AFTER visual acceptance is NOT VERIFIED**. Do not claim source/test PASS is installation PASS. If owner leaves Studio open, do not hot patch, kill, or alter installed app.
+- Historical saved nine READY/4-4-1 and 002 ACCEPT/Pool, 140 source PNGs, original launcher/desktop shortcut, 3,220 untracked paths including 16 prior policy-denied scratch protected. No native actual full current ScrubBots game/CPX-002 replay, game WIN/solver/load-check, AI original creator attestation, or NTFS ART_FIRST link/race-free handle security was verified. R05 parent remains DEFERRED/OPEN; historical 19 deselections/19 skips/6 ignored are not waived.
+
+**NEXT:** R05-G02-R03 installation receipt/owner AFTER visualization, **only** after owner naturally closes running Studio and current manifest+installed file hashes match. Avoid new source edits/tests/CI, avoid full reinstall, preserve protected files, and stop rather than bypass denial if exact scoped update or backup is not authorized.
