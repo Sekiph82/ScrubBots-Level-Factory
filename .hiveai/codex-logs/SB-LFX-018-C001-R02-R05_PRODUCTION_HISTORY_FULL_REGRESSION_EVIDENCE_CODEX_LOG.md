@@ -1620,3 +1620,8 @@ Document role: CODEX BUILDER LOG
 
 - One bounded next full-game proof after the startup fix is safely installed: first reconcile the pinned 232-file runtime with live game HEAD/rules, then, only with owner authorization for the exact preserved 002 source and 4-column plan, run one non-publishing canonical current-main solve -> replay WIN -> Difficulty V1 -> load-check. Do not batch other PNGs, write R2/PRODUCTION, or run CPX-002 as part of that proof.
 - Source commits `15c58403449f85e0245f3c132b471752053ef92d` and `0418dbaf4be422a750ff9a55f96c53b66112b883` were normally pushed. Last verified local HEAD and `origin/main` were both `0418dbaf4be422a750ff9a55f96c53b66112b883`, 0 ahead / 0 behind, tracked tree clean. This log append is committed and published separately below.
+
+### M01 final publication receipt | 2026-10-16
+
+- Log-only commit `c1d5124dbb91453fac653659f6e0ae7c69908eea` was pushed normally. Post-push `git fetch --prune origin` verified local `HEAD == origin/main == c1d5124dbb91453fac653659f6e0ae7c69908eea`, 0 ahead / 0 behind, tracked tree clean. The final read-only updater preflight at this HEAD passed with the same source SHA, R04 installed controller/manifest hashes, 2,316 managed files and nine overlay paths. No `-Apply` was run.
+- Final disposition remains `INSTALL BLOCKED / OWNER STARTUP NOT VERIFIED` because the focused Godot regression produced no verifiable PASS marker. The R04 UI remains installed and visually accepted; both original R04 recovery files are retained. No owner startup evidence, CPX-002 pass, current-game run, or production acceptance is claimed.
