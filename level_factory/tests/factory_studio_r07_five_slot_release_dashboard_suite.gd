@@ -147,6 +147,71 @@ func _run_suite() -> void:
 			await process_frame
 			_check(large_scroll.scroll_vertical > 0, "150-item gallery could not reach candidates below the first 15")
 
+	var signal_entries: Array[Dictionary] = []
+	for index in range(9):
+		var candidate_id := "candidate-r07-signal-%03d" % index
+		signal_entries.append({
+			"candidate_id": candidate_id,
+			"level_id": "R07 Signal Level %03d" % index,
+			"pipeline": {"primary": {"disposition": "READY", "column_count": 3 + (index % 3)}},
+			"pipeline_run_id": "run-r07-signal-%03d" % index,
+			"pipeline_sha256": "%064x" % (index + 101),
+			"entry_digest": "%064x" % (index + 201),
+		})
+	gateway.release_pool = {"state": "READY", "entries": signal_entries, "pool_size": signal_entries.size()}
+	ui.set("_release_pool", gateway.release_pool.duplicate(true))
+	ui.set("_selected_release_ids", [])
+	ui.call("_apply_release_projection")
+	await process_frame
+	var signal_rows := ui.get_node("ReleaseCandidateScroll/ReleaseCandidateRows") as VBoxContainer
+	_check(signal_rows.get_child_count() == 9, "nine READY signal candidates did not produce nine visible rows")
+	var first_signal_row := signal_rows.get_child(0) as Button
+	var first_signal_instance := first_signal_row.get_instance_id()
+	var selected_candidate := str(signal_entries[0].get("candidate_id", ""))
+	var activity_before_preview := (ui.get("_release_activity_events") as Array).size()
+	first_signal_row.emit_signal("pressed")
+	await process_frame
+	_check(not is_instance_valid(first_signal_row), "pressed candidate row was not safely freed after its signal unwound")
+	_check(signal_rows.get_child_count() == 9, "candidate row count changed after a real pressed signal")
+	_check(str(ui.get("_selected_release_id")) == selected_candidate, "pressed candidate did not select its preview identity")
+	var preview_paths: Dictionary = ui.get("_preview_paths_by_screen")
+	_check(preview_paths.has("RELEASE POOL"), "pressed candidate did not update the Release Pool preview")
+	var preview_events: Array = ui.get("_release_activity_events")
+	_check(preview_events.size() == activity_before_preview + 1, "pressed candidate did not append exactly one activity event")
+	if not preview_events.is_empty():
+		var latest_preview: Dictionary = preview_events.back()
+		_check(str(latest_preview.get("action", "")) == "CANDIDATE PREVIEW" and str(latest_preview.get("state", "")) == "READ ONLY", "pressed candidate activity was not read-only preview")
+	var row_instance_ids: Array[int] = []
+	for row in signal_rows.get_children():
+		_check(row is Button, "candidate list contains a non-Button child after rebuild")
+		row_instance_ids.append((row as Button).get_instance_id())
+	_check(row_instance_ids.size() == 9 and not row_instance_ids.has(first_signal_instance), "candidate rebuild retained the emitting row or lost a row")
+	_check(row_instance_ids.size() == row_instance_ids.duplicate().size(), "candidate rebuild produced duplicate Button instances")
+	var second_signal_row := signal_rows.get_child(1) as Button
+	second_signal_row.emit_signal("pressed")
+	await process_frame
+	_check(signal_rows.get_child_count() == 9, "repeated real candidate click changed the nine-row list")
+	_check(str(ui.get("_selected_release_id")) == str(signal_entries[1].get("candidate_id", "")), "repeated real click did not update selected candidate preview")
+	(ui.get_node("ManageSelection") as Button).emit_signal("pressed")
+	var managed_row := signal_rows.get_child(2) as Button
+	managed_row.emit_signal("pressed")
+	await process_frame
+	_check((ui.get("_selected_release_ids") as Array).has(str(signal_entries[2].get("candidate_id", ""))), "Manage Selection did not select the clicked candidate")
+	(ui.get_node("SelectAllRelease") as Button).emit_signal("pressed")
+	_check((ui.get("_selected_release_ids") as Array) == (ui.get("_visible_release_ids") as Array), "Select All did not preserve all nine filtered candidate identities")
+	(ui.get_node("ClearRelease") as Button).emit_signal("pressed")
+	_check((ui.get("_selected_release_ids") as Array).is_empty(), "Clear did not remove managed candidate selection")
+	ui.call("_show_screen", "PIXEL ART")
+	ui.call("_show_screen", "LEVEL FACTORY")
+	ui.call("_show_screen", "RELEASE POOL")
+	await process_frame
+	_check(signal_rows.get_child_count() == 9, "tab transitions changed the filtered nine-row candidate model")
+	var post_tab_row := signal_rows.get_child(8) as Button
+	post_tab_row.emit_signal("pressed")
+	await process_frame
+	_check(signal_rows.get_child_count() == 9, "candidate click after tab transitions changed row count")
+	_check(str(ui.get("_selected_release_id")) == str(signal_entries[8].get("candidate_id", "")), "candidate click after tab transitions failed to update preview")
+
 	var activity_events: Array = ui.get("_release_activity_events")
 	var activity_count_before_tabs := activity_events.size()
 	ui.call("_show_screen", "PIXEL ART")
@@ -307,6 +372,7 @@ func _run_suite() -> void:
 	ui.call("_preview_release_manifest")
 	_check(gateway.calls.all(func(call: Dictionary) -> bool: return str(call.get("operation", "")) != "scrubbots-publish"), "help, target, status or manifest-preview action called the publisher")
 	_check(gateway.calls.all(func(call: Dictionary) -> bool: return str(call.get("operation", "")) not in ["pipeline", "png-batch-run", "png-batch-create", "solve", "replay", "load-check"]), "dashboard test dispatched solver, batch, replay or load-check work")
+	_check(gateway.calls.all(func(call: Dictionary) -> bool: return not str(call.get("operation", "")).to_lower().contains("preflight") and not str(call.get("operation", "")).to_lower().contains("upload") and not str(call.get("operation", "")).to_lower().contains("accept") and not str(call.get("operation", "")).to_lower().contains("reject") and not str(call.get("operation", "")).to_lower().contains("publish")), "dashboard test called preflight, upload, accept/reject or publish")
 	_check((ui.get("_release_activity_events") as Array).any(func(event: Dictionary) -> bool: return str(event.get("state", "")).contains("STATUS ONLY")), "status-only action was not recorded in session activity")
 	_check((ui.get("_release_activity_events") as Array).any(func(event: Dictionary) -> bool: return str(event.get("action", "")).contains("PREVIEW MANIFEST") and str(event.get("state", "")) == "BLOCKED"), "missing-preflight manifest preview was not blocked and logged")
 

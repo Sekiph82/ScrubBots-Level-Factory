@@ -3750,7 +3750,7 @@ func _refresh_release_candidate_rows() -> void:
 	_release_candidate_signature = signature
 	for child in _release_candidate_rows.get_children():
 		_release_candidate_rows.remove_child(child)
-		child.free()
+		child.queue_free()
 	for index in range(_visible_release_ids.size()):
 		var candidate_id := _visible_release_ids[index]
 		var entry := _release_entry_for_id(candidate_id)
