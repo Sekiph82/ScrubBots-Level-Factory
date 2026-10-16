@@ -1560,3 +1560,6 @@ Document role: CODEX BUILDER LOG
 - Publication-preflight note: first git diff --check found carriage-return whitespace on five newly appended log lines due mixed line endings; normalized those lines to LF. Subsequent cached and uncached whitespace checks are run after staging.
 
 - Updater commit: 72b955c2cf4a6a67790a469d9fe14c7acb451ffe (Add bounded Factory Studio UI overlay updater). Log and cleanup chronology are committed separately; main publication/preflight remain pending.
+
+- First publication attempt: two commits pushed normally from `c94d7d66e51498ff49e383b83fb6243c8b904373` to `d8b6291ea93d424f1a0b0bdf32cf498cd7c598a0`; post-push fetch proved HEAD=origin/main, 0/0, tracked clean. Read-only updater preflight then stopped before writes because Git emitted `C:/...` while script compared to `C:\...`; normalized separators and case, and a post-fix parser/path check passed (zero parser errors, canonical root match). Correction is commit `1ea90af4525fe6a76d455082ae04682a93a124e6`.
+- Pre-push command correction record: an initial PowerShell ancestry expression negated an empty command output and falsely stopped before push; no push occurred in that attempt. The corrected check captured `git merge-base --is-ancestor` exit code directly (0), then the normal push and post-push equality check succeeded. No force or rewrite was used.
