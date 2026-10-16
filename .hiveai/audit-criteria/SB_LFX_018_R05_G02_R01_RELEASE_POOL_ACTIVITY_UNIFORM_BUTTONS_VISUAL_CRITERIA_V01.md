@@ -1,0 +1,18 @@
+# SB-LFX-018-R05-G02-R01 | GPT Strict Release Pool right-panel visual acceptance V01
+
+Date: 2026-10-16 Europe/Istanbul
+Authority: user-supplied BEFORE screenshots (PIXEL ART 02:56, LEVEL FACTORY 02:56, RELEASE POOL 02:57). Full R05 game/production still OPEN. Owner requires physical installed layout fix, not simply a status/progress log.
+
+**F01 ACTIVITY full remaining right-panel height:** At owner viewport (~1536x900), Release Pool ACTIVITY heading begins directly under the bottom of Preview Manifest **and its adjacent ⓘ**, gap <=10 scaled logical px. Scroll viewport begins below heading, extends to within right panel bottom inner margin; positive visible height fills *all* the available column instead of original tiny bottom 220px stub. No >one-row empty gap. Visible empty-state text is left/top-aligned, and actual event list remains readable/scrollable with existing follow-tail and truthful timestamps. Must not overlay right buttons/details, window border or bottom selected-release dock.
+
+**F02 eight actions uniform:** ReleaseStaging, ReleaseProduction, PreflightRelease, ValidateReleaseAssets, BuildReleasePack, UploadR2Status, UploadSelected, PreviewReleaseManifest use **exactly same width, height and left alignment**; eight matching ⓘ buttons same width, height and right alignment, each on same row as its action. Consistent vertical row gap. No mixed 36/40/54/50px heights or STAGING x inset mismatch. Numeric geometry assertions at 1536x900, 1536x1024, 1100x720, 1920x1080, and idempotence after repeated resize/tab switches. Uniform enough label text readability and minimum scroll height.
+
+**No collateral change:** PIXEL ART, LEVEL FACTORY frog canvas and five bottom source cards, Release Pool left 9 READY rows, right READY/Visible/Selected/Target/Preflight fields and selected cards untouched. No game/quality/evaluator/provider/publishing logic, no false STAGING/PRODUCTION operation status. Preserve precise icon help descriptions and real action guards.
+
+**Installed native truth:** Before screenshots are actual owner Windows UI, DEBUG title visible with no screenshot error; current tracked launcher already lists DEBUG as permitted, so title suffix is not alone a failure. Current **installed** launcher/controller and manifest must be read by Codex without assuming same SHA as GitHub main. Native AFTER PASS requires new owner Windows Release Pool screenshot of the installed, safely updated controller and explicit owner visual acceptance. GitHub source snapshot or synthetic screenshot alone is insufficient.
+
+**Test authority:** Godot numeric layout tests only if bounded local and no prohibited scratch; exactly report commands/test passes/skips/NOT RUN. GPT code audit source diff, dynamic layout and installed proof. No Actions/CI/hosted tests, no auto solver/batch140/native game/CPX-002, no R2 upload, no owner/PNG/READY/review mutation. Safe scoped installed update only after Studio has been normally closed, verified sourceRevision/manifest and standing owner permission. If app running, log INSTALL PENDING and leave untouched; do not force-close or hot-patch.
+
+**Data protection:** all 3,220 owner+task untracked paths unchanged including 16 scratch deletions previously policy blocked; accepted 002, nine historical READY, installed Release manifest/launcher untouched except explicitly scoped and safely approved controller overlay. No TEMP/worktree/clone/cleanup. R05 parent/Windows race-free handles/AI upstream creator identity remain independently OPEN.
+
+Decision: G02-R01 source geometry PASS when correct code + bounded geometry evidence; actual owner Windows G02 VISUAL ACCEPTANCE PASS only after genuine new screenshot. Keep parent R05 open.
