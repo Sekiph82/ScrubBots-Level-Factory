@@ -1020,7 +1020,8 @@ func _refresh_live_data() -> void:
 		var pool_status := _owner_review_status if not _owner_review_status.is_empty() else "—"
 		var batch_caption := ""
 		if not _batch_snapshot.is_empty():
-			var counts: Dictionary = _batch_snapshot.get("counts", {})
+			var counts_value: Variant = _batch_snapshot.get("counts", {})
+			var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 			batch_caption = "%d loaded / %d job · %d READY · %d failed" % [_gameplay_sources.size(), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
 		if batch_following:
 			var item_release: Dictionary = _batch_follow_item.get("release_pool", {})
@@ -1061,13 +1062,15 @@ func _refresh_run_button_caption() -> void:
 	var imported_count := _gameplay_sources.size()
 	var batch_mode := imported_count > 1
 	if _operation_running and not _batch_job_id.is_empty():
-		var counts: Dictionary = _batch_snapshot.get("counts", {})
+		var counts_value: Variant = _batch_snapshot.get("counts", {})
+		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
 		button.text = "Running %d/%d" % [completed + (1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", imported_count))]
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
-		var counts: Dictionary = _batch_snapshot.get("counts", {})
+		var counts_value: Variant = _batch_snapshot.get("counts", {})
+		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 		if _batch_job_source_mismatch:
 			button.text = "Batch mismatch"
 			button.disabled = true
@@ -1231,12 +1234,14 @@ func _restore_loaded_png_batch_readonly() -> void:
 			return
 		source_ids.append(source_id)
 	var resolved := _extension("loaded-png-batch-find", {"source_ids": source_ids})
-	var composite: Dictionary = resolved.get("batch", {})
+	var composite_value: Variant = resolved.get("batch", {})
+	var composite: Dictionary = composite_value if composite_value is Dictionary else {}
 	var resolution := str(resolved.get("disposition", ""))
 	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH"] or composite.is_empty():
 		if resolution not in ["NO_MATCHING_COMPOSITE", ""]:
 			_batch_job_source_mismatch = true
 			_report("Loaded PNG batch provenance could not be verified; resume and retry are blocked.")
+		_refresh_run_button_caption()
 		return
 	_batch_legacy_reconciliation = resolution == "LEGACY_EXACT_MATCH"
 	_batch_composite_snapshot = composite
@@ -1245,18 +1250,25 @@ func _restore_loaded_png_batch_readonly() -> void:
 		_batch_composite_snapshot.clear()
 		return
 	var latest := _extension("png-batch-latest", {"batch_id": _batch_import_id})
-	var job: Dictionary = latest.get("job", {})
+	var job_value: Variant = latest.get("job", {})
+	var job: Dictionary = job_value if job_value is Dictionary else {}
 	_batch_job_source_mismatch = str(latest.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
 	if _batch_job_source_mismatch:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
 		_report("A persisted PNG job has a different composite authority; it was not resumed.")
+		_refresh_run_button_caption()
 		return
 	if job.is_empty():
 		_batch_job_id = ""
 		_batch_snapshot.clear()
+		_refresh_run_button_caption()
 		return
-	_batch_snapshot = job
+	_batch_snapshot = job.duplicate(true)
+	var counts_value: Variant = _batch_snapshot.get("counts", {})
+	if not counts_value is Dictionary:
+		# Keep malformed optional backend counts local and empty; never mutate saved job data.
+		_batch_snapshot["counts"] = {}
 	_batch_job_id = str(job.get("job_id", ""))
 	if str(job.get("state", "")) == "RUNNING":
 		# Display the crash state locally. The durable job remains unchanged until
@@ -1272,7 +1284,8 @@ func _restore_loaded_png_batch_readonly() -> void:
 		_activity_terminal_state = _activity_stage
 		_activity_message = "Batch is %s. Press Resume Batch to continue this saved job." % _activity_stage.to_lower()
 	else:
-		var counts: Dictionary = job.get("counts", {})
+		var restored_counts_value: Variant = job.get("counts", {})
+		var counts: Dictionary = restored_counts_value if restored_counts_value is Dictionary else {}
 		_activity_stage = "FINISHED WITH FAILURES" if int(counts.get("failed", 0)) > 0 or int(counts.get("rejected", 0)) > 0 else "READY"
 		_activity_backend_disposition = _activity_stage
 		_activity_terminal_state = _activity_stage
@@ -2172,6 +2185,10 @@ func _run_single_level_pipeline() -> void:
 func _run_png_batch() -> void:
 	if _gateway == null or _operation_running:
 		return
+	if _batch_job_source_mismatch:
+		_report("Loaded PNG batch provenance does not match the current sources; no batch was created or resumed.")
+		_refresh_run_button_caption()
+		return
 	if not _batch_job_id.is_empty() and _batch_job_matches_loaded_sources() and str(_batch_snapshot.get("state", "")) in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"]:
 		if _batch_legacy_reconciliation:
 			_activity_message = "Explicit owner resume requested for the SHA-matched legacy composite."
@@ -2313,11 +2330,21 @@ func _refresh_batch_progress() -> void:
 			_activity_message = "Saved batch lineage could not be authenticated. Keeping the last verified source view."
 			_refresh_activity_header()
 		return
-	var parsed: Dictionary = verified.get("job", {})
+	var parsed_value: Variant = verified.get("job", {})
+	if not parsed_value is Dictionary:
+		_batch_job_source_mismatch = true
+		_activity_message = "Saved batch job could not be verified. Keeping the last verified source view; resume and retry are blocked."
+		_refresh_run_button_caption()
+		_refresh_activity_header()
+		return
+	var parsed: Dictionary = parsed_value
 	if parsed.is_empty() or str(parsed.get("job_id", "")) != _batch_job_id:
 		return
 	var previous_snapshot := _batch_snapshot
 	_batch_snapshot = parsed.duplicate(true)
+	var counts_value: Variant = _batch_snapshot.get("counts", {})
+	if not counts_value is Dictionary:
+		_batch_snapshot["counts"] = {}
 	if not _batch_job_matches_loaded_sources():
 		_batch_snapshot = previous_snapshot
 		_batch_job_source_mismatch = true

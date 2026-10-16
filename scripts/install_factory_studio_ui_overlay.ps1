@@ -7,12 +7,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$script:TaskId = 'SB-LFX-018-R05-G02-R04'
+$script:TaskId = 'SB-LFX-018-R05-MASTER-M01'
 $script:ControllerRelative = 'level_factory/scripts/factory_studio_exact_ui.gd'
-$script:ExpectedOldControllerSha = '65a2eafee2620c8d35fafc84a8fb3748ad60d37a7a8bd9d33e634bed3e054c0c'
-$script:ExpectedOldManifestSha = 'c7ab656d263a5c5dbf77f0400a41da45c86ca8f830272872923f19251e300995'
-$script:ExpectedOldControllerBytes = 195392
-$script:ExpectedOldManifestBytes = 454775
+$script:ExpectedOldControllerSha = 'e0a44647f5e54d9b18ca76cf50d8582be41e36bacc6f5400229cc777bfd0b9c2'
+$script:ExpectedOldManifestSha = '56c9f32518fe01b2354942600c8d19662cab0713a23b42551304fccfbc0493eb'
+$script:ExpectedOldControllerBytes = 197118
+$script:ExpectedOldManifestBytes = 455309
+$script:ExpectedR04ReceiptCommit = 'aded2fd5473ebd4af59e677451ee9eb26a1408bd'
+$script:ExpectedR04ReceiptHead = 'ff777c8f3739261c4295f0f33b9ef83c4f2896a4'
+$script:ExpectedR04PriorSha = '65a2eafee2620c8d35fafc84a8fb3748ad60d37a7a8bd9d33e634bed3e054c0c'
 $script:ExpectedMode = 'OWNER_APPROVED_SCOPED_OVERLAY'
 $script:ExpectedBaseRevision = '17643de6756ba3d9552351eb237db19bd8d0c269'
 $script:ExpectedSourceRevision = '89d74c9fe758ad0766f7ff5290154a1f56548b14'
@@ -29,10 +32,10 @@ $script:ReleaseRoot = Join-Path $script:ExpectedRepoRoot 'Release\ScrubBots Fact
 $script:ManifestPath = Join-Path $script:ReleaseRoot '.factory-studio-install-manifest.json'
 $script:ControllerPath = Join-Path $script:ReleaseRoot ($script:ControllerRelative.Replace('/', '\'))
 $script:SourcePath = Join-Path $script:RepoRoot ($script:ControllerRelative.Replace('/', '\'))
-$script:RollbackController = Join-Path $script:ReleaseRoot '.r04-ui-overlay-rollback-controller-65a2eafee262.bin'
-$script:RollbackManifest = Join-Path $script:ReleaseRoot '.r04-ui-overlay-rollback-manifest-c7ab656d263a.json'
-$script:StageController = Join-Path $script:ReleaseRoot '.r04-ui-overlay-stage-controller.tmp'
-$script:StageManifest = Join-Path $script:ReleaseRoot '.r04-ui-overlay-stage-manifest.tmp'
+$script:RollbackController = Join-Path $script:ReleaseRoot '.r05-m01-rollback-controller-e0a44647f5e5.bin'
+$script:RollbackManifest = Join-Path $script:ReleaseRoot '.r05-m01-rollback-manifest-56c9f32518fe.json'
+$script:StageController = Join-Path $script:ReleaseRoot '.r05-m01-stage-controller.tmp'
+$script:StageManifest = Join-Path $script:ReleaseRoot '.r05-m01-stage-manifest.tmp'
 
 function Get-FileSha256([string]$Path) {
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -99,12 +102,27 @@ function Assert-ManifestState($Manifest, [string]$InstalledControllerSha) {
     return $managedTarget[0]
 }
 
+function Get-OtherManagedSignature($Manifest) {
+    $pairs = @($Manifest.managedFiles | Where-Object { $_.path -cne $script:ControllerRelative } | Sort-Object -Property path | ForEach-Object { "$($_.path)|$($_.sha256)" })
+    if ($pairs.Count -ne 2315) { throw 'Expected exactly 2,315 non-controller managed entries.' }
+    return [string]::Join("`n", $pairs)
+}
+
+function Assert-R04Receipt($Manifest) {
+    $receipts = @($Manifest.overlayReceipts)
+    if ($receipts.Count -ne 1) { throw 'The exact R04 overlay receipt must be preserved before appending M01.' }
+    $receipt = $receipts[0]
+    if ($receipt.taskId -cne 'SB-LFX-018-R05-G02-R04' -or $receipt.sourceCommit -cne $script:ExpectedR04ReceiptCommit -or $receipt.sourceHead -cne $script:ExpectedR04ReceiptHead -or $receipt.controllerPath -cne $script:ControllerRelative -or $receipt.priorSha256 -cne $script:ExpectedR04PriorSha -or $receipt.controllerSha256 -cne $script:ExpectedOldControllerSha) {
+        throw 'The existing R04 provenance receipt differs from the accepted baseline.'
+    }
+}
+
 function Assert-NotAlreadyInstalled([string]$InstalledSha, [string]$SourceSha) {
     if ($InstalledSha -ceq $SourceSha) { throw 'Installed controller already equals current source.' }
 }
 
 function New-UpdatedManifest($Manifest, [string]$OldSha, [string]$NewSha, [string]$SourceCommit, [string]$SourceHead) {
-    if ($Manifest.PSObject.Properties.Name -contains 'overlayReceipts') { throw 'Overlay receipt already exists; refusing an already-updated manifest.' }
+    Assert-R04Receipt $Manifest
     $target = Assert-ManifestState $Manifest $OldSha
     $copy = ConvertFrom-Json -InputObject (ConvertTo-Json -InputObject $Manifest -Depth 100 -Compress)
     $copyTarget = @($copy.managedFiles | Where-Object { $_.path -ceq $script:ControllerRelative })[0]
@@ -118,14 +136,8 @@ function New-UpdatedManifest($Manifest, [string]$OldSha, [string]$NewSha, [strin
         controllerSha256 = $NewSha
         installedAtUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
     }
-    $copy | Add-Member -MemberType NoteProperty -Name overlayReceipts -Value @($receipt)
+    $copy.overlayReceipts = @($copy.overlayReceipts) + @($receipt)
     return $copy
-}
-
-function Test-RollbackTransition([string]$CurrentControllerSha, [string]$ManifestControllerSha, [string]$OldSha, [string]$NewSha) {
-    $allowedController = @($OldSha, $NewSha) -ccontains $CurrentControllerSha
-    $allowedManifest = @($OldSha, $NewSha) -ccontains $ManifestControllerSha
-    return ($allowedController -and $allowedManifest)
 }
 
 function Write-CreateNew([string]$Path, [byte[]]$Bytes) {
@@ -152,21 +164,28 @@ public static class R04AtomicFile {
     [R04AtomicFile]::Replace($Source, $Destination)
 }
 
-function Remove-TaskStageFiles {
-    foreach ($stage in @($script:StageController, $script:StageManifest)) {
-        if (Test-Path -LiteralPath $stage) {
-            Assert-NoReparsePath $stage
-            [IO.File]::Delete($stage)
-        }
+function Assert-WritePreconditions([string]$ExpectedInstalledControllerSha, [string]$ExpectedInstalledManifestSha, [string[]]$WritePaths) {
+    Assert-NoReparsePath $script:RepoRoot
+    Assert-NoReparsePath $script:ReleaseRoot
+    Assert-NoReparsePath $script:ControllerPath
+    Assert-NoReparsePath $script:ManifestPath
+    foreach ($path in $WritePaths) { Assert-NoReparsePath $path }
+    $processes = @(Get-InstalledStudioProcesses)
+    if ($processes.Count -ne 0) { throw 'Installed Factory Studio is running; no write is allowed.' }
+    if ((Get-FileSha256 $script:ControllerPath) -cne $ExpectedInstalledControllerSha -or (Get-FileSha256 $script:ManifestPath) -cne $ExpectedInstalledManifestSha) {
+        throw 'Installed controller/manifest state changed before a write.'
     }
 }
 
-function Restore-Previous([byte[]]$ControllerBytes, [byte[]]$ManifestBytes) {
-    Remove-TaskStageFiles
+function Restore-Previous([byte[]]$ControllerBytes, [byte[]]$ManifestBytes, [string]$CurrentControllerSha, [string]$CurrentManifestSha) {
+    Assert-WritePreconditions $CurrentControllerSha $CurrentManifestSha @($script:StageController)
     Write-CreateNew $script:StageController $ControllerBytes
-    try { Write-CreateNew $script:StageManifest $ManifestBytes }
-    catch { Remove-TaskStageFiles; throw }
+    Assert-WritePreconditions $CurrentControllerSha $CurrentManifestSha @($script:StageManifest)
+    Write-CreateNew $script:StageManifest $ManifestBytes
+    if ((Get-FileSha256 $script:StageController) -cne $script:ExpectedOldControllerSha -or (Get-FileSha256 $script:StageManifest) -cne $script:ExpectedOldManifestSha) { throw 'Rollback stage hash verification failed.' }
+    Assert-WritePreconditions $CurrentControllerSha $CurrentManifestSha @($script:StageController, $script:ControllerPath)
     Move-ReplaceFile $script:StageController $script:ControllerPath
+    Assert-WritePreconditions $script:ExpectedOldControllerSha $CurrentManifestSha @($script:StageManifest, $script:ManifestPath)
     Move-ReplaceFile $script:StageManifest $script:ManifestPath
     if ((Get-FileSha256 $script:ControllerPath) -cne $script:ExpectedOldControllerSha) { throw 'Controller rollback hash verification failed.' }
     if ((Get-FileSha256 $script:ManifestPath) -cne $script:ExpectedOldManifestSha) { throw 'Manifest rollback hash verification failed.' }
@@ -224,7 +243,8 @@ function Assert-Preflight {
     Assert-NotAlreadyInstalled $installedSha $source.SourceSha
     $manifest = Get-Content -LiteralPath $script:ManifestPath -Raw | ConvertFrom-Json
     [void](Assert-ManifestState $manifest $installedSha)
-    if ($manifest.PSObject.Properties.Name -contains 'overlayReceipts') { throw 'A prior overlay receipt exists; refusing duplicate apply.' }
+    Assert-R04Receipt $manifest
+    $otherManagedSignature = Get-OtherManagedSignature $manifest
     $launcherPath = Join-Path $script:ReleaseRoot 'scripts\launch_factory_studio.ps1'
     $projectPath = Join-Path $script:ReleaseRoot 'level_factory\project.godot'
     $iconPath = Join-Path $script:ReleaseRoot 'level_factory\assets\icons\ScrubBots_Factory_Studio.ico'
@@ -243,7 +263,7 @@ function Assert-Preflight {
     if ($processes.Count -ne 0) { throw 'An exact installed Factory Studio Godot process is running.' }
     if ((Test-Path -LiteralPath $script:RollbackController) -or (Test-Path -LiteralPath $script:RollbackManifest)) { throw 'A recovery path already exists; refusing to overwrite or create extra copies.' }
     if ((Test-Path -LiteralPath $script:StageController) -or (Test-Path -LiteralPath $script:StageManifest)) { throw 'A task staging path already exists; refusing to overwrite it.' }
-    return [pscustomobject]@{ Head = $source.Head; SourceCommit = $source.SourceCommit; SourceSha = $source.SourceSha; InstalledSha = $installedSha; ManifestSha = $script:ExpectedOldManifestSha; ManagedCount = @($manifest.managedFiles).Count; OverlayCount = @($manifest.overlayPaths).Count }
+    return [pscustomobject]@{ Head = $source.Head; SourceCommit = $source.SourceCommit; SourceSha = $source.SourceSha; InstalledSha = $installedSha; ManifestSha = $script:ExpectedOldManifestSha; ManagedCount = @($manifest.managedFiles).Count; OverlayCount = @($manifest.overlayPaths).Count; OtherManagedSignature = $otherManagedSignature }
 }
 
 function Invoke-Apply($Preflight) {
@@ -255,24 +275,30 @@ function Invoke-Apply($Preflight) {
     $newManifestBytes = [Text.UTF8Encoding]::new($false).GetBytes((ConvertTo-Json -InputObject $newManifest -Depth 100) + "`n")
     $newManifestHash = ([BitConverter]::ToString(([Security.Cryptography.SHA256]::Create()).ComputeHash($newManifestBytes))).Replace('-', '').ToLowerInvariant()
     if ($controllerBytes.Length -ne $script:ExpectedOldControllerBytes -or $manifestBytes.Length -ne $script:ExpectedOldManifestBytes) { throw 'Target sizes changed between preflight and apply.' }
-    if ((Get-FileSha256 $script:ControllerPath) -cne $Preflight.InstalledSha -or (Get-FileSha256 $script:ManifestPath) -cne $Preflight.ManifestSha) { throw 'Target hashes changed between preflight and apply.' }
+    Assert-WritePreconditions $Preflight.InstalledSha $Preflight.ManifestSha @($script:StageController)
     if ((Get-FileSha256 $script:SourcePath) -cne $Preflight.SourceSha) { throw 'Published source changed between preflight and apply.' }
     $rollbackControllerCreated = $false
     try {
         Write-CreateNew $script:StageController $sourceBytes
+        Assert-WritePreconditions $Preflight.InstalledSha $Preflight.ManifestSha @($script:StageManifest)
         Write-CreateNew $script:StageManifest $newManifestBytes
         if ((Get-FileSha256 $script:StageController) -cne $Preflight.SourceSha -or (Get-FileSha256 $script:StageManifest) -cne $newManifestHash) { throw 'Staged target hash verification failed.' }
+        Assert-WritePreconditions $Preflight.InstalledSha $Preflight.ManifestSha @($script:RollbackController)
         Write-CreateNew $script:RollbackController $controllerBytes
         $rollbackControllerCreated = $true
+        Assert-WritePreconditions $Preflight.InstalledSha $Preflight.ManifestSha @($script:RollbackManifest)
         Write-CreateNew $script:RollbackManifest $manifestBytes
         if ((Get-FileSha256 $script:RollbackController) -cne $script:ExpectedOldControllerSha -or (Get-FileSha256 $script:RollbackManifest) -cne $script:ExpectedOldManifestSha) { throw 'Recovery copy hash verification failed.' }
+        Assert-WritePreconditions $Preflight.InstalledSha $Preflight.ManifestSha @($script:StageController, $script:ControllerPath)
         Move-ReplaceFile $script:StageController $script:ControllerPath
         if ((Get-FileSha256 $script:ControllerPath) -cne $Preflight.SourceSha) { throw 'Installed controller SHA verification failed.' }
+        Assert-WritePreconditions $Preflight.SourceSha $Preflight.ManifestSha @($script:StageManifest, $script:ManifestPath)
         Move-ReplaceFile $script:StageManifest $script:ManifestPath
         if ((Get-FileSha256 $script:ManifestPath) -cne $newManifestHash) { throw 'Updated manifest SHA verification failed.' }
         $installedManifest = Get-Content -LiteralPath $script:ManifestPath -Raw | ConvertFrom-Json
         [void](Assert-ManifestState $installedManifest $Preflight.SourceSha)
-        if ($installedManifest.overlayReceipts.Count -ne 1 -or $installedManifest.overlayReceipts[0].sourceCommit -cne $Preflight.SourceCommit -or $installedManifest.overlayReceipts[0].controllerSha256 -cne $Preflight.SourceSha) { throw 'Overlay receipt verification failed.' }
+        if ($installedManifest.overlayReceipts.Count -ne 2 -or $installedManifest.overlayReceipts[1].sourceCommit -cne $Preflight.SourceCommit -or $installedManifest.overlayReceipts[1].controllerSha256 -cne $Preflight.SourceSha) { throw 'Appended overlay receipt verification failed.' }
+        if ((Get-OtherManagedSignature $installedManifest) -cne $Preflight.OtherManagedSignature) { throw 'A non-controller managed path/SHA pair changed.' }
         "INSTALLED_CONTROLLER_HASH_VERIFIED=$($Preflight.SourceSha)"
         "MANIFEST_SHA256=$newManifestHash MANAGED_COUNT=$(@($installedManifest.managedFiles).Count) OVERLAY_RECEIPTS=$($installedManifest.overlayReceipts.Count)"
         "RECOVERY_CONTROLLER=$($script:RollbackController) BYTES=$((Get-Item -LiteralPath $script:RollbackController).Length) SHA256=$(Get-FileSha256 $script:RollbackController)"
@@ -280,40 +306,36 @@ function Invoke-Apply($Preflight) {
     }
     catch {
         $failure = $_
-        if ($rollbackControllerCreated -and (Test-Path -LiteralPath $script:RollbackController) -and (Test-Path -LiteralPath $script:RollbackManifest)) {
-            $rollbackError = $null
-            try {
-                $savedController = [IO.File]::ReadAllBytes($script:RollbackController)
-                $savedManifest = [IO.File]::ReadAllBytes($script:RollbackManifest)
-                if ((Get-FileSha256 $script:RollbackController) -cne $script:ExpectedOldControllerSha -or (Get-FileSha256 $script:RollbackManifest) -cne $script:ExpectedOldManifestSha) { throw 'Rollback copies do not match authorized old hashes.' }
-                Restore-Previous $savedController $savedManifest
-            }
-            catch { $rollbackError = $_ }
-            if ($null -ne $rollbackError) { throw "Apply failed; rollback needs attention. Recovery files were retained. Original error: $failure; rollback error: $rollbackError" }
-            throw "Apply failed and both original files were restored; recovery copies retained. Original error: $failure"
-        }
-        elseif ($rollbackControllerCreated -and (Test-Path -LiteralPath $script:RollbackController)) {
-            if ((Get-FileSha256 $script:RollbackController) -ceq $script:ExpectedOldControllerSha) { [IO.File]::Delete($script:RollbackController) }
-        }
-        Remove-TaskStageFiles
+        if ($rollbackControllerCreated) { throw "Apply failed; explicit guarded -Rollback is required if restoration is desired. Recovery copies are retained. Original error: $failure" }
         throw $failure
     }
 }
 
 function Invoke-Rollback {
+    Assert-NoReparsePath $script:RepoRoot
+    Assert-NoReparsePath $script:ReleaseRoot
+    Assert-NoReparsePath $script:ControllerPath
+    Assert-NoReparsePath $script:ManifestPath
+    Assert-NoReparsePath $script:RollbackController
+    Assert-NoReparsePath $script:RollbackManifest
+    $source = Assert-PublishedSource
     if (-not (Test-Path -LiteralPath $script:RollbackController -PathType Leaf) -or -not (Test-Path -LiteralPath $script:RollbackManifest -PathType Leaf)) { throw 'Both exact R04 recovery copies are required for rollback.' }
     $controllerBackup = [IO.File]::ReadAllBytes($script:RollbackController)
     $manifestBackup = [IO.File]::ReadAllBytes($script:RollbackManifest)
     if ($controllerBackup.Length -ne $script:ExpectedOldControllerBytes -or $manifestBackup.Length -ne $script:ExpectedOldManifestBytes) { throw 'Recovery copy size differs from approved old state.' }
     if ((Get-FileSha256 $script:RollbackController) -cne $script:ExpectedOldControllerSha -or (Get-FileSha256 $script:RollbackManifest) -cne $script:ExpectedOldManifestSha) { throw 'Recovery copy SHA mismatch.' }
     $currentControllerSha = Get-FileSha256 $script:ControllerPath
+    $currentManifestSha = Get-FileSha256 $script:ManifestPath
     $currentManifest = Get-Content -LiteralPath $script:ManifestPath -Raw | ConvertFrom-Json
-    $currentTarget = @($currentManifest.managedFiles | Where-Object { $_.path -ceq $script:ControllerRelative })
-    $currentManifestSha = if ($currentTarget.Count -eq 1) { [string]$currentTarget[0].sha256 } else { '' }
-    $publishedSha = Get-FileSha256 $script:SourcePath
-    if (-not (Test-RollbackTransition $currentControllerSha $currentManifestSha $script:ExpectedOldControllerSha $publishedSha)) { throw 'Current installed files are outside known old/new rollback states; refusing to overwrite possible owner changes.' }
-    Restore-Previous $controllerBackup $manifestBackup
-    Remove-TaskStageFiles
+    [void](Assert-ManifestState $currentManifest $source.SourceSha)
+    if ((Get-FileSha256 $script:SourcePath) -cne $source.SourceSha) { throw 'Published controller bytes changed during rollback preflight.' }
+    $receipts = @($currentManifest.overlayReceipts)
+    if ($receipts.Count -ne 2 -or $receipts[0].taskId -cne 'SB-LFX-018-R05-G02-R04' -or $receipts[0].controllerSha256 -cne $script:ExpectedOldControllerSha -or $receipts[1].taskId -cne $script:TaskId -or $receipts[1].sourceCommit -cne $source.SourceCommit -or $receipts[1].sourceHead -cne $source.Head -or $receipts[1].controllerSha256 -cne $source.SourceSha) { throw 'The installed R04/M01 receipt chain does not match the published source.' }
+    if ($currentControllerSha -cne $source.SourceSha) { throw 'Current installed controller differs from the published M01 source.' }
+    $processes = @(Get-InstalledStudioProcesses)
+    if ($processes.Count -ne 0) { throw 'Installed Factory Studio is running; rollback is prohibited.' }
+    if ((Test-Path -LiteralPath $script:StageController) -or (Test-Path -LiteralPath $script:StageManifest)) { throw 'A staging file already exists; refusing rollback writes.' }
+    Restore-Previous $controllerBackup $manifestBackup $currentControllerSha $currentManifestSha
     'ROLLBACK_RESTORED_OLD_CONTROLLER_AND_MANIFEST_HASHES_VERIFIED'
 }
 

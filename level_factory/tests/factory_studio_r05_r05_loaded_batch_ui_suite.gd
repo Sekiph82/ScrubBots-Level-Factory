@@ -7,9 +7,13 @@ class ReadOnlyGateway extends RefCounted:
 	var calls: Array[Dictionary] = []
 	var source_ids: Array[String] = []
 	var planned_job: Dictionary = {}
+	var extension_responses: Dictionary = {}
 
 	func run_studio_extension(operation: String, request: Dictionary) -> Dictionary:
 		calls.append({"operation": operation, "request": request.duplicate(true)})
+		if extension_responses.has(operation):
+			var response: Variant = extension_responses[operation]
+			return response.duplicate(true) if response is Dictionary else response
 		if operation == "loaded-png-batch-create":
 			source_ids = request.get("source_ids", []).duplicate()
 			return {"batch_id": "batch-loaded-fixture", "counts": {"success": source_ids.size(), "failed": 0}}
@@ -155,6 +159,7 @@ func _run_suite() -> void:
 	ui.set("_batch_job_id", str(rejected_job["job_id"]))
 	ui.call("_refresh_run_button_caption")
 	_check((ui.get_node("RunLevelPipeline") as Button).text.contains("Finished With Failures"), "rejected-only completion was mislabeled as READY")
+	_test_loaded_batch_restore_nullable_contract(ui, gateway, all_ids)
 
 	ui.call("_show_screen", "PIXEL ART")
 	_check(not (ui.get_node("LevelVariation1") as Button).visible, "Level Factory thumbnail leaked into PIXEL ART")
@@ -169,6 +174,95 @@ func _run_suite() -> void:
 	for error in _errors:
 		push_error(error)
 	quit(1)
+
+
+func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnlyGateway, source_ids: Array[String]) -> void:
+	var composite_items: Array[Dictionary] = []
+	var gameplay_sources: Array = ui.get("_gameplay_sources")
+	for index in range(source_ids.size()):
+		var source_id: String = source_ids[index]
+		var source: Dictionary = gameplay_sources[index]
+		composite_items.append({
+			"source_id": source_id,
+			"source_sha256": str(source.get("source_sha256", "")),
+			"source_record_sha256": str(source.get("source_record_sha256", "")),
+		})
+	var composite := {"batch_id": "batch-restored-fixture", "items": composite_items}
+	var saved_items: Array[Dictionary] = []
+	for index in range(source_ids.size()):
+		saved_items.append({
+			"index": index, "source_id": source_ids[index],
+			"source_sha256": str(gameplay_sources[index].get("source_sha256", "")),
+			"source_record_sha256": str(gameplay_sources[index].get("source_record_sha256", "")),
+			"status": "FAILED", "attempt_id": "restore-attempt-%d" % index,
+		})
+	var saved_job := {
+		"job_id": "saved-restore-fixture", "import_batch_id": "batch-restored-fixture",
+		"state": "PAUSED", "items": saved_items,
+		"counts": {"total": 9, "ready": 7, "failed": 2, "remaining": 2},
+	}
+	var cases := [
+		{"name": "no matching composite", "resolved": {"disposition": "NO_MATCHING_COMPOSITE", "batch": null}, "latest": null, "mismatch": false},
+		{"name": "ambiguous null composite", "resolved": {"disposition": "LEGACY_COMPOSITE_AMBIGUOUS", "batch": null}, "latest": null, "mismatch": true},
+		{"name": "snapshot mismatch null composite", "resolved": {"disposition": "SOURCE_SNAPSHOT_MISMATCH", "batch": null}, "latest": null, "mismatch": true},
+		{"name": "no matching job", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "NO_MATCHING_JOB", "job": null}, "mismatch": false},
+		{"name": "batch job source mismatch", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": null}, "mismatch": true},
+		{"name": "valid paused job", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "MATCHED", "job": saved_job}, "mismatch": false},
+	]
+	for test_case in cases:
+		_reset_restore_state(ui, gateway)
+		var latest: Variant = test_case["latest"]
+		gateway.extension_responses = {"loaded-png-batch-find": test_case["resolved"]}
+		if latest is Dictionary:
+			gateway.extension_responses["png-batch-latest"] = latest
+		ui.call("_restore_loaded_png_batch_readonly")
+		var case_name := str(test_case["name"])
+		_check(bool(ui.get("_batch_job_source_mismatch")) == bool(test_case["mismatch"]), "%s produced the wrong lineage gate" % case_name)
+		if bool(test_case["mismatch"]):
+			var run_button := ui.get_node("RunLevelPipeline") as Button
+			_check(run_button.disabled and run_button.text.contains("mismatch"), "%s did not visibly block Resume/Retry" % case_name)
+			ui.call("_run_level_pipeline")
+			_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "%s explicit Run created or started a new job" % case_name)
+		_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "%s created or started work" % case_name)
+		if case_name in ["no matching composite", "ambiguous null composite", "snapshot mismatch null composite"]:
+			_check(str(ui.get("_batch_import_id")) == "" and str(ui.get("_batch_job_id")) == "", "%s fabricated restored batch/job identity" % case_name)
+			_check((ui.get("_batch_snapshot") as Dictionary).is_empty(), "%s changed saved job snapshot" % case_name)
+		elif case_name in ["no matching job", "batch job source mismatch"]:
+			_check(str(ui.get("_batch_import_id")) == "batch-restored-fixture" and str(ui.get("_batch_job_id")) == "", "%s fabricated a saved job identity" % case_name)
+			_check((ui.get("_batch_snapshot") as Dictionary).is_empty(), "%s fabricated READY/job state" % case_name)
+		else:
+			_check(str(ui.get("_batch_job_id")) == "saved-restore-fixture", "valid saved job identity was not restored")
+			var restored: Dictionary = ui.get("_batch_snapshot")
+			var counts: Dictionary = restored.get("counts", {})
+			_check(int(counts.get("total", 0)) == 9 and int(counts.get("ready", 0)) == 7 and int(counts.get("failed", 0)) == 2, "valid saved job counts changed")
+			_check((ui.get_node("RunLevelPipeline") as Button).text.contains("Resume Batch · 2 remaining"), "valid saved job did not preserve resume status")
+	_reset_restore_state(ui, gateway)
+	gateway.extension_responses = {
+		"loaded-png-batch-find": {"disposition": "MATCHED", "batch": composite},
+		"png-batch-latest": {"disposition": "MATCHED", "job": saved_job.duplicate(true)},
+	}
+	var malformed_job: Dictionary = gateway.extension_responses["png-batch-latest"]["job"]
+	malformed_job["counts"] = null
+	ui.call("_restore_loaded_png_batch_readonly")
+	var sanitized_snapshot: Dictionary = ui.get("_batch_snapshot")
+	_check(str(ui.get("_batch_job_id")) == "saved-restore-fixture", "malformed optional counts discarded a valid job")
+	_check(sanitized_snapshot.get("counts", null) is Dictionary and (sanitized_snapshot["counts"] as Dictionary).is_empty(), "malformed optional counts were not safely isolated in local UI state")
+	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "malformed counts started work")
+	_reset_restore_state(ui, gateway)
+	ui.call("_restore_loaded_png_batch_readonly")
+	_check(str(ui.get("_batch_job_id")) == "", "fresh restore reused stale job identity")
+	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "fresh restore started work")
+
+
+func _reset_restore_state(ui: Control, gateway: ReadOnlyGateway) -> void:
+	ui.set("_batch_import_id", "")
+	ui.set("_batch_job_id", "")
+	ui.set("_batch_composite_snapshot", {})
+	ui.set("_batch_snapshot", {})
+	ui.set("_batch_job_source_mismatch", false)
+	ui.set("_batch_legacy_reconciliation", false)
+	gateway.calls.clear()
+	gateway.extension_responses.clear()
 
 
 func _check(condition: bool, message: String) -> void:
