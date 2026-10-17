@@ -1,0 +1,13 @@
+# SB-LFX-018 R05 M02-R01 | GPT independent strict corrective criteria
+
+Date 2026-10-17. Source audit: .hiveai/audits/SB_LFX_018_R05_M02_FIVE_TASK_INDEPENDENT_AUDIT_CHANGES_REQUIRED_V01.md.
+
+F01: ALL positive LevelData/plan test fixtures must be accepted by the authentic current game structural+production documented contracts: nonempty id/name/difficulty, V1/V2 VOID rules, 20..59, 3..12 non-VOID used canonical C01..C16 colors in ascending local palette, unique nonempty batchId for each FIFO batch, 3-5 FIFO columns/preview3, exact cell-count and per-color/non-VOID conservation, positive robots 1..per-plan bound. Current-game static preflight MUST fail closed for absent name, difficulty, <3 color production, missing/duplicate batchId, mismatched candidate ID, duplicate JSON keys and oversized snapshot. A synthetic 2-color no-batchId positive is explicitly prohibited. Verify current Scrubbots ref independently: 5493eb1 was live at audit; 4a328 was five commits ahead but not live.
+
+F02: selected-owner record SHA must be compared with a trusted prior stored digest; if none present then source_record_digest_authority_missing, no compatible=True from hash calculation alone. Preserve exact current owner ACCEPT/verified source/grid binding, don't invent missing authority. Any nine READY/4-4-1 cohort proof must validate actual metadata when available; else honestly report SAVED_HISTORICAL_UNVERIFIED and never promote nine READY to current-game verified.
+
+F03: current_main_replay_bridge must connect to real existing CPX002 adapter's policy/typed preflight seam; cannot treat arbitrary explicit_isolated_temp_game_authority=True or fake replay evidence strings as verified. Existing CPX002 TEMP-only real runtime authority, detached HEAD/hash checks and STAGING pack identity unchanged. Static interface must say CURRENT_MAIN_RUNTIME_NOT_EXECUTED/CPX002_AUTHORITY_REQUIRED until actual permitted authority, and must have spoof-negative tests. No CPX002 or game actual execution permitted.
+
+F04: existing Factory readiness/launcher reachable preflight with a genuinely loader-valid in-memory V1/V2 positive and bad input negatives plus source/review digest/CPX safety; preserve existing READY decision and no solver/provider side effects. Use only bounded local in-memory tests, real PASS assertions and exit, no CI, TEMP, clone, worktree, owner files/app modifications. GPT must inspect diff and source/test evidence, no blanket PASS from builder log alone. M01 owner native GUI stays PASS; parent R05 current game/CPX002/production stays OPEN.
+
+Close M02 source gate only after F01-F04 verifiably PASS; otherwise keep CHANGES_REQUIRED and avoid repeated micro tasks. Six denied-delete rollback files are retained without reattempt.
