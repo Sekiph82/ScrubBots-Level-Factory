@@ -110,14 +110,23 @@ def inspect_current_game_candidate_provenance(
             raise ReleaseError("OWNER_UPLOAD source record path or size is invalid")
         record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
         ready_primary = ready_evidence.get("primary", {}) if isinstance(ready_evidence, Mapping) else {}
-        expected_record_sha = verified.get("source_record_sha256")
-        if expected_record_sha is None and isinstance(ready_primary, Mapping):
-            expected_record_sha = ready_primary.get("source_record_sha256")
-        if expected_record_sha is not None and expected_record_sha != record_sha:
+        lineage = _candidate_source_lineage(candidate)
+        owner_binding = ready_evidence.get("owner_source_binding", {}) if isinstance(ready_evidence, Mapping) else {}
+        expected_record_digests = [
+            verified.get("source_record_sha256"), lineage.get("source_record_sha256"),
+            owner_binding.get("source_record_sha256") if isinstance(owner_binding, Mapping) else None,
+            ready_primary.get("source_record_sha256") if isinstance(ready_primary, Mapping) else None,
+        ]
+        expected_record_digests = [value for value in expected_record_digests if value is not None]
+        if not expected_record_digests or any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+                                              for value in expected_record_digests):
+            raise ReleaseError("SOURCE_RECORD_DIGEST_AUTHORITY_MISSING")
+        if any(expected != record_sha for expected in expected_record_digests):
             raise ReleaseError("OWNER_UPLOAD source record SHA-256 does not match candidate provenance")
     except (ReleaseError, OSError, TypeError, ValueError) as exc:
         return {"disposition": "OWNER_PROVENANCE_REJECTED", "compatible": False,
-                "reason_codes": [f"OWNER_PROVENANCE_INVALID:{str(exc)[:180]}"],
+                "reason_codes": (["SOURCE_RECORD_DIGEST_AUTHORITY_MISSING"] if "SOURCE_RECORD_DIGEST_AUTHORITY_MISSING" in str(exc)
+                                 else [f"OWNER_PROVENANCE_INVALID:{str(exc)[:180]}"]),
                 "runtime_executed": False, "release_pool_mutated": False}
     primary = ready_evidence.get("primary", {}) if isinstance(ready_evidence, Mapping) else {}
     load_check = primary.get("load_check", {}) if isinstance(primary, Mapping) else {}
@@ -144,6 +153,7 @@ def inspect_current_game_candidate_provenance(
             "candidate_class": verified.get("candidate_class"),
             "source_sha256": verified.get("source_sha256"), "source_record_sha256": record_sha,
             "review_id": review.get("review_id") if isinstance(review, Mapping) else None,
+            "historical_cohort_status": "SAVED_HISTORICAL_UNVERIFIED",
             "reason_codes": ["OWNER_SOURCE_GRID_REVIEW_READY_LOAD_CHECK_AND_FIFO_STATIC_EVIDENCE_MATCHED",
                              "CURRENT_MAIN_RUNTIME_NOT_EXECUTED"],
             "runtime_executed": False, "release_pool_mutated": False}

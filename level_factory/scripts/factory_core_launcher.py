@@ -33,6 +33,7 @@ STUDIO_REQUEST_KEYS = {
 DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"
 OWNER_UPLOAD_OPERATION = "owner-upload-import"
 STUDIO_EXTENSION_OPERATION = "studio-extension"
+_MAX_STUDIO_REQUEST_BYTES = 384 * 1024
 
 
 def _repository_root() -> Path:
@@ -207,11 +208,19 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
     args = parser.parse_args(list(arguments))
     try:
         if args.request_file:
-            request = json.loads(Path(args.request_file).read_text(encoding="utf-8"))
+            request_path = Path(args.request_file)
+            if request_path.stat().st_size > _MAX_STUDIO_REQUEST_BYTES:
+                raise ValueError("studio request exceeds the bounded 384 KiB input limit")
+            request_text = request_path.read_text(encoding="utf-8")
         elif args.request_base64:
-            request = json.loads(base64.b64decode(args.request_base64).decode("utf-8"))
+            if len(args.request_base64) > ((_MAX_STUDIO_REQUEST_BYTES * 4 // 3) + 8):
+                raise ValueError("base64 studio request exceeds the bounded 384 KiB input limit")
+            request_text = base64.b64decode(args.request_base64, validate=True).decode("utf-8")
         else:
-            request = json.loads(args.request_json)
+            request_text = args.request_json
+        if len(request_text.encode("utf-8")) > _MAX_STUDIO_REQUEST_BYTES:
+            raise ValueError("studio request exceeds the bounded 384 KiB input limit")
+        request = json.loads(request_text)
         if not isinstance(request, dict):
             raise ValueError("request-json must be an object")
         from scrubbots_pixel_factory import studio_extensions as extensions

@@ -12,6 +12,7 @@ import base64
 import binascii
 import json
 import re
+import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
@@ -25,6 +26,7 @@ REQUIRED_SOURCE_PATHS = (
     "docs/03_LEVEL_DATA_SPEC.md",
     "scripts/data/level_data.gd",
     "scripts/data/level_loader.gd",
+    "scripts/data/level_validator.gd",
     "scripts/gameplay/supply/supply_plan_loader.gd",
     "scripts/gameplay/solver/proof_state.gd",
     "scripts/difficulty/level_difficulty_analyzer_v1.gd",
@@ -32,6 +34,10 @@ REQUIRED_SOURCE_PATHS = (
 )
 _GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+MAX_SOURCE_INVENTORY_BYTES = 96 * 1024
+MAX_LEVEL_DATA_BYTES = 64 * 1024
+MAX_SUPPLY_PLAN_BYTES = 64 * 1024
+MAX_JSON_SNAPSHOT_BYTES = 384 * 1024
 
 
 class CurrentGameContractDisposition(str, Enum):
@@ -213,6 +219,8 @@ def preflight_level_supply_bytes(
         }
     if type(level_data_bytes) is not bytes or type(supply_plan_bytes) is not bytes:
         return _static_failure(contract_report, "LEVEL_DATA_OR_SUPPLY_PLAN_BYTES_REQUIRED")
+    if len(level_data_bytes) > MAX_LEVEL_DATA_BYTES or len(supply_plan_bytes) > MAX_SUPPLY_PLAN_BYTES:
+        return _static_failure(contract_report, "STATIC_INPUT_SIZE_LIMIT_EXCEEDED")
     try:
         level = _strict_json_object(level_data_bytes)
         plan = _strict_json_object(supply_plan_bytes)
@@ -225,6 +233,8 @@ def preflight_level_supply_bytes(
         return _static_failure(contract_report, *level_result["reason_codes"])
     if plan_result:
         return _static_failure(contract_report, *plan_result)
+    if candidate_id is not None and level.get("id") is not None and candidate_id != level.get("id"):
+        return _static_failure(contract_report, "CANDIDATE_ID_LEVEL_ID_MISMATCH")
     from ..quality.core import logical_grid_hash
     logical_cells = ["VOID" if cell == -1 else level_result["local_to_global"][cell] for cell in level["cells"]]
     return {
@@ -243,6 +253,7 @@ def preflight_level_supply_bytes(
         "void_cell_count": level_result["void_cells"],
         "artwork_cell_count": level_result["artwork_cells"],
         "fifo_column_count": plan["columnCount"],
+        "historical_cohort_status": "SAVED_HISTORICAL_UNVERIFIED",
         "visible_preview_depth": plan["visiblePreviewDepth"],
         "runtime_executed": False,
         "solver_invocations": 0,
@@ -254,11 +265,21 @@ def preflight_json_snapshot(value: Mapping[str, object] | None) -> dict[str, obj
 
     if not isinstance(value, Mapping):
         return preflight_level_supply_bytes(contract_report=None, level_data_bytes=None, supply_plan_bytes=None)
+    try:
+        if len(json.dumps(value, separators=(",", ":")).encode("utf-8")) > MAX_JSON_SNAPSHOT_BYTES:
+            return _static_failure_from_missing("JSON_SNAPSHOT_SIZE_LIMIT_EXCEEDED")
+    except (TypeError, ValueError, RecursionError):
+        return _static_failure_from_missing("JSON_SNAPSHOT_INVALID")
     authority = value.get("authority")
     source_encoded = value.get("source_bytes_b64")
     try:
         if not isinstance(source_encoded, Mapping) or set(source_encoded) != set(REQUIRED_SOURCE_PATHS):
             return _static_failure_from_missing("REQUIRED_IMMUTABLE_SOURCE_BYTES_MISSING")
+        if any(not isinstance(encoded, str) or len(encoded) > ((MAX_SOURCE_INVENTORY_BYTES * 4 // 3) + 8)
+               for encoded in source_encoded.values()):
+            return _static_failure_from_missing("SOURCE_INVENTORY_SIZE_LIMIT_EXCEEDED")
+        if sum(len(encoded) for encoded in source_encoded.values() if isinstance(encoded, str)) > ((MAX_SOURCE_INVENTORY_BYTES * 4 // 3) + 16):
+            return _static_failure_from_missing("SOURCE_INVENTORY_SIZE_LIMIT_EXCEEDED")
         source_bytes = {
             path: base64.b64decode(encoded, validate=True)
             for path, encoded in source_encoded.items()
@@ -270,6 +291,8 @@ def preflight_json_snapshot(value: Mapping[str, object] | None) -> dict[str, obj
         plan_bytes = base64.b64decode(plan_bytes_value, validate=True) if isinstance(plan_bytes_value, str) else None
     except (binascii.Error, ValueError, TypeError):
         return _static_failure_from_missing("BASE64_SNAPSHOT_INVALID")
+    if sum(map(len, source_bytes.values())) > MAX_SOURCE_INVENTORY_BYTES:
+        return _static_failure_from_missing("SOURCE_INVENTORY_SIZE_LIMIT_EXCEEDED")
     report = evaluate_current_game_contract(authority=authority if isinstance(authority, Mapping) else None, source_bytes=source_bytes)
     candidate_id = value.get("candidate_id")
     return preflight_level_supply_bytes(contract_report=report, level_data_bytes=level_bytes,
@@ -284,37 +307,56 @@ def current_main_replay_bridge(
     cpx002_authority: Mapping[str, object] | None = None,
     replay_evidence: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Describe the CPX002 replay fence without invoking its runtime adapter."""
+    """Use CPX002's pure policy descriptor; never treat caller claims as authority."""
+    adapter_path = __import__("pathlib").Path(__file__).resolve().parents[3] / "content_pipeline" / "src"
+    added_path = str(adapter_path) not in sys.path
+    if added_path:
+        sys.path.insert(0, str(adapter_path))
+    try:
+        from scripts.cpx002_current_main_replay_adapter import describe_current_main_replay_requirements
+    finally:
+        if added_path:
+            sys.path.remove(str(adapter_path))
+
+    descriptor = describe_current_main_replay_requirements(
+        configured_game_root=(cpx002_authority.get("game_root") if isinstance(cpx002_authority, Mapping) else None),
+        authority_snapshot=(cpx002_authority.get("authority_snapshot") if isinstance(cpx002_authority, Mapping) else None),
+        replay_receipt=(replay_evidence.get("receipt") if isinstance(replay_evidence, Mapping) else None),
+    )
     missing: list[str] = []
     if not isinstance(current_game_preflight, Mapping) or current_game_preflight.get("compatible") is not True:
         missing.append("CURRENT_GAME_CONTRACT_AND_STATIC_LEVEL_PLAN_PREFLIGHT")
     if not isinstance(owner_provenance, Mapping) or owner_provenance.get("compatible") is not True:
         missing.append("SELECTED_OWNER_SOURCE_REVIEW_READY_LOAD_CHECK_PROVENANCE")
-    if not isinstance(cpx002_authority, Mapping) or cpx002_authority.get("explicit_isolated_temp_game_authority") is not True:
-        missing.append("EXPLICIT_ISOLATED_TEMP_SCRUBBOTS_PROJECT_AUTHORITY")
-    if not isinstance(replay_evidence, Mapping):
-        missing.extend(("CURRENT_GAME_MANIFEST_SHA256", "CURRENT_GAME_PACK_SHA256", "CURRENT_GAME_LEVEL_BYTES", "CURRENT_GAME_SUPPLY_PLAN_BYTES", "CURRENT_MAIN_RUNTIME_WIN_DIFFICULTY_LOAD_CHECK"))
-    else:
-        for field in ("manifest_sha256", "pack_sha256", "game_level_sha256", "game_supply_plan_sha256", "runtime_win", "difficulty", "load_check"):
-            if replay_evidence.get(field) in (None, False, ""):
-                missing.append({"manifest_sha256": "CURRENT_GAME_MANIFEST_SHA256", "pack_sha256": "CURRENT_GAME_PACK_SHA256",
-                                "game_level_sha256": "CURRENT_GAME_LEVEL_BYTES", "game_supply_plan_sha256": "CURRENT_GAME_SUPPLY_PLAN_BYTES",
-                                "runtime_win": "CURRENT_MAIN_RUNTIME_WIN_DIFFICULTY_LOAD_CHECK", "difficulty": "CURRENT_MAIN_RUNTIME_WIN_DIFFICULTY_LOAD_CHECK",
-                                "load_check": "CURRENT_MAIN_RUNTIME_WIN_DIFFICULTY_LOAD_CHECK"}[field])
+    missing.extend(descriptor["missing_evidence"])
     return {
         "schema": "scrubbots-cpx002-current-main-bridge/v1",
-        "disposition": "CPX002_AUTHORITY_REQUIRED" if missing else "CPX002_EVIDENCE_PRESENT_NOT_EXECUTED",
+        "disposition": "CPX002_AUTHORITY_REQUIRED",
         "compatible": False,
         "missing_evidence": list(dict.fromkeys(missing)),
-        "reason_codes": ["CURRENT_MAIN_RUNTIME_NOT_EXECUTED"],
+        "authority_state": descriptor["authority_state"],
+        "verified": descriptor["verified"],
+        "reason_codes": ["CPX002_AUTHORITY_REQUIRED", "CURRENT_MAIN_RUNTIME_NOT_EXECUTED"],
         "runtime_executed": False,
         "solver_invocations": 0,
         "release_pool_mutated": False,
+        "compatibility_scope": "SELECTED_SOURCE_ONLY",
+        "historical_cohort_status": "SAVED_HISTORICAL_UNVERIFIED",
     }
 
 
 def _strict_json_object(raw: bytes) -> dict[str, object]:
-    value = json.loads(raw.decode("utf-8"))
+    if type(raw) is not bytes or len(raw) > max(MAX_LEVEL_DATA_BYTES, MAX_SUPPLY_PLAN_BYTES):
+        raise ValueError("input exceeds bounded JSON byte limit")
+    def unique_pairs(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError(f"duplicate JSON key: {key}")
+            value[key] = item
+        return value
+    value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_pairs,
+                       parse_constant=lambda token: (_ for _ in ()).throw(ValueError(f"invalid JSON constant: {token}")))
     if not isinstance(value, dict):
         raise ValueError("input must be a JSON object")
     return value
@@ -322,6 +364,11 @@ def _strict_json_object(raw: bytes) -> dict[str, object]:
 
 def _validate_level_data(level: Mapping[str, object], contract: Mapping[str, object]) -> dict[str, object]:
     reasons: list[str] = []
+    for field in ("id", "name", "difficulty"):
+        if not isinstance(level.get(field), str) or not level[field].strip():
+            reasons.append(f"LEVEL_{field.upper()}_REQUIRED")
+    if level.get("difficulty") not in {"EASY", "MEDIUM", "HARD", "VERY_HARD"}:
+        reasons.append("PRODUCTION_DIFFICULTY_INVALID")
     version = level.get("version")
     width, height = level.get("width"), level.get("height")
     cells, palette = level.get("cells"), level.get("palette")
@@ -374,6 +421,8 @@ def _validate_level_data(level: Mapping[str, object], contract: Mapping[str, obj
         reasons.append("LEVEL_PALETTE_MUST_BE_USED_ONLY_ASCENDING_GLOBAL_CID")
     if isinstance(palette, list) and used != set(range(len(palette))):
         reasons.append("LEVEL_PALETTE_MUST_CONTAIN_ONLY_USED_COLORS")
+    if not 3 <= len(used) <= 12:
+        reasons.append("PRODUCTION_USED_COLOR_COUNT_OUTSIDE_3_TO_12")
     if type(width) is int and type(height) is int and width >= 20 and height >= 20:
         if artwork_cells < 200 or artwork_cells * 4 < width * height:
             reasons.append("PRODUCTION_ARTWORK_MINIMUM_NOT_MET")
@@ -410,6 +459,7 @@ def _validate_supply_plan(
         reasons.append("SUPPLY_COLUMNS_SHAPE_MISMATCH")
         columns = []
     totals: dict[str, int] = {}
+    batch_ids: set[str] = set()
     local_to_global = level_result.get("local_to_global", [])
     for column in columns:
         if not isinstance(column, list) or not column:
@@ -419,6 +469,11 @@ def _validate_supply_plan(
             if not isinstance(batch, Mapping):
                 reasons.append("SUPPLY_BATCH_MALFORMED")
                 continue
+            batch_id = batch.get("batchId")
+            if not isinstance(batch_id, str) or not batch_id.strip() or batch_id in batch_ids:
+                reasons.append("SUPPLY_BATCH_ID_MISSING_OR_DUPLICATE")
+            else:
+                batch_ids.add(batch_id)
             cid, robots = batch.get("cid"), batch.get("robots")
             if not isinstance(cid, str) or cid not in local_to_global:
                 reasons.append("SUPPLY_COLOR_NOT_PRESENT_IN_LEVEL_PALETTE")
@@ -480,6 +535,7 @@ def _parse_contract(source_bytes: Mapping[str, bytes]) -> tuple[dict[str, object
     level_spec = _decode(source_bytes, "docs/03_LEVEL_DATA_SPEC.md")
     level_data = _decode(source_bytes, "scripts/data/level_data.gd")
     level_loader = _decode(source_bytes, "scripts/data/level_loader.gd")
+    level_validator = _decode(source_bytes, "scripts/data/level_validator.gd")
     supply_loader = _decode(source_bytes, "scripts/gameplay/supply/supply_plan_loader.gd")
     proof_state = _decode(source_bytes, "scripts/gameplay/solver/proof_state.gd")
     difficulty = _decode(source_bytes, "scripts/difficulty/level_difficulty_analyzer_v1.gd")
@@ -503,19 +559,32 @@ def _parse_contract(source_bytes: Mapping[str, bytes]) -> tuple[dict[str, object
         "level_data_versions": v1 == 1 and v2 == 2,
         "void_encoding": void_value == -1 and "FORMAT_VERSION_VOID" in level_data and "version == FORMAT_VERSION_VOID" in level_data,
         "production_dimensions": bool(re.search(r"width:\s*20\.\.59", level_spec) and re.search(r"height:\s*20\.\.59", level_spec) and "rectangular boards allowed" in level_spec),
+        "production_level_data_policy": all(token in level_spec for token in (
+            "Production campaign uses", "EASY", "MEDIUM", "HARD", "VERY_HARD", "TEST` is development-only",
+            "3..12 used colours", "C01..C16", ">= 200 non-VOID cells", ">= 25%")),
         "gameplay_dimensions_agree": "20..59" in gameplay,
         "palette_authority": palette_doc.get("schema") == "scrubbots-global-palette/v3" and palette_ids == tuple(f"C{i:02d}" for i in range(1, 17)),
         "fifo_columns": minimum_columns == 3 and maximum_columns == 5 and "3, 4 or 5 FIFO columns" in supply_loader,
+        "supply_plan_schema_and_batch_identity": (
+            'const SCHEMA := "scrubbots.level_supply_plan.v1"' in supply_loader
+            and 'parsed.get("version")' in supply_loader and 'var ids := {}' in supply_loader
+            and 'b.get("batchId", "")' in supply_loader and "ids.has(bid)" in supply_loader
+        ),
         "preview_depth": preview_depth == 3,
         "artwork_conservation": "Supply conservation" in level_spec and "artwork cells only" in level_spec and "get_artwork_cell_count()" in difficulty,
         "void_runtime_semantics": "VOID cells (ADR-030) start CLEARED" in proof_state and "func is_void(index: int) -> bool:" in level_data,
         "level_loader_validation": "LevelValidator" in level_loader and "load_from_text" in level_loader,
+        "production_level_validator_present": all(token in level_validator for token in (
+            "id_value", "name_value", "difficulty_value", "version_int", "void_count")),
     }
     contract = {
         "level_data": {"versions": [v1, v2], "void_version": v2, "void_value": void_value},
         "production_dimensions": {"minimum": 20, "maximum": 59, "rectangular": True},
         "global_palette_ids": list(palette_ids),
         "global_palette_hex": palette_colors,
+        "production_difficulty_classes": ["EASY", "MEDIUM", "HARD", "VERY_HARD"],
+        "production_used_color_range": {"minimum": 3, "maximum": 12},
+        "supply_plan_schema": "scrubbots.level_supply_plan.v1",
         "supply": {"fifo_columns": {"minimum": minimum_columns, "maximum": maximum_columns}, "visible_preview_depth": preview_depth},
         "conservation_basis": "NON_VOID_ARTWORK_CELLS",
         "checks": checks,

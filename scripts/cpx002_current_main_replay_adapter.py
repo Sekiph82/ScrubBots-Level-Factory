@@ -25,6 +25,32 @@ _ROOT = Path(__file__).resolve().parents[1]
 _HARNESS = _ROOT / "tests" / "fixtures" / "cpx002_current_main_replay.gd"
 
 
+def describe_current_main_replay_requirements(
+    *,
+    configured_game_root: str | Path | None = None,
+    authority_snapshot: Mapping[str, object] | None = None,
+    replay_receipt: object | None = None,
+) -> dict[str, object]:
+    """Return a pure CPX002 readiness descriptor without inspecting the host.
+
+    Strings, booleans, and hash-shaped claims are typed claims only. This
+    function intentionally cannot authenticate a TEMP checkout or replay.
+    Only the existing runtime adapter can produce an authenticated receipt.
+    """
+    claimed = configured_game_root is not None or authority_snapshot is not None or replay_receipt is not None
+    return {
+        "schema": "cpx002-current-main-requirements/v1",
+        "disposition": "CPX002_AUTHORITY_REQUIRED",
+        "authority_state": "CLAIMED_TYPED_UNVERIFIED" if claimed else "MISSING",
+        "verified": False,
+        "missing_evidence": [
+            "AUTHENTICATED_ISOLATED_TEMP_GAME_AUTHORITY",
+            "AUTHENTICATED_CURRENT_MAIN_REPLAY_RECEIPT",
+        ],
+        "runtime_executed": False,
+    }
+
+
 def resolve_explicit_temp_game_authority(
     game_root: str | Path | None = None,
 ) -> Path:
@@ -181,4 +207,4 @@ def _run_godot(root: Path, executable: str, job: Path, timeout_seconds: int) -> 
     raise CurrentMainReplayError("GAME_REPLAY_ERROR")
 
 
-__all__ = ["resolve_explicit_temp_game_authority", "verify_staged_supply_with_current_main"]
+__all__ = ["describe_current_main_replay_requirements", "resolve_explicit_temp_game_authority", "verify_staged_supply_with_current_main"]

@@ -6,6 +6,8 @@ import base64
 import io
 import contextlib
 import runpy
+import os
+import stat
 from unittest.mock import patch
 
 from scrubbots_pixel_factory.supply_pipeline.current_game_contract import (
@@ -23,6 +25,8 @@ def _fixture_sources() -> dict[str, bytes]:
         "docs/01_GAMEPLAY_SPEC.md": b"Production board 20..59; rectangular boards allowed. C01..C16.",
         "docs/03_LEVEL_DATA_SPEC.md": (
             b"width: 20..59; height: 20..59; rectangular boards allowed. "
+            b"Production campaign uses EASY, MEDIUM, HARD, VERY_HARD; TEST` is development-only. "
+            b"Palette rules are 3..12 used colours C01..C16. Minimum >= 200 non-VOID cells and >= 25%. "
             b"Supply conservation, WIN (all non-VOID cells cleared), solver and Difficulty V1 measurements use artwork cells only."
         ),
         "scripts/data/level_data.gd": (
@@ -30,9 +34,11 @@ def _fixture_sources() -> dict[str, bytes]:
             b"func is_void(index: int) -> bool:\n\treturn version == FORMAT_VERSION_VOID and cells[index] == VOID_CELL\n"
         ),
         "scripts/data/level_loader.gd": b"const LevelValidator = preload(\"level_validator.gd\")\nstatic func load_from_text(text: String):\n",
+        "scripts/data/level_validator.gd": b"var id_value = data.id\nvar name_value = data.name\nvar difficulty_value = data.difficulty\nvar version_int = 1\nvar void_count = 0\n",
         "scripts/gameplay/supply/supply_plan_loader.gd": (
             b"## The plan's 3, 4 or 5 FIFO columns\nconst MIN_COLUMNS := 3\nconst MAX_COLUMNS := 5\n"
-            b"const VISIBLE_PREVIEW_DEPTH := 3\n"
+            b"const VISIBLE_PREVIEW_DEPTH := 3\nconst SCHEMA := \"scrubbots.level_supply_plan.v1\"\n"
+            b"parsed.get(\"version\")\nvar ids := {}\nb.get(\"batchId\", \"\")\nids.has(bid)\n"
         ),
         "scripts/gameplay/solver/proof_state.gd": b"# VOID cells (ADR-030) start CLEARED\n",
         "scripts/difficulty/level_difficulty_analyzer_v1.gd": b"var cells: int = level.get_artwork_cell_count()\n",
@@ -107,16 +113,18 @@ def test_contract_reports_missing_inputs_and_semantic_drift() -> None:
 
 
 def _level_and_plan(*, version: int = 1, void_count: int = 0) -> tuple[bytes, bytes]:
-    each_color = 100 if void_count else 200
-    half = each_color // 2
-    cells = [-1] * void_count + [0] * each_color + [1] * each_color
-    level = {"id": "fixture-001", "version": version, "width": 20, "height": 20,
-             "cells": cells, "palette": ["#010101FF", "#020202FF"]}
-    plan = {"schema": "scrubbots.level_supply_plan.v1", "version": 1, "levelId": "fixture-001",
+    artwork = 400 - void_count
+    counts = [artwork // 3 + (1 if artwork % 3 else 0), artwork // 3,
+              artwork - 2 * (artwork // 3) - (1 if artwork % 3 else 0)]
+    cells = [-1] * void_count + [0] * counts[0] + [1] * counts[1] + [2] * counts[2]
+    level = {"id": "fixture-candidate", "name": "Fixture Level", "difficulty": "EASY",
+             "version": version, "width": 20, "height": 20,
+             "cells": cells, "palette": ["#010101FF", "#020202FF", "#030303FF"]}
+    plan = {"schema": "scrubbots.level_supply_plan.v1", "version": 1, "levelId": "fixture-candidate",
             "columnCount": 3, "visiblePreviewDepth": 3, "maxRobotsPerBatch": 200,
-            "columns": [[{"cid": "C01", "robots": half}],
-                        [{"cid": "C01", "robots": half}, {"cid": "C02", "robots": half}],
-                        [{"cid": "C02", "robots": half}]]}
+            "columns": [[{"batchId": "batch-1", "cid": "C01", "robots": counts[0]}],
+                        [{"batchId": "batch-2", "cid": "C02", "robots": counts[1]}],
+                        [{"batchId": "batch-3", "cid": "C03", "robots": counts[2]}]]}
     return json.dumps(level, separators=(",", ":")).encode(), json.dumps(plan, separators=(",", ":")).encode()
 
 
@@ -147,7 +155,7 @@ def test_readiness_path_exposes_static_preflight_without_changing_gate_decision(
     assert card["current_game_preflight"]["solver_invocations"] == 0
     assert missing["current_game_preflight"]["disposition"] == Disposition.CURRENT_GAME_UNVERIFIED.value
     assert card["current_main_replay_bridge"]["disposition"] == "CPX002_AUTHORITY_REQUIRED"
-    assert card["current_main_replay_bridge"]["reason_codes"] == ["CURRENT_MAIN_RUNTIME_NOT_EXECUTED"]
+    assert "CPX002_AUTHORITY_REQUIRED" in card["current_main_replay_bridge"]["reason_codes"]
     launcher = open("level_factory/scripts/factory_core_launcher.py", encoding="utf-8").read()
     assert 'request.get("current_game_preflight")' in launcher
     assert 'extensions.readiness_card(' in launcher
@@ -157,7 +165,7 @@ def test_readiness_path_exposes_static_preflight_without_changing_gate_decision(
     with patch.object(studio_extensions, "readiness_card", return_value={"reached": True}) as readiness_call, \
          contextlib.redirect_stdout(output):
         exit_code = launcher_api["_studio_extension_main"](["--operation", "readiness", "--request-json", request])
-    assert exit_code == 0
+    assert exit_code == 0, output.getvalue()
     assert readiness_call.call_args.args[0] == "fixture-candidate"
     assert readiness_call.call_args.args[1]["authority"]["commit"] == _COMMIT
     assert json.loads(output.getvalue())["reached"] is True
@@ -194,7 +202,7 @@ def test_v2_void_and_cpx002_bridge_remain_static_until_authorized_replay() -> No
                                         owner_provenance={"compatible": True},
                                         cpx002_authority=None, replay_evidence=None)
     assert bridge["disposition"] == "CPX002_AUTHORITY_REQUIRED"
-    assert "EXPLICIT_ISOLATED_TEMP_SCRUBBOTS_PROJECT_AUTHORITY" in bridge["missing_evidence"]
+    assert "AUTHENTICATED_ISOLATED_TEMP_GAME_AUTHORITY" in bridge["missing_evidence"]
     assert bridge["runtime_executed"] is False
     assert bridge["solver_invocations"] == 0
 
@@ -260,7 +268,8 @@ def test_owner_provenance_reports_record_digest_but_requires_current_ready_load_
     )
     candidate = {"candidate_id": "owner-candidate", "grid_hash": "grid-1", "metadata": {"generator_metadata": {
         "classification": {"candidate_class": "PRODUCTION_CANDIDATE"}}}}
-    verified_classification = {"candidate_class": "PRODUCTION_CANDIDATE", "source_sha256": "c" * 64}
+    verified_classification = {"candidate_class": "PRODUCTION_CANDIDATE", "source_sha256": "c" * 64,
+                              "source_record_sha256": hashlib.sha256(raw_record).hexdigest()}
     review = {"review_id": "review-owner-candidate-0001", "disposition": "ACCEPT"}
     ready = {"disposition": "READY", "primary": {"state": "READY",
              "load_check": {"state": "READY", "disposition": "READY"},
@@ -275,6 +284,11 @@ def test_owner_provenance_reports_record_digest_but_requires_current_ready_load_
         record_mismatch = release_pool.inspect_current_game_candidate_provenance(
             candidate, review, {"disposition": "READY", "primary": {**ready["primary"],
             "source_record_sha256": "d" * 64}}, static)
+        with patch.object(release_pool, "validate_pool_candidate_provenance",
+                          return_value={"candidate_class": "PRODUCTION_CANDIDATE", "source_sha256": "c" * 64}):
+            missing_digest = release_pool.inspect_current_game_candidate_provenance(
+                candidate, review, {"disposition": "READY", "primary": {"state": "READY",
+                "load_check": {"state": "READY", "disposition": "READY"}}}, static)
     assert result["disposition"] == "OWNER_PROVENANCE_VERIFIED_STATIC_ONLY"
     assert result["source_sha256"] == "c" * 64
     assert result["source_record_sha256"] == hashlib.sha256(raw_record).hexdigest()
@@ -283,4 +297,191 @@ def test_owner_provenance_reports_record_digest_but_requires_current_ready_load_
     assert mismatched["disposition"] == "OWNER_PROVENANCE_VERIFIED_CURRENT_GAME_NOT_READY"
     assert "CURRENT_GAME_STATIC_PREFLIGHT_MUST_MATCH_SELECTED_CANDIDATE_GRID" in mismatched["reason_codes"]
     assert record_mismatch["disposition"] == "OWNER_PROVENANCE_REJECTED"
+    assert missing_digest["reason_codes"] == ["SOURCE_RECORD_DIGEST_AUTHORITY_MISSING"]
     assert result["release_pool_mutated"] is False
+
+
+def test_game_valid_static_contract_rejects_required_fields_batch_ids_and_duplicate_keys() -> None:
+    from scrubbots_pixel_factory.supply_pipeline.current_game_contract import preflight_level_supply_bytes
+    sources = _fixture_sources()
+    report = evaluate_current_game_contract(authority=_authority(sources), source_bytes=sources)
+    level_bytes, plan_bytes = _level_and_plan()
+    level = json.loads(level_bytes)
+    plan = json.loads(plan_bytes)
+    for field in ("name", "difficulty"):
+        invalid = dict(level)
+        invalid.pop(field)
+        rejected = preflight_level_supply_bytes(contract_report=report,
+            level_data_bytes=json.dumps(invalid).encode(), supply_plan_bytes=plan_bytes)
+        assert rejected["compatible"] is False
+        assert any(code.startswith(f"LEVEL_{field.upper()}_REQUIRED") for code in rejected["reason_codes"])
+    test_difficulty = dict(level)
+    test_difficulty["difficulty"] = "TEST"
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=json.dumps(test_difficulty).encode(), supply_plan_bytes=plan_bytes)
+    assert "PRODUCTION_DIFFICULTY_INVALID" in rejected["reason_codes"]
+    two_color = dict(level)
+    two_color["palette"] = two_color["palette"][:2]
+    two_color["cells"] = [(-1 if cell == -1 else min(cell, 1)) for cell in two_color["cells"]]
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=json.dumps(two_color).encode(), supply_plan_bytes=plan_bytes)
+    assert "PRODUCTION_USED_COLOR_COUNT_OUTSIDE_3_TO_12" in rejected["reason_codes"]
+    bad_plan = json.loads(plan_bytes)
+    bad_plan["columns"][0][0].pop("batchId")
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=level_bytes, supply_plan_bytes=json.dumps(bad_plan).encode())
+    assert "SUPPLY_BATCH_ID_MISSING_OR_DUPLICATE" in rejected["reason_codes"]
+    blank_batch = json.loads(plan_bytes)
+    blank_batch["columns"][0][0]["batchId"] = " "
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=level_bytes, supply_plan_bytes=json.dumps(blank_batch).encode())
+    assert "SUPPLY_BATCH_ID_MISSING_OR_DUPLICATE" in rejected["reason_codes"]
+    duplicate_batch = json.loads(plan_bytes)
+    duplicate_batch["columns"][1][0]["batchId"] = duplicate_batch["columns"][0][0]["batchId"]
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=level_bytes, supply_plan_bytes=json.dumps(duplicate_batch).encode())
+    assert "SUPPLY_BATCH_ID_MISSING_OR_DUPLICATE" in rejected["reason_codes"]
+    duplicate_plan = b'{"schema":"scrubbots.level_supply_plan.v1","schema":"duplicate"}'
+    rejected = preflight_level_supply_bytes(contract_report=report,
+        level_data_bytes=level_bytes, supply_plan_bytes=duplicate_plan)
+    assert rejected["compatible"] is False
+    assert any("duplicate JSON key" in code for code in rejected["reason_codes"])
+
+
+def test_candidate_mismatch_oversize_and_cpx002_claims_stay_fail_closed() -> None:
+    from scrubbots_pixel_factory.supply_pipeline.current_game_contract import (
+        current_main_replay_bridge, preflight_json_snapshot, preflight_level_supply_bytes,
+    )
+    sources = _fixture_sources()
+    report = evaluate_current_game_contract(authority=_authority(sources), source_bytes=sources)
+    level, plan = _level_and_plan()
+    mismatch = preflight_level_supply_bytes(contract_report=report, level_data_bytes=level,
+        supply_plan_bytes=plan, candidate_id="some-other-candidate")
+    assert "CANDIDATE_ID_LEVEL_ID_MISMATCH" in mismatch["reason_codes"]
+    assert preflight_json_snapshot({**_snapshot(), "oversized": "x" * 400_000})["compatible"] is False
+    static = preflight_level_supply_bytes(contract_report=report, level_data_bytes=level, supply_plan_bytes=plan)
+    bridge = current_main_replay_bridge(current_game_preflight=static, owner_provenance={"compatible": True},
+        cpx002_authority={"explicit_isolated_temp_game_authority": True, "game_root": "C:/Temp/fake",
+                          "source_sha256": "a" * 64, "game_sha256": "b" * 64,
+                          "manifest_sha256": "a" * 64, "pack_sha256": "b" * 64},
+        replay_evidence={"manifest_sha256": "a" * 64, "pack_sha256": "b" * 64,
+                         "game_level_sha256": "c" * 64, "game_supply_plan_sha256": "d" * 64,
+                         "runtime_win": True, "difficulty": "EASY", "load_check": True})
+    assert bridge["disposition"] == "CPX002_AUTHORITY_REQUIRED"
+    assert bridge["verified"] is False
+    assert bridge["authority_state"] == "CLAIMED_TYPED_UNVERIFIED"
+    launcher = runpy.run_path("level_factory/scripts/factory_core_launcher.py")
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        exit_code = launcher["_studio_extension_main"](["--operation", "readiness",
+            "--request-json", '{"candidate_id":"x","padding":"' + ("x" * (384 * 1024)) + '"}'])
+    assert exit_code != 0
+    assert "bounded 384 KiB" in output.getvalue()
+
+
+def test_integrated_launcher_reaches_real_selected_source_validator_with_memory_bytes() -> None:
+    from pathlib import Path
+    from scrubbots_pixel_factory.contracts.candidate_provenance import build_verified_owner_upload_classification
+    from scrubbots_pixel_factory.output.png import encode_logical_png
+    from scrubbots_pixel_factory.quality.core import logical_grid_hash
+    from scrubbots_pixel_factory import studio_extensions
+    from scrubbots_pixel_factory.supply_pipeline import release_pool
+
+    colors = ["C01"] * 134 + ["C02"] * 133 + ["C03"] * 133
+    png = encode_logical_png(20, 20, colors)
+    source_sha = hashlib.sha256(png).hexdigest()
+    source_id = f"owner-upload-{source_sha}"
+    candidate_id = f"candidate-owner-{source_sha[:48]}"
+    grid_hash = logical_grid_hash(20, 20, colors)
+    candidate_art_sha = hashlib.sha256(png).hexdigest()
+    source_dir = Path.cwd() / "level_factory" / "output" / "owner-uploads" / source_id
+    candidate_dir = Path.cwd() / "level_factory" / "output" / "candidates" / candidate_id
+    record = {
+        "schema": "scrubbots-owner-upload-source", "version": 1, "source_id": source_id,
+        "origin": "OWNER_UPLOAD", "source_sha256": source_sha, "byte_length": len(png),
+        "media_type": "image/png", "original_filename": "memory-fixture.png",
+        "original_width": 20, "original_height": 20,
+        "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
+        "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+        "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
+    }
+    record_bytes = json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
+    lineage = {
+        "source_id": source_id, "source_sha256": source_sha,
+        "source_record_sha256": hashlib.sha256(record_bytes).hexdigest(),
+        "source_record": f"level_factory/output/owner-uploads/{source_id}/source.json",
+        "source_bytes_unchanged": True,
+        "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+    }
+    payload = {"namespace": "owner-upload", "data": {"source_lineage": lineage}}
+    result = {
+        "request": {"seed": {"type": "string", "value": source_sha}, "generator_mode": "MASK"},
+        "generator": {"id": "owner-upload-canonical-derive", "version": "1"},
+        "rng": {"provenance": {"retry_seeds": {}}}, "seed": source_sha,
+    }
+    classification = build_verified_owner_upload_classification(
+        result, candidate_id=candidate_id, grid_hash=grid_hash, generator_metadata=payload,
+        verified_source_sha256=source_sha,
+    )
+    metadata = {"generation": {"result": result}, "generator_metadata": {
+        "classification": classification, "payload": payload,
+    }}
+    candidate = {"candidate_id": candidate_id, "source_path": candidate_dir.relative_to(Path.cwd()).as_posix(),
+        "width": 20, "height": 20, "grid_hash": grid_hash, "artwork_sha256": candidate_art_sha,
+        "metadata": metadata, "quality": {"decision": "ACCEPT", "grid_hash": grid_hash}}
+    review = {"review_id": "memory-review-001", "candidate_id": candidate_id,
+        "artwork_sha256": candidate_art_sha, "grid_hash": grid_hash, "disposition": "ACCEPT"}
+    ready = {"disposition": "READY", "primary": {"state": "READY",
+        "load_check": {"state": "READY", "disposition": "READY"},
+        "source_record_sha256": lineage["source_record_sha256"],
+        "difficulty": {"basis": "ScrubBots Difficulty V1"}, "files": {"pack": "memory-only"}},
+        "owner_source_binding": {"source_record_sha256": lineage["source_record_sha256"]}}
+
+    snapshot = _snapshot()
+    snapshot["candidate_id"] = candidate_id
+    level = json.loads(base64.b64decode(snapshot["level_data_b64"]))
+    plan = json.loads(base64.b64decode(snapshot["supply_plan_b64"]))
+    level.update(id=candidate_id, name="Memory Fixture", difficulty="EASY")
+    plan["levelId"] = candidate_id
+    snapshot["level_data_b64"] = base64.b64encode(json.dumps(level, separators=(",", ":")).encode()).decode()
+    snapshot["supply_plan_b64"] = base64.b64encode(json.dumps(plan, separators=(",", ":")).encode()).decode()
+
+    byte_map = {
+        source_dir / "source.json": record_bytes,
+        source_dir / "source.png": png,
+        candidate_dir / "artwork.png": png,
+        candidate_dir / "metadata.json": json.dumps(metadata).encode(),
+    }
+    original_read_bytes = Path.read_bytes
+    original_read_text = Path.read_text
+    original_stat = Path.stat
+    def memory_read_bytes(path):
+        return byte_map[path] if path in byte_map else original_read_bytes(path)
+    def memory_read_text(path, *args, **kwargs):
+        return byte_map[path].decode("utf-8") if path in byte_map else original_read_text(path, *args, **kwargs)
+    def memory_stat(path, *args, **kwargs):
+        if path in byte_map:
+            return os.stat_result((stat.S_IFREG | 0o600, 0, 0, 1, 0, 0, len(byte_map[path]), 0, 0, 0))
+        return original_stat(path, *args, **kwargs)
+
+    launcher = runpy.run_path("level_factory/scripts/factory_core_launcher.py")
+    stdout = io.StringIO()
+    request_json = json.dumps({"candidate_id": candidate_id, "current_game_preflight": snapshot})
+    with (patch.object(Path, "read_bytes", memory_read_bytes), patch.object(Path, "read_text", memory_read_text),
+          patch.object(Path, "stat", memory_stat),
+          patch.object(studio_extensions, "_source_record_paths", return_value=(source_dir / "source.json", source_dir / "source.png")),
+          patch.object(studio_extensions, "list_candidates", return_value=[candidate]),
+          patch.object(studio_extensions, "_latest_review", return_value=review),
+          patch.object(studio_extensions, "_validated_review_chain", return_value=([review], [])),
+          patch.object(studio_extensions, "_latest_ready_pipeline", return_value=ready),
+          contextlib.redirect_stdout(stdout)):
+        exit_code = launcher["_studio_extension_main"](["--operation", "readiness", "--request-json", request_json])
+    assert exit_code == 0, stdout.getvalue()
+    card = json.loads(stdout.getvalue())
+    assert card["current_game_preflight"]["disposition"] == "SOURCE_CONTRACT_COMPATIBLE_NOT_REPLAYED"
+    assert card["current_game_owner_provenance"]["disposition"] == "OWNER_PROVENANCE_VERIFIED_STATIC_ONLY"
+    assert card["current_game_owner_provenance"]["historical_cohort_status"] == "SAVED_HISTORICAL_UNVERIFIED"
+    assert card["current_main_replay_bridge"]["disposition"] == "CPX002_AUTHORITY_REQUIRED"
+    assert card["overall"] == "READY"
+    assert card["current_main_replay_bridge"]["runtime_executed"] is False
+    assert card["current_game_owner_provenance"]["release_pool_mutated"] is False
