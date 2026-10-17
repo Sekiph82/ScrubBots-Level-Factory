@@ -81,6 +81,74 @@ def validate_pool_candidate_provenance(
     return dict(classification)
 
 
+def inspect_current_game_candidate_provenance(
+    candidate: Mapping[str, Any],
+    review: Mapping[str, Any] | None,
+    ready_evidence: Mapping[str, Any] | None,
+    static_preflight: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Read-only, selected-candidate lineage summary for current-game readiness.
+
+    Reuses the Release Pool's authoritative owner-source/grid/review validator.
+    It never inserts into the pool or starts a solver, replay, or pipeline job.
+    """
+    metadata = candidate.get("metadata")
+    generator = metadata.get("generator_metadata") if isinstance(metadata, Mapping) else None
+    classification = generator.get("classification") if isinstance(generator, Mapping) else None
+    if not isinstance(classification, Mapping):
+        return {"disposition": "OWNER_PROVENANCE_UNAVAILABLE", "compatible": False,
+                "reason_codes": ["VERIFIED_OWNER_UPLOAD_CLASSIFICATION_REQUIRED"],
+                "runtime_executed": False, "release_pool_mutated": False}
+    try:
+        verified = validate_pool_candidate_provenance(candidate, review)
+        source_id = str(_candidate_source_lineage(candidate).get("source_id", ""))
+        from .. import studio_extensions as studio
+        record_path, _source_path = studio._source_record_paths(source_id)
+        repository = studio._repository_root().resolve()
+        if (not record_path.resolve().is_relative_to(repository) or record_path.is_symlink()
+                or record_path.stat().st_size > 64 * 1024):
+            raise ReleaseError("OWNER_UPLOAD source record path or size is invalid")
+        record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
+        ready_primary = ready_evidence.get("primary", {}) if isinstance(ready_evidence, Mapping) else {}
+        expected_record_sha = verified.get("source_record_sha256")
+        if expected_record_sha is None and isinstance(ready_primary, Mapping):
+            expected_record_sha = ready_primary.get("source_record_sha256")
+        if expected_record_sha is not None and expected_record_sha != record_sha:
+            raise ReleaseError("OWNER_UPLOAD source record SHA-256 does not match candidate provenance")
+    except (ReleaseError, OSError, TypeError, ValueError) as exc:
+        return {"disposition": "OWNER_PROVENANCE_REJECTED", "compatible": False,
+                "reason_codes": [f"OWNER_PROVENANCE_INVALID:{str(exc)[:180]}"],
+                "runtime_executed": False, "release_pool_mutated": False}
+    primary = ready_evidence.get("primary", {}) if isinstance(ready_evidence, Mapping) else {}
+    load_check = primary.get("load_check", {}) if isinstance(primary, Mapping) else {}
+    ready = (isinstance(ready_evidence, Mapping) and ready_evidence.get("disposition") == "READY"
+             and isinstance(primary, Mapping) and primary.get("state") == "READY"
+             and isinstance(load_check, Mapping) and load_check.get("state") == "READY"
+             and load_check.get("disposition") == "READY")
+    static_ok = (isinstance(static_preflight, Mapping)
+                 and static_preflight.get("compatible") is True
+                 and static_preflight.get("candidate_id") == candidate.get("candidate_id")
+                 and static_preflight.get("logical_grid_hash") == candidate.get("grid_hash"))
+    if not ready or not static_ok:
+        reasons = []
+        if not ready:
+            reasons.append("CURRENT_READY_AND_LOAD_CHECK_EVIDENCE_REQUIRED")
+        if not static_ok:
+            reasons.append("CURRENT_GAME_STATIC_PREFLIGHT_MUST_MATCH_SELECTED_CANDIDATE_GRID")
+        return {"disposition": "OWNER_PROVENANCE_VERIFIED_CURRENT_GAME_NOT_READY", "compatible": False,
+                "candidate_class": verified.get("candidate_class"),
+                "source_sha256": verified.get("source_sha256"), "source_record_sha256": record_sha,
+                "review_id": review.get("review_id") if isinstance(review, Mapping) else None,
+                "reason_codes": reasons, "runtime_executed": False, "release_pool_mutated": False}
+    return {"disposition": "OWNER_PROVENANCE_VERIFIED_STATIC_ONLY", "compatible": True,
+            "candidate_class": verified.get("candidate_class"),
+            "source_sha256": verified.get("source_sha256"), "source_record_sha256": record_sha,
+            "review_id": review.get("review_id") if isinstance(review, Mapping) else None,
+            "reason_codes": ["OWNER_SOURCE_GRID_REVIEW_READY_LOAD_CHECK_AND_FIFO_STATIC_EVIDENCE_MATCHED",
+                             "CURRENT_MAIN_RUNTIME_NOT_EXECUTED"],
+            "runtime_executed": False, "release_pool_mutated": False}
+
+
 def _validate_source_grid_bytes(
     candidate: Mapping[str, Any],
     classification: Mapping[str, Any],

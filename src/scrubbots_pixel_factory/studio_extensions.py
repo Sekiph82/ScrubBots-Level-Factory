@@ -1230,7 +1230,7 @@ def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> 
     return {"state": "SUCCESS", "disposition": "SUCCESS", "operation": "Generate", "execution": execution, "expanded_request": {**expanded, "canonical_request": canonical_request, "canonical_request_digest": _digest(canonical_request)}}
 
 
-def readiness_card(candidate_id: str) -> dict[str, Any]:
+def readiness_card(candidate_id: str, current_game_preflight: Mapping[str, object] | None = None) -> dict[str, Any]:
     candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id), None)
     if candidate is None: raise StudioExtensionError("candidate is unavailable")
     review = _latest_review(candidate_id, candidate["artwork_sha256"])
@@ -1251,7 +1251,14 @@ def readiness_card(candidate_id: str) -> dict[str, Any]:
         "EXPORT": {"disposition": "PASS" if ready_run and export_files else "NOT_AVAILABLE", "reason": "Canonical ZIP export evidence is present." if ready_run and export_files else "Canonical ZIP export evidence is not available.", "evidence": next(iter(export_files.values()), None) if isinstance(export_files, Mapping) else None},
     }
     ready = all(gate["disposition"] == "PASS" for gate in gates.values())
-    return {"schema": "scrubbots-production-readiness-card", "version": 1, "candidate_id": candidate_id, "gates": gates, "overall": "READY" if ready else "NOT READY", "reason": "Every required gate must be authoritative PASS." if not ready else "All required gates pass."}
+    # This is a read-only diagnostic beside the existing readiness gates. It
+    # cannot promote a saved READY run or change the publication decision.
+    from .supply_pipeline.current_game_contract import current_main_replay_bridge, preflight_json_snapshot
+    from .supply_pipeline.release_pool import inspect_current_game_candidate_provenance
+    current_game = preflight_json_snapshot(current_game_preflight)
+    owner_provenance = inspect_current_game_candidate_provenance(candidate, review, ready_run, current_game)
+    bridge = current_main_replay_bridge(current_game_preflight=current_game, owner_provenance=owner_provenance)
+    return {"schema": "scrubbots-production-readiness-card", "version": 1, "candidate_id": candidate_id, "gates": gates, "overall": "READY" if ready else "NOT READY", "reason": "Every required gate must be authoritative PASS." if not ready else "All required gates pass.", "current_game_preflight": current_game, "current_game_owner_provenance": owner_provenance, "current_main_replay_bridge": bridge}
 
 
 def _reproduction_contract(candidate: Mapping[str, Any]) -> tuple[Path, Any]:

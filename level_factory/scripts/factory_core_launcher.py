@@ -300,7 +300,9 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "comparison":
             payload = extensions.compare_candidates(request.get("candidate_ids", []))
         elif operation == "readiness":
-            payload = extensions.readiness_card(str(request["candidate_id"]))
+            payload = extensions.readiness_card(
+                str(request["candidate_id"]), request.get("current_game_preflight")
+            )
         elif operation == "cost-center":
             payload = extensions.canonical_cost_center(request.get("scope"), request.get("provider"))
         elif operation == "release-pool":
