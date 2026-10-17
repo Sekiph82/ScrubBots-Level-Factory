@@ -1772,3 +1772,10 @@ Document role: CODEX BUILDER LOG
 
 - The diagnosis and its PowerShell ancestry-check correction were committed as 14273e0c12939667b003bd1b5df0798d29db23e7 and 372ef0149da8d4caacac32da9fe20f89f00be545, respectively; both contain only this existing builder log. Normal git push origin HEAD:main succeeded. Post-push fetch verified HEAD == origin/main == 372ef0149da8d4caacac32da9fe20f89f00be545, 0 ahead / 0 behind, and tracked clean; all 2,972 pre-existing untracked paths remain.
 - Immediately before publication, .github/workflows/c001-r09-safe-regression.yml was re-read and its only trigger was workflow_dispatch; no workflow changed and no Actions/CI run was started.
+
+### M03 resume request: approval surface unavailable — 2026-10-17 23:22:21 +03:00
+
+- Owner requested resume from the verified checkpoint, use a supported approval mechanism, and request explicit approval when required. Fresh git fetch --prune origin verified canonical LF HEAD == origin/main == fa4d04e9942046f204002c2d5d8ebe86c7eb33e6, 0/0, tracked clean; 2,972 pre-existing untracked owner paths remain. Fresh game ls-remote still reports main=b9cc502c354e16191871a72ea76fcf10c0103904.
+- Inspected the tools exposed to this turn for an approval/request-permission endpoint: none is available. The active execution contract still reports approval policy 
+ever and explicitly disallows the sandbox_permissions escalation parameter; the app terminal reader has no attached terminal. Thus there is no supported in-turn approval surface to present or accept an explicit process request. This is an executor limitation, not owner denial and not permission to try another launch route.
+- No sandbox, clone, Git child process, Godot process, or test was started. No tool call attempted the blocked process. The existing exact-scope deletion/rehearsal evidence remains the prior builder report only; no new TEMP state was created. M03 remains ACTIVE / PRECLONE POLICY-BLOCKED; native replay/WIN, Difficulty V1/load-check, and CPX002 are NOT RUN. No owner data or project code changed; this continuation changes only this existing log.
