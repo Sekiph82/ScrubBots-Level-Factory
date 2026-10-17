@@ -1740,3 +1740,5 @@ Document role: CODEX BUILDER LOG
   raise SystemExit(bool(failed))"
   ```
 - Exact in-memory syntax command: PowerShell piped the five changed `.py` files to `compile(Path(name).read_text(encoding='utf-8'), name, 'exec')` under `python -B`; result `in_memory_compile=5 passed=5 failed=0`. `git diff --check` and protected-path diff check passed. No task-created caches or fixture files appeared.
+
+- Log correction: the preceding product-commit line had a transcription error. The actual product commit printed by Git is `4368559ebdce826411f752461719a3bfff2b40b7`; the builder log commit immediately following it is `37a570e`. The bracketed `try_body` text was an explanatory placeholder, not a command executed; the verbatim multiline PowerShell command beneath it is the actual focused command.
