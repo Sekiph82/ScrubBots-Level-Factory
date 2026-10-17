@@ -1,12 +1,12 @@
-# SB-LFX-018 R05 M03 | Independent source audit of preclone policy block, zero-residue builder evidence, owner stop V01
+# SB-LFX-018 R05 M03 | Corrected independent audit of preclone policy block and zero-residue builder evidence V01
 
 Date: 2026-10-17 Europe/Istanbul
 Remote GitHub reviewed: `Sekiph82/ScrubBots-Level-Factory` `main = a282ed5fa5f81e5b1ea01b45a16eb678e6838313`.
 Builder source: existing append-only `.hiveai/codex-logs/SB-LFX-018-C001-R02-R05_PRODUCTION_HISTORY_FULL_REGRESSION_EVIDENCE_CODEX_LOG.md`, M03 handoff and publication receipt.
-Owner's present direction: **"vazgeçtim"**, accompanied by M03 builder report. **Respect cancellation: NO new clone attempt, no native game/CPX002 retry, no further TEMP, no duplicate M03 task prompt.** This is a stop/record-only action, not approval to resume.
+**Owner clarification, 2026-10-17 22:05 +03:00:** The owner's earlier **"vazgeçtim"** referred ONLY to the proposed **`crsolver/claude-pxl`** tool/pilot, NOT to M03. The earlier assistant incorrectly treated M03 as cancelled. **This audit corrects that misinterpretation. M03 owner authorization for one bounded isolated TEMP with mandatory zero residue remains in force.** Clone policy rejection is still a real execution blocker; do not bypass it through alternate commands. No `claude-pxl` installation or pilot is authorized.
 
 ## Verdict, scope and provenance
-**M03 = BLOCKED_PRECLONE_NO_TEMP, then STOPPED AT OWNER DIRECTION.** Native current-game Level 002 replay/WIN, Difficulty V1, load-check and full CPX002 **NOT RUN**; parent R05 runtime/production stays OPEN. Owner Factory Studio M01 GUI PASS and M02 static source PASS remain separately CLOSED. No assertion of production-level game compatibility is supported.
+**M03 = ACTIVE MILESTONE / BLOCKED_PRECLONE_NO_TEMP at clone policy gate, NOT OWNER-CANCELLED.** Native current-game Level 002 replay/WIN, Difficulty V1, load-check and full CPX002 **NOT RUN**; parent R05 runtime/production stays OPEN. Owner Factory Studio M01 GUI PASS and M02 static source PASS remain separately CLOSED. No assertion of production-level game compatibility is supported.
 
 GPT read actual remote GitHub final log, not the owner's Windows drive. Log reports immutable original owner source `002_32x32px.png` SHA256 `49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa`, trusted `source.json` record SHA `858d302c10281ab2d70d4a9e22043e4eac216ebc6b6b0d89131b6e5930c232bb`, latest ACCEPT review 0002 linked to ACCEPT 0001, exact 32x32 LevelData V2 SHA `c7801f47c5efe13b3577188e71c6fdae35190bd1a798676c8c41cae2f847de3d` and 4-column FIFO plan SHA `c7a70c8e25b93154124446f62dce106a129d7ee7816413755ea1d0dac8be5045`; columns have 11,15,13,12 batches, preview3. The evidence is historical/builder read-only, not a native replay.
 
@@ -16,5 +16,5 @@ The same builder log records successful normal exact-root cleanup, sandbox absen
 
 No product/test/source code changed in M03. Existing log received normal main push; builder reported HEAD==origin/main 0/0, tracked-clean and 2,972 protected untracked files preserved, zero CI/Actions/workflow changes. GPT checked the published GitHub log and current main SHA, not local Git state.
 
-## Owner cancellation and tracker disposition
-Do not leave M03 as "ACTIVE" or "PENDING CLONE" in `TASKS.md`. Record **M03 halted/cancelled after preclone policy block**; no new automatic M03 milestone work or temp/clone retry, no cleanup retries. Only resume the topic on a new explicit owner decision. Do not conflate this with a technical M03 PASS or parent R05 production readiness; they remain NOT RUN. Do not pursue the optional `claude-pxl` exploratory integration without separate instruction.
+## Corrected M03 disposition and next safe action
+Keep M03 **ACTIVE / TECHNICALLY BLOCKED AT PRECLONE POLICY**, NOT cancelled. Prior explicit owner approval for temporary isolation still applies only with synchronous deletion and zero project residue outside `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`. Preserve the single M03 master and avoid new micro-prompts. The denied `Start-Process` Git clone must not be retried through another launch mechanism to evade policy. Continue only safe, independently useful M03 read-only/source-level investigation and determine a demonstrably permitted, non-evasive execution route; if none exists, report precise blocked requirement and do not assert native replay or CPX002 PASS. No new TEMP sandbox or native invocation while the policy gate remains unresolved. The owner cancelled **only `claude-pxl`**, so do not initiate that optional pilot. M01 GUI and M02 static-source PASS remain; parent R05 runtime/production OPEN.
