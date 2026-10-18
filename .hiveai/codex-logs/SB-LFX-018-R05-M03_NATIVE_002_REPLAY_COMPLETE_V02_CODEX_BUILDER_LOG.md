@@ -51,4 +51,8 @@ Document role: CODEX BUILDER LOG
 ### Publication receipt
 
 - Workflow trigger was rechecked immediately before publication: `.github/workflows/c001-r09-safe-regression.yml` contains only `workflow_dispatch`; no workflow run was requested or started. This is a local evidence-log-only change.
-- Initial evidence commit and push receipt will be appended after the normal push and parity check. No implementation/source/test paths are staged.
+- Publication receipt below records the first evidence-only commit and its verified normal push/parity. No implementation/source/test paths were staged.
+
+- Evidence commit `d2367879123ce4630423bd10b93ff1ea90d20955` was pushed normally with `git push origin HEAD:main` (remote advanced from `6c1edbd00dba8cec3b76a3de2bc3f34a8cafec64` to `d2367879123ce4630423bd10b93ff1ea90d20955`). Post-push `git fetch --prune origin` completed; observed `HEAD == origin/main == d2367879123ce4630423bd10b93ff1ea90d20955`, `0/0`. Tracked working tree was clean. The 2,956 pre-existing owner-untracked paths remain unstaged and untouched; Git continues to report Access denied for the previously noted owner ignore/scratch paths.
+
+- Publication correction: normal `git add`/`git commit` were blocked by `.git/index.lock` Permission denied; the same exact log path was staged via the supported on-request mechanism. The first receipt commit attempt also surfaced a trailing blank-line `git diff --cached --check` warning; the EOF was normalized and this exact-path check is rerun before commit. No other path was staged.
