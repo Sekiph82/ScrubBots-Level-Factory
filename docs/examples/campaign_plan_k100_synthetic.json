@@ -5,7 +5,7 @@
     "catalog_digest": "5c8922e29c4719566d1852f4c0a13486798b55d941f6f1d19c7f585175db82f0",
     "pool_digest": "e3a37eb6d333503c0d3996d7c62788d2bc66036507605135659ec5b1fab63d26"
   },
-  "plan_hash": "e6d192cfac9948065f0ee56f73a3931ed54158c1c46510dd9fa1b0de857d9612",
+  "plan_hash": "9dada2fcfec428ef30e4b3deda9c77d037f66ae88f8a84be49194970b91f2c71",
   "publishable_prefix": [
     1,
     2,
@@ -3312,6 +3312,7 @@
       "tier": 0
     }
   ],
+  "unassigned_ready_candidates": [],
   "warnings": [
     "Current game authority does not configure a consecutive similarity maximum; similarity is reported using the game analyzer formula without rejecting candidates.",
     "Current game analysis authority does not provide a supported scalar Frustration Risk; high-F sequencing cannot be enforced from available official data."

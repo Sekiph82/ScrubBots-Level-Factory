@@ -62,6 +62,9 @@ def test_class_mismatch_and_invalid_owner_lock_fail_closed():
     pool = _pool([50]); pool[0]["difficulty_class"] = "MEDIUM"
     plan = build_campaign_plan(catalog={"entries": []}, authority=_authority(), pool=pool, k=1)
     assert plan["slots"][0]["chosen_id"] is None
+    assert plan["unassigned_ready_candidates"] == ["level-000"]
+    assert pool[0]["difficulty_class"] == "MEDIUM"
+    assert any("class mismatch" in reason for candidate in plan["shortages"][0]["nearest_unused_candidates"] for reason in candidate["reasons"])
     with pytest.raises(CampaignError, match="hard-tolerance eligibility"):
         build_campaign_plan(catalog={"entries": []}, authority=_authority(), pool=_pool([60]), k=1, locks={1: "level-000"})
 
