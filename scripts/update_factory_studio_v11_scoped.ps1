@@ -20,9 +20,9 @@ function Sha([byte[]]$Bytes) {
     $h=[Security.Cryptography.SHA256]::HashData($Bytes)
     ([BitConverter]::ToString($h)).Replace('-','').ToLowerInvariant()
 }
-function Git([string[]]$Args) {
-    $o=& git -C $Repo @Args 2>&1
-    if($LASTEXITCODE -ne 0){ throw "git $($Args -join ' ') failed: $($o -join ' ')" }
+function Invoke-GitCmd([string[]]$GitArgs) {
+    $o=& git.exe -C $Repo @GitArgs 2>&1
+    if($LASTEXITCODE -ne 0){ throw "git $($GitArgs -join ' ') failed: $($o -join ' ')" }
     (($o | Out-String).Trim())
 }
 function NoReparse([string]$Path) {
@@ -32,7 +32,9 @@ function NoReparse([string]$Path) {
             $i=Get-Item -LiteralPath $p -Force
             if(($i.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){ throw "Reparse point blocks scoped update: $p" }
         }
-        $parent=[IO.Directory]::GetParent($p); if($null -eq $parent){break}; $p=$parent.FullName
+        $parent=[IO.Directory]::GetParent($p)
+        if($null -eq $parent -or [StringComparer]::OrdinalIgnoreCase.Equals($parent.FullName,$p)){break}
+        $p=$parent.FullName
     }
 }
 function InstalledStudioProcesses {
@@ -46,9 +48,9 @@ function InstalledStudioProcesses {
 if($Repo -ine $ExpectedRepo){ throw "Unexpected repository root: $Repo" }
 NoReparse $Repo; NoReparse $Install; NoReparse $ManifestPath
 if(!(Test-Path -LiteralPath $Install -PathType Container)){ throw 'Existing installed Release project is missing.' }
-$head=Git @('rev-parse','HEAD'); $remote=Git @('rev-parse','origin/main')
+$head=Invoke-GitCmd @('rev-parse','HEAD'); $remote=Invoke-GitCmd @('rev-parse','origin/main')
 if($head -cne $remote){ throw "Published HEAD must equal origin/main before installation: HEAD=$head origin/main=$remote" }
-if(Git @('status','--porcelain=v1','--untracked-files=no')){ throw 'Tracked checkout must be clean before installation.' }
+if(Invoke-GitCmd @('status','--porcelain=v1','--untracked-files=no')){ throw 'Tracked checkout must be clean before installation.' }
 $processes=InstalledStudioProcesses
 if($processes.Count){ throw "OWNER_CLOSE_APP_REQUIRED: installed Studio/Godot process PID $($processes[0].ProcessId) is using this Release." }
 if(!(Test-Path -LiteralPath $ManifestPath -PathType Leaf)){ throw 'Installed manifest is missing.' }
@@ -61,7 +63,7 @@ foreach($t in $Targets){
     $src=Join-Path $Repo ($t.Path -replace '/','\'); $dst=Join-Path $Install ($t.Path -replace '/','\')
     NoReparse $src; NoReparse $dst
     if(!(Test-Path -LiteralPath $src -PathType Leaf)){ throw "Published source file missing: $($t.Path)" }
-    $gitBlob=Git @('rev-parse',"HEAD:$($t.Path)"); $workBlob=Git @('hash-object',"--path=$($t.Path)",$src)
+    $gitBlob=Invoke-GitCmd @('rev-parse',"HEAD:$($t.Path)"); $workBlob=Invoke-GitCmd @('hash-object',"--path=$($t.Path)",$src)
     if($gitBlob -cne $workBlob){ throw "Source differs from published Git bytes: $($t.Path)" }
     $bytes=[IO.File]::ReadAllBytes($src); $newSha=Sha $bytes; $sourceBytesTotal += $bytes.Length
     $entries=@($manifest.managedFiles | Where-Object path -CEQ $t.Path)
@@ -85,7 +87,7 @@ foreach($plan in $plans){
     } else { $entry[0].sha256=$plan.NewSha }
 }
 $receipt=[pscustomobject][ordered]@{
-    taskId=$TaskId; sourceCommit=(Git @('log','-1','--format=%H','--',$Targets[0].Path)); sourceHead=$head
+    taskId=$TaskId; sourceCommit=(Invoke-GitCmd @('log','-1','--format=%H','--',$Targets[0].Path)); sourceHead=$head
     files=@($plans | ForEach-Object { [pscustomobject][ordered]@{path=$_.Path;priorSha256=$_.OldSha;sha256=$_.NewSha;bytes=$_.Bytes.Length} })
     installedAtUtc=[DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
 }
