@@ -264,3 +264,9 @@ Document role: CODEX BUILDER LOG
 - Installation preflight remains read-only: installed manifest reports source revision `89d74c9fe758ad0766f7ff5290154a1f56548b14`, mode `OWNER_APPROVED_SCOPED_OVERLAY`, 2,318 managed files and 11 overlay paths. PID 19700 was still executing the installed `png-batch-run` command during preflight, so installed runtime files were preserved byte-for-byte and not refreshed.
 - CI/Actions review found only `.github/workflows/c001-r09-safe-regression.yml` with manual `workflow_dispatch`; no workflow was launched. No production, STAGING, CPX001, CPX002, GameFeelFlow or prior successful gate was repeated.
 - Publication: pending at time of this log update.
+
+
+## Scoped installation correction
+
+- Installed manifest inspection showed that the existing approved overlay allows only its enumerated paths. `src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py` is not on that list and its installed bytes differ from the manifest baseline, so no overlay update may replace it. Reverted the candidate-level progress edit from that file before installation; the published batch now reports the optimizer's existing per-round progress through the new activity callback. The four other modified product paths are explicitly present in the installed overlay allowlist.
+- After stopping the verified stalled Python worker PID 19700, two child Godot solver processes (PIDs 9096 and 12908) were observed using the same installed current-game runtime. They were left untouched; Release refresh remains blocked until both exit.
