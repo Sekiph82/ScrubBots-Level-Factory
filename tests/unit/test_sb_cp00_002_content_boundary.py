@@ -168,6 +168,8 @@ def test_contract_schema_documents_the_narrow_versioned_allow_list() -> None:
         "approved_metadata",
     }
     assert len(schema["oneOf"]) == 3
+    level_payload_contract = schema["oneOf"][0]["properties"]["payload_contract"]
+    assert level_payload_contract["properties"]["version"]["enum"] == [1, 2]
 
 
 def test_classifier_source_uses_no_dynamic_execution_network_or_game_imports() -> None:

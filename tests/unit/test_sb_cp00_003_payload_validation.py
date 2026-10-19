@@ -32,6 +32,8 @@ def _descriptor(kind: str, payload: dict[str, object], *, raw: bytes | None = No
     examples = PIPELINE / "schemas" / "v1" / "examples"
     name = {"level_data": "level.json", "supply_plan_data": "supply-plan.json", "approved_metadata": "approved-metadata.json"}[kind]
     descriptor = json.loads((examples / name).read_text(encoding="utf-8"))
+    if kind == "level_data" and payload.get("version") in {1, 2}:
+        descriptor["payload_contract"]["version"] = payload["version"]
     attrs = descriptor["attributes"]
     assert isinstance(attrs, dict)
     if kind == "supply_plan_data":
@@ -88,6 +90,32 @@ def test_current_declarative_payload_families_validate_and_bind_exact_bytes(kind
     assert json.loads(serialize_payload_result(result)) == {
         "validation_version": "1.0", "accepted": True, "reason_code": "VALID_PAYLOAD",
     }
+
+
+def test_level_data_v2_accepts_void_only_when_artwork_minimum_is_met() -> None:
+    payload = _payloads()["level_data"]
+    payload.update({"version": 2, "cells": [0] * 200 + [-1] * 200})
+    raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    descriptor = _descriptor("level_data", payload, raw=raw)
+    assert classify_content(descriptor).disposition is ContentDisposition.REMOTE_DECLARATIVE
+    assert validate_remote_payload(descriptor, raw).accepted
+
+    for cells in ([0] * 199 + [-1] * 201, [0] * 200 + [-2] + [-1] * 199, [0] * 400):
+        invalid_payload = dict(payload, cells=list(cells))
+        invalid_raw = json.dumps(invalid_payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        invalid_descriptor = _descriptor("level_data", invalid_payload, raw=invalid_raw)
+        assert not validate_remote_payload(invalid_descriptor, invalid_raw).accepted
+
+    quarter_boundary = dict(payload, width=32, height=32, cells=[0] * 255 + [-1] * 769)
+    quarter_raw = json.dumps(quarter_boundary, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    assert not validate_remote_payload(
+        _descriptor("level_data", quarter_boundary, raw=quarter_raw), quarter_raw
+    ).accepted
+    quarter_boundary["cells"] = [0] * 256 + [-1] * 768
+    quarter_raw = json.dumps(quarter_boundary, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+    assert validate_remote_payload(
+        _descriptor("level_data", quarter_boundary, raw=quarter_raw), quarter_raw
+    ).accepted
 
 
 def test_pinned_current_scrubbots_production_payload_bytes_validate_with_truthful_descriptors() -> None:

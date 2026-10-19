@@ -295,7 +295,15 @@ def classify_content(descriptor: object) -> ClassificationResult:
     if descriptor_contract_id != expected_contract_id:
         return _result(ContentDisposition.REJECTED, ReasonCode.SCHEMA_TYPE_MISMATCH)
     payload_contract = descriptor.get("payload_contract")
-    if not isinstance(payload_contract, Mapping) or dict(payload_contract) != expected_payload_contract:
+    contract_matches = isinstance(payload_contract, Mapping) and dict(payload_contract) == expected_payload_contract
+    if content_type == "level_data" and isinstance(payload_contract, Mapping):
+        # The descriptor shape stays stable while the external Level Data
+        # Specification advances from V1 to V2.
+        contract_matches = payload_contract == {
+            "authority": "Level Data Specification",
+            "version": payload_contract.get("version"),
+        } and payload_contract.get("version") in {1, 2} and type(payload_contract.get("version")) is int
+    if not contract_matches:
         return _result(ContentDisposition.REJECTED, ReasonCode.PAYLOAD_CONTRACT_MISMATCH)
     if descriptor.get("media_type") != expected_media_type:
         return _result(ContentDisposition.REJECTED, ReasonCode.MEDIA_TYPE_MISMATCH)

@@ -103,7 +103,12 @@ def _level_input(
     level = _decode_object(level_bytes, label="LevelData")
     plan = _decode_object(plan_bytes, label="supply plan")
     level_id = level.get("id")
-    if not isinstance(level_id, str) or plan.get("levelId") != level_id:
+    if (
+        not isinstance(level_id, str)
+        or type(level.get("version")) is not int
+        or level.get("version") not in {1, 2}
+        or plan.get("levelId") != level_id
+    ):
         raise FactoryPackAssemblyError("current Factory candidate and source level identities differ")
     width, height = level.get("width"), level.get("height")
     column_count = plan.get("columnCount")
@@ -140,7 +145,7 @@ def _level_input(
         media_type="application/vnd.scrubbots.level+json",
         descriptor_contract_id="scrubbots.content-pipeline.level-data.v1",
         logical_path=f"levels/{level_id}.json",
-        payload_contract={"authority": "Level Data Specification", "version": 1},
+        payload_contract={"authority": "Level Data Specification", "version": level.get("version")},
         attributes={
             "height": height, "level_id": level_id, "payload_sha256": level_sha256, "width": width,
         },

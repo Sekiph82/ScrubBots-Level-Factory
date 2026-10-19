@@ -6,7 +6,7 @@ import hashlib
 import json
 import math
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -121,13 +121,33 @@ def _keys_are(value: Mapping[str, Any], required: set[str], optional: set[str] |
 _LEVEL_FIELDS = {"version", "id", "name", "difficulty", "width", "height", "palette", "cells"}
 
 
+def _valid_level_v2_cells(cells: Sequence[object], width: int, height: int, palette_size: int) -> bool:
+    if (
+        type(width) is not int or type(height) is not int or type(palette_size) is not int
+        or width < 1 or height < 1 or palette_size < 1
+        or len(cells) != width * height
+        or any(type(cell) is not int for cell in cells)
+    ):
+        return False
+    artwork = sum(0 <= cell < palette_size for cell in cells)
+    void = sum(cell == -1 for cell in cells)
+    return (
+        artwork + void == len(cells)
+        and void > 0
+        and artwork >= 200
+        and artwork * 4 >= width * height
+    )
+
+
 def _valid_level(value: Mapping[str, Any]) -> bool:
     if not _keys_are(value, _LEVEL_FIELDS):
         return False
     width, height, palette, cells = value["width"], value["height"], value["palette"], value["cells"]
-    return (
-        type(value["version"]) is int and value["version"] == 1
-        and isinstance(value["id"], str) and bool(value["id"])
+    version = value["version"]
+    if type(version) is not int or version not in {1, 2}:
+        return False
+    if not (
+        isinstance(value["id"], str) and bool(value["id"])
         and isinstance(value["name"], str) and bool(value["name"])
         and isinstance(value["difficulty"], str) and bool(value["difficulty"])
         and type(width) is int and MIN_LEVEL_DIMENSION <= width <= MAX_LEVEL_DIMENSION
@@ -136,8 +156,11 @@ def _valid_level(value: Mapping[str, Any]) -> bool:
         and all(isinstance(color, str) and bool(color) for color in palette)
         and len(set(palette)) == len(palette)
         and isinstance(cells, list) and len(cells) == width * height
-        and all(type(cell) is int and 0 <= cell < len(palette) for cell in cells)
-    )
+    ):
+        return False
+    if version == 1:
+        return all(type(cell) is int and 0 <= cell < len(palette) for cell in cells)
+    return _valid_level_v2_cells(cells, width, height, len(palette))
 
 
 _SUPPLY_FIELDS = {
@@ -266,7 +289,13 @@ def validate_remote_payload(descriptor: object, payload: object) -> PayloadValid
         return _result(False, PayloadReasonCode.INVALID_DESCRIPTOR)
     if content_type == "level_data":
         valid = _valid_level(parsed)
-        contract_ok = contract == {"authority": "Level Data Specification", "version": 1} and parsed.get("version") == 1
+        contract_version = contract.get("version")
+        contract_ok = (
+            contract.get("authority") == "Level Data Specification"
+            and type(contract_version) is int and contract_version in {1, 2}
+            and parsed.get("version") == contract_version
+            and set(contract) == {"authority", "version"}
+        )
         allowed = _LEVEL_FIELDS
     elif content_type == "supply_plan_data":
         valid = _valid_supply_plan(parsed)

@@ -21,6 +21,7 @@ from .scrubpack_builder import (
     verify_scrubpack_build,
 )
 from .scrubpack_spec import PACK_MANIFEST_PATH
+from .payload_validation import _valid_level_v2_cells
 
 
 SOLVER_IDENTITY_SCHEMA = "scrubbots.factory.solver-supply-identity.v1"
@@ -141,7 +142,20 @@ def _proof_for_level(
         raise ScrubpackSolverIdentityError("packaged LevelData cells must be integer palette IDs or VOID -1")
     void_count = cells.count(-1)
     artwork_count = len(cells) - void_count
-    if any(value < -1 for value in cells) or (level_data.get("version") == 1 and void_count) or (level_data.get("version") == 2 and (void_count == 0 or artwork_count == 0)) or level_data.get("version") not in (1, 2):
+    if (
+        any(value < -1 for value in cells)
+        or (level_data.get("version") == 1 and void_count)
+        or (
+            level_data.get("version") == 2
+            and not _valid_level_v2_cells(
+                cells,
+                level_data.get("width"),
+                level_data.get("height"),
+                len(level_data.get("palette", [])) if isinstance(level_data.get("palette"), list) else 0,
+            )
+        )
+        or level_data.get("version") not in (1, 2)
+    ):
         raise ScrubpackSolverIdentityError("packaged LevelData V1/V2 VOID encoding is not canonical")
     level_sha256 = _sha256(level_raw)
     plan_sha256 = _sha256(plan_raw)

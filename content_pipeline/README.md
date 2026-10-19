@@ -127,7 +127,7 @@ configuration-only check. No live-publish flag or remote write exists.
 
 The versioned descriptor contract is `schemas/v1/content-boundary.schema.json`.
 The local `classify_content()` API accepts only an explicit allow-list of
-versioned JSON descriptors for Level Data V1, supply-plan V1, and current
+versioned JSON descriptors for Level Data V1/V2, supply-plan V1, and current
 publisher metadata V1. Each `descriptor_contract_id` names this package's
 normalized descriptor contract; it is not a field claimed to exist inside the
 payload. `payload_contract` separately records the production authority and
@@ -141,8 +141,10 @@ attributes are embedded in the production payload.
 
 Level Data V1 has no embedded schema string. Its descriptor therefore uses the
 boundary-owned `scrubbots.content-pipeline.level-data.v1` identity and records
-`payload_contract.authority = "Level Data Specification"` with version `1`;
-the Level Data payload itself remains `version: 1` with its current `id`,
+`payload_contract.authority = "Level Data Specification"` with matching
+version `1` or `2`; V1 retains its original format, while V2 permits canonical
+`-1` VOID cells and enforces the production artwork minimum; the Level Data
+payload carries the matching version with its current `id`,
 `name`, `difficulty`, dimensions, palette, and cells fields. Cross-authority
 tests inspect the current Level Factory exporter/publisher source and a
 commit-pinned read-only fixture of current Scrubbots loader/spec authority.
@@ -200,10 +202,12 @@ be established. Results use stable reason codes under validation version
 
 The deterministic resource limits are 1 MiB per byte payload, nesting depth
 32, 65,536 members per collection, and 8,192 characters per string. Production
-LevelData V1 dimensions are independently 20..59, and `cells` is a flat,
+LevelData V1/V2 dimensions are independently 20..59, and `cells` is a flat,
 row-major array of integer indices into `palette` (booleans and string color
 IDs are not cell indices). Publisher metadata retains its separate 1..256
-dimension bound. Current LevelData V1, supply-plan V1, and publisher metadata
+dimension bound. LevelData V2 also requires at least 200 artwork cells and
+at least 25% of the board; all remaining cells must be `-1` VOID. Current
+LevelData V1/V2, supply-plan V1, and publisher metadata
 V1 each use explicit field allow-lists. Supply-plan batches have unique
 non-empty IDs, canonical C01..C16 color IDs, and integer robot counts bounded
 by positive `maxRobotsPerBatch`. `intendedColumnClicks` is checked only as an
