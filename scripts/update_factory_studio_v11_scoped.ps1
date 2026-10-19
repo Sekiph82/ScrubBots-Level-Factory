@@ -51,7 +51,7 @@ if(!(Test-Path -LiteralPath $Install -PathType Container)){ throw 'Existing inst
 $head=Invoke-GitCmd @('rev-parse','HEAD'); $remote=Invoke-GitCmd @('rev-parse','origin/main')
 if($head -cne $remote){ throw "Published HEAD must equal origin/main before installation: HEAD=$head origin/main=$remote" }
 if(Invoke-GitCmd @('status','--porcelain=v1','--untracked-files=no')){ throw 'Tracked checkout must be clean before installation.' }
-$processes=InstalledStudioProcesses
+$processes=@(InstalledStudioProcesses)
 if($processes.Count){ throw "OWNER_CLOSE_APP_REQUIRED: installed Studio/Godot process PID $($processes[0].ProcessId) is using this Release." }
 if(!(Test-Path -LiteralPath $ManifestPath -PathType Leaf)){ throw 'Installed manifest is missing.' }
 $manifestBytes=[IO.File]::ReadAllBytes($ManifestPath); $manifestSha=Sha $manifestBytes
@@ -111,7 +111,8 @@ try {
     }
     [IO.File]::WriteAllBytes($manifestStage,$newManifestBytes); $stagePaths.Add($manifestStage)
     if((Sha ([IO.File]::ReadAllBytes($manifestStage))) -cne $newManifestSha){ throw 'Staged manifest hash mismatch.' }
-    if((Sha ([IO.File]::ReadAllBytes($ManifestPath))) -cne $manifestSha -or (InstalledStudioProcesses).Count){ throw 'Installed state or app process changed during staging; no install performed.' }
+    $activeProcesses=@(InstalledStudioProcesses)
+    if((Sha ([IO.File]::ReadAllBytes($ManifestPath))) -cne $manifestSha -or $activeProcesses.Count){ throw 'Installed state or app process changed during staging; no install performed.' }
     foreach($p in $plans){
         if($p.Add){ [IO.File]::Move("$($p.Destination).m03-v11-stage",$p.Destination) }
         else { [IO.File]::Replace("$($p.Destination).m03-v11-stage",$p.Destination,$null) }
