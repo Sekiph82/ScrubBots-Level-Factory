@@ -2436,10 +2436,15 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	var record_sha := str(item.get("source_record_sha256", ""))
 	var attempt_value: Variant = item.get("attempt_id", "")
 	var attempt_id := "" if attempt_value == null else str(attempt_value)
-	var column_count := int(item.get("column_count", 0))
+	var index_value: Variant = item.get("index", -1)
+	var column_value: Variant = item.get("column_count")
+	if typeof(index_value) != TYPE_INT or int(index_value) != item_index:
+		return
+	if typeof(column_value) != TYPE_INT or int(column_value) not in [3, 4, 5]:
+		return
+	var column_count := int(column_value)
 	var reused_ready := str(item.get("status", "")) == "READY" and bool(item.get("reused_existing_ready", false)) and not str(item.get("run_id", "")).is_empty()
 	if (str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
-			or int(item.get("index", -1)) != item_index
 			or source_id.trim_prefix("owner-upload-") != source_sha
 			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready) or column_count not in [3, 4, 5]):
 		return

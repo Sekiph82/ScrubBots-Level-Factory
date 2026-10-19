@@ -930,7 +930,10 @@ def run_png_batch(
                 "activity_run_id": activity_id,
                 "activity_source_sha256": str(item["source_sha256"]),
                 "activity_source_record_sha256": str(item["source_record_sha256"]),
-                "candidates": min(int(request.get("candidates", 300)), 300),
+                # Batch runs use a smaller default search budget to keep one hard
+                # image from monopolizing the sequential queue. Explicit owner
+                # settings remain honored up to the existing canonical maximum.
+                "candidates": min(int(request.get("candidates", 48)), 300),
                 "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
                 "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 90)), 90),
             })

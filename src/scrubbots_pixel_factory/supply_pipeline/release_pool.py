@@ -593,7 +593,9 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
             raise ReleaseError(f"Release Pool Difficulty V1 proof no longer matches its immutable pipeline: {path.name}")
         current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
         if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
-            raise ReleaseError(f"Release Pool candidate identity changed or disappeared: {path.name}")
+            # Keep stale immutable history on disk, but do not let one obsolete row
+            # prevent independent, currently verified candidates from being listed.
+            continue
         # Existing pre-classification entries remain read-only historical evidence.
         # Newly created entries always carry classification and must revalidate it.
         if value.get("candidate_classification") is not None:

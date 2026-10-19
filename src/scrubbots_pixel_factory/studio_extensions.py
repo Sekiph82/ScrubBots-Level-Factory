@@ -873,6 +873,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             screen_budget=int(request_data.get("screen_budget", 3000)), metric_top=int(request_data.get("metric_top", 12)),
             viability_budget=int(request_data.get("viability_budget", 3000)),
             real_max_visited=solver_max_visited, level_number=int(request_data.get("level_number", 1)),
+            progress=lambda line: emit("ANALYZE/PLAN", "RUNNING", line),
             real_timeout_seconds=solver_timeout,
             max_native_solver_invocations=1 if rules.attestation is not None else None,
         )
