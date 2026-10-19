@@ -555,7 +555,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     return {"disposition": "ENTERED_RELEASE_POOL", "candidate_id": candidate["candidate_id"], "entry_digest": payload["entry_digest"], "pool_size": len(list(_pool_root().glob("*.json")))}
 
 
-def release_entries() -> list[dict[str, Any]]:
+def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
     for path in sorted(_pool_root().glob("*.json")) if _pool_root().exists() else ():
@@ -565,6 +565,8 @@ def release_entries() -> list[dict[str, Any]]:
         value["entry_digest"] = expected
         if expected != actual: raise ReleaseError(f"Release Pool entry digest mismatch: {path.name}")
         candidate_id = str(value.get("candidate_id", ""))
+        if candidate_id_filter is not None and candidate_id != candidate_id_filter:
+            continue
         latest = studio._latest_review(candidate_id)
         if latest and latest.get("disposition") == "REJECT":
             continue

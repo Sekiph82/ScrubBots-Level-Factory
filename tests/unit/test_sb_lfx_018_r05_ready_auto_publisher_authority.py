@@ -58,6 +58,31 @@ def test_ready_auto_is_valid_only_with_consistent_release_pool_authority():
         "disposition": "ACCEPT", "review_id": "review-stale"})
 
 
+def test_current_accepted_ready_pipeline_supersedes_stale_release_pool_pipeline(tmp_path, monkeypatch):
+    candidate_id = "candidate-ready-auto"
+    current_pipeline = {
+        "candidate_id": candidate_id,
+        "run_id": "pipeline-current-main",
+        "disposition": "READY",
+        "primary": {"state": "READY", "disposition": "READY"},
+    }
+    current_path = tmp_path / "pipeline-current-main.json"
+    current_path.write_text(json.dumps(current_pipeline, sort_keys=True), encoding="utf-8")
+    stale_entry = _entry(candidate_id)
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id=None: (stale_entry,))
+    monkeypatch.setattr(studio, "list_candidates", lambda: [{"candidate_id": candidate_id}])
+    monkeypatch.setattr(studio, "_latest_review", lambda _candidate: {
+        "disposition": "ACCEPT", "review_id": "review-current"})
+    monkeypatch.setattr(studio, "_latest_ready_pipeline", lambda _candidate: current_pipeline)
+    monkeypatch.setattr(studio, "_pipeline_path", lambda _run_id: current_path)
+
+    pipeline_bytes, source = scrubpack_identity.current_solver_proof_for_candidate(candidate_id)
+
+    assert json.loads(pipeline_bytes)["run_id"] == "pipeline-current-main"
+    assert source["schema"] == "scrubbots.factory.accepted-ready-proof/v1"
+    assert source["review_id"] == "review-current"
+
+
 def test_ready_auto_preflight_requires_explicit_candidate_selection(monkeypatch):
     entry = _entry()
     monkeypatch.setattr(handoff, "_next_content_version", lambda: 7)

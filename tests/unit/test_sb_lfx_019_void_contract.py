@@ -247,7 +247,11 @@ def test_opaque_v1_solver_identity_keeps_legacy_shape_and_void_layout_is_bound()
 def test_scrubpack_rejects_wrong_v2_artwork_and_void_identity_counts(tmp_path: Path) -> None:
     authority = {"repository": "Sekiph82/Scrubbots", "branch": "main", "git_head": "a" * 40}
     level_id = "void-count-binding"
-    level = {"version": 2, "id": level_id, "width": 4, "height": 1, "palette": ["#FF4500FF", "#00A8E8FF", "#7AC943FF"], "cells": [0, 1, 2, -1]}
+    level = {
+        "version": 2, "id": level_id, "width": 20, "height": 20,
+        "palette": ["#FF4500FF", "#00A8E8FF", "#7AC943FF"],
+        "cells": [index % 3 for index in range(399)] + [-1],
+    }
     plan = {
         "schema": "scrubbots.level_supply_plan.v1", "version": 1, "levelId": level_id,
         "columnCount": 3, "visiblePreviewDepth": 3, "maxRobotsPerBatch": 1,

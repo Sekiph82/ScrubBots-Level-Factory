@@ -627,7 +627,7 @@ def build_export_bundle(
         else:
             metadata["preview"] = {"enabled": False, "scale": None, "width": None, "height": None}
             metadata_json = canonical_json_bytes(metadata)
-        _validate_metadata(metadata, artwork)
+        metadata = _validate_metadata(metadata, artwork)
     except (ArtworkContractError, PNGContractError, TypeError, ValueError) as exc:
         if isinstance(exc, OutputContractError):
             raise
@@ -713,7 +713,22 @@ def _validate_metadata(metadata: object, artwork: ArtworkArtifact) -> dict[str, 
         payload,
     )
     if owner_source_sha256 is not None and classification is None:
-        raise OutputContractError("verified owner-upload bundle must carry its candidate classification")
+        # Older immutable owner-upload bundles predate the persisted
+        # classification field. Reconstruct the same deterministic projection
+        # only after the source bytes and logical grid have been verified above;
+        # never write this compatibility projection back into the bundle.
+        try:
+            classification = build_verified_owner_upload_classification(
+                result_dict,
+                candidate_id=artwork.candidate_id,
+                grid_hash=artwork.grid_hash,
+                generator_metadata=payload,
+                verified_source_sha256=owner_source_sha256,
+            )
+        except CandidateProvenanceError as exc:
+            raise OutputContractError(str(exc)) from exc
+        generator_metadata["classification"] = classification
+        value["generator_metadata"] = generator_metadata
     if classification is not None:
         try:
             if owner_source_sha256 is None:
@@ -781,7 +796,7 @@ def read_bundle(directory: str | os.PathLike[str]) -> ExportBundle:
         artwork_png = (root / "artwork.png").read_bytes()
         artwork = ArtworkArtifact.from_dict(json.loads(artwork_json.decode("utf-8")))
         metadata = json.loads(metadata_json.decode("utf-8"))
-        _validate_metadata(metadata, artwork)
+        metadata = _validate_metadata(metadata, artwork)
         decoded = decode_logical_png(artwork_png)
     except (OSError, UnicodeError, json.JSONDecodeError, ArtworkContractError, PNGContractError) as exc:
         raise OutputContractError(str(exc)) from exc

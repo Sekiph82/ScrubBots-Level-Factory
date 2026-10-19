@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from ..payload_validation import MAX_PAYLOAD_BYTES
+from ..payload_validation import MAX_PAYLOAD_BYTES, _valid_level
 from ..scrubpack_spec import (
     PACK_MANIFEST_PATH,
     SCRUBPACK_SCHEMA,
@@ -120,6 +120,11 @@ def _payload_version_reason(name: str, payload: bytes) -> str | None:
     version = value["version"]
     if type(version) is not int or version <= 0:
         return "INVALID_MEMBER_VERSION"
+    is_level = name.rsplit("/", 1)[-1] == "level.json"
+    if is_level and version == 2:
+        if "schema" in value or not _valid_level(value):
+            return "UNSUPPORTED_VERSION"
+        return None
     if version != 1:
         return "UNSUPPORTED_VERSION"
     expected_schema = {

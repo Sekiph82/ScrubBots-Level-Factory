@@ -188,13 +188,19 @@ def current_solver_proof_for_candidate(candidate_id: str) -> tuple[bytes, dict[s
     if not isinstance(candidate_id, str) or not candidate_id:
         raise SolverSupplyIdentityError("candidate identity is required")
     entry = next(
-        (item for item in release_pool.release_entries() if item.get("candidate_id") == candidate_id),
+        (item for item in release_pool.release_entries(candidate_id) if item.get("candidate_id") == candidate_id),
         None,
     )
+    candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
+    review = studio._latest_review(candidate_id)
+    pipeline = studio._latest_ready_pipeline(candidate_id)
+    if entry is not None and isinstance(pipeline, Mapping) and entry.get("pipeline_run_id") != pipeline.get("run_id"):
+        # A Release Pool receipt can be valid historical evidence while its READY
+        # pipeline is stale against current main. Prefer the current accepted
+        # READY proof below in that case; never bind a new pack to stale solver
+        # authority just because an older pool entry exists.
+        entry = None
     if entry is None:
-        candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
-        review = studio._latest_review(candidate_id)
-        pipeline = studio._latest_ready_pipeline(candidate_id)
         if candidate is None or not isinstance(review, Mapping) or review.get("disposition") != "ACCEPT":
             raise SolverSupplyIdentityError("candidate has no current owner-accepted READY pipeline")
         if not isinstance(pipeline, Mapping):

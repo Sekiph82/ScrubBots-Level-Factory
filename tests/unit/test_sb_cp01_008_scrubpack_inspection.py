@@ -213,7 +213,6 @@ def test_inspection_and_extraction_reject_malformed_or_unsupported_manifest_vers
 @pytest.mark.parametrize(
     ("member_name", "field", "value", "expected"),
     (
-        ("levels/inspect-level/level.json", "version", 2, "UNSUPPORTED_VERSION"),
         (
             "levels/inspect-level/supply-plan.json",
             "schema",
@@ -258,6 +257,49 @@ def test_inspection_rejects_mixed_or_malformed_member_contract_versions(
     assert extracted.reason_code == expected
     assert archive_path.read_bytes() == source_before
     assert not destination.exists()
+
+
+def test_inspection_accepts_valid_level_data_v2_void_and_rejects_invalid_void_rules() -> None:
+    raw = _pack_bytes()
+    with ZipFile(io.BytesIO(raw)) as source:
+        original_manifest = json.loads(source.read(PACK_MANIFEST_PATH))
+        original_level = json.loads(source.read("levels/inspect-level/level.json"))
+    v2_level = {**original_level, "version": 2, "cells": [0] * 399 + [-1]}
+    v2_bytes = _json_bytes(v2_level)
+
+    def replace_level_and_digest(info, data):
+        if info.filename == "levels/inspect-level/level.json":
+            return info, v2_bytes
+        if info.filename == PACK_MANIFEST_PATH:
+            manifest = dict(original_manifest)
+            level_record = dict(manifest["levels"][0])
+            digests = dict(level_record["sha256"])
+            digests["levelData"] = hashlib.sha256(v2_bytes).hexdigest()
+            level_record["sha256"] = digests
+            manifest["levels"] = [level_record]
+            return info, _json_bytes(manifest)
+        return info, data
+
+    valid_v2 = _rewrite(raw, replace_level_and_digest)
+    assert inspect_scrubpack(valid_v2).accepted
+
+    invalid_level = {**v2_level, "cells": [0] * 400}
+    invalid_bytes = _json_bytes(invalid_level)
+
+    def replace_with_invalid_v2(info, data):
+        if info.filename == "levels/inspect-level/level.json":
+            return info, invalid_bytes
+        if info.filename == PACK_MANIFEST_PATH:
+            manifest = dict(original_manifest)
+            level_record = dict(manifest["levels"][0])
+            digests = dict(level_record["sha256"])
+            digests["levelData"] = hashlib.sha256(invalid_bytes).hexdigest()
+            level_record["sha256"] = digests
+            manifest["levels"] = [level_record]
+            return info, _json_bytes(manifest)
+        return info, data
+
+    assert inspect_scrubpack(_rewrite(raw, replace_with_invalid_v2)).reason_code == "UNSUPPORTED_VERSION"
 
 
 def test_supported_scrubpack_version_set_is_explicitly_v1_only() -> None:

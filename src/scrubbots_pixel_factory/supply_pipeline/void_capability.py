@@ -95,7 +95,7 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
         ).returncode
     except (OSError, subprocess.CalledProcessError):
         return _closed("Configured ScrubBots authority is not a readable Git checkout with origin/main.")
-    if top != root or origin not in _EXPECTED_ORIGINS:
+    if top != root or origin.casefold() not in {value.casefold() for value in _EXPECTED_ORIGINS}:
         return _closed("Configured project root or canonical ScrubBots origin does not match.")
     if branch not in {"main", ""} or head != current_main or status:
         return _closed("Configured ScrubBots authority must be clean and equal exact origin/main.", head=head)
