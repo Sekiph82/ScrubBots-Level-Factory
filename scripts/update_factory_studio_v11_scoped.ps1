@@ -115,11 +115,11 @@ try {
     if((Sha ([IO.File]::ReadAllBytes($ManifestPath))) -cne $manifestSha -or $activeProcesses.Count){ throw 'Installed state or app process changed during staging; no install performed.' }
     foreach($p in $plans){
         if($p.Add){ [IO.File]::Move("$($p.Destination).m03-v11-stage",$p.Destination) }
-        else { [IO.File]::Replace("$($p.Destination).m03-v11-stage",$p.Destination,$null) }
+        else { [IO.File]::Move("$($p.Destination).m03-v11-stage",$p.Destination,$true) }
         $written.Add($p)
         if((Sha ([IO.File]::ReadAllBytes($p.Destination))) -cne $p.NewSha){ throw "Installed file hash mismatch: $($p.Path)" }
     }
-    [IO.File]::Replace($manifestStage,$ManifestPath,$null)
+    [IO.File]::Move($manifestStage,$ManifestPath,$true)
     if((Sha ([IO.File]::ReadAllBytes($ManifestPath))) -cne $newManifestSha){ throw 'Installed manifest hash mismatch.' }
     foreach($p in $plans){ if((Sha ([IO.File]::ReadAllBytes($p.Destination))) -cne $p.NewSha){ throw "Final verification failed: $($p.Path)" } }
     'SCOPED_RUNTIME_UPDATE_APPLIED_AND_HASH_VERIFIED'
