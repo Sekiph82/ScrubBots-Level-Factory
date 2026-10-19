@@ -142,8 +142,6 @@ class SupplyOptimizer:
                         pool.append({"id": f"s{seed}-r{rnd}-c{i}-m{mutation}", "columns": columns, "screen": screened, "round": rnd})
                         break
                     columns = generator.mutate(columns)
-                if (i + 1) % 5 == 0 or i + 1 == n_round:
-                    log(f"round {rnd + 1}/4: checked {i + 1}/{n_round} candidate plans ({attempts} screening attempts)")
             log(f"round {rnd}: {len(pool)} screening-solvable / {attempts} attempts")
             if len(pool) >= max(5, metric_top):
                 break
