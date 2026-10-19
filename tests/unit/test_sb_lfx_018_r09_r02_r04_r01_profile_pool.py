@@ -74,7 +74,11 @@ def test_ready_auto_release_pool_entry_reads_back_exactly_once(tmp_path):
     context = _pool_patches(tmp_path, output, candidates, latest, review, pipeline_file)
     with context[0], context[1], context[2], context[3], context[4], context[5], patch(
         "scrubbots_pixel_factory.supply_pipeline.game_rules.GameRules"
-    ) as rules:
+    ) as rules, patch.object(
+        release_pool,
+        "validate_pool_candidate_provenance",
+        return_value={"candidate_class": "PRODUCTION_CANDIDATE", "source_sha256": "a" * 64},
+    ):
         rules.return_value.classify.return_value = "MEDIUM"
         first = release_pool.enter_release_pool(candidate, run)
         assert first["disposition"] == "ENTERED_RELEASE_POOL"

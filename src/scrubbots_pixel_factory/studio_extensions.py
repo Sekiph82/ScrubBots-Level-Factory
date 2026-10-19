@@ -538,7 +538,7 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
         return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
     if exact is None or exact.get("entry_digest") != pooled.get("entry_digest"):
         return {"disposition": "NOT_ENTERED", "reason": "Release Pool write did not return the exact candidate/run entry on read-back.", "pipeline_run_id": run["run_id"]}
-    return {**pooled, "pipeline_run_id": run["run_id"], "publication": "OWNER_ACCEPT_RELEASE_POOL_ONLY", "readback_verified": True}
+    return {**pooled, "pipeline_run_id": run["run_id"], "publication": "RELEASE_POOL_ONLY", "readback_verified": True}
 
 
 def _latest_ready_pipeline(candidate_id: str) -> dict[str, Any] | None:

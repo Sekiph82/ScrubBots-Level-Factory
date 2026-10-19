@@ -27,7 +27,7 @@ _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALAN
 def validate_pool_candidate_provenance(
     candidate: Mapping[str, Any], review: Mapping[str, Any] | None
 ) -> dict[str, Any]:
-    """Require verified owner-source provenance and current owner ACCEPT."""
+    """Require verified owner-source provenance; ACCEPT is optional for pool eligibility."""
 
     metadata = candidate.get("metadata")
     if not isinstance(metadata, Mapping):
@@ -74,10 +74,12 @@ def validate_pool_candidate_provenance(
             or lineage.get("source_bytes_unchanged") is not True
             or lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"):
         raise ReleaseError("production candidate is not bound to unchanged canonical OWNER_UPLOAD source bytes")
-    if (not isinstance(review, Mapping) or review.get("disposition") != "ACCEPT"
-            or review.get("candidate_id") != candidate.get("candidate_id")
-            or review.get("artwork_sha256") != candidate.get("artwork_sha256")):
-        raise ReleaseError("production candidate requires an exact current owner ACCEPT review")
+    if review is not None and (
+        not isinstance(review, Mapping) or review.get("disposition") != "ACCEPT"
+        or review.get("candidate_id") != candidate.get("candidate_id")
+        or review.get("artwork_sha256") != candidate.get("artwork_sha256")
+    ):
+        raise ReleaseError("pool restoration requires an exact current owner ACCEPT review")
     return dict(classification)
 
 
@@ -542,7 +544,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
         "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
         "review_id": review.get("review_id") if review is not None else None,
-        "eligibility_source": "OWNER_ACCEPT",
+        "eligibility_source": "OWNER_ACCEPT" if review is not None else "READY_AUTO",
         "candidate_classification": classification,
         "source_bundle": candidate["source_path"], "candidate": dict(candidate), "pipeline": dict(pipeline),
     }
@@ -595,10 +597,17 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         # Existing pre-classification entries remain read-only historical evidence.
         # Newly created entries always carry classification and must revalidate it.
         if value.get("candidate_classification") is not None:
-            if value.get("eligibility_source") != "OWNER_ACCEPT" or not isinstance(latest, Mapping) or latest.get("disposition") != "ACCEPT":
+            source = value.get("eligibility_source")
+            if source == "OWNER_ACCEPT" and (not isinstance(latest, Mapping) or latest.get("disposition") != "ACCEPT"):
+                continue
+            if source == "READY_AUTO" and isinstance(latest, Mapping) and latest.get("disposition") == "REJECT":
+                continue
+            if source not in {"OWNER_ACCEPT", "READY_AUTO"}:
                 continue
             try:
-                classification = validate_pool_candidate_provenance(current_candidate, latest)
+                classification = validate_pool_candidate_provenance(
+                    current_candidate, latest if source == "OWNER_ACCEPT" else None
+                )
             except ReleaseError:
                 continue
             if value.get("candidate_classification") != classification:
