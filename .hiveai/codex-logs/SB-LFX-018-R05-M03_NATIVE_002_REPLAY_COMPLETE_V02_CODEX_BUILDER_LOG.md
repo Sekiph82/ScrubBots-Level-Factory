@@ -270,3 +270,9 @@ Document role: CODEX BUILDER LOG
 
 - Installed manifest inspection showed that the existing approved overlay allows only its enumerated paths. `src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py` is not on that list and its installed bytes differ from the manifest baseline, so no overlay update may replace it. Reverted the candidate-level progress edit from that file before installation; the published batch now reports the optimizer's existing per-round progress through the new activity callback. The four other modified product paths are explicitly present in the installed overlay allowlist.
 - After stopping the verified stalled Python worker PID 19700, two child Godot solver processes (PIDs 9096 and 12908) were observed using the same installed current-game runtime. They were left untouched; Release refresh remains blocked until both exit.
+
+
+## Safe installed-runtime updater
+
+- Added `scripts/install_factory_studio_scoped_overlay.ps1`, a read-only-by-default updater for exactly the four modified paths present in the installed manifest overlay allowlist. It requires canonical repo identity, published HEAD parity, tracked sources, exact managed-file hashes, an exact scoped installation mode, no active Factory/Godot runtime process for apply, and uses same-volume staged atomic replacements with rollback copies and a manifest receipt. It does not touch the shortcut, owner PNGs, job data, pool entries, or unrelated managed files.
+- PowerShell parser validation passed. Read-only invocation correctly stopped before file writes because the two remediation commits had not yet been pushed to `origin/main`; this was the intended publication guard, not an install failure. Re-run the read-only preflight after publication. `-Apply` remains unused while child Godot processes are active.
