@@ -145,3 +145,9 @@ Document role: CODEX BUILDER LOG
 - A second source review found that the scrubpack solver-identity verifier counted V2 artwork/VOID cells but only required nonzero artwork. That could let an otherwise valid solver proof bind LevelData below the production 200-cell/25% artwork minimum even after remote payload validation. Factored the canonical V2 cell threshold into one side-effect-free validator used by both payload validation and solver-identity verification. Added regression assertions for the 25% boundary (255/1024 rejected, 256/1024 accepted) while keeping the 200-cell minimum and invalid `-2`/missing-VOID cases covered.
 - Re-ran the same bounded selection: 5 passed. AST syntax now passed for 6 changed Python modules/scripts/tests; `git diff --check` passed. This remains local builder evidence only; CPX002 and staging are not verified.
 - Product implementation commit: `8c959d9a2ea1d4d8cf639925a1caffd1938ee5b4` (`Accept LevelData V2 VOID payloads in scrubpacks`). Product diff is separate from this log. This log is being committed separately as builder evidence.
+
+### Publication receipt — 2026-10-19
+
+- Immediately before publication, `.github/workflows/c001-r09-safe-regression.yml` was read and confirmed to use only manual `workflow_dispatch`; no workflow file changed and no GitHub Actions/CI run was requested or started.
+- Normal `git push origin HEAD:main` published product commit `8c959d9a2ea1d4d8cf639925a1caffd1938ee5b4` and builder-log commit `474e7560f56c389b3d464a8148b1a6135615dc41` (`49fb070..474e756`). Post-push `git fetch --prune origin` verified `HEAD == origin/main == 474e7560f56c389b3d464a8148b1a6135615dc41`, ahead/behind `0/0`, and zero tracked unstaged paths. Existing untracked owner paths remain unstaged and untouched.
+- Publication covers only the V2 contract/solver-identity fix and builder evidence. It does not claim a `.scrubpack`, R2 staging/readback, CPX001 current-main proof, CPX002 test, or M03 closure.
