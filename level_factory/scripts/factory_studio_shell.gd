@@ -23,7 +23,11 @@ func _ready() -> void:
 		workspace.call("configure_gateway", core_gateway)
 		master_ui.call("configure_gateway", core_gateway)
 	navigation.connect("surface_selected", Callable(workspace, "show_surface"))
-	workspace.call("show_surface", "HOME")
+	# The legacy workspace frame is deliberately hidden behind the three-master
+	# Studio. Its HOME projection synchronously scans owner history, so do not
+	# load it during startup when that workspace is not visible.
+	if $Frame.visible:
+		workspace.call("show_surface", "HOME")
 	var available: bool = core_gateway != null and core_gateway.status_name() == "AVAILABLE"
 	$Frame/Layout/Footer/Status.text = "System: Ready" if available else "System: Needs setup"
 	if core_gateway != null:

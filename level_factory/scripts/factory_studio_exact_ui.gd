@@ -1291,31 +1291,13 @@ func _restore_imported_sources() -> void:
 			"disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png")),
 			"width": image.get_width(), "height": image.get_height()
 		}
+	# Startup restore needs only the source catalog. owner-pages also validates
+	# every pipeline, candidate, failure, and Release Pool entry; running it here
+	# synchronously blocks Godot's main thread and is unrelated to source display.
+	# Preserve the catalog's own order and let the explicit batch-composite lookup
+	# below restore batch/job state when an exact source match exists.
 	var order_ids: Array[String] = []
-	var history := _extension("owner-pages", {})
-	var batches: Array = history.get("batches", [])
 	_source_batch_by_id.clear()
-	if not batches.is_empty() and batches[0] is Dictionary:
-		_batch_import_id = str(batches[0].get("batch_id", ""))
-	for batch_variant in batches:
-		if not batch_variant is Dictionary:
-			continue
-		var batch_identity := str(batch_variant.get("batch_id", ""))
-		for batch_item in batch_variant.get("items", []):
-			if batch_item is Dictionary:
-				var source_identity := str(batch_item.get("source_id", ""))
-				if not source_identity.is_empty() and not _source_batch_by_id.has(source_identity):
-					_source_batch_by_id[source_identity] = batch_identity
-	for batch_index in range(batches.size() - 1, -1, -1):
-		if not batches[batch_index] is Dictionary:
-			continue
-		var items: Array = batches[batch_index].get("items", [])
-		for item_variant in items:
-			if not item_variant is Dictionary:
-				continue
-			var batch_source_id := str(item_variant.get("source_id", ""))
-			if source_by_id.has(batch_source_id) and batch_source_id not in order_ids:
-				order_ids.append(batch_source_id)
 	for source_variant in sources:
 		if source_variant is Dictionary:
 			var remaining_source_id := str(source_variant.get("source_id", ""))

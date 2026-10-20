@@ -29,15 +29,15 @@ class FakeAppendReader extends RefCounted:
 
 class FakeGateway extends RefCounted:
 	var library_payload: Dictionary = {}
-	var owner_pages_payload: Dictionary = {}
+	var operations: Array[String] = []
 	var prepare_count := 0
 	var execute_count := 0
 	var delay_msec := 0
 	var pipeline_result: Dictionary = {}
 
 	func run_studio_extension(operation: String, _request: Dictionary) -> Dictionary:
+		operations.append(operation)
 		if operation == "library-refresh": return library_payload
-		if operation == "owner-pages": return owner_pages_payload
 		return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE"}
 
 	func prepare_studio_extension_call(_operation: String, _request: Dictionary) -> Dictionary:
@@ -75,8 +75,17 @@ func _make_studio() -> Node:
 		return null
 	var instance := packed.instantiate()
 	root.add_child(instance)
-	await process_frame
+	var workspace := instance.get_node_or_null("Frame/Layout/Body/Workspace")
+	if workspace != null and workspace.get("owner_projection") is Dictionary and not (workspace.get("owner_projection") as Dictionary).is_empty():
+		_fail("hidden legacy workspace loaded the synchronous owner-pages projection during startup")
+		return null
 	var studio := instance.get_node_or_null("MasterUI")
+	if studio != null:
+		# Prevent the scene's deferred startup restore from calling the real
+		# owner-data gateway during this offline UI suite.
+		studio.call("configure_gateway", FakeGateway.new())
+		studio.set("_studio_read_queue", [])
+	await process_frame
 	if studio == null:
 		_fail("Master UI controller did not load")
 		return null
@@ -299,10 +308,6 @@ func _test_restored_import_order(studio: Node) -> bool:
 		ids.append(source_id)
 		sources.append({"source_id": source_id, "source_sha256": digest, "immutable_source_path": "level_factory/" + relative, "original_filename": relative.get_file()})
 	gateway.library_payload = {"schema": "scrubbots-source-library-view", "sources": sources}
-	gateway.owner_pages_payload = {"batches": [
-		{"items": [{"source_id": ids[2]}, {"source_id": ids[3]}]},
-		{"items": [{"source_id": ids[0]}, {"source_id": ids[1]}]},
-	]}
 	studio.call("configure_gateway", gateway)
 	studio.get("_imported_sources").clear()
 	studio.set("_selected_import_source_id", "")
@@ -310,6 +315,9 @@ func _test_restored_import_order(studio: Node) -> bool:
 	var queue: Array = studio.call("imported_queue_snapshot")
 	if queue.size() != 4:
 		_fail("read-only verified library restore did not recover four immutable sources")
+		return false
+	if "owner-pages" in gateway.operations or "library-refresh" not in gateway.operations or "loaded-png-batch-find" not in gateway.operations:
+		_fail("source restore called an unrelated synchronous owner-pages projection: %s" % str(gateway.operations))
 		return false
 	for index in range(4):
 		if str(queue[index].get("source_id", "")) != ids[index] or str(queue[index].get("disposition", "")) != "SOURCE_ONLY":
@@ -382,6 +390,17 @@ func _test_slow_worker_stream(studio: Node) -> bool:
 
 
 func _run() -> void:
+	if OS.get_environment("SB_LFX_R09_R02_R01_RESTORE_ONLY") == "1":
+		var restore_studio := await _make_studio()
+		if restore_studio == null:
+			return
+		if not _test_restored_import_order(restore_studio):
+			await _free_studio(restore_studio)
+			return
+		await _free_studio(restore_studio)
+		print("R09-R02-R01 immutable source restore focused suite: PASS (owner-pages not called)")
+		quit(0)
+		return
 	var studio := await _make_studio()
 	if studio == null:
 		return

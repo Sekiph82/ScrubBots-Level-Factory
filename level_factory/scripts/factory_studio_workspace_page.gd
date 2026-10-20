@@ -997,8 +997,11 @@ func configure_gateway(gateway: RefCounted) -> void:
 		cost_surface.call("configure_gateway", gateway)
 	if release_surface != null and release_surface.has_method("configure_gateway"):
 		release_surface.call("configure_gateway", gateway)
-	_refresh_owner_projection()
-	_render_owner_route_details()
+	# This legacy workspace is hidden in the three-master Studio. Avoid its
+	# synchronous owner-pages projection until the workspace is actually shown.
+	if is_visible_in_tree():
+		_refresh_owner_projection()
+		_render_owner_route_details()
 
 
 func _show_legacy_surface(surface_name: String) -> void:
