@@ -195,6 +195,68 @@ def test_one_explicit_fake_run_visits_all_nine_sequentially_and_retry_is_separat
     assert jobs[job["job_id"]]["state"] == "COMPLETE"
 
 
+def test_explicit_resume_of_stopped_batch_requeues_only_nonready_items(monkeypatch):
+    ids = _source_ids(9)
+    records = {source_id: _record(source_id) for source_id in ids}
+    manifest = {"batch_id": "batch-stopped-test", "items": _validated_items(ids)}
+    manifest["snapshot_source_count"] = 9
+    jobs: dict[str, dict] = {}
+    root = MemoryPath("png-batches")
+    monkeypatch.setattr(png_batch, "_root", lambda: root)
+    monkeypatch.setattr(png_batch, "_job_path", lambda job_id: MemoryPath(f"jobs/{job_id}.json", files=jobs))
+    monkeypatch.setattr(png_batch, "_read_job", lambda job_id: deepcopy(jobs[job_id]))
+
+    def write_job(job):
+        sealed = png_batch._seal(job)
+        jobs[sealed["job_id"]] = deepcopy(sealed)
+        return sealed
+
+    monkeypatch.setattr(png_batch, "_write_job", write_job)
+    monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: _unlocked())
+    monkeypatch.setattr(png_batch, "_clear_control", lambda _job_id: None)
+    monkeypatch.setattr(png_batch, "_control_action", lambda _job_id: "")
+    monkeypatch.setattr(png_batch, "_recover_attempt", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_reuse_existing_ready", lambda *_args: None)
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": manifest})
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id, **_kwargs: records[source_id])
+
+    def validate(source_id, **_kwargs):
+        return {"source_sha256": records[source_id]["source_sha256"], "exact_logical_source": True,
+                "structural": {"disposition": "PASS"}, "void_capability": {"state": "OPEN"}}
+
+    monkeypatch.setattr(studio_extensions, "validate_owner_source", validate)
+    monkeypatch.setattr(studio_extensions, "_source_record_paths", lambda source_id, *_args: (MemoryRecord((source_id + ":record").encode()), None))
+    monkeypatch.setattr(png_batch, "_source_record_paths", lambda source_id, *_args: (MemoryRecord((source_id + ":record").encode()), None), raising=False)
+
+    imported = png_batch.create_png_batch("batch-stopped-test", {})["job"]
+    stopped = deepcopy(imported)
+    stopped["state"] = "STOPPED"
+    stopped["items"][0].update({"status": "READY", "run_id": "pipeline-kept-ready"})
+    stopped["items"][1].update({"status": "FAILED", "reason": "old failure", "attempt_id": "attempt-1"})
+    for item in stopped["items"][2:]:
+        item.update({"status": "REJECTED", "reason": "old source rejection"})
+    stopped["counts"] = png_batch._counts(stopped["items"])
+    write_job(stopped)
+
+    calls = []
+
+    def fake_pipeline_runner(*, source_id, request):
+        calls.append((source_id, request["png_batch_item_index"], request["solver_timeout_seconds"]))
+        return {"disposition": "ERROR", "error": "fixture failure after explicit resume"}
+
+    result = png_batch.run_png_batch(imported["job_id"], expected_batch_id="batch-stopped-test", pipeline_runner=fake_pipeline_runner)
+    assert result["state"] == "SUCCESS", result
+    resumed = result["job"]
+    assert [row[0] for row in calls] == ids[1:], [
+        (item["index"], item["status"], item.get("reason")) for item in resumed["items"]
+    ]
+    assert all(row[2] == 240 for row in calls)
+    assert resumed["counts"] == {"total": 9, "ready": 1, "failed": 8, "rejected": 0, "skipped": 0, "remaining": 0}
+    assert resumed["items"][0]["run_id"] == "pipeline-kept-ready"
+    assert resumed["items"][1]["attempt_history"][-1]["status"] == "FAILED"
+    assert all(item["attempt_history"][-1]["status"] == "REJECTED" for item in resumed["items"][2:])
+
+
 @contextmanager
 def _unlocked():
     yield

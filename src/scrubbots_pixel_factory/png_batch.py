@@ -899,6 +899,30 @@ def run_png_batch(
         if batch.get("version") == 2 and batch.get("kind") == "COMPOSITE_LOADED_SOURCE_SNAPSHOT" and not _job_lineage_matches_snapshot(job, batch):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job,
                     "reason": "Persisted plan or retry parent does not match the exact SHA-bound source snapshot."}
+        if job.get("state") == "STOPPED":
+            # An explicit owner Resume after STOPPED retries terminal non-READY
+            # items in their original immutable source order. READY proof stays
+            # untouched; failed/rejected attempt evidence is retained per item.
+            for item in job.get("items", []):
+                if item.get("status") not in {"FAILED", "REJECTED"}:
+                    continue
+                prior_attempt = {
+                    key: item.get(key) for key in (
+                        "attempt_id", "activity_run_id", "run_id", "candidate_id",
+                        "status", "reason", "started_at", "finished_at",
+                    ) if item.get(key) is not None
+                }
+                if prior_attempt:
+                    history = item.setdefault("attempt_history", [])
+                    if not isinstance(history, list):
+                        history = []
+                        item["attempt_history"] = history
+                    history.append(prior_attempt)
+                item["status"] = "QUEUED"
+                item["reason"] = ""
+                item.pop("finished_at", None)
+                item["requeued_at"] = _now()
+            job["counts"] = _counts(job["items"])
         _record_legacy_resume_choice(job, batch)
         _clear_control(job_id)
         job["state"] = "RUNNING"
@@ -1017,7 +1041,7 @@ def run_png_batch(
                 # settings remain honored up to the existing canonical maximum.
                 "candidates": min(int(request.get("candidates", 48)), 300),
                 "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
-                "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 90)), 90),
+                "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 240)), 240),
             })
             try:
                 control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"

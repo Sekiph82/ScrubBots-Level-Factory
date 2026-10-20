@@ -58,7 +58,7 @@ class SupplyOptimizer:
     def run(self, image, seed=0, candidates=300, level_id="pixelart_level",
             verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
             real_max_visited=None, level_number=1, progress=print,
-            real_timeout_seconds=90, max_native_solver_invocations=None):
+            real_timeout_seconds=240, max_native_solver_invocations=None):
         return self._run_prepared(
             *self.prepare(image), seed=seed, candidates=candidates, level_id=level_id,
             verify_top=verify_top, screen_budget=screen_budget, metric_top=metric_top,
@@ -71,7 +71,7 @@ class SupplyOptimizer:
     def run_grid(self, grid, used, seed=0, candidates=300, level_id="pixelart_level",
                  verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
                  real_max_visited=None, level_number=1, progress=print,
-                 real_timeout_seconds=90, max_native_solver_invocations=None):
+                 real_timeout_seconds=240, max_native_solver_invocations=None):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,

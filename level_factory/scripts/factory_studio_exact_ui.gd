@@ -3635,7 +3635,7 @@ func _build_selected_source_pipeline_request() -> Dictionary:
 		"request": {
 			"column_count": _column_count,
 			"real_max_visited": 25000,
-			"solver_timeout_seconds": 90,
+			"solver_timeout_seconds": 240,
 			"level_number": _level_number if _manual_level_override else 1,
 			"game_project": _pinned_game_project_path(),
 			"background_intent": _background_intent,

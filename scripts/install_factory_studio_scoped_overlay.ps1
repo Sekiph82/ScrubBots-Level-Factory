@@ -19,6 +19,8 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/png_batch.py',
     'src/scrubbots_pixel_factory/studio_extensions.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
     'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )
@@ -27,7 +29,9 @@ $authorizedOverlayAdditions = @(
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
-    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
+    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py'
 )
 # One exact installed solver variant was verified to be missing the Studio
 # cancel-marker/process-tree handling. Permit repairing only those measured

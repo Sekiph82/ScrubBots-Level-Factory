@@ -29,10 +29,11 @@ PINNED_GAME_COMMIT = "aef60a616d4ac401e9dfac15df6fe56e671c0053"
 class StudioSolverContractTests(unittest.TestCase):
     def test_budget_normalizer_is_strict_and_bounded(self) -> None:
         self.assertEqual(normalize_solver_budget(25_000, 90), (25_000, 90.0))
+        self.assertEqual(normalize_solver_budget(25_000, 240), (25_000, 240.0))
         self.assertEqual(normalize_solver_budget(1, 0.25), (1, 0.25))
         invalid = (
             (None, 90), (0, 90), (25_001, 90), (True, 90), ("25000", 90),
-            (25_000, None), (25_000, 0), (25_000, 90.01), (25_000, True),
+            (25_000, None), (25_000, 0), (25_000, 240.01), (25_000, True),
             (25_000, "90"), (25_000, float("inf")), (25_000, float("nan")),
         )
         for visits, timeout in invalid:
@@ -174,7 +175,7 @@ class StudioSolverContractTests(unittest.TestCase):
                 self.column_count = column_count
                 self.attestation = {"source_commit": PINNED_GAME_COMMIT}
 
-        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 91), (25_000, "90")):
+        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 241), (25_000, "90")):
             with self.subTest(visits=visits, timeout=timeout):
                 native_boundary_calls: list[str] = []
 
@@ -230,7 +231,7 @@ class StudioSolverContractTests(unittest.TestCase):
             del encoding
             return json.dumps(level if path.name == "level.json" else plan)
 
-        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 91)):
+        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 241)):
             with self.subTest(visits=visits, timeout=timeout):
                 with (
                     patch.object(Path, "read_text", read_stub),

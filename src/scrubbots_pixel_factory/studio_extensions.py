@@ -866,7 +866,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         requested_timeout = request_data.get("solver_timeout_seconds")
         try:
             if rules.attestation is None and requested_visits is None and requested_timeout is None:
-                solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 90)
+                solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 240)
             else:
                 solver_max_visited, solver_timeout = normalize_solver_budget(
                     requested_visits, requested_timeout

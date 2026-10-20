@@ -169,8 +169,8 @@ class ScrubBotsSolver:
         if attested_runtime and os.name == "nt":
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         start = time.monotonic()
-        hard_timeout = float(timeout if timeout is not None else (90 if attested_runtime else 0))
-        timeout_limit = 90 if attested_runtime else 300
+        hard_timeout = float(timeout if timeout is not None else (240 if attested_runtime else 0))
+        timeout_limit = 240 if attested_runtime else 300
         if hard_timeout < 0 or hard_timeout > timeout_limit or (attested_runtime and hard_timeout == 0):
             raise ValueError(f"native solver timeout must be from 0 to {timeout_limit} seconds")
         p = None
