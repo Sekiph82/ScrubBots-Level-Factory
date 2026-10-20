@@ -6,11 +6,12 @@ Status: OWNER-LOCKED
 
 ## D1 — PIXEL ART provider model
 
-PIXEL ART has one real provider selector. Minimum supported provider choices:
+PIXEL ART has one real provider selector. **Effective active provider choices from the 2026-10-20 owner override:**
 
 - `ALPIX (Claude)`
-- `MAGNIFIC`
-- `PIXELLAB`
+- `PIXELLAB` (use real `PRO_FLASH` engine)
+
+**`MAGNIFIC` is RETIRED in the PIXEL ART UI** because the owner's subscription/credits ended. It was included in the original 2026-10-09 list, but the newer explicit 2026-10-20 owner decision supersedes that selection. Do not call MAGNIFIC for new Generate/Regenerate or CSV rows, do not silently select another paid provider. Preserve immutable legacy MAGNIFIC image/job provenance and do not change the other two Studio pages.
 
 The provider actually used must equal the visible selection. No fake provider label.
 
@@ -166,3 +167,7 @@ Publication remains:
 Release Pool -> ScrubPack -> preflight -> STAGING -> verification -> exact production approval -> R2 Production -> ScrubBots remote content.
 
 No READY event may publish automatically.
+
+## D13 — 2026-10-20 owner override: MAGNIFIC subscription ended
+
+Owner explicitly requested removal of MAGNIFIC **from the PIXEL ART page**. This supersedes D1's historical provider minimum only. Current supported active generation choices are ALPIX (Claude) and PIXELLAB Pro Flash, with exact canonical V3 palette validation governed by the V12 master. Do not delete historic generated imagery, SHA/provenance or paid-job records, auto-transfer MAGNIFIC jobs, change existing READY/Release Pool content or generate anything without owner action. This is not authorization to remove the backend archive/adapter indiscriminately or to reinstall Studio broadly.
