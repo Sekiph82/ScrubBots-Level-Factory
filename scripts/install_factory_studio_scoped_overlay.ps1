@@ -12,6 +12,7 @@ $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
 $relativePaths = @(
 	'level_factory/scripts/factory_core_launcher.py',
     'level_factory/scripts/factory_studio_exact_ui.gd',
+	'scripts/launch_factory_studio.ps1',
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
 	'level_factory/project.godot',

@@ -123,6 +123,8 @@ var _studio_read_done := false
 var _studio_read_result: Dictionary = {}
 var _studio_read_context: Dictionary = {}
 var _studio_read_queue: Array[Dictionary] = []
+var _candidate_inbox_cache: Dictionary = {}
+var _candidate_inbox_last_request_msec := -60000
 var _selection_restore_token := ""
 var _batch_worker_active := false
 var _studio_cancel_marker_path := ""
@@ -1365,7 +1367,8 @@ func _restore_loaded_png_batch_readonly() -> void:
 
 func _refresh_runtime_cards() -> void:
 	_refresh_gameplay_sources()
-	var inbox := _extension("candidate-inbox", {})
+	_request_candidate_inbox_refresh()
+	var inbox := _candidate_inbox_cache
 	var candidates: Array = inbox.get("candidates", [])
 	var pixel_slots := ["ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3"]
 	var level_slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
@@ -3053,6 +3056,22 @@ func _queue_studio_read_extension(operation: String, request: Dictionary, contex
 		_studio_read_queue.append({"prepared": prepared, "context": context.duplicate(true)})
 
 
+func _request_candidate_inbox_refresh(force: bool = false) -> void:
+	# candidate-inbox validates complete bundles and review chains. Keep that
+	# expensive read out of draw/refresh callbacks. Load it on demand once; new
+	# generated art explicitly invalidates the cache. While a sequential source
+	# batch is active, the cached art strip is sufficient.
+	if _gateway == null or _screen != "PIXEL ART" or (_operation_running and not _batch_job_id.is_empty()):
+		return
+	if not force and not _candidate_inbox_cache.is_empty():
+		return
+	var now := Time.get_ticks_msec()
+	if not force and now - _candidate_inbox_last_request_msec < 10000:
+		return
+	_candidate_inbox_last_request_msec = now
+	_queue_studio_read_extension("candidate-inbox", {}, {"kind": "candidate-inbox"})
+
+
 func _start_next_studio_read_extension() -> void:
 	if _studio_read_thread != null or _studio_read_queue.is_empty():
 		return
@@ -3097,7 +3116,12 @@ func _poll_studio_read_extension() -> void:
 	_studio_read_context.clear()
 	_studio_read_mutex.unlock()
 	var kind := str(context.get("kind", ""))
-	if kind == "batch-latest":
+	if kind == "candidate-inbox":
+		if str(result.get("schema", "")) == "scrubbots-candidate-inbox-view" and result.get("candidates", []) is Array:
+			_candidate_inbox_cache = result
+			_refresh_runtime_cards()
+			_refresh_live_data()
+	elif kind == "batch-latest":
 		_apply_batch_progress_result(result, str(context.get("job_id", "")))
 	elif kind == "release-pool":
 		_release_pool = result
@@ -3241,8 +3265,10 @@ func _finish_generation(result: Dictionary) -> void:
 	_last_candidate_id = str(result.get("candidate_id", _last_candidate_id))
 	_last_source_id = str(result.get("source_id", _last_source_id))
 	if not str(result.get("output_path", result.get("source_path", ""))).is_empty():
+		_candidate_inbox_cache.clear()
 		_selected_art_path = str(result.get("output_path", result.get("source_path", ""))).path_join("artwork.png") if result.has("output_path") else str(result.get("source_path", ""))
 		_load_selected_art_preview(_selected_art_path)
+		_request_candidate_inbox_refresh(true)
 	_report("%s · %s" % [_last_candidate_id, str(result.get("state", "ERROR"))])
 
 
@@ -3399,7 +3425,8 @@ func _select_artwork(index: int) -> void:
 
 func _page_artwork(direction: int) -> void:
 	# The artwork strip is a bounded UI-only carousel over the canonical inbox.
-	var inbox := _extension("candidate-inbox", {})
+	_request_candidate_inbox_refresh()
+	var inbox := _candidate_inbox_cache
 	var candidates: Array = inbox.get("candidates", [])
 	if candidates.is_empty():
 		_report("No artwork candidates")
@@ -3617,9 +3644,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _select_inbox_candidate(index: int) -> void:
-	var inbox := _extension("candidate-inbox", {})
+	_request_candidate_inbox_refresh()
+	var inbox := _candidate_inbox_cache
 	var candidates: Array = inbox.get("candidates", [])
-	if index < 0 or index >= candidates.size(): return
+	if index < 0 or index >= candidates.size():
+		if candidates.is_empty():
+			_report("Artwork candidates are still loading. You can keep using the other screens.")
+		return
 	var candidate: Dictionary = candidates[index]
 	_last_candidate_id = str(candidate.get("candidate_id", ""))
 	_last_source_id = ""

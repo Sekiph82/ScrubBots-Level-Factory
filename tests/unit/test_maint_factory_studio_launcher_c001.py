@@ -42,9 +42,9 @@ def test_factory_studio_header_uses_derived_icon_without_distortion() -> None:
     assert "stretch_mode = 6" in scene
     assert 'text = "ScrubBots Factory Studio"' in scene
     shell = (FACTORY / "scripts" / "factory_studio_shell.gd").read_text(encoding="utf-8")
-    assert "DisplayServer.FEATURE_NATIVE_ICON" in shell
-    assert "DisplayServer.set_native_icon(icon_path)" in shell
-    assert "FileAccess.file_exists(icon_path)" in shell
+    assert 'res://assets/icons/ScrubBots_Factory_Studio_256.png' in shell
+    assert "DisplayServer.window_set_icon(icon)" in shell
+    assert "Image.load_from_file(icon_path)" in shell
 
 
 def test_launcher_resolves_from_script_location_and_runs_project_not_editor() -> None:
@@ -58,11 +58,32 @@ def test_launcher_resolves_from_script_location_and_runs_project_not_editor() ->
     assert "Start-Process -FilePath $godotPath" in launcher
     assert "'--path', $quotedProjectPath" in launcher
     assert "SetWindowText" in launcher
+    assert "LoadImage" in launcher
+    assert "SendMessage" in launcher
+    assert "0x0080" in launcher
+    assert "0x007F" in launcher
+    assert "WaitForExit" in launcher
     assert "$windowTitle = 'ScrubBots Factory Studio'" in launcher
     assert "$allowedWindowTitles = @($windowTitle, \"$windowTitle (DEBUG)\")" in launcher
     assert "$allowedWindowTitles -ccontains $lastWindowTitle" in launcher
     assert "--editor" not in launcher
     assert "$ResolveOnly" in launcher
+
+
+def test_factory_screen_refresh_never_runs_candidate_inbox_synchronously() -> None:
+    source = (FACTORY / "scripts" / "factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    start = source.index("func _refresh_runtime_cards() -> void:")
+    end = source.index("\nfunc _runtime_source_status_caption", start)
+    refresh_cards = source[start:end]
+
+    assert '_extension("candidate-inbox"' not in refresh_cards
+    assert "_candidate_inbox_cache" in refresh_cards
+    assert "_request_candidate_inbox_refresh()" in refresh_cards
+    request_start = source.index("func _request_candidate_inbox_refresh(force: bool = false) -> void:")
+    request_end = source.index("\nfunc _start_next_studio_read_extension", request_start)
+    inbox_request = source[request_start:request_end]
+    assert '_queue_studio_read_extension("candidate-inbox"' in inbox_request
+    assert '_screen != "PIXEL ART"' in inbox_request
 
 
 def test_shortcut_installer_repairs_one_named_com_shortcut() -> None:

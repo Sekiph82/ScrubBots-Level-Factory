@@ -98,6 +98,12 @@ public static class FactoryStudioNativeWindowTitle {
     public static extern bool SetWindowText(IntPtr windowHandle, string windowTitle);
     [DllImport("user32.dll", EntryPoint = "GetWindowThreadProcessId", SetLastError = true)]
     public static extern uint GetWindowThreadProcessId(IntPtr windowHandle, out uint processId);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, EntryPoint = "LoadImageW", SetLastError = true)]
+    public static extern IntPtr LoadImage(IntPtr instance, string name, uint imageType, int width, int height, uint loadFlags);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW", SetLastError = true)]
+    public static extern IntPtr SendMessage(IntPtr windowHandle, uint message, IntPtr wParam, IntPtr lParam);
+    [DllImport("user32.dll", EntryPoint = "DestroyIcon", SetLastError = true)]
+    public static extern bool DestroyIcon(IntPtr iconHandle);
 }
 '@
     }
@@ -107,6 +113,7 @@ public static class FactoryStudioNativeWindowTitle {
     $titleSetAttempted = $false
     $lastWindowTitle = ''
     $processIdentityVerified = $false
+    $nativeWindowIcon = [IntPtr]::Zero
     $expectedProjectPath = Get-FullPathForIdentity $projectPath
     $projectArgumentPattern = '(?i)(?:^|\s)--path\s+"' + [regex]::Escape($expectedProjectPath) + '"(?:\s|$)'
     for ($attempt = 0; $attempt -lt 80; $attempt++) {
@@ -138,6 +145,21 @@ public static class FactoryStudioNativeWindowTitle {
             $studioProcess.Refresh()
             $lastWindowTitle = $studioProcess.MainWindowTitle
             if ($allowedWindowTitles -ccontains $lastWindowTitle) {
+                $iconPath = Join-Path $projectPath 'assets\icons\ScrubBots_Factory_Studio.ico'
+                if (-not (Test-Path -LiteralPath $iconPath -PathType Leaf)) {
+                    throw "The approved Studio ICO is missing: $iconPath"
+                }
+                $nativeWindowIcon = [FactoryStudioNativeWindowTitle]::LoadImage([IntPtr]::Zero, $iconPath, 1, 0, 0, 0x10)
+                if ($nativeWindowIcon -eq [IntPtr]::Zero) {
+                    throw "Windows could not load the approved Studio ICO (error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))."
+                }
+                [void][FactoryStudioNativeWindowTitle]::SendMessage($windowHandle, 0x0080, [IntPtr]1, $nativeWindowIcon)
+                [void][FactoryStudioNativeWindowTitle]::SendMessage($windowHandle, 0x0080, [IntPtr]0, $nativeWindowIcon)
+                $largeIcon = [FactoryStudioNativeWindowTitle]::SendMessage($windowHandle, 0x007F, [IntPtr]1, [IntPtr]::Zero)
+                $smallIcon = [FactoryStudioNativeWindowTitle]::SendMessage($windowHandle, 0x007F, [IntPtr]0, [IntPtr]::Zero)
+                if ($largeIcon -ne $nativeWindowIcon -or $smallIcon -ne $nativeWindowIcon) {
+                    throw 'The Studio window did not retain the approved large and small taskbar icons.'
+                }
                 $titleVerified = $true
                 break
             }
@@ -153,6 +175,13 @@ public static class FactoryStudioNativeWindowTitle {
     }
     if (-not $titleVerified) {
         throw "Factory Studio window title was not an approved exact title. Last title: '$lastWindowTitle'."
+    }
+    # Keep the icon handle alive for as long as the window can use it. The
+    # launcher exits with Godot, so this helper cannot linger after the app.
+    $studioProcess.WaitForExit()
+    if ($nativeWindowIcon -ne [IntPtr]::Zero) {
+        [void][FactoryStudioNativeWindowTitle]::DestroyIcon($nativeWindowIcon)
+        $nativeWindowIcon = [IntPtr]::Zero
     }
 }
 catch {

@@ -130,11 +130,14 @@ func _run_suite() -> void:
 	_check(failed_card.tooltip_text.contains("fixture failure reason"), "failed source reason is not available from its thumbnail tooltip")
 
 	var reused_items := active_items.duplicate(true)
+	for item_index in range(reused_items.size()):
+		reused_items[item_index]["status"] = "SKIPPED"
 	reused_items[1]["status"] = "READY"
 	reused_items[1].erase("attempt_id")
 	reused_items[1]["run_id"] = "r08-existing-ready-run"
 	reused_items[1]["reused_existing_ready"] = true
 	var reused_snapshot := running_snapshot.duplicate(true)
+	reused_snapshot["state"] = "COMPLETE"
 	reused_snapshot["items"] = reused_items
 	reused_snapshot["current_index"] = 1
 	ui.set("_batch_snapshot", reused_snapshot.duplicate(true))
