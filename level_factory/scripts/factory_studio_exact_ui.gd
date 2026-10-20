@@ -1370,6 +1370,7 @@ func _refresh_runtime_cards() -> void:
 	_request_candidate_inbox_refresh()
 	var inbox := _candidate_inbox_cache
 	var candidates: Array = inbox.get("candidates", [])
+	var level_sources := _batch_ordered_gameplay_sources()
 	var pixel_slots := ["ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3"]
 	var level_slots := ["LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	for index in range(pixel_slots.size()):
@@ -1380,7 +1381,7 @@ func _refresh_runtime_cards() -> void:
 			_set_runtime_button(pixel_slots[index], caption.left(18), image_path)
 		else:
 			_set_runtime_button(pixel_slots[index], "No artwork", "")
-	var max_start := maxi(0, _gameplay_sources.size() - level_slots.size())
+	var max_start := maxi(0, level_sources.size() - level_slots.size())
 	_imported_window_start = clampi(_imported_window_start, 0, max_start)
 	var bottom_heading := get_node_or_null("RuntimeBottomHeading") as Label
 	if bottom_heading != null:
@@ -1388,8 +1389,8 @@ func _refresh_runtime_cards() -> void:
 	for index in range(level_slots.size()):
 		var source_index := _imported_window_start + index
 		var button := get_node_or_null(level_slots[index]) as Button
-		if source_index < _gameplay_sources.size():
-			var imported: Dictionary = _gameplay_sources[source_index]
+		if source_index < level_sources.size():
+			var imported: Dictionary = level_sources[source_index]
 			var source_id := str(imported.get("source_id", ""))
 			var filename := str(imported.get("display_filename", "image.png"))
 			var disposition := str(imported.get("disposition", "IMPORTED"))
@@ -2529,6 +2530,9 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	if source_index < 0:
 		return
 	var source: Dictionary = _gameplay_sources[source_index]
+	var batch_position := _batch_composite_index(source_id)
+	if batch_position < 0:
+		return
 	var path := str(source.get("path", ""))
 	if (str(source.get("source_sha256", source_id.trim_prefix("owner-upload-"))) != source_sha
 			or str(source.get("source_record_sha256", "")) != record_sha
@@ -2566,7 +2570,7 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_last_candidate_id = ""
 	_last_pipeline.clear()
 	_owner_review_status = ""
-	_imported_window_start = clampi(source_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+	_imported_window_start = clampi(batch_position - 2, 0, maxi(0, _gameplay_sources.size() - 5))
 	_activity_source_id = source_id
 	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
 	var visible_item_state := job_state if item_state == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else item_state
@@ -3527,15 +3531,28 @@ func _batch_job_matches_loaded_sources() -> bool:
 		return false
 	if composite_items.size() != _gameplay_sources.size():
 		return false
-	for source_index in range(composite_items.size()):
-		if not composite_items[source_index] is Dictionary:
+	var loaded_by_id: Dictionary = {}
+	for loaded_source_variant in _gameplay_sources:
+		if not loaded_source_variant is Dictionary:
 			return false
-		var composite_source: Dictionary = composite_items[source_index]
-		var loaded_source: Dictionary = _gameplay_sources[source_index]
-		if (str(composite_source.get("source_id", "")) != str(loaded_source.get("source_id", ""))
-				or str(composite_source.get("source_sha256", "")) != str(loaded_source.get("source_sha256", ""))
+		var loaded_source: Dictionary = loaded_source_variant
+		var loaded_id := str(loaded_source.get("source_id", ""))
+		if loaded_id.is_empty() or loaded_by_id.has(loaded_id):
+			return false
+		loaded_by_id[loaded_id] = loaded_source
+	var composite_by_id: Dictionary = {}
+	for composite_variant in composite_items:
+		if not composite_variant is Dictionary:
+			return false
+		var composite_source: Dictionary = composite_variant
+		var source_id := str(composite_source.get("source_id", ""))
+		if source_id.is_empty() or composite_by_id.has(source_id) or not loaded_by_id.has(source_id):
+			return false
+		var loaded_source: Dictionary = loaded_by_id[source_id]
+		if (str(composite_source.get("source_sha256", "")) != str(loaded_source.get("source_sha256", ""))
 				or str(composite_source.get("source_record_sha256", "")) != str(loaded_source.get("source_record_sha256", ""))):
 			return false
+		composite_by_id[source_id] = composite_source
 	var source_by_id: Dictionary = {}
 	for item_variant in composite_items:
 		if item_variant is Dictionary:
@@ -3561,6 +3578,45 @@ func _batch_job_matches_loaded_sources() -> bool:
 		if not is_retry and str(item.get("source_id", "")) != str(composite_items[index].get("source_id", "")):
 			return false
 	return true
+
+
+func _batch_composite_index(source_id: String) -> int:
+	var composite_items: Array = _batch_composite_snapshot.get("items", [])
+	for index in range(composite_items.size()):
+		if composite_items[index] is Dictionary and str(composite_items[index].get("source_id", "")) == source_id:
+			return index
+	return -1
+
+
+func _batch_ordered_gameplay_sources() -> Array:
+	var composite_items: Array = _batch_composite_snapshot.get("items", [])
+	if composite_items.size() != _gameplay_sources.size() or composite_items.is_empty():
+		return _gameplay_sources
+	var loaded_by_id: Dictionary = {}
+	for source_variant in _gameplay_sources:
+		if not source_variant is Dictionary:
+			return _gameplay_sources
+		var source: Dictionary = source_variant
+		var source_id := str(source.get("source_id", ""))
+		if source_id.is_empty() or loaded_by_id.has(source_id):
+			return _gameplay_sources
+		loaded_by_id[source_id] = source
+	var ordered: Array = []
+	var seen_ids: Dictionary = {}
+	for composite_variant in composite_items:
+		if not composite_variant is Dictionary:
+			return _gameplay_sources
+		var composite_source: Dictionary = composite_variant
+		var source_id := str(composite_source.get("source_id", ""))
+		if source_id.is_empty() or seen_ids.has(source_id) or not loaded_by_id.has(source_id):
+			return _gameplay_sources
+		var source: Dictionary = loaded_by_id[source_id]
+		if (str(composite_source.get("source_sha256", "")) != str(source.get("source_sha256", ""))
+				or str(composite_source.get("source_record_sha256", "")) != str(source.get("source_record_sha256", ""))):
+			return _gameplay_sources
+		seen_ids[source_id] = true
+		ordered.append(source)
+	return ordered
 
 
 func _pinned_game_project_path() -> String:
