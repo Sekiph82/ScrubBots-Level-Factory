@@ -156,7 +156,7 @@ def read_rows(raw_csv: bytes, *, default_size: tuple[int, int] = (32, 32)) -> li
     records = [row for row in records if row and any(cell.strip() for cell in row)]
     if not records:
         return []
-    aliases = {"prompt", "description", "request", "text", "size", "width", "height", "enabled", "active", "reference", "ref"}
+    aliases = {"prompt", "description", "request", "text", "size", "width", "height", "enabled", "active", "reference", "ref", "provider"}
     header = [cell.strip().lower() for cell in records[0]]
     has_header = bool(set(header) & aliases)
     output: list[dict[str, object]] = []
@@ -174,7 +174,8 @@ def read_rows(raw_csv: bytes, *, default_size: tuple[int, int] = (32, 32)) -> li
                 continue
             width, height = _row_size(row, default_size)
             output.append({"prompt": prompt, "width": width, "height": height,
-                           "reference": row.get("reference", row.get("ref", ""))})
+                           "reference": row.get("reference", row.get("ref", "")),
+                           "provider_id": row.get("provider", "ALPIX (Claude)").strip() or "ALPIX (Claude)"})
     else:
         for raw in records:
             prompt = raw[0].strip()
@@ -231,6 +232,19 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
     _save_job(state_path, state)
     for index, row in enumerate(state["rows"]):
         row_state = str(row.get("state", "PENDING"))
+        provider_id = str(row.get("provider_id", "ALPIX (Claude)")).strip().upper()
+        if row_state == "IMPORTED":
+            continue
+        if row_state == "PROVIDER_RETIRED":
+            continue
+        if provider_id == "MAGNIFIC":
+            row.update({"state": "PROVIDER_RETIRED", "error": "PROVIDER_RETIRED_MAGNIFIC"})
+            _save_job(state_path, state)
+            continue
+        if provider_id not in {"ALPIX", "ALPIX (CLAUDE)"}:
+            row.update({"state": "FAILED", "error": "Unsupported provider in CSV row."})
+            _save_job(state_path, state)
+            continue
         artifact = job_dir / f"row-{index + 1:05d}.png"
         row["artifact_path"] = str(artifact)
         _save_job(state_path, state)
@@ -313,7 +327,7 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
         else:
             row.update({"state": "FAILED", "error": "Canonical artwork import failed."})
         _save_job(state_path, state)
-    state["state"] = "COMPLETE" if all(row.get("state") == "IMPORTED" for row in state["rows"]) else "NEEDS_RETRY"
+    state["state"] = "COMPLETE" if all(row.get("state") in {"IMPORTED", "PROVIDER_RETIRED"} for row in state["rows"]) else "NEEDS_RETRY"
     _save_job(state_path, state)
     return _job_result(job_id, state)
 
@@ -371,7 +385,7 @@ def _validate_png(path: Path, width: int, height: int) -> None:
 def _job_result(job_id: str, state: Mapping[str, object]) -> AlpixJobResult:
     rows = tuple(dict(item) for item in state.get("rows", []) if isinstance(item, Mapping))
     completed = sum(item.get("state") == "IMPORTED" for item in rows)
-    failed = sum(item.get("state") == "FAILED" for item in rows)
+    failed = sum(item.get("state") in {"FAILED", "PROVIDER_RETIRED"} for item in rows)
     return AlpixJobResult(job_id, str(state.get("state", "ERROR")), completed, failed,
                           sum(item.get("state") != "IMPORTED" for item in rows), rows)
 

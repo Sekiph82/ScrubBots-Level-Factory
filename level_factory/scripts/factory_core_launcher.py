@@ -322,12 +322,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = _semantic_generate(request)
         elif operation == "provider-options":
             payload = _provider_options()
+        elif operation == "canonical-palette":
+            from scrubbots_pixel_factory import CANONICAL_PALETTE
+            payload = {"state": "READY", "palette_id": "V3", "colors": [
+                {"id": color.id, "hex": color.hex} for color in CANONICAL_PALETTE.colors
+            ]}
         elif operation == "alpix-generate":
             payload = _alpix_generate(request)
         elif operation == "alpix-csv-job":
             payload = _alpix_csv_job(request)
-        elif operation == "magnific-prepare":
-            payload = _magnific_prepare(request)
         elif operation == "campaign-build":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
             payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
@@ -368,7 +371,7 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     Secrets are read only by the provider adapter from process environment. They
     are never accepted in the request payload or copied into the result.
     """
-    allowed = {"prompt", "style", "provider_id", "provider_model", "width", "height", "seed", "background_intent"}
+    allowed = {"prompt", "style", "provider_id", "provider_model", "width", "height", "seed", "background_intent", "operation_id"}
     if set(request) - allowed or "prompt" not in request:
         raise ValueError("semantic generation request contains unsupported or missing fields")
     if request.get("provider_id") != "PIXELLAB":
@@ -387,6 +390,16 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     background = request.get("background_intent", "TRANSPARENT")
     if background not in {"TRANSPARENT", "BACKGROUND"}:
         raise ValueError("background_intent must be TRANSPARENT or BACKGROUND")
+    if model == "PRO_FLASH":
+        return _semantic_generate_pixellab_pro_flash(
+            prompt=prompt,
+            style=style,
+            width=width,
+            height=height,
+            seed=seed,
+            background=background,
+            operation_id=request.get("operation_id"),
+        )
     descriptor = get_provider_descriptor("PIXELLAB")
     semantic_request = SemanticGenerationRequest(
         output_class=OutputClass.ASSET_ART,
@@ -432,23 +445,174 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     }
 
 
+def _semantic_generate_pixellab_pro_flash(
+    *, prompt: str, style: str, width: int, height: int, seed: str | int,
+    background: str, operation_id: object,
+) -> dict[str, object]:
+    """Submit one explicitly requested Pro Flash image and bind its exact result."""
+    import hashlib
+    import re
+    import uuid
+    from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
+    PRO_FLASH_ENGINE = extensions.PRO_FLASH_ENGINE
+    ProFlashError = extensions.ProFlashError
+    generate_pro_flash_image = extensions.generate_pro_flash_image
+
+    resolved_operation_id = str(operation_id or uuid.uuid4().hex)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", resolved_operation_id):
+        raise ValueError("Pro Flash operation_id is invalid")
+    description = f"{prompt}. Pixel art style: {style}." if style else prompt
+    palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
+    request_digest = hashlib.sha256(json.dumps({
+        "provider": "PIXELLAB", "model": PRO_FLASH_ENGINE, "adapter_version": "pixellab-pro-flash-v1",
+        "api_version": "v2", "palette_sha256": palette_sha256, "description": description,
+        "width": width, "height": height, "seed": seed, "background": background,
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
+    job_root.mkdir(parents=True, exist_ok=True)
+    job_path = (job_root / f"{resolved_operation_id}.json").resolve()
+    if not _inside_output(job_path, extensions.extensions_root().resolve()):
+        raise ValueError("Pro Flash job record escaped the Studio output directory")
+    uncertain_states = {"SUBMITTING", "SUBMISSION_UNKNOWN", "POLL_TIMEOUT", "CANCELLED"}
+    for prior_path in sorted(job_root.glob("*.json")):
+        if prior_path == job_path:
+            continue
+        try:
+            prior = json.loads(prior_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if (isinstance(prior, dict) and prior.get("request_sha256") == request_digest
+                and prior.get("state") in uncertain_states):
+            return {
+                "operation": STUDIO_EXTENSION_OPERATION,
+                "state": "NEEDS_REVIEW",
+                "reason": "An earlier identical Pro Flash request may still be processing; check its PixelLab job before retrying.",
+                "job_id": prior.get("job_id"),
+                "operation_id": prior.get("operation_id"),
+            }
+    if job_path.exists():
+        previous = json.loads(job_path.read_text(encoding="utf-8"))
+        return {
+            "operation": STUDIO_EXTENSION_OPERATION,
+            "state": "NEEDS_REVIEW",
+            "reason": "This operation ID already has a durable PixelLab job record; it was not submitted again.",
+            "job_id": previous.get("job_id"),
+            "job_state": previous.get("state"),
+        }
+
+    job_record: dict[str, object] = {
+        "schema": "scrubbots-pixellab-pro-flash-job-v1",
+        "operation_id": resolved_operation_id,
+        "request_sha256": request_digest,
+        "provider_id": "PIXELLAB",
+        "provider_model": PRO_FLASH_ENGINE,
+        "adapter_version": "pixellab-pro-flash-v1",
+        "api_version": "v2",
+        "state": "SUBMITTING",
+        "width": width,
+        "height": height,
+        "seed": seed,
+        "background_intent": background,
+        "palette_source": "data/palette/scrubbots_palette_v3.json",
+        "palette_sha256": palette_sha256,
+        "palette_enforcement": "API_TARGET_PALETTE_V3_AND_LOCAL_EXACT_VALIDATION",
+    }
+
+    def persist_job() -> None:
+        extensions._write_json(job_path, job_record)
+
+    persist_job()
+
+    def accepted(job_id: str) -> None:
+        job_record.update({"state": "POLLING", "job_id": job_id})
+        persist_job()
+
+    try:
+        generated = generate_pro_flash_image(
+            description=description,
+            width=width,
+            height=height,
+            seed=seed,
+            no_background=background == "TRANSPARENT",
+            on_job_accepted=accepted,
+        )
+    except ProFlashError as exc:
+        job_record.update({"state": exc.code, "job_id": exc.job_id or job_record.get("job_id"), "error": str(exc)})
+        persist_job()
+        raise ValueError(f"{exc.code}: {exc}") from None
+
+    content_sha256 = hashlib.sha256(generated.png_bytes).hexdigest()
+    candidate_id = f"pixellab-pro-flash-{generated.job_id[:24]}"
+    factory_output = (_repository_root() / "level_factory" / "output").resolve()
+    output_root = (factory_output / "semantic-generated").resolve()
+    output_root.mkdir(parents=True, exist_ok=True)
+    destination = (output_root / f"{candidate_id}.png").resolve()
+    if not _inside_output(destination, factory_output):
+        raise ValueError("semantic output path escaped the Factory output directory")
+    destination.write_bytes(generated.png_bytes)
+    imported = extensions.batch_import([str(destination)])
+    items = imported.get("items", [])
+    if not isinstance(items, list) or not items or not isinstance(items[0], Mapping):
+        raise ValueError("semantic output was not accepted by canonical artwork import")
+    item = items[0]
+    source_id = item.get("source_id")
+    if not isinstance(source_id, str) or not source_id:
+        raise ValueError(str(item.get("reason", item.get("state", "canonical artwork import failed"))))
+    job_record.update({
+        "state": "IMPORTED",
+        "source_id": source_id,
+        "source_image_id": generated.source_image_id,
+        "content_sha256": content_sha256,
+        "actual_usage": dict(generated.actual_usage or {}),
+        "used_palette_ids": list(generated.used_palette_ids),
+        "local_palette_validation": "PASS",
+    })
+    persist_job()
+    return {
+        "operation": STUDIO_EXTENSION_OPERATION,
+        "state": "IMPORTED",
+        "candidate_id": candidate_id,
+        "source_id": source_id,
+        "provider_id": "PIXELLAB",
+        "provider_version": "pixellab-pro-flash-v1",
+        "api_version": "v2",
+        "provider_model": PRO_FLASH_ENGINE,
+        "job_id": generated.job_id,
+        "operation_id": resolved_operation_id,
+        "source_image_id": generated.source_image_id,
+        "actual_usage": dict(generated.actual_usage or {}),
+        "width": generated.width,
+        "height": generated.height,
+        "content_sha256": content_sha256,
+        "used_palette_ids": list(generated.used_palette_ids),
+        "palette_validation": "PASS",
+        "source_path": str(destination),
+    }
+
+
 def _provider_options() -> dict[str, object]:
     """Expose only adapters that are actually executable in this process."""
-    import importlib.util
     import os
     from scrubbots_pixel_factory.alpix_batch import discover_alpix
+    from scrubbots_pixel_factory.semantic.providers.registry import active_factory_studio_provider_ids
 
     alpix = discover_alpix()
-    options: list[dict[str, object]] = [
-        {"id": "ALPIX (Claude)", "available": alpix.get("available") is True,
-         "prompt_capable": True, "reason": alpix.get("reason", "Ready"),
-         "plugin_id": alpix.get("plugin_id"), "mcp_servers": alpix.get("mcp_servers")},
-        {"id": "MAGNIFIC", "available": True, "prompt_capable": True,
-         "execution_mode": "PREPARE_AND_IMPORT", "reason": "Existing adapter prepares an external job; it does not call Magnific directly."},
-        {"id": "PIXELLAB", "available": bool(os.environ.get("PIXELLAB_SECRET", "").strip()
-         and importlib.util.find_spec("pixellab") is not None), "prompt_capable": True,
-         "execution_mode": "DIRECT"},
-    ]
+    options: list[dict[str, object]] = []
+    for provider_id in active_factory_studio_provider_ids():
+        if provider_id == "ALPIX (Claude)":
+            options.append({"id": provider_id, "available": alpix.get("available") is True,
+                "prompt_capable": True, "reason": alpix.get("reason", "Ready"),
+                "plugin_id": alpix.get("plugin_id"), "mcp_servers": alpix.get("mcp_servers")})
+        elif provider_id == "PIXELLAB":
+            token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
+            legacy_secret = os.environ.get("PIXELLAB_SECRET", "").strip()
+            configured = bool((token or legacy_secret) and not (token and legacy_secret and token != legacy_secret))
+            options.append({"id": provider_id, "available": configured, "prompt_capable": True,
+                "execution_mode": "PRO_FLASH",
+                "reason": "PIXELLAB Pro Flash credentials are configured." if configured
+                else "Set PIXELLAB_API_TOKEN in the local application environment to enable Pro Flash."
+                if not token and not legacy_secret else "PIXELLAB_API_TOKEN and PIXELLAB_SECRET do not match."})
     return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
 
 
@@ -497,8 +661,6 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
 
     return {"operation": "alpix-csv-job", **run_csv_job(csv_path, root, renderer=render,
         importer=import_png, default_size=(default_width, default_height)).to_dict()}
-
-
 def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
     """Delegate to the existing Magnific adapter's truthful prepare/import contract."""
     from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest

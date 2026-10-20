@@ -75,6 +75,7 @@ var _filter_columns: OptionButton
 var _release_confirmation: ConfirmationDialog
 var _pending_production_confirmation: Dictionary = {}
 var _semantic_progress := {"completed": 0, "failed": 0, "remaining": 0}
+var _canonical_palette_colors: Array = []
 var _master_buttons: Array[Button] = []
 var _grid_lines: Array[Line2D] = []
 var _preview_host: Control
@@ -92,12 +93,7 @@ var _selected_import_source_id := ""
 var _seed := ""
 var _background_intent := "TRANSPARENT"
 const _REFERENCE_SIZE := Vector2(1536.0, 1024.0)
-const _OWNER_PALETTE_SWATCHES := {
-	"C01": "#FF4500", "C02": "#FFA800", "C03": "#FFD635", "C04": "#00CC78",
-	"C05": "#00CCC0", "C06": "#51E9F4", "C07": "#3690EA", "C08": "#2450A4",
-	"C09": "#6A5CFF", "C10": "#FF3881", "C11": "#9C6926", "C12": "#FFF8B8",
-	"C13": "#D4D7D9", "C14": "#515252", "C15": "#FFFFFF", "C16": "#000000"
-}
+var _canonical_palette_hex_by_id: Dictionary = {}
 var _responsive_nodes: Array[CanvasItem] = []
 var _responsive_base: Dictionary = {}
 var _responsive_scale := 1.0
@@ -123,6 +119,10 @@ var _studio_read_done := false
 var _studio_read_result: Dictionary = {}
 var _studio_read_context: Dictionary = {}
 var _studio_read_queue: Array[Dictionary] = []
+var _pixel_art_thread: Thread
+var _pixel_art_mutex := Mutex.new()
+var _pixel_art_worker_done := false
+var _pixel_art_worker_result: Dictionary = {}
 var _candidate_inbox_cache: Dictionary = {}
 var _candidate_inbox_last_request_msec := -60000
 var _selection_restore_token := ""
@@ -168,6 +168,9 @@ var _pinned_source_preflight_message := "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
 
 
 func _ready() -> void:
+	# Retire a legacy selection on startup without changing saved asset provenance.
+	if _provider_model == "MAGNIFIC":
+		_provider_model = "ALPIX (Claude)"
 	_canvas = get_node_or_null("MasterCanvas") as TextureRect
 	_status = get_node_or_null("Status") as Label
 	_file_dialog = get_node_or_null("FileDialog") as FileDialog
@@ -224,9 +227,10 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	_poll_studio_read_extension()
 	_start_next_studio_read_extension()
-	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null:
+	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
 		get_tree().quit()
 		return
+	_poll_pixel_art_worker()
 	if not _batch_job_id.is_empty() and not _batch_job_source_mismatch:
 		_refresh_batch_progress()
 	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
@@ -264,6 +268,11 @@ func _notification(what: int) -> void:
 			_activity_message = "Closing after the active Python and game solver processes stop."
 			_activity_stage = "CANCELLING"
 			_refresh_activity_header()
+			return
+		if _operation_running and _pixel_art_thread != null:
+			_shutdown_requested = true
+			_signal_worker_cancel_marker()
+			_report("Closing after the active PixelLab job is cancelled or reaches a terminal state.")
 			return
 		get_tree().quit()
 
@@ -723,11 +732,13 @@ func _build_live_chrome() -> void:
 		label.add_theme_font_size_override("font_size", 12)
 		label.add_theme_color_override("font_color", Color("#91a7c5"))
 		add_child(label)
-	var live := Label.new()
+	var live := RichTextLabel.new()
 	live.name = "RuntimeLiveData"
 	live.position = Vector2(1222, 170)
 	live.size = Vector2(270, 120)
-	live.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	live.bbcode_enabled = true
+	live.fit_content = true
+	live.scroll_active = false
 	live.add_theme_font_size_override("font_size", 13)
 	live.add_theme_color_override("font_color", Color("#dce8f8"))
 	add_child(live)
@@ -1009,8 +1020,9 @@ func _add_supply_batch_row(color_id: String, amount: int) -> void:
 	swatch.name = "CanonicalColorSwatch"
 	swatch.custom_minimum_size = Vector2(13, 13)
 	swatch.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	if _OWNER_PALETTE_SWATCHES.has(color_id):
-		swatch.color = Color(_OWNER_PALETTE_SWATCHES[color_id])
+	_ensure_canonical_palette_loaded()
+	if _canonical_palette_hex_by_id.has(color_id):
+		swatch.color = Color(str(_canonical_palette_hex_by_id[color_id]))
 	else:
 		swatch.color = Color("#7f8792")
 	line.add_child(swatch)
@@ -1058,7 +1070,7 @@ func _update_live_chrome() -> void:
 
 
 func _refresh_live_data() -> void:
-	var live := get_node_or_null("RuntimeLiveData") as Label
+	var live := get_node_or_null("RuntimeLiveData") as RichTextLabel
 	if live == null: return
 	var level_factory_screen := _screen == "LEVEL FACTORY"
 	live.visible = not level_factory_screen
@@ -1068,7 +1080,17 @@ func _refresh_live_data() -> void:
 	if _screen == "LEVEL FACTORY" and not _selected_import_source_id.is_empty():
 		selected_source_text = _selected_import_filename()
 	if _screen == "PIXEL ART":
-		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nSeed: %s\nBatch: %d complete · %d failed · %d remaining" % [_provider_model, _generation_mode, _width, _height, _seed if not _seed.is_empty() else "Auto", _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining]
+		_ensure_canonical_palette_loaded()
+		var provider_caption := "PIXELLAB · Pro Flash" if _provider_model == "PIXELLAB" else _provider_model
+		var palette_markup := "\nPalette V3 LOCKED  "
+		var palette_tooltip := "Canonical palette V3 · API target palette + exact local pixel validation"
+		for color in _canonical_palette_colors:
+			if color is Dictionary:
+				var swatch_hex := str(color.get("hex", "#000000"))
+				palette_markup += "[color=%s]■[/color]" % swatch_hex
+				palette_tooltip += "\n%s %s" % [str(color.get("id", "")), swatch_hex]
+		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nBatch: %d complete · %d failed · %d remaining%s" % [provider_caption, _generation_mode, _width, _height, _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining, palette_markup]
+		live.tooltip_text = palette_tooltip
 	elif _screen == "LEVEL FACTORY":
 		var primary: Dictionary = _last_pipeline.get("primary", {})
 		var monitor_failed := str(_last_pipeline.get("studio_monitor_validation", "")) == "FAILED_CLOSED"
@@ -1121,6 +1143,26 @@ func _refresh_live_data() -> void:
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
 	_refresh_run_button_caption()
 	_refresh_runtime_cards()
+
+
+func _ensure_canonical_palette_loaded() -> void:
+	if not _canonical_palette_hex_by_id.is_empty():
+		return
+	# Read the canonical JSON locally; do not spawn Python or block a screen switch.
+	var palette_path := ProjectSettings.globalize_path("res://../data/palette/scrubbots_palette_v3.json")
+	var palette_file := FileAccess.open(palette_path, FileAccess.READ)
+	if palette_file == null:
+		return
+	var palette_value: Variant = JSON.parse_string(palette_file.get_as_text())
+	if not palette_value is Dictionary or int(palette_value.get("version", 0)) != 3 or palette_value.get("ownerLocked") != true:
+		return
+	var colors: Variant = palette_value.get("colors", [])
+	if not colors is Array or colors.size() != 16:
+		return
+	_canonical_palette_colors = colors.duplicate(true)
+	for color in _canonical_palette_colors:
+		if color is Dictionary and str(color.get("id", "")).begins_with("C"):
+			_canonical_palette_hex_by_id[str(color.get("id", ""))] = str(color.get("hex", ""))
 
 
 func _refresh_run_button_caption() -> void:
@@ -2048,8 +2090,91 @@ func _generate_art() -> void:
 	_last_source_id = ""
 	_last_pipeline = {}
 	_seed = "pixel-art-%d" % Time.get_unix_time_from_system()
+	if _provider_model == "PIXELLAB":
+		if _width % 4 != 0 or _height % 4 != 0:
+			_report("Pro Flash requires canvas width and height in 4-pixel increments; choose a compatible size first.")
+			return
+		_confirm_pro_flash_generation()
+		return
 	var result := _generate_request({"prompt": _prompt, "style": _generation_style, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	_finish_generation(result)
+
+
+func _confirm_pro_flash_generation() -> void:
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Confirm paid PixelLab Pro Flash generation"
+	dialog.dialog_text = "This will submit one paid Pro Flash image request (%d × %d). One prior request used 5 credits; actual cost may vary. Network timeouts are not automatically retried." % [_width, _height]
+	dialog.confirmed.connect(func():
+		if is_instance_valid(dialog): dialog.queue_free()
+		_start_pixel_art_worker({"prompt": _prompt, "style": _generation_style, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
+	)
+	dialog.canceled.connect(func(): dialog.queue_free())
+	add_child(dialog)
+	dialog.popup_centered()
+
+
+func _start_pixel_art_worker(request: Dictionary) -> void:
+	if _gateway == null or _operation_running or _pixel_art_thread != null:
+		return
+	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
+		_report("PixelLab Pro Flash is unavailable because the local Factory Core gateway is not ready.")
+		return
+	var operation_id := "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
+	var payload := {"prompt": request.get("prompt", ""), "style": request.get("style", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_FLASH", "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT"), "operation_id": operation_id}
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "semantic-generate", payload)
+	if prepared.is_empty():
+		_report("PixelLab Pro Flash is unavailable because the local Factory Core cannot start.")
+		return
+	_prepare_worker_cancel_marker()
+	_pixel_art_mutex.lock()
+	_pixel_art_worker_done = false
+	_pixel_art_worker_result.clear()
+	_pixel_art_mutex.unlock()
+	_pixel_art_thread = Thread.new()
+	var error := _pixel_art_thread.start(Callable(self, "_pixel_art_worker").bind(prepared))
+	if error != OK:
+		_pixel_art_thread = null
+		_finish_worker_cancel_marker()
+		_report("PixelLab Pro Flash worker could not start.")
+		return
+	_operation_running = true
+	_semantic_progress = {"completed": 0, "failed": 0, "remaining": 1, "state": "RUNNING"}
+	_report("PIXELLAB PRO FLASH · submitting one image · %d × %d · canonical palette V3" % [int(payload.width), int(payload.height)])
+
+
+func _pixel_art_worker(prepared: Dictionary) -> void:
+	var result: Dictionary = _gateway.call("execute_prepared_studio_extension_call", prepared)
+	_pixel_art_mutex.lock()
+	_pixel_art_worker_result = result
+	_pixel_art_worker_done = true
+	_pixel_art_mutex.unlock()
+
+
+func _poll_pixel_art_worker() -> void:
+	if _pixel_art_thread == null:
+		return
+	_pixel_art_mutex.lock()
+	var completed := _pixel_art_worker_done
+	var result := _pixel_art_worker_result.duplicate(true) if completed else {}
+	_pixel_art_mutex.unlock()
+	if not completed or _pixel_art_thread.is_alive():
+		return
+	_pixel_art_thread.wait_to_finish()
+	_pixel_art_thread = null
+	_finish_worker_cancel_marker()
+	_pixel_art_mutex.lock()
+	_pixel_art_worker_done = false
+	_pixel_art_worker_result.clear()
+	_pixel_art_mutex.unlock()
+	_operation_running = false
+	if str(result.get("state", "")) == "IMPORTED":
+		_semantic_progress = {"completed": 1, "failed": 0, "remaining": 0, "state": "READY"}
+		_finish_generation(result)
+	else:
+		_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
+		_report("PIXELLAB PRO FLASH · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
+	if _shutdown_requested:
+		get_tree().quit()
 
 
 func _run_batch() -> void:
@@ -2063,6 +2188,9 @@ func _generate_batch_csv(path: String) -> void:
 	if _gateway == null or _operation_running:
 		return
 	_batch_csv_path = path
+	if _provider_model == "PIXELLAB":
+		_report("Pro Flash CSV batch is disabled to prevent unconfirmed paid calls. Use one confirmed Generate/Regenerate request at a time.")
+		return
 	if _provider_model == "ALPIX (Claude)":
 		_operation_running = true
 		var job := _extension("alpix-csv-job", {"csv_path": path, "default_width": _width, "default_height": _height})
@@ -3256,11 +3384,11 @@ func _generate_request(request: Dictionary) -> Dictionary:
 	var selected_provider := str(request.get("provider", _provider_model))
 	if selected_provider == "ALPIX (Claude)":
 		result = _extension("alpix-generate", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32)})
-	elif selected_provider == "MAGNIFIC":
-		result = _extension("magnific-prepare", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32), "background_intent": request.get("background_intent", "TRANSPARENT")})
 	elif selected_provider == "PIXELLAB":
-		var model := "PIXFLUX"
-		result = _extension("semantic-generate", {"prompt": request.get("prompt", ""), "style": request.get("style", ""), "provider_id": "PIXELLAB", "provider_model": model, "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT")})
+		# Paid requests only pass through explicit confirmation and the async worker.
+		result = {"state": "PAID_CONFIRMATION_REQUIRED", "reason": "Start one explicit Generate/Regenerate request to confirm Pro Flash cost."}
+	elif selected_provider == "MAGNIFIC":
+		result = {"state": "PROVIDER_RETIRED", "reason": "PROVIDER_RETIRED_MAGNIFIC · choose ALPIX (Claude) or PIXELLAB explicitly."}
 	else:
 		result = {"state": "UNAVAILABLE", "reason": "Selected provider is not configured."}
 	_operation_running = false
@@ -3275,7 +3403,15 @@ func _finish_generation(result: Dictionary) -> void:
 		_selected_art_path = str(result.get("output_path", result.get("source_path", ""))).path_join("artwork.png") if result.has("output_path") else str(result.get("source_path", ""))
 		_load_selected_art_preview(_selected_art_path)
 		_request_candidate_inbox_refresh(true)
-	_report("%s · %s" % [_last_candidate_id, str(result.get("state", "ERROR"))])
+	var usage_text := ""
+	var usage: Dictionary = result.get("actual_usage", {})
+	if usage.has("generations"):
+		usage_text = " · %s generation units used" % str(usage.get("generations"))
+	elif usage.has("usd"):
+		usage_text = " · actual usage $%s" % str(usage.get("usd"))
+	if result.has("palette_validation"):
+		usage_text += " · palette V3 PASS (%d colors)" % result.get("used_palette_ids", []).size()
+	_report("%s · %s%s" % [_last_candidate_id, str(result.get("state", "ERROR")), usage_text])
 
 
 func _csv_dimensions(values: Dictionary) -> Vector2i:
@@ -3315,8 +3451,8 @@ func _choose_size() -> void:
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Size"
 	var row := HBoxContainer.new()
-	var width_input := SpinBox.new(); width_input.min_value = 20; width_input.max_value = 59; width_input.value = _width
-	var height_input := SpinBox.new(); height_input.min_value = 20; height_input.max_value = 59; height_input.value = _height
+	var width_input := SpinBox.new(); width_input.min_value = 20; width_input.max_value = 56; width_input.step = 4; width_input.value = _width
+	var height_input := SpinBox.new(); height_input.min_value = 20; height_input.max_value = 56; height_input.step = 4; height_input.value = _height
 	row.add_child(width_input); row.add_child(height_input); dialog.add_child(row)
 	dialog.confirmed.connect(func(): _width = int(width_input.value); _height = int(height_input.value); dialog.queue_free())
 	dialog.canceled.connect(func(): dialog.queue_free())
@@ -3330,15 +3466,27 @@ func _choose_provider() -> void:
 	var result := _extension("provider-options", {})
 	var options: Array = result.get("providers", [])
 	var names: Array[String] = []
+	var provider_ids: Array[String] = []
 	for item in options:
 		if item is Dictionary:
-			names.append(str(item.get("id", "")))
-	for item in names: choice.add_item(item)
-	var selected := maxi(0, names.find(_provider_model))
+			var provider_id := str(item.get("id", ""))
+			if provider_id in ["ALPIX (Claude)", "PIXELLAB"]:
+				var available := bool(item.get("available", false))
+				var display_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
+				if not available: display_name += " · UNAVAILABLE"
+				choice.add_item(display_name)
+				choice.set_item_metadata(choice.item_count - 1, provider_id)
+				choice.set_item_tooltip(choice.item_count - 1, str(item.get("reason", "")))
+				names.append(display_name)
+				provider_ids.append(provider_id)
+	if _provider_model == "MAGNIFIC": _provider_model = "ALPIX (Claude)"
+	var selected := provider_ids.find(_provider_model)
+	if selected < 0: selected = provider_ids.find("ALPIX (Claude)")
+	if selected < 0: selected = 0
 	if not names.is_empty(): choice.select(selected)
 	dialog.add_child(choice)
 	dialog.confirmed.connect(func():
-		if choice.item_count > 0: _provider_model = choice.get_item_text(choice.selected)
+		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())

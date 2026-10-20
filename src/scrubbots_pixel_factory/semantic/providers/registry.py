@@ -37,6 +37,8 @@ _REGISTRY = {
     "PIXELLAB": ProviderDescriptor("PIXELLAB", "pixellab-adapter-v1", "1", _pixellab_factory),
 }
 
+_ACTIVE_FACTORY_STUDIO_PROVIDER_IDS = ("ALPIX (Claude)", "PIXELLAB")
+
 
 def provider_registry() -> tuple[ProviderDescriptor, ...]:
     """Return registrations in a stable, non-alphabetically surprising order."""
@@ -46,6 +48,11 @@ def provider_registry() -> tuple[ProviderDescriptor, ...]:
 
 def available_provider_ids() -> tuple[str, ...]:
     return tuple(item.provider_id for item in provider_registry())
+
+
+def active_factory_studio_provider_ids() -> tuple[str, ...]:
+    """Return current owner-selectable providers; historical adapters stay registered read-only."""
+    return _ACTIVE_FACTORY_STUDIO_PROVIDER_IDS
 
 
 def get_provider_descriptor(provider_id: str) -> ProviderDescriptor:
@@ -64,6 +71,7 @@ resolve_provider = create_provider
 __all__ = [
     "ProviderDescriptor",
     "available_provider_ids",
+    "active_factory_studio_provider_ids",
     "create_provider",
     "get_provider_descriptor",
     "provider_registry",
