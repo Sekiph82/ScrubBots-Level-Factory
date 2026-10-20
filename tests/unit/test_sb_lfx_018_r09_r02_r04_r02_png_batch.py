@@ -189,6 +189,83 @@ def test_pause_orchestration_only_does_not_start_the_next_source(tmp_path: Path,
     assert paused["job"]["counts"]["remaining"] == 2
 
 
+def test_close_cancellation_marks_current_batch_item_interrupted(monkeypatch: pytest.MonkeyPatch) -> None:
+    import copy
+    import hashlib
+
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    source_sha = "a" * 64
+    source_id = "owner-upload-" + source_sha
+    record_bytes = b"immutable owner source record"
+    record_sha = hashlib.sha256(record_bytes).hexdigest()
+    item = {
+        "index": 0, "source_id": source_id, "source_sha256": source_sha,
+        "source_record_sha256": record_sha, "column_count": 3, "status": "QUEUED",
+    }
+    job = {
+        "job_id": "png-batch-close-test", "import_batch_id": "batch-close-test",
+        "batch_digest": "close-test-digest", "items": [item], "settings": {},
+        "counts": {}, "ready_mix": {}, "state": "QUEUED", "current_index": None,
+    }
+    stored = {"job": copy.deepcopy(job)}
+    control = {"action": ""}
+
+    class ReadOnlyRecord:
+        def read_bytes(self) -> bytes:
+            return record_bytes
+
+    monkeypatch.setattr(png_batch, "_read_job", lambda _job_id: copy.deepcopy(stored["job"]))
+    monkeypatch.setattr(png_batch, "_write_job", lambda value: (stored.update(job=copy.deepcopy(value)), dict(value))[1])
+    monkeypatch.setattr(png_batch, "_control_path", lambda _job_id: Path("unused-control.json"))
+    monkeypatch.setattr(png_batch, "_control_action", lambda _job_id: control["action"])
+    monkeypatch.setattr(png_batch, "_clear_control", lambda _job_id: control.update(action=""))
+    monkeypatch.setattr(png_batch, "_record_legacy_resume_choice", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_recover_attempt", lambda *_args: None)
+    monkeypatch.setattr(extensions, "batch_load", lambda _batch_id: {"batch": {"version": 1, "batch_id": "batch-close-test"}})
+    monkeypatch.setattr(extensions, "_digest", lambda _value: "close-test-digest")
+    monkeypatch.setattr(extensions, "validate_owner_source", lambda *_args, **_kwargs: {
+        "source_sha256": source_sha, "structural": {"disposition": "PASS"}, "exact_logical_source": True,
+    })
+    monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args, **_kwargs: (ReadOnlyRecord(), None))
+    monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: {"state": "SOURCE_ONLY"})
+
+    def cancelled_runner(**_args: object) -> dict[str, object]:
+        control["action"] = "CANCEL_NOW"
+        raise RuntimeError("canonical solver cancelled by Studio close")
+
+    result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=cancelled_runner)
+
+    assert result["disposition"] == "INTERRUPTED"
+    assert result["job"]["state"] == "INTERRUPTED"
+    assert result["job"]["current_index"] == 0
+    assert result["job"]["items"][0]["status"] == "RUNNING"
+    assert result["job"]["counts"]["remaining"] == 1
+
+
+def test_ready_pool_readback_failure_does_not_start_another_solver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    batch_id, _items = _make_batch(tmp_path, monkeypatch, 1)
+    job = png_batch.create_png_batch(batch_id)["job"]
+    ready = _ready_result(str(job["items"][0]["source_id"]), "original-ready-run", {
+        "column_count": int(job["items"][0]["column_count"]),
+    })
+    monkeypatch.setattr(png_batch, "_reuse_existing_ready", lambda *_args: {
+        "pipeline": ready,
+        "release_pool": {"disposition": "NOT_ENTERED", "readback_verified": False},
+        "pool_retryable_error": "candidate already has immutable READY evidence",
+    })
+
+    result = png_batch.run_png_batch(
+        str(job["job_id"]),
+        pipeline_runner=lambda **_args: pytest.fail("an existing READY source must not be solved again"),
+    )
+
+    item = result["job"]["items"][0]
+    assert item["status"] == "FAILED"
+    assert item["run_id"] == "original-ready-run"
+    assert item["reason"].startswith("READY_POOL_ENTRY_FAILED:")
+
+
 def test_interrupted_ready_recovery_orchestration_only_uses_isolated_gate_stubs(monkeypatch: pytest.MonkeyPatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as extensions
 
@@ -316,6 +393,91 @@ def test_existing_ready_reuse_orchestration_only_uses_isolated_gate_stubs(monkey
     assert reused is not None
     assert reused["pipeline"]["run_id"] == "already-ready"
     assert reused["release_pool"]["readback_verified"] is True
+
+
+def test_existing_ready_pool_reentry_failure_is_returned_without_solver_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    source_id = "owner-upload-" + "d" * 64
+    pipeline = _ready_result(source_id, "already-ready-no-pool", {
+        "source_id": source_id, "activity_source_sha256": "d" * 64,
+        "activity_run_id": "activity-existing-ready-no-pool", "column_count": 4,
+    })
+    restored = {
+        "state": "READY", "source_sha256": "d" * 64,
+        "candidate_id": pipeline["candidate_id"], "owner_review_status": {}, "pipeline": pipeline,
+    }
+    monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: restored)
+    monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
+    monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda *_args, **_kwargs: {
+        "disposition": "NOT_ENTERED", "readback_verified": False, "reason": "immutable exact read-back failed",
+    })
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda *_args: True)
+    monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
+    monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: pytest.fail("failed pool proof must not be treated as a reuse miss"))
+
+    outcome = png_batch._reuse_existing_ready(
+        {"settings": {}},
+        {"source_id": source_id, "source_sha256": "d" * 64, "source_record_sha256": "e" * 64, "column_count": 4},
+    )
+
+    assert outcome is not None
+    assert outcome["pipeline"]["run_id"] == "already-ready-no-pool"
+    assert outcome["pool_retryable_error"] == "immutable exact read-back failed"
+    assert outcome["release_pool"]["readback_verified"] is False
+
+
+def test_pool_reentry_returns_existing_exact_row_without_rewriting_immutable_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.supply_pipeline import release_pool
+
+    candidate_id = "candidate-idempotent-pool"
+    pipeline = {"run_id": "pipeline-idempotent", "candidate_id": candidate_id,
+                "disposition": "READY", "primary": {"state": "READY"}}
+    existing_entry = {"candidate_id": candidate_id, "pipeline_run_id": pipeline["run_id"],
+                      "entry_digest": "verified-digest", "eligibility_source": "READY_AUTO"}
+
+    class PipelineDirectory:
+        def glob(self, _pattern: str) -> list[str]:
+            return ["pipeline-idempotent.json"]
+
+    class ExtensionRoot:
+        def __truediv__(self, child: str) -> PipelineDirectory:
+            assert child == "pipelines"
+            return PipelineDirectory()
+
+    monkeypatch.setattr(extensions, "extensions_root", lambda: ExtensionRoot())
+    monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [existing_entry])
+    monkeypatch.setattr(release_pool, "enter_release_pool", lambda *_args, **_kwargs: pytest.fail("immutable existing row must not be rewritten"))
+
+    result = extensions._enter_candidate_release_pool(
+        {"candidate_id": candidate_id, "artwork_sha256": "a" * 64}, pipeline=pipeline,
+    )
+
+    assert result["readback_verified"] is True
+    assert result["entry_digest"] == "verified-digest"
+    assert result["disposition"] == "ALREADY_IN_RELEASE_POOL"
+
+
+def test_candidate_filtered_release_pool_read_scans_only_that_candidate(monkeypatch: pytest.MonkeyPatch) -> None:
+    from scrubbots_pixel_factory.supply_pipeline import release_pool
+
+    observed: list[str] = []
+
+    class PoolRoot:
+        def exists(self) -> bool:
+            return True
+
+        def glob(self, pattern: str) -> list[Path]:
+            observed.append(pattern)
+            return []
+
+    monkeypatch.setattr(release_pool, "_pool_root", lambda: PoolRoot())
+    candidate_id = "candidate-owner-" + "a" * 48
+
+    assert release_pool.release_entries(candidate_id) == []
+    assert observed == [f"{candidate_id}-*.json"]
 
 
 def test_150_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

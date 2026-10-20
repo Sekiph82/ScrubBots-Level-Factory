@@ -413,7 +413,7 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     monkeypatch.setattr(extensions, "_read_json", lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
     from scrubbots_pixel_factory.supply_pipeline import release_pool
 
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [pool_row])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [pool_row])
     candidate = {"candidate_id": "candidate-exact"}
 
     assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
@@ -434,9 +434,9 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
         pool_row, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8")).hexdigest()
     (pool_root / "entry.json").write_text(json.dumps(pool_row), encoding="utf-8")
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [pool_row])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [pool_row])
     assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [])
     assert not png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
 
 
@@ -554,4 +554,13 @@ def test_batch_ui_does_not_gate_on_selected_thumbnail_preflight() -> None:
     assert "_dispatch_png_batch_job(_batch_job_id, _batch_import_id)" in run_batch
     assert '"expected_batch_id": batch_id' in dispatch
     assert "BATCH_JOB_SOURCE_MISMATCH" in run_batch
+
+
+def test_batch_ui_follows_active_item_and_its_pipeline_activity_stream() -> None:
+    source = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    follow = source.split("func _sync_verified_batch_follow(job: Dictionary) -> void:", 1)[1].split("func _complete_png_batch", 1)[0]
+    assert 'str(item.get("activity_run_id", ""))' in follow
+    assert "studio-pipeline-activity" in follow
+    assert 'status", "")) in ["VERIFYING_EXISTING", "RUNNING"]' in source
+    assert "if _batch_worker_active:" in source
 

@@ -117,6 +117,10 @@ var _pipeline_thread: Thread
 var _pipeline_mutex := Mutex.new()
 var _pipeline_worker_done := false
 var _pipeline_worker_result: Dictionary = {}
+var _batch_worker_active := false
+var _studio_cancel_marker_path := ""
+var _studio_cancel_previous_environment := ""
+var _shutdown_requested := false
 var _activity_file_path := ""
 var _activity_stream_reader_override: Object
 var _activity_run_id := ""
@@ -223,7 +227,50 @@ func _process(_delta: float) -> void:
 	if completed and not _pipeline_thread.is_alive():
 		_pipeline_thread.wait_to_finish()
 		_pipeline_thread = null
+		_finish_worker_cancel_marker()
 		_complete_level_pipeline(result)
+		if _shutdown_requested:
+			get_tree().quit()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if _operation_running and _pipeline_thread != null:
+			_shutdown_requested = true
+			_signal_worker_cancel_marker()
+			if not _batch_job_id.is_empty():
+				_request_batch_control("CANCEL_NOW")
+			_activity_message = "Closing after the active Python and game solver processes stop."
+			_activity_stage = "CANCELLING"
+			_refresh_activity_header()
+			return
+		get_tree().quit()
+
+
+func _prepare_worker_cancel_marker() -> void:
+	if not _studio_cancel_marker_path.is_empty():
+		_finish_worker_cancel_marker()
+	_studio_cancel_marker_path = ProjectSettings.globalize_path("res://output/.studio-cancel-%d.flag" % Time.get_ticks_usec())
+	_studio_cancel_previous_environment = OS.get_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE")
+	OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_marker_path)
+
+
+func _signal_worker_cancel_marker() -> void:
+	if _studio_cancel_marker_path.is_empty():
+		return
+	var marker := FileAccess.open(_studio_cancel_marker_path, FileAccess.WRITE)
+	if marker != null:
+		marker.store_string("CANCEL_NOW\n")
+		marker.close()
+
+
+func _finish_worker_cancel_marker() -> void:
+	if not _studio_cancel_marker_path.is_empty():
+		OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_previous_environment)
+	if not _studio_cancel_marker_path.is_empty() and FileAccess.file_exists(_studio_cancel_marker_path):
+		DirAccess.remove_absolute(_studio_cancel_marker_path)
+	_studio_cancel_marker_path = ""
+	_studio_cancel_previous_environment = ""
 
 
 func _capture_responsive_layout() -> void:
@@ -2170,10 +2217,12 @@ func _run_single_level_pipeline() -> void:
 	_pipeline_worker_done = false
 	_pipeline_worker_result.clear()
 	_pipeline_mutex.unlock()
+	_prepare_worker_cancel_marker()
 	_pipeline_thread = Thread.new()
 	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
 	if thread_error != OK:
 		_pipeline_thread = null
+		_finish_worker_cancel_marker()
 		_complete_local_pipeline_failure("Pipeline worker could not start.")
 		return
 	_activity_message = "Waiting for the first backend stage."
@@ -2271,12 +2320,15 @@ func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
 	_pipeline_worker_done = false
 	_pipeline_worker_result.clear()
 	_pipeline_mutex.unlock()
+	_prepare_worker_cancel_marker()
 	_pipeline_thread = Thread.new()
 	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
 	if thread_error != OK:
 		_pipeline_thread = null
+		_finish_worker_cancel_marker()
 		_report("PNG batch worker could not start.")
 		return
+	_batch_worker_active = true
 	_operation_running = true
 	for control_name in ["SolveAgain", "AcceptLevel", "RejectLevel"]:
 		var guarded := get_node_or_null(control_name) as Button
@@ -2315,7 +2367,7 @@ func _request_batch_control(action: String) -> void:
 	if str(result.get("state", "")) != "SUCCESS":
 		_report("Batch control request failed: %s" % str(result.get("error", "UNAVAILABLE")))
 	else:
-		_activity_message = "Pause/stop requested after the current source finishes."
+		_activity_message = "Batch cancellation requested; stopping the active game solver." if action == "CANCEL_NOW" else "Pause/stop requested after the current source finishes."
 		_refresh_activity_header()
 
 
@@ -2366,6 +2418,12 @@ func _batch_follow_index(job: Dictionary) -> int:
 	if items.is_empty():
 		return -1
 	var current: Variant = job.get("current_index")
+	if current is int and current >= 0 and current < items.size() and items[current] is Dictionary:
+		if str(items[current].get("status", "")) in ["VERIFYING_EXISTING", "RUNNING"]:
+			return current
+	for index in range(items.size()):
+		if items[index] is Dictionary and str(items[index].get("status", "")) in ["VERIFYING_EXISTING", "RUNNING"]:
+			return index
 	if current is int and current >= 0 and current < items.size():
 		return current
 	for index in range(items.size() - 1, -1, -1):
@@ -2459,22 +2517,26 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 		return
 	var job_state := str(job.get("state", ""))
 	var token := "%s|%d|%s|%s|%s|%d|%s|%s|%s" % [str(job.get("job_id", "")), item_index, source_id, source_sha, attempt_id, column_count, str(item.get("status", "")), str(item.get("run_id", "")), job_state]
-	if token == _batch_follow_token:
+	if token == _batch_follow_token and _activity_source_id == source_id and _selected_import_source_id == source_id:
 		_batch_follow_item = item.duplicate(true)
 		return
 	if _activity_source_id != source_id:
 		_clear_activity_rows()
-		_activity_run_id = ""
-		_activity_file_path = ""
-		_activity_source_sha256 = ""
+	var item_activity_id := str(item.get("activity_run_id", ""))
+	if _activity_source_id != source_id or _activity_run_id != item_activity_id:
+		_activity_run_id = item_activity_id
+		_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(item_activity_id + ".jsonl") if not item_activity_id.is_empty() else ""
+		_activity_source_sha256 = source_sha
 		_activity_stream_reader_override = null
-		_activity_started_msec = 0
+		_activity_started_msec = Time.get_ticks_msec() if not item_activity_id.is_empty() else 0
 		_activity_finished_msec = 0
 		_activity_event_backend_disposition = ""
 		_activity_read_offset = 0
 		_activity_seen_sequence = 0
 		_activity_pending_bytes.clear()
 		_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+		if not item_activity_id.is_empty():
+			_clear_activity_rows()
 	# Commit all source-facing regions from one exact persisted job item.
 	_batch_follow_token = token
 	_batch_follow_item = item.duplicate(true)
@@ -2518,6 +2580,7 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 
 func _complete_png_batch(result: Dictionary) -> void:
 	_operation_running = false
+	_batch_worker_active = false
 	_activity_finished_msec = Time.get_ticks_msec()
 	if str(result.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH":
 		_batch_job_source_mismatch = true
@@ -2858,7 +2921,7 @@ func _complete_local_pipeline_failure(reason: String) -> void:
 
 
 func _complete_level_pipeline(result: Dictionary) -> void:
-	if not _batch_job_id.is_empty() and _activity_run_id.is_empty():
+	if _batch_worker_active:
 		_complete_png_batch(result)
 		return
 	var completed_source_id := str(result.get("source_id", ""))

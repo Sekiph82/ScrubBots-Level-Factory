@@ -13,8 +13,10 @@ $relativePaths = @(
     'level_factory/scripts/factory_studio_exact_ui.gd',
     'src/scrubbots_pixel_factory/png_batch.py',
     'src/scrubbots_pixel_factory/studio_extensions.py',
-    'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py'
+    'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )
+$authorizedOverlayAdditions = @('src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py')
 
 function Get-Sha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -58,10 +60,14 @@ foreach ($entry in @($manifest.managedFiles)) {
     if ($managed.ContainsKey([string]$entry.path)) { throw "Duplicate managed path: $($entry.path)" }
     $managed[[string]$entry.path] = $entry
 }
+$overlayAdditions = @()
 $plan = @()
 foreach ($relative in $relativePaths) {
-    if (@($manifest.overlayPaths) -cnotcontains $relative) { throw "Installed overlay allowlist does not include: $relative" }
     if (-not $managed.ContainsKey($relative)) { throw "Manifest does not own the managed target: $relative" }
+    if (@($manifest.overlayPaths) -cnotcontains $relative) {
+        if ($relative -cnotin $authorizedOverlayAdditions) { throw "Installed overlay allowlist does not include: $relative" }
+        $overlayAdditions += $relative
+    }
     $source = Join-Path $repoRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))
     $target = Join-Path $runtimeRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))
     if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "Source or installed target is missing: $relative" }
@@ -88,11 +94,12 @@ if ($Apply -and $active.Count -gt 0) {
     sourceHead = $head
     runtimeRoot = $runtimeRoot
     activeRuntimeProcesses = @($active | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name } })
+    overlayAllowlistAdditions = $overlayAdditions
     plannedFiles = $plan
     unchangedFiles = @($relativePaths | Where-Object { $_ -notin @($plan.path) })
 } | ConvertTo-Json -Depth 8
 
-if (-not $Apply -or $plan.Count -eq 0) { return }
+if (-not $Apply -or ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0)) { return }
 
 $transactionRoot = Join-Path $runtimeRoot ('.lf-scoped-overlay-' + [Guid]::NewGuid().ToString('N'))
 if (-not $transactionRoot.StartsWith($runtimeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Transaction path escaped the installed runtime.' }
@@ -124,6 +131,7 @@ try {
         files = $receiptFiles
         installedAtUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
     }
+    $manifest.overlayPaths = @($manifest.overlayPaths) + @($overlayAdditions)
     $manifest.overlayReceipts = @($manifest.overlayReceipts) + @($receipt)
     $manifestStage = Join-Path $transactionRoot '.factory-studio-install-manifest.json'
     $manifestBackup = Join-Path $transactionRoot 'backup-manifest.json'

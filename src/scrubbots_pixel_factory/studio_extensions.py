@@ -523,7 +523,15 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
     if not runs:
         return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "ACCEPT recorded, but no READY canonical ZIP run with official Difficulty V1 evidence exists."}
     run = pipeline if isinstance(pipeline, Mapping) else max(runs, key=lambda value: str(value.get("created_at", "")))
-    from .supply_pipeline.release_pool import ReleaseError, enter_release_pool
+    from .supply_pipeline.release_pool import ReleaseError, enter_release_pool, release_entries
+    try:
+        existing = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")))
+                         if entry.get("pipeline_run_id") == run.get("run_id")), None)
+    except (ReleaseError, OSError, ValueError) as exc:
+        return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
+    if existing is not None:
+        return {**existing, "disposition": "ALREADY_IN_RELEASE_POOL", "pipeline_run_id": run["run_id"],
+                "publication": "RELEASE_POOL_ONLY", "readback_verified": True}
     try:
         review = _latest_review(str(candidate["candidate_id"]), str(candidate["artwork_sha256"]))
         if review is not None and review.get("disposition") == "REJECT":
@@ -533,7 +541,8 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
         return {"disposition": "NOT_ENTERED", "reason": str(exc)[:512], "pipeline_run_id": run["run_id"]}
     from .supply_pipeline.release_pool import release_entries
     try:
-        exact = next((entry for entry in release_entries() if entry.get("candidate_id") == candidate.get("candidate_id") and entry.get("pipeline_run_id") == run.get("run_id")), None)
+        exact = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")))
+                      if entry.get("pipeline_run_id") == run.get("run_id")), None)
     except (ReleaseError, OSError, ValueError) as exc:
         return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
     if exact is None or exact.get("entry_digest") != pooled.get("entry_digest"):

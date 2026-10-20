@@ -560,7 +560,16 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
-    for path in sorted(_pool_root().glob("*.json")) if _pool_root().exists() else ():
+    root = _pool_root()
+    if not root.exists():
+        paths = ()
+    elif candidate_id_filter and re.fullmatch(r"[A-Za-z0-9_-]+", candidate_id_filter):
+        # Entry filenames begin with the canonical candidate id. A filtered
+        # read must not revalidate every other candidate's pipeline and assets.
+        paths = sorted(root.glob(f"{candidate_id_filter}-*.json"))
+    else:
+        paths = sorted(root.glob("*.json"))
+    for path in paths:
         value = _json(path)
         expected = value.pop("entry_digest", None)
         actual = _hash(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())

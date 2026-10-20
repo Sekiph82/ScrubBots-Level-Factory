@@ -93,6 +93,7 @@ class ScrubBotsSolver:
         native_solve_started = False
         native_solve_completed = False
         native_solve_status = None
+        cancelled = False
         process_env = None
         if attested_runtime:
             process_env = os.environ.copy()
@@ -132,6 +133,38 @@ class ScrubBotsSolver:
             except (OSError, UnicodeError) as exc:
                 reader_error.append(str(exc)[:256])
 
+        def studio_cancel_requested():
+            marker_path = os.environ.get("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", "").strip()
+            if marker_path and Path(marker_path).is_file():
+                return True
+            control_path = os.environ.get("SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE", "").strip()
+            if not control_path:
+                return False
+            try:
+                control = json.loads(Path(control_path).read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                return False
+            return control.get("action") == "CANCEL_NOW"
+
+        def terminate_solver_tree(process):
+            if os.name == "nt":
+                taskkill = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "taskkill.exe"
+                if taskkill.is_file():
+                    try:
+                        subprocess.run([str(taskkill), "/PID", str(process.pid), "/T", "/F"],
+                                       capture_output=True, text=True, timeout=5,
+                                       creationflags=NO_WINDOW, check=False)
+                        process.wait(timeout=5)
+                        return
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+            process.terminate()
+            try:
+                process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+
         flags = NO_WINDOW
         if attested_runtime and os.name == "nt":
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
@@ -152,6 +185,10 @@ class ScrubBotsSolver:
             timed_out = False
             output_overflow = False
             while p.poll() is None:
+                if studio_cancel_requested():
+                    cancelled = True
+                    terminate_solver_tree(p)
+                    break
                 if hard_timeout and time.monotonic() - start >= hard_timeout:
                     timed_out = True
                     p.terminate()
@@ -196,13 +233,15 @@ class ScrubBotsSolver:
             "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME" if attested_runtime else "CONFIGURED_GAME_PROJECT",
             "timeout_seconds": hard_timeout or None, "elapsed_seconds": elapsed_seconds,
             "process_exit_code": exit_code, "process_pid": p.pid if p is not None else None,
-            "timed_out": timed_out, "native_solve_started": native_solve_started,
+            "timed_out": timed_out, "cancelled": cancelled, "native_solve_started": native_solve_started,
             "native_solve_completed": native_solve_completed, "native_solve_status": native_solve_status,
             "stdout_bytes": output_bytes, "stdout_tail": list(tail),
             "request_sha256": request_sha256, "plan_sha256": plan_sha256,
             "response_sha256": None, "job_path": str(work),
         }
         self._write_runner_receipt(work, telemetry)
+        if cancelled:
+            raise SolverBridgeError("Studio batch cancellation stopped the active canonical game solver.", telemetry)
         if timed_out:
             raise SolverBridgeError(
                 f"bounded Godot solver timed out after {hard_timeout:.1f}s; job retained at {work}", telemetry

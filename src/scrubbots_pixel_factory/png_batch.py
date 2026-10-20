@@ -323,8 +323,8 @@ def _pool_row_matches(run: Mapping[str, Any], candidate: Mapping[str, Any], sour
     run_id = run.get("run_id")
     candidate_id = candidate.get("candidate_id")
     try:
-        entries = release_entries()
-        entry = next((row for row in entries if row.get("candidate_id") == candidate_id and row.get("pipeline_run_id") == run_id), None)
+        entries = release_entries(str(candidate_id))
+        entry = next((row for row in entries if row.get("pipeline_run_id") == run_id), None)
         if entry is None:
             return False
         if entry.get("source_id", source_id) != source_id or entry.get("column_count", expected_columns) != expected_columns:
@@ -691,7 +691,7 @@ def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
 
 
 def png_batch_control(job_id: str, action: str) -> dict[str, Any]:
-    if action not in {"PAUSE_AFTER_CURRENT", "STOP_AFTER_CURRENT"}:
+    if action not in {"PAUSE_AFTER_CURRENT", "STOP_AFTER_CURRENT", "CANCEL_NOW"}:
         raise ValueError("batch control action is not supported")
     job = _read_job(job_id)
     if job.get("state") in {"COMPLETE", "STOPPED"}:
@@ -797,16 +797,46 @@ def _reuse_existing_ready(job: Mapping[str, Any], item: Mapping[str, Any]) -> di
             or not _verify_column_artifacts(pipeline, columns)):
         return None
     candidate_id = str(restored.get("candidate_id", ""))
-    candidate = next((row for row in list_candidates() if row.get("candidate_id") == candidate_id), None)
+    try:
+        candidate = next((row for row in list_candidates() if row.get("candidate_id") == candidate_id), None)
+    except Exception as exc:
+        return {
+            "pipeline": pipeline,
+            "release_pool": {"disposition": "NOT_ENTERED", "readback_verified": False},
+            "pool_retryable_error": f"Candidate read-back failed: {str(exc)[:320]}",
+        }
     if candidate is None:
-        return None
+        return {
+            "pipeline": pipeline,
+            "release_pool": {"disposition": "NOT_ENTERED", "readback_verified": False},
+            "pool_retryable_error": "READY pipeline references a candidate missing from canonical candidate read-back.",
+        }
     if not _candidate_has_source_lineage(candidate, source_id, str(item.get("source_sha256", ""))):
         return None
-    if not _pool_row_matches(pipeline, candidate, source_id, columns):
-        return None
-    pool = _enter_candidate_release_pool(candidate, pipeline=pipeline)
+    try:
+        pool = _enter_candidate_release_pool(candidate, pipeline=pipeline)
+    except Exception as exc:
+        pool = {"disposition": "NOT_ENTERED", "readback_verified": False, "reason": str(exc)[:400]}
     if not pool.get("readback_verified"):
-        raise ValueError("existing READY source has no exact READY_AUTO Release Pool readback")
+        return {
+            "pipeline": pipeline,
+            "release_pool": pool,
+            "pool_retryable_error": str(pool.get("reason") or "Release Pool did not confirm the exact READY_AUTO candidate/run row.")[:400],
+        }
+    try:
+        matches_pool = _pool_row_matches(pipeline, candidate, source_id, columns)
+    except Exception as exc:
+        return {
+            "pipeline": pipeline,
+            "release_pool": pool,
+            "pool_retryable_error": f"Release Pool row verification failed: {str(exc)[:320]}",
+        }
+    if not matches_pool:
+        return {
+            "pipeline": pipeline,
+            "release_pool": pool,
+            "pool_retryable_error": "Release Pool read-back did not match this READY source identity and selected column count.",
+        }
     return {"pipeline": pipeline, "release_pool": pool}
 
 
@@ -842,7 +872,7 @@ def run_png_batch(
                 continue
             action = _control_action(job_id)
             if action:
-                job["state"] = "PAUSED" if action == "PAUSE_AFTER_CURRENT" else "STOPPED"
+                job["state"] = "PAUSED" if action == "PAUSE_AFTER_CURRENT" else "INTERRUPTED" if action == "CANCEL_NOW" else "STOPPED"
                 job["current_index"] = None
                 job["updated_at"] = _now()
                 _clear_control(job_id)
@@ -893,6 +923,21 @@ def run_png_batch(
             except Exception as exc:
                 reused = None
                 item["existing_ready_check_error"] = str(exc)[:400]
+            if reused is not None and reused.get("pool_retryable_error"):
+                pipeline = reused.get("pipeline", {})
+                item.update({
+                    "status": "FAILED",
+                    "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None,
+                    "candidate_id": pipeline.get("candidate_id") if isinstance(pipeline, Mapping) else None,
+                    "release_pool": reused.get("release_pool", {}),
+                    "reason": f"READY_POOL_ENTRY_FAILED: {reused['pool_retryable_error']}",
+                    "finished_at": _now(),
+                })
+                job["counts"] = _counts(job["items"])
+                job["current_index"] = None
+                job["updated_at"] = _now()
+                job = _write_job(job)
+                continue
             if reused is not None and reused.get("rejected"):
                 item.update({"status": "REJECTED", "reason": str(reused.get("reason", "SOURCE_CANDIDATE_IS_OWNER_REJECTED")), "finished_at": _now()})
                 job["counts"] = _counts(job["items"])
@@ -938,7 +983,24 @@ def run_png_batch(
                 "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 90)), 90),
             })
             try:
-                pipeline = runner(source_id=str(item["source_id"]), request=request)
+                control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"
+                previous_control_file = os.environ.get(control_env)
+                os.environ[control_env] = str(_control_path(job_id))
+                try:
+                    pipeline = runner(source_id=str(item["source_id"]), request=request)
+                finally:
+                    if previous_control_file is None:
+                        os.environ.pop(control_env, None)
+                    else:
+                        os.environ[control_env] = previous_control_file
+                if _control_action(job_id) == "CANCEL_NOW":
+                    job["state"] = "INTERRUPTED"
+                    job["current_index"] = item_index
+                    job["counts"] = _counts(job["items"])
+                    job["updated_at"] = _now()
+                    _clear_control(job_id)
+                    job = _write_job(job)
+                    return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
                 primary = pipeline.get("primary", {}) if isinstance(pipeline, Mapping) else {}
                 pool = pipeline.get("release_pool", {}) if isinstance(pipeline, Mapping) else {}
                 ready = (
@@ -946,14 +1008,24 @@ def run_png_batch(
                         pipeline, str(item["source_id"]), expected_columns=int(item["column_count"]),
                         source_record_sha256=str(item["source_record_sha256"]), job=job, item=item)
                     and _verify_column_artifacts(pipeline, int(item["column_count"]))
-                    and pool.get("readback_verified") is True
                 )
-                if ready:
+                if ready and pool.get("readback_verified") is True:
                     item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": primary.get("files", {}), "release_pool": pool, "finished_at": _now()})
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
+                elif ready:
+                    pool_reason = str(pool.get("reason") or pool.get("disposition") or "Release Pool did not confirm the exact READY_AUTO candidate/run row.")
+                    item.update({"status": "FAILED", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "release_pool": pool, "reason": f"READY_POOL_ENTRY_FAILED: {pool_reason[:400]}", "finished_at": _now()})
                 else:
                     item.update({"status": "FAILED", "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None, "reason": str(pipeline.get("error", pipeline.get("reason", pipeline.get("disposition", "CANONICAL_READY_PROOF_MISSING"))) if isinstance(pipeline, Mapping) else "CANONICAL_PIPELINE_RETURNED_NO_RESULT")[:512], "finished_at": _now()})
             except Exception as exc:
+                if _control_action(job_id) == "CANCEL_NOW":
+                    job["state"] = "INTERRUPTED"
+                    job["current_index"] = item_index
+                    job["counts"] = _counts(job["items"])
+                    job["updated_at"] = _now()
+                    _clear_control(job_id)
+                    job = _write_job(job)
+                    return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
                 item.update({"status": "FAILED", "reason": str(exc)[:512], "finished_at": _now()})
             job["current_index"] = None
             job["counts"] = _counts(job["items"])
