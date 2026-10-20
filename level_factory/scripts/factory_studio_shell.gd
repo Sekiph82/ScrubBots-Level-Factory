@@ -31,11 +31,10 @@ func _ready() -> void:
 
 
 func _apply_native_window_icon() -> void:
-	if OS.get_name() != "Windows" or not DisplayServer.has_feature(DisplayServer.FEATURE_NATIVE_ICON):
-		return
-	var icon_path := ProjectSettings.globalize_path("res://assets/icons/ScrubBots_Factory_Studio.ico")
-	if FileAccess.file_exists(icon_path):
-		DisplayServer.set_native_icon(icon_path)
+	var icon_path := ProjectSettings.globalize_path("res://assets/icons/ScrubBots_Factory_Studio_256.png")
+	var icon := Image.load_from_file(icon_path)
+	if icon != null and not icon.is_empty():
+		DisplayServer.window_set_icon(icon)
 
 
 func _get_configuration_warnings() -> PackedStringArray:

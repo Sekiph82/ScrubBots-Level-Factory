@@ -8,6 +8,11 @@ config_version=5
 config/name="ScrubBots Factory Studio"
 config/icon="res://assets/icons/ScrubBots_Factory_Studio_256.png"
 config/windows_native_icon="res://assets/icons/ScrubBots_Factory_Studio.ico"
+boot_splash/image="res://assets/icons/ScrubBots_Factory_Studio_256.png"
+boot_splash/bg_color=Color(0.0431373, 0.0705882, 0.12549, 1)
+boot_splash/fullsize=false
+boot_splash/show_image=true
+boot_splash/use_filter=true
 run/main_scene="res://scenes/factory_studio.tscn"
 
 [display]

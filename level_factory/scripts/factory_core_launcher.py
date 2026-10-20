@@ -316,7 +316,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.canonical_cost_center(request.get("scope"), request.get("provider"))
         elif operation == "release-pool":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
-            payload = {"state": "READY", "pool_size": len(release_entries()), "entries": release_entries()}
+            entries = release_entries()
+            payload = {"state": "READY", "pool_size": len(entries), "entries": entries}
         elif operation == "semantic-generate":
             payload = _semantic_generate(request)
         elif operation == "provider-options":

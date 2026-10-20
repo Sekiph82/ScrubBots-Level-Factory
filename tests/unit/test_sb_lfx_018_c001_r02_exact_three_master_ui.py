@@ -53,6 +53,12 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
     index = (root / "docs/product/visual-masters/FACTORY_STUDIO_VISUAL_MASTER_INDEX_V01.md").read_text(encoding="utf-8")
 
     assert '"PIXEL ART"' in source and '"LEVEL FACTORY"' in source and '"RELEASE POOL"' in source
+    assert all(name not in source for name in ("NativeMinimize", "NativeMaximize", "NativeClose"))
+    project = (root / "level_factory/project.godot").read_text(encoding="utf-8")
+    shell = (root / "level_factory/scripts/factory_studio_shell.gd").read_text(encoding="utf-8")
+    assert 'boot_splash/image="res://assets/icons/ScrubBots_Factory_Studio_256.png"' in project
+    assert 'config/windows_native_icon="res://assets/icons/ScrubBots_Factory_Studio.ico"' in project
+    assert "DisplayServer.window_set_icon(icon)" in shell
     assert "FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png" in scene
     assert "FACTORY_STUDIO_LEVEL_FACTORY_MASTER_V01.png" in scene
     assert "FACTORY_STUDIO_RELEASE_POOL_MASTER_V01.png" in scene

@@ -109,7 +109,7 @@ def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_so
     single = UI.split("func _on_file_selected", 1)[1].split("func _on_files_selected", 1)[0]
     multiple = UI.split("func _on_files_selected", 1)[1].split("func _set_generation_mode", 1)[0]
     imported = UI.split("func _import_pngs", 1)[1].split("func _show_import_results", 1)[0]
-    csv = UI.split("func _process_level_csv", 1)[1].split("func _minimize_window", 1)[0]
+    csv = UI.split("func _process_level_csv", 1)[1].split("func _on_file_selected", 1)[0]
     assert "_import_pngs([path])" in single
     assert "_import_pngs(Array(paths))" in multiple
     assert '"batch-import", {"paths": paths}' in imported

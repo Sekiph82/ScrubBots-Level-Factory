@@ -117,6 +117,13 @@ var _pipeline_thread: Thread
 var _pipeline_mutex := Mutex.new()
 var _pipeline_worker_done := false
 var _pipeline_worker_result: Dictionary = {}
+var _studio_read_thread: Thread
+var _studio_read_mutex := Mutex.new()
+var _studio_read_done := false
+var _studio_read_result: Dictionary = {}
+var _studio_read_context: Dictionary = {}
+var _studio_read_queue: Array[Dictionary] = []
+var _selection_restore_token := ""
 var _batch_worker_active := false
 var _studio_cancel_marker_path := ""
 var _studio_cancel_previous_environment := ""
@@ -213,6 +220,11 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_poll_studio_read_extension()
+	_start_next_studio_read_extension()
+	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null:
+		get_tree().quit()
+		return
 	if not _batch_job_id.is_empty() and not _batch_job_source_mismatch:
 		_refresh_batch_progress()
 	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
@@ -235,6 +247,13 @@ func _process(_delta: float) -> void:
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if _studio_read_thread != null:
+			_shutdown_requested = true
+			_studio_read_queue.clear()
+			_activity_message = "Closing after the active local read finishes."
+			_activity_stage = "CLOSING"
+			_refresh_activity_header()
+			return
 		if _operation_running and _pipeline_thread != null:
 			_shutdown_requested = true
 			_signal_worker_cancel_marker()
@@ -635,7 +654,7 @@ func _control_style(fill: Color, border: Color) -> StyleBoxFlat:
 func _control_caption(control_name: String) -> String:
 	var captions := {
 		"PixelArtTab": "PIXEL ART", "LevelFactoryTab": "LEVEL FACTORY", "ReleasePoolTab": "RELEASE POOL",
-		"SettingsGear": "Settings", "NativeMinimize": "−", "NativeMaximize": "□", "NativeClose": "×",
+		"SettingsGear": "Settings",
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
 		"GenerationPrompt": "Prompt", "RandomSeed": "↻", "GenerationStyle": "Style: %s" % _generation_style,
@@ -1498,9 +1517,6 @@ func _build_master_controls() -> void:
 	_place_control("LevelFactoryTab", Rect2(633, 22, 270, 72), _show_screen.bind("LEVEL FACTORY"))
 	_place_control("ReleasePoolTab", Rect2(918, 22, 270, 72), _show_screen.bind("RELEASE POOL"))
 	_place_control("SettingsGear", Rect2(1320, 15, 55, 60), _open_settings)
-	_place_control("NativeMinimize", Rect2(1376, 14, 44, 42), _minimize_window)
-	_place_control("NativeMaximize", Rect2(1428, 14, 44, 42), _toggle_window_mode)
-	_place_control("NativeClose", Rect2(1477, 14, 48, 42), _close_window)
 	# PIXEL ART actions and Batch-CSV path.
 	_place_control("GeneratePixelArt", Rect2(27, 558, 334, 49), _generate_art)
 	_place_control("BatchCsvSelect", Rect2(199, 155, 161, 43), _open_batch_csv)
@@ -1720,10 +1736,10 @@ func _show_screen(name: String) -> void:
 func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
-	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "NativeMinimize", "NativeMaximize", "NativeClose", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
+	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
 	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "RandomSeed", "GenerationStyle", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
-	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp", "NativeMinimize", "NativeMaximize", "NativeClose"]
+	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
 	if _screen == "PIXEL ART":
@@ -1824,19 +1840,6 @@ func _process_level_csv(path: String) -> void:
 			failed += 1
 	file.close()
 	_report("Batch pipeline: %d READY · %d failed" % [ready, failed])
-
-
-func _minimize_window() -> void:
-	get_window().mode = Window.MODE_MINIMIZED
-
-
-func _toggle_window_mode() -> void:
-	var window := get_window()
-	window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_MAXIMIZED else Window.MODE_MAXIMIZED
-
-
-func _close_window() -> void:
-	get_tree().quit()
 
 
 func _on_file_selected(path: String) -> void:
@@ -2372,10 +2375,15 @@ func _request_batch_control(action: String) -> void:
 
 
 func _refresh_batch_progress() -> void:
-	if _batch_job_id.is_empty() or not _batch_job_matches_loaded_sources() or Time.get_ticks_msec() - _batch_last_read_msec < 750:
+	if _batch_job_id.is_empty() or not _batch_job_matches_loaded_sources() or Time.get_ticks_msec() - _batch_last_read_msec < 2500:
 		return
 	_batch_last_read_msec = Time.get_ticks_msec()
-	var verified := _extension("png-batch-latest", {"batch_id": _batch_import_id})
+	_queue_studio_read_extension("png-batch-latest", {"batch_id": _batch_import_id}, {"kind": "batch-latest", "job_id": _batch_job_id})
+
+
+func _apply_batch_progress_result(verified: Dictionary, expected_job_id: String) -> void:
+	if expected_job_id != _batch_job_id:
+		return
 	if str(verified.get("disposition", "")) != "MATCHED":
 		if str(verified.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH":
 			_batch_job_source_mismatch = true
@@ -2423,6 +2431,12 @@ func _batch_follow_index(job: Dictionary) -> int:
 			return current
 	for index in range(items.size()):
 		if items[index] is Dictionary and str(items[index].get("status", "")) in ["VERIFYING_EXISTING", "RUNNING"]:
+			return index
+	# When idle or between item hand-offs, keep the preview on the next source
+	# that Resume will actually process, rather than pinning the last completed
+	# thumbnail (often 002) while the queue advances elsewhere.
+	for index in range(items.size()):
+		if items[index] is Dictionary and str(items[index].get("status", "")) in ["QUEUED", "RETRYABLE", "INCONCLUSIVE"]:
 			return index
 	if current is int and current >= 0 and current < items.size():
 		return current
@@ -2496,15 +2510,17 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	var attempt_id := "" if attempt_value == null else str(attempt_value)
 	var index_value: Variant = item.get("index", -1)
 	var column_value: Variant = item.get("column_count")
+	var item_state := str(item.get("status", ""))
 	if typeof(index_value) != TYPE_INT or int(index_value) != item_index:
 		return
 	if typeof(column_value) != TYPE_INT or int(column_value) not in [3, 4, 5]:
 		return
 	var column_count := int(column_value)
 	var reused_ready := str(item.get("status", "")) == "READY" and bool(item.get("reused_existing_ready", false)) and not str(item.get("run_id", "")).is_empty()
+	var queued_source := item_state in ["QUEUED", "RETRYABLE", "INCONCLUSIVE"]
 	if (str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
 			or source_id.trim_prefix("owner-upload-") != source_sha
-			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready) or column_count not in [3, 4, 5]):
+			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready and not queued_source) or column_count not in [3, 4, 5]):
 		return
 	var source_index := _gameplay_source_index(source_id)
 	if source_index < 0:
@@ -2550,7 +2566,6 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_imported_window_start = clampi(source_index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
 	_activity_source_id = source_id
 	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
-	var item_state := str(item.get("status", ""))
 	var visible_item_state := job_state if item_state == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else item_state
 	_activity_stage = "RUNNING" if _operation_running and job_state == "RUNNING" else visible_item_state if not visible_item_state.is_empty() else job_state
 	_activity_backend_disposition = _activity_stage
@@ -2559,20 +2574,10 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_preview_paths_by_screen["LEVEL FACTORY"] = path
 	_load_selected_art_preview(path, "LEVEL FACTORY")
 	if item_state == "READY" and not str(item.get("run_id", "")).is_empty():
-		var restored := _extension("restore-source-run-readonly", {"source_id": source_id, "game_project": _pinned_game_project_path()})
-		var pipeline: Dictionary = restored.get("pipeline", {})
-		var request: Dictionary = pipeline.get("request", {})
-		var saved_run_id := str(restored.get("run_id", pipeline.get("run_id", "")))
-		if (str(restored.get("state", "")) == "READY"
-				and str(restored.get("source_sha256", "")) == source_sha
-				and str(request.get("source_id", "")) == source_id
-				and int(request.get("column_count", 0)) == column_count
-				and str(pipeline.get("run_id", saved_run_id)) == str(item.get("run_id", ""))):
-			pipeline["source_id"] = source_id
-			_batch_follow_pipeline = pipeline.duplicate(true)
-			_last_pipeline = pipeline.duplicate(true)
-			var review: Dictionary = restored.get("owner_review_status", {})
-			_owner_review_status = str(review.get("pool_state", review.get("disposition", ""))) if not review.is_empty() else str(item.get("release_pool", {}).get("disposition", ""))
+		_queue_studio_read_extension("restore-source-run-readonly", {"source_id": source_id, "game_project": _pinned_game_project_path()}, {
+			"kind": "restore-batch-run", "token": token, "source_id": source_id, "source_sha256": source_sha,
+			"column_count": column_count, "run_id": str(item.get("run_id", "")),
+		})
 	_refresh_activity_header()
 	_refresh_runtime_cards()
 	_refresh_live_data()
@@ -2996,7 +3001,8 @@ func _review_candidate(disposition: String) -> void:
 		_report("Owner review requires the selected PNG's completed canonical READY run.")
 		return
 	var result := _extension("owner-review", {"candidate_id": _last_candidate_id, "disposition": disposition})
-	_refresh_release_pool(false)
+	_release_pool = _extension("release-pool", {})
+	_apply_release_projection()
 	var publication: Dictionary = result.get("publication", {})
 	var exact_readback := false
 	var candidate_in_pool := false
@@ -3017,12 +3023,145 @@ func _review_candidate(disposition: String) -> void:
 func _refresh_release_pool(show_status: bool = true) -> void:
 	if show_status:
 		_append_release_pool_activity("REFRESH POOL", "STARTED", "read-only Release Pool projection", _selected_release_ids)
-	_release_pool = _extension("release-pool", {})
+	_queue_studio_read_extension("release-pool", {}, {"kind": "release-pool", "show_status": show_status})
 	_apply_release_projection()
-	if show_status:
-		var entries: Array = _release_pool.get("entries", [])
-		_append_release_pool_activity("REFRESH POOL", str(_release_pool.get("state", _release_pool.get("disposition", "UNAVAILABLE"))), "entries=%d; visible after filters=%d" % [entries.size(), _visible_release_ids.size()], _selected_release_ids)
-		_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
+
+
+func _queue_studio_read_extension(operation: String, request: Dictionary, context: Dictionary) -> void:
+	if _gateway == null or not _gateway.has_method("prepare_studio_extension_call"):
+		return
+	var context_key := str(context.get("kind", ""))
+	var context_identity := context_key
+	if context_key in ["restore-batch-run", "restore-selected-source"]:
+		context_identity += "|" + str(context.get("token", ""))
+	if context_key == "batch-latest" and str(context.get("job_id", "")) != _batch_job_id:
+		return
+	var active_identity := str(_studio_read_context.get("kind", ""))
+	if active_identity in ["restore-batch-run", "restore-selected-source"]:
+		active_identity += "|" + str(_studio_read_context.get("token", ""))
+	if active_identity == context_identity:
+		return
+	for queued in _studio_read_queue:
+		var queued_context: Dictionary = queued.get("context", {})
+		var queued_identity := str(queued_context.get("kind", ""))
+		if queued_identity in ["restore-batch-run", "restore-selected-source"]:
+			queued_identity += "|" + str(queued_context.get("token", ""))
+		if queued_identity == context_identity:
+			return
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", operation, request)
+	if not prepared.is_empty():
+		_studio_read_queue.append({"prepared": prepared, "context": context.duplicate(true)})
+
+
+func _start_next_studio_read_extension() -> void:
+	if _studio_read_thread != null or _studio_read_queue.is_empty():
+		return
+	var queued: Dictionary = _studio_read_queue.pop_front()
+	_studio_read_mutex.lock()
+	_studio_read_done = false
+	_studio_read_result.clear()
+	_studio_read_context = queued.get("context", {}).duplicate(true)
+	_studio_read_mutex.unlock()
+	_studio_read_thread = Thread.new()
+	var error := _studio_read_thread.start(Callable(self, "_studio_read_extension_worker").bind(queued.get("prepared", {})))
+	if error != OK:
+		_studio_read_thread = null
+		_studio_read_mutex.lock()
+		_studio_read_context.clear()
+		_studio_read_mutex.unlock()
+
+
+func _studio_read_extension_worker(prepared: Dictionary) -> void:
+	var result: Dictionary = _gateway.call("execute_prepared_studio_extension_call", prepared)
+	_studio_read_mutex.lock()
+	_studio_read_result = result
+	_studio_read_done = true
+	_studio_read_mutex.unlock()
+
+
+func _poll_studio_read_extension() -> void:
+	if _studio_read_thread == null:
+		return
+	_studio_read_mutex.lock()
+	var completed := _studio_read_done
+	var result := _studio_read_result.duplicate(true) if completed else {}
+	var context := _studio_read_context.duplicate(true) if completed else {}
+	_studio_read_mutex.unlock()
+	if not completed or _studio_read_thread.is_alive():
+		return
+	_studio_read_thread.wait_to_finish()
+	_studio_read_thread = null
+	_studio_read_mutex.lock()
+	_studio_read_done = false
+	_studio_read_result.clear()
+	_studio_read_context.clear()
+	_studio_read_mutex.unlock()
+	var kind := str(context.get("kind", ""))
+	if kind == "batch-latest":
+		_apply_batch_progress_result(result, str(context.get("job_id", "")))
+	elif kind == "release-pool":
+		_release_pool = result
+		_apply_release_projection()
+		_refresh_live_data()
+		if bool(context.get("show_status", false)):
+			var entries: Array = _release_pool.get("entries", [])
+			_append_release_pool_activity("REFRESH POOL", str(_release_pool.get("state", _release_pool.get("disposition", "UNAVAILABLE"))), "entries=%d; visible after filters=%d" % [entries.size(), _visible_release_ids.size()], _selected_release_ids)
+			_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
+	elif kind == "restore-batch-run":
+		_apply_restored_batch_run(result, context)
+	elif kind == "restore-selected-source":
+		_apply_restored_selected_source(result, context)
+
+
+func _apply_restored_selected_source(restored: Dictionary, context: Dictionary) -> void:
+	if (str(context.get("token", "")) != _selection_restore_token
+			or str(context.get("source_id", "")) != _selected_import_source_id):
+		return
+	var source_id := str(context.get("source_id", ""))
+	var expected_sha := str(context.get("source_sha256", ""))
+	var restored_source_run := false
+	if str(restored.get("state", "")) == "READY" and str(restored.get("source_sha256", "")) == expected_sha:
+		var restored_pipeline: Dictionary = restored.get("pipeline", {})
+		var restored_request: Dictionary = restored_pipeline.get("request", {})
+		if str(restored_request.get("source_id", "")) == source_id and str(restored_pipeline.get("disposition", "")) == "READY":
+			restored_pipeline["source_id"] = source_id
+			_last_pipeline = restored_pipeline
+			_last_candidate_id = str(restored.get("candidate_id", ""))
+			var restored_review: Dictionary = restored.get("owner_review_status", {})
+			if not restored_review.is_empty():
+				_owner_review_status = "%s · %s" % [str(restored_review.get("pool_state", "")), str(restored_review.get("reason", ""))]
+			_activity_stage = "RESTORED"
+			_activity_message = "Restored exact source-bound canonical READY result; no solver was run."
+			_activity_backend_disposition = "READY"
+			_activity_terminal_state = "READY"
+			_append_activity_row({"seq": 1, "elapsed_ms": 0, "stage": "RESTORED", "state": "READY", "message": _activity_message, "source_id": source_id})
+			restored_source_run = true
+	if not restored_source_run and bool(context.get("batch_scope_matches", false)):
+		_render_batch_item_results(_batch_snapshot, true)
+	_refresh_activity_header()
+	_refresh_runtime_cards()
+	_refresh_live_data()
+
+
+func _apply_restored_batch_run(restored: Dictionary, context: Dictionary) -> void:
+	if (str(context.get("token", "")) != _batch_follow_token
+			or str(context.get("source_id", "")) != _selected_import_source_id
+			or str(context.get("source_id", "")) != str(_batch_follow_item.get("source_id", ""))):
+		return
+	var pipeline: Dictionary = restored.get("pipeline", {})
+	var request: Dictionary = pipeline.get("request", {})
+	var saved_run_id := str(restored.get("run_id", pipeline.get("run_id", "")))
+	if (str(restored.get("state", "")) == "READY"
+			and str(restored.get("source_sha256", "")) == str(context.get("source_sha256", ""))
+			and str(request.get("source_id", "")) == str(context.get("source_id", ""))
+			and int(request.get("column_count", 0)) == int(context.get("column_count", 0))
+			and str(pipeline.get("run_id", saved_run_id)) == str(context.get("run_id", ""))):
+		pipeline["source_id"] = str(context.get("source_id", ""))
+		_batch_follow_pipeline = pipeline.duplicate(true)
+		_last_pipeline = pipeline.duplicate(true)
+		var review: Dictionary = restored.get("owner_review_status", {})
+		_owner_review_status = str(review.get("pool_state", review.get("disposition", ""))) if not review.is_empty() else str(_batch_follow_item.get("release_pool", {}).get("disposition", ""))
+		_refresh_live_data()
 
 
 func _select_first_release() -> void:
@@ -3329,29 +3468,16 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_preview_paths_by_screen["LEVEL FACTORY"] = _selected_art_path
 		_load_selected_art_preview(_selected_art_path, "LEVEL FACTORY")
 		_refresh_pinned_source_preflight()
-		var restored_source_run := false
-		var restored := _extension("restore-source-run-readonly", {
+		_selection_restore_token = "%s|%s|%d" % [source_id, str(imported.get("source_sha256", source_id.trim_prefix("owner-upload-"))), Time.get_ticks_usec()]
+		_queue_studio_read_extension("restore-source-run-readonly", {
 			"source_id": source_id,
 			"game_project": _pinned_game_project_path()
+		}, {
+			"kind": "restore-selected-source", "token": _selection_restore_token,
+			"source_id": source_id,
+			"source_sha256": str(imported.get("source_sha256", source_id.trim_prefix("owner-upload-"))),
+			"batch_scope_matches": batch_scope_matches,
 		})
-		if str(restored.get("state", "")) == "READY" and str(restored.get("source_sha256", "")) == source_id.trim_prefix("owner-upload-"):
-			var restored_pipeline: Dictionary = restored.get("pipeline", {})
-			var restored_request: Dictionary = restored_pipeline.get("request", {})
-			if str(restored_request.get("source_id", "")) == source_id and str(restored_pipeline.get("disposition", "")) == "READY":
-				restored_pipeline["source_id"] = source_id
-				_last_pipeline = restored_pipeline
-				_last_candidate_id = str(restored.get("candidate_id", ""))
-				var restored_review: Dictionary = restored.get("owner_review_status", {})
-				if not restored_review.is_empty():
-					_owner_review_status = "%s · %s" % [str(restored_review.get("pool_state", "")), str(restored_review.get("reason", ""))]
-				_activity_stage = "RESTORED"
-				_activity_message = "Restored exact source-bound canonical READY result; no solver was run."
-				_activity_backend_disposition = "READY"
-				_activity_terminal_state = "READY"
-				_append_activity_row({"seq": 1, "elapsed_ms": 0, "stage": "RESTORED", "state": "READY", "message": _activity_message, "source_id": source_id})
-				restored_source_run = true
-		if not restored_source_run and batch_scope_matches:
-			_render_batch_item_results(_batch_snapshot, true)
 		_refresh_activity_header()
 		_refresh_runtime_cards()
 		_refresh_live_data()

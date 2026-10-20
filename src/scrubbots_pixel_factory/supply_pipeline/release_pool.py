@@ -569,6 +569,13 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         paths = sorted(root.glob(f"{candidate_id_filter}-*.json"))
     else:
         paths = sorted(root.glob("*.json"))
+    # Candidate discovery is a full canonical projection. Build it once for the
+    # pool snapshot instead of repeating the same scan and validation for each
+    # immutable entry (which made larger pools scale quadratically).
+    current_candidates = {
+        str(item.get("candidate_id", "")): item
+        for item in studio.list_candidates()
+    } if paths else {}
     for path in paths:
         value = _json(path)
         expected = value.pop("entry_digest", None)
@@ -600,7 +607,7 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
                 or float(official.get("challengeScore")) != value.get("challenge_score")
                 or primary.get("difficulty", {}).get("class") != value.get("difficulty_class")):
             raise ReleaseError(f"Release Pool Difficulty V1 proof no longer matches its immutable pipeline: {path.name}")
-        current_candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)
+        current_candidate = current_candidates.get(candidate_id)
         if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
             # Keep stale immutable history on disk, but do not let one obsolete row
             # prevent independent, currently verified candidates from being listed.

@@ -10,7 +10,11 @@ $canonicalOrigin = 'https://github.com/Sekiph82/ScrubBots-Level-Factory.git'
 $runtimeRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\ScrubBots Factory Studio'
 $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
 $relativePaths = @(
+	'level_factory/scripts/factory_core_launcher.py',
     'level_factory/scripts/factory_studio_exact_ui.gd',
+	'level_factory/scripts/factory_studio_shell.gd',
+	'level_factory/scripts/factory_core_gateway.gd',
+	'level_factory/project.godot',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/png_batch.py',
     'src/scrubbots_pixel_factory/studio_extensions.py',
@@ -18,6 +22,9 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )
 $authorizedOverlayAdditions = @(
+	'level_factory/project.godot',
+	'level_factory/scripts/factory_studio_shell.gd',
+	'level_factory/scripts/factory_core_gateway.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )

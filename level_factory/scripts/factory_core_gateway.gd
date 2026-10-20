@@ -1,4 +1,3 @@
-class_name FactoryCoreGateway
 extends RefCounted
 
 ## Narrow local-process boundary for the canonical Python Factory Core.
