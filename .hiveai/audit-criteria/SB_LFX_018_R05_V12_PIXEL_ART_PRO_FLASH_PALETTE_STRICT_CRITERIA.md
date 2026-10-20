@@ -21,3 +21,10 @@ Execution authority: `.hiveai/prompts/SB_LFX_018_R05_V12_PIXEL_ART_PIXELLAB_PRO_
 12. **Required actual regression:** focused offline tests of the provider-option source, PIXEL ART UI, historical MAGNIFIC single/batch persistence readback, fail-closed `PROVIDER_RETIRED_MAGNIFIC`, no provider fallback or API request, PLUS existing owner-repaired 140-source STOPPED batch/READY/pool hash safety. Only claim PASS when exact implementation and installed Studio evidence exist.
 
 V12 previous no-paid-smoke, canonical palette V3, no broad Studio reinstall and no CI/PRODUCTION gates still apply.
+
+## V12 OWNER FOLLOW-UP: NATIVE TARGET_PALETTE / CREATOR UI EXACT HEX PROOF
+
+13. Test the exact canonical RGB hex **C01..C16 in order** against `data/palette/scrubbots_palette_v3.json` SHA-linked bytes; request payload `target_palette.colors` must contain those 16 values in order with `max_colors=12`. No attached older alternative palette accepted. No hardcoding a second source of truth. Test/mock this without sending a paid POST.
+14. PixelLab Creator GUI `Color palette (Beta) / Paste hex colours` is *separate* from the installed LF Pro Flash `target_palette` API. Browser field placement is PASS only with legitimate authenticated tab UI screenshot showing populated 16 color values (and `Max colours 12` if supported), no Generate action and no credit spend. If browser inaccessible, mark `CREATOR_PASTE_PENDING_OWNER` without claiming UI action occurred.
+15. User screenshot shows a web form that can accept pasted hex; it is NOT evidence that it has been filled with the game's canonical colors. Existing V12 product source already sends native `target_palette` from canonical source. Before any modification, verify that fact and the installed source SHA. If already correct, no installer/owner data mutation is permitted merely to satisfy browser paste request.
+16. Keep all existing paid-live-smoke, no CI, no production and no background batch rules. Report separate `LF_NATIVE_PALETTE_EXACT16_PASS` versus `PIXELLAB_CREATOR_WEB_PALETTE_PRESENT` (or `NOT_VERIFIED`) statuses.
