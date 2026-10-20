@@ -17,6 +17,12 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )
 $authorizedOverlayAdditions = @('src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py')
+# One exact installed solver variant was verified to be missing the Studio
+# cancel-marker/process-tree handling. Permit repairing only those measured
+# bytes; any other manifest mismatch remains a hard stop.
+$authorizedRepairHashes = @{
+    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py' = '57b6cf7ae679bf3b8c16b4d9ff8d0c3eb23ff3f4039c8d630c89fe19e3df0169'
+}
 
 function Get-Sha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -74,7 +80,12 @@ foreach ($relative in $relativePaths) {
     Assert-NoReparsePath $target
     $installedHash = Get-Sha256 $target
     $expectedInstalledHash = ([string]$managed[$relative].sha256).ToLowerInvariant()
-    if ($installedHash -cne $expectedInstalledHash) { throw "Installed managed file differs from manifest; preserved it: $relative" }
+    if ($installedHash -cne $expectedInstalledHash) {
+        $authorizedHash = [string]$authorizedRepairHashes[$relative]
+        if (-not $authorizedHash -or $installedHash -cne $authorizedHash) {
+            throw "Installed managed file differs from manifest; preserved it: $relative"
+        }
+    }
     $sourceHash = Get-Sha256 $source
     if ($installedHash -ceq $sourceHash) { continue }
     $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; priorSha256 = $installedHash; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
