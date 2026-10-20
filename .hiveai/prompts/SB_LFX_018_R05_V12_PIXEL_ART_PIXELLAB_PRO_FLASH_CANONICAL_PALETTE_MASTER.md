@@ -69,3 +69,40 @@ Final explicit status:
 8. For installation, **do not repeat the V11 broad installer**, reset scoped overlays or overwrite the current owner-repaired Studio. Only narrowly update authorized, manifest-safe managed files after actual installed baseline and normal app closure; otherwise BLOCK without corrupting the application. Never spend credits or start a batch as part of installation validation.
 
 **Scope rule:** This explicit owner override is part of the *same* `SB-LFX-018 R05 V12` master, **not** a new milestone, separate installer project or request for 700–800 automatic generations. All previous Pro Flash palette/credit/secret/no-CI/no-PRODUCTION restrictions remain in force.
+## V12 OWNER FOLLOW-UP 2026-10-20 20:12 +03 | EXACT HEX PASTE / PRO FLASH NATIVE PALETTE VERIFICATION
+
+**Owner supplied an actual Chrome screenshot of PixelLab Creator at `pixellab.ai/create?tool=create_image_pro_flash`.** In Pro Flash's left pane, `Color palette (Beta)` has `Paste hex colours` and a multiline field, and `Max colours` defaults to `No limit`. The owner explicitly instructs us to give Codex exact *canonical* HEX values and cause those values to be inserted for future Pro Flash image creation. This request does NOT authorize a billable Generate click. **Don't confuse browser Creator UI with local LF Pixel Art API flow**: HTML paste box is the website's manual interface; LF already has a native API `target_palette` field, which is the correct integrated equivalent.
+
+### EXACT paste-ready palette, in canonical C01 → C16 order
+
+```text
+#FF4500 #FFA800 #FFD635 #00CC78 #00CCC0 #51E9F4 #3690EA #2450A4 #6A5CFF #FF3881 #9C6926 #FFF8B8 #D4D7D9 #515252 #FFFFFF #000000
+```
+
+Source-of-truth: owner-locked `data/palette/scrubbots_palette_v3.json`, version3 blob SHA `51ff3cc14441731b39baff283c4289910dc4f256`. **Do not use the different old PixelLab experiment palette** beginning `#E94B4B #F28C3C`.
+
+The active production image may use **any 3–12 colors from these 16 allowed swatches**, not all 16 simultaneously. Thus `Max colours` in the browser should be set to **12** if that control allows it, despite the displayed full set of sixteen **allowed** input colors. Alpha must be 0 or 255, not a seventeenth RGB/background color. Keep transparency/VOID separate.
+
+### Reality check from the already published V12 implementation
+
+GitHub product main `08f1d2db02489a448a6a0fedf39a22c09ae5824a` contains `src/scrubbots_pixel_factory/studio_extensions.py` `generate_pro_flash_image`, with code:
+
+```python
+palette = [color.hex.upper() for color in CANONICAL_PALETTE.colors]
+body["target_palette"] = {
+    "colors": palette,
+    "name": "ScrubBots Palette V3",
+    "max_colors": PRO_FLASH_MAX_COLORS,  # 12
+}
+```
+
+This already passes **all 16 exact production hexes to native Pro Flash**, without manual HTML interaction. The Godot `PIXELLAB` selection already routes to `PRO_FLASH`. Existing tests `tests/unit/test_pixellab_pro_flash_v12.py` assert native `target_palette` shape. **Do not reimplement, rewire or reinstall anything merely to paste the same strings; first VERIFY the installed manifest points to those exact source files and the existing mock payload has all sixteen in order with max_colors=12.** Verify no stale instance executes previous PIXFLUX. The screenshot is evidence of the Creator UI capability, **not proof the owner-locked hexes were pasted there, or that a paid image was created**.
+
+### New exact Codex execution (NO CHARGE)
+
+1. READ-ONLY check actual LF GitHub/main palette JSON, product source `studio_extensions.py` Pro Flash payload, V12 focused test fixture, installed Release-manifest source hash, and existing PIXEL ART Pro Flash selection. Compare each 16 hex strings and order explicitly. If already correct, output `LF_PRO_FLASH_TARGET_PALETTE_EXACT16_ALREADY_WIRED_PASS` and **do not modify/install code, shortcut, owner batch, or Pool**. If mismatch, apply the **smallest safe** source/test correction and scoped install only with owner normal-close/rollback/manifest verification. Protect live 140-source STOPPED batch `27 READY /113 QUEUED`, all owner images.
+2. For the **separate PixelLab Creator website shown in screenshot**, when legitimately able to control the existing owner-authorized Chrome tab, set `Color palette (Beta)` → `Paste hex colours`, insert **exactly** the single paste-ready line above, set `Max colours` → `12` if available, and confirm 16 **allowed** palette swatches appear without other colors. **DO NOT CLICK GENERATE, do not buy credits, and do not create any image.** Capture a cropped screenshot of the populated browser controls for owner confirmation. Don't paste or log tokens. If Codex cannot legitimately access/control that browser UI, report `PIXELLAB_CREATOR_UI_NOT_ACCESSIBLE` and give owner the one-line exact clipboard value with explicit manual steps. **Do not bypass browser permissions, scrape cookies, inject scripts into private tabs, or use alternate executor to evade restrictions.**
+3. The LF Pixel Art app via native API **does not require this manual paste at all**; the API's `target_palette` should always be populated automatically on every PixelLab Pro Flash call and use `max_colors=12`. Check offline mocked payload against canonical JSON, not a paid call. Distinguish **browser control filled** from **application native palette verified** in final report.
+4. Append outcome to the existing M03 V12 builder log, publish only changes if genuinely needed, with GitHub local/remote parity. Report `CREATOR_PALETTE_PASTED_NO_GENERATION` only if webpage textbox actually filled and viewed; otherwise `CREATOR_PASTE_PENDING_OWNER`. State explicitly that no PixelLab credits were spent, no real image generated, no new source/release records created, no pending solver jobs restarted. V12 producer's credit-required first live smoke still **PENDING OWNER APPROVAL**.
+
+**Do not declare overall V12 palette generation behavior end-to-end PASS solely based on mocked payload or a webpage filled with hex codes.** Official PixelLab Creator palette control is labeled Beta, and final PNG exact pixel/alpha verification remains mandatory. No PROD or CI.
