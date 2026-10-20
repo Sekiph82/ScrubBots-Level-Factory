@@ -27,11 +27,12 @@ Zoom/grid/1:1/fit/carousel controls are presentation-only and never mutate canon
 
 ### Provider
 
-Visible Provider must offer, at minimum:
+**Effective active Pixel Art provider choices, owner override 2026-10-20:**
 
 - `ALPIX (Claude)`
-- `MAGNIFIC`
-- `PIXELLAB`
+- `PIXELLAB` (real `PRO_FLASH` engine)
+
+`MAGNIFIC` is retired from the visible Provider options and all active Pixel Art Generate/Regenerate/CSV selection paths because the owner's subscription and credits expired. Preserve historical MAGNIFIC artwork/jobs and provenance without mutating the owner's data. This newer decision supersedes the earlier V02 minimum-provider list without changing three-screen layout or other page functionality.
 
 The selected option must control the actual execution path.
 
@@ -47,11 +48,14 @@ Do not generate a hidden prompt plan or batch list.
 - no Anthropic API key / paid API fallback;
 - output one PNG at requested size.
 
-`MAGNIFIC` and `PIXELLAB`:
-- reuse their existing semantic provider adapters and current truthful execution contracts;
+`PIXELLAB` (Pro Flash):
+- implement the actual official provider invocation, not a label-only change or PIXFLUX fallback;
+- use canonical `data/palette/scrubbots_palette_v3.json` for the 16-color output validator;
 - do not duplicate provider logic;
-- do not fake direct execution if an adapter is prepare/import only;
+- fail closed if the Pro Flash API/token is unavailable;
 - preserve existing secret-handling rules.
+
+Historical `MAGNIFIC` is read-only provenance, not a selectable active Pixel Art provider; retired jobs/CSV rows fail closed without paid calls or implicit conversion.
 
 ### Batch / CSV
 
@@ -172,3 +176,7 @@ Every visible interactive control must have:
 - permanent test.
 
 A visually correct but inert control is FAIL.
+
+## 2026-10-20 Owner Override Scope
+
+The 2026-10-20 owner instruction removes MAGNIFIC only from active PIXEL ART provider choices. It does not authorize deleting stored MAGNIFIC source assets/jobs or the historical adapter, changing LEVEL FACTORY/RELEASE POOL, resetting the 140-PNG job, running provider calls, or reinstalling the owner-repaired Studio. V12 Pro Flash palette master is the current implementation authority for this specific provider change.
