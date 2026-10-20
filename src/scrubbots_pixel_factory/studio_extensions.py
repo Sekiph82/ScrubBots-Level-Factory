@@ -809,7 +809,35 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
     )
     quality = evaluate_grid(width, height, cells, policy=QualityPolicy())
     lineage = {"source_id": source_id, "source_sha256": validation["source_sha256"], "source_record": _owner_source_record_reference(source_png), "source_bytes_unchanged": True, "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"}
-    bundle_path = export_result(result, candidate_id, _repository_root() / "level_factory" / "output" / "studio-derived-candidates", quality_report=quality, generator_metadata={"namespace": "owner-upload", "data": {"source_lineage": lineage}})
+    destination = _repository_root() / "level_factory" / "output" / "studio-derived-candidates"
+    existing_path = destination / candidate_id
+    if existing_path.exists():
+        # Older immutable owner-upload bundles can predate the persisted
+        # classification projection. read_bundle verifies current source
+        # bytes, source-record identity, and logical cells without rewriting
+        # that legacy metadata. Reuse only an exact source-bound artifact.
+        try:
+            existing = read_bundle(existing_path)
+        except Exception as exc:
+            raise StudioExtensionError(f"existing owner-upload candidate bundle cannot be safely reused: {exc}") from exc
+        metadata = existing.metadata.get("generator_metadata", {})
+        payload = metadata.get("payload", {}) if isinstance(metadata, Mapping) else {}
+        data = payload.get("data", {}) if isinstance(payload, Mapping) else {}
+        existing_lineage = data.get("source_lineage", {}) if isinstance(data, Mapping) else {}
+        if (
+            existing.artwork.candidate_id != candidate_id
+            or (existing.artwork.width, existing.artwork.height) != (width, height)
+            or existing.artwork.cells != tuple(cells)
+            or not isinstance(existing_lineage, Mapping)
+            or existing_lineage.get("source_id") != source_id
+            or existing_lineage.get("source_sha256") != validation["source_sha256"]
+            or existing_lineage.get("source_record") != lineage["source_record"]
+            or existing_lineage.get("source_bytes_unchanged") is not True
+            or existing_lineage.get("derivation") != "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"
+        ):
+            raise StudioExtensionError("existing owner-upload candidate bundle conflicts with the exact verified source")
+        return candidate_id, existing_path
+    bundle_path = export_result(result, candidate_id, destination, quality_report=quality, generator_metadata={"namespace": "owner-upload", "data": {"source_lineage": lineage}})
     return candidate_id, bundle_path
 
 

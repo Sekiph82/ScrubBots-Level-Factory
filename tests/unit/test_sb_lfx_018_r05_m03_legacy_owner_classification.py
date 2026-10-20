@@ -41,3 +41,11 @@ def test_legacy_verified_owner_bundle_gets_read_only_classification_projection(
     assert classification["candidate_class"] == "PRODUCTION_CANDIDATE"
     assert classification["candidate_id"] == candidate_id
     assert metadata_path.read_bytes() == legacy_bytes
+
+    reused_id, reused_path = studio._derive_owner_candidate(
+        str(imported["source_id"]), validation,
+        studio._source_record_paths(str(imported["source_id"]))[1],
+    )
+    assert reused_id == candidate_id
+    assert reused_path == bundle_path
+    assert metadata_path.read_bytes() == legacy_bytes
