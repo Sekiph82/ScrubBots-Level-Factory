@@ -11,12 +11,16 @@ $runtimeRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\S
 $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
 $relativePaths = @(
     'level_factory/scripts/factory_studio_exact_ui.gd',
+    'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/png_batch.py',
     'src/scrubbots_pixel_factory/studio_extensions.py',
     'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
 )
-$authorizedOverlayAdditions = @('src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py')
+$authorizedOverlayAdditions = @(
+    'src/scrubbots_pixel_factory/output/bundle.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
+)
 # One exact installed solver variant was verified to be missing the Studio
 # cancel-marker/process-tree handling. Permit repairing only those measured
 # bytes; any other manifest mismatch remains a hard stop.
