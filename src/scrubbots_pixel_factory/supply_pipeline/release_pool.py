@@ -580,6 +580,20 @@ def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: A
     return latest
 
 
+def _cached_latest_review(
+    candidate_id: str,
+    candidate: Mapping[str, Any],
+    cache: dict[str, dict[str, Any] | None],
+    studio: Any,
+) -> dict[str, Any] | None:
+    """Validate a candidate's immutable review chain at most once per pool snapshot."""
+
+    if candidate_id not in cache:
+        chain, _invalid_reviews = studio._validated_review_chain(candidate)
+        cache[candidate_id] = chain[-1] if chain else None
+    return cache[candidate_id]
+
+
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
@@ -601,6 +615,7 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
     } if paths else {}
     pipeline_paths = (studio.extensions_root() / "pipelines").glob("*.json") if paths else ()
     latest_ready_by_candidate = _latest_ready_pipeline_index(pipeline_paths, studio)
+    latest_review_by_candidate: dict[str, dict[str, Any] | None] = {}
     for path in paths:
         value = _json(path)
         expected = value.pop("entry_digest", None)
@@ -610,7 +625,14 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         candidate_id = str(value.get("candidate_id", ""))
         if candidate_id_filter is not None and candidate_id != candidate_id_filter:
             continue
-        latest = studio._latest_review(candidate_id)
+        current_candidate = current_candidates.get(candidate_id)
+        if (current_candidate is None
+                or current_candidate.get("artwork_sha256") != value.get("artwork_sha256")
+                or current_candidate.get("grid_hash") != value.get("grid_hash")):
+            # Keep stale immutable history on disk, but do not spend time
+            # validating its review chain when its current bundle is absent.
+            continue
+        latest = _cached_latest_review(candidate_id, current_candidate, latest_review_by_candidate, studio)
         if latest and latest.get("disposition") == "REJECT":
             continue
         if not _eligibility_matches_current_review(value, latest):
@@ -632,11 +654,6 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
                 or float(official.get("challengeScore")) != value.get("challenge_score")
                 or primary.get("difficulty", {}).get("class") != value.get("difficulty_class")):
             raise ReleaseError(f"Release Pool Difficulty V1 proof no longer matches its immutable pipeline: {path.name}")
-        current_candidate = current_candidates.get(candidate_id)
-        if current_candidate is None or current_candidate.get("artwork_sha256") != value.get("artwork_sha256") or current_candidate.get("grid_hash") != value.get("grid_hash"):
-            # Keep stale immutable history on disk, but do not let one obsolete row
-            # prevent independent, currently verified candidates from being listed.
-            continue
         # Existing pre-classification entries remain read-only historical evidence.
         # Newly created entries always carry classification and must revalidate it.
         if value.get("candidate_classification") is not None:

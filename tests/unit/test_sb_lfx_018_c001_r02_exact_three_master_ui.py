@@ -123,3 +123,24 @@ def test_release_pool_indexes_latest_ready_runs_in_one_pass() -> None:
     assert studio.reads == ["old", "new", "other"]
     assert index["candidate-a"]["run_id"] == "run-new"
     assert "candidate-b" not in index
+
+
+def test_release_pool_validates_each_candidate_review_chain_once_per_snapshot() -> None:
+    class FakeStudioExtensions:
+        def __init__(self) -> None:
+            self.validations = 0
+            self.review = {"candidate_id": "candidate-a", "disposition": "ACCEPT"}
+
+        def _validated_review_chain(self, candidate: dict[str, object]) -> tuple[list[dict[str, str]], list[str]]:
+            self.validations += 1
+            return [self.review], []
+
+    studio = FakeStudioExtensions()
+    candidate = {"candidate_id": "candidate-a", "artwork_sha256": "a" * 64, "grid_hash": "b" * 64}
+    cache: dict[str, dict[str, object] | None] = {}
+
+    first = release_pool._cached_latest_review("candidate-a", candidate, cache, studio)
+    second = release_pool._cached_latest_review("candidate-a", candidate, cache, studio)
+
+    assert first == second == studio.review
+    assert studio.validations == 1
