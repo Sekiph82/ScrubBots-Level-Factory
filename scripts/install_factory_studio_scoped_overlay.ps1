@@ -38,6 +38,9 @@ $authorizedOverlayAdditions = @(
 # bytes; any other manifest mismatch remains a hard stop.
 $authorizedRepairHashes = @{
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py' = '57b6cf7ae679bf3b8c16b4d9ff8d0c3eb23ff3f4039c8d630c89fe19e3df0169'
+    # This exact installed variant differs from the published optimizer only
+    # in retaining the old 90-second defaults; restore the approved 240 cap.
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py' = '798fc4848b35bf1a866e900e5343a641ac9ad97f3100f53b09b743bfd18bc62b'
 }
 
 function Get-Sha256([string]$Path) {
