@@ -98,3 +98,28 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
     with Image.open(binary) as image:
         assert image.format == "PNG"
         assert image.size == (1536, 1024)
+
+
+def test_release_pool_indexes_latest_ready_runs_in_one_pass() -> None:
+    class FakeStudioExtensions:
+        class StudioExtensionError(ValueError):
+            pass
+
+        def __init__(self) -> None:
+            self.reads: list[str] = []
+            self.records = {
+                "old": {"candidate_id": "candidate-a", "run_id": "run-old", "disposition": "READY", "created_at": "2026-01-01", "primary": {"state": "READY"}},
+                "new": {"candidate_id": "candidate-a", "run_id": "run-new", "disposition": "READY", "created_at": "2026-02-01", "primary": {"state": "READY"}},
+                "other": {"candidate_id": "candidate-b", "run_id": "run-failed", "disposition": "FAILED", "created_at": "2026-03-01", "primary": {"state": "FAILED"}},
+            }
+
+        def _read_json(self, path: str) -> dict[str, object]:
+            self.reads.append(path)
+            return self.records[path]
+
+    studio = FakeStudioExtensions()
+    index = release_pool._latest_ready_pipeline_index(["old", "new", "other"], studio)
+
+    assert studio.reads == ["old", "new", "other"]
+    assert index["candidate-a"]["run_id"] == "run-new"
+    assert "candidate-b" not in index

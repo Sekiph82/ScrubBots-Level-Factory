@@ -7,7 +7,7 @@ import json
 import math
 import re
 import subprocess
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -557,6 +557,29 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     return {"disposition": "ENTERED_RELEASE_POOL", "candidate_id": candidate["candidate_id"], "entry_digest": payload["entry_digest"], "pool_size": len(list(_pool_root().glob("*.json")))}
 
 
+def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: Any) -> dict[str, dict[str, Any]]:
+    """Read one canonical pipeline snapshot and retain each candidate's newest READY run."""
+
+    latest: dict[str, dict[str, Any]] = {}
+    for path in pipeline_paths:
+        try:
+            pipeline = studio._read_json(path)
+        except (studio.StudioExtensionError, OSError):
+            continue
+        primary = pipeline.get("primary", {})
+        if (pipeline.get("disposition") != "READY"
+                or not isinstance(primary, Mapping)
+                or primary.get("state") != "READY"):
+            continue
+        candidate_id = str(pipeline.get("candidate_id", ""))
+        if not candidate_id:
+            continue
+        current = latest.get(candidate_id)
+        if current is None or str(pipeline.get("created_at", "")) > str(current.get("created_at", "")):
+            latest[candidate_id] = pipeline
+    return latest
+
+
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
@@ -576,6 +599,8 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         str(item.get("candidate_id", "")): item
         for item in studio.list_candidates()
     } if paths else {}
+    pipeline_paths = (studio.extensions_root() / "pipelines").glob("*.json") if paths else ()
+    latest_ready_by_candidate = _latest_ready_pipeline_index(pipeline_paths, studio)
     for path in paths:
         value = _json(path)
         expected = value.pop("entry_digest", None)
@@ -590,7 +615,7 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
             continue
         if not _eligibility_matches_current_review(value, latest):
             continue
-        current_run = studio._latest_ready_pipeline(candidate_id)
+        current_run = latest_ready_by_candidate.get(candidate_id)
         if current_run is None or current_run.get("run_id") != value.get("pipeline_run_id"):
             continue
         pipeline_path = studio._pipeline_path(str(value.get("pipeline_run_id", "")))
