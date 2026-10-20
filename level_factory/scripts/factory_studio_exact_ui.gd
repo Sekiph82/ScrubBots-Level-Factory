@@ -2515,16 +2515,18 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	var index_value: Variant = item.get("index", -1)
 	var column_value: Variant = item.get("column_count")
 	var item_state := str(item.get("status", ""))
-	if typeof(index_value) != TYPE_INT or int(index_value) != item_index:
+	if typeof(index_value) not in [TYPE_INT, TYPE_FLOAT] or int(index_value) != item_index or float(index_value) != float(item_index):
 		return
-	if typeof(column_value) != TYPE_INT or int(column_value) not in [3, 4, 5]:
+	if typeof(column_value) not in [TYPE_INT, TYPE_FLOAT]:
 		return
 	var column_count := int(column_value)
+	if float(column_value) != float(column_count) or column_count not in [3, 4, 5]:
+		return
 	var reused_ready := str(item.get("status", "")) == "READY" and bool(item.get("reused_existing_ready", false)) and not str(item.get("run_id", "")).is_empty()
 	var queued_source := item_state in ["QUEUED", "RETRYABLE", "INCONCLUSIVE"]
 	if (str(item.get("job_id", job.get("job_id", ""))) != str(job.get("job_id", ""))
 			or source_id.trim_prefix("owner-upload-") != source_sha
-			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready and not queued_source) or column_count not in [3, 4, 5]):
+			or record_sha.length() != 64 or (attempt_id.is_empty() and not reused_ready and not queued_source)):
 		return
 	var source_index := _gameplay_source_index(source_id)
 	if source_index < 0:

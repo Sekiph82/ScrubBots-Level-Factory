@@ -18,6 +18,12 @@ class ReadOnlyGateway extends RefCounted:
 			return restored_run.duplicate(true)
 		return {"state": "UNAVAILABLE", "reason": "R07 dashboard suite uses a read-only fake gateway."}
 
+	func prepare_studio_extension_call(operation: String, request: Dictionary = {}) -> Dictionary:
+		return {"operation": operation, "request": request.duplicate(true)}
+
+	func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
+		return run_studio_extension(str(prepared.get("operation", "")), prepared.get("request", {}))
+
 
 var _errors: Array[String] = []
 
@@ -297,6 +303,8 @@ func _run_suite() -> void:
 			fake_items.append(fake)
 		var source_order := (ui.get("_gameplay_sources") as Array).duplicate(true)
 		_check(source_order.size() == 9, "nine immutable PNG sources did not populate the five-slot gallery fixture")
+		source_order.reverse()
+		ui.set("_gameplay_sources", source_order)
 		ui.set("_batch_job_id", "r07-nine-source-transition-fixture")
 		ui.set("_batch_import_id", "batch-r07-nine-source-fixture")
 		ui.set("_batch_composite_snapshot", {"items": composite_items})
@@ -321,7 +329,12 @@ func _run_suite() -> void:
 			_check(active_button.text.contains("●"), "nine-source transition %d did not highlight the active thumbnail" % active_index)
 			var tooltip_identity := active_button.tooltip_text.replace("\n", "").replace("\r", "")
 			_check(tooltip_identity.contains(active_id), "nine-source transition %d thumbnail is bound to another source ID" % active_index)
-			_check(str((ui.get("_preview_paths_by_screen") as Dictionary).get("LEVEL FACTORY", "")) == str((ui.get("_gameplay_sources") as Array)[active_index].get("path", "")), "nine-source transition %d preview is bound to another source" % active_index)
+			var active_source_path := ""
+			for loaded_source_variant in (ui.get("_gameplay_sources") as Array):
+				if loaded_source_variant is Dictionary and str(loaded_source_variant.get("source_id", "")) == active_id:
+					active_source_path = str(loaded_source_variant.get("path", ""))
+					break
+			_check(str((ui.get("_preview_paths_by_screen") as Dictionary).get("LEVEL FACTORY", "")) == active_source_path, "nine-source transition %d preview is bound to another source" % active_index)
 			_check(str((ui.get("_details_rows") as Array)[0].text).contains("Columns %d" % int(fake_items[active_index].get("column_count", 0))), "nine-source transition %d Details do not show the assigned columns" % active_index)
 			_check(str(ui.get("_activity_stage")) == "RUNNING", "nine-source transition %d Activity does not show its live status" % active_index)
 			if active_index == 4:
@@ -331,6 +344,9 @@ func _run_suite() -> void:
 				ready_item["release_pool"] = {"disposition": "INCLUDED"}
 				var ready_snapshot := live_snapshot.duplicate(true)
 				ready_snapshot["items"] = fake_items.duplicate(true)
+				for ready_neighbor_index in range(fake_items.size()):
+					if ready_neighbor_index != active_index:
+						ready_snapshot["items"][ready_neighbor_index]["status"] = "FAILED"
 				ready_snapshot["items"][active_index] = ready_item
 				ready_snapshot["current_index"] = active_index
 				var ready_column_count := int(ready_item.get("column_count", 0))
@@ -342,6 +358,10 @@ func _run_suite() -> void:
 				}
 				ui.set("_batch_snapshot", ready_snapshot.duplicate(true))
 				ui.call("_sync_verified_batch_follow", ready_snapshot)
+				for read_poll in range(120):
+					await process_frame
+					if not (ui.get("_batch_follow_pipeline") as Dictionary).is_empty():
+						break
 				var ready_details: Array = ui.get("_details_rows")
 				_check(str(ready_details[2].text).contains("SOLVED") and str(ready_details[2].text).contains("WIN"), "authenticated READY item did not bind solver and replay facts to its source")
 				_check(str(ready_details[3].text).contains("V1") and str(ready_details[3].text).contains("INCLUDED"), "authenticated READY item did not bind Difficulty and Pool facts to its source")
@@ -376,6 +396,10 @@ func _run_suite() -> void:
 	_check((ui.get("_release_activity_events") as Array).any(func(event: Dictionary) -> bool: return str(event.get("state", "")).contains("STATUS ONLY")), "status-only action was not recorded in session activity")
 	_check((ui.get("_release_activity_events") as Array).any(func(event: Dictionary) -> bool: return str(event.get("action", "")).contains("PREVIEW MANIFEST") and str(event.get("state", "")) == "BLOCKED"), "missing-preflight manifest preview was not blocked and logged")
 
+	for read_cleanup_poll in range(300):
+		if ui.get("_studio_read_thread") == null and (ui.get("_studio_read_queue") as Array).is_empty():
+			break
+		await process_frame
 	ui.queue_free()
 	await process_frame
 	if _errors.is_empty():
