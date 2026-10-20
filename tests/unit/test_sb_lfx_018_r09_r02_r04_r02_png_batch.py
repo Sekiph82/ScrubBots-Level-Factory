@@ -395,6 +395,57 @@ def test_existing_ready_reuse_orchestration_only_uses_isolated_gate_stubs(monkey
     assert reused["release_pool"]["readback_verified"] is True
 
 
+def test_existing_batch_run_uses_exact_proof_fast_path_without_history_scan(monkeypatch: pytest.MonkeyPatch) -> None:
+    import hashlib
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    source_id = "owner-upload-" + "b" * 64
+    source_bytes = b"unchanged owner source bytes"
+    record_bytes = b"unchanged owner source record"
+    source_sha = hashlib.sha256(source_bytes).hexdigest()
+    record_sha = hashlib.sha256(record_bytes).hexdigest()
+    columns = 3
+    pipeline = _ready_result(source_id, "pipeline-existing-exact", {
+        "source_id": source_id, "activity_source_sha256": source_sha,
+        "activity_source_record_sha256": record_sha,
+        "activity_run_id": "activity-existing-exact", "column_count": columns,
+        "png_batch_job_id": "png-batch-existing-exact", "png_batch_item_index": 7,
+        "png_batch_attempt_id": "attempt-existing-exact",
+    })
+    candidate_id = pipeline["candidate_id"]
+
+    class ReadBytes:
+        def __init__(self, payload: bytes) -> None:
+            self.payload = payload
+
+        def read_bytes(self) -> bytes:
+            return self.payload
+
+    job = {"job_id": "png-batch-existing-exact", "settings": {}}
+    item = {
+        "index": 7, "attempt_id": "attempt-existing-exact",
+        "activity_run_id": "activity-existing-exact", "source_id": source_id,
+        "source_sha256": source_sha, "source_record_sha256": record_sha,
+        "column_count": columns, "run_id": pipeline["run_id"],
+    }
+    monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
+    monkeypatch.setattr(extensions, "_pipeline_path", lambda _run_id: object())
+    monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args: (ReadBytes(record_bytes), ReadBytes(source_bytes)))
+    monkeypatch.setattr(extensions, "_latest_ready_pipeline", lambda _candidate_id: pipeline)
+    monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: pytest.fail("exact READY item must not scan history"))
+    monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": candidate_id}])
+    monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda *_args, **_kwargs: {"readback_verified": True})
+    monkeypatch.setattr(png_batch, "_has_ready_pipeline_proof", lambda run, source, **kwargs: run is pipeline and source == source_id and kwargs.get("job") is job and kwargs.get("item") is item)
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda run, count: run is pipeline and count == columns)
+    monkeypatch.setattr(png_batch, "_candidate_has_source_lineage", lambda *_args: True)
+    monkeypatch.setattr(png_batch, "_pool_row_matches", lambda *_args: True)
+
+    reused = png_batch._reuse_existing_ready(job, item)
+
+    assert reused is not None
+    assert reused["pipeline"] is pipeline
+
+
 def test_existing_ready_pool_reentry_failure_is_returned_without_solver_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
     from scrubbots_pixel_factory import studio_extensions as extensions
 

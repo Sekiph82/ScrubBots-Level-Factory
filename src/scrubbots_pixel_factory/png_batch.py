@@ -776,24 +776,61 @@ def _recover_attempt(job: Mapping[str, Any], item: Mapping[str, Any]) -> dict[st
 
 def _reuse_existing_ready(job: Mapping[str, Any], item: Mapping[str, Any]) -> dict[str, Any] | None:
     """Reuse only a read-back-ready source run whose artifacts and Pool proof verify."""
-    from .studio_extensions import _enter_candidate_release_pool, list_candidates, restore_source_run
-
-    restored = restore_source_run(
-        str(item["source_id"]),
-        game_project=job.get("settings", {}).get("game_project"),
-        source_directory=job.get("settings", {}).get("source_directory"),
+    from .studio_extensions import (
+        _enter_candidate_release_pool, _latest_ready_pipeline, _pipeline_path,
+        _read_json, _source_record_paths, list_candidates, restore_source_run,
     )
+
+    source_id = str(item["source_id"])
+    source_sha256 = str(item.get("source_sha256", ""))
+    source_record_sha256 = str(item.get("source_record_sha256", ""))
+    columns = int(item.get("column_count", 0))
+    restored: dict[str, Any] | None = None
+    run_id = item.get("run_id")
+    if isinstance(run_id, str) and run_id.startswith("pipeline-"):
+        try:
+            exact_run = _read_json(_pipeline_path(run_id))
+            exact_candidate_id = str(exact_run.get("candidate_id", ""))
+            record_path, source_path = _source_record_paths(
+                source_id, job.get("settings", {}).get("source_directory")
+            )
+            source_unchanged = (
+                hashlib.sha256(record_path.read_bytes()).hexdigest() == source_record_sha256
+                and hashlib.sha256(source_path.read_bytes()).hexdigest() == source_sha256
+            )
+            latest = _latest_ready_pipeline(exact_candidate_id) if exact_candidate_id else None
+            if (
+                source_unchanged
+                and latest is not None and latest.get("run_id") == run_id
+                and _has_ready_pipeline_proof(
+                    exact_run, source_id, expected_columns=columns,
+                    source_record_sha256=source_record_sha256,
+                    job=job, item=item,
+                )
+                and _verify_column_artifacts(exact_run, columns)
+            ):
+                restored = {
+                    "state": "READY", "source_id": source_id,
+                    "source_sha256": source_sha256, "candidate_id": exact_candidate_id,
+                    "pipeline": exact_run,
+                }
+        except (OSError, ValueError, TypeError, KeyError):
+            restored = None
+    if restored is None:
+        restored = restore_source_run(
+            source_id,
+            game_project=job.get("settings", {}).get("game_project"),
+            source_directory=job.get("settings", {}).get("source_directory"),
+        )
     if restored.get("state") != "READY" or restored.get("source_sha256") != item.get("source_sha256"):
         return None
     if restored.get("owner_review_status", {}).get("pool_state") == "EXCLUDED_FROM_RELEASE_POOL":
         return {"rejected": True, "reason": "SOURCE_CANDIDATE_IS_OWNER_REJECTED"}
     pipeline = restored.get("pipeline", {})
-    source_id = str(item.get("source_id", ""))
-    columns = int(item.get("column_count", 0))
-    source_record_sha = str(item.get("source_record_sha256", ""))
+    source_record_sha = source_record_sha256
     if (not _has_ready_pipeline_proof(
             pipeline, source_id, expected_columns=columns,
-            source_record_sha256=source_record_sha, item=item)
+            source_record_sha256=source_record_sha, job=job, item=item)
             or not _verify_column_artifacts(pipeline, columns)):
         return None
     candidate_id = str(restored.get("candidate_id", ""))
