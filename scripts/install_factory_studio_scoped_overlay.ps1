@@ -174,7 +174,7 @@ $active = @($processState.active)
 $gateResult = Assert-ScopedInstallApplyGates -ManifestDrift $manifestDrift -Apply:$Apply -ProcessState $processState
 if (-not $Apply) { return }
 if ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0) {
-	[void](Write-ScopedOverlayOutcome -Result ([pscustomobject]@{ status = 'NO_OP'; changedPaths = @() }))
+	Write-ScopedOverlayOutcome -Result ([pscustomobject]@{ status = 'NO_OP'; changedPaths = @() })
 	return
 }
 
@@ -200,4 +200,4 @@ $fileOperations = @{
     }
 }
 $result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -WriterExclusionEstablished:$false
-[void](Write-ScopedOverlayOutcome -Result $result)
+Write-ScopedOverlayOutcome -Result $result

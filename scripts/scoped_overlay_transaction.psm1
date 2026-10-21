@@ -80,7 +80,6 @@ function Write-ScopedOverlayOutcome {
 		'COMMITTED_CLEANUP_PENDING' { "COMMITTED_CLEANUP_PENDING: installed files are verified; preserve evidence at $($outcome.evidencePath). Reason: $($outcome.errorReason) Next action: $($outcome.nextAction)" }
 		'NO_OP' { 'NO_OP: no installed files changed.' }
 	}
-	return $outcome
 }
 
 function Get-ScopedProcessInventoryState {

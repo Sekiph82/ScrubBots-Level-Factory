@@ -17,6 +17,14 @@ function Assert-True([bool]$Condition, [string]$Message) {
 	if (-not $Condition) { throw "ASSERTION_FAILED: $Message" }
 }
 
+# Inspect the real production caller: both status paths must preserve the helper's output.
+$installerPath=Join-Path $PSScriptRoot '..\..\scripts\install_factory_studio_scoped_overlay.ps1'
+$installerSource=Get-Content -LiteralPath $installerPath -Raw
+$visibleCallCount=[regex]::Matches($installerSource,'(?m)^\s*Write-ScopedOverlayOutcome\s+-Result').Count
+$suppressedCallCount=[regex]::Matches($installerSource,'(?im)^\s*\[void\]\s*\(\s*Write-ScopedOverlayOutcome').Count
+Assert-True ($visibleCallCount -eq 2 -and $suppressedCallCount -eq 0) 'both actual installer outcome call sites preserve pipeline output'
+Assert-True ($installerSource -match '(?s)GetProcessSnapshot\s*=\s*\{.*?Get-ScopedProcessInventoryState' -and $installerSource -match 'WriterExclusionEstablished:\$false') 'R04 fresh snapshot and fail-closed writer boundary remain intact'
+
 function ConvertTo-FakeBytes([string]$Text) { return ,([Text.Encoding]::UTF8.GetBytes($Text)) }
 function Get-FakeHash([byte[]]$Bytes) {
 	$sha = [Security.Cryptography.SHA256]::Create()
@@ -166,14 +174,17 @@ Assert-True ($script:replaceCalls -eq 0 -and (Get-FakeText 'target-one') -ceq 'o
 
 # Execute wrapper outcome mapping with synthetic results for every public status.
 $outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='COMMITTED';changedPaths=@('one.py');verifiedHashes=@([pscustomobject]@{path='one.py';sha256='a'*64})}))
-$outcome=$outcomeLines[-1]
-Assert-True ($outcome.status -eq 'COMMITTED' -and $outcome.changedPaths[0] -eq 'one.py' -and $outcome.verifiedHashes.Count -eq 1 -and ([string]$outcomeLines[0] | ConvertFrom-Json).status -eq 'COMMITTED') 'committed wrapper output carries exact scope and verified hash'
+Assert-True ($outcomeLines.Count -eq 2) 'committed output is one JSON line and one operator line'
+$outcome=[string]$outcomeLines[0] | ConvertFrom-Json
+Assert-True ($outcome.status -eq 'COMMITTED' -and $outcome.changedPaths[0] -eq 'one.py' -and $outcome.verifiedHashes.Count -eq 1 -and $outcome.verifiedHashes[0].sha256 -eq ('a'*64) -and [string]$outcomeLines[1] -eq 'OWNER_DESKTOP_STUDIO_SCOPED_OVERLAY_UPDATED') 'committed wrapper output carries exact scope and verified hash'
 $outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='COMMITTED_CLEANUP_PENDING';changedPaths=@('one.py');verifiedHashes=@([pscustomobject]@{path='one.py';sha256='a'*64});transactionRoot='C:\owner-release\.txn-r04';cleanupError='access denied'}))
-$outcome=$outcomeLines[-1]
-Assert-True ($outcome.status -eq 'COMMITTED_CLEANUP_PENDING' -and $outcome.evidencePath -eq $outcome.transactionRoot -and $outcome.errorReason -eq 'access denied' -and $outcome.nextAction -match 'Preserve' -and ([string]$outcomeLines[1] -match 'COMMITTED_CLEANUP_PENDING')) 'cleanup-pending wrapper output exposes evidence, reason and safe next action'
+Assert-True ($outcomeLines.Count -eq 2) 'cleanup-pending output is one JSON line and one operator line'
+$outcome=[string]$outcomeLines[0] | ConvertFrom-Json
+Assert-True ($outcome.status -eq 'COMMITTED_CLEANUP_PENDING' -and $outcome.changedPaths[0] -eq 'one.py' -and $outcome.verifiedHashes[0].sha256 -eq ('a'*64) -and $outcome.evidencePath -eq $outcome.transactionRoot -and $outcome.errorReason -eq 'access denied' -and $outcome.nextAction -match 'Preserve' -and [string]$outcomeLines[1] -match 'COMMITTED_CLEANUP_PENDING') 'cleanup-pending wrapper output exposes evidence, reason and safe next action'
 $outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='NO_OP';changedPaths=@()}))
-$outcome=$outcomeLines[-1]
-Assert-True ($outcome.status -eq 'NO_OP' -and $outcome.changedPaths.Count -eq 0 -and ([string]$outcomeLines[1] -match 'no installed files changed')) 'no-op wrapper output is distinct from commit'
+Assert-True ($outcomeLines.Count -eq 2) 'no-op output is one JSON line and one operator line'
+$outcome=[string]$outcomeLines[0] | ConvertFrom-Json
+Assert-True ($outcome.status -eq 'NO_OP' -and $outcome.changedPaths.Count -eq 0 -and [string]$outcomeLines[1] -match 'no installed files changed') 'no-op wrapper output is distinct from commit'
 $mappingFailed=$false
 try { [void](Write-ScopedOverlayOutcome ([pscustomobject]@{status='TRANSACTION_FAILED_ROLLBACK_INCOMPLETE'})) } catch { $mappingFailed=$_.Exception.Message -like '*failing closed*' }
 Assert-True $mappingFailed 'transaction failure cannot be downgraded to success'
