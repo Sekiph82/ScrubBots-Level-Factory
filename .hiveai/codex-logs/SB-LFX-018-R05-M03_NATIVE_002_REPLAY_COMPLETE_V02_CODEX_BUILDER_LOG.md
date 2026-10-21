@@ -651,3 +651,9 @@ Document role: CODEX BUILDER LOG
 - A text-mode correction briefly normalized carriage returns in two historical log lines; restored the exact pre-R03 log bytes from source commit `e08f3fc` and reapplied the R03 suffix in binary mode. This preserved the historical log; no project data was affected.
 - Source/test commit: `e08f3fc8167baf8ba44d213ae9b0840698d2f33f` (`Prove scoped overlay rollback recovery`). Builder log commit `efd358d` captured the malformed append attempt; this correction is a separate log-only commit.
 - Publication is pending final fetch/ancestry verification. The only workflow remains manual `workflow_dispatch`; no hosted CI will be triggered. Protected owner-untracked files remain unstaged.
+### R03 publication receipt
+
+- Source/test commit `e08f3fc8167baf8ba44d213ae9b0840698d2f33f` and corrected builder-log publication commit `802e28c` were pushed with normal `git push origin HEAD:main`. Intermediate log commits `efd358d` and `dd8e9c` record and correct failed append attempts; the final log preserves the pre-R03 bytes and the R03 continuation.
+- Push advanced `origin/main` from `42c21c25d6a956661b251662f55077eab03f407b` to `802e28c`; post-push fetch verified local HEAD equals origin/main, 0 ahead / 0 behind, with no tracked modifications. Owner-untracked Release, cache, fixture, scratch, and icon paths were not staged.
+- The first post-push parity assertion compared the count to a literal backtick-tab string and failed despite displaying `0<TAB>0`; a whitespace-split equality check passed. It changed no repository data.
+- The only configured workflow uses manual `workflow_dispatch`; no GitHub Actions/CI or paid test service was started. Installation and native GUI acceptance remain blocked as recorded above.
