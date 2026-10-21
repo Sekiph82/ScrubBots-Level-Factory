@@ -14,6 +14,7 @@ $relativePaths = @(
     'level_factory/scripts/factory_studio_exact_ui.gd',
 	'scripts/launch_factory_studio.ps1',
 	'level_factory/scripts/factory_studio_shell.gd',
+	'level_factory/scripts/factory_studio_workspace_page.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
 	'level_factory/project.godot',
     'src/scrubbots_pixel_factory/output/bundle.py',
@@ -28,6 +29,7 @@ $relativePaths = @(
 $authorizedOverlayAdditions = @(
 	'level_factory/project.godot',
 	'level_factory/scripts/factory_studio_shell.gd',
+	'level_factory/scripts/factory_studio_workspace_page.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',
