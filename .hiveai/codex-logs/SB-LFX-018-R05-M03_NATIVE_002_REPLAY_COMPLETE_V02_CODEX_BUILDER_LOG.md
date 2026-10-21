@@ -715,3 +715,11 @@ Document role: CODEX BUILDER LOG
 - Builder disposition: `PROCESS_QUIESCENCE_UNPROVEN`; `INSTALL_BLOCKED_MANIFEST_DRIFT_PENDING_OWNER_DECISION`; `NATIVE_GODOT_OWNER_CACHE_WRITE_RISK`; `INSTALLED_GUI_OPEN`; `NO_APPLY`. No milestone acceptance is claimed. Owner decisions needed are listed independently in the R06 packet.
 - The first `git diff --check` found one trailing-whitespace report on the appended final log line caused by the append's CRLF boundary. Normalized only the newly appended R06 byte suffix to LF, preserving the pre-R06 log bytes; the repeat check is recorded below.
 - Readiness packet commit `f51c00132847028fda6d3c5335036bcc65e67cb7` contains only the new R06 packet. Before publication, `git fetch --prune origin` left `origin/main=ead8875b4c552cdadf00af61d2b321d5f1ab0d0b`; it is an ancestor of local HEAD. Ahead/behind was `1 0`, and `git diff --check` passed. The packet is documentation evidence, not install approval. The separate log commit and normal push result follow.
+
+### R06 first publication receipt
+
+- Readiness packet commit: `f51c00132847028fda6d3c5335036bcc65e67cb7`.
+- Builder evidence commit: `52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`.
+- Normal push `git push origin HEAD:main` advanced `origin/main` from `ead8875b4c552cdadf00af61d2b321d5f1ab0d0b` to `52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`.
+- Immediate post-push `git fetch --prune origin` verified `HEAD == origin/main == 52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`, 0 ahead / 0 behind, and `git diff --exit-code` passed. Tracked tree was clean; untracked owner paths remained unstaged and untouched. The final log-receipt commit will be published separately and parity checked again.
+- No Actions/CI were triggered; workflow trigger remains manual-only.
