@@ -11,6 +11,7 @@ $script:failReplaceAfterAt = 0
 $script:failRollbackTarget = ''
 $script:failFinalVerification = $false
 $script:failRemoveTree = $false
+$script:freshProcessState = $null
 
 function Assert-True([bool]$Condition, [string]$Message) {
 	if (-not $Condition) { throw "ASSERTION_FAILED: $Message" }
@@ -35,6 +36,7 @@ function Reset-FakeFileSystem {
 	$script:failRollbackTarget = ''
 	$script:failFinalVerification = $false
 	$script:failRemoveTree = $false
+	$script:freshProcessState = [pscustomobject]@{ complete = $true; status = 'COMPLETE'; problems = @(); active = @() }
 	Put-FakeText 'source-one' 'new-one'
 	Put-FakeText 'source-two' 'new-two'
 	Put-FakeText 'target-one' 'old-one'
@@ -73,6 +75,7 @@ $script:fakeOperations = @{
 		if ($script:failReplaceAfterAt -eq $script:replaceCalls) { throw 'injected replacement failure after commit' }
 	}
 	RemoveTree = { param($path) if ($script:failRemoveTree) { throw 'injected cleanup failure' }; $prefix=[string]$path + '\'; foreach($key in @($script:fakeFiles.Keys | Where-Object { $_ -eq [string]$path -or $_.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) })) { $script:fakeFiles.Remove($key) } }
+	GetProcessSnapshot = { return $script:freshProcessState }
 }
 
 function Invoke-FakeTransaction {
@@ -81,7 +84,7 @@ function Invoke-FakeTransaction {
 		[pscustomobject]@{ path='two.py'; source='source-two'; target='target-two'; sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-two')); priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-two')); bytes=7 }
 	)
 	$manifest = Get-FakeText 'manifest' | ConvertFrom-Json
-	Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r03' -SourceHead 'head-r03' -OverlayAdditions @('one.py','two.py') -Operations $script:fakeOperations
+	Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r03' -SourceHead 'head-r03' -OverlayAdditions @('one.py','two.py') -Operations $script:fakeOperations -WriterExclusionEstablished:$true
 }
 function Assert-Restored([string]$Context) {
 	Assert-True ((Get-FakeText 'target-one') -ceq 'old-one') "$Context restored target-one exact bytes"
@@ -125,6 +128,56 @@ Assert-True (-not $incomplete.complete -and $incomplete.status -eq 'PROCESS_INVE
 $emptyInventory=Get-ScopedProcessInventoryState -Processes @() -RuntimeRoot $root -CurrentPid 999
 Assert-True (-not $emptyInventory.complete -and @($emptyInventory.problems) -contains 'PROCESS_INVENTORY_EMPTY') 'empty process inventory fails closed'
 
+# A worker that appears only after staging is caught by the fresh pre-replacement snapshot.
+Reset-FakeFileSystem
+$script:freshProcessState=Get-ScopedProcessInventoryState -Processes @(
+	[pscustomobject]@{ProcessId=40;ParentProcessId=1;Name='Godot_v4.7.2-stable_win64.exe';ExecutablePath="$root\Godot.exe";CommandLine="Godot --path `"$root\level_factory`""},
+	[pscustomobject]@{ProcessId=41;ParentProcessId=40;Name='python.exe';ExecutablePath='C:\Python\python.exe';CommandLine='python.exe worker.py'}
+) -RuntimeRoot $root -CurrentPid 999
+$lateWriterBlocked=$false
+try { [void](Invoke-FakeTransaction) } catch { $lateWriterBlocked=$_.Exception.Message -like '*Active processes*' }
+Assert-True $lateWriterBlocked 'late writer/child snapshot blocks replacement'
+Assert-True ($script:stageWriteCalls -gt 0 -and $script:replaceCalls -eq 0) 'late writer is discovered after staging and before the first replacement'
+Assert-Restored 'late writer block'
+
+# CIM failure or incomplete process metadata also blocks before any replacement.
+foreach ($badState in @(
+	[pscustomobject]@{complete=$false;status='PROCESS_INVENTORY_INCOMPLETE';problems=@('CIM_QUERY_FAILED:denied');active=@()},
+	[pscustomobject]@{complete=$false;status='PROCESS_INVENTORY_INCOMPLETE';problems=@('COMMAND_LINE_UNAVAILABLE:41');active=@()}
+)) {
+	Reset-FakeFileSystem; $script:freshProcessState=$badState
+	$inventoryBlocked=$false
+	try { [void](Invoke-FakeTransaction) } catch { $inventoryBlocked=$_.Exception.Message -like '*PROCESS_INVENTORY_INCOMPLETE*' }
+	Assert-True $inventoryBlocked 'fresh incomplete process inventory blocks replacement'
+	Assert-True ($script:replaceCalls -eq 0) 'incomplete inventory leaves replacement count at zero'
+	Assert-Restored 'incomplete fresh inventory'
+}
+
+# Without an exclusive-writer control, even a complete empty snapshot cannot prove quiescence.
+Reset-FakeFileSystem
+$quiescenceBlocked=$false
+try {
+	$plan=@([pscustomobject]@{path='one.py';source='source-one';target='target-one';sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-one'));priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-one'));bytes=7})
+	$manifest=Get-FakeText 'manifest' | ConvertFrom-Json
+	[void](Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r04' -SourceHead 'head-r04' -OverlayAdditions @() -Operations $script:fakeOperations -WriterExclusionEstablished:$false)
+} catch { $quiescenceBlocked=$_.Exception.Message -like '*PROCESS_QUIESCENCE_UNPROVEN*' }
+Assert-True $quiescenceBlocked 'missing exclusive-writer control reports PROCESS_QUIESCENCE_UNPROVEN'
+Assert-True ($script:replaceCalls -eq 0 -and (Get-FakeText 'target-one') -ceq 'old-one') 'unproven quiescence leaves target unchanged'
+
+# Execute wrapper outcome mapping with synthetic results for every public status.
+$outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='COMMITTED';changedPaths=@('one.py');verifiedHashes=@([pscustomobject]@{path='one.py';sha256='a'*64})}))
+$outcome=$outcomeLines[-1]
+Assert-True ($outcome.status -eq 'COMMITTED' -and $outcome.changedPaths[0] -eq 'one.py' -and $outcome.verifiedHashes.Count -eq 1 -and ([string]$outcomeLines[0] | ConvertFrom-Json).status -eq 'COMMITTED') 'committed wrapper output carries exact scope and verified hash'
+$outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='COMMITTED_CLEANUP_PENDING';changedPaths=@('one.py');verifiedHashes=@([pscustomobject]@{path='one.py';sha256='a'*64});transactionRoot='C:\owner-release\.txn-r04';cleanupError='access denied'}))
+$outcome=$outcomeLines[-1]
+Assert-True ($outcome.status -eq 'COMMITTED_CLEANUP_PENDING' -and $outcome.evidencePath -eq $outcome.transactionRoot -and $outcome.errorReason -eq 'access denied' -and $outcome.nextAction -match 'Preserve' -and ([string]$outcomeLines[1] -match 'COMMITTED_CLEANUP_PENDING')) 'cleanup-pending wrapper output exposes evidence, reason and safe next action'
+$outcomeLines=@(Write-ScopedOverlayOutcome ([pscustomobject]@{status='NO_OP';changedPaths=@()}))
+$outcome=$outcomeLines[-1]
+Assert-True ($outcome.status -eq 'NO_OP' -and $outcome.changedPaths.Count -eq 0 -and ([string]$outcomeLines[1] -match 'no installed files changed')) 'no-op wrapper output is distinct from commit'
+$mappingFailed=$false
+try { [void](Write-ScopedOverlayOutcome ([pscustomobject]@{status='TRANSACTION_FAILED_ROLLBACK_INCOMPLETE'})) } catch { $mappingFailed=$_.Exception.Message -like '*failing closed*' }
+Assert-True $mappingFailed 'transaction failure cannot be downgraded to success'
+
 # No-op must not call any I/O adapter.
 $noop=Invoke-ScopedOverlayTransaction -Plan @() -Manifest ([pscustomobject]@{}) -ManifestPath 'none' -TransactionRoot 'none' -SourceHead 'head' -OverlayAdditions @() -Operations @{}
 Assert-True ($noop.status -eq 'NO_OP') 'empty plan is a no-op'
@@ -149,6 +202,6 @@ Reset-FakeFileSystem; $script:failReplaceAfterAt=2; $script:failRollbackTarget='
 Reset-FakeFileSystem; $committed=Invoke-FakeTransaction; Assert-True ($committed.status -eq 'COMMITTED') 'successful transaction committed'; Assert-True ((Get-FakeText 'target-one') -ceq 'new-one' -and (Get-FakeText 'target-two') -ceq 'new-two') 'successful transaction writes planned payloads'; Assert-True ((Get-FakeText 'png-batch-protected') -ceq 'immutable-job-bytes' -and (Get-FakeText 'release-pool-protected') -ceq 'immutable-pool-bytes' -and (Get-FakeText 'owner-png-protected') -ceq 'immutable-png-bytes') 'successful transaction leaves batch, pool and PNG unchanged'
 
 # Cleanup failure after verified commit does not trigger rollback or claim failure of payload installation.
-Reset-FakeFileSystem; $script:failRemoveTree=$true; $committed=Invoke-FakeTransaction; Assert-True ($committed.status -eq 'COMMITTED_CLEANUP_PENDING') 'cleanup failure preserves verified commit status'; Assert-True ((Get-FakeText 'target-one') -ceq 'new-one' -and (Get-FakeText 'target-two') -ceq 'new-two') 'cleanup failure does not attempt unsafe post-commit rollback'
+Reset-FakeFileSystem; $script:failRemoveTree=$true; $committed=Invoke-FakeTransaction; Assert-True ($committed.status -eq 'COMMITTED_CLEANUP_PENDING' -and $committed.verifiedHashes.Count -eq 2) 'cleanup failure preserves verified commit status and exact hashes'; Assert-True ((Get-FakeText 'target-one') -ceq 'new-one' -and (Get-FakeText 'target-two') -ceq 'new-two') 'cleanup failure does not attempt unsafe post-commit rollback'
 
 'SCOPED_OVERLAY_TRANSACTION_IN_MEMORY_TESTS_PASS'

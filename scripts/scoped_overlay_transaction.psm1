@@ -20,7 +20,9 @@ function Assert-ScopedInstallApplyGates {
 	param(
 		[Parameter(Mandatory)][AllowEmptyCollection()][object[]]$ManifestDrift,
 		[Parameter(Mandatory)][bool]$Apply,
-		[Parameter(Mandatory)][object]$ProcessState
+		[Parameter(Mandatory)][object]$ProcessState,
+		[bool]$WriterExclusionEstablished = $false,
+		[bool]$RequireWriterExclusion = $false
 	)
 
 	if ($ManifestDrift.Count -gt 0) { throw 'Installed managed bytes differ from manifest without an approved exact repair; no files were written.' }
@@ -29,7 +31,56 @@ function Assert-ScopedInstallApplyGates {
 		$ids = @($ProcessState.active | ForEach-Object { "$($_.ProcessId):$($_.Name)" }) -join ', '
 		throw "Installed runtime is in use; no files were written. Active processes: $ids"
 	}
+	if ($Apply -and $RequireWriterExclusion -and -not $WriterExclusionEstablished) { throw 'PROCESS_QUIESCENCE_UNPROVEN: a process snapshot cannot prevent a new writer from starting before replacement.' }
 	return [pscustomobject]@{ allowed = $true; apply = $Apply }
+}
+
+function ConvertTo-ScopedOverlayOutcome {
+	[CmdletBinding()]
+	param([Parameter(Mandatory)][object]$Result)
+
+	$status = [string]$Result.status
+	switch ($status) {
+		'COMMITTED' {
+			$paths = @($Result.changedPaths | ForEach-Object { [string]$_ })
+			$hashes = @($Result.verifiedHashes)
+			if ($paths.Count -eq 0 -or $hashes.Count -ne $paths.Count) { throw 'Invalid COMMITTED result: exact changed paths and verified hashes are required.' }
+			return [pscustomobject]@{ status = $status; changedPaths = $paths; verifiedHashes = $hashes }
+		}
+		'COMMITTED_CLEANUP_PENDING' {
+			$root = [string]$Result.transactionRoot
+			$errorReason = [string]$Result.cleanupError
+			$paths = @($Result.changedPaths | ForEach-Object { [string]$_ })
+			$hashes = @($Result.verifiedHashes)
+			if ([string]::IsNullOrWhiteSpace($root) -or [string]::IsNullOrWhiteSpace($errorReason)) { throw 'Invalid COMMITTED_CLEANUP_PENDING result: transaction evidence path and cleanup error are required.' }
+			if ($paths.Count -eq 0 -or $hashes.Count -ne $paths.Count) { throw 'Invalid COMMITTED_CLEANUP_PENDING result: exact changed paths and verified hashes are required.' }
+			return [pscustomobject]@{
+				status = $status
+				changedPaths = $paths
+				verifiedHashes = $hashes
+				transactionRoot = $root
+				errorReason = $errorReason
+				evidencePath = $root
+				nextAction = 'Preserve the transaction directory; inspect its evidence and request operator review before any cleanup.'
+			}
+		}
+		'NO_OP' { return [pscustomobject]@{ status = $status; changedPaths = @(); verifiedHashes = @() } }
+		default { throw "Unknown transaction outcome '$status'; failing closed." }
+	}
+}
+
+function Write-ScopedOverlayOutcome {
+	[CmdletBinding()]
+	param([Parameter(Mandatory)][object]$Result)
+
+	$outcome = ConvertTo-ScopedOverlayOutcome -Result $Result
+	$outcome | ConvertTo-Json -Depth 8 -Compress
+	switch ([string]$outcome.status) {
+		'COMMITTED' { 'OWNER_DESKTOP_STUDIO_SCOPED_OVERLAY_UPDATED' }
+		'COMMITTED_CLEANUP_PENDING' { "COMMITTED_CLEANUP_PENDING: installed files are verified; preserve evidence at $($outcome.evidencePath). Reason: $($outcome.errorReason) Next action: $($outcome.nextAction)" }
+		'NO_OP' { 'NO_OP: no installed files changed.' }
+	}
+	return $outcome
 }
 
 function Get-ScopedProcessInventoryState {
@@ -118,13 +169,14 @@ function Invoke-ScopedOverlayTransaction {
 		[Parameter(Mandatory)][string]$TransactionRoot,
 		[Parameter(Mandatory)][string]$SourceHead,
 		[Parameter(Mandatory)][AllowEmptyCollection()][string[]]$OverlayAdditions,
-		[Parameter(Mandatory)][hashtable]$Operations
+		[Parameter(Mandatory)][hashtable]$Operations,
+		[bool]$WriterExclusionEstablished = $false
 	)
 
 	if ($Plan.Count -eq 0 -and $OverlayAdditions.Count -eq 0) {
 		return [pscustomobject]@{ status = 'NO_OP'; changedPaths = @() }
 	}
-	foreach ($operationName in @('CreateDirectory','ReadBytes','WriteBytes','WriteText','ReadText','Hash','Exists','Replace','RemoveTree')) {
+	foreach ($operationName in @('CreateDirectory','ReadBytes','WriteBytes','WriteText','ReadText','Hash','Exists','Replace','RemoveTree','GetProcessSnapshot')) {
 		if (-not $Operations.ContainsKey($operationName) -or $Operations[$operationName] -isnot [scriptblock]) { throw "Missing transaction operation: $operationName" }
 	}
 
@@ -173,7 +225,15 @@ function Invoke-ScopedOverlayTransaction {
 		[void](& $Operations.WriteBytes (Join-Path $TransactionRoot 'restore-manifest.bin') $originalManifestBytes)
 		[void](& $Operations.WriteText $manifestStage (($Manifest | ConvertTo-Json -Depth 100) + "`n"))
 
+		# This is the last bounded process snapshot before any live replacement.
+		# The caller must also provide an actual exclusive-writer control; a snapshot
+		# alone cannot close the process-start TOCTOU window.
+		$freshProcessState = & $Operations.GetProcessSnapshot
+		[void](Assert-ScopedInstallApplyGates -ManifestDrift @() -Apply:$true -ProcessState $freshProcessState -WriterExclusionEstablished:$WriterExclusionEstablished -RequireWriterExclusion:$true)
 		foreach ($item in $stagedFiles) {
+			$original = $originals[[string]$item.relative]
+			$immediatePriorHash = [string](& $Operations.Hash $item.target)
+			if ($immediatePriorHash -cne [string]$original.sha256) { throw "Pre-replacement target changed: $($item.relative)" }
 			$attempted += $item
 			[void](& $Operations.Replace $item.stage $item.target $item.backup)
 			if (([string](& $Operations.Hash $item.target)) -cne $item.expected) { throw "Installed file hash mismatch after replacement: $($item.relative)" }
@@ -187,12 +247,16 @@ function Invoke-ScopedOverlayTransaction {
 		}
 		try {
 			[void](& $Operations.RemoveTree $TransactionRoot)
-			return [pscustomobject]@{ status = 'COMMITTED'; changedPaths = @($stagedFiles.relative); transactionRoot = $TransactionRoot }
+			return [pscustomobject]@{ status = 'COMMITTED'; changedPaths = @($stagedFiles.relative); verifiedHashes = @($stagedFiles | ForEach-Object { [pscustomobject]@{ path = $_.relative; sha256 = $_.expected } }); transactionRoot = $TransactionRoot }
 		} catch {
-			return [pscustomobject]@{ status = 'COMMITTED_CLEANUP_PENDING'; changedPaths = @($stagedFiles.relative); transactionRoot = $TransactionRoot; cleanupError = $_.Exception.Message }
+			return [pscustomobject]@{ status = 'COMMITTED_CLEANUP_PENDING'; changedPaths = @($stagedFiles.relative); verifiedHashes = @($stagedFiles | ForEach-Object { [pscustomobject]@{ path = $_.relative; sha256 = $_.expected } }); transactionRoot = $TransactionRoot; cleanupError = $_.Exception.Message }
 		}
 	} catch {
 		$transactionFailure = $_.Exception.Message
+	}
+	if ($attempted.Count -eq 0 -and -not $manifestReplaceAttempted -and $transactionFailure -match '^(PROCESS_INVENTORY_INCOMPLETE|PROCESS_QUIESCENCE_UNPROVEN|Installed runtime is in use|Pre-replacement target changed)') {
+		try { [void](& $Operations.RemoveTree $TransactionRoot) } catch { throw "TRANSACTION_FAILED_ROLLBACK_INCOMPLETE: $transactionFailure; no target replacement occurred; staged evidence cleanup failed: $($_.Exception.Message); evidence=$TransactionRoot" }
+		throw $transactionFailure
 	}
 
 	$rollbackProblems = [System.Collections.Generic.List[string]]::new()
@@ -254,4 +318,4 @@ function Invoke-ScopedOverlayTransaction {
 	throw "TRANSACTION_FAILED_ROLLBACK_VERIFIED: $transactionFailure; original manifest and $($attempted.Count) attempted payload target(s) re-hashed to their pre-transaction values."
 }
 
-Export-ModuleMember -Function Get-ScopedInstallHashDisposition, Assert-ScopedInstallApplyGates, Get-ScopedProcessInventoryState, Invoke-ScopedOverlayTransaction
+Export-ModuleMember -Function Get-ScopedInstallHashDisposition, Assert-ScopedInstallApplyGates, Get-ScopedProcessInventoryState, ConvertTo-ScopedOverlayOutcome, Write-ScopedOverlayOutcome, Invoke-ScopedOverlayTransaction

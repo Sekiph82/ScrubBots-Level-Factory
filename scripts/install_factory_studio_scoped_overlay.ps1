@@ -172,7 +172,11 @@ $active = @($processState.active)
 } | ConvertTo-Json -Depth 8
 
 $gateResult = Assert-ScopedInstallApplyGates -ManifestDrift $manifestDrift -Apply:$Apply -ProcessState $processState
-if (-not $Apply -or ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0)) { return }
+if (-not $Apply) { return }
+if ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0) {
+	[void](Write-ScopedOverlayOutcome -Result ([pscustomobject]@{ status = 'NO_OP'; changedPaths = @() }))
+	return
+}
 
 $transactionRoot = Join-Path $runtimeRoot ('.lf-scoped-overlay-' + [Guid]::NewGuid().ToString('N'))
 if (-not $transactionRoot.StartsWith($runtimeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Transaction path escaped the installed runtime.' }
@@ -186,6 +190,14 @@ $fileOperations = @{
     Exists = { param($path) Test-Path -LiteralPath $path -PathType Leaf }
     Replace = { param($stage,$target,$backup) [IO.File]::Replace($stage,$target,$backup) }
     RemoveTree = { param($path) Remove-Item -LiteralPath $path -Recurse -Force }
+    GetProcessSnapshot = {
+        try {
+            $freshInventory = @(Get-CimInstance Win32_Process -ErrorAction Stop)
+            Get-ScopedProcessInventoryState -Processes $freshInventory -RuntimeRoot $runtimeRoot -CurrentPid $PID
+        } catch {
+            [pscustomobject]@{ complete = $false; status = 'PROCESS_INVENTORY_INCOMPLETE'; problems = @("CIM_QUERY_FAILED:$($_.Exception.Message)"); active = @() }
+        }
+    }
 }
-$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations
-if ($result.status -eq 'COMMITTED') { 'OWNER_DESKTOP_STUDIO_SCOPED_OVERLAY_UPDATED' }
+$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -WriterExclusionEstablished:$false
+[void](Write-ScopedOverlayOutcome -Result $result)
