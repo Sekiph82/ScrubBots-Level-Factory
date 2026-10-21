@@ -9,6 +9,7 @@ $expectedRepoRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator'
 $canonicalOrigin = 'https://github.com/Sekiph82/ScrubBots-Level-Factory.git'
 $runtimeRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\ScrubBots Factory Studio'
 $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
+Import-Module (Join-Path $PSScriptRoot 'scoped_overlay_transaction.psm1') -Force
 $relativePaths = @(
 	'level_factory/scripts/factory_core_launcher.py',
     'level_factory/scripts/factory_studio_exact_ui.gd',
@@ -126,9 +127,8 @@ foreach ($relative in $relativePaths) {
         if ($_.PSObject.Properties.Name -contains 'files') { $_.files }
     } | Where-Object { $_.path -ceq $relative })
     $hasOverlayPath = $relative -cin @($manifest.overlayPaths)
-    if ($installedHash -cne $expectedInstalledHash) {
-        $authorizedHash = [string]$authorizedRepairHashes[$relative]
-        if (-not $authorizedHash -or $installedHash -cne $authorizedHash) {
+    $hashDisposition = Get-ScopedInstallHashDisposition -RelativePath $relative -ExpectedHash $expectedInstalledHash -InstalledHash $installedHash -AuthorizedRepairHashes $authorizedRepairHashes
+    if ($hashDisposition -eq 'UNKNOWN_DRIFT') {
             $known = $knownProvenanceHashes[$relative]
             $reason = if ($known -and $installedHash -ceq $known.sha256) { $known.disposition } else { 'UNRECOGNIZED_INSTALLED_BYTES' }
             $manifestDrift += [pscustomobject]@{
@@ -142,45 +142,28 @@ foreach ($relative in $relativePaths) {
                 sourceCommit = if ($known) { $known.sourceCommit } else { $null }
             }
             continue
-        }
     }
     $sourceHash = Get-Sha256 $source
     if ($installedHash -ceq $sourceHash) { continue }
     $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; manifestSha256 = $expectedInstalledHash; installedSha256 = $installedHash; sourceSha256 = $sourceHash; overlayPath = $hasOverlayPath; overlayReceiptCount = $pathReceipts.Count; priorSha256 = $installedHash; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
 }
 
-$processInventory = @(Get-CimInstance Win32_Process)
-$activeProcessIds = [Collections.Generic.HashSet[uint32]]::new()
-$runtimeNeedle = $runtimeRoot.TrimEnd('\')
-foreach ($process in $processInventory) {
-    $commandLine = [string]$process.CommandLine
-    $usesRuntime = $commandLine.IndexOf($runtimeNeedle, [StringComparison]::OrdinalIgnoreCase) -ge 0
-    $isStudioOrWriter = $process.Name -like 'Godot*' -or
-        $commandLine -match 'factory_core_launcher\.py|png_batch\.py'
-    if ($process.ProcessId -ne $PID -and $usesRuntime -and $isStudioOrWriter) {
-        [void]$activeProcessIds.Add([uint32]$process.ProcessId)
-    }
+$processQueryError = $null
+try { $processInventory = @(Get-CimInstance Win32_Process -ErrorAction Stop) }
+catch { $processInventory = @(); $processQueryError = $_.Exception.Message }
+$processState = if ($processQueryError) {
+    [pscustomobject]@{ complete = $false; status = 'PROCESS_INVENTORY_INCOMPLETE'; problems = @("CIM_QUERY_FAILED:$processQueryError"); active = @() }
+} else {
+    Get-ScopedProcessInventoryState -Processes $processInventory -RuntimeRoot $runtimeRoot -CurrentPid $PID
 }
-# Include descendants such as Python workers and console hosts even when their
-# own command line does not repeat the runtime path.
-do {
-    $addedProcess = $false
-    foreach ($process in $processInventory) {
-        if ($process.ProcessId -ne $PID -and $activeProcessIds.Contains([uint32]$process.ParentProcessId)) {
-            if ($activeProcessIds.Add([uint32]$process.ProcessId)) { $addedProcess = $true }
-        }
-    }
-} while ($addedProcess)
-$active = @($processInventory | Where-Object { $activeProcessIds.Contains([uint32]$_.ProcessId) })
-if ($Apply -and $active.Count -gt 0) {
-    $ids = ($active | ForEach-Object { "$($_.ProcessId):$($_.Name)" }) -join ', '
-    throw "Installed runtime is in use; no files were written. Active processes: $ids"
-}
+$active = @($processState.active)
 
 [pscustomobject]@{
     state = if ($manifestDrift.Count -gt 0) { 'BLOCKED_MANIFEST_DRIFT' } elseif ($Apply) { 'APPLY_READY' } else { 'PREFLIGHT_ONLY' }
     sourceHead = $head
     runtimeRoot = $runtimeRoot
+    processInventoryStatus = $processState.status
+    processInventoryProblems = $processState.problems
     activeRuntimeProcesses = @($active | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name; executablePath = $_.ExecutablePath; parentPid = $_.ParentProcessId; commandLine = $_.CommandLine } })
     overlayAllowlistAdditions = $overlayAdditions
     plannedFiles = $plan
@@ -188,71 +171,21 @@ if ($Apply -and $active.Count -gt 0) {
     unchangedFiles = @($relativePaths | Where-Object { $_ -notin @($plan.path) -and $_ -notin @($manifestDrift.path) })
 } | ConvertTo-Json -Depth 8
 
-if ($manifestDrift.Count -gt 0) { throw 'Installed managed bytes differ from manifest without an approved exact repair; no files were written.' }
+$gateResult = Assert-ScopedInstallApplyGates -ManifestDrift $manifestDrift -Apply:$Apply -ProcessState $processState
 if (-not $Apply -or ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0)) { return }
 
 $transactionRoot = Join-Path $runtimeRoot ('.lf-scoped-overlay-' + [Guid]::NewGuid().ToString('N'))
 if (-not $transactionRoot.StartsWith($runtimeRoot + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'Transaction path escaped the installed runtime.' }
-$replaced = @()
-$manifestOriginal = [IO.File]::ReadAllBytes($manifestPath)
-$manifestReplaced = $false
-try {
-    [void][IO.Directory]::CreateDirectory($transactionRoot)
-    $receiptFiles = @()
-    $stagedFiles = @()
-    foreach ($item in $plan) {
-        $relativeStage = $item.path.Replace('/', [IO.Path]::DirectorySeparatorChar)
-        $stage = Join-Path (Join-Path $transactionRoot 'stage') $relativeStage
-        $backup = Join-Path (Join-Path $transactionRoot 'backup') $relativeStage
-        [void][IO.Directory]::CreateDirectory((Split-Path -Parent $stage))
-        [void][IO.Directory]::CreateDirectory((Split-Path -Parent $backup))
-        [IO.File]::WriteAllBytes($stage, [IO.File]::ReadAllBytes($item.source))
-        if ((Get-Sha256 $stage) -cne $item.sha256) { throw "Staged source hash mismatch: $($item.path)" }
-        $stagedFiles += [pscustomobject]@{ stage = $stage; target = $item.target; backup = $backup; relative = $item.path; expected = $item.sha256 }
-        $managedEntry = @($manifest.managedFiles | Where-Object path -ceq $item.path)
-        $managedEntry[0].sha256 = $item.sha256
-        $receiptFiles += [pscustomobject]@{ path = $item.path; priorSha256 = $item.priorSha256; sha256 = $item.sha256; bytes = $item.bytes }
-    }
-    $receipt = [pscustomobject]@{
-        taskId = 'SB-LFX-018-R05-M03'
-        sourceCommit = $head
-        sourceHead = $head
-        files = $receiptFiles
-        installedAtUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
-    }
-    $manifest.overlayPaths = @($manifest.overlayPaths) + @($overlayAdditions)
-    $manifest.overlayReceipts = @($manifest.overlayReceipts) + @($receipt)
-    $manifestStage = Join-Path $transactionRoot '.factory-studio-install-manifest.json'
-    $manifestBackup = Join-Path $transactionRoot 'backup-manifest.json'
-    [IO.File]::WriteAllText($manifestStage, ($manifest | ConvertTo-Json -Depth 100) + "`n", [Text.UTF8Encoding]::new($false))
-
-    # Stage and verify every payload and the updated manifest before the first
-    # owner target is replaced. A staging failure therefore has no live writes.
-    foreach ($item in $stagedFiles) {
-        [IO.File]::Replace($item.stage, $item.target, $item.backup)
-        $replaced += [pscustomobject]@{ target = $item.target; backup = $item.backup; relative = $item.relative; expected = $item.expected }
-        if ((Get-Sha256 $item.target) -cne $item.expected) { throw "Installed file hash mismatch after replacement: $($item.relative)" }
-    }
-    [IO.File]::Replace($manifestStage, $manifestPath, $manifestBackup)
-    $manifestReplaced = $true
-    $installedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-    if ($installedManifest.overlayReceipts[-1].sourceHead -cne $head) { throw 'Installed overlay receipt did not verify.' }
-    foreach ($item in $plan) {
-        if ((Get-Sha256 $item.target) -cne $item.sha256) { throw "Final installed hash mismatch: $($item.path)" }
-    }
-    Remove-Item -LiteralPath $transactionRoot -Recurse -Force
-    'OWNER_DESKTOP_STUDIO_SCOPED_OVERLAY_UPDATED'
+$fileOperations = @{
+    CreateDirectory = { param($path) [IO.Directory]::CreateDirectory($path) }
+    ReadBytes = { param($path) [IO.File]::ReadAllBytes($path) }
+    WriteBytes = { param($path,$bytes) [IO.File]::WriteAllBytes($path,[byte[]]$bytes) }
+    WriteText = { param($path,$value) [IO.File]::WriteAllText($path,[string]$value,[Text.UTF8Encoding]::new($false)) }
+    ReadText = { param($path) Get-Content -LiteralPath $path -Raw }
+    Hash = { param($path) Get-Sha256 $path }
+    Exists = { param($path) Test-Path -LiteralPath $path -PathType Leaf }
+    Replace = { param($stage,$target,$backup) [IO.File]::Replace($stage,$target,$backup) }
+    RemoveTree = { param($path) Remove-Item -LiteralPath $path -Recurse -Force }
 }
-catch {
-    $failure = $_
-    if ($manifestReplaced -and (Test-Path -LiteralPath (Join-Path $transactionRoot 'backup-manifest.json'))) {
-        [IO.File]::Replace((Join-Path $transactionRoot 'backup-manifest.json'), $manifestPath, $null)
-    }
-    foreach ($entry in @($replaced | Select-Object -Reverse)) {
-        if (Test-Path -LiteralPath $entry.backup) { [IO.File]::Replace($entry.backup, $entry.target, $null) }
-    }
-    if ($replaced.Count -eq 0 -or @($replaced | Where-Object { Test-Path -LiteralPath $_.backup }).Count -eq 0) {
-        Remove-Item -LiteralPath $transactionRoot -Recurse -Force -ErrorAction SilentlyContinue
-    }
-    throw "Scoped overlay update failed and rollback was attempted: $failure"
-}
+$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations
+if ($result.status -eq 'COMMITTED') { 'OWNER_DESKTOP_STUDIO_SCOPED_OVERLAY_UPDATED' }

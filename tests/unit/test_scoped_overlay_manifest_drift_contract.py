@@ -3,10 +3,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 INSTALLER = ROOT / "scripts" / "install_factory_studio_scoped_overlay.ps1"
+TRANSACTION = ROOT / "scripts" / "scoped_overlay_transaction.psm1"
 
 
 def _installer() -> str:
     return INSTALLER.read_text(encoding="utf-8")
+
+
+def _transaction() -> str:
+    return TRANSACTION.read_text(encoding="utf-8")
 
 
 def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
@@ -26,42 +31,39 @@ def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
 
 def test_preflight_reports_hash_triples_and_keeps_unproven_verify_drift_blocked() -> None:
     source = _installer()
+    transaction = _transaction()
     for key in ("manifestSha256", "installedSha256", "sourceSha256"):
         assert key in source
     assert "KNOWN_SOURCE_VERSION_APPROVAL_UNPROVEN" in source
     assert "90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744" in source
-    assert "Installed managed bytes differ from manifest without an approved exact repair; no files were written." in source
+    assert "Installed managed bytes differ from manifest without an approved exact repair; no files were written." in transaction
     assert "$manifestDrift.Count -gt 0" in source
 
 
 def test_apply_is_blocked_by_manifest_drift_or_active_runtime() -> None:
     source = _installer()
-    drift_gate = source.index("if ($manifestDrift.Count -gt 0) { throw")
-    transaction_start = source.index("$transactionRoot = Join-Path")
-    active_gate = source.index("if ($Apply -and $active.Count -gt 0)")
-    assert drift_gate < transaction_start
-    assert active_gate < transaction_start
-    assert "$process.ProcessId -ne $PID" in source
-    assert "$process.ParentProcessId" in source
-    assert "activeProcessIds.Contains([uint32]$process.ParentProcessId)" in source
-    assert "executablePath = $_.ExecutablePath" in source
-    assert "commandLine = $_.CommandLine" in source
-    assert "$process.ParentProcessId" in source
-    assert "activeProcessIds.Contains([uint32]$process.ParentProcessId)" in source
-    assert "executablePath = $_.ExecutablePath" in source
-    assert "commandLine = $_.CommandLine" in source
+    transaction = _transaction()
+    gate = source.index("Assert-ScopedInstallApplyGates -ManifestDrift")
+    transaction_start = source.index("Invoke-ScopedOverlayTransaction -Plan")
+    assert gate < transaction_start
+    assert "PROCESS_INVENTORY_INCOMPLETE" in transaction
+    assert "ParentProcessId" in transaction
+    assert "ExecutablePath" in transaction
+    assert "CommandLine" in transaction
+    assert "activeIds.Contains([int]$process.ParentProcessId)" in transaction
 
 
 def test_transaction_stages_every_payload_and_manifest_before_first_replace() -> None:
-    source = _installer()
-    first_payload_write = source.index("[IO.File]::WriteAllBytes($stage")
-    manifest_stage_write = source.index("[IO.File]::WriteAllText($manifestStage")
-    first_payload_replace = source.index("[IO.File]::Replace($item.stage")
-    manifest_replace = source.index("[IO.File]::Replace($manifestStage")
+    source = _transaction()
+    first_payload_write = source.index("$Operations.WriteBytes $stage")
+    manifest_stage_write = source.index("$Operations.WriteText $manifestStage")
+    first_payload_replace = source.index("$Operations.Replace $item.stage")
+    manifest_replace = source.index("$Operations.Replace $manifestStage")
     assert first_payload_write < manifest_stage_write < first_payload_replace < manifest_replace
-    assert "if ((Get-Sha256 $stage) -cne $item.sha256)" in source
-    assert "foreach ($entry in @($replaced | Select-Object -Reverse))" in source
-    assert "if ((Get-Sha256 $item.target) -cne $item.expected)" in source
+    assert "if (([string](& $Operations.Hash $stage)) -cne [string]$item.sha256)" in source
+    assert "[array]::Reverse($reverseAttempted)" in source
+    assert "TARGET_HASH_MISMATCH" in source
+    assert "MANIFEST_HASH_MISMATCH" in source
 
 
 def test_preflight_never_writes_the_protected_job_or_release_pool() -> None:
