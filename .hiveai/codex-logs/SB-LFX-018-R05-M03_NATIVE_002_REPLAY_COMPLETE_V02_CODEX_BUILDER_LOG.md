@@ -744,3 +744,6 @@ Document role: CODEX BUILDER LOG
 - Report commit: `cd0112edc536a60f294fd11da0284c1ce8db1b4f`; builder log commit: `ea31f012d56fc008037a5578d2c5382c74c1b23c`.
 - Normal `git push origin HEAD:main` advanced `origin/main` from `8a817c3ebc9ec96d78762401b1658ed61309ac7d` to `ea31f012d56fc008037a5578d2c5382c74c1b23c`. Immediate `git fetch --prune origin` verified `HEAD == origin/main`, 0 ahead / 0 behind; tracked worktree and index were clean. Owner-untracked files remain untouched. This final log receipt is being published separately, then parity will be checked again.
 - No CI/Actions were run; no workflow definitions changed.
+### R07 publication receipt correction
+
+- Correction to the report commit SHA transcribed in the prior receipt paragraphs: the exact full report commit is `cd0112e45acae4dea7e47eedaef848ea3b74f1f2`. The earlier full SHA string in those paragraphs was a transcription error; the report commit and its tree contents were not changed. This correction is appended without rewriting prior log bytes.
