@@ -908,6 +908,11 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             raise StudioExtensionError(f"invalid {budget_scope}: {exc}") from exc
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
         auto_extend_solver_timeout = rules.attestation is not None
+        source_sha256 = request_data.get("source_sha256")
+        if not isinstance(source_sha256, str) and isinstance(owner_source_binding, Mapping):
+            source_sha256 = owner_source_binding.get("source_sha256")
+        if not isinstance(source_sha256, str):
+            source_sha256 = request_data.get("candidate_artwork_sha256")
 
         def solver_progress(line: str) -> None:
             if line.startswith("BRIDGE_SOLVER_BUDGET_EXTENDED"):
@@ -926,14 +931,16 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             real_max_visited=solver_max_visited, level_number=int(request_data.get("level_number", 1)),
             progress=solver_progress,
             real_timeout_seconds=solver_timeout,
-            max_native_solver_invocations=1 if rules.attestation is not None else None,
+            max_native_solver_invocations=1,
             auto_extend_solver_timeout=auto_extend_solver_timeout,
+            source_sha256=source_sha256,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply
         load_check = verify_exported_supply(
             files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project"),
             max_visited=solver_max_visited, timeout_seconds=solver_timeout,
+            solver_evidence=result.get("solver_evidence"),
         ) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
         if load_check.get("state") != "READY":
             raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")

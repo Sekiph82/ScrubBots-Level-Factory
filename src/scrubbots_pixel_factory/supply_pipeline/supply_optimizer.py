@@ -1,5 +1,7 @@
 """Canonical owner-ZIP supply planning, ranking, solve, and verification route."""
 
+import hashlib
+import json
 import random
 
 import numpy as np
@@ -59,7 +61,7 @@ class SupplyOptimizer:
             verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
             real_max_visited=None, level_number=1, progress=print,
             real_timeout_seconds=240, max_native_solver_invocations=None,
-            auto_extend_solver_timeout=False):
+            auto_extend_solver_timeout=False, source_sha256=None):
         return self._run_prepared(
             *self.prepare(image), seed=seed, candidates=candidates, level_id=level_id,
             verify_top=verify_top, screen_budget=screen_budget, metric_top=metric_top,
@@ -68,13 +70,14 @@ class SupplyOptimizer:
             real_timeout_seconds=real_timeout_seconds,
             max_native_solver_invocations=max_native_solver_invocations,
             auto_extend_solver_timeout=auto_extend_solver_timeout,
+            source_sha256=source_sha256,
         )
 
     def run_grid(self, grid, used, seed=0, candidates=300, level_id="pixelart_level",
                  verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
                  real_max_visited=None, level_number=1, progress=print,
                  real_timeout_seconds=240, max_native_solver_invocations=None,
-                 auto_extend_solver_timeout=False):
+                 auto_extend_solver_timeout=False, source_sha256=None):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,
@@ -84,13 +87,14 @@ class SupplyOptimizer:
             real_timeout_seconds=real_timeout_seconds,
             max_native_solver_invocations=max_native_solver_invocations,
             auto_extend_solver_timeout=auto_extend_solver_timeout,
+            source_sha256=source_sha256,
         )
 
     def _run_prepared(self, grid, used, m, band, mean, total, rows, *, seed,
                       candidates, level_id, verify_top, screen_budget, metric_top,
                       viability_budget, real_max_visited, level_number, progress,
                       real_timeout_seconds, max_native_solver_invocations,
-                      auto_extend_solver_timeout):
+                      auto_extend_solver_timeout, source_sha256):
         log = progress or (lambda *_: None)
         pinned_runtime = getattr(self.rules, "attestation", None) is not None
         if pinned_runtime:
@@ -170,6 +174,8 @@ class SupplyOptimizer:
             "palette": [self.rules.palette[global_index][1] + "FF" for global_index in used],
             "cells": [int(value) for value in grid.ravel()],
         }
+        if isinstance(source_sha256, str) and len(source_sha256) == 64:
+            level["source_sha256"] = source_sha256
         solver = self.solver or ScrubBotsSolver(self.rules)
         accepted, real_runs = [], []
         native_solver_invocations = 0
@@ -205,7 +211,7 @@ class SupplyOptimizer:
                 )
                 official = record.get("difficultyV1")
                 if verification["all_ok"] and isinstance(official, dict) and official.get("ok"):
-                    accepted.append((candidate, record, verification))
+                    accepted.append((candidate, record, verification, response))
             if len(accepted) >= verify_top:
                 break
         if not accepted:
@@ -213,7 +219,7 @@ class SupplyOptimizer:
                 "no candidate was proven SOLVED by the game's solver with official Difficulty V1 "
                 f"({len(real_runs)} real solver runs)"
             )
-        candidate, record, verification = max(accepted, key=lambda item: (item[0]["score"], item[0]["id"]))
+        candidate, record, verification, solver_response = max(accepted, key=lambda item: (item[0]["score"], item[0]["id"]))
         gameplay_metrics = scorer.metrics(candidate["columns"], record["trace"])
         difficulty_class, difficulty_score, difficulty_basis = self.model.final(
             record.get("difficultyV1"), m["image_complexity_score"], gameplay_metrics
@@ -236,6 +242,17 @@ class SupplyOptimizer:
                 "invariants": verification["checks"], "all_ok": verification["all_ok"],
             },
             "solver_status": record["status"],
+            "solver_evidence": {
+                "schema": "scrubbots-invocation-proof/v1",
+                "level_id": level_id,
+                "source_sha256": source_sha256 if isinstance(source_sha256, str) else None,
+                "level_sha256": hashlib.sha256(json.dumps(level, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                "solver": record,
+                "levelLoaderPass": solver_response.get("levelLoaderPass") is True,
+                "productionValidatorPass": solver_response.get("productionValidatorPass") is True,
+                "supplyPlanLoaderPass": record.get("supplyPlanLoaderPass") is True,
+                "runner": solver_response.get("_runner"),
+            },
             "solution_trace": [{"step": i + 1, "column": a["column"] + 1, "batch": {"color": color_id(a["color"]), "amount": a["count"]}, "clears": a["clears"], "pixels_left": a["active_after"]} for i, a in enumerate(record["trace"])],
             "solution_final": "WIN" if record["replay"]["solved"] and record["replay"]["finalActive"] == 0 else "FAIL",
             "solution_length": len(record["trace"]), "solution_replay": record["replay"],

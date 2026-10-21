@@ -35,13 +35,17 @@ def normalize_staged_solver_budget(
     return visited, initial, MAX_SOLVER_HARD_TIMEOUT_SECONDS
 
 
+def staged_solver_timeout_limit(initial_timeout_seconds: float, hard_timeout_seconds: float, *, attested: bool) -> float:
+    """Return the policy ceiling matching the normalized effective deadline."""
+    if not attested:
+        return 300.0
+    return MAX_SOLVER_HARD_TIMEOUT_SECONDS if hard_timeout_seconds > initial_timeout_seconds else MAX_SOLVER_TIMEOUT_SECONDS
+
+
 def staged_solver_deadline_state(
     elapsed_seconds: float, initial_timeout_seconds: float, hard_timeout_seconds: float,
-    *, terminal: bool = False,
 ) -> str:
     """Return the native runner phase without mutating or extending a deadline."""
-    if terminal:
-        return "TERMINAL"
     if elapsed_seconds >= hard_timeout_seconds:
         return "TIMEOUT"
     if hard_timeout_seconds > initial_timeout_seconds and elapsed_seconds >= initial_timeout_seconds:

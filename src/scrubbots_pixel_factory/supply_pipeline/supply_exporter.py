@@ -41,6 +41,8 @@ class SupplyExporter:
         level = {"version": 2 if void_count else 1, "id": level_id, "name": level_id.replace("_", " ").title(),
                  "difficulty": result["difficulty"], "width": lv["width"], "height": lv["height"],
                  "palette": lv["palette"], "cells": lv["cells"]}
+        if isinstance(lv.get("source_sha256"), str):
+            level["source_sha256"] = lv["source_sha256"]
         if void_count:
             result["level_metadata"] = {"artworkCellCount": artwork_count, "voidCellCount": void_count}
         lp = out / f"{level_id}.json"

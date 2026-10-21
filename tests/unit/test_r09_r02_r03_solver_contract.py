@@ -126,10 +126,10 @@ class StudioSolverContractTests(unittest.TestCase):
             def export(self, _result: object, _output: object, _level_id: str) -> dict[str, str]:
                 return {"level": "stub-level.json", "supply_plan": "stub-plan.json", "result": "stub-result.json"}
 
-        def no_native_load_check(level: str, plan: str, project: object, *, max_visited: int, timeout_seconds: float) -> dict[str, str]:
-            inspect.signature(real_verify).bind(level, plan, project, max_visited=max_visited, timeout_seconds=timeout_seconds)
+        def no_native_load_check(level: str, plan: str, project: object, *, max_visited: int, timeout_seconds: float, solver_evidence: object = None) -> dict[str, str]:
+            inspect.signature(real_verify).bind(level, plan, project, max_visited=max_visited, timeout_seconds=timeout_seconds, solver_evidence=solver_evidence)
             column_count, primary, _ = captured[-1]
-            captured[-1] = (column_count, primary, {"max_visited": max_visited, "timeout_seconds": timeout_seconds})
+            captured[-1] = (column_count, primary, {"max_visited": max_visited, "timeout_seconds": timeout_seconds, "solver_evidence": solver_evidence})
             return {"state": "ERROR", "disposition": "ERROR", "reason": "TEST_STUB_NO_NATIVE_LOAD_CHECK"}
 
         for columns in (3, 4, 5):
@@ -155,6 +155,7 @@ class StudioSolverContractTests(unittest.TestCase):
                             "game_project": str(RUNTIME_ROOT / "level_factory" / "output" / "current-game-runtime" / PINNED_GAME_COMMIT),
                             "real_max_visited": 25_000,
                             "solver_timeout_seconds": 240,
+                            "source_sha256": "a" * 64,
                         },
                         source_kind="OWNER_UPLOAD",
                     )
@@ -167,8 +168,69 @@ class StudioSolverContractTests(unittest.TestCase):
                 self.assertEqual(primary_kwargs["real_timeout_seconds"], 240)
                 self.assertEqual(primary_kwargs["max_native_solver_invocations"], 1)
                 self.assertIs(primary_kwargs["auto_extend_solver_timeout"], True)
+                self.assertEqual(primary_kwargs["source_sha256"], "a" * 64)
                 self.assertNotIn("real_timeout", primary_kwargs)
-                self.assertEqual(load_kwargs, {"max_visited": 25_000, "timeout_seconds": 240})
+                self.assertEqual(load_kwargs, {"max_visited": 25_000, "timeout_seconds": 240, "solver_evidence": None})
+
+    def test_exported_load_check_reuses_one_process_proof(self) -> None:
+        class PinnedRules:
+            column_count = 3
+            preview_depth = 3
+            attestation = {"source_commit": PINNED_GAME_COMMIT}
+            authority = {"git_head": PINNED_GAME_COMMIT}
+            palette = [("C01", "#FF0000")]
+            live_column_verification_available = True
+
+        level = {"version": 1, "id": "stub-level", "width": 3, "height": 1, "cells": [0, 0, 0], "palette": ["#FF0000"]}
+        exported_columns = [[{"color": "C01", "amount": 1}] for _ in range(3)]
+        plan = {
+            "schema": "scrubbots.level_supply_plan.v1", "version": 1,
+            "levelId": "stub-level", "columnCount": 3, "visiblePreviewDepth": 3,
+            "maxRobotsPerBatch": 1,
+            "ownerInputSha256": hashlib.sha256(json.dumps(exported_columns).encode()).hexdigest(),
+            "columns": [[{"batchId": f"K{i}", "cid": "C01", "robots": 1}] for i in range(3)],
+        }
+        level_binding = {key: level[key] for key in ("id", "width", "height", "palette", "cells")}
+        record = {
+            "status": "SOLVED", "trace": [
+                {"column": 0, "color": 0, "count": 1},
+                {"column": 1, "color": 0, "count": 1},
+                {"column": 2, "color": 0, "count": 1},
+            ], "replay": {"ok": True, "solved": True, "finalActive": 0},
+            "difficultyV1": {"ok": True},
+        }
+        evidence = {
+            "schema": "scrubbots-invocation-proof/v1", "level_id": "stub-level",
+            "source_sha256": None,
+            "level_sha256": hashlib.sha256(json.dumps(level_binding, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+            "solver": record,
+            "runner": {
+                "process_invocation_count": 1, "invocation_count": 1, "process_exit_code": 0,
+                "native_solve_completed": True, "native_solve_status": "SOLVED",
+                "timed_out": False, "cancelled": False,
+            },
+            "levelLoaderPass": True, "productionValidatorPass": True, "supplyPlanLoaderPass": True,
+        }
+
+        def read_stub(path: Path, encoding: str = "utf-8") -> str:
+            del encoding
+            return json.dumps(level if path.name == "level.json" else plan)
+
+        with (
+            patch.object(Path, "read_text", read_stub),
+            patch.object(Path, "read_bytes", return_value=b"export"),
+            patch.object(verify, "GameRules", return_value=PinnedRules()),
+            patch.object(verify, "find_godot") as find_godot,
+            patch.object(verify.ScrubBotsSolver, "run") as solver_run,
+        ):
+            result = verify.verify_exported_supply(
+                "level.json", "plan.json", "pinned-root", max_visited=25_000,
+                timeout_seconds=240, solver_evidence=evidence,
+            )
+        self.assertEqual(result["disposition"], "READY", result)
+        self.assertEqual(result["solver_invocations"], 1)
+        find_godot.assert_not_called()
+        solver_run.assert_not_called()
 
     def test_invalid_pinned_budgets_stop_before_optimizer_or_load_check(self) -> None:
         class PinnedRules:

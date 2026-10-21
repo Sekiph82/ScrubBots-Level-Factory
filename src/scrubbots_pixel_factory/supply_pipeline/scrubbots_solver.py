@@ -12,7 +12,12 @@ from collections import deque
 from pathlib import Path
 
 from .game_rules import find_godot
-from .solver_budget import normalize_solver_budget, normalize_staged_solver_budget, staged_solver_deadline_state
+from .solver_budget import (
+    normalize_solver_budget,
+    normalize_staged_solver_budget,
+    staged_solver_deadline_state,
+    staged_solver_timeout_limit,
+)
 
 BRIDGE = Path(__file__).resolve().parent / "godot" / "solver_bridge.gd"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -39,9 +44,10 @@ class ScrubBotsSolver:
         if attested_runtime:
             if not isinstance(candidates, (list, tuple)) or len(candidates) != 1 or stop_after != 1:
                 raise ValueError("pinned-runtime bridge requires exactly one candidate and stop_after=1")
+            extend_timeout = True if auto_extend_timeout is None else auto_extend_timeout
             max_visited, timeout, hard_timeout = normalize_staged_solver_budget(
                 max_visited, timeout,
-                auto_extend=(True if auto_extend_timeout is None else auto_extend_timeout),
+                auto_extend=extend_timeout,
             )
         else:
             hard_timeout = float(timeout if timeout is not None else 0)
@@ -100,6 +106,9 @@ class ScrubBotsSolver:
         tail = deque(maxlen=30)
         output_bytes = 0
         reader_error = []
+        control_errors = []
+        receipt_errors = []
+        progress_disabled = False
         native_solve_started = False
         native_solve_completed = False
         native_solve_status = None
@@ -113,7 +122,7 @@ class ScrubBotsSolver:
                 process_env[key] = str(bounded_temp)
 
         def drain_output(stream):
-            nonlocal output_bytes, native_solve_started, native_solve_completed, native_solve_status
+            nonlocal output_bytes, native_solve_started, native_solve_completed, native_solve_status, progress_disabled
             pending = ""
             try:
                 while True:
@@ -134,14 +143,18 @@ class ScrubBotsSolver:
                         elif line.startswith("BRIDGE_NATIVE_END "):
                             native_solve_completed = True
                             native_solve_status = line.split(" status=", 1)[-1].split(" ", 1)[0]
-                        if line.startswith("BRIDGE") and progress:
-                            progress(line)
+                        if line.startswith("BRIDGE") and progress and not progress_disabled:
+                            try:
+                                progress(line)
+                            except Exception as exc:
+                                control_errors.append(f"stdout progress callback failed: {type(exc).__name__}")
+                                progress_disabled = True
                     if len(pending) > 4096:
                         pending = pending[-4096:]
                 if pending:
                     tail.append(pending[-2048:].rstrip())
             except (OSError, UnicodeError) as exc:
-                reader_error.append(str(exc)[:256])
+                reader_error.append(f"stdout read failed: {type(exc).__name__}")
 
         def studio_cancel_requested():
             marker_path = os.environ.get("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", "").strip()
@@ -180,7 +193,7 @@ class ScrubBotsSolver:
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         start = time.monotonic()
         initial_timeout = float(timeout if timeout is not None else (240 if attested_runtime else 0))
-        timeout_limit = 480 if attested_runtime and auto_extend_timeout else (240 if attested_runtime else 300)
+        timeout_limit = staged_solver_timeout_limit(initial_timeout, hard_timeout, attested=attested_runtime)
         if hard_timeout < 0 or hard_timeout > timeout_limit or (attested_runtime and hard_timeout == 0):
             raise ValueError(f"native solver timeout must be from 0 to {timeout_limit} seconds")
         p = None
@@ -199,9 +212,7 @@ class ScrubBotsSolver:
             next_progress_at = 5.0
             while p.poll() is None:
                 elapsed = time.monotonic() - start
-                phase = staged_solver_deadline_state(
-                    elapsed, initial_timeout, hard_timeout, terminal=native_solve_completed
-                )
+                phase = staged_solver_deadline_state(elapsed, initial_timeout, hard_timeout)
                 if studio_cancel_requested():
                     cancelled = True
                     terminate_solver_tree(p)
@@ -232,36 +243,42 @@ class ScrubBotsSolver:
                             "source_sha256": source_sha256, "plan_sha256": plan_sha256, "response_sha256": None,
                             "job_path": str(work),
                         })
-                        if progress:
+                    except Exception as exc:
+                        receipt_errors.append(f"EXTENDED receipt write failed: {type(exc).__name__}")
+                    if progress and not progress_disabled:
+                        try:
                             progress(extension_note)
-                    except Exception:
-                        if p.poll() is None:
-                            terminate_solver_tree(p)
-                        raise
+                        except Exception as exc:
+                            control_errors.append(f"extension progress callback failed: {type(exc).__name__}")
+                            progress_disabled = True
                 if hard_timeout and phase == "TIMEOUT":
                     timed_out = True
                     terminate_solver_tree(p)
                     break
                 if reader_error:
                     output_overflow = True
-                    terminate_solver_tree(p)
-                    break
-                if progress and elapsed >= next_progress_at:
+                if progress and not progress_disabled and elapsed >= next_progress_at:
                     phase_label = "EXTENDED 240-480s" if extended else "Solving 0-240s"
                     deadline = hard_timeout if extended else initial_timeout
                     remaining = max(0.0, deadline - elapsed)
-                    progress(
-                        f"BRIDGE_SOLVER_PROGRESS phase={phase_label} elapsed_s={elapsed:.1f} "
-                        f"remaining_s={remaining:.1f} pid={p.pid} job_id={work.name} "
-                        f"request_sha256={request_sha256} source_sha256={source_sha256 or 'BOUND_BY_REQUEST_SHA'}"
-                    )
+                    try:
+                        progress(
+                            f"BRIDGE_SOLVER_PROGRESS phase={phase_label} elapsed_s={elapsed:.1f} "
+                            f"remaining_s={remaining:.1f} pid={p.pid} job_id={work.name} "
+                            f"request_sha256={request_sha256} source_sha256={source_sha256 or 'BOUND_BY_REQUEST_SHA'}"
+                        )
+                    except Exception as exc:
+                        control_errors.append(f"solver progress callback failed: {type(exc).__name__}")
+                        progress_disabled = True
                     next_progress_at = elapsed + 5.0
                 time.sleep(0.05)
             reader.join(timeout=2)
             if reader.is_alive():
-                p.kill()
-                p.wait()
-                reader.join(timeout=2)
+                if p.poll() is None:
+                    terminate_solver_tree(p)
+                    reader.join(timeout=2)
+                else:
+                    reader_error.append("stdout reader remained open after native process exit; possible orphaned pipe holder")
             if p.stdout is not None:
                 p.stdout.close()
             elapsed_seconds = round(time.monotonic() - start, 3)
@@ -289,6 +306,8 @@ class ScrubBotsSolver:
             "timed_out": timed_out, "cancelled": cancelled, "native_solve_started": native_solve_started,
             "native_solve_completed": native_solve_completed, "native_solve_status": native_solve_status,
             "stdout_bytes": output_bytes, "stdout_tail": list(tail),
+            "stdout_overflow": output_overflow, "stdout_errors": list(reader_error),
+            "control_errors": list(control_errors), "extension_receipt_errors": list(receipt_errors),
             "request_sha256": request_sha256, "source_sha256": source_sha256, "plan_sha256": plan_sha256,
             "response_sha256": None, "job_path": str(work),
         }

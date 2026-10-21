@@ -9,6 +9,7 @@ from scrubbots_pixel_factory.supply_pipeline.solver_budget import (
     MAX_SOLVER_TIMEOUT_SECONDS,
     normalize_staged_solver_budget,
     staged_solver_deadline_state,
+    staged_solver_timeout_limit,
 )
 
 
@@ -68,6 +69,9 @@ def test_staged_budget_keeps_240_initial_and_caps_absolute_total_at_480() -> Non
     assert normalize_staged_solver_budget(25_000, 240, auto_extend=False) == (25_000, 240.0, 240.0)
     assert MAX_SOLVER_TIMEOUT_SECONDS == 240.0
     assert MAX_SOLVER_HARD_TIMEOUT_SECONDS == 480.0
+    assert staged_solver_timeout_limit(240.0, 480.0, attested=True) == 480.0
+    assert staged_solver_timeout_limit(240.0, 240.0, attested=True) == 240.0
+    assert staged_solver_timeout_limit(240.0, 300.0, attested=False) == 300.0
     with pytest.raises(ValueError, match="240-second initial"):
         normalize_staged_solver_budget(25_000, 90, auto_extend=True)
     with pytest.raises(ValueError, match=r"240\]"):
@@ -107,10 +111,20 @@ def test_manual_cancel_after_extension_terminates_same_process_without_timeout()
     assert extensions == [(731, 240.0)]
 
 
+def test_solver_process_crash_before_initial_deadline_is_terminal_without_retry() -> None:
+    launches, process, extensions, phase = _drive_fake_process(terminal_at=20.0, terminal_result="CRASHED")
+    assert launches == 1
+    assert process.poll() == "CRASHED"
+    assert phase == "TERMINAL"
+    assert extensions == []
+    assert process.termination_count == 0
+
+
 def test_staged_deadline_exact_transition_boundaries() -> None:
     assert staged_solver_deadline_state(239.99, 240.0, 480.0) == "RUNNING"
     assert staged_solver_deadline_state(240.0, 240.0, 480.0) == "EXTENDED"
     assert staged_solver_deadline_state(400.0, 240.0, 480.0) == "EXTENDED"
     assert staged_solver_deadline_state(479.99, 240.0, 480.0) == "EXTENDED"
     assert staged_solver_deadline_state(480.0, 240.0, 480.0) == "TIMEOUT"
-    assert staged_solver_deadline_state(480.0, 240.0, 480.0, terminal=True) == "TERMINAL"
+    # A native solve-end marker alone must not disable the process hard deadline.
+    assert staged_solver_deadline_state(480.0, 240.0, 480.0) == "TIMEOUT"
