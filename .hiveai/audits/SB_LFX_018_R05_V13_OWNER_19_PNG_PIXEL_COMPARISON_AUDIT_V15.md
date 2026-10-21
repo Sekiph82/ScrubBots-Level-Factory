@@ -1,6 +1,6 @@
 # V15 GPT Independent Uploaded PNG Pixel-Level Comparison (2026-10-21)
 
-**Scope:** 19 PNGs physically attached by the owner in this conversation and available in the current model's working sandbox: named 035, 036, 037–043, 045–051, 053–055. **These are NOT the previously requested 15 later 129–143 or 4 FAILED 019,056,058,060; those 19 requested files remain absent from the uploaded runtime.** This report intentionally does not claim to validate 38 original source bytes. Do not derive provenance or claim SHA equality to immutable owner Release sources without a matching signed source record.
+**Corrected scope (owner screenshot re-check 2026-10-21):** The owner's earlier message actually included **both groups**. The 19 previously checked sources (035–055) **and all 15 later REJECTED (129–143), plus 3 of 4 FAILED (056/058/060)** exist as real PNG bytes in `/mnt/data` and have now been independently read. **The ONLY requested FAILED source not found is `019_32x32px.png`; an unrelated `014_32x32px.png` was supplied instead**, and its pixels were separately inspected. Prior statement that 15+4 were not attached was incorrect and is explicitly superseded. Reports below compare attached files' actual PNG pixels to saved builder metrics; no claim of installed immutable Release source SHA equivalence without its original source record.
 
 **Method:** direct image-byte inspection with Pillow RGBA decode; canonical owner-locked palette `data/palette/scrubbots_palette_v3.json` 16 exact RGB values; pixels with alpha0 are VOID and their RGB ignored, alpha 1..254 is invalid, alpha255 is checked for exact color membership; valid distinct colors are counted **only among RGB matching canonical swatches**. Minimum artwork if transparent: at least 200 nontransparent pixels AND >=25% of area. Compared to published builder V13-A table rows near lines 480–501 for the identical filenames. No image edits, no quantization or solver runs.
 
@@ -34,4 +34,43 @@
 
 **Separate owner change on native solver timing:** Owner requested at t=0 a 240s budget, and *if the SAME native solver process is still running unsolved at 240s*, extend its **total** time cap to 480s, not restart and not 240+480=720s. Implement as an auditable soft deadline at 240 and hard deadline at 480, preserving pinned-runtime SHA, job identity, cancel semantics, max-visited/memory bounds, stdout reader and no duplicate native job, then offline/fake-time tests. Never auto-rerun old FAILED 056/058/060 or override current completed 140 job. This is a design/implementation instruction only, **no code or actual solve test yet**.
 
-**Source references:** owner attachments above, `src/scrubbots_pixel_factory/studio_extensions.py::_owner_source_grid,validate_owner_source`, `data/palette/scrubbots_palette_v3.json`, builder 38-issue table, `src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py`, `.../scrubbots_solver.py`. 
+**Source references:** owner attachments above, `src/scrubbots_pixel_factory/studio_extensions.py::_owner_source_grid,validate_owner_source`, `data/palette/scrubbots_palette_v3.json`, builder 38-issue table, `src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py`, `.../scrubbots_solver.py`.
+
+## 2026-10-21 owner screenshot correction: 15 late REJECTED + 3 FAILED actually arrived earlier
+
+**Apology/correction:** Assistant originally overlooked the already mounted second upload and reported it as not received. Fresh filesystem inspection showed **15/15 `129_...` through `143_...`** and **3/4 FAILED `056,058,060`** already present and available. Only `019_32x32px.png` missing; `014_32x32px.png` was present, a different source. No request to upload the 18 already-received files again.
+
+Fresh RGBA pixel-by-pixel analysis using exact sixteen V3 palette values independently matched Codex V13-A persisted log **15/15** late rejected files: dimensions, valid canonical colors, fully opaque off-palette pixel counts, intermediate alpha counts and non-transparent artwork counts.
+
+| PNG | Dimensions | V3 colors exactly used | Off-palette opaque pixels | Semi-alpha | Nontransparent pixels | Minimum artwork | Codex table |
+|---|---:|---:|---:|---:|---:|---|---|
+| `129_32x32px.png` | 32×32 | 0 | 330 | 0 | 330 | PASS | MATCH |
+| `130_35x35px.png` | 35×35 | 1 | 466 | 0 | 472 | PASS | MATCH |
+| `131_32x32px.png` | 32×32 | 0 | 442 | 0 | 442 | PASS | MATCH |
+| `132_36x36px.png` | 36×36 | 1 | 660 | 0 | 661 | PASS | MATCH |
+| `133_32x32px.png` | 32×32 | 1 | 488 | 0 | 489 | PASS | MATCH |
+| `134_34x34px.png` | 34×34 | 1 | 733 | 0 | 738 | PASS | MATCH |
+| `135_34x34px.png` | 34×34 | 0 | 295 | 0 | 295 | PASS | MATCH |
+| `136_34x34px.png` | 34×34 | 0 | 753 | 0 | 753 | PASS | MATCH |
+| `137_32x32px.png` | 32×32 | 0 | 322 | 0 | 322 | PASS | MATCH |
+| `138_32x32px.png` | 32×32 | 0 | 407 | 0 | 407 | PASS | MATCH |
+| `139_37x37px.png` | 37×37 | 1 | 669 | 0 | 673 | PASS | MATCH |
+| `140_32x32px.png` | 32×32 | 1 | 531 | 0 | 541 | PASS | MATCH |
+| `141_32x32px.png` | 32×32 | 1 | 268 | 0 | 283 | PASS | MATCH |
+| `142_33x33px.png` | 33×33 | 1 | 670 | 0 | 683 | PASS | MATCH |
+| `143_37x37px.png` | 37×37 | 1 | 705 | 0 | 706 | PASS | MATCH |
+
+All 15 violate `FOREIGN_COLORS` and `USED_COLOR_COUNT`, with zero semitransparent pixels and minimum-artwork PASS. These facts reproduce every V13-A table count, no aesthetic opinions or color conversion needed.
+
+**3 actually uploaded FAILED PNGs, strict source validation:**
+
+| PNG | Pixels | V3 colors used | Foreign pixels | Semi-alpha | Art cells | Strict source result | Saved failure |
+|---|---|---:|---:|---:|---:|---|---|
+| `056_50x50px.png` | 50×50 | 9 | 0 | 0 | 2,500 | **PASS** | Solver reached 240s timeout |
+| `058_50x50px.png` | 50×50 | 10 | 0 | 0 | 2,500 | **PASS** | Solver reached 240s timeout |
+| `060_50x50px.png` | 50×50 | 12 | 0 | 0 | 2,500 | **PASS** | Solver reached 240s timeout |
+
+These three are **not failed artwork validation**: they are exact-palette, fully opaque 50×50s with allowed 9/10/12 color counts. Their **solver timeout cannot be proven from PNG bytes**, but the linked Codex run receipt separately records native bounded solve at 240s for each. One `014_32x32px.png` was also uploaded; strict source validation PASS: 7 canonical colors, zero foreign, zero semi-alpha, 588/1024 nontransparent cells. `014` is **not** the absent `019` and must not be treated as proof for the Windows access-denied error.
+
+**Overall independent attachment metric coverage now:** all **34/34 REJECTED PNGs** (19 previous +15 newly recognized), **3/4 FAILED PNG source validations**, and **1 unrelated 014 source**. **37 of 38 requested problem PNGs directly examined**, all 34 reject findings confirmed, 3 solver PNGs passed source rules. `019` PNG absent, and even if uploaded its bytes alone cannot prove the WinError5 path/ACL root cause. Current total READY 102 and batch COMPLETE 140 unchanged. No Godot solve runs, palette quantization or source alterations. Scoped V13-C installation and V13-D staged 240→480 native solver source implementation remain pending.
+
