@@ -1,0 +1,62 @@
+# SB-LFX-018 R05 M03 | EXECUTION UNBLOCK + REAL OWNER-002 NATIVE REPLAY | UNRESTRICTED ENGINEERING MASTER V02
+Document role: GPT AUTHORIZED CODEX BUILDER PROMPT
+Date: 2026-10-21 Europe/Istanbul
+Current task: **SB-LFX-018 R05 V13-C/D R07 — OWNER APPROVED 3-STAGE INVENTORY, MIGRATION DESIGN AND BOUNDED NATIVE VALIDATION**
+Canonical repo: https://github.com/Sekiph82/ScrubBots-Level-Factory
+Canonical ONLY local checkout: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`
+Canonical root tracker: `TASKS.md` (GPT-owned, Codex READ ONLY)
+Independent R06 strict audit V21: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/audits/SB_LFX_018_R05_V13_CD_R06_INSTALL_READINESS_INDEPENDENT_AUDIT_V21.md
+R06 decision packet: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/docs/process/SB_LFX_018_R05_V13_CD_R06_INSTALL_READINESS_DECISION_PACKET.md
+Existing builder log, append ONLY: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/codex-logs/SB-LFX-018-R05-M03_NATIVE_002_REPLAY_COMPLETE_V02_CODEX_BUILDER_LOG.md
+
+## OWNER AUTHORITY: explicit response on 2026-10-21
+
+The owner stated, in Turkish: **"3 engeli de senin onerdigin gibi yapmayi pnayliyorum"** (approves addressing all three gates *as previously recommended*). This explicitly authorizes **IN ORDER**:
+
+1. **Read-only** inspection of existing Windows Studio/Godot/Python processes and exact Release/6-manifest/18-path/source SHA state. No file writes, process kills, Godot launch or installer Apply in Stage 1.
+2. **Prospective controlled-install migration DESIGN/ENGINEERING ONLY**, after stage 1: plan to address `verify.py` manifest drift and genuine all-entrypoint writer exclusion, with safe source-only changes/tests where actually warranted. This owner response DOES NOT authorize changing installed Release files/manifests, forging an earlier receipt, installing source over a drifted binary, running `-Apply`, or setting `WriterExclusionEstablished=true` without real enforceable proof.
+3. **Bounded native Godot 4.7.2 parsing/validation** of the real canonical project, **after** Stages 1 and 2 safety preflight, with permission ONLY for tool-generated project `level_factory/.godot/**`, relevant generated `level_factory/**/*.uid`, `*.import`, and narrowly attributable Godot user cache/config writes. The owner knows these files can be created/changed. Stage 3 does **not** authorize edits to gameplay/source/owner PNG/job/Pool, installed Release, app launch/UI clicking, paid generation, mass-import/asset regeneration, or unbounded local file changes. Do not ask to re-approve the exact three stage permissions already granted; if a fundamentally different write/operation is necessary, leave it blocked and identify that specific separate owner gate.
+
+A prospective approval is not an installation/rollback execution receipt. The owner has **not authorized any real Release Apply**, native GUI of the installed Studio, 140-item original job re-run, CI, paid providers or destructive processes.
+
+## Initial sync and preservation gate, BEFORE doing anything
+
+Read current `TASKS.md`, AGENTS/GOVERNANCE, `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`, V21 audit, R06 packet, existing M03 builder log, R04 exact 18-path manifest matrix. Verify the exact canonical Desktop origin, branch, current HEAD vs GitHub `origin/main`, tracked/untracked status, known 18 stashes, all existing worktrees. Safe `git fetch --prune origin` and fast-forward ONLY when owner paths remain intact and tracked conflicts absent. No new clone, git worktree, TEMP folder, full-project copy, scratch sandbox, destructive reset/clean, rebase/autostash/force or branch rewriting. Do not stage thousands of owner-untracked files or remove historical worktrees/stashes. If FF is unsafe, preserve everything; document exact issue. The owner's Windows files are accessible to Codex only through canonical local checkout; do not invent machine results.
+
+Hard cost/security locks for ALL stages: zero GitHub Actions/CI/hosted runners, billable PixelLab/ALPIX/Claude/etc provider use, quota checks, R2, production/staging access, credential extraction, source image generation, original 140 PNG rerun or retries, broad disk cleanup, process killing/suspending/termination, installed GUI automation, or `Release -Apply`. Never edit GPT-owned `TASKS.md`, old prompts, audits or previous log sections.
+
+## R07-A | Owner-authorized exact READ-ONLY live inventory (MUST EXECUTE FIRST)
+
+1. Inspect all real local Windows processes with bounded, read-only CIM/Get-Process enumeration. Build accurate Studio/Godot/Python writer tree and direct launch routes. Match immutable executable paths, command-line, PID+PPID+start time if accessible; avoid PID-only conclusions, redact sensitive command lines, fail closed if process metadata inaccessible. **Do not start, stop, suspend, attach to, or change any live process**; no live worker signal.
+2. Read/hash without mutation the **six** known current/backup/rollback manifest artifacts described in R04 packet, including main `.factory-studio-install-manifest.json`, validate JSON structure, managed file/overlayPaths/receipt counts and the `verify.py` receipt evidence. Recompute (not copy blindly) expected/installed/source SHA-256 for exact **18-path installer allowlist** from the R04/R06 matrix. Check relative paths, existence, symlinks/junctions and file identity; do not follow reparse paths outside canon. Report changes to any historical SHA and precise unknown provenance. Source and Release comparisons must be made against real bytes in this canonical Windows environment, no generated install.
+3. Read-only baseline exact owner COMPLETE 140-job and Release Pool state *only via bounded digests/counts*, if read permission and paths established. Preserve original job data and PNGs completely. Prior builder baseline: 140 total = 102 READY, 4 FAILED, 34 REJECTED, zero pending, Pool 131 JSON files (not equal verified READY). If any user data is unreadable, label NOT VERIFIED; do not trigger a run by trying to verify.
+4. Write ONLY an evidence report into tracked `docs/process/` and append-only M03 log after inventory completes. Evidence may be stored in memory until publication; no untracked owner-local log/TEMP file dumps. Redact personal paths beyond needed canonical roots, tokens, credential-containing arguments and secrets. Stage A must be completed before proceeding to B. If no reliable full inventory is possible, explain what is incomplete, and proceed only with truly independent read-only/source-only work; not native.
+
+## R07-B | Prospective manifest + writer-exclusion ENGINEERING ONLY
+
+1. On the fresh R07-A facts, identify the exact installed `verify.py` expected/installed/current SHA mismatch and any other drift. The historic known CRLF/source provenance `90e560...` is **not** an approved per-file install receipt; do not declare authorization by source lineage. Present a prospective, owner-reviewable exact managed migration plan for **only 18 listed paths** and three proposed overlay additions `supply_exporter.py`, `verify.py`, `alpix_batch.py`, including change-by-change before/after hashes, staged proof, rollback, owner-data preservation and fresh preflight. Do not add `verify.py` to `authorizedRepairHashes` to silently pass the gate; do not alter the installed manifest.
+2. Analyze whether all currently installed legacy launchers, PowerShell/Godot GUI, Python direct entry, Godot solver and ALPIX child processes could be **actually** excluded for the whole future transaction + rollback. A cooperative mutex in new source alone cannot exclude old installed processes. A simple manual no-start promise plus a snapshot does not establish strict exclusivity. If an enforceable external/OS control is needed, design it and state exact costs, owner decision and proof prerequisites. **Do not flip `WriterExclusionEstablished:$false` or install any new launcher/lock.**
+3. Only if demonstrably useful, implement narrowly scoped **source-only** code improvements with synthetic offline tests in canonical tracked files, without weakening fail-closed behavior. Do not fabricate a new R08/R09 "paper test" cycle; if real exclusion remains blocked, document precisely why. Tests only when code materially changed, no cache-generating test runs, use `-B -p no:cacheprovider` where relevant, `git diff --check`.
+4. Publish a concise truthful manifest / exclusion decision result; *no* Release writes/Apply.
+
+## R07-C | Owner-authorized LIMITED NATIVE Godot 4.7.2 test, CONDITIONALLY EXECUTE
+
+The owner's consent now covers a real native parse against **existing canonical** `level_factory/project.godot` with *narrowly generated* Godot cache/UID/import writes, but not a blanket project mutation. Before invocation:
+- Confirm exact Godot 4.7.2 executable, project root, CLI and command semantics. Prefer bounded `--headless` syntax/import/scene validation with a definite exit deadline, and NO editor GUI/screenshot/Release import/real solver replay. Establish allowed path boundaries and exact project-relative generated cache/UID/import candidates; identify any cache/config destinations outside the project and treat unknown write targets as blocked. Avoid `--editor` or mass import if a narrower parse suffices.
+- Take read-only, in-memory before-state path/SHA inventory of tracked project files and important owner-untracked source assets and original job/Pool, ensuring no protected owner data will be overwritten. In the approved generated-file scope, existing owner `.uid`/`.import` values may have meaning: identify and preserve each original hash; do not silently overwrite pre-existing owner files if that cannot be safely controlled. No TEMP/cache copy or new worktree as a workaround. Do not elevate permission to all user profile/AppData; only narrow, directly attributable Godot cache/config.
+- **RUN** a bounded native Godot parse/test only if those controls make the owner-approved scope reasonably enforceable. If Godot needs wider unknown writes, or if any condition fails, do **NOT** launch it; report `NATIVE_TEST_BLOCKED_OUTSIDE_OWNER_SCOPE` with exact cause. A failure of install writer exclusion does not automatically forbid source-project parsing if Stage C's separate write boundaries and process safety can be proven; conversely owner approval does not override failed native safety checks.
+- Re-hash current tracked/owner data and enumerate generated cache/UID/import files after the run, including unexpected changes. Preserve all owner files; no speculative cleanup, deletion or restore. If unexpected changed bytes, stop and report exact paths. Do not claim installed Studio GUI accepted, because this scope approves only native parse. Mark `NATIVE_PARSE_PASS` only with real Godot invocation/version/exit proof, not a Python surrogate. Any timed native launch must not spawn the paid renderer or solver/140 batch.
+- No Godot project duplication, new worktree or TEMP sandbox; owner permits approved generated caches in real canonical project, subject to above gates.
+
+## Publication and handoff
+
+Append R07 phase-by-phase evidence to SAME existing M03 builder log, preserve old text byte-for-byte; commit separate tracked R07 report in `docs/process/`, optional source/tests only if warranted, and log-only commit when feasible. Before push, `git diff --check`, git fetch and verify origin/main ancestry. Normal `git push origin HEAD:main`, post-fetch HEAD==origin/main, ahead/behind 0/0, tracked clean. Never force push or edit `TASKS.md`. Workflow must stay manual; no CI/Actions launch.
+
+Return status independently for stages:
+- `R07_A_LIVE_READONLY_INVENTORY_PASS` or precise blocker, real six manifest hashes, `verify.py` triple and writer graph.
+- `R07_B_MIGRATION_DESIGN_READY` plus `PROCESS_QUIESCENCE_UNPROVEN` unless enforceably proven (no -Apply).
+- `R07_C_NATIVE_PARSE_PASS` or `NATIVE_TEST_BLOCKED_OUTSIDE_OWNER_SCOPE`/execution failure, exact generated path evidence.
+- `INSTALLED_GUI_OPEN`, `RELEASE_APPLY_NOT_AUTHORIZED`, and safe original 140 job / pool baseline.
+- Source/report/log commit SHAs, exact GitHub report/log URLs and remaining true next approval. Owner's consent for these three already exists; do not ask same question again.
+
+Full V13 installed acceptance is not granted by R07. A *separate* owner decision is required before any actual installed Release migration or installed GUI manipulation.
