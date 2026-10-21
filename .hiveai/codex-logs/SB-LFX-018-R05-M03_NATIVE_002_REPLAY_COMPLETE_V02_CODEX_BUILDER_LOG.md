@@ -721,5 +721,5 @@ Document role: CODEX BUILDER LOG
 - Readiness packet commit: `f51c00132847028fda6d3c5335036bcc65e67cb7`.
 - Builder evidence commit: `52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`.
 - Normal push `git push origin HEAD:main` advanced `origin/main` from `ead8875b4c552cdadf00af61d2b321d5f1ab0d0b` to `52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`.
-- Immediate post-push `git fetch --prune origin` verified `HEAD == origin/main == 52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`, 0 ahead / 0 behind, and `git diff --exit-code` passed. Tracked tree was clean; untracked owner paths remained unstaged and untouched. The final log-receipt commit will be published separately and parity checked again.
+- Immediate post-push `git fetch --prune origin` verified `HEAD == origin/main == 52eab80e68df57ca01cdca8d7f9ffeaa8dd3f337`, 0 ahead / 0 behind, and `git diff --exit-code` passed. Tracked tree was clean; untracked owner paths remained unstaged and untouched. The separate log-receipt commit `3641c6c35803dd2e12769a79b6c9af3fa710f8d1` was also published; its post-push fetch verified `HEAD == origin/main` at that SHA, 0 ahead / 0 behind, with tracked tree clean. The final R06 addendum records the closing publication check.
 - No Actions/CI were triggered; workflow trigger remains manual-only.
