@@ -739,3 +739,8 @@ Document role: CODEX BUILDER LOG
 ### R07 evidence publication preparation
 
 - Evidence report is committed separately as `cd0112edc536a60f294fd11da0284c1ce8db1b4f` (`Record R07 inventory and migration evidence`). `git diff --cached --check` passed. The live-process recheck immediately before closing R07-C still found PID 13860 running the same unrelated Godot Android-template installation; no Godot CLI was invoked. The report and this log append are the only task-authored files. Normal publication and post-push parity verification follow.
+### R07 first publication receipt
+
+- Report commit: `cd0112edc536a60f294fd11da0284c1ce8db1b4f`; builder log commit: `ea31f012d56fc008037a5578d2c5382c74c1b23c`.
+- Normal `git push origin HEAD:main` advanced `origin/main` from `8a817c3ebc9ec96d78762401b1658ed61309ac7d` to `ea31f012d56fc008037a5578d2c5382c74c1b23c`. Immediate `git fetch --prune origin` verified `HEAD == origin/main`, 0 ahead / 0 behind; tracked worktree and index were clean. Owner-untracked files remain untouched. This final log receipt is being published separately, then parity will be checked again.
+- No CI/Actions were run; no workflow definitions changed.
