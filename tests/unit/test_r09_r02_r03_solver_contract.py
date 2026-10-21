@@ -154,7 +154,7 @@ class StudioSolverContractTests(unittest.TestCase):
                             "column_count": columns,
                             "game_project": str(RUNTIME_ROOT / "level_factory" / "output" / "current-game-runtime" / PINNED_GAME_COMMIT),
                             "real_max_visited": 25_000,
-                            "solver_timeout_seconds": 90,
+                            "solver_timeout_seconds": 240,
                         },
                         source_kind="OWNER_UPLOAD",
                     )
@@ -164,10 +164,11 @@ class StudioSolverContractTests(unittest.TestCase):
                 actual_columns, primary_kwargs, load_kwargs = captured[0]
                 self.assertEqual(actual_columns, columns)
                 self.assertEqual(primary_kwargs["real_max_visited"], 25_000)
-                self.assertEqual(primary_kwargs["real_timeout_seconds"], 90)
+                self.assertEqual(primary_kwargs["real_timeout_seconds"], 240)
                 self.assertEqual(primary_kwargs["max_native_solver_invocations"], 1)
+                self.assertIs(primary_kwargs["auto_extend_solver_timeout"], True)
                 self.assertNotIn("real_timeout", primary_kwargs)
-                self.assertEqual(load_kwargs, {"max_visited": 25_000, "timeout_seconds": 90})
+                self.assertEqual(load_kwargs, {"max_visited": 25_000, "timeout_seconds": 240})
 
     def test_invalid_pinned_budgets_stop_before_optimizer_or_load_check(self) -> None:
         class PinnedRules:
@@ -175,7 +176,7 @@ class StudioSolverContractTests(unittest.TestCase):
                 self.column_count = column_count
                 self.attestation = {"source_commit": PINNED_GAME_COMMIT}
 
-        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 241), (25_000, "90")):
+        for visits, timeout in ((None, 90), (0, 90), (25_001, 90), (25_000, None), (25_000, 90), (25_000, 241), (25_000, 480), (25_000, "240")):
             with self.subTest(visits=visits, timeout=timeout):
                 native_boundary_calls: list[str] = []
 

@@ -58,7 +58,8 @@ class SupplyOptimizer:
     def run(self, image, seed=0, candidates=300, level_id="pixelart_level",
             verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
             real_max_visited=None, level_number=1, progress=print,
-            real_timeout_seconds=240, max_native_solver_invocations=None):
+            real_timeout_seconds=240, max_native_solver_invocations=None,
+            auto_extend_solver_timeout=False):
         return self._run_prepared(
             *self.prepare(image), seed=seed, candidates=candidates, level_id=level_id,
             verify_top=verify_top, screen_budget=screen_budget, metric_top=metric_top,
@@ -66,12 +67,14 @@ class SupplyOptimizer:
             level_number=level_number, progress=progress,
             real_timeout_seconds=real_timeout_seconds,
             max_native_solver_invocations=max_native_solver_invocations,
+            auto_extend_solver_timeout=auto_extend_solver_timeout,
         )
 
     def run_grid(self, grid, used, seed=0, candidates=300, level_id="pixelart_level",
                  verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
                  real_max_visited=None, level_number=1, progress=print,
-                 real_timeout_seconds=240, max_native_solver_invocations=None):
+                 real_timeout_seconds=240, max_native_solver_invocations=None,
+                 auto_extend_solver_timeout=False):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,
@@ -80,12 +83,14 @@ class SupplyOptimizer:
             progress=progress,
             real_timeout_seconds=real_timeout_seconds,
             max_native_solver_invocations=max_native_solver_invocations,
+            auto_extend_solver_timeout=auto_extend_solver_timeout,
         )
 
     def _run_prepared(self, grid, used, m, band, mean, total, rows, *, seed,
                       candidates, level_id, verify_top, screen_budget, metric_top,
                       viability_budget, real_max_visited, level_number, progress,
-                      real_timeout_seconds, max_native_solver_invocations):
+                      real_timeout_seconds, max_native_solver_invocations,
+                      auto_extend_solver_timeout):
         log = progress or (lambda *_: None)
         pinned_runtime = getattr(self.rules, "attestation", None) is not None
         if pinned_runtime:
@@ -182,6 +187,7 @@ class SupplyOptimizer:
             }
             if isinstance(solver, ScrubBotsSolver):
                 call_options["timeout"] = real_timeout_seconds
+                call_options["auto_extend_timeout"] = auto_extend_solver_timeout
             response = solver.run(
                 level,
                 [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
@@ -237,6 +243,6 @@ class SupplyOptimizer:
             "image": {key: value for key, value in m.items() if not key.startswith("_")},
             "generation_attempts": attempts, "screening_solvable_candidates": len(pool), "real_solver_runs": real_runs, "random_seed": seed,
             "real_solver_invocations": native_solver_invocations,
-            "settings": {"candidates": candidates, "column_count": self.column_count, "visible_preview_depth": 3, "verify_top": verify_top, "screen_budget": screen_budget, "metric_top": metric_top, "viability_budget": viability_budget, "batch_cap": None, "slot_count": getattr(self.rules, "baseline_slot_count", 5), "batch_count_policy": "positive per-plan metadata bound; no global cap"},
+            "settings": {"candidates": candidates, "column_count": self.column_count, "visible_preview_depth": 3, "verify_top": verify_top, "screen_budget": screen_budget, "metric_top": metric_top, "viability_budget": viability_budget, "solver_timeout_policy": {"initial_budget_s": real_timeout_seconds, "hard_budget_s": 480 if pinned_runtime and auto_extend_solver_timeout else real_timeout_seconds, "auto_extend_if_running": bool(pinned_runtime and auto_extend_solver_timeout)}, "batch_cap": None, "slot_count": getattr(self.rules, "baseline_slot_count", 5), "batch_count_policy": "positive per-plan metadata bound; no global cap"},
             "export_notes": [], "_level": level,
         }

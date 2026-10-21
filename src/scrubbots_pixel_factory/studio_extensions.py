@@ -865,7 +865,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
 
     from .supply_pipeline.contracts import validate_column_count
     from .supply_pipeline.game_rules import GameRules
-    from .supply_pipeline.solver_budget import normalize_solver_budget
+    from .supply_pipeline.solver_budget import normalize_solver_budget, normalize_staged_solver_budget
     from .supply_pipeline.supply_exporter import SupplyExporter
     from .supply_pipeline.supply_optimizer import NoValidSupply, SupplyOptimizer
 
@@ -893,7 +893,11 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         requested_visits = request_data.get("real_max_visited")
         requested_timeout = request_data.get("solver_timeout_seconds")
         try:
-            if rules.attestation is None and requested_visits is None and requested_timeout is None:
+            if rules.attestation is not None:
+                solver_max_visited, solver_timeout, _ = normalize_staged_solver_budget(
+                    requested_visits, requested_timeout, auto_extend=True
+                )
+            elif requested_visits is None and requested_timeout is None:
                 solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 240)
             else:
                 solver_max_visited, solver_timeout = normalize_solver_budget(
@@ -903,6 +907,16 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             budget_scope = "pinned solver budget" if rules.attestation is not None else "solver budget"
             raise StudioExtensionError(f"invalid {budget_scope}: {exc}") from exc
         grid, used = _canonical_cells_to_grid(cells, width, height, rules)
+        auto_extend_solver_timeout = rules.attestation is not None
+
+        def solver_progress(line: str) -> None:
+            if line.startswith("BRIDGE_SOLVER_BUDGET_EXTENDED"):
+                emit("SOLVE", "RUNNING", line)
+            elif line.startswith("BRIDGE_SOLVER_PROGRESS"):
+                emit("SOLVE", "RUNNING", line)
+            else:
+                emit("ANALYZE/PLAN", "RUNNING", line)
+
         emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
@@ -910,9 +924,10 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             screen_budget=int(request_data.get("screen_budget", 3000)), metric_top=int(request_data.get("metric_top", 12)),
             viability_budget=int(request_data.get("viability_budget", 3000)),
             real_max_visited=solver_max_visited, level_number=int(request_data.get("level_number", 1)),
-            progress=lambda line: emit("ANALYZE/PLAN", "RUNNING", line),
+            progress=solver_progress,
             real_timeout_seconds=solver_timeout,
             max_native_solver_invocations=1 if rules.attestation is not None else None,
+            auto_extend_solver_timeout=auto_extend_solver_timeout,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply
@@ -2117,6 +2132,82 @@ from pathlib import Path
 import time
 from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
+
+PIXELLAB_CREDENTIAL_TARGET = "ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN"
+
+
+def _credential_manager_secret(target: str = PIXELLAB_CREDENTIAL_TARGET) -> str:
+    """Read the supported Windows Generic credential in memory only."""
+    import ctypes
+    import os
+    from ctypes import wintypes
+
+    if os.name != "nt":
+        return ""
+
+    class FILETIME(ctypes.Structure):
+        _fields_ = [("dwLowDateTime", wintypes.DWORD), ("dwHighDateTime", wintypes.DWORD)]
+
+    class CREDENTIAL(ctypes.Structure):
+        _fields_ = [
+            ("Flags", wintypes.DWORD), ("Type", wintypes.DWORD),
+            ("TargetName", wintypes.LPWSTR), ("Comment", wintypes.LPWSTR),
+            ("LastWritten", FILETIME), ("CredentialBlobSize", wintypes.DWORD),
+            ("CredentialBlob", ctypes.POINTER(ctypes.c_ubyte)),
+            ("Persist", wintypes.DWORD), ("AttributeCount", wintypes.DWORD),
+            ("Attributes", ctypes.c_void_p), ("TargetAlias", wintypes.LPWSTR),
+            ("UserName", wintypes.LPWSTR),
+        ]
+
+    credential_ptr = ctypes.POINTER(CREDENTIAL)()
+    advapi32 = ctypes.WinDLL("Advapi32.dll", use_last_error=True)
+    advapi32.CredReadW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD, ctypes.POINTER(ctypes.POINTER(CREDENTIAL))]
+    advapi32.CredReadW.restype = wintypes.BOOL
+    advapi32.CredFree.argtypes = [ctypes.c_void_p]
+    advapi32.CredFree.restype = None
+    if not advapi32.CredReadW(target, 1, 0, ctypes.byref(credential_ptr)):
+        return ""
+    try:
+        credential = credential_ptr.contents
+        if not credential.CredentialBlob or credential.CredentialBlobSize == 0:
+            return ""
+        raw = ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
+        try:
+            return raw.decode("utf-8").strip()
+        except UnicodeDecodeError:
+            return raw.decode("utf-16-le").strip().rstrip("\x00")
+    finally:
+        advapi32.CredFree(credential_ptr)
+
+
+def pixellab_secret_status() -> dict[str, str | bool]:
+    """Return configuration state only; never expose the credential value."""
+    import os
+
+    token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
+    legacy = os.environ.get("PIXELLAB_SECRET", "").strip()
+    if token and legacy and token != legacy:
+        return {"configured": False, "status": "PIXELLAB_CREDENTIALS_CONFLICT",
+                "reason": "PIXELLAB_CREDENTIALS_CONFLICT: PIXELLAB_API_TOKEN and PIXELLAB_SECRET do not match."}
+    if token or legacy:
+        return {"configured": True, "status": "READY_CREDENTIALS_CONFIGURED",
+                "reason": "PixelLab credential is present in the Studio worker. This checks configuration only, not account credits."}
+    if _credential_manager_secret():
+        return {"configured": True, "status": "READY_CREDENTIALS_CONFIGURED",
+                "reason": "PixelLab credential is present in Windows Credential Manager. This checks configuration only, not account credits."}
+    return {"configured": False, "status": "PIXELLAB_API_TOKEN_NOT_CONFIGURED",
+            "reason": "PIXELLAB_API_TOKEN_NOT_CONFIGURED: In Windows Credential Manager, add a Generic Credential with address ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN, user name token, and the PixelLab API token as password. Restart Studio, then reopen Provider to refresh. PixelLab Creator/MCP login is separate."}
+
+
+def get_pixellab_secret() -> str:
+    """Resolve a provider secret in memory for an explicitly requested call."""
+    import os
+
+    token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
+    legacy = os.environ.get("PIXELLAB_SECRET", "").strip()
+    if token and legacy and token != legacy:
+        return ""
+    return token or legacy or _credential_manager_secret()
 from urllib.request import Request, urlopen
 
 
@@ -2277,7 +2368,6 @@ def generate_pro_flash_image(
         raise ProFlashError("INVALID_BACKGROUND", "Pro Flash background intent is invalid.")
     if not 1 <= max_wait_seconds <= 600 or not 1 <= poll_seconds <= 30:
         raise ProFlashError("INVALID_POLL_POLICY", "Pro Flash polling bounds are invalid.")
-    from .provider_credentials import get_pixellab_secret
     token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
     legacy_secret = os.environ.get("PIXELLAB_SECRET", "").strip()
     if token and legacy_secret and token != legacy_secret:

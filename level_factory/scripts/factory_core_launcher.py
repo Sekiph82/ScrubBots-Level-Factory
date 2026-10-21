@@ -595,7 +595,7 @@ def _semantic_generate_pixellab_pro_flash(
 def _provider_options() -> dict[str, object]:
     """Expose only adapters that are actually executable in this process."""
     from scrubbots_pixel_factory.alpix_batch import discover_alpix
-    from scrubbots_pixel_factory.provider_credentials import pixellab_secret_status
+    from scrubbots_pixel_factory.studio_extensions import pixellab_secret_status
     from scrubbots_pixel_factory.semantic.providers.registry import active_factory_studio_provider_ids
 
     alpix = discover_alpix()

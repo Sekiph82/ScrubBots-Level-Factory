@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from scrubbots_pixel_factory import alpix_batch
-from scrubbots_pixel_factory import provider_credentials
+from scrubbots_pixel_factory import studio_extensions
 
 
 def _virtual_files(monkeypatch, files: dict[str, str], executable: str) -> None:
@@ -78,9 +78,9 @@ def test_pixellab_status_checks_presence_only_and_never_returns_secret(monkeypat
     token = "offline-test-secret-never-display"
     monkeypatch.setenv("PIXELLAB_API_TOKEN", token)
     monkeypatch.delenv("PIXELLAB_SECRET", raising=False)
-    monkeypatch.setattr(provider_credentials, "_credential_manager_secret", lambda: "")
+    monkeypatch.setattr(studio_extensions, "_credential_manager_secret", lambda: "")
 
-    status = provider_credentials.pixellab_secret_status()
+    status = studio_extensions.pixellab_secret_status()
 
     assert status["configured"] is True
     assert status["status"] == "READY_CREDENTIALS_CONFIGURED"

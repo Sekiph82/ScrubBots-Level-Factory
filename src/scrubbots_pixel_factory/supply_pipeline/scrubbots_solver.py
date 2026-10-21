@@ -12,7 +12,7 @@ from collections import deque
 from pathlib import Path
 
 from .game_rules import find_godot
-from .solver_budget import normalize_solver_budget
+from .solver_budget import normalize_solver_budget, normalize_staged_solver_budget, staged_solver_deadline_state
 
 BRIDGE = Path(__file__).resolve().parent / "godot" / "solver_bridge.gd"
 NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
@@ -32,14 +32,21 @@ class ScrubBotsSolver:
             raise RuntimeError("Godot not found (set SCRUBBOTS_GODOT or put godot on PATH)")
 
     def run(self, level, candidates, stop_after=1, max_visited=None, analyze=True,
-            level_number=1, progress=None, timeout=None):
+            level_number=1, progress=None, timeout=None, auto_extend_timeout=None):
         """level: {id,width,height,palette:[#RRGGBBAA local],cells:[local or -1]}
         candidates: [{id, columns:[[{color,count}]*3]} or {..., replay_trace:[...]}]"""
         attested_runtime = getattr(self.rules, "attestation", None) is not None
         if attested_runtime:
             if not isinstance(candidates, (list, tuple)) or len(candidates) != 1 or stop_after != 1:
                 raise ValueError("pinned-runtime bridge requires exactly one candidate and stop_after=1")
-            max_visited, timeout = normalize_solver_budget(max_visited, timeout)
+            max_visited, timeout, hard_timeout = normalize_staged_solver_budget(
+                max_visited, timeout,
+                auto_extend=(True if auto_extend_timeout is None else auto_extend_timeout),
+            )
+        else:
+            hard_timeout = float(timeout if timeout is not None else 0)
+            if auto_extend_timeout:
+                raise ValueError("staged solver extension is available only for an attested pinned runtime")
         if attested_runtime:
             work_root = Path(self.rules.project).resolve() / ".lf_solver_jobs"
             work = work_root / f"job-{uuid.uuid4().hex}"
@@ -87,6 +94,9 @@ class ScrubBotsSolver:
         request_sha256 = hashlib.sha256((work / "req.json").read_bytes()).hexdigest()
         plan_path = Path(str(candidates[0].get("supply_plan_path", ""))) if candidates else None
         plan_sha256 = hashlib.sha256(plan_path.read_bytes()).hexdigest() if plan_path and plan_path.is_file() else None
+        source_sha256 = level.get("source_sha256") if isinstance(level, dict) else None
+        if not isinstance(source_sha256, str) or len(source_sha256) != 64 or any(c not in "0123456789abcdefABCDEF" for c in source_sha256):
+            source_sha256 = None
         tail = deque(maxlen=30)
         output_bytes = 0
         reader_error = []
@@ -169,8 +179,8 @@ class ScrubBotsSolver:
         if attested_runtime and os.name == "nt":
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         start = time.monotonic()
-        hard_timeout = float(timeout if timeout is not None else (240 if attested_runtime else 0))
-        timeout_limit = 240 if attested_runtime else 300
+        initial_timeout = float(timeout if timeout is not None else (240 if attested_runtime else 0))
+        timeout_limit = 480 if attested_runtime and auto_extend_timeout else (240 if attested_runtime else 300)
         if hard_timeout < 0 or hard_timeout > timeout_limit or (attested_runtime and hard_timeout == 0):
             raise ValueError(f"native solver timeout must be from 0 to {timeout_limit} seconds")
         p = None
@@ -183,30 +193,69 @@ class ScrubBotsSolver:
             reader = threading.Thread(target=drain_output, args=(p.stdout,), daemon=True)
             reader.start()
             timed_out = False
+            extended = False
+            extension_trigger_elapsed_seconds = None
             output_overflow = False
+            next_progress_at = 5.0
             while p.poll() is None:
+                elapsed = time.monotonic() - start
+                phase = staged_solver_deadline_state(
+                    elapsed, initial_timeout, hard_timeout, terminal=native_solve_completed
+                )
                 if studio_cancel_requested():
                     cancelled = True
                     terminate_solver_tree(p)
                     break
-                if hard_timeout and time.monotonic() - start >= hard_timeout:
-                    timed_out = True
-                    p.terminate()
+                if phase == "EXTENDED" and not extended:
+                    extended = True
+                    extension_trigger_elapsed_seconds = round(elapsed, 3)
+                    extension_note = (
+                        "BRIDGE_SOLVER_BUDGET_EXTENDED initial_budget_s=240 hard_budget_s=480 "
+                        f"extension_trigger_elapsed_s={extension_trigger_elapsed_seconds} "
+                        f"extension_reason=STILL_RUNNING pid={p.pid} job_id={work.name} "
+                        f"request_sha256={request_sha256} source_sha256={source_sha256 or 'BOUND_BY_REQUEST_SHA'} "
+                        f"plan_sha256={plan_sha256 or 'UNAVAILABLE'}"
+                    )
                     try:
-                        p.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        p.kill()
-                        p.wait()
+                        self._write_runner_receipt(work, {
+                            "invocation_count": int(native_solve_started), "process_invocation_count": 1,
+                            "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME",
+                            "timeout_seconds": initial_timeout, "initial_budget_s": initial_timeout,
+                            "hard_budget_s": hard_timeout, "phase": "EXTENDED",
+                            "extension_trigger_elapsed_s": extension_trigger_elapsed_seconds,
+                            "extension_reason": "STILL_RUNNING", "elapsed_seconds": round(elapsed, 3),
+                            "process_exit_code": None, "process_pid": p.pid, "timed_out": False,
+                            "cancelled": False, "native_solve_started": native_solve_started,
+                            "native_solve_completed": native_solve_completed,
+                            "native_solve_status": native_solve_status, "stdout_bytes": output_bytes,
+                            "stdout_tail": list(tail), "request_sha256": request_sha256,
+                            "source_sha256": source_sha256, "plan_sha256": plan_sha256, "response_sha256": None,
+                            "job_path": str(work),
+                        })
+                        if progress:
+                            progress(extension_note)
+                    except Exception:
+                        if p.poll() is None:
+                            terminate_solver_tree(p)
+                        raise
+                if hard_timeout and phase == "TIMEOUT":
+                    timed_out = True
+                    terminate_solver_tree(p)
                     break
                 if reader_error:
                     output_overflow = True
-                    p.terminate()
-                    try:
-                        p.wait(timeout=2)
-                    except subprocess.TimeoutExpired:
-                        p.kill()
-                        p.wait()
+                    terminate_solver_tree(p)
                     break
+                if progress and elapsed >= next_progress_at:
+                    phase_label = "EXTENDED 240-480s" if extended else "Solving 0-240s"
+                    deadline = hard_timeout if extended else initial_timeout
+                    remaining = max(0.0, deadline - elapsed)
+                    progress(
+                        f"BRIDGE_SOLVER_PROGRESS phase={phase_label} elapsed_s={elapsed:.1f} "
+                        f"remaining_s={remaining:.1f} pid={p.pid} job_id={work.name} "
+                        f"request_sha256={request_sha256} source_sha256={source_sha256 or 'BOUND_BY_REQUEST_SHA'}"
+                    )
+                    next_progress_at = elapsed + 5.0
                 time.sleep(0.05)
             reader.join(timeout=2)
             if reader.is_alive():
@@ -231,12 +280,16 @@ class ScrubBotsSolver:
             "invocation_count": int(native_solve_started),
             "process_invocation_count": 1 if p is not None else 0,
             "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME" if attested_runtime else "CONFIGURED_GAME_PROJECT",
-            "timeout_seconds": hard_timeout or None, "elapsed_seconds": elapsed_seconds,
+            "timeout_seconds": hard_timeout or None, "initial_budget_s": initial_timeout or None,
+            "hard_budget_s": hard_timeout or None, "phase": "TIMEOUT_480" if timed_out and extended else ("TIMEOUT_240" if timed_out else "COMPLETE"),
+            "extended": extended, "extension_trigger_elapsed_s": extension_trigger_elapsed_seconds,
+            "extension_reason": "STILL_RUNNING" if extended else None,
+            "elapsed_seconds": elapsed_seconds,
             "process_exit_code": exit_code, "process_pid": p.pid if p is not None else None,
             "timed_out": timed_out, "cancelled": cancelled, "native_solve_started": native_solve_started,
             "native_solve_completed": native_solve_completed, "native_solve_status": native_solve_status,
             "stdout_bytes": output_bytes, "stdout_tail": list(tail),
-            "request_sha256": request_sha256, "plan_sha256": plan_sha256,
+            "request_sha256": request_sha256, "source_sha256": source_sha256, "plan_sha256": plan_sha256,
             "response_sha256": None, "job_path": str(work),
         }
         self._write_runner_receipt(work, telemetry)
@@ -244,7 +297,8 @@ class ScrubBotsSolver:
             raise SolverBridgeError("Studio batch cancellation stopped the active canonical game solver.", telemetry)
         if timed_out:
             raise SolverBridgeError(
-                f"bounded Godot solver timed out after {hard_timeout:.1f}s; job retained at {work}", telemetry
+                f"bounded Godot solver timed out after {hard_timeout:.1f}s "
+                f"({'TIMEOUT_480' if extended else 'TIMEOUT_240'}); job retained at {work}", telemetry
             )
         if reader_error:
             raise SolverBridgeError("bounded Godot output capture failed: " + "; ".join(reader_error), telemetry)
@@ -264,4 +318,11 @@ class ScrubBotsSolver:
 
     @staticmethod
     def _write_runner_receipt(work, telemetry):
-        (work / "runner.json").write_text(json.dumps(telemetry, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        destination = work / "runner.json"
+        staged = work / ".runner.json.stage"
+        payload = (json.dumps(telemetry, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        with staged.open("wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(staged, destination)
