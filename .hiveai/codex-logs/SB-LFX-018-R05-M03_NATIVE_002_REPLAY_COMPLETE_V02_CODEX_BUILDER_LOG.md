@@ -523,3 +523,10 @@ Document role: CODEX BUILDER LOG
 - Current failed run JSON hashes: 056 `37d15aee7c582550a92c833ec41cb3cee670c34cfa66e2339891ea47c9b6e6dd`; 058 `18c0542971d2b5605de837eefba7e0a441d3069f022c43f9dd64c2cffd05f774`; 060 `dce07ebed46816fc316099587cfc4ca6d366a6d920ed1a48acdbd8104f393564`. 019 current activity chain file SHA-256 `9b7b5766d52ce2bf284c621628bfeba18568308de11546858a167bd4210661eb`.
 - This ledger reports the exact status/reason saved in each batch item and separately labels source/pipeline read-back. It does not relabel any REJECTED row as owner-manually-rejected, does not claim any FAILED run reached later gates, and does not modify the job or its evidence.
 - Part A is now recorded before V13 product-code changes. Remaining V13 UI/provider/style/size work has not started.
+
+
+## 2026-10-21 06:25 UTC | V13-A report publication receipt
+
+- Starting local branch `codex/sb-lfx-018-r05-m03-evidence-20261018-resume` was at `ce5617b2dd44b3174114c7729af441eac57c486f`; fetched `origin/main` was `411132f94b0788b2cd7577a4597f3425dfd778ac`, and `git merge-base --is-ancestor HEAD origin/main` passed. The only incoming tracked paths were current `TASKS.md`, the V13 master, and its strict criteria; none collided with pre-existing untracked owner paths. Fast-forwarded with `git merge --ff-only origin/main`, preserving all untracked owner/runtime inputs.
+- The 38-row report was committed as `63331010e1dda3ed830992a043a0bd336a3f9a4f` and published with normal `git push origin HEAD:main`. Post-push fetch verified local `HEAD == origin/main == 63331010e1dda3ed830992a043a0bd336a3f9a4f`, 0 ahead / 0 behind; tracked worktree clean at that verification. `git diff --check` passed. The current workflow is manual `workflow_dispatch`; no workflow, CI, or Actions run was started.
+- Only the existing M03 builder log was staged/committed for this report. No Release data, job JSON, image, or pool record was committed.
