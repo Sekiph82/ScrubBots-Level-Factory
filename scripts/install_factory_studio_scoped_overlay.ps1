@@ -24,7 +24,10 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
     'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
-    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py'
+    'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
+    'src/scrubbots_pixel_factory/alpix_batch.py'
 )
 $authorizedOverlayAdditions = @(
 	'level_factory/project.godot',
@@ -33,6 +36,9 @@ $authorizedOverlayAdditions = @(
 	'level_factory/scripts/factory_core_gateway.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
+    'src/scrubbots_pixel_factory/alpix_batch.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py'
@@ -45,6 +51,18 @@ $authorizedRepairHashes = @{
     # This exact installed variant differs from the published optimizer only
     # in retaining the old 90-second defaults; restore the approved 240 cap.
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py' = '798fc4848b35bf1a866e900e5343a641ac9ad97f3100f53b09b743bfd18bc62b'
+}
+# The installed verify.py bytes are an exact CRLF checkout of published
+# source commit 17643de6756ba3d9552351eb237db19bd8d0c269. The existing builder
+# log records that this mismatch predated scoped installs, and no per-file
+# overlay receipt proves an approved transaction. Report this provenance, but
+# deliberately do not authorize it as a repair hash.
+$knownProvenanceHashes = @{
+    'src/scrubbots_pixel_factory/supply_pipeline/verify.py' = @{
+        sha256 = '90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744'
+        sourceCommit = '17643de6756ba3d9552351eb237db19bd8d0c269'
+        disposition = 'KNOWN_SOURCE_VERSION_APPROVAL_UNPROVEN'
+    }
 }
 
 function Get-Sha256([string]$Path) {
@@ -91,6 +109,7 @@ foreach ($entry in @($manifest.managedFiles)) {
 }
 $overlayAdditions = @()
 $plan = @()
+$manifestDrift = @()
 foreach ($relative in $relativePaths) {
     if (-not $managed.ContainsKey($relative)) { throw "Manifest does not own the managed target: $relative" }
     if (@($manifest.overlayPaths) -cnotcontains $relative) {
@@ -103,36 +122,73 @@ foreach ($relative in $relativePaths) {
     Assert-NoReparsePath $target
     $installedHash = Get-Sha256 $target
     $expectedInstalledHash = ([string]$managed[$relative].sha256).ToLowerInvariant()
+    $pathReceipts = @($manifest.overlayReceipts | ForEach-Object {
+        if ($_.PSObject.Properties.Name -contains 'files') { $_.files }
+    } | Where-Object { $_.path -ceq $relative })
+    $hasOverlayPath = $relative -cin @($manifest.overlayPaths)
     if ($installedHash -cne $expectedInstalledHash) {
         $authorizedHash = [string]$authorizedRepairHashes[$relative]
         if (-not $authorizedHash -or $installedHash -cne $authorizedHash) {
-            throw "Installed managed file differs from manifest; preserved it: $relative"
+            $known = $knownProvenanceHashes[$relative]
+            $reason = if ($known -and $installedHash -ceq $known.sha256) { $known.disposition } else { 'UNRECOGNIZED_INSTALLED_BYTES' }
+            $manifestDrift += [pscustomobject]@{
+                path = $relative
+                manifestSha256 = $expectedInstalledHash
+                installedSha256 = $installedHash
+                sourceSha256 = Get-Sha256 $source
+                overlayPath = $hasOverlayPath
+                overlayReceiptCount = $pathReceipts.Count
+                provenance = $reason
+                sourceCommit = if ($known) { $known.sourceCommit } else { $null }
+            }
+            continue
         }
     }
     $sourceHash = Get-Sha256 $source
     if ($installedHash -ceq $sourceHash) { continue }
-    $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; priorSha256 = $installedHash; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
+    $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; manifestSha256 = $expectedInstalledHash; installedSha256 = $installedHash; sourceSha256 = $sourceHash; overlayPath = $hasOverlayPath; overlayReceiptCount = $pathReceipts.Count; priorSha256 = $installedHash; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
 }
 
-$active = @(Get-CimInstance Win32_Process | Where-Object {
-    $_.ProcessId -ne $PID -and $_.CommandLine -like '*Release\ScrubBots Factory Studio*' -and
-    ($_.Name -like 'Godot*' -or $_.CommandLine -like '*factory_core_launcher.py*')
-})
+$processInventory = @(Get-CimInstance Win32_Process)
+$activeProcessIds = [Collections.Generic.HashSet[uint32]]::new()
+$runtimeNeedle = $runtimeRoot.TrimEnd('\')
+foreach ($process in $processInventory) {
+    $commandLine = [string]$process.CommandLine
+    $usesRuntime = $commandLine.IndexOf($runtimeNeedle, [StringComparison]::OrdinalIgnoreCase) -ge 0
+    $isStudioOrWriter = $process.Name -like 'Godot*' -or
+        $commandLine -match 'factory_core_launcher\.py|png_batch\.py'
+    if ($process.ProcessId -ne $PID -and $usesRuntime -and $isStudioOrWriter) {
+        [void]$activeProcessIds.Add([uint32]$process.ProcessId)
+    }
+}
+# Include descendants such as Python workers and console hosts even when their
+# own command line does not repeat the runtime path.
+do {
+    $addedProcess = $false
+    foreach ($process in $processInventory) {
+        if ($process.ProcessId -ne $PID -and $activeProcessIds.Contains([uint32]$process.ParentProcessId)) {
+            if ($activeProcessIds.Add([uint32]$process.ProcessId)) { $addedProcess = $true }
+        }
+    }
+} while ($addedProcess)
+$active = @($processInventory | Where-Object { $activeProcessIds.Contains([uint32]$_.ProcessId) })
 if ($Apply -and $active.Count -gt 0) {
     $ids = ($active | ForEach-Object { "$($_.ProcessId):$($_.Name)" }) -join ', '
     throw "Installed runtime is in use; no files were written. Active processes: $ids"
 }
 
 [pscustomobject]@{
-    state = if ($Apply) { 'APPLY_READY' } else { 'PREFLIGHT_ONLY' }
+    state = if ($manifestDrift.Count -gt 0) { 'BLOCKED_MANIFEST_DRIFT' } elseif ($Apply) { 'APPLY_READY' } else { 'PREFLIGHT_ONLY' }
     sourceHead = $head
     runtimeRoot = $runtimeRoot
-    activeRuntimeProcesses = @($active | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name } })
+    activeRuntimeProcesses = @($active | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name; executablePath = $_.ExecutablePath; parentPid = $_.ParentProcessId; commandLine = $_.CommandLine } })
     overlayAllowlistAdditions = $overlayAdditions
     plannedFiles = $plan
-    unchangedFiles = @($relativePaths | Where-Object { $_ -notin @($plan.path) })
+    manifestDrift = $manifestDrift
+    unchangedFiles = @($relativePaths | Where-Object { $_ -notin @($plan.path) -and $_ -notin @($manifestDrift.path) })
 } | ConvertTo-Json -Depth 8
 
+if ($manifestDrift.Count -gt 0) { throw 'Installed managed bytes differ from manifest without an approved exact repair; no files were written.' }
 if (-not $Apply -or ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0)) { return }
 
 $transactionRoot = Join-Path $runtimeRoot ('.lf-scoped-overlay-' + [Guid]::NewGuid().ToString('N'))
@@ -143,6 +199,7 @@ $manifestReplaced = $false
 try {
     [void][IO.Directory]::CreateDirectory($transactionRoot)
     $receiptFiles = @()
+    $stagedFiles = @()
     foreach ($item in $plan) {
         $relativeStage = $item.path.Replace('/', [IO.Path]::DirectorySeparatorChar)
         $stage = Join-Path (Join-Path $transactionRoot 'stage') $relativeStage
@@ -151,9 +208,7 @@ try {
         [void][IO.Directory]::CreateDirectory((Split-Path -Parent $backup))
         [IO.File]::WriteAllBytes($stage, [IO.File]::ReadAllBytes($item.source))
         if ((Get-Sha256 $stage) -cne $item.sha256) { throw "Staged source hash mismatch: $($item.path)" }
-        [IO.File]::Replace($stage, $item.target, $backup)
-        $replaced += [pscustomobject]@{ target = $item.target; backup = $backup; relative = $item.path; expected = $item.sha256 }
-        if ((Get-Sha256 $item.target) -cne $item.sha256) { throw "Installed file hash mismatch after replacement: $($item.path)" }
+        $stagedFiles += [pscustomobject]@{ stage = $stage; target = $item.target; backup = $backup; relative = $item.path; expected = $item.sha256 }
         $managedEntry = @($manifest.managedFiles | Where-Object path -ceq $item.path)
         $managedEntry[0].sha256 = $item.sha256
         $receiptFiles += [pscustomobject]@{ path = $item.path; priorSha256 = $item.priorSha256; sha256 = $item.sha256; bytes = $item.bytes }
@@ -170,6 +225,14 @@ try {
     $manifestStage = Join-Path $transactionRoot '.factory-studio-install-manifest.json'
     $manifestBackup = Join-Path $transactionRoot 'backup-manifest.json'
     [IO.File]::WriteAllText($manifestStage, ($manifest | ConvertTo-Json -Depth 100) + "`n", [Text.UTF8Encoding]::new($false))
+
+    # Stage and verify every payload and the updated manifest before the first
+    # owner target is replaced. A staging failure therefore has no live writes.
+    foreach ($item in $stagedFiles) {
+        [IO.File]::Replace($item.stage, $item.target, $item.backup)
+        $replaced += [pscustomobject]@{ target = $item.target; backup = $item.backup; relative = $item.relative; expected = $item.expected }
+        if ((Get-Sha256 $item.target) -cne $item.expected) { throw "Installed file hash mismatch after replacement: $($item.relative)" }
+    }
     [IO.File]::Replace($manifestStage, $manifestPath, $manifestBackup)
     $manifestReplaced = $true
     $installedManifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
