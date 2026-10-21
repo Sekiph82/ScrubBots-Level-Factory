@@ -6,6 +6,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 from collections.abc import Mapping, Sequence
@@ -593,8 +594,8 @@ def _semantic_generate_pixellab_pro_flash(
 
 def _provider_options() -> dict[str, object]:
     """Expose only adapters that are actually executable in this process."""
-    import os
     from scrubbots_pixel_factory.alpix_batch import discover_alpix
+    from scrubbots_pixel_factory.provider_credentials import pixellab_secret_status
     from scrubbots_pixel_factory.semantic.providers.registry import active_factory_studio_provider_ids
 
     alpix = discover_alpix()
@@ -602,17 +603,14 @@ def _provider_options() -> dict[str, object]:
     for provider_id in active_factory_studio_provider_ids():
         if provider_id == "ALPIX (Claude)":
             options.append({"id": provider_id, "available": alpix.get("available") is True,
-                "prompt_capable": True, "reason": alpix.get("reason", "Ready"),
+                "prompt_capable": True, "status": alpix.get("status", "ALPIX_INVALID_CONFIG"),
+                "reason": alpix.get("reason", "ALPIX_INVALID_CONFIG: Claude Alpix configuration could not be verified."),
                 "plugin_id": alpix.get("plugin_id"), "mcp_servers": alpix.get("mcp_servers")})
         elif provider_id == "PIXELLAB":
-            token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
-            legacy_secret = os.environ.get("PIXELLAB_SECRET", "").strip()
-            configured = bool((token or legacy_secret) and not (token and legacy_secret and token != legacy_secret))
-            options.append({"id": provider_id, "available": configured, "prompt_capable": True,
-                "execution_mode": "PRO_FLASH",
-                "reason": "PIXELLAB Pro Flash credentials are configured." if configured
-                else "Set PIXELLAB_API_TOKEN in the local application environment to enable Pro Flash."
-                if not token and not legacy_secret else "PIXELLAB_API_TOKEN and PIXELLAB_SECRET do not match."})
+            credential = pixellab_secret_status()
+            options.append({"id": provider_id, "available": credential.get("configured") is True, "prompt_capable": True,
+                "execution_mode": "PRO_FLASH", "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
+                "reason": credential.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")})
     return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
 
 

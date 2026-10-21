@@ -39,7 +39,11 @@ def find_claude(*, user_home: Path | None = None) -> str | None:
         found = shutil.which("claude")
         if found:
             return found
-    for candidate in (home / ".local" / "bin" / "claude.exe", home / ".local" / "bin" / "claude"):
+    candidates = (
+        home / ".local" / "bin" / "claude.exe", home / ".local" / "bin" / "claude",
+        home / "AppData" / "Local" / "Programs" / "claude" / "claude.exe",
+    )
+    for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
     return None
@@ -51,21 +55,30 @@ def discover_alpix(*, user_home: Path | None = None) -> dict[str, object]:
     Only the two Claude Code configuration files and installed plugin manifests
     are inspected. Credentials, history, and session files are never read.
     """
-    home = user_home or Path.home()
-    executable = find_claude(user_home=home)
+    home = user_home or Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or Path.home())
+    config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", "")).expanduser() if user_home is None and os.environ.get("CLAUDE_CONFIG_DIR") else home / ".claude"
+    executable = find_claude(user_home=user_home)
     if not executable:
-        return {"available": False, "reason": "Claude Code is unavailable."}
-    settings_path = home / ".claude" / "settings.json"
-    installed_path = home / ".claude" / "plugins" / "installed_plugins.json"
+        return {"available": False, "status": "ALPIX_CLI_NOT_FOUND", "reason": "ALPIX_CLI_NOT_FOUND: Claude Code executable is not available on this Studio process PATH or the current user-local install path."}
+    settings_path = config_dir / "settings.json"
+    installed_path = config_dir / "plugins" / "installed_plugins.json"
     try:
         settings = json.loads(settings_path.read_text(encoding="utf-8"))
         installed = json.loads(installed_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError):
-        return {"available": False, "reason": "Claude Alpix configuration is unavailable."}
+        # Newer Claude Code installations can register a user MCP server in the
+        # top-level config instead of an installed plugin manifest. Read only
+        # the server names; never return or log config values such as argv/env.
+        settings = {}
+        installed = {"plugins": {}}
+    if not isinstance(settings, Mapping):
+        return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude settings.json must contain an object."}
+    if not isinstance(installed, Mapping):
+        return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude installed plugin manifest must contain an object."}
     enabled = settings.get("enabledPlugins", {})
     plugins = installed.get("plugins", {})
     if not isinstance(enabled, Mapping) or not isinstance(plugins, Mapping):
-        return {"available": False, "reason": "Claude Alpix configuration is invalid."}
+        return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude plugin settings or installed plugin map is invalid."}
     identities: list[dict[str, str]] = []
     for plugin_id, records in plugins.items():
         if not isinstance(plugin_id, str) or not isinstance(records, list):
@@ -90,9 +103,22 @@ def discover_alpix(*, user_home: Path | None = None) -> dict[str, object]:
             identities.append({"plugin_id": plugin_id, "enabled": str(enabled.get(plugin_id, False)).lower(),
                                "mcp_servers": ",".join(sorted(set(mcp_names)))})
     active = next((item for item in identities if item["enabled"] == "true" and item["mcp_servers"]), None)
+    global_config_path = home / ".claude.json"
+    global_mcp_names: list[str] = []
+    try:
+        global_config = json.loads(global_config_path.read_text(encoding="utf-8"))
+        global_servers = global_config.get("mcpServers", {}) if isinstance(global_config, Mapping) else {}
+        if isinstance(global_servers, Mapping):
+            global_mcp_names = [name for name in global_servers if isinstance(name, str) and "alpix" in name.lower()]
+    except (OSError, UnicodeError, json.JSONDecodeError):
+        pass
+    if active is None and global_mcp_names:
+        active = {"plugin_id": "claude-user-mcp@global-config", "enabled": "true",
+                  "mcp_servers": ",".join(sorted(set(global_mcp_names)))}
     if active is None:
-        return {"available": False, "reason": "Installed Alpix plugin/MCP is unavailable in Claude Code."}
-    return {"available": True, "executable": executable, **active}
+        return {"available": False, "status": "ALPIX_PLUGIN_MISSING",
+                "reason": "ALPIX_PLUGIN_MISSING: Claude Code is installed, but no enabled ALPIX plugin/MCP server was found in the current user configuration."}
+    return {"available": True, "status": "ALPIX_CONFIGURED", "reason": "Claude Code and an enabled ALPIX MCP route are configured. Usage-limit health is not probed.", "executable": executable, **active}
 
 
 def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str | Path,

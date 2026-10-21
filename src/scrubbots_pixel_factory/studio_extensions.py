@@ -64,7 +64,7 @@ def _accounting_root() -> Path:
 
 
 def _canonical_bytes(value: object) -> bytes:
-    return (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    return (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")) + "\r\n").encode("utf-8")
 
 
 def _digest(value: object) -> str:
@@ -2208,14 +2208,14 @@ def _image_bytes_from_response(last_response: Mapping[str, object]) -> bytes:
             raw = base64.b64decode(value, validate=True)
         except (ValueError, base64.binascii.Error):
             continue
-        if raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        if raw.startswith(b"\x89PNG\r\n\x1a\r\n"):
             return raw
     raise ProFlashError("IMAGE_MISSING", "Completed PixelLab job did not include an encoded PNG.")
 
 
 def validate_pro_flash_png(raw: bytes, *, expected_width: int, expected_height: int) -> tuple[str, ...]:
     """Validate exact pixels; this path never resizes or palette-snaps output."""
-    if not isinstance(raw, bytes) or not raw.startswith(b"\x89PNG\r\n\x1a\n"):
+    if not isinstance(raw, bytes) or not raw.startswith(b"\x89PNG\r\n\x1a\r\n"):
         raise ProFlashError("INVALID_PNG", "PixelLab result is not a PNG.")
     try:
         from PIL import Image
@@ -2277,13 +2277,14 @@ def generate_pro_flash_image(
         raise ProFlashError("INVALID_BACKGROUND", "Pro Flash background intent is invalid.")
     if not 1 <= max_wait_seconds <= 600 or not 1 <= poll_seconds <= 30:
         raise ProFlashError("INVALID_POLL_POLICY", "Pro Flash polling bounds are invalid.")
+    from .provider_credentials import get_pixellab_secret
     token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
     legacy_secret = os.environ.get("PIXELLAB_SECRET", "").strip()
     if token and legacy_secret and token != legacy_secret:
         raise ProFlashError("CREDENTIALS_CONFLICT", "PIXELLAB_API_TOKEN and PIXELLAB_SECRET are both set but do not match.")
-    secret = token or legacy_secret
+    secret = get_pixellab_secret()
     if not secret:
-        raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "Set PIXELLAB_API_TOKEN in the local application environment to enable PixelLab Pro Flash.")
+        raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: add the credential named ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN in Windows Credential Manager.")
     if cancel_check is None:
         cancel_path = os.environ.get("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", "").strip()
         cancel_check = lambda: bool(cancel_path and Path(cancel_path).is_file())

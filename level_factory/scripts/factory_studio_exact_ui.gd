@@ -24,7 +24,6 @@ var _column_count := 4
 var _level_number := 11
 var _manual_level_override := false
 var _prompt := "pixel art owl"
-var _generation_style := "CREATURE"
 var _width := 32
 var _height := 32
 var _provider_model := "ALPIX (Claude)"
@@ -62,6 +61,8 @@ var _batch_composite_snapshot: Dictionary = {}
 var _batch_legacy_reconciliation := false
 var _batch_job_source_mismatch := false
 var _batch_last_read_msec := 0
+var _batch_restore_pending := false
+var _batch_restore_token := ""
 var _batch_pause_button: Button
 var _batch_stop_button: Button
 var _prompt_dialog: ConfirmationDialog
@@ -119,6 +120,16 @@ var _studio_read_done := false
 var _studio_read_result: Dictionary = {}
 var _studio_read_context: Dictionary = {}
 var _studio_read_queue: Array[Dictionary] = []
+var _batch_issue_panel: PanelContainer
+var _batch_issue_tabs: HBoxContainer
+var _batch_issue_search: LineEdit
+var _batch_issue_rows: VBoxContainer
+var _batch_issue_filter := "ALL"
+var _batch_issue_query := ""
+var _batch_issue_render_key := ""
+var _selected_issue: Dictionary = {}
+var _selected_size_value: Label
+var _selected_size_panel: PanelContainer
 var _pixel_art_thread: Thread
 var _pixel_art_mutex := Mutex.new()
 var _pixel_art_worker_done := false
@@ -668,8 +679,8 @@ func _control_caption(control_name: String) -> String:
 		"SettingsGear": "Settings",
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
-		"GenerationPrompt": "Prompt", "RandomSeed": "↻", "GenerationStyle": "Style: %s" % _generation_style,
-		"GenerationSize": "Size: %d × %d" % [_width, _height], "GenerationProvider": "Provider: %s" % _provider_model,
+		"GenerationPrompt": "Prompt", "RandomSeed": "↻", "GenerationSize": "Size",
+		"GenerationProvider": "Provider: %s" % _provider_model,
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
@@ -695,6 +706,213 @@ func _control_caption(control_name: String) -> String:
 
 func _level_number_caption() -> String:
 	return "Level: %s" % (str(_level_number) if _manual_level_override else "Auto")
+
+
+func _build_selected_size_value_panel() -> void:
+	_selected_size_panel = PanelContainer.new()
+	_selected_size_panel.name = "SelectedSizeValuePanel"
+	_selected_size_panel.position = Vector2(198, 348)
+	_selected_size_panel.size = Vector2(163, 42)
+	_selected_size_panel.add_theme_stylebox_override("panel", _control_style(Color("#17243a"), Color("#30415e")))
+	_selected_size_value = Label.new()
+	_selected_size_value.name = "SelectedSizeValue"
+	_selected_size_value.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_selected_size_value.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_selected_size_value.add_theme_font_size_override("font_size", 11)
+	_selected_size_value.add_theme_color_override("font_color", Color("#dce8f8"))
+	_selected_size_panel.add_child(_selected_size_value)
+	add_child(_selected_size_panel)
+	_refresh_selected_size_value()
+
+
+func _refresh_selected_size_value() -> void:
+	if _selected_size_value != null:
+		_selected_size_value.text = "Selected Size\n%d × %d px" % [_width, _height]
+	if _selected_size_panel != null:
+		_selected_size_panel.visible = _screen == "PIXEL ART"
+
+
+func _build_batch_issue_panel() -> void:
+	var details := get_node_or_null("RuntimeDetailsPanel") as Control
+	if details == null or _batch_issue_panel != null:
+		return
+	_batch_issue_panel = PanelContainer.new()
+	_batch_issue_panel.name = "BatchIssuesPanel"
+	_batch_issue_panel.position = Vector2(12, 286)
+	_batch_issue_panel.anchor_left = 0.0
+	_batch_issue_panel.anchor_right = 1.0
+	_batch_issue_panel.anchor_top = 0.0
+	_batch_issue_panel.anchor_bottom = 1.0
+	_batch_issue_panel.offset_left = 0
+	_batch_issue_panel.offset_right = -24
+	_batch_issue_panel.offset_top = 0
+	_batch_issue_panel.offset_bottom = -12
+	_batch_issue_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 6)
+	_batch_issue_panel.add_child(content)
+	var heading := Label.new()
+	heading.name = "BatchIssuesHeading"
+	heading.text = "BATCH ISSUES"
+	heading.add_theme_font_size_override("font_size", 12)
+	heading.add_theme_color_override("font_color", Color("#91a7c5"))
+	content.add_child(heading)
+	_batch_issue_tabs = HBoxContainer.new()
+	_batch_issue_tabs.add_theme_constant_override("separation", 3)
+	content.add_child(_batch_issue_tabs)
+	_batch_issue_search = LineEdit.new()
+	_batch_issue_search.name = "BatchIssuesSearch"
+	_batch_issue_search.placeholder_text = "Search PNG or reason"
+	_batch_issue_search.text_changed.connect(func(value: String):
+		_batch_issue_query = value.strip_edges().to_lower()
+		_refresh_batch_issue_panel()
+	)
+	content.add_child(_batch_issue_search)
+	var scroll := ScrollContainer.new()
+	scroll.name = "BatchIssuesScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	content.add_child(scroll)
+	_batch_issue_rows = VBoxContainer.new()
+	_batch_issue_rows.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_batch_issue_rows.add_theme_constant_override("separation", 4)
+	scroll.add_child(_batch_issue_rows)
+	details.add_child(_batch_issue_panel)
+	_refresh_batch_issue_panel()
+
+
+func _refresh_batch_issue_panel() -> void:
+	if _batch_issue_panel == null or _batch_issue_rows == null:
+		return
+	_batch_issue_panel.visible = _screen == "LEVEL FACTORY"
+	var items: Array = _batch_snapshot.get("items", [])
+	var counts_value: Variant = _batch_snapshot.get("counts", {})
+	var counts: Dictionary = counts_value if counts_value is Dictionary else {}
+	var failed_count := int(counts.get("failed", 0))
+	var rejected_count := int(counts.get("rejected", 0))
+	var render_key := "%s|%s|%d|%d|%s|%s" % [str(_batch_snapshot.get("job_id", "")), str(_batch_snapshot.get("updated_at", "")), failed_count, rejected_count, _batch_issue_filter, _batch_issue_query]
+	var title := _batch_issue_panel.get_node_or_null("VBoxContainer/BatchIssuesHeading") as Label
+	if title != null:
+		title.text = "BATCH ISSUES · %d" % (failed_count + rejected_count)
+	if render_key == _batch_issue_render_key:
+		return
+	_batch_issue_render_key = render_key
+	if _batch_issue_tabs != null and _batch_issue_tabs.get_child_count() == 0:
+		for spec in [["ALL", "All (%d)" % (failed_count + rejected_count)], ["FAILED", "FAILED (%d)" % failed_count], ["REJECTED", "REJECTED (%d)" % rejected_count]]:
+			var tab := Button.new()
+			tab.text = str(spec[1])
+			tab.disabled = str(spec[0]) == _batch_issue_filter
+			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tab.add_theme_font_size_override("font_size", 10)
+			tab.pressed.connect(_set_batch_issue_filter.bind(str(spec[0])))
+			_batch_issue_tabs.add_child(tab)
+	else:
+		for index in range(_batch_issue_tabs.get_child_count()):
+			var tab := _batch_issue_tabs.get_child(index) as Button
+			if tab == null:
+				continue
+			tab.text = ["All (%d)" % (failed_count + rejected_count), "FAILED (%d)" % failed_count, "REJECTED (%d)" % rejected_count][index]
+			tab.disabled = ["ALL", "FAILED", "REJECTED"][index] == _batch_issue_filter
+	for child in _batch_issue_rows.get_children():
+		child.queue_free()
+	var rendered := 0
+	if not _batch_job_matches_loaded_sources():
+		var empty := Label.new()
+		empty.text = "Verified batch issue details are not loaded."
+		empty.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_batch_issue_rows.add_child(empty)
+		return
+	for item_variant in items:
+		if not item_variant is Dictionary:
+			continue
+		var item: Dictionary = item_variant
+		var state := str(item.get("status", ""))
+		if state not in ["FAILED", "REJECTED"] or (_batch_issue_filter != "ALL" and state != _batch_issue_filter):
+			continue
+		var filename := str(item.get("display_name", item.get("original_filename", "PNG")))
+		var reason := str(item.get("reason", state))
+		if not _batch_issue_query.is_empty() and not (filename.to_lower().contains(_batch_issue_query) or reason.to_lower().contains(_batch_issue_query)):
+			continue
+		var button := Button.new()
+		button.text = "%s · %s\n%s" % [state, filename, reason.left(100)]
+		button.tooltip_text = "%s\n%s\n%s" % [filename, state, reason]
+		button.custom_minimum_size = Vector2(0, 50)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 10)
+		button.add_theme_color_override("font_color", Color("#dce8f8"))
+		button.add_theme_stylebox_override("normal", _control_style(Color("#17243a"), Color("#30415e")))
+		button.add_theme_stylebox_override("hover", _control_style(Color("#233651"), Color("#6b8bb9")))
+		button.pressed.connect(_inspect_batch_issue.bind(item.duplicate(true)))
+		_batch_issue_rows.add_child(button)
+		rendered += 1
+	if rendered == 0:
+		var none := Label.new()
+		none.text = "No matching issues."
+		none.add_theme_font_size_override("font_size", 11)
+		_batch_issue_rows.add_child(none)
+
+
+func _set_batch_issue_filter(value: String) -> void:
+	_batch_issue_filter = value if value in ["ALL", "FAILED", "REJECTED"] else "ALL"
+	_refresh_batch_issue_panel()
+
+
+func _inspect_batch_issue(item: Dictionary) -> void:
+	var source_id := str(item.get("source_id", ""))
+	var source_sha := str(item.get("source_sha256", ""))
+	var verified := _verified_batch_issue_for_source(source_id)
+	if verified.is_empty() or str(verified.get("source_sha256", "")) != source_sha:
+		_report("Issue source identity could not be verified; no source was selected.")
+		return
+	_selected_issue = verified
+	_select_imported_source_by_id(source_id)
+	var filename := str(verified.get("display_name", "PNG"))
+	var status := str(verified.get("status", "UNKNOWN"))
+	var reason := str(verified.get("reason", "No saved reason."))
+	var guidance := "Inspect the immutable source and saved evidence before deciding on any retry."
+	if status == "REJECTED":
+		guidance = "Source validation rejected this PNG. Correct the art/source and import a new SHA-bound version; a solver retry cannot fix rejected pixels."
+	elif "WinError 5" in reason:
+		guidance = "Inspect the exact owner candidate bundle and Windows ACL conflict before a selective FAILED-only retry."
+	elif "timed out" in reason.to_lower() or "timeout" in reason.to_lower():
+		guidance = "Inspect the retained solver job and bounded timeout evidence before a selective FAILED-only retry."
+	var detail := AcceptDialog.new()
+	detail.title = "%s · %s" % [status, filename]
+	detail.dialog_text = "Saved reason:\n%s\n\nStage: %s\nRun: %s\nSolver job: %s\nPNG SHA-256: %s\nSource ID: %s\n\n%s\n\nNo retry or publish was started." % [reason, str(verified.get("stage", "—")), str(verified.get("run_id", "—")), str(verified.get("solver_job_id", "—")), source_sha, source_id, guidance]
+	add_child(detail)
+	detail.confirmed.connect(func(): detail.queue_free())
+	detail.popup_centered(Vector2i(640, 360))
+	_refresh_runtime_cards()
+	_refresh_live_data()
+
+
+func _verified_batch_issue_for_source(source_id: String) -> Dictionary:
+	if source_id.is_empty() or _batch_snapshot.is_empty() or _batch_job_source_mismatch or not _batch_job_matches_loaded_sources():
+		return {}
+	var items: Array = _batch_snapshot.get("items", [])
+	for index in range(items.size()):
+		if not items[index] is Dictionary:
+			continue
+		var item: Dictionary = items[index]
+		if str(item.get("source_id", "")) != source_id or str(item.get("status", "")) not in ["FAILED", "REJECTED"]:
+			continue
+		if int(item.get("index", -1)) != index or str(item.get("job_id", _batch_snapshot.get("job_id", ""))) != str(_batch_snapshot.get("job_id", "")):
+			return {}
+		var source_index := _gameplay_source_index(source_id)
+		if source_index < 0:
+			return {}
+		var source: Dictionary = _gameplay_sources[source_index]
+		var expected_sha := str(item.get("source_sha256", ""))
+		if (expected_sha.length() != 64 or source_id.trim_prefix("owner-upload-") != expected_sha
+				or str(source.get("source_sha256", "")) != expected_sha
+				or str(source.get("source_record_sha256", "")) != str(item.get("source_record_sha256", ""))
+				or _source_png_sha256(str(source.get("path", ""))) != expected_sha):
+			return {}
+		return item.duplicate(true)
+	return {}
 
 
 func _build_live_chrome() -> void:
@@ -752,6 +970,7 @@ func _build_live_chrome() -> void:
 		row.add_theme_color_override("font_color", Color("#dce8f8"))
 		add_child(row)
 		_details_rows.append(row)
+	_build_batch_issue_panel()
 	_build_inline_results()
 	_activity_panel = Panel.new()
 	_activity_panel.name = "PipelineActivityPanel"
@@ -1059,6 +1278,7 @@ func _update_live_chrome() -> void:
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
 	if _activity_panel != null: _activity_panel.visible = _screen == "LEVEL FACTORY"
+	if _batch_issue_panel != null: _batch_issue_panel.visible = _screen == "LEVEL FACTORY"
 	if _release_candidate_scroll != null: _release_candidate_scroll.visible = _screen == "RELEASE POOL"
 	if _release_activity_title != null: _release_activity_title.visible = _screen == "RELEASE POOL"
 	if _release_activity_scroll != null: _release_activity_scroll.visible = _screen == "RELEASE POOL"
@@ -1143,6 +1363,8 @@ func _refresh_live_data() -> void:
 		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
 	_refresh_run_button_caption()
 	_refresh_runtime_cards()
+	_refresh_batch_issue_panel()
+	_refresh_selected_size_value()
 
 
 func _ensure_canonical_palette_loaded() -> void:
@@ -1171,7 +1393,10 @@ func _refresh_run_button_caption() -> void:
 		return
 	var imported_count := _gameplay_sources.size()
 	var batch_mode := imported_count > 1
-	if _operation_running and not _batch_job_id.is_empty():
+	if _batch_restore_pending:
+		button.text = "Checking saved batch…"
+		button.disabled = true
+	elif _operation_running and not _batch_job_id.is_empty():
 		var counts_value: Variant = _batch_snapshot.get("counts", {})
 		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
@@ -1187,19 +1412,9 @@ func _refresh_run_button_caption() -> void:
 		elif state in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"] and _batch_job_matches_loaded_sources():
 			button.text = "Review & Resume Legacy Batch" if _batch_legacy_reconciliation else "Resume Batch · %d remaining" % int(counts.get("remaining", 0))
 			button.disabled = false
-		elif state == "COMPLETE" and (int(counts.get("failed", 0)) > 0 or int(counts.get("rejected", 0)) > 0):
-			if int(counts.get("failed", 0)) > 0 and _batch_job_matches_loaded_sources():
-				button.text = "Retry Failed (%d)" % int(counts.get("failed", 0))
-				button.disabled = false
-			else:
-				button.text = "Finished With Failures · %d READY" % int(counts.get("ready", 0))
-				button.disabled = true
 		elif state == "COMPLETE":
 			if _batch_job_matches_loaded_sources():
-				if int(counts.get("skipped", 0)) > 0:
-					button.text = "Batch Complete · %d READY · %d Skipped" % [int(counts.get("ready", 0)), int(counts.get("skipped", 0))]
-				else:
-					button.text = "Retry Finished · %d READY" % int(counts.get("ready", 0)) if _batch_snapshot.has("parent_job_id") else "Loaded Batch READY (%d)" % int(counts.get("ready", 0))
+				button.text = "Batch Complete · %d READY · %d FAILED · %d REJECTED\n%d remaining" % [int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)), int(counts.get("remaining", 0))]
 				button.disabled = true
 			else:
 				button.text = "Run Entire Loaded Batch (%d)" % imported_count
@@ -1258,7 +1473,10 @@ func _pipeline_stop_reason(result: Dictionary) -> String:
 func _restore_imported_sources() -> void:
 	if _gateway == null:
 		return
-	var catalog := _extension("library-refresh", {})
+	_queue_studio_read_extension("library-refresh", {}, {"kind": "restore-imported-sources"})
+
+
+func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 	if str(catalog.get("schema", "")) != "scrubbots-source-library-view":
 		return
 	var release_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
@@ -1325,36 +1543,68 @@ func _restore_loaded_png_batch_readonly() -> void:
 		if source_id.is_empty() or source_id in source_ids:
 			return
 		source_ids.append(source_id)
-	var resolved := _extension("loaded-png-batch-find", {"source_ids": source_ids})
+	_batch_restore_pending = true
+	_batch_restore_token = "%d-%d" % [Time.get_ticks_msec(), Time.get_ticks_usec()]
+	_refresh_run_button_caption()
+	if not _queue_studio_read_extension("loaded-png-batch-find", {"source_ids": source_ids}, {"kind": "batch-find", "token": _batch_restore_token}):
+		_batch_restore_pending = false
+		_report("Saved batch lookup could not be prepared; no batch was resumed or modified.")
+		_refresh_run_button_caption()
+
+
+func _apply_loaded_png_batch_find(resolved: Dictionary, token: String) -> void:
+	if token != _batch_restore_token:
+		return
 	var composite_value: Variant = resolved.get("batch", {})
 	var composite: Dictionary = composite_value if composite_value is Dictionary else {}
 	var resolution := str(resolved.get("disposition", ""))
 	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH"] or composite.is_empty():
+		_batch_restore_pending = false
+		_batch_composite_snapshot.clear()
+		_batch_import_id = ""
+		_batch_job_id = ""
+		_batch_snapshot.clear()
 		if resolution not in ["NO_MATCHING_COMPOSITE", ""]:
 			_batch_job_source_mismatch = true
 			_report("Loaded PNG batch provenance could not be verified; resume and retry are blocked.")
+		else:
+			_batch_job_source_mismatch = false
 		_refresh_run_button_caption()
+		_refresh_batch_issue_panel()
 		return
 	_batch_legacy_reconciliation = resolution == "LEGACY_EXACT_MATCH"
 	_batch_composite_snapshot = composite
 	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
 		_batch_composite_snapshot.clear()
+		_batch_restore_pending = false
+		_refresh_run_button_caption()
 		return
-	var latest := _extension("png-batch-latest", {"batch_id": _batch_import_id})
+	if not _queue_studio_read_extension("png-batch-latest", {"batch_id": _batch_import_id}, {"kind": "batch-restore-latest", "token": token, "batch_id": _batch_import_id}):
+		_batch_restore_pending = false
+		_report("Saved batch status lookup could not be prepared; no batch was resumed or modified.")
+		_refresh_run_button_caption()
+
+
+func _apply_restored_latest_batch(latest: Dictionary, token: String, batch_id: String) -> void:
+	if token != _batch_restore_token or batch_id != _batch_import_id:
+		return
 	var job_value: Variant = latest.get("job", {})
 	var job: Dictionary = job_value if job_value is Dictionary else {}
 	_batch_job_source_mismatch = str(latest.get("disposition", "")) == "BATCH_JOB_SOURCE_MISMATCH"
+	_batch_restore_pending = false
 	if _batch_job_source_mismatch:
 		_batch_job_id = ""
 		_batch_snapshot.clear()
 		_report("A persisted PNG job has a different composite authority; it was not resumed.")
 		_refresh_run_button_caption()
+		_refresh_batch_issue_panel()
 		return
 	if job.is_empty():
 		_batch_job_id = ""
 		_batch_snapshot.clear()
 		_refresh_run_button_caption()
+		_refresh_batch_issue_panel()
 		return
 	_batch_snapshot = job.duplicate(true)
 	var counts_value: Variant = _batch_snapshot.get("counts", {})
@@ -1387,6 +1637,7 @@ func _restore_loaded_png_batch_readonly() -> void:
 	_render_batch_item_results(_batch_snapshot)
 	_refresh_activity_header()
 	_refresh_run_button_caption()
+	_refresh_live_data()
 
 
 func _refresh_runtime_cards() -> void:
@@ -1554,8 +1805,8 @@ func _build_master_controls() -> void:
 	_place_control("AddToLevelFactory", Rect2(1208, 560, 294, 48), _send_to_level_factory)
 	_place_control("GenerationPrompt", Rect2(26, 208, 334, 92), _edit_prompt)
 	_place_control("RandomSeed", Rect2(315, 296, 42, 40), _new_seed)
-	_place_control("GenerationStyle", Rect2(27, 348, 334, 42), _choose_style)
-	_place_control("GenerationSize", Rect2(27, 397, 334, 42), _choose_size)
+	_place_control("GenerationSize", Rect2(27, 348, 160, 42), _choose_size)
+	_build_selected_size_value_panel()
 	_place_control("GenerationProvider", Rect2(27, 446, 334, 42), _choose_provider)
 	_place_control("SingleMode", Rect2(27, 151, 160, 45), _set_generation_mode.bind("SINGLE"))
 	_place_control("BatchMode", Rect2(198, 151, 162, 45), _set_generation_mode.bind("BATCH"))
@@ -1754,6 +2005,8 @@ func _show_screen(name: String) -> void:
 		_present_active_preview()
 	_refresh_live_data()
 	if name == "LEVEL FACTORY":
+		if not _operation_running:
+			_restore_loaded_png_batch_readonly()
 		if not _batch_snapshot.is_empty():
 			_sync_verified_batch_follow(_batch_snapshot)
 		_refresh_activity_header()
@@ -1765,11 +2018,12 @@ func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
-	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "RandomSeed", "GenerationStyle", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
+	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "RandomSeed", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
+	_refresh_selected_size_value()
 	if _screen == "PIXEL ART":
 		var generate := get_node_or_null("GeneratePixelArt") as Button
 		var batch_path := get_node_or_null("BatchCsvPath") as Button
@@ -2068,6 +2322,10 @@ func _wrap_identity(value: String, chunk_size: int = 24) -> String:
 func _generate_art() -> void:
 	if _operation_running:
 		return
+	var provider_status := _provider_status_for(_provider_model)
+	if not bool(provider_status.get("available", false)):
+		_report(str(provider_status.get("reason", "Selected provider is unavailable.")))
+		return
 	_last_candidate_id = ""
 	_last_source_id = ""
 	_last_pipeline = {}
@@ -2078,7 +2336,7 @@ func _generate_art() -> void:
 			return
 		_confirm_pro_flash_generation()
 		return
-	var result := _generate_request({"prompt": _prompt, "style": _generation_style, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
+	var result := _generate_request({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	_finish_generation(result)
 
 
@@ -2088,7 +2346,7 @@ func _confirm_pro_flash_generation() -> void:
 	dialog.dialog_text = "This will submit one paid Pro Flash image request (%d × %d). One prior request used 5 credits; actual cost may vary. Network timeouts are not automatically retried." % [_width, _height]
 	dialog.confirmed.connect(func():
 		if is_instance_valid(dialog): dialog.queue_free()
-		_start_pixel_art_worker({"prompt": _prompt, "style": _generation_style, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
+		_start_pixel_art_worker({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog)
@@ -2102,7 +2360,7 @@ func _start_pixel_art_worker(request: Dictionary) -> void:
 		_report("PixelLab Pro Flash is unavailable because the local Factory Core gateway is not ready.")
 		return
 	var operation_id := "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
-	var payload := {"prompt": request.get("prompt", ""), "style": request.get("style", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_FLASH", "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT"), "operation_id": operation_id}
+	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_FLASH", "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT"), "operation_id": operation_id}
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "semantic-generate", payload)
 	if prepared.is_empty():
 		_report("PixelLab Pro Flash is unavailable because the local Factory Core cannot start.")
@@ -2215,7 +2473,8 @@ func _generate_batch_csv(path: String) -> void:
 		var row_values := {}
 		for index in range(header.size()): row_values[str(header[index]).strip_edges()] = row[index].strip_edges()
 		var dims := _csv_dimensions(row_values)
-		var result := _generate_request({"prompt": str(row_values.get("prompt", "")), "style": str(row_values.get("style", _generation_style)), "width": dims.x, "height": dims.y, "provider": str(row_values.get("provider", _provider_model)), "seed": str(row_values.get("seed", "")), "background_intent": str(row_values.get("background_intent", _background_intent))})
+		# Historical CSV style cells are retained for compatibility but ignored.
+		var result := _generate_request({"prompt": str(row_values.get("prompt", "")), "width": dims.x, "height": dims.y, "provider": str(row_values.get("provider", _provider_model)), "seed": str(row_values.get("seed", "")), "background_intent": str(row_values.get("background_intent", _background_intent))})
 		if str(result.get("state", "")) in ["SUCCESS", "IMPORTED"]:
 			_last_candidate_id = str(result.get("candidate_id", _last_candidate_id))
 			_last_source_id = str(result.get("source_id", _last_source_id))
@@ -2515,6 +2774,15 @@ func _apply_batch_progress_result(verified: Dictionary, expected_job_id: String)
 	if parsed.is_empty() or str(parsed.get("job_id", "")) != _batch_job_id:
 		return
 	var previous_snapshot := _batch_snapshot
+	# A completed canonical job is terminal. A delayed in-flight response from an
+	# older poll must never roll the visible state back to RUNNING/INTERRUPTED.
+	if str(previous_snapshot.get("state", "")) == "COMPLETE":
+		if str(parsed.get("state", "")) != "COMPLETE":
+			return
+		var previous_updated_at := str(previous_snapshot.get("updated_at", ""))
+		var parsed_updated_at := str(parsed.get("updated_at", ""))
+		if not previous_updated_at.is_empty() and (parsed_updated_at.is_empty() or parsed_updated_at < previous_updated_at):
+			return
 	_batch_snapshot = parsed.duplicate(true)
 	var counts_value: Variant = _batch_snapshot.get("counts", {})
 	if not counts_value is Dictionary:
@@ -3146,30 +3414,32 @@ func _refresh_release_pool(show_status: bool = true) -> void:
 	_apply_release_projection()
 
 
-func _queue_studio_read_extension(operation: String, request: Dictionary, context: Dictionary) -> void:
+func _queue_studio_read_extension(operation: String, request: Dictionary, context: Dictionary) -> bool:
 	if _gateway == null or not _gateway.has_method("prepare_studio_extension_call"):
-		return
+		return false
 	var context_key := str(context.get("kind", ""))
 	var context_identity := context_key
-	if context_key in ["restore-batch-run", "restore-selected-source"]:
+	if context_key in ["restore-batch-run", "restore-selected-source", "batch-find", "batch-restore-latest"]:
 		context_identity += "|" + str(context.get("token", ""))
 	if context_key == "batch-latest" and str(context.get("job_id", "")) != _batch_job_id:
-		return
+		return false
 	var active_identity := str(_studio_read_context.get("kind", ""))
-	if active_identity in ["restore-batch-run", "restore-selected-source"]:
+	if active_identity in ["restore-batch-run", "restore-selected-source", "batch-find", "batch-restore-latest"]:
 		active_identity += "|" + str(_studio_read_context.get("token", ""))
 	if active_identity == context_identity:
-		return
+		return true
 	for queued in _studio_read_queue:
 		var queued_context: Dictionary = queued.get("context", {})
 		var queued_identity := str(queued_context.get("kind", ""))
-		if queued_identity in ["restore-batch-run", "restore-selected-source"]:
+		if queued_identity in ["restore-batch-run", "restore-selected-source", "batch-find", "batch-restore-latest"]:
 			queued_identity += "|" + str(queued_context.get("token", ""))
 		if queued_identity == context_identity:
-			return
+			return true
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", operation, request)
 	if not prepared.is_empty():
 		_studio_read_queue.append({"prepared": prepared, "context": context.duplicate(true)})
+		return true
+	return false
 
 
 func _request_candidate_inbox_refresh(force: bool = false) -> void:
@@ -3201,9 +3471,14 @@ func _start_next_studio_read_extension() -> void:
 	var error := _studio_read_thread.start(Callable(self, "_studio_read_extension_worker").bind(queued.get("prepared", {})))
 	if error != OK:
 		_studio_read_thread = null
+		var failed_context: Dictionary = queued.get("context", {})
 		_studio_read_mutex.lock()
 		_studio_read_context.clear()
 		_studio_read_mutex.unlock()
+		if str(failed_context.get("kind", "")) in ["batch-find", "batch-restore-latest"]:
+			_batch_restore_pending = false
+			_report("Saved batch lookup could not start; no batch was resumed or modified.")
+			_refresh_run_button_caption()
 
 
 func _studio_read_extension_worker(prepared: Dictionary) -> void:
@@ -3239,6 +3514,12 @@ func _poll_studio_read_extension() -> void:
 			_refresh_live_data()
 	elif kind == "batch-latest":
 		_apply_batch_progress_result(result, str(context.get("job_id", "")))
+	elif kind == "restore-imported-sources":
+		_apply_restored_imported_sources(result)
+	elif kind == "batch-find":
+		_apply_loaded_png_batch_find(result, str(context.get("token", "")))
+	elif kind == "batch-restore-latest":
+		_apply_restored_latest_batch(result, str(context.get("token", "")), str(context.get("batch_id", "")))
 	elif kind == "release-pool":
 		_release_pool = result
 		_apply_release_projection()
@@ -3415,20 +3696,6 @@ func _new_seed() -> void:
 	_report("New seed selected")
 
 
-func _choose_style() -> void:
-	var dialog := ConfirmationDialog.new()
-	dialog.title = "Style"
-	var choice := OptionButton.new()
-	var styles := ["ROBOT", "CREATURE", "FISH", "SEA_CREATURE", "SPACE_SHIP", "INSECT", "FACE_EMBLEM", "TREE_PLANT", "CORAL", "ABSTRACT_SYMBOL"]
-	for style in styles: choice.add_item(style)
-	choice.selected = maxi(0, styles.find(_generation_style))
-	dialog.add_child(choice)
-	dialog.confirmed.connect(func(): _generation_style = choice.get_item_text(choice.selected); dialog.queue_free())
-	dialog.canceled.connect(func(): dialog.queue_free())
-	add_child(dialog)
-	dialog.popup_centered()
-
-
 func _choose_size() -> void:
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Size"
@@ -3436,7 +3703,13 @@ func _choose_size() -> void:
 	var width_input := SpinBox.new(); width_input.min_value = 20; width_input.max_value = 56; width_input.step = 4; width_input.value = _width
 	var height_input := SpinBox.new(); height_input.min_value = 20; height_input.max_value = 56; height_input.step = 4; height_input.value = _height
 	row.add_child(width_input); row.add_child(height_input); dialog.add_child(row)
-	dialog.confirmed.connect(func(): _width = int(width_input.value); _height = int(height_input.value); dialog.queue_free())
+	dialog.confirmed.connect(func():
+		_width = int(width_input.value)
+		_height = int(height_input.value)
+		_refresh_selected_size_value()
+		_refresh_live_data()
+		dialog.queue_free()
+	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog); dialog.popup_centered()
 
@@ -3449,30 +3722,73 @@ func _choose_provider() -> void:
 	var options: Array = result.get("providers", [])
 	var names: Array[String] = []
 	var provider_ids: Array[String] = []
+	var reasons_by_id: Dictionary = {}
 	for item in options:
 		if item is Dictionary:
 			var provider_id := str(item.get("id", ""))
 			if provider_id in ["ALPIX (Claude)", "PIXELLAB"]:
 				var available := bool(item.get("available", false))
+				var status := str(item.get("status", "UNAVAILABLE"))
 				var display_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
-				if not available: display_name += " · UNAVAILABLE"
+				if not available: display_name += " · %s" % status
 				choice.add_item(display_name)
 				choice.set_item_metadata(choice.item_count - 1, provider_id)
 				choice.set_item_tooltip(choice.item_count - 1, str(item.get("reason", "")))
 				names.append(display_name)
 				provider_ids.append(provider_id)
+				reasons_by_id[provider_id] = str(item.get("reason", "Provider status is unavailable."))
 	if _provider_model == "MAGNIFIC": _provider_model = "ALPIX (Claude)"
 	var selected := provider_ids.find(_provider_model)
 	if selected < 0: selected = provider_ids.find("ALPIX (Claude)")
 	if selected < 0: selected = 0
 	if not names.is_empty(): choice.select(selected)
 	dialog.add_child(choice)
+	var status_label := Label.new()
+	status_label.name = "ProviderStatusReason"
+	status_label.custom_minimum_size = Vector2(520, 72)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.add_theme_font_size_override("font_size", 12)
+	status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No active provider status was returned."))
+	dialog.add_child(status_label)
+	choice.item_selected.connect(func(index: int):
+		var selected_id := str(choice.get_item_metadata(index))
+		status_label.text = str(reasons_by_id.get(selected_id, "No provider status was returned."))
+	)
+	dialog.add_button("Refresh status", false, "refresh_provider_status")
+	dialog.add_button("Open Credential Manager", false, "open_credential_manager")
+	dialog.custom_action.connect(func(action: String):
+		if action == "open_credential_manager":
+			OS.create_process("control.exe", PackedStringArray(["/name", "Microsoft.CredentialManager"]), false)
+		elif action == "refresh_provider_status":
+			var refreshed := _extension("provider-options", {})
+			var refreshed_options: Array = refreshed.get("providers", [])
+			for refreshed_item in refreshed_options:
+				if refreshed_item is Dictionary:
+					var provider_id := str(refreshed_item.get("id", ""))
+					if reasons_by_id.has(provider_id):
+						var available := bool(refreshed_item.get("available", false))
+						var status := str(refreshed_item.get("status", "UNAVAILABLE"))
+						reasons_by_id[provider_id] = str(refreshed_item.get("reason", "Provider status is unavailable."))
+						var option_index := provider_ids.find(provider_id)
+						if option_index >= 0:
+							var base_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
+							choice.set_item_text(option_index, base_name if available else "%s · %s" % [base_name, status])
+			status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No provider status was returned."))
 	dialog.confirmed.connect(func():
 		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog); dialog.popup_centered()
+
+
+func _provider_status_for(provider_id: String) -> Dictionary:
+	var result := _extension("provider-options", {})
+	var options: Array = result.get("providers", [])
+	for item in options:
+		if item is Dictionary and str(item.get("id", "")) == provider_id:
+			return item.duplicate(true)
+	return {"available": false, "status": "PROVIDER_STATUS_UNAVAILABLE", "reason": "Provider status could not be read from the Factory Studio worker."}
 
 
 func _set_batch_action_label(resume: bool) -> void:
