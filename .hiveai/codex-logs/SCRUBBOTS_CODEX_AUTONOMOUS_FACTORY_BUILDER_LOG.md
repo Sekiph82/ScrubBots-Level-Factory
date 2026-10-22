@@ -126,3 +126,4 @@ Document role: CODEX BUILDER LOG
 - Product commit: `2730fe7` (`fix(codex): bound local task validation commands`). After commit, `python -B scripts/codex/scrubbots_task_queue.py --json` fetched origin and validated the current explicit R08 tracker/prompt and authority pins. This did not rerun the R08 one-shot process gate or launch Godot.
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone was changed or used.
 - Publication: pending normal fast-forward push and final parity check.
+- Publication follow-up: product commit `2730fe7` and builder-log commit `fc3f0c2` were pushed normally (`50067a5..fc3f0c2`). Post-push fetch confirmed `HEAD == origin/main == fc3f0c2d11523045d1b40ca42957ee5199e7c2fc`, 0 ahead / 0 behind, and no tracked changes; untracked owner files were preserved.
