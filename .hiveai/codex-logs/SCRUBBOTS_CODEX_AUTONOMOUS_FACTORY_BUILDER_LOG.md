@@ -56,3 +56,10 @@ Document role: CODEX BUILDER LOG
 - Correction notes: first patch application used a test class name that did not match the file; inspected the test module and reapplied against the actual `ScrubBotsTaskQueueTests` class. No source changes were lost. No dependencies, workflows, TASKS, audit, Release, PNG, or owner data changed.
 - Product commit: `d88a8f8` (`feat(codex): harden autonomous task checkout gate`). Publication of this continuation and final parity are recorded below after normal push.
 - Publication result: product commit `d88a8f8` and builder-log commit `e0bee30` were pushed normally (`29e9a30..e0bee30`). A fresh `git fetch --prune origin` confirmed `HEAD == origin/main == e0bee301476877364f8bdcb680a95cf6e0fe8e39`, 0 ahead / 0 behind, and zero tracked working-tree changes. This final log note is published as a separate normal fast-forward commit; final parity is verified once more after that push.
+
+## Autonomous factory authority pinning — continued coding
+
+- Added `validate_file_matches_origin()` and invoke it for both `TASKS.md` and the selected authoritative prompt. The guard compares clean-filtered local Git object identity to each `origin/main` blob, so local commits cannot substitute edited tracker/prompt content for GitHub authority. The existing tracked-prompt and canonical-checkout guards remain active.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 8/8 passed; `git diff --check` passed.
+- Real checkout check after commit: `python -B scripts/codex/scrubbots_task_queue.py --json` succeeded against the canonical Desktop path and selected the R08 prompt; current `TASKS.md` and prompt blobs matched `origin/main`. This is a queue validation only, not a retry of R08 native preflight.
+- Product commit: `0e0196f` (`feat(codex): pin task authority to origin main`). No TASKS, prompt, audit, workflow, owner data, Release or PNG file changed. No CI/Actions, native Godot, paid API, TEMP or worktree operation.
