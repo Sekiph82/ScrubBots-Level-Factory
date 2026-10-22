@@ -135,3 +135,4 @@ Document role: CODEX BUILDER LOG
 - Test commit: `f789771` (`test(codex): reject duplicate task actors`). After commit, the read-only queue CLI refreshed origin and validated the explicit R08 task/prompt pins; no native gate or process inventory was repeated.
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and parity verification.
+- Publication result: test commit `f789771` and builder-log commit `b281091` were pushed normally (`4ce2e66..b281091`). Post-push fetch verified `HEAD == origin/main == b2810919381b543b3b1342361fef33d9cead154a`, 0 ahead / 0 behind, with no tracked working-tree changes. Untracked owner files were preserved.
