@@ -118,3 +118,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, native Godot, paid API, CI/Actions, TEMP, worktree, or clone operation was performed.
 - Publication: pending normal fast-forward push and final parity check.
 - Publication follow-up: product commit `cc6237d` and builder-log commit `0481b71` were pushed by normal fast-forward (`59ae46a..0481b71`). Fresh fetch confirmed `HEAD == origin/main == 0481b71b23ecd905e6107ff22bdc80b5febfb5ec`, 0 ahead / 0 behind, and no tracked working-tree changes. Untracked owner files remain untouched.
+
+## Bounded local Git validation — autonomous factory continuation — 2026-10-22
+
+- Added a shared 10-second timeout to local Git reads used by the read-only task queue: checkout/root and branch checks, ancestry, tracked-prompt lookup, tracker/prompt blob comparisons, and authority SHA pins. A timeout now fails closed with an explicit validation error. The remote `git fetch --prune origin` retains its separate 30-second bound.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 17/17 passed, including the new local-Git timeout refusal case. Python AST parsing passed for both changed files. `git diff --check` passed; Git displayed only LF-to-CRLF working-copy warnings.
+- Product commit: `2730fe7` (`fix(codex): bound local task validation commands`). After commit, `python -B scripts/codex/scrubbots_task_queue.py --json` fetched origin and validated the current explicit R08 tracker/prompt and authority pins. This did not rerun the R08 one-shot process gate or launch Godot.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone was changed or used.
+- Publication: pending normal fast-forward push and final parity check.
