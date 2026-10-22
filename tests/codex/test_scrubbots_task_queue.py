@@ -81,7 +81,12 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "CODEX - NOT AUTHORIZED"))
 
     def test_rejects_empty_actor_chain_segments(self) -> None:
-        for malformed in ("CODEX,, CHATGPT", "CODEX, , CHATGPT", "CODEX THEN THEN CHATGPT"):
+        for malformed in (
+            "CODEX,, CHATGPT",
+            "CODEX, , CHATGPT",
+            "CODEX THEN THEN CHATGPT",
+            "CODEX, CHATGPT, CHATGPT",
+        ):
             with self.subTest(actor_chain=malformed):
                 with self.assertRaisesRegex(ValueError, "authorize CODEX"):
                     select_current_task(tracker().replace("CODEX, THEN CHATGPT", malformed))
