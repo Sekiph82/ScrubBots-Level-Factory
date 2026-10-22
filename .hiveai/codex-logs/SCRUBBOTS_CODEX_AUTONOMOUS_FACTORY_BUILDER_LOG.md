@@ -38,3 +38,9 @@ Document role: CODEX BUILDER LOG
 - Post-commit queue guard: `python -B scripts/codex/scrubbots_task_queue.py --json` returned repository `Sekiph82/ScrubBots-Level-Factory`, tracker branch `main`, and the explicit R08 prompt; tracked working tree was clean before this log update.
 - Workflow recheck: `.github/workflows/c001-r09-safe-regression.yml` has only `workflow_dispatch`; normal push does not trigger Actions. No workflow file changed.
 - Builder log is committed separately. Publication uses normal fast-forward `git push origin HEAD:main`; no force or rewrite.
+
+## Publication verification follow-up
+
+- First post-push `git fetch --prune origin` showed `HEAD` and `origin/main` both at `a8cefc7f7df3536d18383cbc00c9fe692148f10e`; `git rev-list --left-right --count HEAD...origin/main` returned `0<TAB>0`.
+- The initial PowerShell parity assertion failed because it compared that tab-delimited output to a literal backtick-t string. The displayed SHA/counts were already equal; the check was corrected to parse the two whitespace-separated integer fields. No repository or Git state was changed by the failed assertion.
+- The builder log commit `a8cefc7f7df3536d18383cbc00c9fe692148f10e` was successfully pushed by normal fast-forward. A follow-up log commit records this verification correction; final post-push parity is checked again after publishing it.
