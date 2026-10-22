@@ -127,3 +127,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone was changed or used.
 - Publication: pending normal fast-forward push and final parity check.
 - Publication follow-up: product commit `2730fe7` and builder-log commit `fc3f0c2` were pushed normally (`50067a5..fc3f0c2`). Post-push fetch confirmed `HEAD == origin/main == fc3f0c2d11523045d1b40ca42957ee5199e7c2fc`, 0 ahead / 0 behind, and no tracked changes; untracked owner files were preserved.
+
+## Duplicate task-actor regression coverage — autonomous factory continuation — 2026-10-22
+
+- Added a focused regression case ensuring `CODEX, CHATGPT, CHATGPT` is rejected as a duplicate actor chain, protecting the task queue's exact actor authorization rule.
+- Verification: `python -B -m unittest discover -s tests/codex -v` — 17/17 passed; `git diff --check` passed. The test addition does not change product behavior.
+- Test commit: `f789771` (`test(codex): reject duplicate task actors`). After commit, the read-only queue CLI refreshed origin and validated the explicit R08 task/prompt pins; no native gate or process inventory was repeated.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
+- Publication pending normal fast-forward push and parity verification.
