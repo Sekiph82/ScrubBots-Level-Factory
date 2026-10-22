@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
@@ -105,11 +106,20 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result) as run:
             fetch_origin(Path("."))
         self.assertEqual(run.call_args.args[0][-3:], ["fetch", "--prune", "origin"])
+        self.assertEqual(run.call_args.kwargs["timeout"], 30)
 
     def test_fetch_guard_fails_closed_on_network_error(self) -> None:
         result = type("Result", (), {"returncode": 128, "stderr": "network unavailable"})()
         with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
             with self.assertRaisesRegex(ValueError, "refusing stale task authority"):
+                fetch_origin(Path("."))
+
+    def test_fetch_guard_fails_closed_on_timeout(self) -> None:
+        with patch(
+            "scripts.codex.scrubbots_task_queue.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("git fetch", 30),
+        ):
+            with self.assertRaisesRegex(ValueError, "exceeded 30s"):
                 fetch_origin(Path("."))
 
 

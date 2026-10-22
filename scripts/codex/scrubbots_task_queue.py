@@ -17,6 +17,7 @@ from typing import Sequence
 REPOSITORY = "Sekiph82/ScrubBots-Level-Factory"
 TRACKING_BRANCH = "main"
 CANONICAL_ROOT = Path(r"C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator")
+FETCH_TIMEOUT_SECONDS = 30
 PROMPT_URL = re.compile(
     r"https://github\.com/Sekiph82/ScrubBots-Level-Factory/blob/main/"
     r"\.hiveai/prompts/[A-Za-z0-9_.-]+\.md"
@@ -168,13 +169,19 @@ def validate_checkout(root: Path) -> None:
 
 
 def fetch_origin(root: Path) -> None:
-    result = subprocess.run(
-        ["git", "-C", str(root.resolve()), "fetch", "--prune", "origin"],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root.resolve()), "fetch", "--prune", "origin"],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=FETCH_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ValueError(
+            f"git fetch --prune origin exceeded {FETCH_TIMEOUT_SECONDS}s; refusing stale task authority"
+        ) from error
     if result.returncode != 0:
         detail = result.stderr.strip()
         raise ValueError(f"git fetch --prune origin failed; refusing stale task authority{': ' + detail if detail else ''}")
