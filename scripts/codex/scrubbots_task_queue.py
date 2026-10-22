@@ -45,6 +45,14 @@ class CurrentTask:
     prompt_path: str
 
 
+@dataclass(frozen=True)
+class AuthorityPins:
+    head_sha: str
+    origin_main_sha: str
+    tasks_blob_sha: str
+    prompt_blob_sha: str
+
+
 def _project_status(source: str) -> dict[str, str]:
     lines = source.splitlines()
     headings = [index for index, line in enumerate(lines) if line == "## Project Status"]
@@ -221,6 +229,29 @@ def validate_file_matches_origin(root: Path, relative_path: str) -> None:
         raise ValueError(f"{relative_path} differs from authoritative origin/main")
 
 
+def authority_pins(root: Path, prompt_path: str) -> AuthorityPins:
+    root = root.resolve()
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", "-C", str(root), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+        )
+        if result.returncode != 0:
+            raise ValueError(f"cannot pin task authority with git {' '.join(args)}")
+        return result.stdout.strip()
+
+    return AuthorityPins(
+        head_sha=git("rev-parse", "HEAD"),
+        origin_main_sha=git("rev-parse", "origin/main"),
+        tasks_blob_sha=git("rev-parse", "origin/main:TASKS.md"),
+        prompt_blob_sha=git("rev-parse", f"origin/main:{prompt_path}"),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -234,10 +265,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         validate_tracked_prompt(args.root, task.prompt_path)
         validate_file_matches_origin(args.root, "TASKS.md")
         validate_file_matches_origin(args.root, task.prompt_path)
+        pins = authority_pins(args.root, task.prompt_path)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))
     if args.json:
-        print(json.dumps(asdict(task), ensure_ascii=False, sort_keys=True))
+        print(json.dumps({**asdict(task), **asdict(pins)}, ensure_ascii=False, sort_keys=True))
     else:
         print(f"Current task validated; prompt={task.prompt_path}; status={task.status}")
         print("Read-only mode: TASKS.md was not changed.")

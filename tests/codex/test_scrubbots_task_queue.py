@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.codex.scrubbots_task_queue import (
+    authority_pins,
     validate_checkout,
     fetch_origin,
     validate_file_matches_origin,
@@ -97,6 +98,16 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             side_effect=(result, result),
         ):
             validate_file_matches_origin(Path("."), "TASKS.md")
+
+    def test_authority_pins_capture_commits_and_exact_task_blobs(self) -> None:
+        values = ("1" * 40, "2" * 40, "3" * 40, "4" * 40)
+        results = [type("Result", (), {"returncode": 0, "stdout": value + "\n"})() for value in values]
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run", side_effect=results):
+            pins = authority_pins(Path("."), PROMPT.split("/blob/main/")[1])
+        self.assertEqual(
+            (pins.head_sha, pins.origin_main_sha, pins.tasks_blob_sha, pins.prompt_blob_sha),
+            values,
+        )
 
     def test_authority_file_guard_rejects_local_drift(self) -> None:
         remote = type("Result", (), {"returncode": 0, "stdout": "a" * 40})()
