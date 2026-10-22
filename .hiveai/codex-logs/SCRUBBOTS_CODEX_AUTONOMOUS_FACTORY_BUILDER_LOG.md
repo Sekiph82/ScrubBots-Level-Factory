@@ -79,3 +79,10 @@ Document role: CODEX BUILDER LOG
 - Focused verification: `python -B -m unittest discover -s tests/codex -v` — 11/11 passed, including query and fragment rejection; `git diff --check` passed.
 - After product commit `d19eea0`, `python -B scripts/codex/scrubbots_task_queue.py --json` passed on the real Desktop checkout, performed safe origin fetch, checked canonical root/remote, and validated current TASKS/prompt blobs. No native R08 preflight was repeated.
 - Product commit: `d19eea0` (`fix(codex): reject decorated task prompt URLs`). No tracker, prompt, audit, workflow, Release, PNG, job, Pool or owner data changed. No CI/Actions, paid service or TEMP/worktree used.
+- Publication result for the exact-URL guard: product `d19eea0` and log `1e324c0` were pushed normally (`0057cee..1e324c0`); post-fetch `HEAD == origin/main == 1e324c01190cc9a92053ace38ef3e5251cbea148`, 0/0, tracked clean.
+
+## Authorized task actor parsing — autonomous factory continuation
+
+- Fixed actor validation so strings merely starting with `CODEX` (for example `CODEX - NOT AUTHORIZED`) cannot pass. The parser now accepts a unique actor chain beginning with `CODEX`, with only recognized subsequent `CHATGPT` or `OWNER` actors.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 11/11 passed; `git diff --check` passed. After product commit `285d066`, the real queue guard completed fetch and returned actor `CODEX, THEN CHATGPT` with the explicit R08 prompt.
+- Product commit: `285d066` (`fix(codex): require unambiguous authorized task actors`). R08's one-shot native process gate was not repeated. No TASKS/prompt/audit/workflow/owner data changed; no CI, paid service, TEMP/worktree, Release, PNG, or native Godot operation.
