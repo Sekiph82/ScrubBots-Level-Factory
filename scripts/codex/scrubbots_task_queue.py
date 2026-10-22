@@ -96,8 +96,10 @@ def select_current_task(source: str) -> CurrentTask:
         raise ValueError("Tracking Branch must be main")
     actor_chain = [
         actor.strip()
-        for actor in re.split(r"\s*(?:,|\bTHEN\b)\s*", fields["Required Actor"])
-        if actor.strip()
+        for actor in re.split(
+            r"\s*(?:,\s*(?:THEN\s+)?|\bTHEN\s+)\s*",
+            fields["Required Actor"].strip(),
+        )
     ]
     if (
         not actor_chain

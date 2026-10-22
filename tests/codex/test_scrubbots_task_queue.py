@@ -79,6 +79,20 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "authorize CODEX"):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "CODEX - NOT AUTHORIZED"))
 
+    def test_rejects_empty_actor_chain_segments(self) -> None:
+        for malformed in ("CODEX,, CHATGPT", "CODEX, , CHATGPT", "CODEX THEN THEN CHATGPT"):
+            with self.subTest(actor_chain=malformed):
+                with self.assertRaisesRegex(ValueError, "authorize CODEX"):
+                    select_current_task(tracker().replace("CODEX, THEN CHATGPT", malformed))
+
+    def test_accepts_comma_and_then_actor_delimiters(self) -> None:
+        for actor_chain in ("CODEX, CHATGPT", "CODEX THEN CHATGPT", "CODEX, THEN CHATGPT"):
+            with self.subTest(actor_chain=actor_chain):
+                self.assertEqual(
+                    select_current_task(tracker().replace("CODEX, THEN CHATGPT", actor_chain)).required_actor,
+                    actor_chain,
+                )
+
     def test_tracked_prompt_guard_accepts_exact_git_path(self) -> None:
         result = type("Result", (), {"returncode": 0, "stdout": PROMPT.split("/blob/main/")[1] + "\n"})()
         with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
