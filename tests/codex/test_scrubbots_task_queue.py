@@ -67,6 +67,8 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             select_current_task(tracker() + "\n## Project Status\n")
         with self.assertRaisesRegex(ValueError, "authorize CODEX"):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "OWNER"))
+        with self.assertRaisesRegex(ValueError, "authorize CODEX"):
+            select_current_task(tracker().replace("CODEX, THEN CHATGPT", "CODEX - NOT AUTHORIZED"))
 
     def test_tracked_prompt_guard_accepts_exact_git_path(self) -> None:
         result = type("Result", (), {"returncode": 0, "stdout": PROMPT.split("/blob/main/")[1] + "\n"})()

@@ -85,7 +85,17 @@ def select_current_task(source: str) -> CurrentTask:
         raise ValueError("Tracking Repository must be Sekiph82/ScrubBots-Level-Factory")
     if fields["Tracking Branch"] != TRACKING_BRANCH:
         raise ValueError("Tracking Branch must be main")
-    if not fields["Required Actor"].startswith("CODEX"):
+    actor_chain = [
+        actor.strip()
+        for actor in re.split(r"\s*(?:,|\bTHEN\b)\s*", fields["Required Actor"])
+        if actor.strip()
+    ]
+    if (
+        not actor_chain
+        or actor_chain[0] != "CODEX"
+        or any(actor not in {"CODEX", "CHATGPT", "OWNER"} for actor in actor_chain)
+        or len(set(actor_chain)) != len(actor_chain)
+    ):
         raise ValueError("Required Actor must authorize CODEX")
 
     current = fields["Current Task"]
