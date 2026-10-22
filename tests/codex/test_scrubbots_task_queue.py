@@ -12,6 +12,7 @@ from scripts.codex.scrubbots_task_queue import (
     validate_file_matches_origin,
     validate_tracked_prompt,
     select_current_task,
+    _run_git,
 )
 
 
@@ -153,6 +154,15 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "exceeded 30s"):
                 fetch_origin(Path("."))
+
+    def test_local_git_guard_fails_closed_on_timeout(self) -> None:
+        with patch(
+            "scripts.codex.scrubbots_task_queue.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("git status", 10),
+        ) as run:
+            with self.assertRaisesRegex(ValueError, "exceeded 10s"):
+                _run_git(Path("."), "status", "--porcelain")
+        self.assertEqual(run.call_args.kwargs["timeout"], 10)
 
 
 if __name__ == "__main__":

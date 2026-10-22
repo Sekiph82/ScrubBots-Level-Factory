@@ -18,6 +18,7 @@ REPOSITORY = "Sekiph82/ScrubBots-Level-Factory"
 TRACKING_BRANCH = "main"
 CANONICAL_ROOT = Path(r"C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator")
 FETCH_TIMEOUT_SECONDS = 30
+LOCAL_GIT_TIMEOUT_SECONDS = 10
 PROMPT_URL = re.compile(
     r"https://github\.com/Sekiph82/ScrubBots-Level-Factory/blob/main/"
     r"\.hiveai/prompts/[A-Za-z0-9_.-]+\.md"
@@ -51,6 +52,26 @@ class AuthorityPins:
     origin_main_sha: str
     tasks_blob_sha: str
     prompt_blob_sha: str
+
+
+def _run_git(root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    command = ["git", "-C", str(root.resolve()), *args]
+    try:
+        result = subprocess.run(
+            command,
+            check=False,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=LOCAL_GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ValueError(
+            f"git {' '.join(args)} exceeded {LOCAL_GIT_TIMEOUT_SECONDS}s; refusing incomplete task validation"
+        ) from error
+    if check and result.returncode != 0:
+        raise ValueError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result
 
 
 def _project_status(source: str) -> dict[str, str]:
@@ -144,16 +165,7 @@ def validate_checkout(root: Path) -> None:
         raise ValueError(f"task execution is limited to the canonical checkout: {CANONICAL_ROOT}")
 
     def git(*args: str) -> str:
-        result = subprocess.run(
-            ["git", "-C", str(root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode != 0:
-            raise ValueError(f"git {' '.join(args)} failed: {result.stderr.strip()}")
-        return result.stdout.strip()
+        return _run_git(root, *args).stdout.strip()
 
     actual_root = Path(git("rev-parse", "--show-toplevel")).resolve()
     if actual_root != root:
@@ -165,13 +177,7 @@ def validate_checkout(root: Path) -> None:
         raise ValueError("Detached HEAD is not an allowed task execution state")
     fetch_origin(root)
     git("rev-parse", "--verify", "origin/main")
-    ancestry = subprocess.run(
-        ["git", "-C", str(root), "merge-base", "--is-ancestor", "origin/main", "HEAD"],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    ancestry = _run_git(root, "merge-base", "--is-ancestor", "origin/main", "HEAD", check=False)
     if ancestry.returncode != 0:
         raise ValueError("HEAD is behind or diverged from origin/main; safe fast-forward sync is required")
     if git("status", "--porcelain", "--untracked-files=no"):
@@ -198,33 +204,15 @@ def fetch_origin(root: Path) -> None:
 
 
 def validate_tracked_prompt(root: Path, prompt_path: str) -> None:
-    result = subprocess.run(
-        ["git", "-C", str(root.resolve()), "ls-files", "--error-unmatch", "--", prompt_path],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    result = _run_git(root, "ls-files", "--error-unmatch", "--", prompt_path, check=False)
     if result.returncode != 0 or result.stdout.strip() != prompt_path:
         raise ValueError(f"authoritative prompt is not tracked at HEAD: {prompt_path}")
 
 
 def validate_file_matches_origin(root: Path, relative_path: str) -> None:
     root = root.resolve()
-    remote = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", f"origin/main:{relative_path}"],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    local = subprocess.run(
-        ["git", "-C", str(root), "hash-object", f"--path={relative_path}", "--", relative_path],
-        check=False,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
+    remote = _run_git(root, "rev-parse", f"origin/main:{relative_path}", check=False)
+    local = _run_git(root, "hash-object", f"--path={relative_path}", "--", relative_path, check=False)
     if remote.returncode != 0 or local.returncode != 0:
         raise ValueError(f"cannot verify {relative_path} against origin/main")
     if remote.stdout.strip() != local.stdout.strip():
@@ -235,16 +223,10 @@ def authority_pins(root: Path, prompt_path: str) -> AuthorityPins:
     root = root.resolve()
 
     def git(*args: str) -> str:
-        result = subprocess.run(
-            ["git", "-C", str(root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        )
-        if result.returncode != 0:
-            raise ValueError(f"cannot pin task authority with git {' '.join(args)}")
-        return result.stdout.strip()
+        try:
+            return _run_git(root, *args).stdout.strip()
+        except ValueError as error:
+            raise ValueError(f"cannot pin task authority with git {' '.join(args)}: {error}") from error
 
     return AuthorityPins(
         head_sha=git("rev-parse", "HEAD"),
