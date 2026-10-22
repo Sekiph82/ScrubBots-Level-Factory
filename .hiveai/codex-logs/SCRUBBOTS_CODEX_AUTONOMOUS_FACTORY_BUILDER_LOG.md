@@ -86,3 +86,11 @@ Document role: CODEX BUILDER LOG
 - Fixed actor validation so strings merely starting with `CODEX` (for example `CODEX - NOT AUTHORIZED`) cannot pass. The parser now accepts a unique actor chain beginning with `CODEX`, with only recognized subsequent `CHATGPT` or `OWNER` actors.
 - Tests: `python -B -m unittest discover -s tests/codex -v` — 11/11 passed; `git diff --check` passed. After product commit `285d066`, the real queue guard completed fetch and returned actor `CODEX, THEN CHATGPT` with the explicit R08 prompt.
 - Product commit: `285d066` (`fix(codex): require unambiguous authorized task actors`). R08's one-shot native process gate was not repeated. No TASKS/prompt/audit/workflow/owner data changed; no CI, paid service, TEMP/worktree, Release, PNG, or native Godot operation.
+
+## Bounded authority refresh — autonomous factory continuation
+
+- Bounded the queue's `git fetch --prune origin` call to 30 seconds. A timed-out fetch now fails closed with a clear stale-authority error, so an unattended/heartbeat run cannot wait indefinitely or proceed on cached refs.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 12/12 passed, including timeout and network-error fail-closed cases; `git diff --check` passed.
+- A first patch application had stale context for the test assertion and failed without modifying files; inspected the current test and reapplied. No test failures remained after the corrected patch.
+- After implementation commit `a141719`, `python -B scripts/codex/scrubbots_task_queue.py --json` passed against the real canonical Desktop checkout and selected the R08 prompt. This did not re-run its native gate.
+- Product commit: `a141719` (`fix(codex): bound authority refresh wait`). No TASKS/prompt/audit/workflow/Release/PNG/owner data changes; no CI, paid API, native Godot, TEMP or worktree operation.
