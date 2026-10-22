@@ -72,3 +72,10 @@ Document role: CODEX BUILDER LOG
 - One test assertion initially expected the `fetch` argument triplet as a nested item, while subprocess receives a flat argv. It failed; assertion corrected to verify the final three argv elements, then the full focused suite passed 10/10.
 - Real checkout: after product commit `c2b51b5`, `python -B scripts/codex/scrubbots_task_queue.py --json` successfully fetched origin and validated the explicit R08 prompt plus tracker/prompt blob equality. Queue validation does not rerun R08's native gate.
 - Product commit: `c2b51b5` (`feat(codex): refresh task authority before selection`). No workflow, TASKS, prompt, audit, Release, PNG, job, Pool, owner data or dependency was changed. No Actions, paid API, native Godot, TEMP or worktree use.
+
+## Exact task prompt URL parsing — autonomous factory continuation
+
+- Found and fixed a selector edge case: the prior URL regex matched only the valid prefix, so a `?query` or `#fragment` suffix could pass despite the exact-canonical-URL requirement. The parser now captures the full prompt token and requires an exact full match after removing only terminal prose punctuation.
+- Focused verification: `python -B -m unittest discover -s tests/codex -v` — 11/11 passed, including query and fragment rejection; `git diff --check` passed.
+- After product commit `d19eea0`, `python -B scripts/codex/scrubbots_task_queue.py --json` passed on the real Desktop checkout, performed safe origin fetch, checked canonical root/remote, and validated current TASKS/prompt blobs. No native R08 preflight was repeated.
+- Product commit: `d19eea0` (`fix(codex): reject decorated task prompt URLs`). No tracker, prompt, audit, workflow, Release, PNG, job, Pool or owner data changed. No CI/Actions, paid service or TEMP/worktree used.
