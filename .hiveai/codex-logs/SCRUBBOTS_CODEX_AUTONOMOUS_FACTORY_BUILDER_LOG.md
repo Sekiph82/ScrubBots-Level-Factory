@@ -64,3 +64,11 @@ Document role: CODEX BUILDER LOG
 - Real checkout check after commit: `python -B scripts/codex/scrubbots_task_queue.py --json` succeeded against the canonical Desktop path and selected the R08 prompt; current `TASKS.md` and prompt blobs matched `origin/main`. This is a queue validation only, not a retry of R08 native preflight.
 - Product commit: `0e0196f` (`feat(codex): pin task authority to origin main`). No TASKS, prompt, audit, workflow, owner data, Release or PNG file changed. No CI/Actions, native Godot, paid API, TEMP or worktree operation.
 - Publication: product commit `0e0196f` and builder-log commit `e489a9c` were published by normal fast-forward (`ee13dff..e489a9c`). Fresh fetch confirmed `HEAD == origin/main == e489a9cc30befc496c095df6dedff3380f1a4698`, 0 ahead / 0 behind, and no tracked changes. This verification note is published in a final builder-log commit and parity is checked again after that push.
+
+## Autonomous factory fresh-authority fetch — continued coding
+
+- Factory startup now performs bounded `git fetch --prune origin` after verifying the canonical remote, before accepting `origin/main` ancestry or comparing tracker/prompt blobs. A fetch error fails closed with an explicit stale-authority message; no task is selected from a stale remote-tracking ref.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 10/10 passed; `git diff --check` passed. Test coverage includes successful fetch argument and fetch/network failure refusal.
+- One test assertion initially expected the `fetch` argument triplet as a nested item, while subprocess receives a flat argv. It failed; assertion corrected to verify the final three argv elements, then the full focused suite passed 10/10.
+- Real checkout: after product commit `c2b51b5`, `python -B scripts/codex/scrubbots_task_queue.py --json` successfully fetched origin and validated the explicit R08 prompt plus tracker/prompt blob equality. Queue validation does not rerun R08's native gate.
+- Product commit: `c2b51b5` (`feat(codex): refresh task authority before selection`). No workflow, TASKS, prompt, audit, Release, PNG, job, Pool, owner data or dependency was changed. No Actions, paid API, native Godot, TEMP or worktree use.
