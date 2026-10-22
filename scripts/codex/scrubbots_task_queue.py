@@ -131,6 +131,7 @@ def validate_checkout(root: Path) -> None:
         raise ValueError("origin must be https://github.com/Sekiph82/ScrubBots-Level-Factory.git")
     if not git("branch", "--show-current"):
         raise ValueError("Detached HEAD is not an allowed task execution state")
+    fetch_origin(root)
     git("rev-parse", "--verify", "origin/main")
     ancestry = subprocess.run(
         ["git", "-C", str(root), "merge-base", "--is-ancestor", "origin/main", "HEAD"],
@@ -143,6 +144,19 @@ def validate_checkout(root: Path) -> None:
         raise ValueError("HEAD is behind or diverged from origin/main; safe fast-forward sync is required")
     if git("status", "--porcelain", "--untracked-files=no"):
         raise ValueError("Tracked working-tree changes exist; refusing to start an automated task")
+
+
+def fetch_origin(root: Path) -> None:
+    result = subprocess.run(
+        ["git", "-C", str(root.resolve()), "fetch", "--prune", "origin"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip()
+        raise ValueError(f"git fetch --prune origin failed; refusing stale task authority{': ' + detail if detail else ''}")
 
 
 def validate_tracked_prompt(root: Path, prompt_path: str) -> None:

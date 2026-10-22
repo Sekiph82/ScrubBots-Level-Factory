@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 from scripts.codex.scrubbots_task_queue import (
     select_current_task,
+    fetch_origin,
     validate_file_matches_origin,
     validate_tracked_prompt,
 )
@@ -90,6 +91,18 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(ValueError, "differs from authoritative origin/main"):
                 validate_file_matches_origin(Path("."), "TASKS.md")
+
+    def test_fetch_guard_accepts_successful_fetch(self) -> None:
+        result = type("Result", (), {"returncode": 0, "stderr": ""})()
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result) as run:
+            fetch_origin(Path("."))
+        self.assertEqual(run.call_args.args[0][-3:], ["fetch", "--prune", "origin"])
+
+    def test_fetch_guard_fails_closed_on_network_error(self) -> None:
+        result = type("Result", (), {"returncode": 128, "stderr": "network unavailable"})()
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
+            with self.assertRaisesRegex(ValueError, "refusing stale task authority"):
+                fetch_origin(Path("."))
 
 
 if __name__ == "__main__":
