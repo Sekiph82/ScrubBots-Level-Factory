@@ -82,7 +82,7 @@ You must not:
 - perform or author an independent audit,
 - declare `AUDIT_PASSED`,
 - declare final milestone/sprint/cycle acceptance,
-- edit root `TASKS.md` task state except when the active authoritative prompt explicitly grants a one-time mechanical format-only exception,
+- edit root `TASKS.md` task state except where the owner explicitly authorizes the exact update in the active conversation or active authoritative prompt; preserve the single-ledger and independent-audit boundaries,
 - edit `.hiveai/HANDOFF.md`,
 - create or modify legacy tracker/control-plane files,
 - create or modify files under `.hiveai/audits/`,
@@ -160,6 +160,14 @@ Do not resize, resample, interpolate, or antialias logical source art to force i
 - The repository root `TASKS.md` is the only current project-management/task-state tracker.
 - Do not create or revive legacy `.hiveai` tracker/control-plane files or a lowercase root `tasks.md`.
 - Prompts, builder logs, audits, README, AGENTS, CLAUDE, and other documents are not tracker inputs.
+
+## Chat-driven Codex factory
+
+- The owner authorized a repository-local Codex factory bootstrap on 2026-10-22, before resuming R08. This authorization is bounded to the current Codex thread and does not authorize release/install operations, CI/Actions, paid services, or owner-data mutations.
+- Do not use a dashboard, dashboard inbox, or another task ledger. Ask owner questions and receive answers in the active chat.
+- Before processing a task, run `python -B scripts/codex/scrubbots_task_queue.py --json`. This is a read-only guard: it must validate the exact explicit current task and its matching prompt URL from `TASKS.md`; it must never select from the first unchecked row or write/claim/publish `TASKS.md`.
+- Work only on the explicit task and its authoritative prompt. Do not continue across a task boundary unless the owner or current prompt expressly authorizes the sequence. A later owner answer in chat can authorize a narrow task-state update, but does not waive any other prompt safety gate.
+- The Codex skill is `.codex/skills/scrubbots-factory/SKILL.md`. It is workflow guidance, not a second status ledger. Keep the independent auditor boundary intact.
 
 ## Factory Studio exact visual-master lock
 
