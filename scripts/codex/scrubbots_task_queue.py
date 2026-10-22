@@ -21,7 +21,15 @@ PROMPT_URL = re.compile(
     r"https://github\.com/Sekiph82/ScrubBots-Level-Factory/blob/main/"
     r"\.hiveai/prompts/[A-Za-z0-9_.-]+\.md"
 )
+PROMPT_TOKEN = re.compile(
+    r"https://github\.com/Sekiph82/ScrubBots-Level-Factory/blob/main/"
+    r"\.hiveai/prompts/\S+"
+)
 PROMPT_PATH = re.compile(r"\.hiveai/prompts/[A-Za-z0-9_.-]+\.md")
+
+
+def _prompt_urls(text: str) -> list[str]:
+    return [match.group(0).rstrip(".,;)]}") for match in PROMPT_TOKEN.finditer(text)]
 
 
 @dataclass(frozen=True)
@@ -82,12 +90,15 @@ def select_current_task(source: str) -> CurrentTask:
 
     current = fields["Current Task"]
     actions = fields["Next Task/Action"]
-    urls = PROMPT_URL.findall(current)
-    action_urls = PROMPT_URL.findall(actions)
-    if len(urls) != 1 or len(action_urls) != 1 or urls[0] != action_urls[0]:
+    urls = _prompt_urls(current)
+    action_urls = _prompt_urls(actions)
+    if (
+        len(urls) != 1
+        or len(action_urls) != 1
+        or urls[0] != action_urls[0]
+        or PROMPT_URL.fullmatch(urls[0]) is None
+    ):
         raise ValueError("Current Task and Next Task/Action must name the same exact main-branch prompt URL")
-    if urls[0].count("?") or "#" in urls[0]:
-        raise ValueError("Prompt URL must not contain a query or fragment")
 
     prompt_file = PROMPT_PATH.search(urls[0])
     assert prompt_file is not None

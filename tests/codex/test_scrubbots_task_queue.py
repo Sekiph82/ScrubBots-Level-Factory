@@ -56,6 +56,12 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "same exact"):
             select_current_task(tracker(prompt=PROMPT + " and " + PROMPT))
 
+    def test_rejects_prompt_query_and_fragment_suffixes(self) -> None:
+        for suffix in ("?plain=1", "#readme"):
+            with self.subTest(suffix=suffix):
+                with self.assertRaisesRegex(ValueError, "same exact"):
+                    select_current_task(tracker(prompt=PROMPT + suffix))
+
     def test_rejects_duplicate_status_sections_and_non_codex_actor(self) -> None:
         with self.assertRaisesRegex(ValueError, "exactly one"):
             select_current_task(tracker() + "\n## Project Status\n")
