@@ -101,3 +101,11 @@ Document role: CODEX BUILDER LOG
 - Tests: `python -B -m unittest discover -s tests/codex -v` — 13/13 passed; `git diff --check` passed. After commit `1125ea6`, the real queue command fetched current origin and selected the expected explicit R08 prompt.
 - Previous bounded-fetch change `a141719` and builder-log update `1628edc` were pushed normally (`d9324be..1628edc`); post-fetch equality was verified at `1628edcf2ff14e39f304e054ba9e585f601364a5`, 0/0, tracked clean.
 - Product commit: `1125ea6` (`test(codex): assert canonical checkout refusal`). No source tracker, audit, prompt, workflow, Release, PNG, owner data, native Godot or CI was touched.
+
+## Authority provenance pins — autonomous factory continuation
+
+- Extended the read-only queue JSON with `HEAD`, `origin/main`, `TASKS.md` blob, and active prompt blob SHA pins. Updated the Codex skill to retain these in each builder log, making the exact task authority reproducible at run start.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 14/14 passed; `git diff --check` passed.
+- Real checkout after product commit `acdce1f`: queue validation fetched origin and returned HEAD `acdce1f7f72a772960b0a11a51584f38ccfe7dff`, origin/main `b4621aa67f6a40a5b5ba9ec609d0b77e2e648407`, TASKS blob `62cc37d39f7840ebaa0cffa320effbf0625daa39`, and R08 prompt blob `2b60855c137b80977a0693a16d48746f737bf5c1`.
+- The previous product `1125ea6` and log `b4621aa` were pushed normally (`1628edc..b4621aa`), then fetched and verified at exact equality, 0/0, tracked clean.
+- Product commit: `acdce1f` (`feat(codex): emit task authority provenance pins`). No TASKS/prompt/audit/workflow/owner-data changes; no CI, paid service, TEMP/worktree, Release, PNG or native Godot work.
