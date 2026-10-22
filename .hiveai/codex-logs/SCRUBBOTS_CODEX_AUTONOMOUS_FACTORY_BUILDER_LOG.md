@@ -117,3 +117,4 @@ Document role: CODEX BUILDER LOG
 - Product commit: `cc6237d` (`fix(codex): reject malformed task actor chains`). After commit, `python -B scripts/codex/scrubbots_task_queue.py --json` successfully fetched current origin and validated the explicit R08 task, exact prompt, and authority pins. This was factory queue validation only; the already-blocked one-shot R08 native Godot gate was not repeated.
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, native Godot, paid API, CI/Actions, TEMP, worktree, or clone operation was performed.
 - Publication: pending normal fast-forward push and final parity check.
+- Publication follow-up: product commit `cc6237d` and builder-log commit `0481b71` were pushed by normal fast-forward (`59ae46a..0481b71`). Fresh fetch confirmed `HEAD == origin/main == 0481b71b23ecd905e6107ff22bdc80b5febfb5ec`, 0 ahead / 0 behind, and no tracked working-tree changes. Untracked owner files remain untouched.
