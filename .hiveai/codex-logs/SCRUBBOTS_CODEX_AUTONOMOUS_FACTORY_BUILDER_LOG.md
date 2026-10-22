@@ -94,3 +94,10 @@ Document role: CODEX BUILDER LOG
 - A first patch application had stale context for the test assertion and failed without modifying files; inspected the current test and reapplied. No test failures remained after the corrected patch.
 - After implementation commit `a141719`, `python -B scripts/codex/scrubbots_task_queue.py --json` passed against the real canonical Desktop checkout and selected the R08 prompt. This did not re-run its native gate.
 - Product commit: `a141719` (`fix(codex): bound authority refresh wait`). No TASKS/prompt/audit/workflow/Release/PNG/owner data changes; no CI, paid API, native Godot, TEMP or worktree operation.
+
+## Canonical checkout isolation regression — autonomous factory continuation
+
+- Added a unit regression proving that a noncanonical checkout path is rejected before any Git subprocess runs. This protects the user's single Desktop checkout rule and prevents accidental task work in clones/worktrees.
+- Tests: `python -B -m unittest discover -s tests/codex -v` — 13/13 passed; `git diff --check` passed. After commit `1125ea6`, the real queue command fetched current origin and selected the expected explicit R08 prompt.
+- Previous bounded-fetch change `a141719` and builder-log update `1628edc` were pushed normally (`d9324be..1628edc`); post-fetch equality was verified at `1628edcf2ff14e39f304e054ba9e585f601364a5`, 0/0, tracked clean.
+- Product commit: `1125ea6` (`test(codex): assert canonical checkout refusal`). No source tracker, audit, prompt, workflow, Release, PNG, owner data, native Godot or CI was touched.
