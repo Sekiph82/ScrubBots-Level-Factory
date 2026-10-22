@@ -109,3 +109,11 @@ Document role: CODEX BUILDER LOG
 - Real checkout after product commit `acdce1f`: queue validation fetched origin and returned HEAD `acdce1f7f72a772960b0a11a51584f38ccfe7dff`, origin/main `b4621aa67f6a40a5b5ba9ec609d0b77e2e648407`, TASKS blob `62cc37d39f7840ebaa0cffa320effbf0625daa39`, and R08 prompt blob `2b60855c137b80977a0693a16d48746f737bf5c1`.
 - The previous product `1125ea6` and log `b4621aa` were pushed normally (`1628edc..b4621aa`), then fetched and verified at exact equality, 0/0, tracked clean.
 - Product commit: `acdce1f` (`feat(codex): emit task authority provenance pins`). No TASKS/prompt/audit/workflow/owner-data changes; no CI, paid service, TEMP/worktree, Release, PNG or native Godot work.
+
+## Malformed actor-chain rejection — autonomous factory continuation — 2026-10-22
+
+- Hardened the read-only task queue parser against empty segments in `Required Actor`. Previously, empty entries were filtered, so malformed chains such as `CODEX,, CHATGPT` could collapse into an apparently valid authorization. Parsing now preserves empty segments and rejects malformed delimiters while still accepting the supported comma and `THEN` forms.
+- Focused tests: `python -B -m unittest discover -s tests/codex -v` — 16/16 passed. Added rejection coverage for repeated/empty delimiters and acceptance coverage for supported delimiters. Syntax validation: `python -B -c "import ast,pathlib; ..."` parsed both modified Python files. `git diff --check` passed; Git emitted only its expected LF-to-CRLF working-copy warnings.
+- Product commit: `cc6237d` (`fix(codex): reject malformed task actor chains`). After commit, `python -B scripts/codex/scrubbots_task_queue.py --json` successfully fetched current origin and validated the explicit R08 task, exact prompt, and authority pins. This was factory queue validation only; the already-blocked one-shot R08 native Godot gate was not repeated.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, native Godot, paid API, CI/Actions, TEMP, worktree, or clone operation was performed.
+- Publication: pending normal fast-forward push and final parity check.
