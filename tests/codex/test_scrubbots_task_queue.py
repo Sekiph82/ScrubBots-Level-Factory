@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import unittest
 import subprocess
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
 from scripts.codex.scrubbots_task_queue import (
-    select_current_task,
+    validate_checkout,
     fetch_origin,
     validate_file_matches_origin,
     validate_tracked_prompt,
+    select_current_task,
 )
 
 
@@ -38,6 +39,12 @@ def tracker(*, repository: str = "Sekiph82/ScrubBots-Level-Factory", branch: str
 
 
 class ScrubBotsTaskQueueTests(unittest.TestCase):
+    def test_checkout_guard_rejects_noncanonical_root_before_git_calls(self) -> None:
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run") as run:
+            with self.assertRaisesRegex(ValueError, "canonical checkout"):
+                validate_checkout(Path(r"C:\other\ScrubBots-Level-Factory"))
+        run.assert_not_called()
+
     def test_selects_only_the_explicit_current_task_and_exact_prompt(self) -> None:
         selected = select_current_task(tracker())
         self.assertEqual(selected.prompt_path, ".hiveai/prompts/SB_LFX_018_R05_V13_CD_R08_CONDITIONAL_NATIVE_GODOT_PARSE_ONLY.md")
