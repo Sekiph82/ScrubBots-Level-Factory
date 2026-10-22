@@ -16,6 +16,7 @@ from typing import Sequence
 
 REPOSITORY = "Sekiph82/ScrubBots-Level-Factory"
 TRACKING_BRANCH = "main"
+CANONICAL_ROOT = Path(r"C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator")
 PROMPT_URL = re.compile(
     r"https://github\.com/Sekiph82/ScrubBots-Level-Factory/blob/main/"
     r"\.hiveai/prompts/[A-Za-z0-9_.-]+\.md"
@@ -107,6 +108,8 @@ def select_current_task(source: str) -> CurrentTask:
 
 def validate_checkout(root: Path) -> None:
     root = root.resolve()
+    if root != CANONICAL_ROOT.resolve():
+        raise ValueError(f"task execution is limited to the canonical checkout: {CANONICAL_ROOT}")
 
     def git(*args: str) -> str:
         result = subprocess.run(
@@ -142,6 +145,18 @@ def validate_checkout(root: Path) -> None:
         raise ValueError("Tracked working-tree changes exist; refusing to start an automated task")
 
 
+def validate_tracked_prompt(root: Path, prompt_path: str) -> None:
+    result = subprocess.run(
+        ["git", "-C", str(root.resolve()), "ls-files", "--error-unmatch", "--", prompt_path],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if result.returncode != 0 or result.stdout.strip() != prompt_path:
+        raise ValueError(f"authoritative prompt is not tracked at HEAD: {prompt_path}")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -152,6 +167,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         task = select_current_task((args.root / "TASKS.md").read_text(encoding="utf-8"))
         if not (args.root / task.prompt_path).is_file():
             raise ValueError(f"Authoritative prompt is missing from this checkout: {task.prompt_path}")
+        validate_tracked_prompt(args.root, task.prompt_path)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))
     if args.json:

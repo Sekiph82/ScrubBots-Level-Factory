@@ -166,7 +166,7 @@ Do not resize, resample, interpolate, or antialias logical source art to force i
 - The owner authorized a repository-local Codex factory bootstrap on 2026-10-22, before resuming R08. This authorization is bounded to the current Codex thread and does not authorize release/install operations, CI/Actions, paid services, or owner-data mutations.
 - Do not use a dashboard, dashboard inbox, or another task ledger. Ask owner questions and receive answers in the active chat.
 - Before processing a task, run `python -B scripts/codex/scrubbots_task_queue.py --json`. This is a read-only guard: it must validate the exact explicit current task and its matching prompt URL from `TASKS.md`; it must never select from the first unchecked row or write/claim/publish `TASKS.md`.
-- Work only on the explicit task and its authoritative prompt. Do not continue across a task boundary unless the owner or current prompt expressly authorizes the sequence. A later owner answer in chat can authorize a narrow task-state update, but does not waive any other prompt safety gate.
+- Work only on the explicit task and its authoritative prompt. The owner may authorize ongoing coding across task boundaries; at each authorized boundary, reread the live tracker and exact prompt and continue only if its gates allow it. Never infer tasks from unchecked rows, rerun one-shot gates, or advance past a blocked task. A later owner answer in chat can authorize a narrow task-state update, but does not waive any other prompt safety gate.
 - The Codex skill is `.codex/skills/scrubbots-factory/SKILL.md`. It is workflow guidance, not a second status ledger. Keep the independent auditor boundary intact.
 
 ## Factory Studio exact visual-master lock

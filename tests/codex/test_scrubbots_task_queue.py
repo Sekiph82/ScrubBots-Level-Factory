@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
-from scripts.codex.scrubbots_task_queue import select_current_task
+from scripts.codex.scrubbots_task_queue import select_current_task, validate_tracked_prompt
 
 
 PROMPT = (
@@ -54,6 +56,17 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             select_current_task(tracker() + "\n## Project Status\n")
         with self.assertRaisesRegex(ValueError, "authorize CODEX"):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "OWNER"))
+
+    def test_tracked_prompt_guard_accepts_exact_git_path(self) -> None:
+        result = type("Result", (), {"returncode": 0, "stdout": PROMPT.split("/blob/main/")[1] + "\n"})()
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
+            validate_tracked_prompt(Path("."), PROMPT.split("/blob/main/")[1])
+
+    def test_tracked_prompt_guard_rejects_untracked_prompt(self) -> None:
+        result = type("Result", (), {"returncode": 1, "stdout": ""})()
+        with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
+            with self.assertRaisesRegex(ValueError, "not tracked"):
+                validate_tracked_prompt(Path("."), PROMPT.split("/blob/main/")[1])
 
 
 if __name__ == "__main__":
