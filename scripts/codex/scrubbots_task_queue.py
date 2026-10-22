@@ -157,6 +157,28 @@ def validate_tracked_prompt(root: Path, prompt_path: str) -> None:
         raise ValueError(f"authoritative prompt is not tracked at HEAD: {prompt_path}")
 
 
+def validate_file_matches_origin(root: Path, relative_path: str) -> None:
+    root = root.resolve()
+    remote = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", f"origin/main:{relative_path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    local = subprocess.run(
+        ["git", "-C", str(root), "hash-object", f"--path={relative_path}", "--", relative_path],
+        check=False,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    if remote.returncode != 0 or local.returncode != 0:
+        raise ValueError(f"cannot verify {relative_path} against origin/main")
+    if remote.stdout.strip() != local.stdout.strip():
+        raise ValueError(f"{relative_path} differs from authoritative origin/main")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
@@ -168,6 +190,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not (args.root / task.prompt_path).is_file():
             raise ValueError(f"Authoritative prompt is missing from this checkout: {task.prompt_path}")
         validate_tracked_prompt(args.root, task.prompt_path)
+        validate_file_matches_origin(args.root, "TASKS.md")
+        validate_file_matches_origin(args.root, task.prompt_path)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))
     if args.json:

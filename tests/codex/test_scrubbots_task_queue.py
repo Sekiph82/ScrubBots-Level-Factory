@@ -4,7 +4,11 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.codex.scrubbots_task_queue import select_current_task, validate_tracked_prompt
+from scripts.codex.scrubbots_task_queue import (
+    select_current_task,
+    validate_file_matches_origin,
+    validate_tracked_prompt,
+)
 
 
 PROMPT = (
@@ -67,6 +71,25 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
         with patch("scripts.codex.scrubbots_task_queue.subprocess.run", return_value=result):
             with self.assertRaisesRegex(ValueError, "not tracked"):
                 validate_tracked_prompt(Path("."), PROMPT.split("/blob/main/")[1])
+
+    def test_authority_file_guard_accepts_origin_blob_match(self) -> None:
+        blob = "a" * 40
+        result = type("Result", (), {"returncode": 0, "stdout": blob + "\n"})()
+        with patch(
+            "scripts.codex.scrubbots_task_queue.subprocess.run",
+            side_effect=(result, result),
+        ):
+            validate_file_matches_origin(Path("."), "TASKS.md")
+
+    def test_authority_file_guard_rejects_local_drift(self) -> None:
+        remote = type("Result", (), {"returncode": 0, "stdout": "a" * 40})()
+        local = type("Result", (), {"returncode": 0, "stdout": "b" * 40})()
+        with patch(
+            "scripts.codex.scrubbots_task_queue.subprocess.run",
+            side_effect=(remote, local),
+        ):
+            with self.assertRaisesRegex(ValueError, "differs from authoritative origin/main"):
+                validate_file_matches_origin(Path("."), "TASKS.md")
 
 
 if __name__ == "__main__":
