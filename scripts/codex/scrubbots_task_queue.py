@@ -48,6 +48,7 @@ class CurrentTask:
 
 @dataclass(frozen=True)
 class AuthorityPins:
+    execution_branch: str
     head_sha: str
     origin_main_sha: str
     tasks_blob_sha: str
@@ -229,6 +230,7 @@ def authority_pins(root: Path, prompt_path: str) -> AuthorityPins:
             raise ValueError(f"cannot pin task authority with git {' '.join(args)}: {error}") from error
 
     return AuthorityPins(
+        execution_branch=git("branch", "--show-current"),
         head_sha=git("rev-parse", "HEAD"),
         origin_main_sha=git("rev-parse", "origin/main"),
         tasks_blob_sha=git("rev-parse", "origin/main:TASKS.md"),
