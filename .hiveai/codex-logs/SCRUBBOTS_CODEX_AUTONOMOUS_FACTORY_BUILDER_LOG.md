@@ -154,3 +154,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and parity verification.
 - Publication result: product commit `a44ed3d` and builder-log commit `8764c13` were pushed normally (`5196627..8764c13`). Post-push fetch verified `HEAD == origin/main == 8764c131faed3aa0cc142281de331450f1db1a35`, 0 ahead / 0 behind, with no tracked changes; untracked owner files remain untouched.
+
+## Ambiguous current-task status regression — autonomous factory continuation — 2026-10-23
+
+- Added queue-parser regressions proving duplicated or blank `Current Task Status` fields fail closed rather than being treated as an unambiguous current-task authority.
+- Verification: `python -B -m unittest discover -s tests/codex -v` — 19/19 passed; `git diff --check` passed; AST parsing passed for the modified test file. Git emitted its expected LF-to-CRLF warning only.
+- Test commit: `235e8a6` (`test(codex): reject ambiguous current status`). Post-commit queue execution refreshed origin and validated the explicit R08 task/prompt pins; the blocked one-shot native process gate was not repeated.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
+- Publication pending normal fast-forward push and final parity check.
