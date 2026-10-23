@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scripts.codex.scrubbots_task_queue import (
+    CANONICAL_ROOT,
     authority_pins,
     validate_checkout,
     fetch_origin,
@@ -46,6 +47,23 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "canonical checkout"):
                 validate_checkout(Path(r"C:\other\ScrubBots-Level-Factory"))
         run.assert_not_called()
+
+    def test_checkout_guard_rejects_remote_ahead_or_diverged_head_after_fetch(self) -> None:
+        root_output = str(CANONICAL_ROOT.resolve())
+        responses = (
+            subprocess.CompletedProcess([], 0, root_output, ""),
+            subprocess.CompletedProcess([], 0, "https://github.com/Sekiph82/ScrubBots-Level-Factory.git", ""),
+            subprocess.CompletedProcess([], 0, "codex/task", ""),
+            subprocess.CompletedProcess([], 0, "a" * 40, ""),
+            subprocess.CompletedProcess([], 1, "", ""),
+        )
+        with patch("scripts.codex.scrubbots_task_queue.fetch_origin") as fetch, patch(
+            "scripts.codex.scrubbots_task_queue._run_git",
+            side_effect=responses,
+        ):
+            with self.assertRaisesRegex(ValueError, "behind or diverged from origin/main"):
+                validate_checkout(CANONICAL_ROOT)
+        fetch.assert_called_once_with(CANONICAL_ROOT.resolve())
 
     def test_selects_only_the_explicit_current_task_and_exact_prompt(self) -> None:
         selected = select_current_task(tracker())
