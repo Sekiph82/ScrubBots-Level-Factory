@@ -153,3 +153,4 @@ Document role: CODEX BUILDER LOG
 - Product commit: `a44ed3d` (`feat(codex): report task execution branch pin`). After commit, the real read-only queue command fetched origin and returned `execution_branch=codex/sb-lfx-018-r05-v13-cd-recovery-20261021`, with the current R08 task and authority pins. No R08 process gate was rerun and Godot was not launched.
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and parity verification.
+- Publication result: product commit `a44ed3d` and builder-log commit `8764c13` were pushed normally (`5196627..8764c13`). Post-push fetch verified `HEAD == origin/main == 8764c131faed3aa0cc142281de331450f1db1a35`, 0 ahead / 0 behind, with no tracked changes; untracked owner files remain untouched.
