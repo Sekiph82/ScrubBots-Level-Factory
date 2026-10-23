@@ -77,6 +77,19 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     select_current_task(source)
 
+    def test_rejects_duplicate_or_blank_current_status_fields(self) -> None:
+        sources = (
+            tracker().replace(
+                "- Current Task Status: READY",
+                "- Current Task Status: READY\n- Current Task Status: READY",
+            ),
+            tracker().replace("- Current Task Status: READY", "- Current Task Status:"),
+        )
+        for source in sources:
+            with self.subTest(source=source):
+                with self.assertRaisesRegex(ValueError, "Current Task Status.*exactly once"):
+                    select_current_task(source)
+
     def test_rejects_mismatched_or_ambiguous_prompt(self) -> None:
         other = PROMPT.replace("R08_", "R09_")
         with self.assertRaisesRegex(ValueError, "same exact"):
