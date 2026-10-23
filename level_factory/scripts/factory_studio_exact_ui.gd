@@ -3774,6 +3774,7 @@ func _choose_provider() -> void:
 							var base_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
 							choice.set_item_text(option_index, base_name if available else "%s · %s" % [base_name, status])
 			status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No provider status was returned."))
+	)
 	dialog.confirmed.connect(func():
 		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
 		dialog.queue_free()
