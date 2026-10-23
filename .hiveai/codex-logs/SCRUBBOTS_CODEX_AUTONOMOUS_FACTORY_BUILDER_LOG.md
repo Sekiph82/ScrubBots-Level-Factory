@@ -136,3 +136,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and parity verification.
 - Publication result: test commit `f789771` and builder-log commit `b281091` were pushed normally (`4ce2e66..b281091`). Post-push fetch verified `HEAD == origin/main == b2810919381b543b3b1342361fef33d9cead154a`, 0 ahead / 0 behind, with no tracked working-tree changes. Untracked owner files were preserved.
+
+## Stale or divergent authority checkout regression — autonomous factory continuation — 2026-10-23
+
+- Added an in-memory regression for the checkout gate's `origin/main` ancestry check. It simulates a successful safe fetch followed by a failed `merge-base --is-ancestor` check and verifies task processing is refused before task selection. No real Git refs or owner files were modified by the test.
+- Verification: `python -B -m unittest discover -s tests/codex -v` — 18/18 passed; `git diff --check` passed; AST parsing passed for the modified test file. Git emitted its expected LF-to-CRLF working-copy warning only.
+- Test commit: `cc40c77` (`test(codex): reject stale task authority checkout`). The post-commit read-only queue command fetched origin and validated the exact R08 tracker/prompt. No native process gate was repeated and Godot was not launched.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
+- Publication pending normal fast-forward push and post-push parity verification.
