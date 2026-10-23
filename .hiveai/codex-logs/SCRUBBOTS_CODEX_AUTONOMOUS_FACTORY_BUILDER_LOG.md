@@ -145,3 +145,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and post-push parity verification.
 - Publication result: test commit `cc40c77` and builder-log commit `447ffe3` were pushed normally (`cf1142c..447ffe3`). Fresh fetch confirmed `HEAD == origin/main == 447ffe3bfbbd7185d533429442df4172fc60bfd7`, 0 ahead / 0 behind, with no tracked working-tree changes. Untracked owner files remain untouched.
+
+## Execution-branch authority pin — autonomous factory continuation — 2026-10-23
+
+- Extended the read-only queue JSON with `execution_branch`, distinct from the tracker’s `branch` (`main`). The runner can now record the actual checkout branch alongside HEAD, `origin/main`, TASKS and prompt blob pins, avoiding ambiguity when work is performed from the canonical topic branch.
+- Verification: `python -B -m unittest discover -s tests/codex -v` — 18/18 passed; AST parsing passed for the implementation and test module; `git diff --check` passed. Git emitted only LF-to-CRLF working-copy warnings.
+- Product commit: `a44ed3d` (`feat(codex): report task execution branch pin`). After commit, the real read-only queue command fetched origin and returned `execution_branch=codex/sb-lfx-018-r05-v13-cd-recovery-20261021`, with the current R08 task and authority pins. No R08 process gate was rerun and Godot was not launched.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
+- Publication pending normal fast-forward push and parity verification.
