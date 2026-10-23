@@ -144,3 +144,4 @@ Document role: CODEX BUILDER LOG
 - Test commit: `cc40c77` (`test(codex): reject stale task authority checkout`). The post-commit read-only queue command fetched origin and validated the exact R08 tracker/prompt. No native process gate was repeated and Godot was not launched.
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and post-push parity verification.
+- Publication result: test commit `cc40c77` and builder-log commit `447ffe3` were pushed normally (`cf1142c..447ffe3`). Fresh fetch confirmed `HEAD == origin/main == 447ffe3bfbbd7185d533429442df4172fc60bfd7`, 0 ahead / 0 behind, with no tracked working-tree changes. Untracked owner files remain untouched.
