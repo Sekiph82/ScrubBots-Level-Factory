@@ -163,3 +163,11 @@ Document role: CODEX BUILDER LOG
 - No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
 - Publication pending normal fast-forward push and final parity check.
 - Publication result: test commit `235e8a6` and builder-log commit `dd936d1` were pushed normally (`71679eb..dd936d1`). Post-push fetch confirmed `HEAD == origin/main == dd936d1d3de4e5339d93903b6bf4c02ef1876b0f`, 0 ahead / 0 behind, with no tracked changes; untracked owner files remain untouched.
+
+## Factory skill provenance-pin guidance — autonomous continuation — 2026-10-23
+
+- Updated `.codex/skills/scrubbots-factory/SKILL.md` to tell future runs to retain `execution_branch` alongside HEAD, origin/main, TASKS blob and prompt blob values. This aligns the workflow instructions with the queue JSON field added in the prior factory change and makes the actual topic branch part of logged authority context.
+- Verification: `git diff --check` passed. After the documentation commit, `python -B scripts/codex/scrubbots_task_queue.py --json` fetched origin and validated the explicit R08 authority envelope, including `execution_branch=codex/sb-lfx-018-r05-v13-cd-recovery-20261021`.
+- Documentation commit: `a912a5e` (`docs(codex): retain execution branch authority pin`). No Python source changed, so no unit suite rerun. R08 native process gate was not repeated; no Godot was launched.
+- No TASKS, AGENTS, prompt, audit, workflow, owner data, Release, PNG, CI/Actions, paid service, TEMP, worktree or clone changes.
+- Publication pending normal fast-forward push and final parity verification.
