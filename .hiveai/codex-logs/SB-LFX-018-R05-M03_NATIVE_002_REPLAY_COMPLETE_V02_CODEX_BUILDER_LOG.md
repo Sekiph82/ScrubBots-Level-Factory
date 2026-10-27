@@ -799,3 +799,8 @@ Document role: CODEX BUILDER LOG
 ### R09 commit and publication preparation
 
 - Product commit: `2e41598` (`Enforce PixelLab 32x32 source readiness`). R09 status report commit: `3c2d285` (`Record R09 PixelLab zero-spend readiness`). The pre-publication `git fetch --prune origin` returned `origin/main=c7f4537c8b3d35e35817a7b93d6096379fe5f338`; it is an ancestor of local HEAD `3c2d285c51bb7b9030becfb491f5bae35839d61f`, 2 local commits ahead / 0 behind. `git diff --cached --check` passed for both commits. Append-only builder-log commit, normal fast-forward publication, and post-push parity verification follow.
+
+### R09 final publication receipt
+
+- First `git push origin HEAD:main` attempt returned GitHub `Empty reply from server`; no commit was rewritten. A fresh `git fetch --prune origin` showed `origin/main` still at `c7f4537c8b3d35e35817a7b93d6096379fe5f338`, local HEAD at `52a4f4507862f56a40f08bae2162c2a78a982145`, 3 ahead / 0 behind. `git merge-base --is-ancestor origin/main HEAD` passed; the same normal push was retried and succeeded, advancing main to `52a4f4507862f56a40f08bae2162c2a78a982145`.
+- Post-push `git fetch --prune origin` verified `HEAD == origin/main == 52a4f4507862f56a40f08bae2162c2a78a982145`, 0 ahead / 0 behind. Tracked worktree/index are clean. The read-only queue guard passed again with current R09 task and prompt pins. Pre-existing untracked owner paths and 18 stashes were left untouched. No CI/Actions were run; no workflow definitions changed.
