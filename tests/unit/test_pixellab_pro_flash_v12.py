@@ -242,14 +242,42 @@ def test_semantic_generation_dispatches_to_pro_flash_without_fallback() -> None:
     exec(compile(selected, str(launcher_path), "exec"), namespace)
     result = namespace["_semantic_generate"]({
         "prompt": "moth seed collector", "style": "CREATURE", "provider_id": "PIXELLAB",
-        "provider_model": "PRO_FLASH", "width": 48, "height": 56, "seed": "test-seed",
+        "provider_model": "PRO_FLASH", "width": 32, "height": 32, "seed": "test-seed",
         "background_intent": "TRANSPARENT", "operation_id": "offline-dispatch-check",
     })
     assert result == {"state": "PRO_FLASH_DISPATCHED"}
     assert observed == {
-        "prompt": "moth seed collector", "style": "CREATURE", "width": 48, "height": 56,
+        "prompt": "moth seed collector", "style": "CREATURE", "width": 32, "height": 32,
         "seed": "test-seed", "background": "TRANSPARENT", "operation_id": "offline-dispatch-check",
     }
+
+
+def test_semantic_generation_rejects_non_32x32_pro_flash_before_dispatch() -> None:
+    import ast
+    from pathlib import Path
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts"))
+    import factory_core_launcher
+
+    launcher_path = Path(factory_core_launcher.__file__)
+    tree = ast.parse(launcher_path.read_text(encoding="utf-8"))
+    selected = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_semantic_generate"], type_ignores=[])
+    dispatched: list[dict[str, object]] = []
+    namespace = {
+        "STUDIO_EXTENSION_OPERATION": "scrubbots-factory-studio-extension",
+        "_text": factory_core_launcher._text,
+        "_exact_int": factory_core_launcher._exact_int,
+        "_semantic_generate_pixellab_pro_flash": lambda **kwargs: dispatched.append(kwargs),
+    }
+    exec(compile(selected, str(launcher_path), "exec"), namespace)
+
+    with pytest.raises(ValueError, match="fixed at 32x32"):
+        namespace["_semantic_generate"]({
+            "prompt": "moth seed collector", "style": "CREATURE", "provider_id": "PIXELLAB",
+            "provider_model": "PRO_FLASH", "width": 48, "height": 56, "seed": "test-seed",
+        })
+    assert dispatched == []
 
 
 def test_dispatch_records_exact_imported_png_and_reuses_operation_without_second_call(tmp_path, monkeypatch) -> None:
@@ -318,3 +346,23 @@ def test_unknown_submission_blocks_identical_new_operation_without_resubmission(
     assert result["state"] == "NEEDS_REVIEW"
     assert result["operation_id"] == "first-unknown"
     assert len(calls) == 1
+
+
+def test_pixellab_pixel_art_ui_enforces_fixed_32x32_canvas() -> None:
+    from pathlib import Path
+
+    ui_path = Path(__file__).resolve().parents[2] / "level_factory" / "scripts" / "factory_studio_exact_ui.gd"
+    source = ui_path.read_text(encoding="utf-8")
+    generate = source.split("func _generate_art() -> void:", 1)[1].split("func _confirm_pro_flash_generation()", 1)[0]
+    confirmation = source.split("func _confirm_pro_flash_generation() -> void:", 1)[1].split("func _start_pixel_art_worker", 1)[0]
+    size_dialog = source.split("func _choose_size() -> void:", 1)[1].split("func _choose_provider()", 1)[0]
+    provider_dialog = source.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
+
+    assert '_provider_model == "PIXELLAB"' in generate
+    assert "_width = 32" in generate and "_height = 32" in generate
+    assert "_width = 32" in confirmation and "_height = 32" in confirmation
+    assert "width_input.value = 32" in size_dialog and "height_input.value = 32" in size_dialog
+    assert "width_input.editable = false" in size_dialog and "height_input.editable = false" in size_dialog
+    assert '_width = 32 if _provider_model == "PIXELLAB"' in size_dialog
+    assert '_height = 32 if _provider_model == "PIXELLAB"' in size_dialog
+    assert 'if _provider_model == "PIXELLAB":' in provider_dialog

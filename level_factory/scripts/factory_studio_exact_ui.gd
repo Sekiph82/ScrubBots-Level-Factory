@@ -2322,6 +2322,10 @@ func _wrap_identity(value: String, chunk_size: int = 24) -> String:
 func _generate_art() -> void:
 	if _operation_running:
 		return
+	if _provider_model == "PIXELLAB":
+		_width = 32
+		_height = 32
+		_refresh_selected_size_value()
 	var provider_status := _provider_status_for(_provider_model)
 	if not bool(provider_status.get("available", false)):
 		_report(str(provider_status.get("reason", "Selected provider is unavailable.")))
@@ -2341,6 +2345,8 @@ func _generate_art() -> void:
 
 
 func _confirm_pro_flash_generation() -> void:
+	_width = 32
+	_height = 32
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Confirm paid PixelLab Pro Flash generation"
 	dialog.dialog_text = "This will submit one paid Pro Flash image request (%d × %d). One prior request used 5 credits; actual cost may vary. Network timeouts are not automatically retried." % [_width, _height]
@@ -3702,10 +3708,15 @@ func _choose_size() -> void:
 	var row := HBoxContainer.new()
 	var width_input := SpinBox.new(); width_input.min_value = 20; width_input.max_value = 56; width_input.step = 4; width_input.value = _width
 	var height_input := SpinBox.new(); height_input.min_value = 20; height_input.max_value = 56; height_input.step = 4; height_input.value = _height
+	if _provider_model == "PIXELLAB":
+		width_input.value = 32
+		height_input.value = 32
+		width_input.editable = false
+		height_input.editable = false
 	row.add_child(width_input); row.add_child(height_input); dialog.add_child(row)
 	dialog.confirmed.connect(func():
-		_width = int(width_input.value)
-		_height = int(height_input.value)
+		_width = 32 if _provider_model == "PIXELLAB" else int(width_input.value)
+		_height = 32 if _provider_model == "PIXELLAB" else int(height_input.value)
 		_refresh_selected_size_value()
 		_refresh_live_data()
 		dialog.queue_free()
@@ -3777,6 +3788,11 @@ func _choose_provider() -> void:
 	)
 	dialog.confirmed.connect(func():
 		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
+		if _provider_model == "PIXELLAB":
+			_width = 32
+			_height = 32
+			_refresh_selected_size_value()
+			_refresh_live_data()
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())

@@ -2306,14 +2306,14 @@ def _image_bytes_from_response(last_response: Mapping[str, object]) -> bytes:
             raw = base64.b64decode(value, validate=True)
         except (ValueError, base64.binascii.Error):
             continue
-        if raw.startswith(b"\x89PNG\r\n\x1a\r\n"):
+        if raw.startswith(b"\x89PNG\r\n\x1a\n"):
             return raw
     raise ProFlashError("IMAGE_MISSING", "Completed PixelLab job did not include an encoded PNG.")
 
 
 def validate_pro_flash_png(raw: bytes, *, expected_width: int, expected_height: int) -> tuple[str, ...]:
     """Validate exact pixels; this path never resizes or palette-snaps output."""
-    if not isinstance(raw, bytes) or not raw.startswith(b"\x89PNG\r\n\x1a\r\n"):
+    if not isinstance(raw, bytes) or not raw.startswith(b"\x89PNG\r\n\x1a\n"):
         raise ProFlashError("INVALID_PNG", "PixelLab result is not a PNG.")
     try:
         from PIL import Image

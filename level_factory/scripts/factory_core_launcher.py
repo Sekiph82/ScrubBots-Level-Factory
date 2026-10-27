@@ -392,6 +392,8 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     if background not in {"TRANSPARENT", "BACKGROUND"}:
         raise ValueError("background_intent must be TRANSPARENT or BACKGROUND")
     if model == "PRO_FLASH":
+        if width != 32 or height != 32:
+            raise ValueError("PixelLab Pro Flash Studio requests are fixed at 32x32 pixels.")
         return _semantic_generate_pixellab_pro_flash(
             prompt=prompt,
             style=style,
