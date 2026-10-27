@@ -2412,6 +2412,7 @@ def generate_pixellab_pro_4x4_frames(
     monotonic: Callable[[], float] = time.monotonic,
     max_wait_seconds: int = PRO_FLASH_MAX_WAIT_SECONDS,
     poll_seconds: int = PRO_FLASH_POLL_SECONDS,
+    on_submission_started: Callable[[], None] | None = None,
     on_job_accepted: Callable[[str], None] | None = None,
 ) -> PixelLabPro4x4Result:
     """Submit one Pro 4x4 job and retrieve sixteen original frames without POST retry."""
@@ -2446,6 +2447,8 @@ def generate_pixellab_pro_4x4_frames(
         "style_options": {"color_palette": False},
     }
     base_url = "https://api.pixellab.ai/v2"
+    if on_submission_started is not None:
+        on_submission_started()
     submitted, _ = request_json(
         f"{base_url}/generate-image-v2", secret=secret, method="POST", payload=body, timeout=30
     )
@@ -2479,6 +2482,43 @@ def generate_pixellab_pro_4x4_frames(
             raise ProFlashError("JOB_FAILED", "PixelLab Pro 4x4 job did not complete.", job_id=job_id)
         sleep(poll_seconds)
     raise ProFlashError("POLL_TIMEOUT", "PixelLab Pro 4x4 job is still processing; retain its job ID and check it before another generation.", job_id=job_id)
+
+
+def reconcile_pixellab_pro_4x4_job(
+    job_id: str,
+    *,
+    network_consent: bool = False,
+    request_json: Callable[..., tuple[dict[str, object], Mapping[str, str]]] = _json_request,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+    max_wait_seconds: int = PRO_FLASH_MAX_WAIT_SECONDS,
+    poll_seconds: int = PRO_FLASH_POLL_SECONDS,
+) -> dict[str, object]:
+    """Reconcile one persisted job using bounded GET requests only."""
+    if network_consent is not True:
+        raise ProFlashError("NETWORK_CONSENT_REQUIRED", "NETWORK_CONSENT_REQUIRED: explicit owner consent is required before PixelLab job reconciliation.", job_id=job_id)
+    if type(job_id) is not str or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", job_id):
+        raise ProFlashError("INVALID_JOB_ID", "PixelLab reconciliation requires a valid persisted job ID.")
+    if not 1 <= max_wait_seconds <= 600 or not 1 <= poll_seconds <= 30:
+        raise ProFlashError("INVALID_POLL_POLICY", "Pro 4x4 recovery polling bounds are invalid.", job_id=job_id)
+    secret = get_pixellab_secret()
+    if not secret:
+        raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: configure the local credential before reconciliation.", job_id=job_id)
+    url = f"https://api.pixellab.ai/v2/background-jobs/{job_id}"
+    deadline = monotonic() + max_wait_seconds
+    while monotonic() < deadline:
+        try:
+            status, _ = request_json(url, secret=secret, method="GET", timeout=30)
+        except ProFlashError as exc:
+            if exc.code == "POLL_NETWORK_ERROR":
+                sleep(poll_seconds)
+                continue
+            raise ProFlashError(exc.code, str(exc), job_id=job_id) from None
+        state = str(status.get("status", "")).lower()
+        if state in {"completed", "failed", "cancelled", "error"}:
+            return {"job_id": job_id, "state": state.upper(), "provider_status": status}
+        sleep(poll_seconds)
+    raise ProFlashError("POLL_TIMEOUT", "PixelLab job remains unresolved; no new submission was sent.", job_id=job_id)
 
 
 def generate_pro_flash_image(

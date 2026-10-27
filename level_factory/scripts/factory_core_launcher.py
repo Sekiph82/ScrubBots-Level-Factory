@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import sys
+import uuid
 from collections.abc import Mapping, Sequence
 
 
@@ -81,6 +82,41 @@ def _inside_output(path: Path, output_root: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _create_exclusive_json(path: Path, value: Mapping[str, object]) -> bool:
+    """Create one durable claim atomically; never replace an existing claim."""
+    payload = (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True,
+                          separators=(",", ":")) + "\n").encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        return False
+    with os.fdopen(descriptor, "wb") as stream:
+        stream.write(payload)
+        stream.flush()
+        os.fsync(stream.fileno())
+    return True
+
+
+def _write_durable_json(path: Path, value: Mapping[str, object]) -> None:
+    """Atomically replace one owned ledger record after flushing its contents."""
+    payload = (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True,
+                          separators=(",", ":")) + "\n").encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid.uuid4().hex}.tmp")
+    descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    except Exception:
+        # Do not remove a possibly unrelated path after an unexpected error.
+        # The digest claim remains and therefore still blocks repeat billing.
+        raise
 
 
 def _source_file_hashes(bundle: object) -> dict[str, str]:
@@ -321,6 +357,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = {"state": "READY", "pool_size": len(entries), "entries": entries}
         elif operation == "semantic-generate":
             payload = _semantic_generate(request)
+        elif operation == "pixellab-pro-4x4-reconcile":
+            payload = _semantic_reconcile_pixellab_pro_4x4(request)
         elif operation == "pixellab-pro-4x4-import":
             payload = _semantic_import_pixellab_pro_4x4(request)
         elif operation == "provider-options":
@@ -624,7 +662,16 @@ def _semantic_generate_pixellab_pro_4x4(
 
     description = f"{prompt}. Pixel art style: {style}." if style else prompt
     palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
+    normalized_description = description.strip()
+    normalized_seed = extensions._resolved_seed(extensions._resolved_seed(seed))
     request_digest = hashlib.sha256(json.dumps({
+        "provider": "PIXELLAB", "model": "PRO_4X4", "adapter_version": "pixellab-pro-4x4-v1",
+        "api_version": "v2", "palette_sha256": palette_sha256, "description": normalized_description,
+        "width": width, "height": height, "max_colors": max_colors, "seed": normalized_seed,
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    # V02 hashed raw text and the caller's seed representation. Keep that
+    # fingerprint for read-only matching so old paid records stay protected.
+    legacy_request_digest = hashlib.sha256(json.dumps({
         "provider": "PIXELLAB", "model": "PRO_4X4", "adapter_version": "pixellab-pro-4x4-v1",
         "api_version": "v2", "palette_sha256": palette_sha256, "description": description,
         "width": width, "height": height, "max_colors": max_colors, "seed": seed,
@@ -636,35 +683,110 @@ def _semantic_generate_pixellab_pro_4x4(
         raise ValueError("PixelLab Pro 4x4 job record escaped the Studio output directory")
     if job_path.exists():
         previous = json.loads(job_path.read_text(encoding="utf-8"))
-        return {"operation": STUDIO_EXTENSION_OPERATION, "state": "NEEDS_REVIEW",
-                "reason": "This operation ID already has a durable PixelLab record; it was not submitted again.",
+        return {"operation": STUDIO_EXTENSION_OPERATION, "state": "NEEDS_OWNER_REVIEW_IDENTICAL_REQUEST",
+                "reason": "This operation ID already has a durable PixelLab record; no request was submitted again.",
                 "job_id": previous.get("job_id"), "job_state": previous.get("state"),
                 "operation_id": resolved_operation_id}
-    uncertain_states = {"SUBMITTING", "SUBMISSION_UNKNOWN", "POLL_TIMEOUT", "POLL_NETWORK_ERROR"}
-    for prior_path in sorted(job_root.glob("*.json")):
+
+    claim_path = (job_root / f"{request_digest}.claim.json").resolve()
+    if not _inside_output(claim_path, job_root):
+        raise ValueError("PixelLab Pro 4x4 request claim escaped its ledger directory")
+
+    def blocked_claim(claim: Mapping[str, object] | None) -> dict[str, object]:
+        effective: dict[str, object] = dict(claim or {})
         try:
-            prior = json.loads(prior_path.read_text(encoding="utf-8"))
+            paired_operation_id = effective.get("operation_id")
+            if isinstance(paired_operation_id, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,80}", paired_operation_id):
+                job_record_path = (job_root / f"{paired_operation_id}.json").resolve()
+                if _inside_output(job_record_path, job_root):
+                    paired = json.loads(job_record_path.read_text(encoding="utf-8"))
+                    if isinstance(paired, dict) and paired.get("request_sha256") in {request_digest, legacy_request_digest}:
+                        effective.update(paired)
+        except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+            pass
+        prior_id = str(effective.get("operation_id", "")) if effective else ""
+        prior_job_id = effective.get("job_id") if effective else None
+        prior_state = str(effective.get("state", "UNKNOWN")) if effective else "UNKNOWN"
+        post_possible_states = {
+            "SUBMITTING", "SUBMISSION_UNKNOWN", "POLLING", "POLL_TIMEOUT", "POLL_NETWORK_ERROR",
+            "NORMALIZING", "POST_SUBMISSION_ERROR", "SUCCEEDED", "FAILED_AFTER_POST",
+            "SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED",
+        }
+        paid_possible = bool(effective) and (
+            effective.get("paid_submission_possible") is True
+            or prior_state in post_possible_states
+            or isinstance(prior_job_id, str) and bool(prior_job_id)
+        )
+        if not effective or paid_possible and not prior_job_id:
+            state = "NEEDS_OWNER_REVIEW_UNKNOWN_SUBMISSION"
+            reason = "A matching claim has an unknown or possibly charged outcome; reconcile PixelLab manually before any new request."
+        elif paid_possible:
+            state = "NEEDS_OWNER_REVIEW_ACCEPTED_JOB"
+            reason = "An identical paid request is already recorded; use explicit GET-only job reconciliation, never submit it again."
+        else:
+            state = "NEEDS_OWNER_REVIEW_ACTIVE_OR_STALE_CLAIM"
+            reason = "An identical request claim already exists; it is not automatically reclaimed or resubmitted."
+        return {"operation": STUDIO_EXTENSION_OPERATION, "state": state, "reason": reason,
+                "job_id": prior_job_id, "job_state": prior_state,
+                "prior_operation_id": prior_id, "operation_id": resolved_operation_id}
+
+    if claim_path.exists():
+        try:
+            previous_claim = json.loads(claim_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError):
-            continue
-        if (isinstance(prior, dict) and prior.get("request_sha256") == request_digest
-                and prior.get("state") in uncertain_states):
-            return {"operation": STUDIO_EXTENSION_OPERATION, "state": "NEEDS_REVIEW",
-                    "reason": "An identical request may already be processing; inspect its job before another submission.",
-                    "job_id": prior.get("job_id"), "operation_id": prior.get("operation_id")}
+            return blocked_claim(None)
+        if not isinstance(previous_claim, dict) or previous_claim.get("request_sha256") != request_digest:
+            return blocked_claim(None)
+        return blocked_claim(previous_claim)
 
     job_record: dict[str, object] = {
         "schema": "scrubbots-pixellab-pro-4x4-job-v1",
         "operation_id": resolved_operation_id, "request_sha256": request_digest,
+        "legacy_request_sha256": legacy_request_digest,
         "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
         "adapter_version": "pixellab-pro-4x4-v1", "api_version": "v2",
-        "state": "SUBMITTING", "width": width, "height": height, "max_colors": max_colors,
-        "seed": seed, "palette_source": "data/palette/scrubbots_palette_v3.json",
+        "state": "CLAIMED_BEFORE_POST", "paid_submission_possible": False,
+        "width": width, "height": height, "max_colors": max_colors,
+        "seed": normalized_seed, "description_sha256": hashlib.sha256(normalized_description.encode("utf-8")).hexdigest(),
+        "palette_source": "data/palette/scrubbots_palette_v3.json",
         "palette_sha256": palette_sha256,
         "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
     }
 
+    # Read legacy V02 records before acquiring a new claim. They used a raw
+    # prompt/seed digest, so matching either fingerprint must fail closed.
+    for prior_path in sorted(job_root.glob("*.json")):
+        if prior_path == claim_path or prior_path == job_path:
+            continue
+        try:
+            prior = json.loads(prior_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return blocked_claim(None)
+        if isinstance(prior, dict) and {request_digest, legacy_request_digest}.intersection({
+                prior.get("request_sha256"), prior.get("legacy_request_sha256")
+        }):
+            return blocked_claim(prior)
+
+    if not _create_exclusive_json(claim_path, job_record):
+        try:
+            previous_claim = json.loads(claim_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            previous_claim = None
+        return blocked_claim(previous_claim if isinstance(previous_claim, dict) else None)
+    if not _create_exclusive_json(job_path, job_record):
+        # The digest claim stays in place; ambiguous filesystem state always
+        # blocks another billable attempt.
+        return blocked_claim(job_record)
+
     def persist_job() -> None:
-        extensions._write_json(job_path, job_record)
+        _write_durable_json(job_path, job_record)
+        _write_durable_json(claim_path, job_record)
+
+    def submission_started() -> None:
+        # The monotonic marker reaches both durable records before the adapter
+        # is allowed to invoke its single POST.
+        job_record.update({"state": "SUBMITTING", "paid_submission_possible": True})
+        persist_job()
 
     def accepted(job_id: str) -> None:
         job_record.update({"state": "POLLING", "job_id": job_id})
@@ -673,8 +795,9 @@ def _semantic_generate_pixellab_pro_4x4(
     persist_job()
     try:
         generated = extensions.generate_pixellab_pro_4x4_frames(
-            description=description, width=width, height=height,
-            max_colors=max_colors, seed=seed, on_job_accepted=accepted,
+            description=normalized_description, width=width, height=height,
+            max_colors=max_colors, seed=normalized_seed, on_submission_started=submission_started,
+            on_job_accepted=accepted,
         )
         job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
         persist_job()
@@ -731,15 +854,57 @@ def _semantic_generate_pixellab_pro_4x4(
             "actual_usage": dict(generated.actual_usage or {}),
         }
     except extensions.ProFlashError as exc:
-        job_record.update({"state": exc.code, "job_id": exc.job_id or job_record.get("job_id"),
-                           "error": str(exc)})
+        state = exc.code if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
+        job_record.update({"state": state, "job_id": exc.job_id or job_record.get("job_id"),
+                           "error_code": exc.code, "error": str(exc)})
         persist_job()
         raise ValueError(f"{exc.code}: {exc}") from None
     except Exception as exc:
-        if job_record.get("state") in {"SUBMITTING", "NORMALIZING"}:
-            job_record.update({"state": "POST_SUBMISSION_ERROR", "error": str(exc)[:512]})
-            persist_job()
+        state = "POST_SUBMISSION_ERROR" if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
+        job_record.update({"state": state, "error": str(exc)[:512]})
+        persist_job()
         raise
+
+
+def _semantic_reconcile_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str, object]:
+    """Read a durable Pro 4x4 job and explicitly reconcile it with GET only."""
+    import re
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    if set(request) - {"operation_id", "network_consent"}:
+        raise ValueError("PixelLab reconciliation request contains unsupported fields")
+    operation_id = request.get("operation_id")
+    if type(operation_id) is not str or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", operation_id):
+        raise ValueError("PixelLab reconciliation requires a valid persisted operation ID")
+    if request.get("network_consent") is not True:
+        raise ValueError("NETWORK_CONSENT_REQUIRED: owner must explicitly approve the status-only network check")
+    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
+    record_path = (job_root / f"{operation_id}.json").resolve()
+    if not _inside_output(record_path, job_root) or not record_path.is_file():
+        raise ValueError("PIXELLAB_JOB_RECORD_NOT_FOUND: no durable PixelLab job matches this operation ID")
+    record = json.loads(record_path.read_text(encoding="utf-8"))
+    if not isinstance(record, dict) or record.get("provider_id") != "PIXELLAB" or record.get("provider_model") != "PRO_4X4":
+        raise ValueError("PIXELLAB_JOB_RECORD_INVALID: refusing to reconcile an unrecognized record")
+    if record.get("paid_submission_possible") is not True:
+        return {"operation": "pixellab-pro-4x4-reconcile", "state": "NO_PAID_SUBMISSION_RECORDED",
+                "operation_id": operation_id, "job_state": record.get("state"),
+                "paid_submission_possible": False, "network_requests": 0}
+    job_id = record.get("job_id")
+    if type(job_id) is not str or not job_id:
+        return {"operation": "pixellab-pro-4x4-reconcile", "state": "NEEDS_OWNER_REVIEW_UNKNOWN_SUBMISSION",
+                "operation_id": operation_id, "job_state": record.get("state"),
+                "paid_submission_possible": True, "network_requests": 0,
+                "reason": "No provider job ID was persisted; manually reconcile PixelLab account history before any new generation."}
+    reconciled = extensions.reconcile_pixellab_pro_4x4_job(job_id, network_consent=True)
+    provider_status = reconciled.get("provider_status", {})
+    provider_state = str(reconciled.get("state", "UNKNOWN"))
+    record["last_reconciliation_state"] = provider_state
+    record["last_reconciliation_job_id"] = job_id
+    _write_durable_json(record_path, record)
+    return {"operation": "pixellab-pro-4x4-reconcile", "state": "RECONCILED",
+            "operation_id": operation_id, "job_id": job_id,
+            "provider_state": provider_state, "provider_status": provider_status,
+            "network_method": "GET", "paid_submission_possible": True}
 
 
 def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str, object]:
