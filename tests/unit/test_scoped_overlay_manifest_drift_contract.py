@@ -22,19 +22,25 @@ def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
         "src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py",
         "src/scrubbots_pixel_factory/supply_pipeline/verify.py",
         "src/scrubbots_pixel_factory/alpix_batch.py",
+        "src/scrubbots_pixel_factory/pixellab_pro_atlas.py",
     ):
         assert f"'{path}'" in relative_paths
         assert f"'{path}'" in overlay_paths
-    assert "if (-not $managed.ContainsKey($relative)) { throw \"Manifest does not own the managed target: $relative\" }" in source
+    assert "$isNewManagedPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'" in source
+    assert "if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath)" in source
+    assert "NewManagedPaths @('src/scrubbots_pixel_factory/pixellab_pro_atlas.py')" in source
     assert "if ($relative -cnotin $authorizedOverlayAdditions) { throw \"Installed overlay allowlist does not include: $relative\" }" in source
 
 
-def test_preflight_reports_hash_triples_and_keeps_unproven_verify_drift_blocked() -> None:
+def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_bytes() -> None:
     source = _installer()
     transaction = _transaction()
     for key in ("manifestSha256", "installedSha256", "sourceSha256"):
         assert key in source
-    assert "KNOWN_SOURCE_VERSION_APPROVAL_UNPROVEN" in source
+    assert "Get-HistoricBlobBytes" in source
+    assert "892b02b69bb5d3d9b1aa26d7499bbda4f1017548658444dc4332e67a2515cc9a" in source
+    assert "canonicalCrlfBytes" in source
+    assert "$authorizedRepairHashes[$verifyPath] = $knownProvenanceHashes[$verifyPath].sha256" in source
     assert "90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744" in source
     assert "Installed managed bytes differ from manifest without an approved exact repair; no files were written." in transaction
     assert "$manifestDrift.Count -gt 0" in source
@@ -51,6 +57,9 @@ def test_apply_is_blocked_by_manifest_drift_or_active_runtime() -> None:
     assert "ExecutablePath" in transaction
     assert "CommandLine" in transaction
     assert "activeIds.Contains([int]$process.ParentProcessId)" in transaction
+    assert "AcquireWriterExclusion = {" in source
+    assert "-ExpectBlocked" in transaction
+    assert "WriterExclusionEstablished:$true" not in source
 
 
 def test_transaction_stages_every_payload_and_manifest_before_first_replace() -> None:
@@ -64,6 +73,9 @@ def test_transaction_stages_every_payload_and_manifest_before_first_replace() ->
     assert "[array]::Reverse($reverseAttempted)" in source
     assert "TARGET_HASH_MISMATCH" in source
     assert "MANIFEST_HASH_MISMATCH" in source
+    assert "priorExists" in source
+    assert "writerExclusionMethod" in source
+    assert "MoveNew" in source
 
 
 def test_preflight_never_writes_the_protected_job_or_release_pool() -> None:

@@ -12,6 +12,7 @@ $script:failRollbackTarget = ''
 $script:failFinalVerification = $false
 $script:failRemoveTree = $false
 $script:freshProcessState = $null
+$script:writerLeaseEstablished = $true
 
 function Assert-True([bool]$Condition, [string]$Message) {
 	if (-not $Condition) { throw "ASSERTION_FAILED: $Message" }
@@ -23,7 +24,7 @@ $installerSource=Get-Content -LiteralPath $installerPath -Raw
 $visibleCallCount=[regex]::Matches($installerSource,'(?m)^\s*Write-ScopedOverlayOutcome\s+-Result').Count
 $suppressedCallCount=[regex]::Matches($installerSource,'(?im)^\s*\[void\]\s*\(\s*Write-ScopedOverlayOutcome').Count
 Assert-True ($visibleCallCount -eq 2 -and $suppressedCallCount -eq 0) 'both actual installer outcome call sites preserve pipeline output'
-Assert-True ($installerSource -match '(?s)GetProcessSnapshot\s*=\s*\{.*?Get-ScopedProcessInventoryState' -and $installerSource -match 'WriterExclusionEstablished:\$false') 'R04 fresh snapshot and fail-closed writer boundary remain intact'
+Assert-True ($installerSource -match '(?s)GetProcessSnapshot\s*=\s*\{.*?Get-ScopedProcessInventoryState' -and $installerSource -match 'AcquireWriterExclusion\s*=\s*\{' -and $installerSource -notmatch 'WriterExclusionEstablished:\$true|WriterExclusionEstablished:\$false') 'installer proves writer exclusion through transaction operation without caller-supplied assertion'
 
 function ConvertTo-FakeBytes([string]$Text) { return ,([Text.Encoding]::UTF8.GetBytes($Text)) }
 function Get-FakeHash([byte[]]$Bytes) {
@@ -45,6 +46,7 @@ function Reset-FakeFileSystem {
 	$script:failFinalVerification = $false
 	$script:failRemoveTree = $false
 	$script:freshProcessState = [pscustomobject]@{ complete = $true; status = 'COMPLETE'; problems = @(); active = @() }
+	$script:writerLeaseEstablished = $true
 	Put-FakeText 'source-one' 'new-one'
 	Put-FakeText 'source-two' 'new-two'
 	Put-FakeText 'target-one' 'old-one'
@@ -84,15 +86,19 @@ $script:fakeOperations = @{
 	}
 	RemoveTree = { param($path) if ($script:failRemoveTree) { throw 'injected cleanup failure' }; $prefix=[string]$path + '\'; foreach($key in @($script:fakeFiles.Keys | Where-Object { $_ -eq [string]$path -or $_.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) })) { $script:fakeFiles.Remove($key) } }
 	GetProcessSnapshot = { return $script:freshProcessState }
+	MoveNew = { param($stage,$target) if ($script:fakeFiles.ContainsKey([string]$target)) { throw 'fake no-overwrite move target already exists' }; if (-not $script:fakeFiles.ContainsKey([string]$stage)) { throw "fake stage missing: $stage" }; $script:fakeFiles[[string]$target]=[byte[]]$script:fakeFiles[[string]$stage]; $script:fakeFiles.Remove([string]$stage) }
+	DeleteFile = { param($path) $script:fakeFiles.Remove([string]$path) }
+	AcquireWriterExclusion = { param($live,$staged) return @{established=$script:writerLeaseEstablished;method=if($script:writerLeaseEstablished){Get-ScopedWriterExclusionMethod}else{''};handles=@()} }
+	ReleaseWriterExclusion = { param($lease) if ($lease) { $lease.established=$false } }
 }
 
 function Invoke-FakeTransaction {
 	$plan = @(
-		[pscustomobject]@{ path='one.py'; source='source-one'; target='target-one'; sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-one')); priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-one')); bytes=7 },
-		[pscustomobject]@{ path='two.py'; source='source-two'; target='target-two'; sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-two')); priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-two')); bytes=7 }
+		[pscustomobject]@{ path='one.py'; source='source-one'; target='target-one'; sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-one')); priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-one')); priorExists=$true; bytes=7 },
+		[pscustomobject]@{ path='two.py'; source='source-two'; target='target-two'; sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-two')); priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-two')); priorExists=$true; bytes=7 }
 	)
 	$manifest = Get-FakeText 'manifest' | ConvertFrom-Json
-	Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r03' -SourceHead 'head-r03' -OverlayAdditions @('one.py','two.py') -Operations $script:fakeOperations -WriterExclusionEstablished:$true
+	Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r03' -SourceHead 'head-r03' -OverlayAdditions @('one.py','two.py') -Operations $script:fakeOperations
 }
 function Assert-Restored([string]$Context) {
 	Assert-True ((Get-FakeText 'target-one') -ceq 'old-one') "$Context restored target-one exact bytes"
@@ -143,8 +149,9 @@ $script:freshProcessState=Get-ScopedProcessInventoryState -Processes @(
 	[pscustomobject]@{ProcessId=41;ParentProcessId=40;Name='python.exe';ExecutablePath='C:\Python\python.exe';CommandLine='python.exe worker.py'}
 ) -RuntimeRoot $root -CurrentPid 999
 $lateWriterBlocked=$false
-try { [void](Invoke-FakeTransaction) } catch { $lateWriterBlocked=$_.Exception.Message -like '*Active processes*' }
-Assert-True $lateWriterBlocked 'late writer/child snapshot blocks replacement'
+ $lateWriterError=''
+try { [void](Invoke-FakeTransaction) } catch { $lateWriterError=$_.Exception.Message; $lateWriterBlocked=$lateWriterError -like '*Active processes*' }
+Assert-True $lateWriterBlocked "late writer/child snapshot blocks replacement: $lateWriterError"
 Assert-True ($script:stageWriteCalls -gt 0 -and $script:replaceCalls -eq 0) 'late writer is discovered after staging and before the first replacement'
 Assert-Restored 'late writer block'
 
@@ -163,13 +170,14 @@ foreach ($badState in @(
 
 # Without an exclusive-writer control, even a complete empty snapshot cannot prove quiescence.
 Reset-FakeFileSystem
+$script:writerLeaseEstablished=$false
 $quiescenceBlocked=$false
 try {
-	$plan=@([pscustomobject]@{path='one.py';source='source-one';target='target-one';sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-one'));priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-one'));bytes=7})
+	$plan=@([pscustomobject]@{path='one.py';source='source-one';target='target-one';sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-one'));priorSha256=(Get-FakeHash (ConvertTo-FakeBytes 'old-one'));priorExists=$true;bytes=7})
 	$manifest=Get-FakeText 'manifest' | ConvertFrom-Json
-	[void](Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r04' -SourceHead 'head-r04' -OverlayAdditions @() -Operations $script:fakeOperations -WriterExclusionEstablished:$false)
+	[void](Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-r04' -SourceHead 'head-r04' -OverlayAdditions @() -Operations $script:fakeOperations)
 } catch { $quiescenceBlocked=$_.Exception.Message -like '*PROCESS_QUIESCENCE_UNPROVEN*' }
-Assert-True $quiescenceBlocked 'missing exclusive-writer control reports PROCESS_QUIESCENCE_UNPROVEN'
+Assert-True $quiescenceBlocked 'missing acquired exclusive-writer lease reports PROCESS_QUIESCENCE_UNPROVEN'
 Assert-True ($script:replaceCalls -eq 0 -and (Get-FakeText 'target-one') -ceq 'old-one') 'unproven quiescence leaves target unchanged'
 
 # Execute wrapper outcome mapping with synthetic results for every public status.
@@ -211,6 +219,28 @@ Reset-FakeFileSystem; $script:failReplaceAfterAt=2; $script:failRollbackTarget='
 
 # Successful transaction updates only its two planned payloads and the manifest.
 Reset-FakeFileSystem; $committed=Invoke-FakeTransaction; Assert-True ($committed.status -eq 'COMMITTED') 'successful transaction committed'; Assert-True ((Get-FakeText 'target-one') -ceq 'new-one' -and (Get-FakeText 'target-two') -ceq 'new-two') 'successful transaction writes planned payloads'; Assert-True ((Get-FakeText 'png-batch-protected') -ceq 'immutable-job-bytes' -and (Get-FakeText 'release-pool-protected') -ceq 'immutable-pool-bytes' -and (Get-FakeText 'owner-png-protected') -ceq 'immutable-png-bytes') 'successful transaction leaves batch, pool and PNG unchanged'
+
+# A new source dependency is added only when both the manifest entry and target are absent.
+Reset-FakeFileSystem
+Put-FakeText 'source-new' 'new-atlas-module'
+$newPlan=@([pscustomobject]@{path='new.py';source='source-new';target='target-new';sha256=(Get-FakeHash (ConvertTo-FakeBytes 'new-atlas-module'));priorSha256=$null;priorExists=$false;bytes=16})
+$newManifest=Get-FakeText 'manifest' | ConvertFrom-Json
+$added=Invoke-ScopedOverlayTransaction -Plan $newPlan -Manifest $newManifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-new' -SourceHead 'head-add' -OverlayAdditions @('new.py') -NewManagedPaths @('new.py') -Operations $script:fakeOperations
+Assert-True ($added.status -eq 'COMMITTED' -and (Get-FakeText 'target-new') -ceq 'new-atlas-module') 'authorized absent target is atomically added'
+$addedManifest=Get-FakeText 'manifest' | ConvertFrom-Json
+Assert-True (@($addedManifest.managedFiles | Where-Object { $_.path -ceq 'new.py' }).Count -eq 1 -and $addedManifest.overlayReceipts[-1].files[0].priorExists -eq $false -and $addedManifest.overlayReceipts[-1].files[0].sha256 -ceq (Get-FakeHash (ConvertTo-FakeBytes 'new-atlas-module')) -and $addedManifest.overlayReceipts[-1].writerExclusionMethod -match 'no-overwrite move') 'addition receipt records prior absence, source hash and writer method'
+
+# A race-created destination is never overwritten by a new-file move.
+Reset-FakeFileSystem
+Put-FakeText 'source-new' 'new-atlas-module'
+$script:fakeOperations.AcquireWriterExclusion = { param($live,$staged) Put-FakeText 'target-new' 'owner-concurrent-bytes'; return @{established=$true;method=Get-ScopedWriterExclusionMethod;handles=@()} }
+$newManifest=Get-FakeText 'manifest' | ConvertFrom-Json
+$raceRejected=$false
+$raceError=''
+try { [void](Invoke-ScopedOverlayTransaction -Plan $newPlan -Manifest $newManifest -ManifestPath 'manifest' -TransactionRoot 'C:\owner-release\.txn-race' -SourceHead 'head-add' -OverlayAdditions @('new.py') -NewManagedPaths @('new.py') -Operations $script:fakeOperations) } catch { $raceError=$_.Exception.Message; $raceRejected=$raceError -match 'existence changed after exclusive lock|unexpectedly exists|target already exists' }
+Assert-True $raceRejected "new target race fails closed without overwrite: $raceError"
+Assert-True ((Get-FakeText 'target-new') -ceq 'owner-concurrent-bytes') 'new target race preserves concurrent owner bytes'
+$script:fakeOperations.AcquireWriterExclusion = { param($live,$staged) return @{established=$script:writerLeaseEstablished;method=if($script:writerLeaseEstablished){Get-ScopedWriterExclusionMethod}else{''};handles=@()} }
 
 # Cleanup failure after verified commit does not trigger rollback or claim failure of payload installation.
 Reset-FakeFileSystem; $script:failRemoveTree=$true; $committed=Invoke-FakeTransaction; Assert-True ($committed.status -eq 'COMMITTED_CLEANUP_PENDING' -and $committed.verifiedHashes.Count -eq 2) 'cleanup failure preserves verified commit status and exact hashes'; Assert-True ((Get-FakeText 'target-one') -ceq 'new-one' -and (Get-FakeText 'target-two') -ceq 'new-two') 'cleanup failure does not attempt unsafe post-commit rollback'

@@ -28,7 +28,8 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
-    'src/scrubbots_pixel_factory/alpix_batch.py'
+    'src/scrubbots_pixel_factory/alpix_batch.py',
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
 )
 $authorizedOverlayAdditions = @(
 	'level_factory/project.godot',
@@ -42,7 +43,8 @@ $authorizedOverlayAdditions = @(
     'src/scrubbots_pixel_factory/alpix_batch.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
-    'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py'
+    'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
 )
 # One exact installed solver variant was verified to be missing the Studio
 # cancel-marker/process-tree handling. Permit repairing only those measured
@@ -55,16 +57,44 @@ $authorizedRepairHashes = @{
 }
 # The installed verify.py bytes are an exact CRLF checkout of published
 # source commit 17643de6756ba3d9552351eb237db19bd8d0c269. The existing builder
-# log records that this mismatch predated scoped installs, and no per-file
-# overlay receipt proves an approved transaction. Report this provenance, but
-# deliberately do not authorize it as a repair hash.
+# log records this pre-existing mismatch. The repair is authorized only after
+# runtime reproduction below proves the exact raw Git blob and CRLF byte hash.
 $knownProvenanceHashes = @{
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py' = @{
         sha256 = '90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744'
         sourceCommit = '17643de6756ba3d9552351eb237db19bd8d0c269'
-        disposition = 'KNOWN_SOURCE_VERSION_APPROVAL_UNPROVEN'
+        disposition = 'EXACT_HISTORIC_SOURCE_AND_CRLF_REPRODUCTION_REQUIRED'
     }
 }
+
+function Get-HistoricBlobBytes([string]$Commit, [string]$RelativePath) {
+    $blobId = (Invoke-Git @('rev-parse', "$Commit`:$RelativePath")).Trim()
+    if ($blobId -notmatch '^[0-9a-f]{40}$') { throw 'Historical verify.py Git blob identity is invalid.' }
+    $start = [Diagnostics.ProcessStartInfo]::new()
+    $start.FileName = 'git'
+    $start.UseShellExecute = $false
+    $start.RedirectStandardOutput = $true
+    $start.RedirectStandardError = $true
+    $start.Arguments = '-C "{0}" cat-file blob {1}' -f $repoRoot, $blobId
+    $process = [Diagnostics.Process]::Start($start)
+    $memory = [IO.MemoryStream]::new()
+    try {
+        $process.StandardOutput.BaseStream.CopyTo($memory)
+        $stderr = $process.StandardError.ReadToEnd()
+        $process.WaitForExit()
+        if ($process.ExitCode -ne 0) { throw "git cat-file failed: $stderr" }
+        $bytes = $memory.ToArray()
+        if ((Get-Sha256Bytes $bytes) -cne '892b02b69bb5d3d9b1aa26d7499bbda4f1017548658444dc4332e67a2515cc9a') { throw 'Historical verify.py raw blob bytes differ from the independently recorded source hash.' }
+        return ,$bytes
+    } finally { $memory.Dispose(); $process.Dispose() }
+}
+
+function Get-Sha256Bytes([byte[]]$Bytes) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return ([BitConverter]::ToString($sha.ComputeHash($Bytes))).Replace('-', '').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
+
 
 function Get-Sha256([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -108,26 +138,40 @@ foreach ($entry in @($manifest.managedFiles)) {
     if ($managed.ContainsKey([string]$entry.path)) { throw "Duplicate managed path: $($entry.path)" }
     $managed[[string]$entry.path] = $entry
 }
+$verifyPath = 'src/scrubbots_pixel_factory/supply_pipeline/verify.py'
+$verifyEntries = @($manifest.managedFiles | Where-Object path -ceq $verifyPath)
+if ($verifyEntries.Count -ne 1 -or ([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne '0f4b7f0319d68278934863fd448db63acdeb418776cddcbca4685815d3317ca2') { throw 'Historical verify.py repair requires the exact expected managed manifest hash.' }
+$historicLfBytes = [byte[]](Get-HistoricBlobBytes -Commit $knownProvenanceHashes[$verifyPath].sourceCommit -RelativePath $verifyPath)
+$lfText = [Text.UTF8Encoding]::new($false, $true).GetString($historicLfBytes)
+$canonicalLf = $lfText.Replace("`r`n", "`n")
+$canonicalCrlfBytes = [Text.UTF8Encoding]::new($false).GetBytes($canonicalLf.Replace("`n", "`r`n"))
+if ((Get-Sha256Bytes $canonicalCrlfBytes) -cne $knownProvenanceHashes[$verifyPath].sha256) { throw 'Historical verify.py LF-to-CRLF provenance did not reproduce the exact installed hash.' }
+$authorizedRepairHashes[$verifyPath] = $knownProvenanceHashes[$verifyPath].sha256
 $overlayAdditions = @()
 $plan = @()
 $manifestDrift = @()
 foreach ($relative in $relativePaths) {
-    if (-not $managed.ContainsKey($relative)) { throw "Manifest does not own the managed target: $relative" }
+    $isNewManagedPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath) { throw "Manifest does not own the managed target: $relative" }
+    if ($managed.ContainsKey($relative) -and $isNewManagedPath) { throw "New managed target already has an unexpected manifest entry: $relative" }
     if (@($manifest.overlayPaths) -cnotcontains $relative) {
         if ($relative -cnotin $authorizedOverlayAdditions) { throw "Installed overlay allowlist does not include: $relative" }
         $overlayAdditions += $relative
     }
     $source = Join-Path $repoRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))
     $target = Join-Path $runtimeRoot ($relative.Replace('/', [IO.Path]::DirectorySeparatorChar))
-    if (-not (Test-Path -LiteralPath $source -PathType Leaf) -or -not (Test-Path -LiteralPath $target -PathType Leaf)) { throw "Source or installed target is missing: $relative" }
-    Assert-NoReparsePath $target
-    $installedHash = Get-Sha256 $target
-    $expectedInstalledHash = ([string]$managed[$relative].sha256).ToLowerInvariant()
+    if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "Source file is missing: $relative" }
+    $targetExists = Test-Path -LiteralPath $target -PathType Leaf
+    if ($targetExists) { Assert-NoReparsePath $target }
+    elseif (-not $isNewManagedPath) { throw "Installed managed target is missing: $relative" }
+    elseif (Test-Path -LiteralPath $target) { throw "New managed target path is occupied by a non-file owner object: $relative" }
+    $installedHash = if ($targetExists) { Get-Sha256 $target } else { $null }
+    $expectedInstalledHash = if ($managed.ContainsKey($relative)) { ([string]$managed[$relative].sha256).ToLowerInvariant() } else { $null }
     $pathReceipts = @($manifest.overlayReceipts | ForEach-Object {
         if ($_.PSObject.Properties.Name -contains 'files') { $_.files }
     } | Where-Object { $_.path -ceq $relative })
     $hasOverlayPath = $relative -cin @($manifest.overlayPaths)
-    $hashDisposition = Get-ScopedInstallHashDisposition -RelativePath $relative -ExpectedHash $expectedInstalledHash -InstalledHash $installedHash -AuthorizedRepairHashes $authorizedRepairHashes
+    $hashDisposition = if ($targetExists) { Get-ScopedInstallHashDisposition -RelativePath $relative -ExpectedHash $expectedInstalledHash -InstalledHash $installedHash -AuthorizedRepairHashes $authorizedRepairHashes } else { 'AUTHORIZED_NEW' }
     if ($hashDisposition -eq 'UNKNOWN_DRIFT') {
             $known = $knownProvenanceHashes[$relative]
             $reason = if ($known -and $installedHash -ceq $known.sha256) { $known.disposition } else { 'UNRECOGNIZED_INSTALLED_BYTES' }
@@ -144,34 +188,24 @@ foreach ($relative in $relativePaths) {
             continue
     }
     $sourceHash = Get-Sha256 $source
-    if ($installedHash -ceq $sourceHash) { continue }
-    $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; manifestSha256 = $expectedInstalledHash; installedSha256 = $installedHash; sourceSha256 = $sourceHash; overlayPath = $hasOverlayPath; overlayReceiptCount = $pathReceipts.Count; priorSha256 = $installedHash; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
+    if ($targetExists -and $installedHash -ceq $sourceHash) { continue }
+    $plan += [pscustomobject]@{ path = $relative; source = $source; target = $target; manifestSha256 = $expectedInstalledHash; installedSha256 = $installedHash; sourceSha256 = $sourceHash; overlayPath = $hasOverlayPath; overlayReceiptCount = $pathReceipts.Count; priorSha256 = $installedHash; priorExists = $targetExists; sha256 = $sourceHash; bytes = (Get-Item -LiteralPath $source).Length }
 }
-
-$processQueryError = $null
-try { $processInventory = @(Get-CimInstance Win32_Process -ErrorAction Stop) }
-catch { $processInventory = @(); $processQueryError = $_.Exception.Message }
-$processState = if ($processQueryError) {
-    [pscustomobject]@{ complete = $false; status = 'PROCESS_INVENTORY_INCOMPLETE'; problems = @("CIM_QUERY_FAILED:$processQueryError"); active = @() }
-} else {
-    Get-ScopedProcessInventoryState -Processes $processInventory -RuntimeRoot $runtimeRoot -CurrentPid $PID
-}
-$active = @($processState.active)
+$plannedPaths = @($plan | ForEach-Object { [string]$_.path })
+$driftPaths = @($manifestDrift | ForEach-Object { [string]$_.path })
 
 [pscustomobject]@{
-    state = if ($manifestDrift.Count -gt 0) { 'BLOCKED_MANIFEST_DRIFT' } elseif ($Apply) { 'APPLY_READY' } else { 'PREFLIGHT_ONLY' }
+    state = if ($manifestDrift.Count -gt 0) { 'BLOCKED_MANIFEST_DRIFT' } elseif ($Apply) { 'APPLY_TRANSACTION_GATED' } else { 'PREFLIGHT_ONLY' }
     sourceHead = $head
     runtimeRoot = $runtimeRoot
-    processInventoryStatus = $processState.status
-    processInventoryProblems = $processState.problems
-    activeRuntimeProcesses = @($active | ForEach-Object { [pscustomobject]@{ pid = $_.ProcessId; name = $_.Name; executablePath = $_.ExecutablePath; parentPid = $_.ParentProcessId; commandLine = $_.CommandLine } })
+    processInventoryStatus = if ($Apply) { 'DEFERRED_TO_LOCKED_TRANSACTION_GATE' } else { 'NOT_QUERIED' }
     overlayAllowlistAdditions = $overlayAdditions
     plannedFiles = $plan
     manifestDrift = $manifestDrift
-    unchangedFiles = @($relativePaths | Where-Object { $_ -notin @($plan.path) -and $_ -notin @($manifestDrift.path) })
+    unchangedFiles = @($relativePaths | Where-Object { $_ -notin $plannedPaths -and $_ -notin $driftPaths })
 } | ConvertTo-Json -Depth 8
 
-$gateResult = Assert-ScopedInstallApplyGates -ManifestDrift $manifestDrift -Apply:$Apply -ProcessState $processState
+$gateResult = Assert-ScopedInstallApplyGates -ManifestDrift $manifestDrift -Apply:$false -ProcessState $null
 if (-not $Apply) { return }
 if ($plan.Count -eq 0 -and $overlayAdditions.Count -eq 0) {
 	Write-ScopedOverlayOutcome -Result ([pscustomobject]@{ status = 'NO_OP'; changedPaths = @() })
@@ -190,6 +224,10 @@ $fileOperations = @{
     Exists = { param($path) Test-Path -LiteralPath $path -PathType Leaf }
     Replace = { param($stage,$target,$backup) [IO.File]::Replace($stage,$target,$backup) }
     RemoveTree = { param($path) Remove-Item -LiteralPath $path -Recurse -Force }
+    MoveNew = { param($stage,$target) [IO.File]::Move($stage,$target) }
+    DeleteFile = { param($path) [IO.File]::Delete($path) }
+    AcquireWriterExclusion = { param($livePaths,$stagePaths) Acquire-ScopedWriterExclusion -LivePaths $livePaths -StagedPaths $stagePaths -ProbeScriptPath (Join-Path $PSScriptRoot 'probe_scoped_writer_lock.ps1') -PowerShellPath (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe') }
+    ReleaseWriterExclusion = { param($lease) Release-ScopedWriterExclusion -Lease $lease }
     GetProcessSnapshot = {
         try {
             $freshInventory = @(Get-CimInstance Win32_Process -ErrorAction Stop)
@@ -199,5 +237,5 @@ $fileOperations = @{
         }
     }
 }
-$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -WriterExclusionEstablished:$false
+$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -NewManagedPaths @('src/scrubbots_pixel_factory/pixellab_pro_atlas.py')
 Write-ScopedOverlayOutcome -Result $result
