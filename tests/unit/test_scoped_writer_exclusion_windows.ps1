@@ -23,6 +23,11 @@ try {
 	if ($unlocked.ExitCode -ne 0) { throw "Unlocked control write-open failed unexpectedly: $($unlocked.ExitCode)" }
 	$lease = Acquire-ScopedWriterExclusion -LivePaths @($target) -StagedPaths @($stage) -ProbeScriptPath $probePath -PowerShellPath $powerShellPath
 	if (-not $lease.established -or $lease.probeCount -ne 1) { throw 'Writer exclusion lease did not report the exact live target probe.' }
+	$lockedHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
+	$sha256 = [Security.Cryptography.SHA256]::Create()
+	try { $expectedHash = ([BitConverter]::ToString($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes('before')))).Replace('-', '').ToLowerInvariant() }
+	finally { $sha256.Dispose() }
+	if ($lockedHash -cne $expectedHash) { throw 'Read-only hash verification failed while the deny-write lease was held.' }
 	'WINDOWS_SCOPED_WRITER_EXCLUSION_TEST_PASS'
 }
 finally {

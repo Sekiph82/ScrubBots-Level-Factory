@@ -55,14 +55,14 @@ function Acquire-ScopedWriterExclusion {
 				continue
 			}
 			$share = [IO.FileShare]::Read -bor [IO.FileShare]::Delete
-			$handle = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, $share)
+			$handle = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, $share)
 			$handles.Add($handle)
 			$lockedLive.Add([string]$path)
 		}
 		foreach ($path in @($StagedPaths | Select-Object -Unique)) {
 			if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Writer exclusion staging target is missing: $path" }
 			$share = [IO.FileShare]::Read -bor [IO.FileShare]::Delete
-			$handle = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, $share)
+			$handle = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, $share)
 			$handles.Add($handle)
 		}
 		foreach ($path in $lockedLive) {
