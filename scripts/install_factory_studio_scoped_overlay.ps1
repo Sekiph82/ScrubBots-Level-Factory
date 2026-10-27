@@ -152,33 +152,50 @@ if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -ceq '0f4b7f0319d68278
     if ((Get-Sha256Bytes $canonicalCrlfBytes) -cne $historicVerifyHash) { throw 'Historical verify.py LF-to-CRLF provenance did not reproduce the exact installed hash.' }
     $verifyRepairAuthorized = $true
 }
-elseif ($manifestSha256 -ceq 'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122') {
-    # This exact manifest is the previous successful V05 overlay receipt. Permit
-    # a repeat V05 install only when that immutable receipt proves the prior
-    # historical verify.py bytes were atomically replaced by exact source at ee51.
+elseif ($manifestSha256 -cin @(
+    'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122',
+    '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82'
+)) {
+    # These two exact manifests are prior successful V05 overlays. Permit a
+    # repeat only when the latest UI receipt and the historic verify.py plus
+    # atlas-addition receipts prove the exact chain and writer exclusion.
     $priorReceipt = @($manifest.overlayReceipts)[-1]
-    $priorVerifyReceipt = @($priorReceipt.files | Where-Object path -ceq $verifyPath)
     $atlasPath = 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
-    $priorAtlasReceipt = @($priorReceipt.files | Where-Object path -ceq $atlasPath)
+    $priorReceiptHead = if ($manifestSha256 -ceq 'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122') { 'ee51d899df149cb559184f4617537e1e6cb7dc6e' } else { '1a8e7d435eb55601b2eaa37371109e753f4852fd' }
+    $priorUiHash = if ($priorReceiptHead -ceq 'ee51d899df149cb559184f4617537e1e6cb7dc6e') { 'ebe91efa47224520c3de97139638916c492b68b94db7612c76bdfa023c5208d2' } else { 'f39f0324e704d636e21d4aab9d83b527b790f2a0c2b0eab7861472b745653e66' }
+    $priorUiReceipt = @($priorReceipt.files | Where-Object { $_.path -ceq 'level_factory/scripts/factory_studio_exact_ui.gd' -and $_.sha256 -ceq $priorUiHash })
     if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
-        $priorReceipt.sourceCommit -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -or
-        $priorReceipt.sourceHead -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -or
+        $priorReceipt.sourceCommit -cne $priorReceiptHead -or
+        $priorReceipt.sourceHead -cne $priorReceiptHead -or
         [string]$priorReceipt.writerExclusionMethod -cnotlike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -or
-        $priorVerifyReceipt.Count -ne 1 -or
-        $priorAtlasReceipt.Count -ne 1 -or
-        [bool]$priorAtlasReceipt[0].priorExists -ne $false -or
-        [string]$priorAtlasReceipt[0].sha256 -cne 'afe51ffcc48b94ca9e81b4fbdfc54ab5d6c4e434213874573cf9e7d50c595497' -or
-        [string]$priorVerifyReceipt[0].priorSha256 -cne $historicVerifyHash -or
-        [string]$priorVerifyReceipt[0].sha256 -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3' -or
-        ([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne [string]$priorVerifyReceipt[0].sha256) {
+        $priorUiReceipt.Count -ne 1) {
         throw 'Repeat V05 install requires the exact previously published verified overlay receipt.'
     }
-    $priorSourceBytes = [byte[]](Get-HistoricBlobBytes -Commit ([string]$priorReceipt.sourceHead) -RelativePath $verifyPath)
+    $verifiedReceiptChain = $false
+    $atlasAdditionReceipt = $false
+    foreach ($receipt in @($manifest.overlayReceipts)) {
+        if ([string]$receipt.sourceHead -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -or [string]$receipt.sourceCommit -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e') { continue }
+        foreach ($fileReceipt in @($receipt.files)) {
+            if ([string]$fileReceipt.path -ceq $verifyPath -and
+                [string]$fileReceipt.priorSha256 -ceq $historicVerifyHash -and
+                [string]$fileReceipt.sha256 -ceq '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3' -and
+                [string]$receipt.writerExclusionMethod -clike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*') { $verifiedReceiptChain = $true }
+            if ([string]$fileReceipt.path -ceq $atlasPath -and
+                [bool]$fileReceipt.priorExists -eq $false -and
+                [string]$fileReceipt.sha256 -ceq 'afe51ffcc48b94ca9e81b4fbdfc54ab5d6c4e434213874573cf9e7d50c595497' -and
+                [string]$receipt.writerExclusionMethod -clike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*') { $atlasAdditionReceipt = $true }
+        }
+    }
+    if (-not $verifiedReceiptChain -or -not $atlasAdditionReceipt -or
+        ([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') {
+        throw 'Prior V05 verify.py or atlas addition receipts are missing or inconsistent.'
+    }
+    $priorSourceBytes = [byte[]](Get-HistoricBlobBytes -Commit 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -RelativePath $verifyPath)
     $priorSourceText = [Text.UTF8Encoding]::new($false, $true).GetString($priorSourceBytes)
     $priorCanonicalLf = $priorSourceText.Replace("`r`n", "`n")
     $priorCanonicalCrlf = [Text.UTF8Encoding]::new($false).GetBytes($priorCanonicalLf.Replace("`n", "`r`n"))
-    if ((Get-Sha256Bytes $priorCanonicalCrlf) -cne [string]$priorVerifyReceipt[0].sha256) { throw 'Prior V05 verify.py receipt does not reproduce exact source-at-install bytes.' }
-    if ((Get-Sha256 (Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar)))) -cne [string]$priorVerifyReceipt[0].sha256) { throw 'Installed verify.py no longer matches its prior successful V05 receipt.' }
+    if ((Get-Sha256Bytes $priorCanonicalCrlf) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') { throw 'Prior V05 verify.py receipt does not reproduce exact source-at-install bytes.' }
+    if ((Get-Sha256 (Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar)))) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') { throw 'Installed verify.py no longer matches its prior successful V05 receipt.' }
     $verifyRepairAuthorized = $true
 }
 else { throw 'Historical verify.py repair requires the exact legacy manifest or the exact prior V05 receipt manifest.' }

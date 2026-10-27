@@ -44,10 +44,12 @@ def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_byt
     assert "$authorizedRepairHashes[$verifyPath] = $historicVerifyHash" in source
     assert "90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744" in source
     assert "a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122" in source
+    assert "395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82" in source
     assert "Repeat V05 install requires the exact previously published verified overlay receipt." in source
     assert "Prior V05 verify.py receipt does not reproduce exact source-at-install bytes." in source
-    assert "$priorAtlasReceipt.Count -ne 1" in source
-    assert "priorExists -ne $false" in source
+    assert "$verifiedReceiptChain = $false" in source
+    assert "$atlasAdditionReceipt = $false" in source
+    assert "[bool]$fileReceipt.priorExists -eq $false" in source
     assert "Installed managed bytes differ from manifest without an approved exact repair; no files were written." in transaction
     assert "$manifestDrift.Count -gt 0" in source
 
