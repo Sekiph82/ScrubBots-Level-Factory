@@ -3807,11 +3807,13 @@ func _choose_size() -> void:
 		dialog.title = "PixelLab Pro 4×4 controls"
 	dialog.add_child(controls)
 	dialog.confirmed.connect(func():
-		_width = int(width_input.value)
-		_height = int(height_input.value)
 		if _provider_model == "PIXELLAB":
-			_max_used_colors = int(max_colors_input.value)
+			_width = clampi(int(width_input.value), 51, 59)
+			_height = clampi(int(height_input.value), 51, 59)
+			_max_used_colors = clampi(int(max_colors_input.value), 3, 12)
 		else:
+			_width = int(width_input.value)
+			_height = int(height_input.value)
 			_alpix_width = _width
 			_alpix_height = _height
 		_refresh_selected_size_value()

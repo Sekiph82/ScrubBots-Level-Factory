@@ -364,5 +364,9 @@ def test_pixellab_pixel_art_ui_enforces_variable_51_to_59_four_by_four_canvas() 
     assert "width_input.min_value = 51; width_input.max_value = 59; width_input.step = 1" in size_dialog
     assert "height_input.min_value = 51; height_input.max_value = 59; height_input.step = 1" in size_dialog
     assert "max_colors_input.min_value = 3; max_colors_input.max_value = 12" in size_dialog
+    confirmation_handler = size_dialog.split("dialog.confirmed.connect(func():", 1)[1].split("dialog.canceled.connect", 1)[0]
+    assert "_width = clampi(int(width_input.value), 51, 59)" in confirmation_handler
+    assert "_height = clampi(int(height_input.value), 51, 59)" in confirmation_handler
+    assert "_max_used_colors = clampi(int(max_colors_input.value), 3, 12)" in confirmation_handler
     assert '"provider_model": "PRO_4X4"' in source
     assert 'if _provider_model == "PIXELLAB":' in provider_dialog
