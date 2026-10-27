@@ -67,7 +67,7 @@ $knownProvenanceHashes = @{
     }
 }
 
-function Get-HistoricBlobBytes([string]$Commit, [string]$RelativePath) {
+function Get-HistoricBlobBytes([string]$Commit, [string]$RelativePath, [string]$ExpectedRawSha256 = '') {
     $blobId = (Invoke-Git @('rev-parse', "$Commit`:$RelativePath")).Trim()
     if ($blobId -notmatch '^[0-9a-f]{40}$') { throw 'Historical verify.py Git blob identity is invalid.' }
     $start = [Diagnostics.ProcessStartInfo]::new()
@@ -84,7 +84,7 @@ function Get-HistoricBlobBytes([string]$Commit, [string]$RelativePath) {
         $process.WaitForExit()
         if ($process.ExitCode -ne 0) { throw "git cat-file failed: $stderr" }
         $bytes = $memory.ToArray()
-        if ((Get-Sha256Bytes $bytes) -cne '892b02b69bb5d3d9b1aa26d7499bbda4f1017548658444dc4332e67a2515cc9a') { throw 'Historical verify.py raw blob bytes differ from the independently recorded source hash.' }
+        if (-not [string]::IsNullOrWhiteSpace($ExpectedRawSha256) -and (Get-Sha256Bytes $bytes) -cne $ExpectedRawSha256) { throw 'Historical verify.py raw blob bytes differ from the independently recorded source hash.' }
         return ,$bytes
     } finally { $memory.Dispose(); $process.Dispose() }
 }
@@ -140,20 +140,56 @@ foreach ($entry in @($manifest.managedFiles)) {
 }
 $verifyPath = 'src/scrubbots_pixel_factory/supply_pipeline/verify.py'
 $verifyEntries = @($manifest.managedFiles | Where-Object path -ceq $verifyPath)
-if ($verifyEntries.Count -ne 1 -or ([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne '0f4b7f0319d68278934863fd448db63acdeb418776cddcbca4685815d3317ca2') { throw 'Historical verify.py repair requires the exact expected managed manifest hash.' }
-$historicLfBytes = [byte[]](Get-HistoricBlobBytes -Commit $knownProvenanceHashes[$verifyPath].sourceCommit -RelativePath $verifyPath)
-$lfText = [Text.UTF8Encoding]::new($false, $true).GetString($historicLfBytes)
-$canonicalLf = $lfText.Replace("`r`n", "`n")
-$canonicalCrlfBytes = [Text.UTF8Encoding]::new($false).GetBytes($canonicalLf.Replace("`n", "`r`n"))
-if ((Get-Sha256Bytes $canonicalCrlfBytes) -cne $knownProvenanceHashes[$verifyPath].sha256) { throw 'Historical verify.py LF-to-CRLF provenance did not reproduce the exact installed hash.' }
-$authorizedRepairHashes[$verifyPath] = $knownProvenanceHashes[$verifyPath].sha256
+if ($verifyEntries.Count -ne 1) { throw 'Historical verify.py repair requires exactly one managed manifest entry.' }
+$manifestSha256 = Get-Sha256 $manifestPath
+$historicVerifyHash = $knownProvenanceHashes[$verifyPath].sha256
+$verifyRepairAuthorized = $false
+if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -ceq '0f4b7f0319d68278934863fd448db63acdeb418776cddcbca4685815d3317ca2') {
+    $historicLfBytes = [byte[]](Get-HistoricBlobBytes -Commit $knownProvenanceHashes[$verifyPath].sourceCommit -RelativePath $verifyPath -ExpectedRawSha256 '892b02b69bb5d3d9b1aa26d7499bbda4f1017548658444dc4332e67a2515cc9a')
+    $lfText = [Text.UTF8Encoding]::new($false, $true).GetString($historicLfBytes)
+    $canonicalLf = $lfText.Replace("`r`n", "`n")
+    $canonicalCrlfBytes = [Text.UTF8Encoding]::new($false).GetBytes($canonicalLf.Replace("`n", "`r`n"))
+    if ((Get-Sha256Bytes $canonicalCrlfBytes) -cne $historicVerifyHash) { throw 'Historical verify.py LF-to-CRLF provenance did not reproduce the exact installed hash.' }
+    $verifyRepairAuthorized = $true
+}
+elseif ($manifestSha256 -ceq 'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122') {
+    # This exact manifest is the previous successful V05 overlay receipt. Permit
+    # a repeat V05 install only when that immutable receipt proves the prior
+    # historical verify.py bytes were atomically replaced by exact source at ee51.
+    $priorReceipt = @($manifest.overlayReceipts)[-1]
+    $priorVerifyReceipt = @($priorReceipt.files | Where-Object path -ceq $verifyPath)
+    $atlasPath = 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    $priorAtlasReceipt = @($priorReceipt.files | Where-Object path -ceq $atlasPath)
+    if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
+        $priorReceipt.sourceCommit -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -or
+        $priorReceipt.sourceHead -cne 'ee51d899df149cb559184f4617537e1e6cb7dc6e' -or
+        [string]$priorReceipt.writerExclusionMethod -cnotlike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -or
+        $priorVerifyReceipt.Count -ne 1 -or
+        $priorAtlasReceipt.Count -ne 1 -or
+        [bool]$priorAtlasReceipt[0].priorExists -ne $false -or
+        [string]$priorAtlasReceipt[0].sha256 -cne 'afe51ffcc48b94ca9e81b4fbdfc54ab5d6c4e434213874573cf9e7d50c595497' -or
+        [string]$priorVerifyReceipt[0].priorSha256 -cne $historicVerifyHash -or
+        [string]$priorVerifyReceipt[0].sha256 -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3' -or
+        ([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne [string]$priorVerifyReceipt[0].sha256) {
+        throw 'Repeat V05 install requires the exact previously published verified overlay receipt.'
+    }
+    $priorSourceBytes = [byte[]](Get-HistoricBlobBytes -Commit ([string]$priorReceipt.sourceHead) -RelativePath $verifyPath)
+    $priorSourceText = [Text.UTF8Encoding]::new($false, $true).GetString($priorSourceBytes)
+    $priorCanonicalLf = $priorSourceText.Replace("`r`n", "`n")
+    $priorCanonicalCrlf = [Text.UTF8Encoding]::new($false).GetBytes($priorCanonicalLf.Replace("`n", "`r`n"))
+    if ((Get-Sha256Bytes $priorCanonicalCrlf) -cne [string]$priorVerifyReceipt[0].sha256) { throw 'Prior V05 verify.py receipt does not reproduce exact source-at-install bytes.' }
+    if ((Get-Sha256 (Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar)))) -cne [string]$priorVerifyReceipt[0].sha256) { throw 'Installed verify.py no longer matches its prior successful V05 receipt.' }
+    $verifyRepairAuthorized = $true
+}
+else { throw 'Historical verify.py repair requires the exact legacy manifest or the exact prior V05 receipt manifest.' }
+if ($verifyRepairAuthorized) { $authorizedRepairHashes[$verifyPath] = $historicVerifyHash }
 $overlayAdditions = @()
 $plan = @()
 $manifestDrift = @()
 foreach ($relative in $relativePaths) {
-    $isNewManagedPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    $isAtlasPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    $isNewManagedPath = $isAtlasPath -and -not $managed.ContainsKey($relative)
     if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath) { throw "Manifest does not own the managed target: $relative" }
-    if ($managed.ContainsKey($relative) -and $isNewManagedPath) { throw "New managed target already has an unexpected manifest entry: $relative" }
     if (@($manifest.overlayPaths) -cnotcontains $relative) {
         if ($relative -cnotin $authorizedOverlayAdditions) { throw "Installed overlay allowlist does not include: $relative" }
         $overlayAdditions += $relative

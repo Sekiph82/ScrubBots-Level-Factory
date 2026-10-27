@@ -26,7 +26,8 @@ def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
     ):
         assert f"'{path}'" in relative_paths
         assert f"'{path}'" in overlay_paths
-    assert "$isNewManagedPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'" in source
+    assert "$isAtlasPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'" in source
+    assert "$isNewManagedPath = $isAtlasPath -and -not $managed.ContainsKey($relative)" in source
     assert "if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath)" in source
     assert "NewManagedPaths @('src/scrubbots_pixel_factory/pixellab_pro_atlas.py')" in source
     assert "if ($relative -cnotin $authorizedOverlayAdditions) { throw \"Installed overlay allowlist does not include: $relative\" }" in source
@@ -40,8 +41,13 @@ def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_byt
     assert "Get-HistoricBlobBytes" in source
     assert "892b02b69bb5d3d9b1aa26d7499bbda4f1017548658444dc4332e67a2515cc9a" in source
     assert "canonicalCrlfBytes" in source
-    assert "$authorizedRepairHashes[$verifyPath] = $knownProvenanceHashes[$verifyPath].sha256" in source
+    assert "$authorizedRepairHashes[$verifyPath] = $historicVerifyHash" in source
     assert "90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744" in source
+    assert "a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122" in source
+    assert "Repeat V05 install requires the exact previously published verified overlay receipt." in source
+    assert "Prior V05 verify.py receipt does not reproduce exact source-at-install bytes." in source
+    assert "$priorAtlasReceipt.Count -ne 1" in source
+    assert "priorExists -ne $false" in source
     assert "Installed managed bytes differ from manifest without an approved exact repair; no files were written." in transaction
     assert "$manifestDrift.Count -gt 0" in source
 
