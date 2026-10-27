@@ -321,6 +321,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = {"state": "READY", "pool_size": len(entries), "entries": entries}
         elif operation == "semantic-generate":
             payload = _semantic_generate(request)
+        elif operation == "pixellab-pro-4x4-import":
+            payload = _semantic_import_pixellab_pro_4x4(request)
         elif operation == "provider-options":
             payload = _provider_options()
         elif operation == "canonical-palette":
@@ -372,7 +374,7 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     Secrets are read only by the provider adapter from process environment. They
     are never accepted in the request payload or copied into the result.
     """
-    allowed = {"prompt", "style", "provider_id", "provider_model", "width", "height", "seed", "background_intent", "operation_id"}
+    allowed = {"prompt", "style", "provider_id", "provider_model", "width", "height", "max_colors", "seed", "background_intent", "operation_id"}
     if set(request) - allowed or "prompt" not in request:
         raise ValueError("semantic generation request contains unsupported or missing fields")
     if request.get("provider_id") != "PIXELLAB":
@@ -391,18 +393,25 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     background = request.get("background_intent", "TRANSPARENT")
     if background not in {"TRANSPARENT", "BACKGROUND"}:
         raise ValueError("background_intent must be TRANSPARENT or BACKGROUND")
-    if model == "PRO_FLASH":
-        if width != 32 or height != 32:
-            raise ValueError("PixelLab Pro Flash Studio requests are fixed at 32x32 pixels.")
-        return _semantic_generate_pixellab_pro_flash(
+    if model == "PRO_4X4":
+        max_colors = _exact_int(request.get("max_colors", 12), "max_colors")
+        if not 51 <= width <= 59 or not 51 <= height <= 59:
+            raise ValueError("GAME_DIMENSIONS_OUT_OF_RANGE: PixelLab Pro 4x4 requires each axis in 51..59.")
+        if not 3 <= max_colors <= 12:
+            raise ValueError("MAX_COLORS_OUT_OF_RANGE: choose 3..12.")
+        if background != "TRANSPARENT":
+            raise ValueError("PixelLab Pro 4x4 requires transparent-background intent.")
+        return _semantic_generate_pixellab_pro_4x4(
             prompt=prompt,
             style=style,
             width=width,
             height=height,
+            max_colors=max_colors,
             seed=seed,
-            background=background,
             operation_id=request.get("operation_id"),
         )
+    if model == "PRO_FLASH":
+        raise ValueError("Pro Flash is retired from active generation; select PRO_4X4.")
     descriptor = get_provider_descriptor("PIXELLAB")
     semantic_request = SemanticGenerationRequest(
         output_class=OutputClass.ASSET_ART,
@@ -594,6 +603,205 @@ def _semantic_generate_pixellab_pro_flash(
     }
 
 
+def _semantic_generate_pixellab_pro_4x4(
+    *, prompt: str, style: str, width: int, height: int, max_colors: int,
+    seed: str | int, operation_id: object,
+) -> dict[str, object]:
+    """Persist one explicit 4x4 request, normalize and always slice all 16 frames."""
+    import re
+    import uuid
+    from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
+    from scrubbots_pixel_factory.pixellab_pro_atlas import export_frames
+
+    resolved_operation_id = str(operation_id or uuid.uuid4().hex)
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", resolved_operation_id):
+        raise ValueError("PixelLab Pro 4x4 operation_id is invalid")
+    if type(width) is not int or type(height) is not int or not 51 <= width <= 59 or not 51 <= height <= 59:
+        raise ValueError("GAME_DIMENSIONS_OUT_OF_RANGE: ScrubBots Pro 4x4 axes must each be 51..59.")
+    if type(max_colors) is not int or not 3 <= max_colors <= 12:
+        raise ValueError("MAX_COLORS_OUT_OF_RANGE: choose 3..12.")
+
+    description = f"{prompt}. Pixel art style: {style}." if style else prompt
+    palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
+    request_digest = hashlib.sha256(json.dumps({
+        "provider": "PIXELLAB", "model": "PRO_4X4", "adapter_version": "pixellab-pro-4x4-v1",
+        "api_version": "v2", "palette_sha256": palette_sha256, "description": description,
+        "width": width, "height": height, "max_colors": max_colors, "seed": seed,
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
+    job_root.mkdir(parents=True, exist_ok=True)
+    job_path = (job_root / f"{resolved_operation_id}.json").resolve()
+    if not _inside_output(job_path, extensions.extensions_root().resolve()):
+        raise ValueError("PixelLab Pro 4x4 job record escaped the Studio output directory")
+    if job_path.exists():
+        previous = json.loads(job_path.read_text(encoding="utf-8"))
+        return {"operation": STUDIO_EXTENSION_OPERATION, "state": "NEEDS_REVIEW",
+                "reason": "This operation ID already has a durable PixelLab record; it was not submitted again.",
+                "job_id": previous.get("job_id"), "job_state": previous.get("state"),
+                "operation_id": resolved_operation_id}
+    uncertain_states = {"SUBMITTING", "SUBMISSION_UNKNOWN", "POLL_TIMEOUT", "POLL_NETWORK_ERROR"}
+    for prior_path in sorted(job_root.glob("*.json")):
+        try:
+            prior = json.loads(prior_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        if (isinstance(prior, dict) and prior.get("request_sha256") == request_digest
+                and prior.get("state") in uncertain_states):
+            return {"operation": STUDIO_EXTENSION_OPERATION, "state": "NEEDS_REVIEW",
+                    "reason": "An identical request may already be processing; inspect its job before another submission.",
+                    "job_id": prior.get("job_id"), "operation_id": prior.get("operation_id")}
+
+    job_record: dict[str, object] = {
+        "schema": "scrubbots-pixellab-pro-4x4-job-v1",
+        "operation_id": resolved_operation_id, "request_sha256": request_digest,
+        "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
+        "adapter_version": "pixellab-pro-4x4-v1", "api_version": "v2",
+        "state": "SUBMITTING", "width": width, "height": height, "max_colors": max_colors,
+        "seed": seed, "palette_source": "data/palette/scrubbots_palette_v3.json",
+        "palette_sha256": palette_sha256,
+        "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
+    }
+
+    def persist_job() -> None:
+        extensions._write_json(job_path, job_record)
+
+    def accepted(job_id: str) -> None:
+        job_record.update({"state": "POLLING", "job_id": job_id})
+        persist_job()
+
+    persist_job()
+    try:
+        generated = extensions.generate_pixellab_pro_4x4_frames(
+            description=description, width=width, height=height,
+            max_colors=max_colors, seed=seed, on_job_accepted=accepted,
+        )
+        job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
+        persist_job()
+        factory_output = (_repository_root() / "level_factory" / "output").resolve()
+        source_root = (factory_output / "semantic-generated" /
+                       f"pixellab-pro-4x4-{generated.job_id[:20]}-{resolved_operation_id[:12]}").resolve()
+        if not _inside_output(source_root, factory_output):
+            raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
+        manifest = export_frames(generated.frames_png, source_root, max_colors=max_colors)
+        imported_sources: list[dict[str, object]] = []
+        for frame in manifest["frames"]:
+            if frame["intake_status"] != "PASS":
+                continue
+            frame_path = source_root / frame["filename"]
+            imported = extensions.batch_import([str(frame_path)])
+            items = imported.get("items", [])
+            item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
+            imported_sources.append({
+                "index": frame["index"], "status": str(item.get("disposition", item.get("state", "IMPORT_REJECTED"))),
+                "source_id": item.get("source_id"), "reason": item.get("error", item.get("reason")),
+                "sha256": frame["sha256"],
+            })
+        pass_count = sum(item.get("intake_status") == "PASS" for item in manifest["frames"])
+        rejected_count = 16 - pass_count
+        imported_source_ids = [item["source_id"] for item in imported_sources if item.get("source_id")]
+        final_state = "SOURCES_IMPORTED_NOT_READY" if imported_source_ids else "SOURCE_IMPORT_FAILED" if pass_count else "FRAMES_REJECTED"
+        job_record.update({
+            "state": final_state,
+            "output_directory": str(source_root), "atlas_sha256": manifest["source_atlas_sha256"],
+            "frames": manifest["frames"], "imported_sources": imported_sources,
+            "pass_count": pass_count, "rejected_count": rejected_count,
+            "actual_usage": dict(generated.actual_usage or {}),
+            "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
+        })
+        persist_job()
+        statuses = [
+            {"index": frame["index"], "intake_status": frame["intake_status"],
+             "reasons": frame["reasons"], "width": frame["width"], "height": frame["height"],
+             "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
+             "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
+             "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
+             "path": str(source_root / frame["filename"])}
+            for frame in manifest["frames"]
+        ]
+        return {
+            "operation": STUDIO_EXTENSION_OPERATION,
+            "state": str(job_record["state"]), "operation_id": resolved_operation_id,
+            "job_id": generated.job_id, "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
+            "width": width, "height": height, "atlas_width": width * 4, "atlas_height": height * 4,
+            "max_colors": max_colors, "pass_count": pass_count, "rejected_count": rejected_count,
+            "frame_statuses": statuses, "source_ids": imported_source_ids,
+            "atlas_path": str(source_root / "original-atlas.png"),
+            "manifest_path": str(source_root / "manifest.json"),
+            "actual_usage": dict(generated.actual_usage or {}),
+        }
+    except extensions.ProFlashError as exc:
+        job_record.update({"state": exc.code, "job_id": exc.job_id or job_record.get("job_id"),
+                           "error": str(exc)})
+        persist_job()
+        raise ValueError(f"{exc.code}: {exc}") from None
+    except Exception as exc:
+        if job_record.get("state") in {"SUBMITTING", "NORMALIZING"}:
+            job_record.update({"state": "POST_SUBMISSION_ERROR", "error": str(exc)[:512]})
+            persist_job()
+        raise
+
+
+def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str, object]:
+    """Normalize a user-selected atlas or coordinate-labelled ZIP, then always slice."""
+    import uuid
+    from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.pixellab_pro_atlas import export_atlas, export_photopea_zip
+
+    if set(request) - {"path", "max_colors"}:
+        raise ValueError("PixelLab Pro 4x4 import contains unsupported fields")
+    source_path = Path(_text(request.get("path"), "path")).resolve()
+    max_colors = _exact_int(request.get("max_colors", 12), "max_colors")
+    if not 3 <= max_colors <= 12:
+        raise ValueError("MAX_COLORS_OUT_OF_RANGE: choose 3..12.")
+    if not source_path.is_file() or source_path.suffix.lower() not in {".png", ".zip"}:
+        raise ValueError("PIXELLAB_PRO_4X4_SOURCE_INVALID: select one PNG atlas or Photopea ZIP.")
+    size_limit = 128 * 1024 * 1024 if source_path.suffix.lower() == ".zip" else 16 * 1024 * 1024
+    if source_path.stat().st_size > size_limit:
+        raise ValueError("PIXELLAB_PRO_4X4_SOURCE_TOO_LARGE")
+    raw = source_path.read_bytes()
+    output_root = (_repository_root() / "level_factory" / "output" / "semantic-generated").resolve()
+    output_directory = (output_root / f"pixellab-pro-4x4-import-{uuid.uuid4().hex}").resolve()
+    if not _inside_output(output_directory, (_repository_root() / "level_factory" / "output").resolve()):
+        raise ValueError("PixelLab Pro 4x4 import output escaped Factory output")
+    manifest = (
+        export_photopea_zip(raw, output_directory, max_colors=max_colors)
+        if source_path.suffix.lower() == ".zip"
+        else export_atlas(raw, output_directory, max_colors=max_colors)
+    )
+    imported_sources: list[dict[str, object]] = []
+    for frame in manifest["frames"]:
+        if frame["intake_status"] != "PASS":
+            continue
+        imported = extensions.batch_import([str(output_directory / frame["filename"])])
+        items = imported.get("items", [])
+        item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
+        imported_sources.append({
+            "index": frame["index"], "status": str(item.get("disposition", item.get("state", "IMPORT_REJECTED"))),
+            "source_id": item.get("source_id"), "reason": item.get("error", item.get("reason")),
+        })
+    source_ids = [item["source_id"] for item in imported_sources if item.get("source_id")]
+    pass_count = sum(frame["intake_status"] == "PASS" for frame in manifest["frames"])
+    return {
+        "operation": STUDIO_EXTENSION_OPERATION,
+        "state": "SOURCES_IMPORTED_NOT_READY" if source_ids else "SOURCE_IMPORT_FAILED" if pass_count else "FRAMES_REJECTED",
+        "source_kind": manifest["source_kind"], "output_directory": str(output_directory),
+        "atlas_path": str(output_directory / "original-atlas.png"),
+        "manifest_path": str(output_directory / "manifest.json"),
+        "frame_statuses": [
+            {"index": frame["index"], "intake_status": frame["intake_status"], "reasons": frame["reasons"],
+             "width": frame["width"], "height": frame["height"],
+             "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
+             "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
+             "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
+             "path": str(output_directory / frame["filename"])}
+            for frame in manifest["frames"]
+        ],
+        "source_ids": source_ids, "pass_count": pass_count, "rejected_count": 16 - pass_count,
+        "quality_scope": "SOURCE_ONLY; solver/WIN replay/difficulty/VOID/QA remain required for READY",
+    }
+
+
 def _provider_options() -> dict[str, object]:
     """Expose only adapters that are actually executable in this process."""
     from scrubbots_pixel_factory.alpix_batch import discover_alpix
@@ -611,7 +819,7 @@ def _provider_options() -> dict[str, object]:
         elif provider_id == "PIXELLAB":
             credential = pixellab_secret_status()
             options.append({"id": provider_id, "available": credential.get("configured") is True, "prompt_capable": True,
-                "execution_mode": "PRO_FLASH", "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
+                "execution_mode": "PRO_4X4", "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
                 "reason": credential.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")})
     return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
 

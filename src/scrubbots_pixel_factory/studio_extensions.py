@@ -2216,14 +2216,17 @@ def get_pixellab_secret() -> str:
         return ""
     return token or legacy or _credential_manager_secret()
 from urllib.request import Request, urlopen
+from PIL import Image
 
 
 
 PRO_FLASH_BASE_URL = "https://api.pixellab.ai/v2"
 PRO_FLASH_ENGINE = "PRO_FLASH"
+PRO_4X4_ENGINE = "PRO_4X4"
 PRO_FLASH_MAX_COLORS = 12
 PRO_FLASH_MAX_WAIT_SECONDS = 240
 PRO_FLASH_POLL_SECONDS = 5
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 class ProFlashError(RuntimeError):
@@ -2351,6 +2354,133 @@ def _resolved_seed(seed: str | int) -> int:
     return int.from_bytes(sha256(seed.encode("utf-8")).digest()[:4], "big")
 
 
+@dataclass(frozen=True, slots=True)
+class PixelLabPro4x4Result:
+    """One API job's unmodified sixteen source PNG frames."""
+
+    frames_png: tuple[bytes, ...]
+    job_id: str
+    actual_usage: Mapping[str, object] | None
+    width: int
+    height: int
+    max_colors: int
+    request_seed: int
+
+
+def _pro_4x4_frames_from_response(last_response: Mapping[str, object], *, width: int, height: int) -> tuple[bytes, ...]:
+    images = last_response.get("images")
+    if not isinstance(images, list) or len(images) != 16:
+        raise ProFlashError("PRO_4X4_FRAME_COUNT_INCOMPATIBLE", "PRO_4X4_FRAME_COUNT_INCOMPATIBLE: PixelLab Pro 4x4 must return exactly 16 inline PNG frames.")
+    frames: list[bytes] = []
+    for index, candidate in enumerate(images, start=1):
+        encoded: object = candidate
+        if isinstance(candidate, Mapping):
+            encoded = candidate.get("base64") or candidate.get("data") or candidate.get("image_base64")
+        if not isinstance(encoded, str) or not encoded.strip():
+            raise ProFlashError("INVALID_FRAME_RESPONSE", f"PixelLab frame {index} has no inline PNG data.")
+        value = encoded.strip()
+        if value.startswith("data:") and "," in value:
+            value = value.split(",", 1)[1]
+        try:
+            raw = base64.b64decode(value, validate=True)
+        except (ValueError, base64.binascii.Error):
+            raise ProFlashError("INVALID_FRAME_RESPONSE", f"PixelLab frame {index} is not valid base64 PNG data.") from None
+        if not raw.startswith(PNG_SIGNATURE):
+            raise ProFlashError("INVALID_FRAME_RESPONSE", f"PixelLab frame {index} is not a PNG.")
+        try:
+            with Image.open(BytesIO(raw)) as image:
+                image.load()
+                if image.format != "PNG" or image.size != (width, height):
+                    raise ProFlashError("PRO_4X4_FRAME_SIZE_MISMATCH", f"PixelLab frame {index} is not the exact requested size.")
+        except ProFlashError:
+            raise
+        except Exception:
+            raise ProFlashError("INVALID_FRAME_RESPONSE", f"PixelLab frame {index} cannot be decoded.") from None
+        frames.append(raw)
+    return tuple(frames)
+
+
+def generate_pixellab_pro_4x4_frames(
+    *,
+    description: str,
+    width: int,
+    height: int,
+    max_colors: int = 12,
+    seed: str | int,
+    request_json: Callable[..., tuple[dict[str, object], Mapping[str, str]]] = _json_request,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+    max_wait_seconds: int = PRO_FLASH_MAX_WAIT_SECONDS,
+    poll_seconds: int = PRO_FLASH_POLL_SECONDS,
+    on_job_accepted: Callable[[str], None] | None = None,
+) -> PixelLabPro4x4Result:
+    """Submit one Pro 4x4 job and retrieve sixteen original frames without POST retry."""
+    if type(width) is not int or type(height) is not int or not 51 <= width <= 59 or not 51 <= height <= 59:
+        code = "GAME_DIMENSIONS_OUT_OF_RANGE" if width > 59 or height > 59 else "PRO_4X4_FRAME_COUNT_INCOMPATIBLE"
+        raise ProFlashError(code, f"{code}: ScrubBots Pro 4x4 axes must each be 51..59 pixels.")
+    if type(max_colors) is not int or not 3 <= max_colors <= 12:
+        raise ProFlashError("MAX_COLORS_OUT_OF_RANGE", "MAX_COLORS_OUT_OF_RANGE: ScrubBots Pro 4x4 max colors must be 3..12.")
+    if type(description) is not str or not description.strip() or len(description) > 2000:
+        raise ProFlashError("INVALID_DESCRIPTION", "Pro 4x4 description must contain 1–2000 characters.")
+    if not 1 <= max_wait_seconds <= 600 or not 1 <= poll_seconds <= 30:
+        raise ProFlashError("INVALID_POLL_POLICY", "Pro 4x4 polling bounds are invalid.")
+    token = os.environ.get("PIXELLAB_API_TOKEN", "").strip()
+    legacy_secret = os.environ.get("PIXELLAB_SECRET", "").strip()
+    if token and legacy_secret and token != legacy_secret:
+        raise ProFlashError("CREDENTIALS_CONFLICT", "PIXELLAB_API_TOKEN and PIXELLAB_SECRET are both set but do not match.")
+    secret = get_pixellab_secret()
+    if not secret:
+        raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: add the secure ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN credential.")
+
+    actual_seed = _resolved_seed(seed)
+    body = {
+        "description": description.strip(),
+        "image_size": {"width": width, "height": height},
+        "no_background": True,
+        "seed": actual_seed,
+        "target_palette": {
+            "colors": [color.hex.upper() for color in CANONICAL_PALETTE.colors],
+            "name": "ScrubBots Palette V3",
+            "max_colors": max_colors,
+        },
+        "style_options": {"color_palette": False},
+    }
+    base_url = "https://api.pixellab.ai/v2"
+    submitted, _ = request_json(
+        f"{base_url}/generate-image-v2", secret=secret, method="POST", payload=body, timeout=30
+    )
+    job_id = submitted.get("background_job_id")
+    if type(job_id) is not str or not job_id.strip():
+        raise ProFlashError("INVALID_SUBMISSION_RESPONSE", "PixelLab Pro 4x4 did not return a background job ID.")
+    job_id = job_id.strip()
+    if on_job_accepted is not None:
+        on_job_accepted(job_id)
+    deadline = monotonic() + max_wait_seconds
+    while monotonic() < deadline:
+        try:
+            status, _ = request_json(f"{base_url}/background-jobs/{job_id}", secret=secret, method="GET", timeout=30)
+        except ProFlashError as exc:
+            if exc.code == "POLL_NETWORK_ERROR":
+                sleep(poll_seconds)
+                continue
+            raise ProFlashError(exc.code, str(exc), job_id=job_id) from None
+        if status.get("status") == "completed":
+            last_response = status.get("last_response")
+            if not isinstance(last_response, Mapping):
+                raise ProFlashError("INVALID_RESPONSE", "PixelLab completed without a result payload.", job_id=job_id)
+            frames = _pro_4x4_frames_from_response(last_response, width=width, height=height)
+            usage = status.get("usage", last_response.get("usage"))
+            return PixelLabPro4x4Result(
+                frames_png=frames, job_id=job_id,
+                actual_usage=dict(usage) if isinstance(usage, Mapping) else None,
+                width=width, height=height, max_colors=max_colors, request_seed=actual_seed,
+            )
+        if status.get("status") in {"failed", "cancelled", "canceled"}:
+            raise ProFlashError("JOB_FAILED", "PixelLab Pro 4x4 job did not complete.", job_id=job_id)
+        sleep(poll_seconds)
+    raise ProFlashError("POLL_TIMEOUT", "PixelLab Pro 4x4 job is still processing; retain its job ID and check it before another generation.", job_id=job_id)
+
+
 def generate_pro_flash_image(
     *,
     description: str,
@@ -2446,4 +2576,4 @@ def generate_pro_flash_image(
     raise ProFlashError("POLL_TIMEOUT", "PixelLab job is still processing; keep its job ID and check status before starting another generation.", job_id=job_id)
 
 
-__all__ = ["PRO_FLASH_BASE_URL", "PRO_FLASH_ENGINE", "PRO_FLASH_MAX_COLORS", "ProFlashError", "ProFlashImageResult", "generate_pro_flash_image", "validate_pro_flash_png"]
+__all__ = ["PRO_FLASH_BASE_URL", "PRO_FLASH_ENGINE", "PRO_FLASH_MAX_COLORS", "ProFlashError", "ProFlashImageResult", "PixelLabPro4x4Result", "generate_pro_flash_image", "generate_pixellab_pro_4x4_frames", "validate_pro_flash_png"]

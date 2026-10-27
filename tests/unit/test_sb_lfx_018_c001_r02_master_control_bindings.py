@@ -24,10 +24,10 @@ def test_every_declared_master_control_has_one_unique_explicit_action() -> None:
 
 def test_generation_values_and_csv_use_the_same_real_generation_entrypoint() -> None:
     assert '"semantic-generate"' in UI
-    assert '"provider_model": "PRO_FLASH"' in UI
-    assert '"width": request.get("width", 32)' in UI
-    assert '"height": request.get("height", 32)' in UI
-    assert "_confirm_pro_flash_generation()" in UI
+    assert '"provider_model": "PRO_4X4"' in UI
+    assert '"width": request.get("width", 56)' in UI
+    assert '"height": request.get("height", 56)' in UI
+    assert "_confirm_pro_4x4_generation()" in UI
     assert "_start_pixel_art_worker" in UI
     assert '"state": "PAID_CONFIRMATION_REQUIRED"' in UI
     assert 'selected_provider == "ALPIX (Claude)"' in UI
@@ -88,7 +88,7 @@ def test_provider_picker_exposes_owner_provider_choices_with_truthful_availabili
     assert options["state"] == "READY"
     assert [item["id"] for item in options["providers"]] == ["ALPIX (Claude)", "PIXELLAB"]
     assert options["providers"][0]["available"] is False
-    assert options["providers"][1]["execution_mode"] == "PRO_FLASH"
+    assert options["providers"][1]["execution_mode"] == "PRO_4X4"
     monkeypatch.setenv("PIXELLAB_API_TOKEN", "redacted-test-secret")
     configured = factory_core_launcher._provider_options()
     assert configured["providers"][1]["available"] is True

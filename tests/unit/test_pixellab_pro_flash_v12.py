@@ -194,7 +194,7 @@ def test_provider_options_retire_magnific_and_csv_rejects_only_its_own_row(tmp_p
     options = namespace["_provider_options"]()
     ids = [item["id"] for item in options["providers"]]
     assert ids == ["ALPIX (Claude)", "PIXELLAB"]
-    assert options["providers"][1]["execution_mode"] == "PRO_FLASH"
+    assert options["providers"][1]["execution_mode"] == "PRO_4X4"
     assert options["providers"][1]["available"] is True
 
     source_bytes = b"prompt,width,height,provider\nretired prompt,20,20,MAGNIFIC\nactive prompt,20,20,ALPIX (Claude)\n"
@@ -217,7 +217,7 @@ def test_provider_options_retire_magnific_and_csv_rejects_only_its_own_row(tmp_p
     assert result.completed == 1 and result.failed == 1
 
 
-def test_semantic_generation_dispatches_to_pro_flash_without_fallback() -> None:
+def test_semantic_generation_dispatches_to_pro_4x4_without_fallback() -> None:
     import ast
     from pathlib import Path
     import sys
@@ -229,30 +229,30 @@ def test_semantic_generation_dispatches_to_pro_flash_without_fallback() -> None:
     selected = ast.Module(body=[node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "_semantic_generate"], type_ignores=[])
     observed: dict[str, object] = {}
 
-    def pro_flash(**kwargs):
+    def pro_4x4(**kwargs):
         observed.update(kwargs)
-        return {"state": "PRO_FLASH_DISPATCHED"}
+        return {"state": "PRO_4X4_DISPATCHED"}
 
     namespace = {
         "STUDIO_EXTENSION_OPERATION": "scrubbots-factory-studio-extension",
         "_text": factory_core_launcher._text,
         "_exact_int": factory_core_launcher._exact_int,
-        "_semantic_generate_pixellab_pro_flash": pro_flash,
+        "_semantic_generate_pixellab_pro_4x4": pro_4x4,
     }
     exec(compile(selected, str(launcher_path), "exec"), namespace)
     result = namespace["_semantic_generate"]({
         "prompt": "moth seed collector", "style": "CREATURE", "provider_id": "PIXELLAB",
-        "provider_model": "PRO_FLASH", "width": 32, "height": 32, "seed": "test-seed",
+        "provider_model": "PRO_4X4", "width": 56, "height": 57, "max_colors": 7, "seed": "test-seed",
         "background_intent": "TRANSPARENT", "operation_id": "offline-dispatch-check",
     })
-    assert result == {"state": "PRO_FLASH_DISPATCHED"}
+    assert result == {"state": "PRO_4X4_DISPATCHED"}
     assert observed == {
-        "prompt": "moth seed collector", "style": "CREATURE", "width": 32, "height": 32,
-        "seed": "test-seed", "background": "TRANSPARENT", "operation_id": "offline-dispatch-check",
+        "prompt": "moth seed collector", "style": "CREATURE", "width": 56, "height": 57, "max_colors": 7,
+        "seed": "test-seed", "operation_id": "offline-dispatch-check",
     }
 
 
-def test_semantic_generation_rejects_non_32x32_pro_flash_before_dispatch() -> None:
+def test_semantic_generation_retires_pro_flash_from_active_dispatch() -> None:
     import ast
     from pathlib import Path
     import sys
@@ -268,11 +268,11 @@ def test_semantic_generation_rejects_non_32x32_pro_flash_before_dispatch() -> No
         "STUDIO_EXTENSION_OPERATION": "scrubbots-factory-studio-extension",
         "_text": factory_core_launcher._text,
         "_exact_int": factory_core_launcher._exact_int,
-        "_semantic_generate_pixellab_pro_flash": lambda **kwargs: dispatched.append(kwargs),
+        "_semantic_generate_pixellab_pro_4x4": lambda **kwargs: dispatched.append(kwargs),
     }
     exec(compile(selected, str(launcher_path), "exec"), namespace)
 
-    with pytest.raises(ValueError, match="fixed at 32x32"):
+    with pytest.raises(ValueError, match="retired from active generation"):
         namespace["_semantic_generate"]({
             "prompt": "moth seed collector", "style": "CREATURE", "provider_id": "PIXELLAB",
             "provider_model": "PRO_FLASH", "width": 48, "height": 56, "seed": "test-seed",
@@ -348,21 +348,21 @@ def test_unknown_submission_blocks_identical_new_operation_without_resubmission(
     assert len(calls) == 1
 
 
-def test_pixellab_pixel_art_ui_enforces_fixed_32x32_canvas() -> None:
+def test_pixellab_pixel_art_ui_enforces_variable_51_to_59_four_by_four_canvas() -> None:
     from pathlib import Path
 
     ui_path = Path(__file__).resolve().parents[2] / "level_factory" / "scripts" / "factory_studio_exact_ui.gd"
     source = ui_path.read_text(encoding="utf-8")
-    generate = source.split("func _generate_art() -> void:", 1)[1].split("func _confirm_pro_flash_generation()", 1)[0]
-    confirmation = source.split("func _confirm_pro_flash_generation() -> void:", 1)[1].split("func _start_pixel_art_worker", 1)[0]
+    generate = source.split("func _generate_art() -> void:", 1)[1].split("func _confirm_pro_4x4_generation()", 1)[0]
+    confirmation = source.split("func _confirm_pro_4x4_generation() -> void:", 1)[1].split("func _start_pixel_art_worker", 1)[0]
     size_dialog = source.split("func _choose_size() -> void:", 1)[1].split("func _choose_provider()", 1)[0]
     provider_dialog = source.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
 
     assert '_provider_model == "PIXELLAB"' in generate
-    assert "_width = 32" in generate and "_height = 32" in generate
-    assert "_width = 32" in confirmation and "_height = 32" in confirmation
-    assert "width_input.value = 32" in size_dialog and "height_input.value = 32" in size_dialog
-    assert "width_input.editable = false" in size_dialog and "height_input.editable = false" in size_dialog
-    assert '_width = 32 if _provider_model == "PIXELLAB"' in size_dialog
-    assert '_height = 32 if _provider_model == "PIXELLAB"' in size_dialog
+    assert "_width < 51 or _width > 59" in generate and "_height < 51 or _height > 59" in generate
+    assert "one paid request for 16 frames" in confirmation
+    assert "width_input.min_value = 51; width_input.max_value = 59; width_input.step = 1" in size_dialog
+    assert "height_input.min_value = 51; height_input.max_value = 59; height_input.step = 1" in size_dialog
+    assert "max_colors_input.min_value = 3; max_colors_input.max_value = 12" in size_dialog
+    assert '"provider_model": "PRO_4X4"' in source
     assert 'if _provider_model == "PIXELLAB":' in provider_dialog

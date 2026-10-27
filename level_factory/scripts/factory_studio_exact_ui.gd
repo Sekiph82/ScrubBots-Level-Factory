@@ -26,6 +26,9 @@ var _manual_level_override := false
 var _prompt := "pixel art owl"
 var _width := 32
 var _height := 32
+var _max_used_colors := 12
+var _alpix_width := 32
+var _alpix_height := 32
 var _provider_model := "ALPIX (Claude)"
 var _generation_mode := "SINGLE"
 var _batch_csv_path := ""
@@ -727,7 +730,7 @@ func _build_selected_size_value_panel() -> void:
 
 func _refresh_selected_size_value() -> void:
 	if _selected_size_value != null:
-		_selected_size_value.text = "Selected Size\n%d × %d px" % [_width, _height]
+		_selected_size_value.text = "Selected Size\n%d × %d px%s" % [_width, _height, " · 4×4 / 16" if _provider_model == "PIXELLAB" else ""]
 	if _selected_size_panel != null:
 		_selected_size_panel.visible = _screen == "PIXEL ART"
 
@@ -1301,7 +1304,11 @@ func _refresh_live_data() -> void:
 		selected_source_text = _selected_import_filename()
 	if _screen == "PIXEL ART":
 		_ensure_canonical_palette_loaded()
-		var provider_caption := "PIXELLAB · Pro Flash" if _provider_model == "PIXELLAB" else _provider_model
+		var provider_caption := "PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else _provider_model
+		var frame_summary := ""
+		for frame_variant in _semantic_progress.get("frame_statuses", []):
+			if frame_variant is Dictionary:
+				frame_summary += "%02d:%s/%s " % [int(frame_variant.get("index", 0)), str(frame_variant.get("intake_status", "REJECTED")), str(frame_variant.get("import_status", "NOT_IMPORTED"))]
 		var palette_markup := "\nPalette V3 LOCKED  "
 		var palette_tooltip := "Canonical palette V3 · API target palette + exact local pixel validation"
 		for color in _canonical_palette_colors:
@@ -1309,7 +1316,8 @@ func _refresh_live_data() -> void:
 				var swatch_hex := str(color.get("hex", "#000000"))
 				palette_markup += "[color=%s]■[/color]" % swatch_hex
 				palette_tooltip += "\n%s %s" % [str(color.get("id", "")), swatch_hex]
-		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nBatch: %d complete · %d failed · %d remaining%s" % [provider_caption, _generation_mode, _width, _height, _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining, palette_markup]
+		var pro_summary := "\n4×4 output: 16 frames · atlas %d × %d · max %d colours\nFrames: %s" % [_width * 4, _height * 4, _max_used_colors, frame_summary] if _provider_model == "PIXELLAB" else ""
+		live.text = "Provider: %s\nMode: %s\nCanvas: %d × %d\nBatch: %d complete · %d failed · %d remaining%s%s" % [provider_caption, _generation_mode, _width, _height, _semantic_progress.completed, _semantic_progress.failed, _semantic_progress.remaining, pro_summary, palette_markup]
 		live.tooltip_text = palette_tooltip
 	elif _screen == "LEVEL FACTORY":
 		var primary: Dictionary = _last_pipeline.get("primary", {})
@@ -2058,10 +2066,13 @@ func _open_files(multiple: bool) -> void:
 	if _file_dialog == null:
 		return
 	_file_selection_action = "PNG_IMPORT"
-	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILES if multiple else FileDialog.FILE_MODE_OPEN_FILE
-	_file_dialog.title = "Select artwork PNG"
+	var pro_atlas := _provider_model == "PIXELLAB"
+	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if pro_atlas or not multiple else FileDialog.FILE_MODE_OPEN_FILES
+	_file_dialog.title = "Select one 4×4 atlas PNG or Photopea ZIP" if pro_atlas else "Select artwork PNG"
 	_file_dialog.clear_filters()
 	_file_dialog.add_filter("*.png ; PNG image")
+	if pro_atlas:
+		_file_dialog.add_filter("*.zip ; Photopea positioned slices ZIP")
 	_file_dialog.popup_centered_ratio(0.72)
 
 
@@ -2128,10 +2139,50 @@ func _on_file_selected(path: String) -> void:
 	if _file_selection_action == "PIXEL_ART_BATCH":
 		_generate_batch_csv(path)
 		return
+	if _provider_model == "PIXELLAB":
+		_import_pro_4x4_source(path)
+		return
 	_import_pngs([path])
 
 func _on_files_selected(paths: PackedStringArray) -> void:
+	if _provider_model == "PIXELLAB":
+		if paths.size() != 1:
+			_report("PixelLab Pro 4×4 intake accepts one atlas or ZIP at a time.")
+			return
+		_import_pro_4x4_source(str(paths[0]))
+		return
 	_import_pngs(Array(paths))
+
+
+func _import_pro_4x4_source(path: String) -> void:
+	if _operation_running:
+		return
+	if _width < 51 or _width > 59 or _height < 51 or _height > 59:
+		_report("PixelLab Pro 4×4 intake requires inferred frame sizes 51..59. ScrubBots maximum is 59.")
+		return
+	_operation_running = true
+	var result := _extension("pixellab-pro-4x4-import", {"path": path, "max_colors": _max_used_colors})
+	_operation_running = false
+	var frame_statuses: Array = result.get("frame_statuses", [])
+	if not frame_statuses.is_empty() and frame_statuses[0] is Dictionary:
+		_width = int(frame_statuses[0].get("width", _width))
+		_height = int(frame_statuses[0].get("height", _height))
+		_refresh_selected_size_value()
+	var imported_source_ids: Array = result.get("source_ids", [])
+	var imported_count := imported_source_ids.size()
+	_semantic_progress = {"completed": imported_count, "failed": 16 - imported_count, "remaining": 0, "state": str(result.get("state", "ERROR")), "frame_statuses": result.get("frame_statuses", [])}
+	for frame_variant in result.get("frame_statuses", []):
+		if frame_variant is Dictionary and not str(frame_variant.get("source_id", "")).is_empty():
+			_upsert_imported_source({"path": str(frame_variant.get("path", "")), "source_id": str(frame_variant.get("source_id", "")), "display_filename": "Pro4x4-%02d.png" % int(frame_variant.get("index", 0)), "width": int(frame_variant.get("width", _width)), "height": int(frame_variant.get("height", _height)), "disposition": "IMPORTED"})
+	if not str(result.get("atlas_path", "")).is_empty():
+		_load_selected_art_preview(str(result.get("atlas_path", "")), "PIXEL ART")
+	_refresh_live_data()
+	var statuses: Array[String] = []
+	for frame_variant in result.get("frame_statuses", []):
+		if frame_variant is Dictionary:
+			var why := ",".join(frame_variant.get("reasons", []))
+			statuses.append("%02d:%s%s" % [int(frame_variant.get("index", 0)), str(frame_variant.get("intake_status", "REJECTED")), " (" + why + ")" if not why.is_empty() else ""])
+	_report("4×4 SOURCE ONLY · %d frame PASS · %d rejected · %d imported · not READY until solver/WIN/difficulty/QA · %s" % [int(result.get("pass_count", 0)), int(result.get("rejected_count", 16)), imported_count, " · ".join(statuses)])
 
 
 func _import_pngs(paths: Array) -> void:
@@ -2322,10 +2373,6 @@ func _wrap_identity(value: String, chunk_size: int = 24) -> String:
 func _generate_art() -> void:
 	if _operation_running:
 		return
-	if _provider_model == "PIXELLAB":
-		_width = 32
-		_height = 32
-		_refresh_selected_size_value()
 	var provider_status := _provider_status_for(_provider_model)
 	if not bool(provider_status.get("available", false)):
 		_report(str(provider_status.get("reason", "Selected provider is unavailable.")))
@@ -2335,24 +2382,25 @@ func _generate_art() -> void:
 	_last_pipeline = {}
 	_seed = "pixel-art-%d" % Time.get_unix_time_from_system()
 	if _provider_model == "PIXELLAB":
-		if _width % 4 != 0 or _height % 4 != 0:
-			_report("Pro Flash requires canvas width and height in 4-pixel increments; choose a compatible size first.")
+		if _width < 51 or _width > 59 or _height < 51 or _height > 59:
+			_report("PixelLab Pro 4×4 requires width and height from 51 to 59. ScrubBots maximum is 59 × 59.")
 			return
-		_confirm_pro_flash_generation()
+		if _max_used_colors < 3 or _max_used_colors > 12:
+			_report("Max colours must be 3..12.")
+			return
+		_confirm_pro_4x4_generation()
 		return
 	var result := _generate_request({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	_finish_generation(result)
 
 
-func _confirm_pro_flash_generation() -> void:
-	_width = 32
-	_height = 32
+func _confirm_pro_4x4_generation() -> void:
 	var dialog := ConfirmationDialog.new()
-	dialog.title = "Confirm paid PixelLab Pro Flash generation"
-	dialog.dialog_text = "This will submit one paid Pro Flash image request (%d × %d). One prior request used 5 credits; actual cost may vary. Network timeouts are not automatically retried." % [_width, _height]
+	dialog.title = "Confirm PixelLab Pro 4×4 generation"
+	dialog.dialog_text = "This submits one paid request for 16 frames at %d × %d each (%d × %d atlas), V3 palette locked, maximum %d used colours. API cost is account-dependent and not verified here. An uncertain request will not be submitted again automatically." % [_width, _height, _width * 4, _height * 4, _max_used_colors]
 	dialog.confirmed.connect(func():
 		if is_instance_valid(dialog): dialog.queue_free()
-		_start_pixel_art_worker({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
+		_start_pixel_art_worker({"prompt": _prompt, "width": _width, "height": _height, "max_colors": _max_used_colors, "provider": _provider_model, "seed": _seed, "background_intent": "TRANSPARENT"})
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
 	add_child(dialog)
@@ -2363,13 +2411,13 @@ func _start_pixel_art_worker(request: Dictionary) -> void:
 	if _gateway == null or _operation_running or _pixel_art_thread != null:
 		return
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
-		_report("PixelLab Pro Flash is unavailable because the local Factory Core gateway is not ready.")
+		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core gateway is not ready.")
 		return
 	var operation_id := "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
-	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_FLASH", "width": request.get("width", 32), "height": request.get("height", 32), "seed": request.get("seed", ""), "background_intent": request.get("background_intent", "TRANSPARENT"), "operation_id": operation_id}
+	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_4X4", "width": request.get("width", 56), "height": request.get("height", 56), "max_colors": request.get("max_colors", 12), "seed": request.get("seed", ""), "background_intent": "TRANSPARENT", "operation_id": operation_id}
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "semantic-generate", payload)
 	if prepared.is_empty():
-		_report("PixelLab Pro Flash is unavailable because the local Factory Core cannot start.")
+		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core cannot start.")
 		return
 	_prepare_worker_cancel_marker()
 	_pixel_art_mutex.lock()
@@ -2381,11 +2429,11 @@ func _start_pixel_art_worker(request: Dictionary) -> void:
 	if error != OK:
 		_pixel_art_thread = null
 		_finish_worker_cancel_marker()
-		_report("PixelLab Pro Flash worker could not start.")
+		_report("PixelLab Pro 4×4 worker could not start.")
 		return
 	_operation_running = true
 	_semantic_progress = {"completed": 0, "failed": 0, "remaining": 1, "state": "RUNNING"}
-	_report("PIXELLAB PRO FLASH · submitting one image · %d × %d · canonical palette V3" % [int(payload.width), int(payload.height)])
+	_report("PIXELLAB PRO · submitting one 4×4 request · %d × %d sprites · atlas %d × %d · V3 locked · max %d colours" % [int(payload.width), int(payload.height), int(payload.width) * 4, int(payload.height) * 4, int(payload.max_colors)])
 
 
 func _pixel_art_worker(prepared: Dictionary) -> void:
@@ -2413,12 +2461,28 @@ func _poll_pixel_art_worker() -> void:
 	_pixel_art_worker_result.clear()
 	_pixel_art_mutex.unlock()
 	_operation_running = false
-	if str(result.get("state", "")) == "IMPORTED":
+	if str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"]:
+		var source_ids: Array = result.get("source_ids", [])
+		_semantic_progress = {"completed": source_ids.size(), "failed": 16 - source_ids.size(), "remaining": 0, "state": str(result.get("state", "SOURCE_ONLY")), "frame_statuses": result.get("frame_statuses", [])}
+		var atlas_path := str(result.get("atlas_path", ""))
+		if not atlas_path.is_empty():
+			_load_selected_art_preview(atlas_path, "PIXEL ART")
+		for frame_variant in result.get("frame_statuses", []):
+			if frame_variant is Dictionary and not str(frame_variant.get("source_id", "")).is_empty():
+				_upsert_imported_source({"path": str(frame_variant.get("path", "")), "source_id": str(frame_variant.get("source_id", "")), "display_filename": "Pro4x4-%02d.png" % int(frame_variant.get("index", 0)), "width": int(frame_variant.get("width", result.get("width", 0))), "height": int(frame_variant.get("height", result.get("height", 0))), "disposition": "IMPORTED"})
+		var status_lines: Array[String] = []
+		for frame_variant in result.get("frame_statuses", []):
+			if frame_variant is Dictionary:
+				var status := str(frame_variant.get("intake_status", "REJECTED"))
+				var reasons := ",".join(frame_variant.get("reasons", []))
+				status_lines.append("%02d:%s/%s%s" % [int(frame_variant.get("index", 0)), status, str(frame_variant.get("import_status", "NOT_IMPORTED")), " (" + reasons + ")" if not reasons.is_empty() else ""])
+		_report("SOURCE ONLY · %d frame PASS · %d rejected · %d imported · not READY until solver/WIN/difficulty/QA · %s" % [int(result.get("pass_count", 0)), int(result.get("rejected_count", 0)), source_ids.size(), " · ".join(status_lines)])
+	elif str(result.get("state", "")) == "IMPORTED":
 		_semantic_progress = {"completed": 1, "failed": 0, "remaining": 0, "state": "READY"}
 		_finish_generation(result)
 	else:
 		_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
-		_report("PIXELLAB PRO FLASH · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
+		_report("PIXELLAB PRO · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
 	if _shutdown_requested:
 		get_tree().quit()
 
@@ -2435,7 +2499,7 @@ func _generate_batch_csv(path: String) -> void:
 		return
 	_batch_csv_path = path
 	if _provider_model == "PIXELLAB":
-		_report("Pro Flash CSV batch is disabled to prevent unconfirmed paid calls. Use one confirmed Generate/Regenerate request at a time.")
+		_report("PixelLab Pro 4×4 CSV batch is disabled to prevent unconfirmed paid calls. Use one confirmed Generate/Regenerate request at a time.")
 		return
 	if _provider_model == "ALPIX (Claude)":
 		_operation_running = true
@@ -3655,7 +3719,7 @@ func _generate_request(request: Dictionary) -> Dictionary:
 		result = _extension("alpix-generate", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32)})
 	elif selected_provider == "PIXELLAB":
 		# Paid requests only pass through explicit confirmation and the async worker.
-		result = {"state": "PAID_CONFIRMATION_REQUIRED", "reason": "Start one explicit Generate/Regenerate request to confirm Pro Flash cost."}
+		result = {"state": "PAID_CONFIRMATION_REQUIRED", "reason": "Start one explicit Generate/Regenerate request to confirm PixelLab Pro 4×4 cost."}
 	elif selected_provider == "MAGNIFIC":
 		result = {"state": "PROVIDER_RETIRED", "reason": "PROVIDER_RETIRED_MAGNIFIC · choose ALPIX (Claude) or PIXELLAB explicitly."}
 	else:
@@ -3704,19 +3768,45 @@ func _new_seed() -> void:
 
 func _choose_size() -> void:
 	var dialog := ConfirmationDialog.new()
-	dialog.title = "Size"
+	dialog.title = "Size and palette limit"
+	var controls := VBoxContainer.new()
 	var row := HBoxContainer.new()
-	var width_input := SpinBox.new(); width_input.min_value = 20; width_input.max_value = 56; width_input.step = 4; width_input.value = _width
-	var height_input := SpinBox.new(); height_input.min_value = 20; height_input.max_value = 56; height_input.step = 4; height_input.value = _height
+	var width_input := SpinBox.new()
+	var height_input := SpinBox.new()
+	var max_colors_input := SpinBox.new()
 	if _provider_model == "PIXELLAB":
-		width_input.value = 32
-		height_input.value = 32
-		width_input.editable = false
-		height_input.editable = false
-	row.add_child(width_input); row.add_child(height_input); dialog.add_child(row)
+		width_input.min_value = 51; width_input.max_value = 59; width_input.step = 1; width_input.value = clampi(_width, 51, 59)
+		height_input.min_value = 51; height_input.max_value = 59; height_input.step = 1; height_input.value = clampi(_height, 51, 59)
+		max_colors_input.min_value = 3; max_colors_input.max_value = 12; max_colors_input.step = 1; max_colors_input.value = _max_used_colors
+	else:
+		width_input.min_value = 20; width_input.max_value = 56; width_input.step = 4; width_input.value = _width
+		height_input.min_value = 20; height_input.max_value = 56; height_input.step = 4; height_input.value = _height
+		max_colors_input.min_value = 12; max_colors_input.max_value = 12; max_colors_input.value = 12; max_colors_input.editable = false
+	row.add_child(width_input); row.add_child(height_input)
+	controls.add_child(Label.new())
+	controls.get_child(0).text = "Width                         Height"
+	controls.add_child(row)
+	if _provider_model == "PIXELLAB":
+		var color_row := HBoxContainer.new()
+		color_row.add_child(Label.new())
+		color_row.get_child(0).text = "Max colours (3–12)"
+		color_row.add_child(max_colors_input)
+		controls.add_child(color_row)
+		var atlas_hint := Label.new()
+		atlas_hint.text = "4×4 = 16 frames · atlas %d × %d · game maximum 59 × 59" % [int(width_input.value) * 4, int(height_input.value) * 4]
+		width_input.value_changed.connect(func(value: float): atlas_hint.text = "4×4 = 16 frames · atlas %d × %d · game maximum 59 × 59" % [int(value) * 4, int(height_input.value) * 4])
+		height_input.value_changed.connect(func(value: float): atlas_hint.text = "4×4 = 16 frames · atlas %d × %d · game maximum 59 × 59" % [int(width_input.value) * 4, int(value) * 4])
+		controls.add_child(atlas_hint)
+		dialog.title = "PixelLab Pro 4×4 controls"
+	dialog.add_child(controls)
 	dialog.confirmed.connect(func():
-		_width = 32 if _provider_model == "PIXELLAB" else int(width_input.value)
-		_height = 32 if _provider_model == "PIXELLAB" else int(height_input.value)
+		_width = int(width_input.value)
+		_height = int(height_input.value)
+		if _provider_model == "PIXELLAB":
+			_max_used_colors = int(max_colors_input.value)
+		else:
+			_alpix_width = _width
+			_alpix_height = _height
 		_refresh_selected_size_value()
 		_refresh_live_data()
 		dialog.queue_free()
@@ -3740,7 +3830,7 @@ func _choose_provider() -> void:
 			if provider_id in ["ALPIX (Claude)", "PIXELLAB"]:
 				var available := bool(item.get("available", false))
 				var status := str(item.get("status", "UNAVAILABLE"))
-				var display_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
+				var display_name := "PixelLab Pro · 4×4" if provider_id == "PIXELLAB" else provider_id
 				if not available: display_name += " · %s" % status
 				choice.add_item(display_name)
 				choice.set_item_metadata(choice.item_count - 1, provider_id)
@@ -3782,15 +3872,24 @@ func _choose_provider() -> void:
 						reasons_by_id[provider_id] = str(refreshed_item.get("reason", "Provider status is unavailable."))
 						var option_index := provider_ids.find(provider_id)
 						if option_index >= 0:
-							var base_name := "PIXELLAB · Pro Flash" if provider_id == "PIXELLAB" else provider_id
+							var base_name := "PixelLab Pro · 4×4" if provider_id == "PIXELLAB" else provider_id
 							choice.set_item_text(option_index, base_name if available else "%s · %s" % [base_name, status])
 			status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No provider status was returned."))
 	)
 	dialog.confirmed.connect(func():
+		var previous_provider := _provider_model
 		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
+		if previous_provider == "ALPIX (Claude)":
+			_alpix_width = _width
+			_alpix_height = _height
 		if _provider_model == "PIXELLAB":
-			_width = 32
-			_height = 32
+			if _width < 51 or _width > 59: _width = 56
+			if _height < 51 or _height > 59: _height = 56
+			_refresh_selected_size_value()
+			_refresh_live_data()
+		elif _provider_model == "ALPIX (Claude)" and previous_provider == "PIXELLAB":
+			_width = _alpix_width
+			_height = _alpix_height
 			_refresh_selected_size_value()
 			_refresh_live_data()
 		dialog.queue_free()
