@@ -61,9 +61,6 @@ function Acquire-ScopedWriterExclusion {
 		}
 		foreach ($path in @($StagedPaths | Select-Object -Unique)) {
 			if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Writer exclusion staging target is missing: $path" }
-			$share = [IO.FileShare]::Read -bor [IO.FileShare]::Delete
-			$handle = [IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, $share)
-			$handles.Add($handle)
 		}
 		foreach ($path in $lockedLive) {
 			$quotedProbe = '"{0}"' -f $ProbeScriptPath.Replace('"', '\"')
@@ -89,7 +86,7 @@ function Acquire-ScopedWriterExclusion {
 }
 
 function Get-ScopedWriterExclusionMethod {
-	return 'Windows FileStream deny-write handles on every existing replacement target, staged replacement, and install manifest; independent PowerShell write-open probe denied on each existing live target; absent additions use no-overwrite move.'
+	return 'Windows FileStream deny-write handles on every existing replacement target and install manifest; independent PowerShell write-open probe denied on each existing live target; staged files remain under a unique transaction directory and are SHA-256 checked immediately before atomic replacement; absent additions use no-overwrite move.'
 }
 
 function Release-ScopedWriterExclusion {

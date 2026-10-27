@@ -16,18 +16,25 @@ try {
 	$createdFixture = $true
 	$target = Join-Path $fixtureRoot 'live-target.bin'
 	$stage = Join-Path $fixtureRoot 'staged-target.bin'
+	$replaceTarget = Join-Path $fixtureRoot 'replace-target.bin'
+	$replaceStage = Join-Path $fixtureRoot 'replace-stage.bin'
+	$replaceBackup = Join-Path $fixtureRoot 'replace-backup.bin'
 	[IO.File]::WriteAllBytes($target, [Text.Encoding]::UTF8.GetBytes('before'))
 	[IO.File]::WriteAllBytes($stage, [Text.Encoding]::UTF8.GetBytes('replacement'))
+	[IO.File]::WriteAllBytes($replaceTarget, [Text.Encoding]::UTF8.GetBytes('old-transaction-bytes'))
+	[IO.File]::WriteAllBytes($replaceStage, [Text.Encoding]::UTF8.GetBytes('new-transaction-bytes'))
 	$powerShellPath = (Get-Process -Id $PID).Path
 	$unlocked = Start-Process -FilePath $powerShellPath -ArgumentList @('-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',('"{0}"' -f $probePath),'-TargetPath',('"{0}"' -f $target)) -Wait -PassThru -WindowStyle Hidden
 	if ($unlocked.ExitCode -ne 0) { throw "Unlocked control write-open failed unexpectedly: $($unlocked.ExitCode)" }
-	$lease = Acquire-ScopedWriterExclusion -LivePaths @($target) -StagedPaths @($stage) -ProbeScriptPath $probePath -PowerShellPath $powerShellPath
-	if (-not $lease.established -or $lease.probeCount -ne 1) { throw 'Writer exclusion lease did not report the exact live target probe.' }
+	$lease = Acquire-ScopedWriterExclusion -LivePaths @($target,$replaceTarget) -StagedPaths @() -ProbeScriptPath $probePath -PowerShellPath $powerShellPath
+	if (-not $lease.established -or $lease.probeCount -ne 2) { throw 'Writer exclusion lease did not report the exact live target probes.' }
 	$lockedHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash.ToLowerInvariant()
 	$sha256 = [Security.Cryptography.SHA256]::Create()
 	try { $expectedHash = ([BitConverter]::ToString($sha256.ComputeHash([Text.Encoding]::UTF8.GetBytes('before')))).Replace('-', '').ToLowerInvariant() }
 	finally { $sha256.Dispose() }
 	if ($lockedHash -cne $expectedHash) { throw 'Read-only hash verification failed while the deny-write lease was held.' }
+	[IO.File]::Replace($replaceStage,$replaceTarget,$replaceBackup)
+	if ([Text.Encoding]::UTF8.GetString([IO.File]::ReadAllBytes($replaceTarget)) -cne 'new-transaction-bytes') { throw 'Atomic replacement did not retain the staged bytes while the writer lease was held.' }
 	'WINDOWS_SCOPED_WRITER_EXCLUSION_TEST_PASS'
 }
 finally {
