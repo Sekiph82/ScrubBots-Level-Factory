@@ -199,6 +199,9 @@ def test_factory_imports_only_pass_frames_as_source_only_and_reuses_job_id(monke
         extensions_root = sandbox / "extensions"
         monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
         originals = tuple(_varied_frame(index) for index in range(16))
         submissions: list[dict[str, object]] = []
         imported: list[Path] = []
@@ -287,6 +290,9 @@ def test_cross_operation_digest_claim_blocks_every_paid_or_uncertain_state(
         extensions_root = sandbox / "extensions"
         monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
         submissions: list[dict[str, object]] = []
 
         def generate(**kwargs: object) -> PixelLabPro4x4Result:
@@ -371,6 +377,9 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
     try:
         monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
         submissions: list[dict[str, object]] = []
 
         def generate(**kwargs: object) -> PixelLabPro4x4Result:
@@ -448,37 +457,126 @@ def test_legacy_v02_digest_remains_guarded_before_creating_new_claim(
         assert not list(jobs_root.glob("*.claim.json"))
 
 
-def test_known_pre_post_failure_is_marked_unpaid_but_never_auto_reclaimed(
+def test_missing_credential_creates_no_claim_then_same_intent_can_submit_once(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     launcher = _launcher_module()
+    from scrubbots_pixel_factory.studio_extensions import PixelLabPro4x4Result
+
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
         extensions_root = sandbox / "extensions"
         monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
-        attempts: list[object] = []
+        status = {"configured": False, "status": "PIXELLAB_API_TOKEN_NOT_CONFIGURED",
+                  "reason": "PIXELLAB_API_TOKEN_NOT_CONFIGURED: no local credential."}
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: dict(status))
+        submissions: list[dict[str, object]] = []
 
-        def fail_preflight(**kwargs: object):
-            attempts.append(kwargs)
-            raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "mock preflight failure")
+        def generate(**kwargs: object) -> PixelLabPro4x4Result:
+            submissions.append(kwargs)
+            started = kwargs.get("on_submission_started")
+            if callable(started):
+                started()
+            accepted = kwargs.get("on_job_accepted")
+            if callable(accepted):
+                accepted("mock-first-use-job")
+            return PixelLabPro4x4Result(
+                tuple(_varied_frame(index) for index in range(16)),
+                "mock-first-use-job", None, 56, 56, 12, 123,
+            )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", fail_preflight)
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", generate)
+        monkeypatch.setattr(
+            extensions, "batch_import",
+            lambda paths: {"items": [{"disposition": "IMPORTED", "source_id": "offline-source-1"}]},
+        )
+        first = launcher._semantic_generate_pixellab_pro_4x4(
+            prompt="same normalized first use", style="CREATURE", width=56, height=56,
+            max_colors=12, seed="same-seed", operation_id="first-use-operation",
+        )
+        assert first["state"] == "PIXELLAB_API_TOKEN_NOT_CONFIGURED"
+        assert first["paid_submission_possible"] is False
+        assert first["job_record_created"] is False
+        assert first["digest_claim_created"] is False
+        assert submissions == []
+        assert not extensions_root.exists()
+
+        status.update({"configured": True, "status": "READY_CREDENTIALS_CONFIGURED",
+                       "reason": "PixelLab credential is present (in-memory test only)."})
+        second = launcher._semantic_generate_pixellab_pro_4x4(
+            prompt="same normalized first use", style="CREATURE", width=56, height=56,
+            max_colors=12, seed="same-seed", operation_id="first-use-operation",
+        )
+        assert second["state"] == "SOURCES_IMPORTED_NOT_READY"
+        assert len(submissions) == 1
+        jobs_root = extensions_root / "pixellab-jobs"
+        record = json.loads((jobs_root / "first-use-operation.json").read_text(encoding="utf-8"))
+        claim = json.loads(next(jobs_root.glob("*.claim.json")).read_text(encoding="utf-8"))
+        assert record["paid_submission_possible"] is True
+        assert claim["paid_submission_possible"] is True
+        assert "mock credential value" not in json.dumps(record)
+
+
+def test_credential_conflict_returns_without_creating_claim_or_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launcher = _launcher_module()
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": False, "status": "PIXELLAB_CREDENTIALS_CONFLICT",
+            "reason": "PIXELLAB_CREDENTIALS_CONFLICT: environment entries differ.",
+        })
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames",
+                            lambda **kwargs: pytest.fail("provider adapter must not run"))
+        result = launcher._semantic_generate_pixellab_pro_4x4(
+            prompt="credential conflict", style="CREATURE", width=56, height=56,
+            max_colors=12, seed="conflict-seed", operation_id="conflict-operation",
+        )
+        assert result["state"] == "PIXELLAB_CREDENTIALS_CONFLICT"
+        assert result["digest_claim_created"] is False
+        assert not extensions_root.exists()
+
+
+def test_existing_known_unpaid_claim_stays_fail_closed_without_auto_release(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launcher = _launcher_module()
+
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "mock only"})
+
+        def fail_before_post(**kwargs: object):
+            raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "synthetic pre-submit failure")
+
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", fail_before_post)
         with pytest.raises(ValueError, match="CREDENTIALS_NOT_CONFIGURED"):
             launcher._semantic_generate_pixellab_pro_4x4(
-                prompt="known preflight failure", style="CREATURE", width=56, height=56,
-                max_colors=12, seed="no-post", operation_id="preflight-one",
+                prompt="preserve old unpaid intent", style="CREATURE", width=56, height=56,
+                max_colors=12, seed="old-unpaid-seed", operation_id="old-unpaid-operation",
             )
         jobs_root = extensions_root / "pixellab-jobs"
-        record = json.loads((jobs_root / "preflight-one.json").read_text(encoding="utf-8"))
+        record_path = jobs_root / "old-unpaid-operation.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
         assert record["state"] == "PRE_SUBMISSION_ERROR"
         assert record["paid_submission_possible"] is False
+        claim_path = next(jobs_root.glob("*.claim.json"))
+        before_claim = claim_path.read_bytes()
+        before_record = record_path.read_bytes()
         outcome = launcher._semantic_generate_pixellab_pro_4x4(
-            prompt="known preflight failure", style="CREATURE", width=56, height=56,
-            max_colors=12, seed="no-post", operation_id="preflight-two",
+            prompt="preserve old unpaid intent", style="CREATURE", width=56, height=56,
+            max_colors=12, seed="old-unpaid-seed", operation_id="new-owner-intent",
         )
         assert outcome["state"] == "NEEDS_OWNER_REVIEW_ACTIVE_OR_STALE_CLAIM"
-        assert len(attempts) == 1
+        assert claim_path.read_bytes() == before_claim
+        assert record_path.read_bytes() == before_record
 
 
 def test_submission_marker_is_persisted_before_single_post(monkeypatch: pytest.MonkeyPatch) -> None:

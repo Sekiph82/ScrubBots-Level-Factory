@@ -83,7 +83,7 @@ def test_provider_picker_exposes_owner_provider_choices_with_truthful_availabili
 
     monkeypatch.delenv("PIXELLAB_SECRET", raising=False)
     monkeypatch.delenv("PIXELLAB_API_TOKEN", raising=False)
-    monkeypatch.setattr(alpix_batch, "discover_alpix", lambda: {"available": False, "reason": "not installed"})
+    monkeypatch.setattr(alpix_batch, "discover_alpix", lambda **_kwargs: {"available": False, "reason": "not installed"})
     options = factory_core_launcher._provider_options()
     assert options["state"] == "READY"
     assert [item["id"] for item in options["providers"]] == ["ALPIX (Claude)", "PIXELLAB"]

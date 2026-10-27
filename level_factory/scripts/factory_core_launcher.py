@@ -659,11 +659,17 @@ def _semantic_generate_pixellab_pro_4x4(
         raise ValueError("GAME_DIMENSIONS_OUT_OF_RANGE: ScrubBots Pro 4x4 axes must each be 51..59.")
     if type(max_colors) is not int or not 3 <= max_colors <= 12:
         raise ValueError("MAX_COLORS_OUT_OF_RANGE: choose 3..12.")
+    if type(prompt) is not str or not prompt.strip() or type(style) is not str:
+        raise ValueError("INVALID_DESCRIPTION: Pro 4x4 prompt/style are invalid.")
+    if isinstance(seed, bool) or not isinstance(seed, (str, int)):
+        raise ValueError("INVALID_SEED: Pro 4x4 seed must be text or integer.")
 
     description = f"{prompt}. Pixel art style: {style}." if style else prompt
-    palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
     normalized_description = description.strip()
+    if len(normalized_description) > 2000:
+        raise ValueError("INVALID_DESCRIPTION: Pro 4x4 description exceeds 2000 characters.")
     normalized_seed = extensions._resolved_seed(extensions._resolved_seed(seed))
+    palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
     request_digest = hashlib.sha256(json.dumps({
         "provider": "PIXELLAB", "model": "PRO_4X4", "adapter_version": "pixellab-pro-4x4-v1",
         "api_version": "v2", "palette_sha256": palette_sha256, "description": normalized_description,
@@ -677,7 +683,6 @@ def _semantic_generate_pixellab_pro_4x4(
         "width": width, "height": height, "max_colors": max_colors, "seed": seed,
     }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
     job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
-    job_root.mkdir(parents=True, exist_ok=True)
     job_path = (job_root / f"{resolved_operation_id}.json").resolve()
     if not _inside_output(job_path, extensions.extensions_root().resolve()):
         raise ValueError("PixelLab Pro 4x4 job record escaped the Studio output directory")
@@ -767,6 +772,24 @@ def _semantic_generate_pixellab_pro_4x4(
         }):
             return blocked_claim(prior)
 
+    # This status-only check may consult Windows Credential Manager, but it
+    # never returns or persists a credential value. Do it before creating the
+    # job directory, digest claim, or operation record so first-use setup is
+    # retryable after credentials are configured.
+    credential_status = extensions.pixellab_secret_status()
+    if credential_status.get("configured") is not True:
+        credential_state = str(credential_status.get("status", "PIXELLAB_CREDENTIAL_PREFLIGHT_FAILED"))
+        if credential_state not in {"PIXELLAB_API_TOKEN_NOT_CONFIGURED", "PIXELLAB_CREDENTIALS_CONFLICT"}:
+            credential_state = "PIXELLAB_CREDENTIAL_PREFLIGHT_FAILED"
+        return {
+            "operation": STUDIO_EXTENSION_OPERATION, "state": credential_state,
+            "status": credential_state, "reason": str(credential_status.get("reason", credential_state)),
+            "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
+            "operation_id": resolved_operation_id, "paid_submission_possible": False,
+            "job_record_created": False, "digest_claim_created": False,
+        }
+
+    job_root.mkdir(parents=True, exist_ok=True)
     if not _create_exclusive_json(claim_path, job_record):
         try:
             previous_claim = json.loads(claim_path.read_text(encoding="utf-8"))
@@ -973,7 +996,7 @@ def _provider_options() -> dict[str, object]:
     from scrubbots_pixel_factory.studio_extensions import pixellab_secret_status
     from scrubbots_pixel_factory.semantic.providers.registry import active_factory_studio_provider_ids
 
-    alpix = discover_alpix()
+    alpix = discover_alpix(project_root=Path(_repository_root()))
     options: list[dict[str, object]] = []
     for provider_id in active_factory_studio_provider_ids():
         if provider_id == "ALPIX (Claude)":
@@ -999,7 +1022,7 @@ def _alpix_generate(request: Mapping[str, object]) -> dict[str, object]:
     output = _alpix_output_path(request.get("output_path"))
     generated = generate_alpix_png(prompt=_text(request.get("prompt"), "prompt"),
         width=_exact_int(request.get("width"), "width"), height=_exact_int(request.get("height"), "height"),
-        destination=output)
+        destination=output, project_root=Path(_repository_root()))
     imported = extensions.batch_import([str(output)])
     items = imported.get("items", [])
     item = items[0] if isinstance(items, list) and items else {}
@@ -1024,7 +1047,8 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
     default_height = _exact_int(request.get("default_height", 32), "default_height")
 
     def render(prompt: str, width: int, height: int, destination: Path) -> Mapping[str, object]:
-        return generate_alpix_png(prompt=prompt, width=width, height=height, destination=destination)
+        return generate_alpix_png(prompt=prompt, width=width, height=height, destination=destination,
+                                  project_root=Path(_repository_root()))
 
     def import_png(path: Path) -> Mapping[str, object]:
         result = extensions.batch_import([str(path)])

@@ -49,36 +49,61 @@ def find_claude(*, user_home: Path | None = None) -> str | None:
     return None
 
 
-def discover_alpix(*, user_home: Path | None = None) -> dict[str, object]:
+def discover_alpix(*, user_home: Path | None = None,
+                  project_root: Path | None = None) -> dict[str, object]:
     """Discover an enabled Alpix plugin and its configured MCP identity.
 
-    Only the two Claude Code configuration files and installed plugin manifests
-    are inspected. Credentials, history, and session files are never read.
+    Claude user configuration and installed plugin manifests are inspected, as
+    well as project-scoped settings and MCP names when an explicit project root
+    is supplied. Credentials, history, and session files are never read.
     """
     home = user_home or Path(os.environ.get("USERPROFILE") or os.environ.get("HOME") or Path.home())
     config_dir = Path(os.environ.get("CLAUDE_CONFIG_DIR", "")).expanduser() if user_home is None and os.environ.get("CLAUDE_CONFIG_DIR") else home / ".claude"
     executable = find_claude(user_home=user_home)
     if not executable:
-        return {"available": False, "status": "ALPIX_CLI_NOT_FOUND", "reason": "ALPIX_CLI_NOT_FOUND: Claude Code executable is not available on this Studio process PATH or the current user-local install path."}
+        return {"available": False, "status": "CLAUDE_CLI_MISSING", "reason": "CLAUDE_CLI_MISSING: Claude Code executable is not available on this Studio process PATH or the current user-local install path."}
     settings_path = config_dir / "settings.json"
     installed_path = config_dir / "plugins" / "installed_plugins.json"
-    try:
-        settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        installed = json.loads(installed_path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        # Newer Claude Code installations can register a user MCP server in the
-        # top-level config instead of an installed plugin manifest. Read only
-        # the server names; never return or log config values such as argv/env.
-        settings = {}
-        installed = {"plugins": {}}
-    if not isinstance(settings, Mapping):
-        return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude settings.json must contain an object."}
-    if not isinstance(installed, Mapping):
-        return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude installed plugin manifest must contain an object."}
+    project_settings_paths = (() if project_root is None else (
+        Path(project_root) / ".claude" / "settings.json",
+        Path(project_root) / ".claude" / "settings.local.json",
+    ))
+    scope_unread = False
+    scope_invalid = False
+    project_settings: list[Mapping[str, object]] = []
+
+    def read_optional_object(path: Path) -> Mapping[str, object] | None:
+        nonlocal scope_unread, scope_invalid
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except (OSError, UnicodeError):
+            scope_unread = True
+            return None
+        except json.JSONDecodeError:
+            scope_invalid = True
+            return None
+        if not isinstance(value, Mapping):
+            scope_invalid = True
+            return None
+        return value
+
+    settings = read_optional_object(settings_path) or {}
+    installed = read_optional_object(installed_path) or {"plugins": {}}
     enabled = settings.get("enabledPlugins", {})
     plugins = installed.get("plugins", {})
     if not isinstance(enabled, Mapping) or not isinstance(plugins, Mapping):
         return {"available": False, "status": "ALPIX_INVALID_CONFIG", "reason": "ALPIX_INVALID_CONFIG: Claude plugin settings or installed plugin map is invalid."}
+    for project_settings_path in project_settings_paths:
+        project_setting = read_optional_object(project_settings_path)
+        if project_setting is not None:
+            project_settings.append(project_setting)
+    effective_enabled = dict(enabled)
+    for project_setting in project_settings:
+        project_enabled = project_setting.get("enabledPlugins", {})
+        if isinstance(project_enabled, Mapping):
+            effective_enabled.update(project_enabled)
     identities: list[dict[str, str]] = []
     for plugin_id, records in plugins.items():
         if not isinstance(plugin_id, str) or not isinstance(records, list):
@@ -102,34 +127,54 @@ def discover_alpix(*, user_home: Path | None = None) -> dict[str, object]:
         if "alpix" in (plugin_id + manifest_text + " " + " ".join(mcp_names)).lower():
             identities.append({"plugin_id": plugin_id, "enabled": str(enabled.get(plugin_id, False)).lower(),
                                "mcp_servers": ",".join(sorted(set(mcp_names)))})
-    active = next((item for item in identities if item["enabled"] == "true" and item["mcp_servers"]), None)
+    active = next((item for item in identities
+                   if str(effective_enabled.get(item["plugin_id"], item["enabled"])).lower() == "true"
+                   and item["mcp_servers"]), None)
+    if project_root is not None:
+        project_mcp = read_optional_object(Path(project_root) / ".mcp.json")
+        project_servers = project_mcp.get("mcpServers", {}) if project_mcp is not None else {}
+        if not isinstance(project_servers, Mapping):
+            return {"available": False, "status": "ALPIX_INVALID_CONFIG",
+                    "reason": "ALPIX_INVALID_CONFIG: project .mcp.json mcpServers must contain an object."}
+        project_alpix_servers = sorted(name for name in project_servers
+                                       if isinstance(name, str) and "alpix" in name.lower())
+        if active is None and project_alpix_servers:
+            active = {"plugin_id": "claude-project-mcp@project-config", "enabled": "true",
+                      "mcp_servers": ",".join(project_alpix_servers)}
     global_config_path = home / ".claude.json"
     global_mcp_names: list[str] = []
-    try:
-        global_config = json.loads(global_config_path.read_text(encoding="utf-8"))
-        global_servers = global_config.get("mcpServers", {}) if isinstance(global_config, Mapping) else {}
-        if isinstance(global_servers, Mapping):
-            global_mcp_names = [name for name in global_servers if isinstance(name, str) and "alpix" in name.lower()]
-    except (OSError, UnicodeError, json.JSONDecodeError):
-        pass
+    global_config = read_optional_object(global_config_path)
+    global_servers = global_config.get("mcpServers", {}) if global_config is not None else {}
+    if isinstance(global_servers, Mapping):
+        global_mcp_names = [name for name in global_servers if isinstance(name, str) and "alpix" in name.lower()]
     if active is None and global_mcp_names:
         active = {"plugin_id": "claude-user-mcp@global-config", "enabled": "true",
                   "mcp_servers": ",".join(sorted(set(global_mcp_names)))}
     if active is None:
+        if scope_unread:
+            return {"available": False, "status": "CONFIG_SCOPE_UNREAD",
+                    "reason": "CONFIG_SCOPE_UNREAD: one or more Claude configuration scopes could not be read; ALPIX availability is unknown."}
+        if scope_invalid:
+            return {"available": False, "status": "ALPIX_INVALID_CONFIG",
+                    "reason": "ALPIX_INVALID_CONFIG: a Claude configuration scope contains invalid JSON or a non-object value."}
         return {"available": False, "status": "ALPIX_PLUGIN_MISSING",
                 "reason": "ALPIX_PLUGIN_MISSING: Claude Code is installed, but no enabled ALPIX plugin/MCP server was found in the current user configuration."}
-    return {"available": True, "status": "ALPIX_CONFIGURED", "reason": "Claude Code and an enabled ALPIX MCP route are configured. Usage-limit health is not probed.", "executable": executable, **active}
+    return {"available": True, "status": "ALPIX_AVAILABLE_DISCOVERY_ONLY",
+            "session_status": "CLAUDE_SESSION_UNVERIFIED",
+            "reason": "ALPIX MCP route is configured. Claude session authentication is not probed; usage-limit health is not probed.",
+            "executable": executable, **active}
 
 
 def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str | Path,
                        discovery: Mapping[str, object] | None = None,
+                       project_root: Path | None = None,
                        runner: Callable[..., object] = subprocess.run) -> dict[str, object]:
     """Ask the discovered Alpix integration to write one exact-size PNG."""
     if type(prompt) is not str or not prompt.strip():
         raise ValueError("Prompt is required.")
     if type(width) is not int or type(height) is not int or not 1 <= width <= 8192 or not 1 <= height <= 8192:
         raise ValueError("Requested PNG size is invalid.")
-    identity = dict(discovery or discover_alpix())
+    identity = dict(discovery or discover_alpix(project_root=project_root))
     if identity.get("available") is not True:
         raise AlpixUnavailable(str(identity.get("reason", "Claude Alpix is unavailable.")))
     executable = identity.get("executable")
@@ -149,9 +194,11 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     child_env = os.environ.copy()
     child_env.pop("ANTHROPIC_API_KEY", None)
     child_env.pop("ANTHROPIC_AUTH_TOKEN", None)
+    working_directory = str(Path(project_root).resolve()) if project_root is not None else None
     try:
         completed = runner([str(executable), "-p", task, "--output-format", "text"],
-                           capture_output=True, text=True, timeout=1800, env=child_env, check=False)
+                           capture_output=True, text=True, timeout=1800, env=child_env, check=False,
+                           cwd=working_directory)
     except subprocess.TimeoutExpired as exc:
         raise AlpixUnavailable("Claude Alpix generation timed out.") from exc
     output_text = "\n".join((str(getattr(completed, "stdout", "")), str(getattr(completed, "stderr", "")))).lower()
