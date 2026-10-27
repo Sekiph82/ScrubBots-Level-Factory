@@ -683,7 +683,7 @@ func _control_caption(control_name: String) -> String:
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
 		"GenerationPrompt": "Prompt", "RandomSeed": "↻", "GenerationSize": "Size",
-		"GenerationProvider": "Provider: %s" % _provider_model,
+		"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
@@ -733,6 +733,13 @@ func _refresh_selected_size_value() -> void:
 		_selected_size_value.text = "Selected Size\n%d × %d px%s" % [_width, _height, " · 4×4 / 16" if _provider_model == "PIXELLAB" else ""]
 	if _selected_size_panel != null:
 		_selected_size_panel.visible = _screen == "PIXEL ART"
+
+
+func _refresh_provider_control_caption() -> void:
+	for button in _master_buttons:
+		if button.name == "GenerationProvider":
+			button.text = _control_caption("GenerationProvider")
+			return
 
 
 func _build_batch_issue_panel() -> void:
@@ -3892,6 +3899,7 @@ func _choose_provider() -> void:
 			_height = _alpix_height
 			_refresh_selected_size_value()
 			_refresh_live_data()
+		_refresh_provider_control_caption()
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())

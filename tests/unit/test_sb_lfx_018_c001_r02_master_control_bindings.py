@@ -95,6 +95,13 @@ def test_provider_picker_exposes_owner_provider_choices_with_truthful_availabili
     assert "redacted-test-secret" not in str(configured)
 
 
+def test_provider_control_caption_tracks_the_selected_provider_after_confirmation() -> None:
+    assert '"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)"' in UI
+    assert "func _refresh_provider_control_caption() -> void:" in UI
+    provider_dialog = UI.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
+    assert provider_dialog.index("_provider_model = str(choice.get_item_metadata(choice.selected))") < provider_dialog.index("_refresh_provider_control_caption()")
+
+
 def test_production_screens_are_native_controls_and_master_textures_are_not_live_underlays() -> None:
     assert "_canvas.texture = null" in UI
     assert "_canvas.visible = false" in UI
