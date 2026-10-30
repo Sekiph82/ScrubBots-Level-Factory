@@ -68,6 +68,29 @@ def test_release_projection_and_publish_stay_within_canonical_boundaries() -> No
     assert '_release_confirmation.confirmed.connect(_publish_production_confirmed)' in UI
 
 
+def test_canonical_ready_pool_prefetches_after_gateway_binding_and_reuses_fresh_cache() -> None:
+    configure = UI.split("func configure_gateway(gateway: RefCounted) -> void:", 1)[1].split("\n\nfunc ", 1)[0]
+    assert configure.index("_gateway = gateway") < configure.index("_refresh_release_pool(false)")
+    assert "not _release_pool_loaded and not _release_pool_loading" in configure
+
+    show_screen = UI.split("func _show_screen(name: String) -> void:", 1)[1].split("\n\nfunc ", 1)[0]
+    assert "if not _release_pool_cache_is_fresh() and not _release_pool_loading:" in show_screen
+    assert show_screen.index("_apply_release_projection()") < show_screen.index("_select_release_entry(_selected_release_id)")
+
+    refresh = UI.split("func _refresh_release_pool(show_status: bool = true) -> void:", 1)[1].split("\n\nfunc _release_pool_cache_is_fresh", 1)[0]
+    assert "_release_pool_loading = true" in refresh
+    assert "if not _queue_studio_read_extension(\"release-pool\"" in refresh
+    assert "_release_pool_load_error = \"Canonical Release Pool read could not be queued." in refresh
+    assert "const RELEASE_POOL_CACHE_TTL_MSEC := 60000" in UI
+
+    completion = UI.split('elif kind == "release-pool":', 1)[1].split('elif kind == "restore-batch-run":', 1)[0]
+    assert 'result.get("state", "")) == "READY" and returned_entries is Array' in completion
+    assert "_release_pool = result" in completion
+    assert "_release_pool_loaded = true" in completion
+    assert "if not result_is_valid" in completion
+    assert "_release_pool_load_error = \"Release Pool refresh failed:" in completion
+
+
 def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None:
     for control in ("ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"):
         assert f'"{control}"' in UI

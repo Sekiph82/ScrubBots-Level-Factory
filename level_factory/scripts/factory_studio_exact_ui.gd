@@ -19,6 +19,11 @@ var _owner_review_status := ""
 var _selected_release_ids: Array[String] = []
 var _release_selection_manage_mode := false
 var _release_pool: Dictionary = {}
+var _release_pool_loaded := false
+var _release_pool_loading := false
+var _release_pool_last_success_msec := -1
+var _release_pool_load_error := ""
+const RELEASE_POOL_CACHE_TTL_MSEC := 60000
 var _operation_running := false
 var _column_count := 4
 var _level_number := 11
@@ -721,6 +726,11 @@ func preview_state_snapshot() -> Dictionary:
 
 func configure_gateway(gateway: RefCounted) -> void:
 	_gateway = gateway
+	# The parent shell configures this child after the child's _ready() has run.
+	# Start the canonical read as soon as the gateway is available so the owner
+	# can stay on PIXEL ART while the existing READY pool loads in the background.
+	if not _release_pool_loaded and not _release_pool_loading:
+		_refresh_release_pool(false)
 
 
 func active_master() -> String:
@@ -1554,7 +1564,14 @@ func _refresh_live_data() -> void:
 	else:
 		if _results_panel != null: _results_panel.visible = false
 		var entries: Array = _release_pool.get("entries", [])
-		live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
+		if entries.is_empty() and _release_pool_loading:
+			live.text = "Release Pool: LOADING\nReading the canonical READY list in the background."
+		elif entries.is_empty() and not _release_pool_load_error.is_empty():
+			live.text = _release_pool_load_error.left(180)
+		else:
+			live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
+			if not _release_pool_load_error.is_empty():
+				live.text += "\nRefresh issue: %s" % _release_pool_load_error.trim_prefix("Release Pool refresh failed: ").left(96)
 	_refresh_run_button_caption()
 	_refresh_runtime_cards()
 	_refresh_batch_issue_panel()
@@ -2192,7 +2209,8 @@ func _show_screen(name: String) -> void:
 		_status.visible = false
 	if name == "RELEASE POOL":
 		_clear_preview_for_screen("RELEASE POOL")
-		_refresh_release_pool(false)
+		if not _release_pool_cache_is_fresh() and not _release_pool_loading:
+			_refresh_release_pool(false)
 		_apply_release_projection()
 		if not _selected_release_id.is_empty():
 			_select_release_entry(_selected_release_id)
@@ -3810,10 +3828,28 @@ func _review_candidate(disposition: String) -> void:
 
 
 func _refresh_release_pool(show_status: bool = true) -> void:
+	if _release_pool_loading:
+		if show_status:
+			_append_release_pool_activity("REFRESH POOL", "ALREADY RUNNING", "canonical READY pool read is already in flight", _selected_release_ids)
+		return
 	if show_status:
 		_append_release_pool_activity("REFRESH POOL", "STARTED", "read-only Release Pool projection", _selected_release_ids)
-	_queue_studio_read_extension("release-pool", {}, {"kind": "release-pool", "show_status": show_status})
+	_release_pool_loading = true
+	_release_pool_load_error = ""
+	if not _queue_studio_read_extension("release-pool", {}, {"kind": "release-pool", "show_status": show_status}):
+		_release_pool_loading = false
+		_release_pool_load_error = "Canonical Release Pool read could not be queued. Check the local Factory Core connection and select Refresh to retry."
+		_refresh_live_data()
+		if show_status or _screen == "RELEASE POOL":
+			_append_release_pool_activity("REFRESH POOL", "UNAVAILABLE", _release_pool_load_error, _selected_release_ids)
+			_report(_release_pool_load_error)
+		return
+	_refresh_live_data()
 	_apply_release_projection()
+
+
+func _release_pool_cache_is_fresh() -> bool:
+	return _release_pool_loaded and _release_pool_last_success_msec >= 0 and Time.get_ticks_msec() - _release_pool_last_success_msec < RELEASE_POOL_CACHE_TTL_MSEC
 
 
 func _queue_studio_read_extension(operation: String, request: Dictionary, context: Dictionary) -> bool:
@@ -3885,6 +3921,13 @@ func _start_next_studio_read_extension() -> void:
 			_batch_restore_pending = false
 			_report("Saved batch lookup could not start; no batch was resumed or modified.")
 			_refresh_run_button_caption()
+		elif str(failed_context.get("kind", "")) == "release-pool":
+			_release_pool_loading = false
+			_release_pool_load_error = "Canonical Release Pool background reader could not start. Select Refresh to retry."
+			_refresh_live_data()
+			if _screen == "RELEASE POOL":
+				_append_release_pool_activity("REFRESH POOL", "UNAVAILABLE", _release_pool_load_error, _selected_release_ids)
+				_report(_release_pool_load_error)
 
 
 func _studio_read_extension_worker(prepared: Dictionary) -> void:
@@ -3968,10 +4011,23 @@ func _poll_studio_read_extension() -> void:
 	elif kind == "batch-restore-latest":
 		_apply_restored_latest_batch(result, str(context.get("token", "")), str(context.get("batch_id", "")))
 	elif kind == "release-pool":
-		_release_pool = result
+		_release_pool_loading = false
+		var returned_entries: Variant = result.get("entries", null)
+		var result_is_valid := str(result.get("state", "")) == "READY" and returned_entries is Array
+		if result_is_valid:
+			_release_pool = result
+			_release_pool_loaded = true
+			_release_pool_last_success_msec = Time.get_ticks_msec()
+			_release_pool_load_error = ""
+		else:
+			var reason := str(result.get("error", result.get("reason", result.get("state", "No validated READY entries were returned.")))).strip_edges()
+			_release_pool_load_error = "Release Pool refresh failed: %s" % reason.left(240)
 		_apply_release_projection()
 		_refresh_live_data()
-		if bool(context.get("show_status", false)):
+		if not result_is_valid and (bool(context.get("show_status", false)) or _screen == "RELEASE POOL"):
+			_append_release_pool_activity("REFRESH POOL", "UNAVAILABLE", _release_pool_load_error, _selected_release_ids)
+			_report(_release_pool_load_error)
+		elif result_is_valid and bool(context.get("show_status", false)):
 			var entries: Array = _release_pool.get("entries", [])
 			_append_release_pool_activity("REFRESH POOL", str(_release_pool.get("state", _release_pool.get("disposition", "UNAVAILABLE"))), "entries=%d; visible after filters=%d" % [entries.size(), _visible_release_ids.size()], _selected_release_ids)
 			_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
