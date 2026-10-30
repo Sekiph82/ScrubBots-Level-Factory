@@ -18,18 +18,27 @@ def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
     source = _installer()
     relative_paths = source.split("$relativePaths = @(", 1)[1].split(")", 1)[0]
     overlay_paths = source.split("$authorizedOverlayAdditions = @(", 1)[1].split(")", 1)[0]
+    new_managed_paths = source.split("$authorizedNewManagedPaths = @(", 1)[1].split(")", 1)[0]
     for path in (
         "src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py",
         "src/scrubbots_pixel_factory/supply_pipeline/verify.py",
         "src/scrubbots_pixel_factory/alpix_batch.py",
+        "src/scrubbots_pixel_factory/owner_art_storage.py",
+        "src/scrubbots_pixel_factory/owner_folder_batch.py",
+        "src/scrubbots_pixel_factory/owner_release_library.py",
         "src/scrubbots_pixel_factory/pixellab_pro_atlas.py",
     ):
         assert f"'{path}'" in relative_paths
         assert f"'{path}'" in overlay_paths
-    assert "$isAtlasPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'" in source
-    assert "$isNewManagedPath = $isAtlasPath -and -not $managed.ContainsKey($relative)" in source
+    for path in (
+        "src/scrubbots_pixel_factory/owner_art_storage.py",
+        "src/scrubbots_pixel_factory/owner_folder_batch.py",
+        "src/scrubbots_pixel_factory/owner_release_library.py",
+    ):
+        assert f"'{path}'" in new_managed_paths
+    assert "$isNewManagedPath = $relative -cin $authorizedNewManagedPaths -and -not $managed.ContainsKey($relative)" in source
     assert "if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath)" in source
-    assert "NewManagedPaths @('src/scrubbots_pixel_factory/pixellab_pro_atlas.py')" in source
+    assert "NewManagedPaths $authorizedNewManagedPaths" in source
     assert "if ($relative -cnotin $authorizedOverlayAdditions) { throw \"Installed overlay allowlist does not include: $relative\" }" in source
 
 

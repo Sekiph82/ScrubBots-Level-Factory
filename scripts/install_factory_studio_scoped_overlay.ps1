@@ -10,6 +10,12 @@ $canonicalOrigin = 'https://github.com/Sekiph82/ScrubBots-Level-Factory.git'
 $runtimeRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\ScrubBots Factory Studio'
 $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
 Import-Module (Join-Path $PSScriptRoot 'scoped_overlay_transaction.psm1') -Force
+$authorizedNewManagedPaths = @(
+    'src/scrubbots_pixel_factory/owner_art_storage.py',
+    'src/scrubbots_pixel_factory/owner_folder_batch.py',
+    'src/scrubbots_pixel_factory/owner_release_library.py',
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+)
 $relativePaths = @(
 	'level_factory/scripts/factory_core_launcher.py',
     'level_factory/scripts/factory_studio_exact_ui.gd',
@@ -29,6 +35,9 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
     'src/scrubbots_pixel_factory/alpix_batch.py',
+	'src/scrubbots_pixel_factory/owner_art_storage.py',
+	'src/scrubbots_pixel_factory/owner_folder_batch.py',
+	'src/scrubbots_pixel_factory/owner_release_library.py',
     'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
 )
 $authorizedOverlayAdditions = @(
@@ -41,6 +50,9 @@ $authorizedOverlayAdditions = @(
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
     'src/scrubbots_pixel_factory/alpix_batch.py',
+	'src/scrubbots_pixel_factory/owner_art_storage.py',
+	'src/scrubbots_pixel_factory/owner_folder_batch.py',
+	'src/scrubbots_pixel_factory/owner_release_library.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
@@ -214,8 +226,7 @@ $overlayAdditions = @()
 $plan = @()
 $manifestDrift = @()
 foreach ($relative in $relativePaths) {
-    $isAtlasPath = $relative -ceq 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
-    $isNewManagedPath = $isAtlasPath -and -not $managed.ContainsKey($relative)
+    $isNewManagedPath = $relative -cin $authorizedNewManagedPaths -and -not $managed.ContainsKey($relative)
     if (-not $managed.ContainsKey($relative) -and -not $isNewManagedPath) { throw "Manifest does not own the managed target: $relative" }
     if (@($manifest.overlayPaths) -cnotcontains $relative) {
         if ($relative -cnotin $authorizedOverlayAdditions) { throw "Installed overlay allowlist does not include: $relative" }
@@ -300,5 +311,5 @@ $fileOperations = @{
         }
     }
 }
-$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -NewManagedPaths @('src/scrubbots_pixel_factory/pixellab_pro_atlas.py')
+$result = Invoke-ScopedOverlayTransaction -Plan $plan -Manifest $manifest -ManifestPath $manifestPath -TransactionRoot $transactionRoot -SourceHead $head -OverlayAdditions $overlayAdditions -Operations $fileOperations -NewManagedPaths $authorizedNewManagedPaths
 Write-ScopedOverlayOutcome -Result $result
