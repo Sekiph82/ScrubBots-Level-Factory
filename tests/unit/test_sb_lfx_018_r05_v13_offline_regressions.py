@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from types import SimpleNamespace
 from pathlib import Path
 
 from scrubbots_pixel_factory import alpix_batch
@@ -53,24 +55,23 @@ def test_alpix_discovery_accepts_enabled_plugin_and_path_cli_without_temp_files(
 
 def test_alpix_discovery_accepts_user_mcp_and_distinguishes_missing_route(monkeypatch) -> None:
     home = Path("C:/v13-fixture/profile")
-    executable = "C:/fixture-bin/claude.exe"
+    executable = str(home / ".local" / "bin" / "claude.exe")
     global_config = home / ".claude.json"
     monkeypatch.setenv("USERPROFILE", str(home))
-    executable = "C:/fixture-bin/claude.exe"
     _virtual_files(monkeypatch, {str(global_config): json.dumps({
         "mcpServers": {"alpix-image-service": {"command": "node", "env": {"TOKEN": "never-return"}},
                         "other-service": {"command": "node"}},
     })}, executable)
     monkeypatch.setattr(alpix_batch.shutil, "which", lambda name: executable if name == "claude" else None)
 
-    configured = alpix_batch.discover_alpix()
+    configured = alpix_batch.discover_alpix(user_home=home)
     assert configured["available"] is True
     assert configured["plugin_id"] == "claude-user-mcp@global-config"
     assert configured["mcp_servers"] == "alpix-image-service"
     assert "never-return" not in str(configured)
 
     _virtual_files(monkeypatch, {str(global_config): json.dumps({"mcpServers": {"n8n-local": {}}})}, executable)
-    missing = alpix_batch.discover_alpix()
+    missing = alpix_batch.discover_alpix(user_home=home)
     assert missing["available"] is False
     assert missing["status"] == "ALPIX_PLUGIN_MISSING"
 
@@ -104,7 +105,7 @@ def test_alpix_discovery_reads_project_mcp_names_without_exposing_config_values(
 def test_alpix_discovery_reports_unread_project_scope_without_claiming_missing(monkeypatch) -> None:
     home = Path("C:/v13-fixture/unread-profile")
     project = Path("C:/v13-fixture/unread-project")
-    executable = "C:/fixture-bin/claude.exe"
+    executable = str(home / ".local" / "bin" / "claude.exe")
     monkeypatch.setenv("USERPROFILE", str(home))
     _virtual_files(monkeypatch, {}, executable)
     monkeypatch.setattr(alpix_batch.shutil, "which", lambda name: executable if name == "claude" else None)
@@ -117,10 +118,76 @@ def test_alpix_discovery_reports_unread_project_scope_without_claiming_missing(m
 
     monkeypatch.setattr(Path, "read_text", unread_project_scope)
 
-    result = alpix_batch.discover_alpix(project_root=project)
+    result = alpix_batch.discover_alpix(user_home=home, project_root=project)
 
     assert result["available"] is False
     assert result["status"] == "CONFIG_SCOPE_UNREAD"
+
+
+def test_alpix_discovery_recognizes_account_synced_claude_ai_connector(monkeypatch) -> None:
+    home = Path("C:/account-sync-profile")
+    executable = str(home / ".local" / "bin" / "claude.exe")
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    _virtual_files(monkeypatch, {}, executable)
+    monkeypatch.setattr(alpix_batch.shutil, "which", lambda name: executable if name == "claude" else None)
+    calls = []
+    probe = alpix_batch._discover_account_synced_alpix
+
+    def runner(args, **kwargs):
+        calls.append((args, kwargs))
+        return SimpleNamespace(
+            returncode=0,
+            stdout="claude.ai Alpix:\n  Scope: claude.ai config\n  Status: √ Connected\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(alpix_batch, "_discover_account_synced_alpix",
+                        lambda path: probe(path, runner=runner))
+    result = alpix_batch.discover_alpix()
+
+    assert result["available"] is True
+    assert result["status"] == "ALPIX_AVAILABLE_DISCOVERY_ONLY"
+    assert result["session_status"] == "CLAUDEAI_CONNECTOR_CONNECTED"
+    assert result["plugin_id"] == "claude.ai connector"
+    assert result["mcp_servers"] == "claude.ai Alpix"
+    assert result["route_scope"] == "claude.ai config"
+    assert result["route_kind"] == "claude.ai_connector"
+    assert "capabilities and usage-limit health are not probed" in result["reason"]
+    assert calls[0][0] == [executable, "mcp", "get", "claude.ai Alpix"]
+    assert calls[0][1]["timeout"] == 10
+
+
+def test_alpix_discovery_does_not_claim_missing_when_account_route_probe_fails(monkeypatch) -> None:
+    home = Path("C:/account-sync-profile")
+    executable = str(home / ".local" / "bin" / "claude.exe")
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    _virtual_files(monkeypatch, {}, executable)
+    monkeypatch.setattr(alpix_batch.shutil, "which", lambda name: executable if name == "claude" else None)
+    monkeypatch.setattr(alpix_batch, "_discover_account_synced_alpix",
+                        lambda _path: {"state": "unverified", "reason": "offline fixture"})
+
+    result = alpix_batch.discover_alpix()
+
+    assert result["available"] is False
+    assert result["status"] == "ALPIX_SYNC_UNVERIFIED"
+    assert "offline fixture" in result["reason"]
+
+
+def test_account_synced_alpix_probe_reports_authentication_required() -> None:
+    def runner(_args, **_kwargs):
+        return SimpleNamespace(
+            returncode=0,
+            stdout="claude.ai Alpix:\n  Scope: claude.ai config\n  Status: ! Needs authentication\n",
+            stderr="",
+        )
+
+    result = alpix_batch._discover_account_synced_alpix("C:/fixture/claude.exe", runner=runner)
+
+    assert result is not None
+    assert result["state"] == "auth_required"
+    assert "needs authentication" in result["reason"].lower()
 
 
 def test_alpix_discovery_applies_project_plugin_enablement(monkeypatch) -> None:

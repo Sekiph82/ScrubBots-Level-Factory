@@ -49,6 +49,65 @@ def find_claude(*, user_home: Path | None = None) -> str | None:
     return None
 
 
+def _discover_account_synced_alpix(
+    executable: str,
+    *,
+    runner: Callable[..., object] | None = None,
+) -> dict[str, object] | None:
+    """Probe Claude Code's account-synced Alpix connector without invoking tools."""
+    run = runner or subprocess.run
+    try:
+        completed = run(
+            [executable, "mcp", "get", "claude.ai Alpix"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return {
+            "state": "unverified",
+            "reason": "Claude Code did not finish the read-only Alpix connector status check.",
+        }
+    except OSError:
+        return {
+            "state": "unverified",
+            "reason": "Claude Code could not run the read-only Alpix connector status check.",
+        }
+
+    output = "\n".join((str(getattr(completed, "stdout", "")), str(getattr(completed, "stderr", ""))))
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if not any(line.casefold() == "claude.ai alpix:" for line in lines):
+        if int(getattr(completed, "returncode", 1)) != 0 and "not found" not in output.casefold():
+            return {
+                "state": "unverified",
+                "reason": "Claude Code could not verify the account-synced Alpix connector.",
+            }
+        return None
+
+    scope = next((line.split(":", 1)[1].strip() for line in lines if line.casefold().startswith("scope:")), "")
+    status = next((line.split(":", 1)[1].strip() for line in lines if line.casefold().startswith("status:")), "")
+    if scope.casefold() != "claude.ai config":
+        return None
+    if "connected" in status.casefold():
+        return {
+            "state": "connected",
+            "plugin_id": "claude.ai connector",
+            "mcp_servers": "claude.ai Alpix",
+            "route_scope": scope,
+            "reason": "Claude Code reports the account-synced Alpix connector connected; its drawing/export tools are not yet verified.",
+        }
+    if "authentication" in status.casefold() or "auth" in status.casefold():
+        return {
+            "state": "auth_required",
+            "reason": "Claude Code sees the account-synced Alpix connector, but it needs authentication.",
+        }
+    return {
+        "state": "unverified",
+        "reason": "Claude Code sees the account-synced Alpix connector but did not report it connected.",
+    }
+
+
 def discover_alpix(*, user_home: Path | None = None,
                   project_root: Path | None = None) -> dict[str, object]:
     """Discover an enabled Alpix plugin and its configured MCP identity.
@@ -150,7 +209,23 @@ def discover_alpix(*, user_home: Path | None = None,
     if active is None and global_mcp_names:
         active = {"plugin_id": "claude-user-mcp@global-config", "enabled": "true",
                   "mcp_servers": ",".join(sorted(set(global_mcp_names)))}
+    account_route = None
+    if active is None and user_home is None and not scope_unread and not scope_invalid:
+        account_route = _discover_account_synced_alpix(executable)
+        if account_route and account_route.get("state") == "connected":
+            active = {
+                "plugin_id": str(account_route["plugin_id"]),
+                "mcp_servers": str(account_route["mcp_servers"]),
+                "route_scope": str(account_route["route_scope"]),
+                "route_kind": "claude.ai_connector",
+            }
     if active is None:
+        if account_route and account_route.get("state") == "auth_required":
+            return {"available": False, "status": "ALPIX_AUTH_REQUIRED",
+                    "reason": str(account_route["reason"])}
+        if account_route and account_route.get("state") == "unverified":
+            return {"available": False, "status": "ALPIX_SYNC_UNVERIFIED",
+                    "reason": str(account_route["reason"])}
         if scope_unread:
             return {"available": False, "status": "CONFIG_SCOPE_UNREAD",
                     "reason": "CONFIG_SCOPE_UNREAD: one or more Claude configuration scopes could not be read; ALPIX availability is unknown."}
@@ -159,9 +234,11 @@ def discover_alpix(*, user_home: Path | None = None,
                     "reason": "ALPIX_INVALID_CONFIG: a Claude configuration scope contains invalid JSON or a non-object value."}
         return {"available": False, "status": "ALPIX_PLUGIN_MISSING",
                 "reason": "ALPIX_PLUGIN_MISSING: Claude Code is installed, but no enabled ALPIX plugin/MCP server was found in the current user configuration."}
+    account_synced = active.get("route_kind") == "claude.ai_connector"
     return {"available": True, "status": "ALPIX_AVAILABLE_DISCOVERY_ONLY",
-            "session_status": "CLAUDE_SESSION_UNVERIFIED",
-            "reason": "ALPIX MCP route is configured. Claude session authentication is not probed; usage-limit health is not probed.",
+            "session_status": "CLAUDEAI_CONNECTOR_CONNECTED" if account_synced else "CLAUDE_SESSION_UNVERIFIED",
+            "reason": ("Claude Code reports the account-synced Alpix MCP connector connected; drawing/export capabilities and usage-limit health are not probed."
+                       if account_synced else "ALPIX MCP route is configured. Claude session authentication is not probed; usage-limit health is not probed."),
             "executable": executable, **active}
 
 
@@ -186,9 +263,14 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     output.parent.mkdir(parents=True, exist_ok=True)
     if output.exists():
         raise FileExistsError("Alpix output identity already exists.")
-    task = (f"Use the installed Claude Code plugin {plugin_id!r} and its configured MCP server(s) "
-            f"{mcp_servers!r} to draw exactly one native-resolution pixel-art PNG. "
-            f"Owner prompt: {prompt.strip()}\nRequested dimensions: {width}x{height}. "
+    if identity.get("route_kind") == "claude.ai_connector":
+        route_instruction = (f"Use the account-synced Claude Code MCP connector {mcp_servers!r} "
+                             f"(scope {identity.get('route_scope', 'claude.ai config')!r}) to draw exactly one native-resolution pixel-art PNG. ")
+    else:
+        route_instruction = (f"Use the installed Claude Code plugin {plugin_id!r} and its configured MCP server(s) "
+                             f"{mcp_servers!r} to draw exactly one native-resolution pixel-art PNG. ")
+    task = (route_instruction
+            + f"Owner prompt: {prompt.strip()}\nRequested dimensions: {width}x{height}. "
             f"Save the PNG bytes at this exact path: {str(output)}. Do not resize after drawing, "
             "do not create a prompt plan, and report completion only after the file exists.")
     child_env = os.environ.copy()
