@@ -154,15 +154,25 @@ if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -ceq '0f4b7f0319d68278
 }
 elseif ($manifestSha256 -cin @(
     'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122',
-    '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82'
+    '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82',
+    '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5'
 )) {
-    # These two exact manifests are prior successful V05 overlays. Permit a
+    # These exact manifests are prior successful V05 overlays. Permit a
     # repeat only when the latest UI receipt and the historic verify.py plus
     # atlas-addition receipts prove the exact chain and writer exclusion.
     $priorReceipt = @($manifest.overlayReceipts)[-1]
     $atlasPath = 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
-    $priorReceiptHead = if ($manifestSha256 -ceq 'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122') { 'ee51d899df149cb559184f4617537e1e6cb7dc6e' } else { '1a8e7d435eb55601b2eaa37371109e753f4852fd' }
-    $priorUiHash = if ($priorReceiptHead -ceq 'ee51d899df149cb559184f4617537e1e6cb7dc6e') { 'ebe91efa47224520c3de97139638916c492b68b94db7612c76bdfa023c5208d2' } else { 'f39f0324e704d636e21d4aab9d83b527b790f2a0c2b0eab7861472b745653e66' }
+    $priorReceiptHead = switch ($manifestSha256) {
+        'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122' { 'ee51d899df149cb559184f4617537e1e6cb7dc6e'; break }
+        '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82' { '1a8e7d435eb55601b2eaa37371109e753f4852fd'; break }
+        '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5' { 'deb2a96ca8c54413c4a0fcad365eb0e2864f9147'; break }
+        default { throw 'Installed manifest digest was not matched to a known V05 source receipt.' }
+    }
+    $priorUiHash = switch ($priorReceiptHead) {
+        'ee51d899df149cb559184f4617537e1e6cb7dc6e' { 'ebe91efa47224520c3de97139638916c492b68b94db7612c76bdfa023c5208d2'; break }
+        '1a8e7d435eb55601b2eaa37371109e753f4852fd' { 'f39f0324e704d636e21d4aab9d83b527b790f2a0c2b0eab7861472b745653e66'; break }
+        'deb2a96ca8c54413c4a0fcad365eb0e2864f9147' { 'e4a64f70ace7a18b080d8453e09573b1f4cac4e3bb6d79194c96150c61c0ac4b'; break }
+    }
     $priorUiReceipt = @($priorReceipt.files | Where-Object { $_.path -ceq 'level_factory/scripts/factory_studio_exact_ui.gd' -and $_.sha256 -ceq $priorUiHash })
     if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
         $priorReceipt.sourceCommit -cne $priorReceiptHead -or
