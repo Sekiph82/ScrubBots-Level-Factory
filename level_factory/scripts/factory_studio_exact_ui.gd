@@ -426,6 +426,7 @@ func _apply_responsive_layout() -> void:
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
 	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
 	_layout_release_pool_dashboard(left_scale, right_start, float(geometry.get("right_width", 313.0)), scale_y)
+	_layout_pixellab_details_artwork_gap()
 
 
 func _layout_batch_issue_panel() -> void:
@@ -444,6 +445,48 @@ func _layout_batch_issue_panel() -> void:
 		return
 	const BATCH_ISSUES_GAP := 38.0
 	_batch_issue_panel.offset_top = upper_section_bottom - details.position.y + BATCH_ISSUES_GAP
+
+
+func _layout_pixellab_details_artwork_gap() -> void:
+	if _screen != "PIXEL ART" or _provider_model != "PIXELLAB":
+		return
+	var details := get_node_or_null("RuntimeLiveData") as RichTextLabel
+	var first_artwork := get_node_or_null("ArtworkVariation1") as Control
+	var carousel := get_node_or_null("ArtworkCarouselLeft") as Control
+	if details == null or first_artwork == null or carousel == null:
+		return
+	const DETAILS_ARTWORK_GAP := 38.0
+	var scale_y := float(responsive_geometry(size).get("scale_y", 1.0))
+	var artwork_action_gap := 44.0 * scale_y
+	var action_separation := 6.0 * scale_y
+	var carousel_clearance := 12.0 * scale_y
+	var actions: Array[Control] = []
+	for control_name in ["Regenerate", "EditPrompt", "AddToLevelFactory"]:
+		var action := get_node_or_null(control_name) as Control
+		if action == null:
+			return
+		actions.append(action)
+	var stack_height := first_artwork.size.y + artwork_action_gap + actions[0].size.y + action_separation + actions[1].size.y + action_separation + actions[2].size.y + carousel_clearance
+	var max_details_height := maxf(0.0, carousel.position.y - details.position.y - DETAILS_ARTWORK_GAP - stack_height)
+	details.fit_content = false
+	details.custom_maximum_size.x = details.size.x
+	details.update_minimum_size()
+	var content_height := maxf(0.0, details.get_content_height())
+	var viewport_height := minf(content_height, max_details_height)
+	details.size.y = viewport_height
+	details.scroll_active = content_height > viewport_height + 0.5
+	var artwork_top := details.position.y + viewport_height + DETAILS_ARTWORK_GAP
+	var first_artwork_base: Dictionary = _responsive_base.get(first_artwork.get_instance_id(), {})
+	var artwork_base_y := float(first_artwork_base.get("position", first_artwork.position).y) * scale_y
+	var artwork_delta := artwork_top - artwork_base_y
+	for index in range(3):
+		var card := get_node_or_null("ArtworkVariation%d" % (index + 1)) as Control
+		if card != null:
+			var card_base: Dictionary = _responsive_base.get(card.get_instance_id(), {})
+			card.position.y = float(card_base.get("position", card.position).y) * scale_y + artwork_delta
+	for index in range(actions.size()):
+		var action_base: Dictionary = _responsive_base.get(actions[index].get_instance_id(), {})
+		actions[index].position.y = float(action_base.get("position", actions[index].position).y) * scale_y + artwork_delta
 
 
 func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -> void:
@@ -1516,6 +1559,7 @@ func _refresh_live_data() -> void:
 	_refresh_runtime_cards()
 	_refresh_batch_issue_panel()
 	_refresh_selected_size_value()
+	_layout_pixellab_details_artwork_gap()
 
 
 func _ensure_canonical_palette_loaded() -> void:
@@ -4153,7 +4197,10 @@ func _choose_size() -> void:
 func _choose_provider() -> void:
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Provider"
+	dialog.min_size = Vector2i(680, 420)
 	var choice := OptionButton.new()
+	choice.custom_minimum_size = Vector2(0, 42)
+	choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var result := _extension("provider-options", {})
 	var options: Array = result.get("providers", [])
 	var names: Array[String] = []
@@ -4178,14 +4225,28 @@ func _choose_provider() -> void:
 	if selected < 0: selected = provider_ids.find("ALPIX (Claude)")
 	if selected < 0: selected = 0
 	if not names.is_empty(): choice.select(selected)
-	dialog.add_child(choice)
+	var content := VBoxContainer.new()
+	content.name = "ProviderDialogContent"
+	content.custom_minimum_size = Vector2(560, 220)
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_theme_constant_override("separation", 12)
+	content.add_child(choice)
+	var reason_scroll := ScrollContainer.new()
+	reason_scroll.name = "ProviderStatusScroll"
+	reason_scroll.custom_minimum_size = Vector2(0, 150)
+	reason_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	reason_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	reason_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	reason_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
 	var status_label := Label.new()
 	status_label.name = "ProviderStatusReason"
-	status_label.custom_minimum_size = Vector2(520, 72)
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.add_theme_font_size_override("font_size", 12)
 	status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No active provider status was returned."))
-	dialog.add_child(status_label)
+	reason_scroll.add_child(status_label)
+	content.add_child(reason_scroll)
+	dialog.add_child(content)
 	choice.item_selected.connect(func(index: int):
 		var selected_id := str(choice.get_item_metadata(index))
 		status_label.text = str(reasons_by_id.get(selected_id, "No provider status was returned."))
@@ -4231,7 +4292,7 @@ func _choose_provider() -> void:
 		dialog.queue_free()
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
-	add_child(dialog); dialog.popup_centered()
+	add_child(dialog); dialog.popup_centered(Vector2i(680, 420))
 
 
 func _provider_status_for(provider_id: String) -> Dictionary:

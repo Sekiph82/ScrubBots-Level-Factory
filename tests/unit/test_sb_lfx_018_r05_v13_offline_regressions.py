@@ -737,3 +737,28 @@ def test_owner_release_ready_verification_requires_exact_source_run_entry(monkey
     monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [bad])
     with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
         owner_release_library._verified_ready_entry(source_id, "run-exact")
+
+
+def test_pixellab_provider_dialog_uses_non_overlapping_scrollable_vertical_layout() -> None:
+    ui = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    dialog = ui.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
+    assert "dialog.min_size = Vector2i(680, 420)" in dialog
+    assert 'content.name = "ProviderDialogContent"' in dialog
+    assert 'reason_scroll.name = "ProviderStatusScroll"' in dialog
+    assert "reason_scroll.add_child(status_label)" in dialog
+    assert "content.add_child(choice)" in dialog and "content.add_child(reason_scroll)" in dialog
+    assert "dialog.add_child(content)" in dialog
+    assert "dialog.add_child(status_label)" not in dialog
+    assert "dialog.popup_centered(Vector2i(680, 420))" in dialog
+
+
+def test_pixellab_details_gallery_spacing_is_fixed_and_alpix_is_unmodified_by_helper() -> None:
+    ui = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    layout = ui.split("func _layout_pixellab_details_artwork_gap() -> void:", 1)[1].split("func _layout_level_factory_thumbnail_dock", 1)[0]
+    assert 'if _screen != "PIXEL ART" or _provider_model != "PIXELLAB":' in layout
+    assert "const DETAILS_ARTWORK_GAP := 38.0" in layout
+    assert "details.get_content_height()" in layout
+    assert "details.scroll_active = content_height > viewport_height + 0.5" in layout
+    assert "artwork_top := details.position.y + viewport_height + DETAILS_ARTWORK_GAP" in layout
+    assert "card.position.y = float(card_base.get(\"position\", card.position).y) * scale_y + artwork_delta" in layout
+    assert "actions[index].position.y = float(action_base.get(\"position\", actions[index].position).y) * scale_y + artwork_delta" in layout
