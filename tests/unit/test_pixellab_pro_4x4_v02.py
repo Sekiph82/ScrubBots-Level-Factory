@@ -78,6 +78,7 @@ def _runtime_sandbox():
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test output: {root}")
     root.mkdir()
+    (root / "repo").mkdir()
     try:
         yield root
     finally:
@@ -374,6 +375,7 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test output: {root}")
     root.mkdir()
+    sandbox_repo.mkdir()
     try:
         monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)

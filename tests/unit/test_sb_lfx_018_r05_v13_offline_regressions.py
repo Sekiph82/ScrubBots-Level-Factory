@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import shutil
 import subprocess
 from types import SimpleNamespace
 from pathlib import Path
+import pytest
 
 from scrubbots_pixel_factory import alpix_batch
+from scrubbots_pixel_factory import owner_art_storage
 from scrubbots_pixel_factory import studio_extensions
 
 
@@ -304,3 +308,125 @@ def test_batch_issues_panel_starts_below_level_factory_details() -> None:
     assert "button.position.y + button.size.y" in layout
     assert "const BATCH_ISSUES_GAP := 38.0" in layout
     assert "upper_section_bottom - details.position.y + BATCH_ISSUES_GAP" in layout
+
+
+def test_owner_art_folder_contract_uses_exact_owner_spelling() -> None:
+    root = Path(__file__).resolve().parents[2]
+    paths = owner_art_storage.owner_art_paths(root)
+
+    assert paths["input"] == root / "data/input"
+    assert paths["alpix"] == root / "data/output/Alpix"
+    assert paths["pixellab_grid_files"] == root / "data/output/Pixellab/Grid Files"
+    assert paths["pixellab_final"] == root / "data/output/Pixellab/Final"
+    assert paths["owner_suggestions"] == root / "data/output/Owner Suggestions"
+    assert paths["pending"] == root / "data/Release Pool/Pending"
+    assert paths["ready"] == root / "data/Release Pool/Ready"
+    assert paths["failed"] == root / "data/Release Pool/Failed"
+    assert paths["rejected"] == root / "data/Release Pool/Rejected"
+
+
+def test_owner_art_archivers_reject_invalid_inputs_before_filesystem_access(monkeypatch) -> None:
+    def forbidden_layout(*_args, **_kwargs):
+        pytest.fail("invalid artifact must be rejected before creating owner folders")
+
+    monkeypatch.setattr(owner_art_storage, "ensure_owner_art_layout", forbidden_layout)
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="manifest schema"):
+        owner_art_storage.archive_pixellab_export("unused", {"schema": "wrong"})
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="exactly sixteen"):
+        owner_art_storage.archive_pixellab_export("unused", {
+            "schema": "scrubbots-pixellab-pro-4x4-source/v2",
+            "source_atlas_sha256": "0" * 64,
+            "source_kind": "IMPORTED_ATLAS",
+            "frames": [],
+        })
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="PNG byte stream"):
+        owner_art_storage.archive_alpix_png(b"not a png")
+
+
+def test_owner_art_outputs_route_only_through_explicit_catalog_functions() -> None:
+    root = Path(__file__).resolve().parents[2]
+    launcher = (root / "level_factory/scripts/factory_core_launcher.py").read_text(encoding="utf-8")
+    ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    ignore = (root / ".gitignore").read_text(encoding="utf-8")
+
+    assert "archive_pixellab_export(source_root, manifest)" in launcher
+    assert "archive_pixellab_export(output_directory, manifest)" in launcher
+    assert 'ensure_owner_art_layout(_repository_root())["alpix"]' in launcher
+    assert 'archive_alpix_png(raw_png, repository_root=_repository_root())' in launcher
+    csv_picker = ui.split("func _open_batch_csv() -> void:", 1)[1].split("func _process_level_csv", 1)[0]
+    assert 'globalize_path("res://../data/input")' in csv_picker
+    assert "data/output/Alpix/**" in ignore
+    assert "data/output/Pixellab/Grid Files/**" in ignore
+    assert "data/output/Pixellab/Final/**" in ignore
+    assert "data/output/Owner Suggestions/**" in ignore
+    assert "data/Release Pool/**" in ignore
+
+
+def test_owner_art_layout_and_alpix_archive_are_idempotent_and_repo_local() -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-art-storage-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        repository = root / "repo"
+        repository.mkdir(parents=True)
+        paths = owner_art_storage.ensure_owner_art_layout(repository)
+        assert all(path.is_dir() for path in paths.values())
+        raw_png = b"\x89PNG\r\n\x1a\nowner-art-storage-offline-test"
+
+        first = owner_art_storage.archive_alpix_png(raw_png, repository_root=repository)
+        second = owner_art_storage.archive_alpix_png(raw_png, repository_root=repository)
+
+        assert first == second
+        assert first.read_bytes() == raw_png
+        assert first.parent == paths["alpix"]
+        assert first.name == f"alpix-{hashlib.sha256(raw_png).hexdigest()}.png"
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner-art test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_pixellab_catalog_archives_all_sixteen_verified_slices_without_overwrite() -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-art-storage-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        repository = root / "repo"
+        source = root / "source"
+        (repository / "unused").mkdir(parents=True)
+        source.mkdir(parents=True)
+        raw_png = b"\x89PNG\r\n\x1a\nowner-art-storage-offline-test"
+        digest = hashlib.sha256(raw_png).hexdigest()
+        (source / "original-atlas.png").write_bytes(raw_png)
+        frames = []
+        for index in range(1, 17):
+            filename = f"sprite-{index:02d}.png"
+            (source / filename).write_bytes(raw_png)
+            frames.append({"index": index, "filename": filename, "sha256": digest})
+        manifest = {
+            "schema": "scrubbots-pixellab-pro-4x4-source/v2",
+            "source_atlas_sha256": digest,
+            "source_kind": "IMPORTED_ATLAS",
+            "frame_dimensions": {"width": 52, "height": 52},
+            "frames": frames,
+        }
+
+        first = owner_art_storage.archive_pixellab_export(source, manifest, repository_root=repository)
+        second = owner_art_storage.archive_pixellab_export(source, manifest, repository_root=repository)
+
+        final_paths = owner_art_storage.owner_art_paths(repository)
+        assert first == second
+        assert Path(first["atlas_path"]).parent == final_paths["pixellab_grid_files"]
+        assert len(first["slices"]) == 16
+        assert [item["index"] for item in first["slices"]] == list(range(1, 17))
+        assert all(Path(item["path"]).parent == final_paths["pixellab_final"] for item in first["slices"])
+        assert len(list(final_paths["pixellab_final"].glob("*.png"))) == 16
+        assert json.loads(Path(first["catalog_path"]).read_text(encoding="utf-8")) == {
+            key: value for key, value in first.items() if key != "catalog_path"
+        }
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner-art test output escaped its owned directory")
+            shutil.rmtree(root)

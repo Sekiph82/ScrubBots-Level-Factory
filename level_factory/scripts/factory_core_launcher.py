@@ -650,6 +650,7 @@ def _semantic_generate_pixellab_pro_4x4(
     import uuid
     from scrubbots_pixel_factory import studio_extensions as extensions
     from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
+    from scrubbots_pixel_factory.owner_art_storage import archive_pixellab_export
     from scrubbots_pixel_factory.pixellab_pro_atlas import export_frames
 
     resolved_operation_id = str(operation_id or uuid.uuid4().hex)
@@ -830,6 +831,7 @@ def _semantic_generate_pixellab_pro_4x4(
         if not _inside_output(source_root, factory_output):
             raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
         manifest = export_frames(generated.frames_png, source_root, max_colors=max_colors)
+        owner_catalog = archive_pixellab_export(source_root, manifest)
         imported_sources: list[dict[str, object]] = []
         for frame in manifest["frames"]:
             if frame["intake_status"] != "PASS":
@@ -851,6 +853,7 @@ def _semantic_generate_pixellab_pro_4x4(
             "state": final_state,
             "output_directory": str(source_root), "atlas_sha256": manifest["source_atlas_sha256"],
             "frames": manifest["frames"], "imported_sources": imported_sources,
+            "owner_catalog_path": owner_catalog["catalog_path"],
             "pass_count": pass_count, "rejected_count": rejected_count,
             "actual_usage": dict(generated.actual_usage or {}),
             "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
@@ -862,7 +865,7 @@ def _semantic_generate_pixellab_pro_4x4(
              "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
              "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
              "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
-             "path": str(source_root / frame["filename"])}
+             "path": str(owner_catalog["slices"][int(frame["index"]) - 1]["path"])}
             for frame in manifest["frames"]
         ]
         return {
@@ -872,8 +875,8 @@ def _semantic_generate_pixellab_pro_4x4(
             "width": width, "height": height, "atlas_width": width * 4, "atlas_height": height * 4,
             "max_colors": max_colors, "pass_count": pass_count, "rejected_count": rejected_count,
             "frame_statuses": statuses, "source_ids": imported_source_ids,
-            "atlas_path": str(source_root / "original-atlas.png"),
-            "manifest_path": str(source_root / "manifest.json"),
+            "atlas_path": str(owner_catalog["atlas_path"]),
+            "manifest_path": str(owner_catalog["catalog_path"]),
             "actual_usage": dict(generated.actual_usage or {}),
         }
     except extensions.ProFlashError as exc:
@@ -934,6 +937,7 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
     """Normalize a user-selected atlas or coordinate-labelled ZIP, then always slice."""
     import uuid
     from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.owner_art_storage import archive_pixellab_export
     from scrubbots_pixel_factory.pixellab_pro_atlas import export_atlas, export_photopea_zip
 
     if set(request) - {"path", "max_colors"}:
@@ -957,6 +961,7 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
         if source_path.suffix.lower() == ".zip"
         else export_atlas(raw, output_directory, max_colors=max_colors)
     )
+    owner_catalog = archive_pixellab_export(output_directory, manifest)
     imported_sources: list[dict[str, object]] = []
     for frame in manifest["frames"]:
         if frame["intake_status"] != "PASS":
@@ -974,15 +979,16 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
         "operation": STUDIO_EXTENSION_OPERATION,
         "state": "SOURCES_IMPORTED_NOT_READY" if source_ids else "SOURCE_IMPORT_FAILED" if pass_count else "FRAMES_REJECTED",
         "source_kind": manifest["source_kind"], "output_directory": str(output_directory),
-        "atlas_path": str(output_directory / "original-atlas.png"),
-        "manifest_path": str(output_directory / "manifest.json"),
+        "atlas_path": str(owner_catalog["atlas_path"]),
+        "manifest_path": str(owner_catalog["catalog_path"]),
+        "owner_catalog_path": str(owner_catalog["catalog_path"]),
         "frame_statuses": [
             {"index": frame["index"], "intake_status": frame["intake_status"], "reasons": frame["reasons"],
              "width": frame["width"], "height": frame["height"],
              "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
              "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
              "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
-             "path": str(output_directory / frame["filename"])}
+             "path": str(owner_catalog["slices"][int(frame["index"]) - 1]["path"])}
             for frame in manifest["frames"]
         ],
         "source_ids": source_ids, "pass_count": pass_count, "rejected_count": 16 - pass_count,
@@ -1056,8 +1062,22 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
         item = items[0] if isinstance(items, list) and items else {}
         return item if isinstance(item, Mapping) else {}
 
-    return {"operation": "alpix-csv-job", **run_csv_job(csv_path, root, renderer=render,
-        importer=import_png, default_size=(default_width, default_height)).to_dict()}
+    job_result = run_csv_job(csv_path, root, renderer=render,
+        importer=import_png, default_size=(default_width, default_height))
+    from scrubbots_pixel_factory.owner_art_storage import archive_alpix_png
+    rows: list[dict[str, object]] = []
+    for row_value in job_result.rows:
+        row = dict(row_value)
+        artifact_path = row.get("artifact_path")
+        expected_sha = row.get("artifact_sha256")
+        if row.get("state") in {"DRAWN", "VALIDATED", "IMPORTED"} and isinstance(artifact_path, str):
+            artifact = Path(artifact_path)
+            raw_png = artifact.read_bytes()
+            if not isinstance(expected_sha, str) or hashlib.sha256(raw_png).hexdigest() != expected_sha:
+                raise ValueError("ALPIX CSV artifact changed before owner-catalog archival")
+            row["owner_catalog_path"] = str(archive_alpix_png(raw_png, repository_root=_repository_root()))
+        rows.append(row)
+    return {"operation": "alpix-csv-job", **job_result.to_dict(), "rows": rows}
 def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
     """Delegate to the existing Magnific adapter's truthful prepare/import contract."""
     from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest
@@ -1081,16 +1101,15 @@ def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
 
 
 def _alpix_output_path(raw: object) -> Path:
-    factory_output = (_repository_root() / "level_factory" / "output").resolve()
-    root = (factory_output / "alpix-generated").resolve()
-    root.mkdir(parents=True, exist_ok=True)
+    from scrubbots_pixel_factory.owner_art_storage import ensure_owner_art_layout
+    root = ensure_owner_art_layout(_repository_root())["alpix"].resolve()
     if raw is None or not str(raw).strip():
         import uuid
         target = root / f"alpix-{uuid.uuid4().hex}.png"
     else:
         target = Path(_text(raw, "output_path")).resolve()
-    if not _inside_output(target, factory_output) or target.suffix.lower() != ".png":
-        raise ValueError("ALPIX output must be a PNG inside Factory output")
+    if not _inside_output(target, root) or target.suffix.lower() != ".png":
+        raise ValueError("ALPIX output must be a PNG inside data/output/Alpix")
     return target
 
 

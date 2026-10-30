@@ -25,6 +25,21 @@ output/*
 level_factory/output/*
 !level_factory/output/.gitkeep
 
+# Owner-local artwork catalog and Release Pool records are runtime data.
+# Keep source code/tests visible; only these explicit data roots are ignored.
+data/input/*.csv
+data/output/Alpix/**
+!data/output/Alpix/.gitkeep
+data/output/Pixellab/Grid Files/**
+!data/output/Pixellab/Grid Files/.gitkeep
+data/output/Pixellab/Final/**
+!data/output/Pixellab/Final/.gitkeep
+data/output/Pixellab/atlas-*.json
+data/output/Owner Suggestions/**
+!data/output/Owner Suggestions/.gitkeep
+data/Release Pool/**
+!data/Release Pool/.gitkeep
+
 # Runtime logs and temporary WFC/cache material
 logs/
 *.log

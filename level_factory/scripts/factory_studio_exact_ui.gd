@@ -2105,6 +2105,9 @@ func _open_batch_csv() -> void:
 	if _file_dialog == null:
 		return
 	_file_selection_action = "PIXEL_ART_BATCH"
+	var input_directory := ProjectSettings.globalize_path("res://../data/input")
+	if DirAccess.dir_exists_absolute(input_directory):
+		_file_dialog.current_dir = input_directory
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	_file_dialog.title = "Select artwork batch CSV"
 	_file_dialog.clear_filters()
