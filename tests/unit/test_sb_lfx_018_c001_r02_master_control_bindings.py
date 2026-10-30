@@ -128,3 +128,14 @@ def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_so
     assert '"column_count": int(row[col_index])' in csv
     assert '"background_intent": _background_intent' in multiple
     assert '"background_intent": row[bg_index]' in csv
+
+
+def test_level_factory_multi_png_picker_stays_multi_when_pixellab_is_selected() -> None:
+    picker = UI.split("func _open_files(multiple: bool) -> void:", 1)[1].split("func _open_batch_csv", 1)[0]
+    multi_callback = UI.split("func _on_files_selected(paths: PackedStringArray) -> void:", 1)[1].split("func _import_pro_4x4_source", 1)[0]
+    assert "_place_control(\"SelectArtwork\", Rect2(42, 165, 95, 100), _open_files.bind(true))" in UI
+    assert "FileDialog.FILE_MODE_OPEN_FILES if multiple else FileDialog.FILE_MODE_OPEN_FILE" in picker
+    assert "FILE_MODE_OPEN_FILE if pro_atlas or not multiple" not in picker
+    assert 'paths.size() == 1' in multi_callback and "_import_pro_4x4_source(str(paths[0]))" in multi_callback
+    assert "_import_pngs(Array(paths))" in multi_callback
+    assert "paths.size() != 1" not in multi_callback

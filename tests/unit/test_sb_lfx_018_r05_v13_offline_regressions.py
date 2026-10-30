@@ -289,3 +289,18 @@ def test_v13_live_ui_and_batch_guards_remain_source_bound() -> None:
     assert '"GenerationStyle"' not in ui and '_generation_style' not in ui
     assert '"Selected Size\\n%d × %d px%s"' in ui
     assert "Saved batch lookup could not be prepared" in ui
+
+
+def test_batch_issues_panel_starts_below_level_factory_details() -> None:
+    root = Path(__file__).resolve().parents[2]
+    ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    panel = ui.split("func _build_batch_issue_panel() -> void:", 1)[1].split("func _refresh_batch_issue_panel()", 1)[0]
+    layout = ui.split("func _layout_batch_issue_panel() -> void:", 1)[1].split("func _layout_level_factory_thumbnail_dock", 1)[0]
+
+    assert "details.add_child(_batch_issue_panel)" in panel
+    assert "_batch_issue_panel.offset_top = 286" in panel
+    assert "_batch_issue_panel.offset_top = 0" not in panel
+    assert '"PreviewReplay", "ExpandSupplyPlan", "SolveAgain", "AcceptLevel", "RejectLevel"' in layout
+    assert "button.position.y + button.size.y" in layout
+    assert "const BATCH_ISSUES_GAP := 38.0" in layout
+    assert "upper_section_bottom - details.position.y + BATCH_ISSUES_GAP" in layout

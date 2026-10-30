@@ -394,6 +394,7 @@ func _apply_responsive_layout() -> void:
 	if bottom_panel != null:
 		bottom_panel.position.y = bottom_y
 		bottom_panel.size.y = dock_height
+	_layout_batch_issue_panel()
 	if center_panel != null:
 		center_panel.size.x = maxf(300.0, right_start - center_start - 16.0)
 		center_panel.size.y = maxf(220.0, bottom_y - main_top - 12.0 * scale_y)
@@ -419,6 +420,24 @@ func _apply_responsive_layout() -> void:
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
 	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
 	_layout_release_pool_dashboard(left_scale, right_start, float(geometry.get("right_width", 313.0)), scale_y)
+
+
+func _layout_batch_issue_panel() -> void:
+	if _batch_issue_panel == null:
+		return
+	var details := get_node_or_null("RuntimeDetailsPanel") as Control
+	if details == null:
+		return
+	var upper_section_bottom := -INF
+	for node_name in ["PreviewReplay", "ExpandSupplyPlan", "SolveAgain", "AcceptLevel", "RejectLevel"]:
+		var button := get_node_or_null(node_name) as Control
+		if button == null or not button.visible:
+			continue
+		upper_section_bottom = maxf(upper_section_bottom, button.position.y + button.size.y)
+	if not is_finite(upper_section_bottom):
+		return
+	const BATCH_ISSUES_GAP := 38.0
+	_batch_issue_panel.offset_top = upper_section_bottom - details.position.y + BATCH_ISSUES_GAP
 
 
 func _layout_level_factory_thumbnail_dock(center_scale: float, scale_y: float) -> void:
@@ -748,14 +767,13 @@ func _build_batch_issue_panel() -> void:
 		return
 	_batch_issue_panel = PanelContainer.new()
 	_batch_issue_panel.name = "BatchIssuesPanel"
-	_batch_issue_panel.position = Vector2(12, 286)
 	_batch_issue_panel.anchor_left = 0.0
 	_batch_issue_panel.anchor_right = 1.0
 	_batch_issue_panel.anchor_top = 0.0
 	_batch_issue_panel.anchor_bottom = 1.0
 	_batch_issue_panel.offset_left = 0
 	_batch_issue_panel.offset_right = -24
-	_batch_issue_panel.offset_top = 0
+	_batch_issue_panel.offset_top = 286
 	_batch_issue_panel.offset_bottom = -12
 	_batch_issue_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
 	var content := VBoxContainer.new()
@@ -2074,8 +2092,8 @@ func _open_files(multiple: bool) -> void:
 		return
 	_file_selection_action = "PNG_IMPORT"
 	var pro_atlas := _provider_model == "PIXELLAB"
-	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE if pro_atlas or not multiple else FileDialog.FILE_MODE_OPEN_FILES
-	_file_dialog.title = "Select one 4×4 atlas PNG or Photopea ZIP" if pro_atlas else "Select artwork PNG"
+	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILES if multiple else FileDialog.FILE_MODE_OPEN_FILE
+	_file_dialog.title = "Select PNG artwork files (or one 4×4 atlas / Photopea ZIP)" if pro_atlas and multiple else "Select one 4×4 atlas PNG or Photopea ZIP" if pro_atlas else "Select artwork PNG files" if multiple else "Select artwork PNG"
 	_file_dialog.clear_filters()
 	_file_dialog.add_filter("*.png ; PNG image")
 	if pro_atlas:
@@ -2152,10 +2170,7 @@ func _on_file_selected(path: String) -> void:
 	_import_pngs([path])
 
 func _on_files_selected(paths: PackedStringArray) -> void:
-	if _provider_model == "PIXELLAB":
-		if paths.size() != 1:
-			_report("PixelLab Pro 4×4 intake accepts one atlas or ZIP at a time.")
-			return
+	if _provider_model == "PIXELLAB" and paths.size() == 1:
 		_import_pro_4x4_source(str(paths[0]))
 		return
 	_import_pngs(Array(paths))
