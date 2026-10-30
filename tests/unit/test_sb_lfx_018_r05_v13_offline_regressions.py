@@ -12,6 +12,7 @@ import pytest
 from scrubbots_pixel_factory import alpix_batch
 from scrubbots_pixel_factory import owner_art_storage
 from scrubbots_pixel_factory import owner_folder_batch
+from scrubbots_pixel_factory import owner_release_library
 from scrubbots_pixel_factory import owner_upload
 from scrubbots_pixel_factory import studio_extensions
 from PIL import Image
@@ -580,3 +581,159 @@ def test_concurrent_and_interrupted_owner_uploads_fail_or_reuse_without_overwrit
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("Owner-upload concurrency test escaped its owned directory")
             shutil.rmtree(root)
+
+
+def test_owner_release_library_keeps_status_history_separate_and_ready_gated(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-release-library-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+        image = BytesIO()
+        Image.new("RGBA", (32, 32), (30, 60, 90, 255)).save(image, format="PNG")
+        raw = image.getvalue()
+        source = source_dir / "frog.png"
+        source.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        source_id = "owner-upload-" + digest
+        kwargs = {"source_sha256": digest, "provider": "ALPIX", "original_source_path": str(source),
+                  "repository_root": root, "batch_id": "batch-import-test"}
+
+        pending = owner_release_library.transition(source_id, "PENDING", **kwargs)
+        repeated = owner_release_library.transition(source_id, "PENDING", **kwargs)
+        assert repeated["idempotent"] is True
+        failed = owner_release_library.transition(source_id, "FAILED", **{**kwargs, "reason": "synthetic solver timeout",
+            "pipeline_run_id": "run-first", "evidence": {"solution": {"state": "NOT_AVAILABLE"}}})
+        retried = owner_release_library.transition(source_id, "PENDING", **{**kwargs, "reason": "explicit retry",
+            "pipeline_run_id": "run-retry", "retry_of": failed["event_sha256"]})
+
+        real_ready_check = owner_release_library._verified_ready_entry
+        monkeypatch.setattr(owner_release_library, "_verified_ready_entry", lambda _source, _run: (_ for _ in ()).throw(owner_release_library.OwnerReleaseLibraryError("canonical evidence absent")))
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="canonical evidence absent"):
+            owner_release_library.transition(source_id, "READY", **{**kwargs, "pipeline_run_id": "run-retry"})
+        monkeypatch.setattr(owner_release_library, "_verified_ready_entry", real_ready_check)
+        ready_entry = {"pipeline_run_id": "run-retry", "entry_digest": "a" * 64,
+                       "pipeline_sha256": "b" * 64, "pipeline": {"disposition": "READY", "primary": {"state": "READY"}}}
+        monkeypatch.setattr(owner_release_library, "_verified_ready_entry", lambda _source, _run: ready_entry)
+        ready = owner_release_library.transition(source_id, "READY", **{**kwargs, "pipeline_run_id": "run-retry",
+            "evidence": {"solver": "synthetic canonical release-entry test"}})
+        repeat_import = owner_release_library.record_import_items({"batch_id": "batch-import-repeat",
+            "source_provider": "ALPIX", "items": [{"source_id": source_id, "source_sha256": digest,
+            "original_source_path": str(source), "disposition": "ALREADY_IMPORTED"}]}, repository_root=root)
+        assert repeat_import["records"][0]["status"] == "READY" and repeat_import["records"][0]["idempotent"] is True
+        view = owner_release_library.list_records(repository_root=root)
+        assert view["counts"] == {"FAILED": 0, "PENDING": 0, "READY": 1, "REJECTED": 0}
+        assert view["records"][0]["artifact"]["sha256"] == digest
+        assert (root / "data/Release Pool/Ready" / f"{source_id}.json").is_file()
+        assert hashlib.sha256((root / "data/Release Pool/Ready" / f"{source_id}.png").read_bytes()).hexdigest() == digest
+        assert not (root / "data/Release Pool/Pending" / f"{source_id}.json").exists()
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 4
+
+        rejected = owner_release_library.transition(source_id, "REJECTED", **{**kwargs, "reason": "owner rejected"})
+        assert rejected["status"] == "REJECTED"
+        assert not (root / "data/Release Pool/Ready" / f"{source_id}.json").exists()
+        assert not (root / "data/Release Pool/Ready" / f"{source_id}.png").exists()
+        assert (root / "data/Release Pool/Rejected" / f"{source_id}.json").is_file()
+        assert hashlib.sha256((root / "data/Release Pool/Rejected" / f"{source_id}.png").read_bytes()).hexdigest() == digest
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="REJECTED -> PENDING"):
+            owner_release_library.transition(source_id, "PENDING", **kwargs)
+        final = owner_release_library.list_records(repository_root=root)
+        assert final["counts"]["REJECTED"] == 1 and final["counts"]["READY"] == 0
+        assert final["records"][0]["retry_of"] is None
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 5
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="excluded from solver retry"):
+            owner_release_library.assert_solver_allowed([source_id], repository_root=root)
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner release library test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_release_library_concurrent_same_import_creates_one_event() -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-release-library-concurrency-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+        image = BytesIO()
+        Image.new("RGBA", (32, 32), (10, 100, 200, 255)).save(image, format="PNG")
+        raw = image.getvalue(); source = source_dir / "same.png"; source.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest(); source_id = "owner-upload-" + digest
+        request = {"source_sha256": digest, "provider": "PIXELLAB", "original_source_path": str(source), "repository_root": root}
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            values = list(pool.map(lambda _index: owner_release_library.transition(source_id, "PENDING", **request), range(8)))
+        assert sum(bool(value.get("idempotent")) for value in values) == 7
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 1
+        assert owner_release_library.list_records(repository_root=root)["counts"]["PENDING"] == 1
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner release concurrency fixture escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_release_library_refuses_to_replace_unverified_owner_projection() -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-release-library-collision-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+        image = BytesIO()
+        Image.new("RGBA", (32, 32), (70, 80, 90, 255)).save(image, format="PNG")
+        raw = image.getvalue()
+        source = source_dir / "owner.png"
+        source.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        source_id = "owner-upload-" + digest
+        root.joinpath("data/Release Pool/Pending").mkdir(parents=True)
+        projection = root / "data/Release Pool/Pending" / f"{source_id}.json"
+        projection.write_text("owner data that is not a verified archive projection", encoding="utf-8")
+        before = projection.read_bytes()
+
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="collides with an unverified"):
+            owner_release_library.transition(source_id, "PENDING", source_sha256=digest, provider="OWNER_UPLOAD",
+                original_source_path=str(source), repository_root=root)
+        assert projection.read_bytes() == before
+        assert not list((root / "data/Release Pool/.history").glob(f"{source_id}/*.json"))
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner release collision fixture escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_release_library_is_wired_without_weakening_canonical_pool() -> None:
+    launcher = Path("level_factory/scripts/factory_core_launcher.py").read_text(encoding="utf-8")
+    ui = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    canonical_pool = Path("src/scrubbots_pixel_factory/supply_pipeline/release_pool.py").read_text(encoding="utf-8")
+    assert 'operation == "owner-release-library"' in launcher
+    assert "record_import_items(payload)" in launcher
+    assert "record_batch_outcomes(completed_job)" in launcher
+    assert "assert_solver_allowed(sources)" in launcher
+    assert 'state == "REJECTED"' in ui and "cannot be sent to the solver" in ui
+    assert 'solve_again.text = "Retry Failed"' in ui
+    assert "_refresh_owner_release_library_panel()" in ui
+    assert "Keep prior loaded-batch failures visible" in ui
+    assert 'status not in ["FAILED", "REJECTED"]' in ui
+    assert 'pipeline.get("disposition") != "READY"' in canonical_pool
+    assert "canonical solver/replay/difficulty/QA and owner-eligibility evidence" in Path("src/scrubbots_pixel_factory/owner_release_library.py").read_text(encoding="utf-8")
+
+
+def test_owner_release_ready_verification_requires_exact_source_run_entry(monkeypatch) -> None:
+    from scrubbots_pixel_factory.supply_pipeline import release_pool
+
+    source_id = "owner-upload-" + "a" * 64
+    good = {"candidate": {"source_lineage": {"source_id": source_id}}, "pipeline_run_id": "run-exact",
+            "pipeline": {"disposition": "READY", "primary": {"state": "READY"}}}
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [good])
+    assert owner_release_library._verified_ready_entry(source_id, "run-exact") == good
+    with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
+        owner_release_library._verified_ready_entry(source_id, "different-run")
+    bad = {**good, "pipeline": {"disposition": "FAILED", "primary": {"state": "FAILED"}}}
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [bad])
+    with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
+        owner_release_library._verified_ready_entry(source_id, "run-exact")

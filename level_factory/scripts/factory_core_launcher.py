@@ -286,6 +286,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.candidate_inbox()
         elif operation == "owner-review":
             payload = extensions.record_owner_review(str(request["candidate_id"]), str(request["disposition"]), str(request.get("reason", "")), str(request.get("note", "")))
+            from scrubbots_pixel_factory.owner_release_library import record_review_outcome
+            payload["owner_release_status"] = record_review_outcome(str(request["candidate_id"]), str(request["disposition"]), payload)
         elif operation == "preset-save":
             payload = extensions.save_preset(str(request["preset_id"]), str(request["name"]), str(request["operation"]), request.get("settings", {}), str(request.get("description", "")))
         elif operation == "preset-load":
@@ -317,12 +319,16 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.list_failures()
         elif operation == "batch-import":
             payload = extensions.batch_import(request.get("paths", []))
+            from scrubbots_pixel_factory.owner_release_library import record_import_items
+            payload["owner_release_archive"] = record_import_items(payload)
         elif operation == "owner-folder-import":
             from scrubbots_pixel_factory.owner_folder_batch import import_owner_source_folder
             payload = import_owner_source_folder(
                 str(request.get("folder", "")),
                 explicit_alternative=request.get("explicit_alternative") is True,
             )
+            from scrubbots_pixel_factory.owner_release_library import record_import_items
+            payload["owner_release_archive"] = record_import_items(payload)
         elif operation == "owner-folder-preview":
             from scrubbots_pixel_factory.owner_folder_batch import scan_owner_source_folder
             payload = scan_owner_source_folder(
@@ -346,7 +352,15 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "png-batch-control":
             payload = extensions.png_batch_control(str(request["job_id"]), str(request["action"]))
         elif operation == "png-batch-run":
+            before = extensions.png_batch_status(str(request["job_id"]))
+            job = before.get("job", {}) if isinstance(before, Mapping) else {}
+            sources = [str(item.get("source_id", "")) for item in job.get("items", []) if isinstance(item, Mapping)]
+            from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
+            assert_solver_allowed(sources)
             payload = extensions.png_batch_run(str(request["job_id"]), request.get("expected_batch_id"))
+            from scrubbots_pixel_factory.owner_release_library import record_batch_outcomes
+            completed_job = payload.get("job", {}) if isinstance(payload, Mapping) else {}
+            payload["owner_release_archive"] = record_batch_outcomes(completed_job) if isinstance(completed_job, Mapping) else []
         elif operation == "session-save":
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":
@@ -354,7 +368,13 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "similarity":
             payload = extensions.similarity_canonical(str(request["left_id"]), str(request["right_id"]), float(request.get("threshold", 0.92)))
         elif operation == "pipeline":
+            if request.get("source_id"):
+                from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
+                assert_solver_allowed([str(request["source_id"])])
             payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
+            if request.get("source_id"):
+                from scrubbots_pixel_factory.owner_release_library import transition_pipeline
+                payload["owner_release_status"] = transition_pipeline(str(request["source_id"]), payload)
         elif operation == "comparison":
             payload = extensions.compare_candidates(request.get("candidate_ids", []))
         elif operation == "readiness":
@@ -363,6 +383,9 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             )
         elif operation == "cost-center":
             payload = extensions.canonical_cost_center(request.get("scope"), request.get("provider"))
+        elif operation == "owner-release-library":
+            from scrubbots_pixel_factory.owner_release_library import list_records
+            payload = list_records(str(request.get("status")) if request.get("status") else None)
         elif operation == "release-pool":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
             entries = release_entries()

@@ -60,6 +60,7 @@ var _results_run_id := ""
 var _batch_job_id := ""
 var _batch_import_id := ""
 var _batch_snapshot: Dictionary = {}
+var _owner_release_archive: Dictionary = {}
 var _batch_composite_snapshot: Dictionary = {}
 var _batch_legacy_reconciliation := false
 var _batch_job_source_mismatch := false
@@ -237,6 +238,7 @@ func _ready() -> void:
 	_build_master_controls()
 	_show_screen(_screen)
 	call_deferred("_restore_imported_sources")
+	call_deferred("_refresh_owner_release_archive")
 	_capture_responsive_layout()
 	resized.connect(_apply_responsive_layout)
 	_apply_responsive_layout()
@@ -818,6 +820,9 @@ func _refresh_batch_issue_panel() -> void:
 	if _batch_issue_panel == null or _batch_issue_rows == null:
 		return
 	_batch_issue_panel.visible = _screen == "LEVEL FACTORY"
+	if not _owner_release_archive.is_empty():
+		_refresh_owner_release_library_panel()
+		return
 	var items: Array = _batch_snapshot.get("items", [])
 	var counts_value: Variant = _batch_snapshot.get("counts", {})
 	var counts: Dictionary = counts_value if counts_value is Dictionary else {}
@@ -885,6 +890,115 @@ func _refresh_batch_issue_panel() -> void:
 		none.text = "No matching issues."
 		none.add_theme_font_size_override("font_size", 11)
 		_batch_issue_rows.add_child(none)
+
+
+func _refresh_owner_release_archive() -> void:
+	_queue_studio_read_extension("owner-release-library", {}, {"kind": "owner-release-library", "token": str(Time.get_ticks_usec())})
+
+
+func _refresh_owner_release_library_panel() -> void:
+	var records: Array = (_owner_release_archive.get("records", []) as Array).duplicate(true)
+	var known_sources := {}
+	var counts := {"PENDING": 0, "READY": 0, "FAILED": 0, "REJECTED": 0}
+	for item in records:
+		if not item is Dictionary: continue
+		known_sources[str(item.get("source_id", ""))] = true
+		var status := str(item.get("status", ""))
+		if counts.has(status): counts[status] += 1
+	# Keep prior loaded-batch failures visible until those sources are represented
+	# in the new owner archive; this does not rewrite their historic batch ledger.
+	if _batch_job_matches_loaded_sources():
+		for item_variant in _batch_snapshot.get("items", []):
+			if not item_variant is Dictionary: continue
+			var prior: Dictionary = item_variant
+			var source_id := str(prior.get("source_id", ""))
+			var status := str(prior.get("status", ""))
+			if status not in ["FAILED", "REJECTED"] or source_id in known_sources: continue
+			var legacy := {"source_id": source_id, "source_sha256": prior.get("source_sha256", ""),
+				"original_source_path": prior.get("original_source_path", ""), "status": status,
+				"reason": prior.get("reason", ""), "pipeline_run_id": prior.get("run_id", ""),
+				"evidence": {"solution": {"state": "NOT_AVAILABLE"}, "plan": {"state": "NOT_AVAILABLE"}}}
+			records.append(legacy)
+			known_sources[source_id] = true
+			counts[status] += 1
+	var total := records.size()
+	var title := _batch_issue_panel.get_node_or_null("VBoxContainer/BatchIssuesHeading") as Label
+	if title != null:
+		title.text = "OWNER ARCHIVE · %d" % total
+	if _batch_issue_tabs != null and _batch_issue_tabs.get_child_count() == 0:
+		for spec in [["ALL", "All (%d)" % total], ["FAILED", "FAILED (%d)" % int(counts.get("FAILED", 0))], ["REJECTED", "REJECTED (%d)" % int(counts.get("REJECTED", 0))]]:
+			var tab := Button.new()
+			tab.text = str(spec[1])
+			tab.disabled = str(spec[0]) == _batch_issue_filter
+			tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			tab.add_theme_font_size_override("font_size", 10)
+			tab.pressed.connect(_set_batch_issue_filter.bind(str(spec[0])))
+			_batch_issue_tabs.add_child(tab)
+	else:
+		for index in range(_batch_issue_tabs.get_child_count()):
+			var tab := _batch_issue_tabs.get_child(index) as Button
+			if tab != null:
+				tab.text = ["All (%d)" % total, "FAILED (%d)" % int(counts.get("FAILED", 0)), "REJECTED (%d)" % int(counts.get("REJECTED", 0))][index]
+				tab.disabled = ["ALL", "FAILED", "REJECTED"][index] == _batch_issue_filter
+	for child in _batch_issue_rows.get_children():
+		child.queue_free()
+	var rendered := 0
+	for item in records:
+		if not item is Dictionary:
+			continue
+		var state := str(item.get("status", ""))
+		if _batch_issue_filter != "ALL" and state != _batch_issue_filter:
+			continue
+		var path := str(item.get("original_source_path", ""))
+		var filename := path.get_file() if not path.is_empty() else str(item.get("source_id", "source"))
+		var reason := str(item.get("reason", ""))
+		var digest := str(item.get("source_sha256", "NOT_AVAILABLE"))
+		if not _batch_issue_query.is_empty() and not (filename.to_lower().contains(_batch_issue_query) or reason.to_lower().contains(_batch_issue_query) or digest.to_lower().contains(_batch_issue_query)):
+			continue
+		var button := Button.new()
+		button.text = "%s · %s\n%s" % [state, filename, reason.left(100) if not reason.is_empty() else "SHA256 " + digest.left(20)]
+		button.tooltip_text = "%s\n%s\nSHA256 %s\nRun %s\nSolution %s\nPlan %s" % [filename, state, digest, str(item.get("pipeline_run_id", "NOT_AVAILABLE")), str(item.get("evidence", {}).get("solution", {}).get("state", "NOT_AVAILABLE")), str(item.get("evidence", {}).get("plan", {}).get("state", "NOT_AVAILABLE"))]
+		button.custom_minimum_size = Vector2(0, 50)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 10)
+		button.add_theme_color_override("font_color", Color("#dce8f8"))
+		button.add_theme_stylebox_override("normal", _control_style(Color("#17243a"), Color("#30415e")))
+		button.add_theme_stylebox_override("hover", _control_style(Color("#233651"), Color("#6b8bb9")))
+		button.pressed.connect(_select_owner_archive_record.bind(item.duplicate(true)))
+		_batch_issue_rows.add_child(button)
+		rendered += 1
+	if rendered == 0:
+		var none := Label.new()
+		none.text = "No matching archived artwork."
+		none.add_theme_font_size_override("font_size", 11)
+		_batch_issue_rows.add_child(none)
+	var solve_again := get_node_or_null("SolveAgain") as Button
+	if solve_again != null:
+		var selected_status := ""
+		for item in records:
+			if item is Dictionary and str(item.get("source_id", "")) == _selected_import_source_id:
+				selected_status = str(item.get("status", ""))
+				break
+		solve_again.text = "Retry Failed" if selected_status == "FAILED" else "Solve Again"
+		solve_again.disabled = _operation_running or selected_status == "REJECTED"
+
+
+func _select_owner_archive_record(item: Dictionary) -> void:
+	var state := str(item.get("status", ""))
+	if state == "REJECTED":
+		_report("REJECTED · this source is preserved in the owner archive and cannot be sent to the solver.")
+		return
+	var source_id := str(item.get("source_id", ""))
+	if not source_id.begins_with("owner-upload-"):
+		_report("Archived source has no valid OWNER_UPLOAD identity; source selection was not changed.")
+		return
+	_select_imported_source_by_id(source_id)
+	if state == "FAILED":
+		_report("FAILED · use Retry Failed to start a new explicit run; prior outcome remains archived.")
+	else:
+		_report("%s · archived source selected; no solver was started." % state)
 
 
 func _set_batch_issue_filter(value: String) -> void:
@@ -2430,6 +2544,7 @@ func _import_pngs(paths: Array, supplied_result: Dictionary = {}) -> void:
 	_refresh_runtime_cards()
 	_refresh_live_data()
 	_report(summary)
+	_refresh_owner_release_archive()
 	if not paths.is_empty():
 		_show_import_results(paths.size(), lines)
 
@@ -3256,6 +3371,7 @@ func _complete_png_batch(result: Dictionary) -> void:
 	_refresh_release_pool(false)
 	_refresh_activity_header()
 	_refresh_live_data()
+	_refresh_owner_release_archive()
 	_refresh_run_button_caption()
 	_report(_activity_message)
 
@@ -3595,6 +3711,7 @@ func _complete_level_pipeline(result: Dictionary) -> void:
 	_refresh_live_data()
 	if still_selected:
 		_report("Pipeline %s · %s" % [backend_state, backend_reason])
+	_refresh_owner_release_archive()
 
 
 func _set_columns(columns: int) -> void:
@@ -3645,6 +3762,7 @@ func _review_candidate(disposition: String) -> void:
 		_owner_review_status = "REJECTED / EXCLUDED FROM RELEASE POOL" if readback_ok else "REJECT_RECORDED_BUT_POOL_READBACK_FAILED: %s" % str(publication.get("reason", "candidate remained in the Release Pool"))
 	_refresh_live_data()
 	_report("%s · review %s" % [_owner_review_status, str(result.get("review_id", result.get("state", "UNAVAILABLE")))])
+	_refresh_owner_release_archive()
 
 
 func _refresh_release_pool(show_status: bool = true) -> void:
@@ -3659,11 +3777,15 @@ func _queue_studio_read_extension(operation: String, request: Dictionary, contex
 		return false
 	var context_key := str(context.get("kind", ""))
 	var context_identity := context_key
+	if context_key == "owner-release-library":
+		context_identity += "|" + str(context.get("token", ""))
 	if context_key in ["restore-batch-run", "restore-selected-source", "batch-find", "batch-restore-latest"]:
 		context_identity += "|" + str(context.get("token", ""))
 	if context_key == "batch-latest" and str(context.get("job_id", "")) != _batch_job_id:
 		return false
 	var active_identity := str(_studio_read_context.get("kind", ""))
+	if active_identity == "owner-release-library":
+		active_identity += "|" + str(_studio_read_context.get("token", ""))
 	if active_identity in ["restore-batch-run", "restore-selected-source", "batch-find", "batch-restore-latest"]:
 		active_identity += "|" + str(_studio_read_context.get("token", ""))
 	if active_identity == context_identity:
@@ -3786,6 +3908,12 @@ func _poll_studio_read_extension() -> void:
 		if str(result.get("schema", "")) == "scrubbots-candidate-inbox-view" and result.get("candidates", []) is Array:
 			_candidate_inbox_cache = result
 			_refresh_runtime_cards()
+			_refresh_live_data()
+	elif kind == "owner-release-library":
+		if str(result.get("schema", "")) == "scrubbots-owner-release-library-view/v1" and result.get("records", []) is Array:
+			_owner_release_archive = result
+			_batch_issue_render_key = ""
+			_refresh_batch_issue_panel()
 			_refresh_live_data()
 	elif kind == "batch-latest":
 		_apply_batch_progress_result(result, str(context.get("job_id", "")))
