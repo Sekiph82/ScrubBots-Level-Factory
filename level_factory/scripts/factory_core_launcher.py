@@ -317,6 +317,18 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.list_failures()
         elif operation == "batch-import":
             payload = extensions.batch_import(request.get("paths", []))
+        elif operation == "owner-folder-import":
+            from scrubbots_pixel_factory.owner_folder_batch import import_owner_source_folder
+            payload = import_owner_source_folder(
+                str(request.get("folder", "")),
+                explicit_alternative=request.get("explicit_alternative") is True,
+            )
+        elif operation == "owner-folder-preview":
+            from scrubbots_pixel_factory.owner_folder_batch import scan_owner_source_folder
+            payload = scan_owner_source_folder(
+                str(request.get("folder", "")),
+                explicit_alternative=request.get("explicit_alternative") is True,
+            )
         elif operation == "batch-load":
             payload = extensions.batch_load(str(request["batch_id"]))
         elif operation == "loaded-png-batch-create":

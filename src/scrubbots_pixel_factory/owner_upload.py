@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 import re
 import stat
+import time
 
 from .semantic.normalization.core import (
     RAW_ARTIFACT_MAX_BYTES,
@@ -162,6 +163,8 @@ def _exact_text(value: object, label: str) -> str:
 def _verify_existing(destination: Path, expected: Mapping[str, object], raw: bytes) -> dict[str, object]:
     source_path = destination / OWNER_UPLOAD_FILENAME
     record_path = destination / "source.json"
+    if any(_path_is_reparse_point(path) for path in (destination, source_path, record_path)):
+        raise OwnerUploadError("content-addressed source destination contains a symlink or reparse point")
     if not source_path.is_file() or not record_path.is_file():
         raise OwnerUploadError("content-addressed source destination is incomplete")
     try:
@@ -185,6 +188,20 @@ def _verify_existing(destination: Path, expected: Mapping[str, object], raw: byt
     if record.get("source_sha256") != expected.get("source_sha256"):
         raise OwnerUploadError("existing source hash does not match the selected bytes")
     return record
+
+
+def _verify_concurrent_existing(destination: Path, expected: Mapping[str, object], raw: bytes) -> dict[str, object]:
+    """Wait briefly for an atomic competing import to finish, never overwrite it."""
+    deadline = time.monotonic() + 1.0
+    while True:
+        try:
+            return _verify_existing(destination, expected, raw)
+        except OwnerUploadError as exc:
+            if not any(marker in str(exc) for marker in ("destination is incomplete", "existing content-addressed source is unreadable")):
+                raise
+            if time.monotonic() >= deadline:
+                raise OwnerUploadError("concurrent OWNER_UPLOAD did not finish a complete immutable source record") from exc
+            time.sleep(0.01)
 
 
 def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
@@ -218,13 +235,17 @@ def import_owner_upload(source_path: str | Path) -> dict[str, object]:
         destination = owner_upload_root() / source_id
         expected = _record(source_id, source_sha256, len(raw), original_filename, width, height)
         if destination.exists():
-            record = _verify_existing(destination, expected, raw)
+            record = _verify_concurrent_existing(destination, expected, raw)
             return _result(record, "ALREADY_IMPORTED")
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.mkdir()
+        try:
+            destination.mkdir()
+        except FileExistsError:
+            record = _verify_concurrent_existing(destination, expected, raw)
+            return _result(record, "ALREADY_IMPORTED")
         (destination / OWNER_UPLOAD_FILENAME).write_bytes(raw)
         (destination / "source.json").write_bytes(_canonical_json_bytes(expected))
-        record = _verify_existing(destination, expected, raw)
+        record = _verify_concurrent_existing(destination, expected, raw)
         return _result(record, "IMPORTED")
     except OwnerUploadError as exc:
         return _error(str(exc))

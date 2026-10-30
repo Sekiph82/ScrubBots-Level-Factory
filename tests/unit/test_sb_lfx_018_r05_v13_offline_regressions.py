@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+from io import BytesIO
 import shutil
 import subprocess
 from types import SimpleNamespace
@@ -10,7 +11,11 @@ import pytest
 
 from scrubbots_pixel_factory import alpix_batch
 from scrubbots_pixel_factory import owner_art_storage
+from scrubbots_pixel_factory import owner_folder_batch
+from scrubbots_pixel_factory import owner_upload
 from scrubbots_pixel_factory import studio_extensions
+from PIL import Image
+from concurrent.futures import ThreadPoolExecutor
 
 
 def _virtual_files(monkeypatch, files: dict[str, str], executable: str) -> None:
@@ -429,4 +434,149 @@ def test_pixellab_catalog_archives_all_sixteen_verified_slices_without_overwrite
         if root.exists():
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("Owner-art test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_files() -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-folder-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        repository = root / "repo"
+        folders = owner_folder_batch.approved_owner_source_folders(repository)
+        for folder in folders.values():
+            folder.mkdir(parents=True, exist_ok=True)
+        grid = owner_art_storage.owner_art_paths(repository)["pixellab_grid_files"]
+        grid.mkdir(parents=True, exist_ok=True)
+        png_bytes = BytesIO()
+        Image.new("RGBA", (32, 32), (10, 20, 30, 255)).save(png_bytes, format="PNG")
+        for name in ("b.png", "A.PNG"):
+            (folders["ALPIX"] / name).write_bytes(png_bytes.getvalue())
+        nested = folders["ALPIX"] / "nested"
+        nested.mkdir()
+        (nested / "ignored.png").write_bytes(png_bytes.getvalue())
+        (grid / "raw-atlas.png").write_bytes(png_bytes.getvalue())
+
+        scanned = owner_folder_batch.scan_owner_source_folder(folders["ALPIX"], repository_root=repository)
+
+        assert scanned["provider"] == "ALPIX"
+        assert [Path(path).name for path in scanned["paths"]] == ["A.PNG", "b.png"]
+        assert scanned["png_count"] == 2
+        invalid = folders["ALPIX"] / "invalid.png"
+        invalid.write_bytes(b"not a PNG")
+        rescanned = owner_folder_batch.scan_owner_source_folder(folders["ALPIX"], repository_root=repository)
+        assert rescanned["png_count"] == 3
+        assert any(item.get("disposition") == "REJECTED" and item.get("display_path") == "invalid.png" for item in rescanned["entries"])
+        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="raw atlases"):
+            owner_folder_batch.scan_owner_source_folder(grid, repository_root=repository, explicit_alternative=True)
+        alternative = root / "manually-selected"
+        alternative.mkdir()
+        explicit = owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
+        assert explicit["provider"] == "OWNER_SELECTED_ALTERNATIVE"
+        for index in range(owner_folder_batch.MAX_OWNER_FOLDER_PNGS + 1):
+            (alternative / f"{index:03d}.png").write_bytes(b"")
+        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="no files were imported"):
+            owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner-folder test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-folder-dedupe-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    root.mkdir()
+    ledger = root / "ledger"
+    calls = {}
+
+    def fake_import(path):
+        raw = Path(path).read_bytes()
+        digest = hashlib.sha256(raw).hexdigest()
+        seen_before = digest in calls
+        calls[digest] = calls.get(digest, 0) + 1
+        return {
+            "state": "ALREADY_IMPORTED" if seen_before else "IMPORTED",
+            "source_id": f"owner-upload-{digest}", "source_sha256": digest,
+            "original_width": 32, "original_height": 32,
+        }
+
+    try:
+        files = [root / "one" / "same.png", root / "two" / "same.png", root / "three" / "same.png"]
+        for item in files:
+            item.parent.mkdir()
+            item.write_bytes(b"different identity" if item.parent.name == "three" else b"same valid test identity")
+        monkeypatch.setattr(studio_extensions, "extensions_root", lambda: ledger)
+        monkeypatch.setattr(studio_extensions, "import_owner_upload", fake_import)
+
+        first = studio_extensions.batch_import(files, source_provider="ALPIX", source_folder="approved")
+        second = studio_extensions.batch_import(files, source_provider="ALPIX", source_folder="approved")
+
+        assert first["items"][0]["disposition"] == "IMPORTED"
+        assert first["items"][1]["disposition"] == "SKIPPED_DUPLICATE"
+        assert first["items"][0]["filename_collision"] is True
+        assert first["items"][2]["filename_collision"] is True
+        assert first["items"][2]["source_id"] != first["items"][0]["source_id"]
+        assert first["counts"]["imported"] == 2 and first["counts"]["skipped"] == 1
+        another_folder_file = root / "four" / "same.png"
+        another_folder_file.parent.mkdir()
+        another_folder_file.write_bytes(b"different provider folder identity")
+        cross_folder = studio_extensions.batch_import([another_folder_file], source_provider="OWNER_SUGGESTIONS", source_folder="other-approved-folder")
+        assert cross_folder["items"][0]["filename_collision"] is True
+        assert cross_folder["items"][0]["collision_with_source_id"] in {
+            first["items"][0]["source_id"], first["items"][2]["source_id"],
+        }
+        assert second["counts"]["skipped"] == 3
+        assert second["items"][0]["source_sha256"] == hashlib.sha256(b"same valid test identity").hexdigest()
+        assert all(Path(item["original_source_path"]).name == "same.png" for item in second["items"])
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner-folder test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_concurrent_and_interrupted_owner_uploads_fail_or_reuse_without_overwrite(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".r10-owner-upload-concurrency-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+        image_bytes = BytesIO()
+        Image.new("RGBA", (32, 32), (44, 55, 66, 255)).save(image_bytes, format="PNG")
+        raw = image_bytes.getvalue()
+        source_path = source_dir / "same.png"
+        source_path.write_bytes(raw)
+        upload_root = root / "owner-uploads"
+        monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: upload_root)
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(lambda _index: owner_upload.import_owner_upload(source_path), range(8)))
+
+        states = [item["state"] for item in results]
+        assert states.count("IMPORTED") == 1
+        assert states.count("ALREADY_IMPORTED") == 7
+        source_id = "owner-upload-" + hashlib.sha256(raw).hexdigest()
+        assert len(list(upload_root.glob(f"{source_id}/source.png"))) == 1
+
+        interrupted_bytes = BytesIO()
+        Image.new("RGBA", (32, 32), (77, 88, 99, 255)).save(interrupted_bytes, format="PNG")
+        interrupted_path = source_dir / "interrupted.png"
+        interrupted_path.write_bytes(interrupted_bytes.getvalue())
+        interrupted_id = "owner-upload-" + hashlib.sha256(interrupted_bytes.getvalue()).hexdigest()
+        partial = upload_root / interrupted_id
+        partial.mkdir(parents=True)
+        before = sorted(path.name for path in partial.iterdir())
+        interrupted = owner_upload.import_owner_upload(interrupted_path)
+        after = sorted(path.name for path in partial.iterdir())
+        assert interrupted["state"] == "ERROR"
+        assert "did not finish a complete immutable source record" in str(interrupted.get("error", ""))
+        assert before == after == []
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Owner-upload concurrency test escaped its owned directory")
             shutil.rmtree(root)

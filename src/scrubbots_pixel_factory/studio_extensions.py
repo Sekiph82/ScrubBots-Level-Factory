@@ -1646,13 +1646,116 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
     return sorted({record["failure_id"]: record for record in records}.values(), key=lambda record: (record["evidence_reference"], record["stage"], record["failure_id"]))
 
 
-def batch_import(paths: Sequence[str | Path]) -> dict[str, Any]:
+def _prior_import_filename_sources() -> dict[str, list[tuple[str, str]]]:
+    """Read import-ledger metadata only; never open prior source PNGs."""
+    known: dict[str, list[tuple[str, str]]] = {}
+    batch_root = extensions_root() / "batches"
+    if not batch_root.is_dir():
+        return known
+    for path in sorted(batch_root.glob("batch-import-*.json"), key=lambda item: item.name.casefold()):
+        if path.is_symlink() or path.parent.resolve() != batch_root.resolve():
+            continue
+        try:
+            batch = batch_load(path.stem).get("batch", {})
+        except (StudioExtensionError, OSError, ValueError):
+            continue
+        for item in batch.get("items", []):
+            if not isinstance(item, Mapping):
+                continue
+            filename = str(item.get("display_path", "")).strip()
+            digest = str(item.get("source_sha256", ""))
+            source_id = str(item.get("source_id", ""))
+            if filename and re.fullmatch(r"[0-9a-f]{64}", digest) and source_id == f"owner-upload-{digest}":
+                known.setdefault(filename.casefold(), []).append((digest, source_id))
+    return known
+
+
+def batch_import(
+    paths: Sequence[str | Path],
+    *,
+    source_provider: str = "OWNER_UPLOAD",
+    source_folder: str = "",
+    pre_rejected: Sequence[Mapping[str, object]] = (),
+    path_indices: Sequence[int] | None = None,
+) -> dict[str, Any]:
+    allowed_providers = {"OWNER_UPLOAD", "ALPIX", "PIXELLAB", "OWNER_SUGGESTIONS", "OWNER_SELECTED_ALTERNATIVE"}
+    if source_provider not in allowed_providers:
+        raise StudioExtensionError("batch source provider is not an approved owner-art source")
+    if path_indices is not None and len(path_indices) != len(paths):
+        raise StudioExtensionError("batch path indexes do not match the selected path list")
     items = []
+    seen_sha: set[str] = set()
+    seen_filename: dict[str, tuple[str, int, str]] = {}
+    prior_filename_sources = _prior_import_filename_sources()
     for index, path in enumerate(paths):
+        source_path = Path(path)
         result = import_owner_upload(path)
-        items.append({"index": index, "display_path": Path(path).name, "source_id": result.get("source_id"), "disposition": result.get("state", "ERROR"), "error": result.get("error")})
+        state = str(result.get("state", "ERROR"))
+        source_sha = str(result.get("source_sha256", ""))
+        duplicate = state in {"IMPORTED", "ALREADY_IMPORTED"} and bool(source_sha) and source_sha in seen_sha
+        if state in {"IMPORTED", "ALREADY_IMPORTED"} and source_sha:
+            seen_sha.add(source_sha)
+        disposition = "SKIPPED_DUPLICATE" if duplicate else state
+        error = "DUPLICATE_IDENTICAL_SHA256_IN_SELECTED_BATCH" if duplicate else result.get("error")
+        if state == "ERROR":
+            error_text = str(error or "")
+            disposition = "REJECTED" if any(marker in error_text for marker in (
+                "not a supported strict PNG", "must be an existing local file", "not a PNG", "exceeds the bounded raw-artifact size policy",
+            )) else "FAILED"
+        try:
+            original_path = str(source_path.resolve(strict=False))
+        except (OSError, RuntimeError):
+            original_path = str(source_path)
+        batch_item = {
+            "index": int(path_indices[index]) if path_indices is not None else index,
+            "display_path": source_path.name, "original_source_path": original_path,
+            "source_provider": source_provider, "source_folder": source_folder,
+            "source_id": result.get("source_id"), "source_sha256": source_sha or None,
+            "disposition": disposition, "error": error,
+            "original_width": result.get("original_width"), "original_height": result.get("original_height"),
+        }
+        if source_sha:
+            filename_key = source_path.name.casefold()
+            previous = seen_filename.get(filename_key)
+            if previous is not None and previous[0] != source_sha:
+                batch_item["filename_collision"] = True
+                batch_item["collision_with_source_id"] = previous[2]
+                items[previous[1]]["filename_collision"] = True
+                items[previous[1]]["collision_with_source_id"] = str(result.get("source_id", ""))
+            elif previous is None:
+                seen_filename[filename_key] = (source_sha, len(items), str(result.get("source_id", "")))
+                historical = next((source_id for prior_sha, source_id in prior_filename_sources.get(filename_key, []) if prior_sha != source_sha), "")
+                if historical:
+                    batch_item["filename_collision"] = True
+                    batch_item["collision_with_source_id"] = historical
+            prior_filename_sources.setdefault(filename_key, []).append((source_sha, str(result.get("source_id", ""))))
+        items.append(batch_item)
+    for rejected in pre_rejected:
+        items.append({
+            "index": int(rejected.get("index", len(items))),
+            "display_path": str(rejected.get("display_path", "")),
+            "original_source_path": str(rejected.get("original_source_path", "")),
+            "source_provider": source_provider, "source_folder": source_folder,
+            "source_id": None, "source_sha256": rejected.get("source_sha256"),
+            "disposition": "FAILED" if rejected.get("disposition") == "FAILED" else "REJECTED",
+            "error": str(rejected.get("error", "SOURCE_REJECTED")),
+            "original_width": rejected.get("original_width"), "original_height": rejected.get("original_height"),
+        })
+    items.sort(key=lambda item: int(item["index"]))
     batch_id = f"batch-import-{_digest(items)[:24]}-{uuid.uuid4().hex[:12]}"
-    payload = {"schema": BATCH_SCHEMA, "version": 1, "batch_id": batch_id, "items": items, "counts": {"success": sum(item["disposition"] in {"IMPORTED", "ALREADY_IMPORTED"} for item in items), "failed": sum(item["disposition"] not in {"IMPORTED", "ALREADY_IMPORTED"} for item in items)}, "created_at": datetime.now(timezone.utc).isoformat()}
+    payload = {
+        "schema": BATCH_SCHEMA, "version": 1, "batch_id": batch_id,
+        "source_provider": source_provider, "source_folder": source_folder,
+        "items": items,
+        "counts": {
+            "success": sum(item["disposition"] in {"IMPORTED", "ALREADY_IMPORTED", "SKIPPED_DUPLICATE"} for item in items),
+            "imported": sum(item["disposition"] == "IMPORTED" for item in items),
+            "skipped": sum(item["disposition"] in {"ALREADY_IMPORTED", "SKIPPED_DUPLICATE"} for item in items),
+            "failed": sum(item["disposition"] == "FAILED" for item in items),
+            "rejected": sum(item["disposition"] == "REJECTED" for item in items),
+        },
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
     _write_json(extensions_root() / "batches" / f"{batch_id}.json", payload, immutable=True)
     return payload
 

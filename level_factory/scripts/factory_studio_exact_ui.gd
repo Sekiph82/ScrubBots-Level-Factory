@@ -104,6 +104,9 @@ var _responsive_scale := 1.0
 var _responsive_offset := Vector2.ZERO
 var _last_import_summary: Dictionary = {}
 var _file_selection_action := "PNG_IMPORT"
+var _owner_folder_provider := ""
+var _owner_folder_explicit_alternative := false
+var _owner_folder_preview: Dictionary = {}
 var _activity_panel: Panel
 var _activity_title: Label
 var _activity_state_chip: Panel
@@ -192,6 +195,7 @@ func _ready() -> void:
 		return
 	_file_dialog.file_selected.connect(_on_file_selected)
 	_file_dialog.files_selected.connect(_on_files_selected)
+	_file_dialog.dir_selected.connect(_on_owner_folder_selected)
 	_build_live_chrome()
 	_preview_host = Control.new()
 	_preview_host.name = "VisualReviewClip"
@@ -707,7 +711,7 @@ func _control_caption(control_name: String) -> String:
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
 		"ArtworkCarouselLeft": "‹", "ArtworkCarouselRight": "›", "ZoomOut": "−", "ZoomIn": "+",
-		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "Select PNG",
+		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "Select Folder",
 		"LevelNumber": _level_number_caption(), "SupplyColumns3": "3", "SupplyColumns4": "4", "SupplyColumns5": "5",
 		"MaxRobotsAuto": "Max Robots: Auto", "BackgroundIntent": "Background: %s" % _background_intent,
 		"RunLevelPipeline": "Run Pipeline", "SolveAgain": "Solve Again", "PreviewReplay": "Preview Replay",
@@ -1858,7 +1862,7 @@ func _build_master_controls() -> void:
 	_place_control("ToggleGrid", Rect2(1010, 124, 45, 32), _toggle_grid)
 	# LEVEL FACTORY: select artwork, set 3/4/5 columns, run real pipeline,
 	# then record append-only owner acceptance or rejection for its candidate.
-	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _open_files.bind(true))
+	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _open_owner_folder_sources)
 	_place_control("LevelNumber", Rect2(172, 165, 190, 38), _edit_level_number)
 	_place_control("SupplyColumns3", Rect2(172, 209, 56, 38), _set_columns.bind(3))
 	_place_control("SupplyColumns4", Rect2(238, 209, 56, 38), _set_columns.bind(4))
@@ -2101,6 +2105,132 @@ func _open_files(multiple: bool) -> void:
 	_file_dialog.popup_centered_ratio(0.72)
 
 
+func _open_owner_folder_sources() -> void:
+	var menu := PopupMenu.new()
+	menu.name = "OwnerFolderProviderMenu"
+	menu.add_item("ALPIX · Finished PNGs", 0)
+	menu.add_item("PixelLab · Final slices only", 1)
+	menu.add_item("Owner Suggestions", 2)
+	menu.add_separator()
+	menu.add_item("Browse another folder…", 3)
+	menu.id_pressed.connect(_on_owner_folder_provider_selected)
+	add_child(menu)
+	menu.popup(Rect2(get_global_mouse_position(), Vector2.ZERO))
+
+
+func _on_owner_folder_provider_selected(id: int) -> void:
+	var menu := get_node_or_null("OwnerFolderProviderMenu") as PopupMenu
+	if menu != null:
+		menu.queue_free()
+	if _file_dialog == null:
+		return
+	_owner_folder_explicit_alternative = id == 3
+	_file_selection_action = "OWNER_FOLDER_IMPORT"
+	var data_root := ProjectSettings.globalize_path("res://../data/output")
+	match id:
+		0:
+			_owner_folder_provider = "ALPIX"
+			_file_dialog.current_dir = data_root.path_join("Alpix")
+			_file_dialog.title = "Select ALPIX output folder"
+		1:
+			_owner_folder_provider = "PIXELLAB"
+			_file_dialog.current_dir = data_root.path_join("Pixellab").path_join("Final")
+			_file_dialog.title = "Select PixelLab Final slices folder · Grid Files is excluded"
+		2:
+			_owner_folder_provider = "OWNER_SUGGESTIONS"
+			_file_dialog.current_dir = data_root.path_join("Owner Suggestions")
+			_file_dialog.title = "Select Owner Suggestions folder"
+		_:
+			_owner_folder_provider = "OWNER_SELECTED_ALTERNATIVE"
+			_file_dialog.current_dir = data_root
+			_file_dialog.title = "Select an explicitly chosen artwork folder · Grid Files is blocked"
+	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
+	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+	_file_dialog.clear_filters()
+	_file_dialog.popup_centered_ratio(0.72)
+
+
+func _on_owner_folder_selected(folder: String) -> void:
+	if _file_selection_action != "OWNER_FOLDER_IMPORT":
+		return
+	if _operation_running:
+		return
+	_owner_folder_preview.clear()
+	_operation_running = true
+	_activity_stage = "FOLDER PREVIEW"
+	_activity_message = "Scanning and validating direct PNG files in a background worker; no solver or provider call is running."
+	if _activity_panel != null:
+		_activity_panel.visible = true
+	_refresh_activity_header()
+	if not _queue_studio_read_extension("owner-folder-preview", {
+		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
+	}, {"kind": "owner-folder-preview"}):
+		_operation_running = false
+		_report("Folder preview worker could not start.")
+
+
+func _show_owner_folder_preview(preview: Dictionary) -> void:
+	_owner_folder_preview = preview.duplicate(true)
+	var entries: Array = preview.get("entries", [])
+	var eligible_count := 0
+	var skipped_count := 0
+	var failed_count := 0
+	var rejected_count := 0
+	var lines: Array[String] = []
+	for item in entries:
+		if not item is Dictionary:
+			continue
+		var state := str(item.get("disposition", "REJECTED"))
+		if state == "ELIGIBLE": eligible_count += 1
+		elif state in ["ALREADY_IMPORTED", "SKIPPED_DUPLICATE"]: skipped_count += 1
+		elif state == "FAILED": failed_count += 1
+		else: rejected_count += 1
+		var suffix := " · SHA256 " + str(item.get("source_sha256", "")) if not str(item.get("source_sha256", "")).is_empty() else ""
+		var reason := " · " + str(item.get("reason", "")) if not str(item.get("reason", "")).is_empty() else ""
+		if bool(item.get("filename_collision", false)):
+			reason += " · same filename, different content SHA"
+		lines.append("%s · %s%s%s" % [str(item.get("display_path", "")), state, suffix, reason])
+	var dialog := AcceptDialog.new()
+	dialog.name = "OwnerFolderImportPreview"
+	dialog.title = "Review artwork folder before import"
+	dialog.add_cancel_button("Cancel")
+	dialog.get_ok_button().text = "Import folder"
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(760, minf(520.0, 110.0 + float(lines.size()) * 24.0))
+	dialog.add_child(scroll)
+	var detail := Label.new()
+	detail.custom_minimum_size = Vector2(730, maxf(130.0, float(lines.size()) * 28.0))
+	detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.text = "Provider: %s\nFolder: %s\nPNG files: %d · new: %d · skipped: %d · failed: %d · rejected: %d\nNo solver or paid provider call runs during import.\n\n%s" % [str(preview.get("provider", _owner_folder_provider)), str(preview.get("selected_folder", "")), int(preview.get("png_count", 0)), eligible_count, skipped_count, failed_count, rejected_count, "\n".join(lines)]
+	scroll.add_child(detail)
+	add_child(dialog)
+	dialog.confirmed.connect(_confirm_owner_folder_import)
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.popup_centered()
+
+
+func _confirm_owner_folder_import() -> void:
+	if _operation_running:
+		return
+	var old_entries: Array = _owner_folder_preview.get("entries", [])
+	var folder := str(_owner_folder_preview.get("selected_folder", ""))
+	var all_paths: Array = []
+	for item in old_entries:
+		if item is Dictionary:
+			all_paths.append(str(item.get("path", "")))
+	_operation_running = true
+	_activity_stage = "SOURCE IMPORT"
+	_activity_message = "Rechecking %d PNG files against the confirmed preview in a background worker." % all_paths.size()
+	if _activity_panel != null:
+		_activity_panel.visible = true
+	_refresh_activity_header()
+	if not _queue_studio_read_extension("owner-folder-preview", {
+		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
+	}, {"kind": "owner-folder-recheck", "paths": all_paths, "entries": old_entries, "folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}):
+		_operation_running = false
+		_report("Folder confirmation recheck could not start; no source was imported.")
+
+
 func _open_batch_csv() -> void:
 	if _file_dialog == null:
 		return
@@ -2210,8 +2340,8 @@ func _import_pro_4x4_source(path: String) -> void:
 	_report("4×4 SOURCE ONLY · %d frame PASS · %d rejected · %d imported · not READY until solver/WIN/difficulty/QA · %s" % [int(result.get("pass_count", 0)), int(result.get("rejected_count", 16)), imported_count, " · ".join(statuses)])
 
 
-func _import_pngs(paths: Array) -> void:
-	var result := _extension("batch-import", {"paths": paths})
+func _import_pngs(paths: Array, supplied_result: Dictionary = {}) -> void:
+	var result := supplied_result if not supplied_result.is_empty() else _extension("batch-import", {"paths": paths})
 	var new_batch_id := str(result.get("batch_id", ""))
 	if new_batch_id != _batch_import_id and not _operation_running:
 		_batch_job_id = ""
@@ -2236,6 +2366,7 @@ func _import_pngs(paths: Array) -> void:
 	var item_records: Array[Dictionary] = []
 	var imported_count := 0
 	var reused_count := 0
+	var failed_count := 0
 	var rejected_count := 0
 	var preview_path := ""
 	var preview_source_id := ""
@@ -2254,19 +2385,33 @@ func _import_pngs(paths: Array) -> void:
 			if preview_path.is_empty():
 				preview_path = path
 				preview_source_id = source_id
-			var detail := "%s · %s" % [state, _wrap_identity(source_id, 24)]
+			var collision_note := " · same filename, different content SHA" if bool(item.get("filename_collision", false)) else ""
+			var detail := "%s · %s · SHA256 %s%s" % [state, _wrap_identity(source_id, 24), str(item.get("source_sha256", source_id.trim_prefix("owner-upload-"))).left(64), collision_note]
 			lines.append("%s\n%s" % [path.get_file(), detail])
 			item_records.append({"path": path, "source_id": source_id, "disposition": state, "display_filename": path.get_file()})
+		elif state == "SKIPPED_DUPLICATE":
+			reused_count += 1
+			var duplicate_sha := str(item.get("source_sha256", ""))
+			lines.append("%s\nSKIPPED · identical SHA-256 %s · no second processing" % [path.get_file(), duplicate_sha])
+			item_records.append({"path": path, "source_id": source_id, "source_sha256": duplicate_sha, "disposition": state, "display_filename": path.get_file()})
+		elif state == "FAILED":
+			failed_count += 1
+			var failure_reason := str(item.get("error", "IMPORT_FAILED"))
+			lines.append("%s\nFAILED · %s" % [path.get_file(), failure_reason])
+			item_records.append({"path": path, "source_sha256": str(item.get("source_sha256", "")), "disposition": state, "error": failure_reason})
 		else:
 			rejected_count += 1
 			var reason := str(item.get("error", item.get("reason", state if not state.is_empty() else result.get("reason", "Canonical import returned no source identity."))))
-			lines.append("%s\nREJECTED · %s" % [path.get_file(), reason])
-			var rejected := {"path": path, "source_id": source_id, "disposition": "REJECTED", "display_filename": path.get_file(), "error": reason}
+			var rejected_sha := str(item.get("source_sha256", ""))
+			lines.append("%s\nREJECTED · %s%s" % [path.get_file(), reason, " · SHA256 " + rejected_sha if not rejected_sha.is_empty() else ""])
+			var rejected := {"path": path, "source_id": source_id, "source_sha256": rejected_sha, "disposition": "REJECTED", "display_filename": path.get_file(), "error": reason}
 			_rejected_imports.append(rejected)
 			item_records.append(rejected.duplicate(true))
 	_last_import_summary = {
 		"selected_count": paths.size(), "imported_count": imported_count, "reused_count": reused_count,
-		"rejected_count": rejected_count, "batch_id": new_batch_id,
+		"failed_count": failed_count, "rejected_count": rejected_count,
+		"source_provider": str(result.get("source_provider", "OWNER_UPLOAD")),
+		"source_folder": str(result.get("source_folder", "")), "batch_id": new_batch_id,
 		"preview_source_id": preview_source_id, "preview_path": preview_path,
 		"accepted_source_count": _imported_sources.size(), "solver_calls": 0,
 		"items": lines.duplicate(), "item_records": item_records.duplicate(true), "rejected": _rejected_imports.duplicate(true)
@@ -2279,7 +2424,7 @@ func _import_pngs(paths: Array) -> void:
 		_last_pipeline.clear()
 		_selected_import_source_id = ""
 		_clear_preview_for_screen("LEVEL FACTORY")
-	var summary := "PNG selection: %d selected · %d imported · %d reused · %d rejected" % [paths.size(), imported_count, reused_count, rejected_count]
+	var summary := "PNG folder import · %s · %d PNG · %d imported · %d skipped · %d failed · %d rejected" % [str(result.get("source_provider", "OWNER_UPLOAD")), paths.size(), imported_count, reused_count, failed_count, rejected_count]
 	if not preview_source_id.is_empty():
 		summary += "\nSelected: %s · %s" % [preview_path.get_file(), _wrap_identity(preview_source_id, 24)]
 	_refresh_runtime_cards()
@@ -3602,6 +3747,41 @@ func _poll_studio_read_extension() -> void:
 	_studio_read_context.clear()
 	_studio_read_mutex.unlock()
 	var kind := str(context.get("kind", ""))
+	if kind == "owner-folder-preview":
+		_operation_running = false
+		if not result.has("entries"):
+			_report("Folder preview blocked: %s" % str(result.get("error", result.get("reason", "No valid artwork folder was returned."))))
+			return
+		_show_owner_folder_preview(result)
+		return
+	if kind == "owner-folder-recheck":
+		if not result.has("entries"):
+			_operation_running = false
+			_report("Folder contents could not be rechecked; nothing was imported.")
+			return
+		var old_entries: Array = context.get("entries", [])
+		if JSON.stringify(old_entries) != JSON.stringify(result.get("entries", [])):
+			_operation_running = false
+			_report("Folder contents changed after preview. Review the refreshed list before importing.")
+			_show_owner_folder_preview(result)
+			return
+		var folder := str(context.get("folder", ""))
+		var paths: Array = context.get("paths", [])
+		_activity_message = "SHA-bound folder import worker running for %d PNG files; solver has not started." % paths.size()
+		if not _queue_studio_read_extension("owner-folder-import", {
+			"folder": folder, "explicit_alternative": bool(context.get("explicit_alternative", false)),
+		}, {"kind": "owner-folder-import", "paths": paths}):
+			_operation_running = false
+			_report("Owner folder import worker could not start; no source was imported.")
+		return
+	if kind == "owner-folder-import":
+		_operation_running = false
+		if not result.has("items"):
+			_report("Folder import stopped: %s" % str(result.get("error", result.get("reason", "Canonical import did not return its ledger."))))
+			return
+		var imported_paths: Array = context.get("paths", [])
+		_import_pngs(imported_paths, result)
+		return
 	if kind == "candidate-inbox":
 		if str(result.get("schema", "")) == "scrubbots-candidate-inbox-view" and result.get("candidates", []) is Array:
 			_candidate_inbox_cache = result
