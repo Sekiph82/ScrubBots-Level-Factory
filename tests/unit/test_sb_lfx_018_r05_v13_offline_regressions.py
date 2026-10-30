@@ -190,6 +190,44 @@ def test_account_synced_alpix_probe_reports_authentication_required() -> None:
     assert "needs authentication" in result["reason"].lower()
 
 
+def test_unverified_account_synced_alpix_generation_fails_before_path_or_request(monkeypatch) -> None:
+    identity = {
+        "available": True,
+        "status": "ALPIX_AVAILABLE_DISCOVERY_ONLY",
+        "route_kind": "claude.ai_connector",
+        "executable": "C:/fixture/claude.exe",
+        "plugin_id": "claude.ai connector",
+        "mcp_servers": "claude.ai Alpix",
+        "route_scope": "claude.ai config",
+    }
+    calls = []
+
+    def runner(*args, **kwargs):
+        calls.append((args, kwargs))
+        raise AssertionError("Unverified account connector must not be invoked.")
+
+    def forbidden_resolve(self, *args, **kwargs):
+        raise AssertionError("Unverified connector must be rejected before touching output paths.")
+
+    monkeypatch.setattr(Path, "resolve", forbidden_resolve)
+    try:
+        alpix_batch.generate_alpix_png(
+            prompt="offline test",
+            width=16,
+            height=16,
+            destination="unverified-account-route.png",
+            discovery=identity,
+            runner=runner,
+        )
+    except alpix_batch.AlpixUnavailable as exc:
+        assert "ALPIX_CLAUDEAI_CAPABILITY_UNVERIFIED" in str(exc)
+        assert "no request was sent" in str(exc)
+    else:
+        raise AssertionError("Unverified account connector unexpectedly proceeded.")
+
+    assert calls == []
+
+
 def test_alpix_discovery_applies_project_plugin_enablement(monkeypatch) -> None:
     home = Path("C:/v13-fixture/project-plugin-profile")
     project = Path("C:/v13-fixture/project-plugin")

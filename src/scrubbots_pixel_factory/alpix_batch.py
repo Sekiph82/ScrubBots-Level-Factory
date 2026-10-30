@@ -254,6 +254,11 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     identity = dict(discovery or discover_alpix(project_root=project_root))
     if identity.get("available") is not True:
         raise AlpixUnavailable(str(identity.get("reason", "Claude Alpix is unavailable.")))
+    if identity.get("route_kind") == "claude.ai_connector":
+        raise AlpixUnavailable(
+            "ALPIX_CLAUDEAI_CAPABILITY_UNVERIFIED: the account-synced connector is connected, "
+            "but its drawing/export tools are unverified; no request was sent."
+        )
     executable = identity.get("executable")
     plugin_id = identity.get("plugin_id")
     mcp_servers = identity.get("mcp_servers")

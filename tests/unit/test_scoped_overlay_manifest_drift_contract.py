@@ -45,6 +45,10 @@ def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_byt
     assert "90e560824678fd07055225e5d500a956e7a82f9734263f22d2cc4a7afa190744" in source
     assert "a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122" in source
     assert "395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82" in source
+    assert "2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5" in source
+    assert "fdd2d815aafbd81706572178825abadd24a42cbd95a0e06f46a2d15317c1d4a2" in source
+    assert "d30651a2c1d89720fc73e070a72282cbedcfa366159004aea327ae7937d12507" in source
+    assert "priorExpectedFileReceipt" in source
     assert "Repeat V05 install requires the exact previously published verified overlay receipt." in source
     assert "Prior V05 verify.py receipt does not reproduce exact source-at-install bytes." in source
     assert "$verifiedReceiptChain = $false" in source

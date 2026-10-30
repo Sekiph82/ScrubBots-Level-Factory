@@ -155,30 +155,30 @@ if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -ceq '0f4b7f0319d68278
 elseif ($manifestSha256 -cin @(
     'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122',
     '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82',
-    '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5'
+    '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5',
+    'fdd2d815aafbd81706572178825abadd24a42cbd95a0e06f46a2d15317c1d4a2'
 )) {
     # These exact manifests are prior successful V05 overlays. Permit a
-    # repeat only when the latest UI receipt and the historic verify.py plus
+    # repeat only when the latest file receipt and the historic verify.py plus
     # atlas-addition receipts prove the exact chain and writer exclusion.
     $priorReceipt = @($manifest.overlayReceipts)[-1]
     $atlasPath = 'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
-    $priorReceiptHead = switch ($manifestSha256) {
-        'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122' { 'ee51d899df149cb559184f4617537e1e6cb7dc6e'; break }
-        '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82' { '1a8e7d435eb55601b2eaa37371109e753f4852fd'; break }
-        '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5' { 'deb2a96ca8c54413c4a0fcad365eb0e2864f9147'; break }
+    $priorReceiptExpectation = switch ($manifestSha256) {
+        'a9776ce1dcb73df2ac9acab34f0e26ae97cdb4d7c7caee248af8eeb9eb5f6122' { @{ head = 'ee51d899df149cb559184f4617537e1e6cb7dc6e'; path = 'level_factory/scripts/factory_studio_exact_ui.gd'; sha256 = 'ebe91efa47224520c3de97139638916c492b68b94db7612c76bdfa023c5208d2' }; break }
+        '395e2fc99fd437dda256f25c33f09a5b75f63c5429e1dacce8e01ec0c1c3dd82' { @{ head = '1a8e7d435eb55601b2eaa37371109e753f4852fd'; path = 'level_factory/scripts/factory_studio_exact_ui.gd'; sha256 = 'f39f0324e704d636e21d4aab9d83b527b790f2a0c2b0eab7861472b745653e66' }; break }
+        '2c2d2d39183780efd44516f97784ee20994f3554e4d3c2eac09920058a4071f5' { @{ head = 'deb2a96ca8c54413c4a0fcad365eb0e2864f9147'; path = 'level_factory/scripts/factory_studio_exact_ui.gd'; sha256 = 'e4a64f70ace7a18b080d8453e09573b1f4cac4e3bb6d79194c96150c61c0ac4b' }; break }
+        'fdd2d815aafbd81706572178825abadd24a42cbd95a0e06f46a2d15317c1d4a2' { @{ head = '0fadcccd21da9180d5f16ee5f5e85c54e5de174e'; path = 'src/scrubbots_pixel_factory/alpix_batch.py'; sha256 = 'd30651a2c1d89720fc73e070a72282cbedcfa366159004aea327ae7937d12507'; priorSha256 = '48226e5f15ee6ef3b554c132592dd4b756ee9927755a00f0e7f6fc7f162eb510' }; break }
         default { throw 'Installed manifest digest was not matched to a known V05 source receipt.' }
     }
-    $priorUiHash = switch ($priorReceiptHead) {
-        'ee51d899df149cb559184f4617537e1e6cb7dc6e' { 'ebe91efa47224520c3de97139638916c492b68b94db7612c76bdfa023c5208d2'; break }
-        '1a8e7d435eb55601b2eaa37371109e753f4852fd' { 'f39f0324e704d636e21d4aab9d83b527b790f2a0c2b0eab7861472b745653e66'; break }
-        'deb2a96ca8c54413c4a0fcad365eb0e2864f9147' { 'e4a64f70ace7a18b080d8453e09573b1f4cac4e3bb6d79194c96150c61c0ac4b'; break }
-    }
-    $priorUiReceipt = @($priorReceipt.files | Where-Object { $_.path -ceq 'level_factory/scripts/factory_studio_exact_ui.gd' -and $_.sha256 -ceq $priorUiHash })
+    $priorExpectedFileReceipt = @($priorReceipt.files | Where-Object {
+        $_.path -ceq $priorReceiptExpectation.path -and $_.sha256 -ceq $priorReceiptExpectation.sha256 -and
+        ($null -eq $priorReceiptExpectation.priorSha256 -or ([bool]$_.priorExists -and $_.priorSha256 -ceq $priorReceiptExpectation.priorSha256))
+    })
     if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
-        $priorReceipt.sourceCommit -cne $priorReceiptHead -or
-        $priorReceipt.sourceHead -cne $priorReceiptHead -or
+        $priorReceipt.sourceCommit -cne $priorReceiptExpectation.head -or
+        $priorReceipt.sourceHead -cne $priorReceiptExpectation.head -or
         [string]$priorReceipt.writerExclusionMethod -cnotlike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -or
-        $priorUiReceipt.Count -ne 1) {
+        $priorExpectedFileReceipt.Count -ne 1) {
         throw 'Repeat V05 install requires the exact previously published verified overlay receipt.'
     }
     $verifiedReceiptChain = $false
