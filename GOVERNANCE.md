@@ -1,5 +1,11 @@
 # ScrubBots Level Factory Governance
 
+## MOST RECENT OWNER TASK DELEGATION 2026-10-31 20:30
+
+Codex may SELF-SELECT the next SAFE EXISTING root TASKS.md open/partial requirement within the unchanged owner GOAL, rather than being restricted to prior A-E or requiring ChatGPT new task assignment. Existing unchecked backlog remains actionable. Latest mandatory stable single prompt: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. After each real tested/published builder result, Codex updates existing TASKS.md live fields and applicable task checkbox with exact evidence, GitHub-pushes the tracker, verifies canonical Desktop == origin/main and advances autonomously. Do not mark actual production, paid, game-native, GUI or independent audit as verified unless it truly happened. Real external approval requirements are per-operation; no administrative blanket blocked state prevents unrelated safe work. This is the latest owner exception to older ChatGPT-only or A-E-only language below. Historic task evidence remains immutable. No extra worktrees, no protected owner data mutation and no background agent creation.
+
+---
+
 ## OWNER OVERRIDE 2026-10-31: CONTINUOUS CODEX GOAL, NO MANDATORY CHATGPT GATE
 
 The owner's existing Codex GOAL is unchanged. The owner now authorizes Codex to update the **single canonical root `TASKS.md`** for substantiated task progress and move to the next **PREAUTHORIZED GOAL stage**, with no ChatGPT handoff. Current execution contract: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md. The same URL must appear once in both `Next Task/Action` and `Current Task`, with `Required Actor: CODEX`. After focused test and safe code/log commit/push/main-Desktop parity, Codex updates TASKS.md current/next/stage evidence and previously approved task checkboxes in a separate normal commit, verifies parity again, rechecks the queue guard and proceeds.
