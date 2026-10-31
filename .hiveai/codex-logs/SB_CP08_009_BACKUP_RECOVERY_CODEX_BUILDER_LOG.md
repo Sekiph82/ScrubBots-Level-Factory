@@ -27,3 +27,6 @@ Document role: CODEX BUILDER LOG
 - **NOT RUN:** clean-machine disaster recovery, restoration of actual provider/Production backups, or operational failover. This evidence is bounded builder-level in-memory validation and does not prove backup authenticity or a live restore.
 - Files changed: `content_pipeline/src/scrubbots_content_pipeline/operations.py` and `tests/unit/test_sb_cp08_operations_evidence.py`. No dependencies or schemas were changed; no generated cache/scratch was created.
 - The initial failing test attempt is retained above as truthful RED evidence; it was followed by the strict type fix and 2/2 passing targeted checks.
+- Source/test commit: `b18fdec7` (`Reject boolean recovery bundle schema versions`); builder log commit: `3489b6da` (`Record CP08-009 backup validation evidence`).
+- Normal `git push origin HEAD:main` succeeded after `origin/main` ancestry verification. The only workflow is manual `workflow_dispatch`; no CI workflow was triggered.
+- Post-push `git fetch --prune origin` verified `HEAD == origin/main == 3489b6da`; ahead/behind `0/0`; tracked working tree clean. Pre-existing untracked owner files were left untouched.
