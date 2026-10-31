@@ -62,3 +62,10 @@ Document role: CODEX BUILDER LOG
 - Ran `git fetch --prune origin`; latest `origin/main` was an ancestor of Desktop HEAD with 0 behind / 7 ahead. Ran normal `git push origin HEAD:main`; push succeeded, advancing remote from `d4f69754887c7acb959551b00e071a38688e124e` to `3b5805a86eda58c8f23284a5a5f29dda5c762a7c`.
 - Post-push `git fetch --prune origin` confirmed Desktop `HEAD == origin/main == 3b5805a86eda58c8f23284a5a5f29dda5c762a7c`, 0 ahead / 0 behind, no staged or tracked working-tree diff. Existing owner-untracked paths and the two test-owned scratch directories remain local and were not included in the push.
 - The builder-log URL on GitHub main is now live. This append records the publication evidence in the same single builder log; the log-only commit will also be normally published and parity rechecked. No tests were rerun.
+
+
+### 2026-10-31 19:06 UTC — SB-CP06-003 per-level disable/re-enable evidence reuse
+- Current source block `prepare_disable_candidate` in `content_pipeline/src/scrubbots_content_pipeline/m17_release_controls.py` was byte-identical to `e980ff2`: SHA-256 `454442f74e56cb06f165c4fc0928b33bbecbbe6b2ba12d952830a1a0f915730d`.
+- Adversarial test block `test_disable_reenable_changes_only_selected_declarative_state_and_rejects_invalid_ids` in `tests/unit/test_m17_release_controls.py` was byte-identical to `e980ff2`: SHA-256 `02541a5f12a87d59b496a1a60d33590fdfc8f4c92e4e9d3dcd35286a71ed593b`.
+- The original M17 Stage 1 builder record reports 63/63 scoped tests passing; the active owner prompt prohibits repeating completed tests when the source and test bodies are unchanged, so no tests or compile command were rerun. No live manifest/provider write was performed. This confirms only builder evidence for the local per-level control implementation; no external game/runtime acceptance is claimed.
+- No source or test files changed for this child. `git diff --check` is the only new check planned for the log-only publication.
