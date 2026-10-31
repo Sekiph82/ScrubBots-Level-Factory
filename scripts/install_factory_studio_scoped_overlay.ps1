@@ -118,6 +118,82 @@ function Invoke-Git([string[]]$Arguments) {
     return (($output | Out-String).Trim())
 }
 
+if (-not ('ScrubBots.NativeProcessQuery' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+namespace ScrubBots {
+    public sealed class ProcessIdentity {
+        public string ExecutablePath { get; set; }
+        public string CommandLine { get; set; }
+    }
+    public static class NativeProcessQuery {
+        [DllImport("kernel32.dll", SetLastError=true)]
+        private static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+        [DllImport("kernel32.dll", SetLastError=true, CharSet=CharSet.Unicode)]
+        private static extern bool QueryFullProcessImageName(IntPtr process, int flags, StringBuilder name, ref int size);
+        [DllImport("kernel32.dll")]
+        private static extern bool CloseHandle(IntPtr handle);
+        [DllImport("ntdll.dll")]
+        private static extern int NtQueryInformationProcess(IntPtr process, int infoClass, IntPtr info, uint length, out uint returned);
+        [StructLayout(LayoutKind.Sequential)]
+        private struct UnicodeString { public ushort Length; public ushort MaximumLength; public IntPtr Buffer; }
+
+        public static ProcessIdentity Read(int pid) {
+            ProcessIdentity result = new ProcessIdentity { ExecutablePath = "", CommandLine = "" };
+            IntPtr process = OpenProcess(0x1000, false, pid); // PROCESS_QUERY_LIMITED_INFORMATION
+            if (process == IntPtr.Zero) return result;
+            try {
+                int size = 32768;
+                StringBuilder path = new StringBuilder(size);
+                if (QueryFullProcessImageName(process, 0, path, ref size)) result.ExecutablePath = path.ToString();
+                uint needed;
+                NtQueryInformationProcess(process, 60, IntPtr.Zero, 0, out needed); // ProcessCommandLineInformation
+                if (needed < Marshal.SizeOf(typeof(UnicodeString))) return result;
+                IntPtr buffer = Marshal.AllocHGlobal((int)needed);
+                try {
+                    int status = NtQueryInformationProcess(process, 60, buffer, needed, out needed);
+                    if (status < 0 || needed < Marshal.SizeOf(typeof(UnicodeString))) return result;
+                    UnicodeString value = (UnicodeString)Marshal.PtrToStructure(buffer, typeof(UnicodeString));
+                    long start = buffer.ToInt64();
+                    long pointer = value.Buffer.ToInt64();
+                    if (value.Length == 0 || value.Length > value.MaximumLength || pointer < start || pointer + value.Length > start + needed) return result;
+                    result.CommandLine = Marshal.PtrToStringUni(value.Buffer, value.Length / 2);
+                    return result;
+                } finally { Marshal.FreeHGlobal(buffer); }
+            } finally { CloseHandle(process); }
+        }
+    }
+}
+'@ -ErrorAction Stop
+}
+
+function Complete-ScopedProcessMetadata {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Processes)
+
+    $writerNamePattern = '^(Godot.*|python(?:w)?\.exe|pwsh\.exe|powershell\.exe|cmd\.exe)$'
+    $completed = foreach ($process in $Processes) {
+        $path = [string]$process.ExecutablePath
+        $commandLine = [string]$process.CommandLine
+        if ([int]$process.ProcessId -ne $PID -and [string]$process.Name -match $writerNamePattern -and
+            ([string]::IsNullOrWhiteSpace($path) -or [string]::IsNullOrWhiteSpace($commandLine))) {
+            $native = [ScrubBots.NativeProcessQuery]::Read([int]$process.ProcessId)
+            if ([string]::IsNullOrWhiteSpace($path)) { $path = [string]$native.ExecutablePath }
+            if ([string]::IsNullOrWhiteSpace($commandLine)) { $commandLine = [string]$native.CommandLine }
+        }
+        [pscustomobject]@{
+            ProcessId = $process.ProcessId
+            ParentProcessId = $process.ParentProcessId
+            Name = $process.Name
+            ExecutablePath = $path
+            CommandLine = $commandLine
+        }
+    }
+    return ,@($completed)
+}
+
 function Assert-NoReparsePath([string]$Path) {
     $root = [IO.Path]::GetFullPath($runtimeRoot).TrimEnd('\')
     $cursor = [IO.Path]::GetFullPath($Path)
@@ -348,7 +424,8 @@ $fileOperations = @{
     GetProcessSnapshot = {
         try {
             $freshInventory = @(Get-CimInstance Win32_Process -ErrorAction Stop)
-            Get-ScopedProcessInventoryState -Processes $freshInventory -RuntimeRoot $runtimeRoot -CurrentPid $PID
+            $completeInventory = @(Complete-ScopedProcessMetadata -Processes $freshInventory)
+            Get-ScopedProcessInventoryState -Processes $completeInventory -RuntimeRoot $runtimeRoot -CurrentPid $PID
         } catch {
             [pscustomobject]@{ complete = $false; status = 'PROCESS_INVENTORY_INCOMPLETE'; problems = @("CIM_QUERY_FAILED:$($_.Exception.Message)"); active = @() }
         }

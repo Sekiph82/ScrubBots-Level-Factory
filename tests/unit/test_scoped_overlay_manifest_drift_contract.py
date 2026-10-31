@@ -125,3 +125,14 @@ def test_repeat_v06_install_requires_exact_manifest_receipt_and_verify_hashes() 
         "f93289e84276529b1404c64bf6b435c3c50a636db9c4d19cbaef941a2f4c8540",
     ):
         assert sha256 in source
+
+
+def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() -> None:
+    source = _installer()
+    assert "OpenProcess(0x1000" in source
+    assert "QueryFullProcessImageName" in source
+    assert "NtQueryInformationProcess" in source
+    assert "function Complete-ScopedProcessMetadata" in source
+    assert "$completeInventory = @(Complete-ScopedProcessMetadata -Processes $freshInventory)" in source
+    assert "Get-ScopedProcessInventoryState -Processes $completeInventory" in source
+    assert "PROCESS_INVENTORY_INCOMPLETE" in _transaction()
