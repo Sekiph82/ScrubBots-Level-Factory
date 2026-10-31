@@ -1,5 +1,13 @@
 # ScrubBots Level Factory Governance
 
+## OWNER OVERRIDE 2026-10-31: CONTINUOUS CODEX GOAL, NO MANDATORY CHATGPT GATE
+
+The owner's existing Codex GOAL is unchanged. The owner now authorizes Codex to update the **single canonical root `TASKS.md`** for substantiated task progress and move to the next **PREAUTHORIZED GOAL stage**, with no ChatGPT handoff. Current execution contract: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md. The same URL must appear once in both `Next Task/Action` and `Current Task`, with `Required Actor: CODEX`. After focused test and safe code/log commit/push/main-Desktop parity, Codex updates TASKS.md current/next/stage evidence and previously approved task checkboxes in a separate normal commit, verifies parity again, rechecks the queue guard and proceeds.
+
+This **supersedes** the historical rule that only ChatGPT can modify TASKS.md or approve advancement. Codex evidence may justify `BUILDER_VERIFIED`, but NEVER `INDEPENDENT_AUDIT_PASS` or external production approval. ChatGPT independent review remains optional on request, not a prerequisite to unrelated safe stages. Historical owner content, used prompts, and `.hiveai/audits/**` remain immutable. No permission to invent tasks, skip queue, spend money, modify owner data, run CI, create TEMP worktrees, use unauthorized GUI interactions or write R2/Production without explicit owner authorization. Codex session `.codex/attachments` paths are not project artifact locations or task authority. The GOAL text is NOT modified.
+
+---
+
 ## Purpose
 
 This repository follows an H!veAI-compatible evidence-first development protocol with strict separation between builder and independent auditor.
@@ -12,17 +20,18 @@ The owner's Windows folder `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generat
 
 ## Roles
 
-### ChatGPT — planner, tracker owner, independent auditor
+### ChatGPT — optional independent reviewer and historical task planner
 
 ChatGPT owns:
 
 - implementation and remediation prompt authoring,
 - independent strict audits,
 - acceptance and rejection decisions,
-- task checkbox/status state in root `TASKS.md`,
-- milestone, sprint, and cycle closure state,
-- bounded remediation prompt creation,
-- final determination of whether work may advance.
+- optional independent task/review opinions on request,
+- independent-audit status only when a real independent audit was performed,
+- requested remediation prompt assistance.
+
+Under the owner's delegated continuous GOAL, Codex advances the preauthorized TASKS.md work itself, not ChatGPT.
 
 ### Codex — builder only
 
@@ -34,27 +43,26 @@ Codex owns:
 - detailed chronological implementation logging,
 - commits and pushes requested by the active prompt.
 
-Codex does **not** independently audit its own work.
+Codex does **not** perform an independent audit of its own work. It MAY record builder-verified progress and advance to preauthorized work without waiting for a separate ChatGPT audit.
 
 Codex must not:
 
 - declare `AUDIT_PASSED`,
-- declare a milestone, sprint, or cycle finally accepted,
-- mutate root `TASKS.md` task state except for the one-time format-only
-  normalization explicitly authorized by `SB-LF00-007-C001`,
+- declare unverified independent-audit, owner, or production acceptance; verified builder-stage closure IS allowed under the 2026-10-31 delegation,
+- mutate root `TASKS.md` outside the 2026-10-31 owner-delegated current/next/evidence/actor and already-approved checklist scope, or rewrite historical owner state,
 - create or revive legacy H!veAI tracker/control-plane files,
 - author or edit files under `.hiveai/audits/`,
 - rewrite historical prompt/log/audit files,
 - author a strict audit,
-- treat its own passing tests as final acceptance evidence.
+- claim independent-audit PASS, native test PASS or externally published Production from its own offline tests; builder-stage evidence may justify progression.
 
 ## Evidence policy
 
 A Codex log is a builder claim/evidence record, not proof.
 
-Statements such as “all tests passed”, “implementation complete”, or “requirements satisfied” must be independently verified by ChatGPT.
+Every builder claim must be backed by actual reproducible evidence; no mandatory ChatGPT verification is required to advance to a separately authorized safe next stage.
 
-ChatGPT audit must inspect repository truth directly and, where tooling permits, independently run or reproduce relevant tests and checks.
+When an optional ChatGPT audit is specifically requested, it must inspect repository truth directly and reproduce available evidence; it is not a gate for other safe GOAL work.
 
 A passing builder test suite does not override a direct contract violation.
 
@@ -109,7 +117,7 @@ Every ChatGPT strict audit must include:
 
 ## Remediation
 
-If an audit is not an unconditional PASS, ChatGPT decides whether a bounded remediation cycle is required.
+If a requested independent audit finds a real defect, Codex must address any authorized affected remediation; that audit does not automatically block unrelated authorized work.
 
 Each remediation finding must specify:
 
@@ -157,13 +165,13 @@ Matching filenames:
 
 - GitHub repository `Sekiph82/ScrubBots-Level-Factory` is the sole task/prompt/audit authority.
 - Every user-facing Codex handoff must include the full GitHub repository URL and full authoritative prompt URL.
-- When a previous independent audit exists, the handoff must include its full GitHub URL.
+- When relevant previous independent audit evidence exists, link it for context, not as a mandatory advancement gate.
 - Codex must read the authoritative prompt from GitHub before acting.
 - Local folders must never be searched to infer the active project or task.
 - `C:\Users\sekip\Desktop\ScrubBots` is the separate main-game repository and is off-limits unless an authoritative prompt names a narrowly scoped read-only or recovery action.
 - The only persistent local root for this repository is `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
 - **Standing owner rule:** every Codex implementation, remediation, continuation, or maintenance task follows `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`.
-- Start: verify canonical repository/origin, fetch/prune, inspect status/ahead-behind/stashes/worktrees. If the persistent Desktop checkout is clean and only behind, fast-forward only. If it contains owner work, is divergent, stale/unsafe, or cannot be made current without touching owner work, do **not** reconcile it; preserve it byte-for-byte and immediately use a clean task-specific worktree under `%TEMP%\ScrubBots-Level-Factory\<TASK-ID>` from exact current `origin/main`.
+- Start: verify canonical repository/origin, fetch/prune, inspect status/ahead-behind/stashes/worktrees. Fast-forward a safely clean behind canonical Desktop checkout only. If owner work conflicts or history diverges, preserve its bytes and continue only nonconflicting safe work in the SAME Desktop checkout. No new/reused TEMP worktrees or clones; report genuine conflicts instead of overwriting owner data.
 - The owner does not need to manually synchronize the persistent Desktop checkout for builder work.
 - Never reset, rebase, auto-stash, clean, force, restore/discard, or create a sibling Desktop clone/worktree/copy.
 - Finish: completed implementation/test commits and builder-log/evidence commits must be published by normal fast-forward push before handoff. Fetch/prune before push, require `origin/main` ancestry, push `HEAD:main`, fetch again, and require `HEAD == origin/main`, 0 ahead / 0 behind, clean execution worktree.
@@ -177,11 +185,9 @@ determines current task state from GitHub repository metadata plus that file;
 prompts, builder logs, audits, and other documents are process/evidence
 archives, not tracker inputs.
 
-Only ChatGPT may promote task states or mark sprint/milestone closure after the
-one-time parser-format normalization authorized by `SB-LF00-007-C001`.
+Under the owner's 2026-10-31 authorization, Codex may promote BUILDER_VERIFIED stage/task states, update current/next task/actor and already-authorized checkboxes after source/test/GitHub proof. Independent-audit acceptance is separate and requires an actual independent reviewer.
 
-Codex may describe proposed completion in its log but must not edit task state
-outside that explicit format-only exception.
+Codex MUST synchronize TASKS.md with finished and next PREAUTHORIZED stages while preserving old owner history and never inventing an independent-audit or external publication result.
 
 ## SCRUBBOTS contract precedence
 
