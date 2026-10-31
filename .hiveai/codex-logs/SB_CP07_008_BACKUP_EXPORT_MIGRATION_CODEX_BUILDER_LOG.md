@@ -29,3 +29,9 @@ Document role: CODEX BUILDER LOG
 - Builder evidence commit `ab324560` was pushed normally. Fetch verified `HEAD == origin/main == ab324560f539148a649fa892da23c538e9331526`, 0 ahead / 0 behind. The task-boundary queue guard passed at this pin.
 - Next eligible existing row is `SB-CP07-009` least-privilege publishing credentials. Review the documented permission boundary and local offline contract only; do not inspect live secret values or change external credentials.
 - The separate TASKS update will mark CP07-008 partial with the exact offline evidence and NOT_RUN export/live restoration scope, then select CP07-009.
+
+## Publication verification addendum
+
+- The earlier statement that publication/TASKS remained pending was superseded: evidence commit `ab324560` and receipt `5312aa06` were published, followed by tracker commit `4208a9b7` selecting CP07-009.
+- The post-tracker verification command printed `HEAD=4208a9b71b413810f97fc891c669175764bd3900` and `ORIGIN_MAIN` with the same SHA and `AHEAD_BEHIND=0\t0`, but its PowerShell string comparison incorrectly rejected Git's tab/CR formatted count. This was a wrapper false negative, not a Git divergence. The queue guard immediately afterward independently reported both `head_sha` and `origin_main_sha` equal to `4208a9b71b413810f97fc891c669175764bd3900`; it accepted the clean tracker selection for CP07-009. Thus parity and 0/0 are confirmed.
+- No source or test files changed for the addendum. No additional tests were run.
