@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from scrubbots_content_pipeline import cli
 from scrubbots_content_pipeline.operations import (
     OperationRecord,
     OperationsEvidenceError,
@@ -45,6 +46,31 @@ def test_weekly_summary_is_deterministic_and_records_only_observed_status() -> N
     assert summary["recorded_object_verifications_marked_match"] == 1
     assert [row["operation_id"] for row in summary["records"]] == ["op-001", "op-002"]  # type: ignore[index]
     assert "access_key" not in render_jsonl(records).decode("utf-8").lower()
+
+
+def test_dry_run_cli_wires_blocked_preflight_into_weekly_summary_without_writing(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
+
+    def capture_evidence(output_dir, records, *, week_start, week_end):
+        captured["summary"] = weekly_batch_summary(records, week_start, week_end)
+        captured["output_dir"] = output_dir
+        return output_dir / "operations.jsonl", output_dir / "weekly-summary.json"
+
+    monkeypatch.setattr(cli, "write_local_operation_evidence", capture_evidence)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["scrubbots-content-pipeline", "--dry-run", "--environment", "staging",
+         "--operations-dir", "unused-output/weekly"],
+    )
+
+    assert cli.main() == 1
+    report = json.loads(capsys.readouterr().out)
+    summary = captured["summary"]
+    assert report["remote_mutation_performed"] is False
+    assert summary["record_count"] == 1  # type: ignore[index]
+    assert summary["records"][0]["kind"] == "ERROR"  # type: ignore[index]
+    assert summary["records"][0]["outcome"] == "BLOCKED"  # type: ignore[index]
+    assert summary["records"][0]["reason_code"] == "REQUIRED_PLAN_EVIDENCE"  # type: ignore[index]
 
 
 def test_health_report_is_unknown_without_reads_and_healthy_only_for_exact_bytes() -> None:
