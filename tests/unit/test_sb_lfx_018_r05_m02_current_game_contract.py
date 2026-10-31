@@ -8,6 +8,7 @@ import contextlib
 import runpy
 import os
 import stat
+import pytest
 from unittest.mock import patch
 
 from scrubbots_pixel_factory.supply_pipeline.current_game_contract import (
@@ -231,7 +232,7 @@ def test_owner_provenance_adapter_fails_closed_for_test_candidates_without_mutat
     assert result["runtime_executed"] is False
 
 
-def test_release_pool_provenance_requires_exact_current_owner_accept() -> None:
+def test_ready_auto_release_pool_provenance_does_not_require_owner_accept() -> None:
     from scrubbots_pixel_factory.contracts.candidate_provenance import CandidateClass
     from scrubbots_pixel_factory.supply_pipeline import release_pool
     lineage = {"source_id": "owner-upload-" + "c" * 64, "source_sha256": "c" * 64,
@@ -246,12 +247,18 @@ def test_release_pool_provenance_requires_exact_current_owner_accept() -> None:
     with patch.object(release_pool, "_verify_candidate_source_grid_binding", return_value="c" * 64), \
          patch("scrubbots_pixel_factory.supply_pipeline.release_pool.validate_verified_owner_upload_classification",
                return_value=CandidateClass.PRODUCTION_CANDIDATE):
-        try:
-            release_pool.validate_pool_candidate_provenance(candidate, None)
-        except release_pool.ReleaseError as exc:
-            assert "exact current owner ACCEPT" in str(exc)
-        else:
-            raise AssertionError("missing current owner ACCEPT unexpectedly passed")
+        result = release_pool.validate_pool_candidate_provenance(candidate, None)
+        assert result["candidate_class"] == CandidateClass.PRODUCTION_CANDIDATE.value
+        with pytest.raises(release_pool.ReleaseError, match="exact current owner ACCEPT"):
+            release_pool.validate_pool_candidate_provenance(
+                candidate,
+                {"disposition": "ACCEPT", "candidate_id": "other", "artwork_sha256": candidate["artwork_sha256"]},
+            )
+        with pytest.raises(release_pool.ReleaseError, match="exact current owner ACCEPT"):
+            release_pool.validate_pool_candidate_provenance(
+                candidate,
+                {"disposition": "REJECT", "candidate_id": candidate["candidate_id"], "artwork_sha256": candidate["artwork_sha256"]},
+            )
 
 
 def test_owner_provenance_reports_record_digest_but_requires_current_ready_load_check() -> None:

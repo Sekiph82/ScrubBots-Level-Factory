@@ -384,8 +384,9 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
             _owner_accept(candidate),
         )
 
-    with pytest.raises(ReleaseError, match="exact current owner ACCEPT"):
-        validate_pool_candidate_provenance(candidate, None)
+    # READY_AUTO inclusion does not need ACCEPT; only an explicitly supplied
+    # stale/mismatched review must fail closed.
+    assert validate_pool_candidate_provenance(candidate, None)["candidate_class"] == CandidateClass.PRODUCTION_CANDIDATE.value
     with pytest.raises(ReleaseError, match="exact current owner ACCEPT"):
         validate_pool_candidate_provenance(
             candidate,
