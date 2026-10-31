@@ -470,6 +470,17 @@ def verify_content_health(
     actual_manifest = hashlib.sha256(manifest_bytes).hexdigest()
     if actual_manifest != expected_manifest:
         return {"status": "FAIL", "reason": "MANIFEST_HASH_MISMATCH", "observed_manifest_sha256": actual_manifest, "objects": []}
+    from .manifest_parser import ManifestParseError, parse_content_manifest_v1
+
+    try:
+        manifest = parse_content_manifest_v1(manifest_bytes)
+    except ManifestParseError:
+        return {"status": "FAIL", "reason": "INVALID_MANIFEST", "observed_manifest_sha256": actual_manifest,
+                "objects": []}
+    declared_objects = {pack.object_key: pack.sha256 for pack in manifest.packs}
+    if declared_objects != checked_expected:
+        return {"status": "FAIL", "reason": "MANIFEST_OBJECT_SET_MISMATCH",
+                "observed_manifest_sha256": actual_manifest, "objects": []}
     if observed_objects is None:
         return {"status": "UNKNOWN", "reason": "OBJECT_BYTES_NOT_OBSERVED", "observed_manifest_sha256": actual_manifest, "objects": []}
     if not isinstance(observed_objects, Mapping):

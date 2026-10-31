@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from scrubbots_content_pipeline import cli
+from scrubbots_content_pipeline.manifest_v1 import ContentManifestV1, ManifestPackV1
 from scrubbots_content_pipeline.operations import (
     OperationRecord,
     OperationsEvidenceError,
@@ -77,24 +78,37 @@ def test_dry_run_cli_wires_blocked_preflight_into_weekly_summary_without_writing
 
 
 def test_health_report_is_unknown_without_reads_and_healthy_only_for_exact_bytes() -> None:
-    manifest = b'plain canonical manifest bytes'
     object_bytes = b'published content sample'
     object_sha = hashlib.sha256(object_bytes).hexdigest()
+    object_key = "packs/campaign/main.scrubpack"
+    manifest = ContentManifestV1(
+        packs=(ManifestPackV1("campaign", 1, object_key, object_sha, len(object_bytes)),),
+    ).to_json_bytes()
     manifest_sha = hashlib.sha256(manifest).hexdigest()
     unknown = verify_content_health(manifest, expected_manifest_sha256=manifest_sha,
-                                    expected_objects={"packs/level-01.scrubpack": object_sha}, observed_objects=None)
+                                    expected_objects={object_key: object_sha}, observed_objects=None)
     assert unknown["status"] == "UNKNOWN"
     assert verify_content_health(None, expected_manifest_sha256=manifest_sha,
-                                 expected_objects={"packs/level-01.scrubpack": object_sha}, observed_objects={})["status"] == "UNKNOWN"
+                                 expected_objects={object_key: object_sha}, observed_objects={})["status"] == "UNKNOWN"
     healthy = verify_content_health(manifest, expected_manifest_sha256=manifest_sha,
-                                    expected_objects={"packs/level-01.scrubpack": object_sha},
-                                    observed_objects={"packs/level-01.scrubpack": object_bytes})
+                                    expected_objects={object_key: object_sha},
+                                    observed_objects={object_key: object_bytes})
     assert healthy["status"] == "HEALTHY"
     mismatch = verify_content_health(manifest, expected_manifest_sha256=manifest_sha,
-                                     expected_objects={"packs/level-01.scrubpack": object_sha},
-                                     observed_objects={"packs/level-01.scrubpack": b"different"})
+                                     expected_objects={object_key: object_sha},
+                                     observed_objects={object_key: b"different"})
     assert mismatch["status"] == "FAIL"
     assert mismatch["objects"][0]["disposition"] == "HASH_MISMATCH"  # type: ignore[index]
+    assert verify_content_health(manifest, expected_manifest_sha256="0" * 64,
+                                 expected_objects={object_key: object_sha},
+                                 observed_objects={object_key: object_bytes})["reason"] == "MANIFEST_HASH_MISMATCH"
+    malformed = b"not a manifest"
+    assert verify_content_health(malformed, expected_manifest_sha256=hashlib.sha256(malformed).hexdigest(),
+                                 expected_objects={object_key: object_sha},
+                                 observed_objects={object_key: object_bytes})["reason"] == "INVALID_MANIFEST"
+    assert verify_content_health(manifest, expected_manifest_sha256=manifest_sha,
+                                 expected_objects={object_key: "0" * 64},
+                                 observed_objects={object_key: object_bytes})["reason"] == "MANIFEST_OBJECT_SET_MISMATCH"
 
 
 def test_error_records_and_jsonl_schema_do_not_accept_free_form_secret_or_pii_fields() -> None:
