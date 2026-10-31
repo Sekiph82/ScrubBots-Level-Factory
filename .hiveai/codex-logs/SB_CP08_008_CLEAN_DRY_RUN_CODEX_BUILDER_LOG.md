@@ -20,3 +20,7 @@ Document role: CODEX BUILDER LOG
 - **NOT RUN:** a genuinely clean-machine installation/workspace, remote Staging/Production reads, and a live R2 dry-run. Current owner rules permit only the canonical Desktop checkout and prohibit TEMP/worktrees/clones/provider contact; in-memory CLI evidence is not equivalent to those external gates.
 - Result: the reproducible local path is builder-verified as deterministic, fail-closed, and mutation-free at the CLI boundary. The isolated clean-machine and live-provider requirements remain open, so CP08-008 remains partial (`[~]`). No independent audit or release acceptance is claimed.
 - Changed product/test files: `tests/unit/test_sb_cp08_operations_evidence.py` only. No production source change, dependency/license change, secret, or generated cache.
+- Published implementation/test commit: `65950136` (`Verify deterministic blocked publish dry run`).
+- Published builder log commit: `026cef14` (`Record CP08-008 dry-run verification`).
+- Push used normal `git push origin HEAD:main`; no workflow change was made. The only repository workflow is manual `workflow_dispatch` (no push trigger).
+- Post-push `git fetch --prune origin`: `HEAD == origin/main == 026cef14`; `git rev-list --left-right --count HEAD...origin/main` returned `0 0`; tracked working tree clean. Pre-existing untracked owner files were left untouched.
