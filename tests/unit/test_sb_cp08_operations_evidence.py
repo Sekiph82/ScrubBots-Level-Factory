@@ -297,6 +297,19 @@ def test_backup_export_verifies_all_bytes_before_returning_recovered_objects() -
         export_recovery_bundle({"../escape": b"no"})
 
 
+def test_backup_restore_rejects_boolean_schema_version_even_with_valid_bundle_hash() -> None:
+    document = json.loads(export_recovery_bundle({"packs/level.scrubpack": b"verified bytes"}))
+    document["schema_version"] = True
+    body = {key: value for key, value in document.items() if key != "bundle_sha256"}
+    document["bundle_sha256"] = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    tampered_schema = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n"
+
+    with pytest.raises(OperationsEvidenceError, match="supported exact schema"):
+        restore_recovery_bundle(tampered_schema)
+
+
 def test_operational_runbook_keeps_live_restore_as_an_owner_gate() -> None:
     report = (Path(__file__).resolve().parents[2] / "docs/operations/CONTENT_PLATFORM_INCIDENT_RECOVERY_RUNBOOK_V01.md").read_text(encoding="utf-8")
     assert "UNKNOWN" in report

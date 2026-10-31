@@ -526,7 +526,14 @@ def restore_recovery_bundle(bundle_bytes: bytes) -> dict[str, bytes]:
         document = json.loads(bundle_bytes)
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise OperationsEvidenceError("recovery export is not valid UTF-8 JSON") from exc
-    if not isinstance(document, dict) or set(document) != {"schema", "schema_version", "objects", "bundle_sha256"} or document.get("schema") != "scrubbots-content-recovery-export" or document.get("schema_version") != 1 or not isinstance(document.get("objects"), list):
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"schema", "schema_version", "objects", "bundle_sha256"}
+        or document.get("schema") != "scrubbots-content-recovery-export"
+        or type(document.get("schema_version")) is not int
+        or document.get("schema_version") != 1
+        or not isinstance(document.get("objects"), list)
+    ):
         raise OperationsEvidenceError("recovery export does not match the supported exact schema")
     expected_bundle = _digest(document["bundle_sha256"], "bundle_sha256")
     body = {key: value for key, value in document.items() if key != "bundle_sha256"}
