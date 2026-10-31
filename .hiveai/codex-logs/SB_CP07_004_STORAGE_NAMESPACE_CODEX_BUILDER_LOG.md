@@ -16,3 +16,9 @@ Document role: CODEX BUILDER LOG
 - The precise requirement is satisfied by the source mapping and focused test; no product code change or redundant test rerun was needed. Mark `SB-CP07-004` complete on this builder evidence.
 - This is namespace source proof only. No actual R2 request, object write, Production action, CI, credential-value read, owner-data change, Release Apply, GUI, or game-repository write occurred.
 - Builder-log publication receipt and authorized `TASKS.md` transition are pending separate commits and parity checks.
+
+## Publication receipt and next row
+
+- Builder evidence commit `65f90ae0` was normally pushed. Fetch verified `HEAD == origin/main == 65f90ae0a376266691e3b639a86349d2bbd2fc3b`, 0 ahead / 0 behind. The task-boundary queue guard passed at the same source/tracker/prompt pins.
+- Next eligible existing dependency row is `SB-CP07-005`, immutable/versioned object naming where practical. Evaluate its deterministic key construction and collision refusal using source and focused offline tests; no remote object mutation.
+- Update root `TASKS.md` separately to close CP07-004 with the exact namespace test evidence and select CP07-005.
