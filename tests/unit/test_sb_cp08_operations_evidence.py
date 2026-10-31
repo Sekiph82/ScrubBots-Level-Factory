@@ -77,6 +77,32 @@ def test_dry_run_cli_wires_blocked_preflight_into_weekly_summary_without_writing
     assert summary["records"][0]["reason_code"] == "REQUIRED_PLAN_EVIDENCE"  # type: ignore[index]
 
 
+def test_plain_dry_run_is_deterministic_and_never_invokes_evidence_writer(monkeypatch, capsys) -> None:
+    def reject_evidence_write(*args, **kwargs):
+        pytest.fail("plain dry-run must not create local evidence files")
+
+    monkeypatch.setattr(cli, "write_local_operation_evidence", reject_evidence_write)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["scrubbots-content-pipeline", "--dry-run", "--environment", "staging"],
+    )
+
+    assert cli.main() == 1
+    first = capsys.readouterr().out
+    assert cli.main() == 1
+    second = capsys.readouterr().out
+
+    assert first == second
+    report = json.loads(first)
+    assert report["accepted"] is False
+    assert report["complete"] is False
+    assert report["remote_mutation_performed"] is False
+    assert report["target_environment"] == "staging"
+    assert report["checks"] == [
+        {"check_id": "required_plan_evidence", "accepted": False, "reason_code": "UNVALIDATED_PAYLOAD"}
+    ]
+
+
 def test_health_report_is_unknown_without_reads_and_healthy_only_for_exact_bytes() -> None:
     object_bytes = b'published content sample'
     object_sha = hashlib.sha256(object_bytes).hexdigest()
