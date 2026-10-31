@@ -21,3 +21,9 @@ Document role: CODEX BUILDER LOG
 - The fake staging pipeline wrote the exact deterministic pack bytes, verified and read back each object, compared returned bytes to its build artifact, and authorized the manifest step only after success. The fake Cloudflare adapter recomputed the requested SHA-256 over exact readback bytes and rejected repeat/changed writes to an existing key.
 - No source defect was found. Mark `SB-CP07-006` partial for offline/fake-provider round-trip verification; the real R2 upload/download/hash receipt remains NOT_RUN and needs a separately authorized exact external operation.
 - `git diff --check`, builder-log commit/push, parity verification and the separate authorized TASKS progress update remain pending.
+
+## Publication receipt and next row
+
+- Builder evidence commit `b8eaa9e9` was pushed normally. Fetch verified canonical Desktop `HEAD == origin/main == b8eaa9e90c68ba09202b76b009820d6ea4d548cd`, 0 ahead / 0 behind. The queue guard passed at the task boundary.
+- Next eligible existing row: `SB-CP07-007` (cache-control/CDN strategy), a safe offline design/code-contract task. Actual public connectivity or R2 object writes remain unverified and unauthorized.
+- The root `TASKS.md` will separately mark CP07-006 partial with the exact fake-provider scope and transition to CP07-007.
