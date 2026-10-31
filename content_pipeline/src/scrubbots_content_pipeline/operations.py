@@ -114,6 +114,8 @@ class OperationRecord:
         if self.kind == "OBJECT_VERIFY":
             if self.expected_object_sha256 is None or self.observed_object_sha256 is None:
                 raise OperationsEvidenceError("OBJECT_VERIFY requires expected and observed object digests")
+            if self.outcome not in {"MATCH", "MISMATCH"}:
+                raise OperationsEvidenceError("OBJECT_VERIFY outcome must compare observed digests")
             if self.outcome == "MATCH" and self.expected_object_sha256 != self.observed_object_sha256:
                 raise OperationsEvidenceError("MATCH requires identical expected and observed object digests")
             if self.outcome == "MISMATCH" and self.expected_object_sha256 == self.observed_object_sha256:
@@ -256,6 +258,38 @@ def operation_record_from_manifest_observation(
         reason_code="VERSION_OBSERVED",
         content_version=manifest.content_version,
         manifest_sha256=hashlib.sha256(observed_manifest_bytes).hexdigest(),
+    )
+
+
+def operation_record_from_object_observation(
+    expected_object_sha256: str,
+    observed_object_bytes: bytes | None,
+    *,
+    environment: str,
+    operation_id: str,
+    occurred_at: str,
+) -> OperationRecord:
+    """Record an object digest comparison only when exact observed bytes exist.
+
+    No provider is contacted; absent bytes cannot be labeled a mismatch or a
+    remote verification and instead remain an unrecorded/unknown observation.
+    """
+    expected = _digest(expected_object_sha256, "expected_object_sha256")
+    if type(environment) is not str or environment not in _ENVIRONMENTS:
+        raise OperationsEvidenceError("object observation environment is invalid")
+    if type(observed_object_bytes) is not bytes:
+        raise OperationsEvidenceError("object bytes must be explicitly observed before recording verification")
+    observed = hashlib.sha256(observed_object_bytes).hexdigest()
+    matches = observed == expected
+    return OperationRecord(
+        operation_id=operation_id,
+        occurred_at=occurred_at,
+        kind="OBJECT_VERIFY",
+        environment=environment,
+        outcome="MATCH" if matches else "MISMATCH",
+        reason_code="HASH_MATCH" if matches else "HASH_MISMATCH",
+        expected_object_sha256=expected,
+        observed_object_sha256=observed,
     )
 
 

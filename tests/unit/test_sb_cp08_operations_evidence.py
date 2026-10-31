@@ -13,6 +13,7 @@ from scrubbots_content_pipeline.operations import (
     OperationsEvidenceError,
     export_recovery_bundle,
     operation_record_from_manifest_observation,
+    operation_record_from_object_observation,
     render_jsonl,
     restore_recovery_bundle,
     verify_content_health,
@@ -144,6 +145,54 @@ def test_staging_and_production_versions_require_and_bind_observed_manifest_byte
     with pytest.raises(OperationsEvidenceError, match="observed manifest version and digest"):
         OperationRecord("version-missing", "2026-10-14T08:15:00Z", "STAGING_VERSION", "STAGING",
                         "COMPLETED", "VERSION_OBSERVED")
+
+
+def test_object_verification_records_only_exact_observed_hashes() -> None:
+    expected_bytes = b"expected object bytes"
+    expected_sha256 = hashlib.sha256(expected_bytes).hexdigest()
+    matched = operation_record_from_object_observation(
+        expected_sha256,
+        expected_bytes,
+        environment="STAGING",
+        operation_id="object-match-01",
+        occurred_at="2026-10-14T09:00:00Z",
+    )
+    mismatched = operation_record_from_object_observation(
+        expected_sha256,
+        b"different observed bytes",
+        environment="PRODUCTION",
+        operation_id="object-mismatch-01",
+        occurred_at="2026-10-14T09:01:00Z",
+    )
+
+    assert (matched.outcome, matched.expected_object_sha256, matched.observed_object_sha256) == (
+        "MATCH", expected_sha256, expected_sha256,
+    )
+    assert mismatched.outcome == "MISMATCH"
+    assert mismatched.expected_object_sha256 == expected_sha256
+    assert mismatched.observed_object_sha256 == hashlib.sha256(b"different observed bytes").hexdigest()
+    report = weekly_batch_summary((matched, mismatched), date(2026, 10, 14), date(2026, 10, 15))
+    assert report["recorded_object_verifications_marked_match"] == 1
+
+    with pytest.raises(OperationsEvidenceError, match="explicitly observed"):
+        operation_record_from_object_observation(
+            expected_sha256,
+            None,
+            environment="STAGING",
+            operation_id="object-unknown-01",
+            occurred_at="2026-10-14T09:02:00Z",
+        )
+    with pytest.raises(OperationsEvidenceError, match="must compare observed digests"):
+        OperationRecord(
+            "object-invalid-outcome",
+            "2026-10-14T09:03:00Z",
+            "OBJECT_VERIFY",
+            "STAGING",
+            "COMPLETED",
+            "HASH_MATCH",
+            expected_object_sha256=expected_sha256,
+            observed_object_sha256=expected_sha256,
+        )
 
 
 def test_backup_export_verifies_all_bytes_before_returning_recovered_objects() -> None:
