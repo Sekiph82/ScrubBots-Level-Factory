@@ -22,3 +22,9 @@ Document role: CODEX BUILDER LOG
 - The source test verifies stable manifest pointers use no-cache JSON and retain provider-neutral logical keys; the prior exact pack test asserts immutable one-year cache headers for versioned pack objects. The operations document identifies `r2.dev` as a test read endpoint and keeps custom-domain/CDN behavior unverified. No contradiction or source gap was demonstrated; no product change was necessary.
 - Mark existing `SB-CP07-007` complete for its cache-control/CDN strategy requirement at source/document scope. Do not claim live CDN configuration or public cache behavior.
 - `git diff --check`, evidence publication/parity receipt and separate TASKS progress update remain pending.
+
+## Publication receipt and next row
+
+- Builder log commit `4f0187df` was pushed normally. Post-push fetch verified `HEAD == origin/main == 4f0187dffad61f5254c574162899ce9b0d992561`, 0 ahead / 0 behind. The queue guard passed at this task boundary.
+- Next eligible existing row: `SB-CP07-008` backup/export/migration path. Inspect existing documented/offline backup capabilities and tests; do not execute a live export or touch owner/provider data.
+- Root `TASKS.md` will be updated separately to close CP07-007 at source/document scope and transition to CP07-008. Live custom-domain/CDN configuration stays explicitly unverified.
