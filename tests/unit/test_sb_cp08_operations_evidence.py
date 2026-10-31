@@ -12,6 +12,7 @@ from scrubbots_content_pipeline.operations import (
     OperationRecord,
     OperationsEvidenceError,
     export_recovery_bundle,
+    operation_record_from_manifest_observation,
     render_jsonl,
     restore_recovery_bundle,
     verify_content_health,
@@ -105,6 +106,44 @@ def test_error_records_and_jsonl_schema_do_not_accept_free_form_secret_or_pii_fi
         _record(operation_id="api_key-secret")
     with pytest.raises(OperationsEvidenceError, match="timezone"):
         _record(occurred_at="2026-10-14T08:15:00")
+
+
+def test_staging_and_production_versions_require_and_bind_observed_manifest_bytes() -> None:
+    observed = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
+    staging = operation_record_from_manifest_observation(
+        observed,
+        environment="STAGING",
+        operation_id="version-staging-01",
+        occurred_at="2026-10-14T08:15:00Z",
+    )
+    production = operation_record_from_manifest_observation(
+        observed,
+        environment="PRODUCTION",
+        operation_id="version-production-01",
+        occurred_at="2026-10-14T08:16:00Z",
+    )
+
+    assert (staging.kind, staging.environment, staging.content_version) == ("STAGING_VERSION", "STAGING", 7)
+    assert (production.kind, production.environment, production.content_version) == ("PRODUCTION_VERSION", "PRODUCTION", 7)
+    assert staging.manifest_sha256 == production.manifest_sha256 == hashlib.sha256(observed).hexdigest()
+    summary = weekly_batch_summary((staging, production), date(2026, 10, 14), date(2026, 10, 15))
+    assert [row["content_version"] for row in summary["records"]] == [7, 7]  # type: ignore[index]
+
+    for unobserved in (None, b"not a manifest"):
+        with pytest.raises(OperationsEvidenceError):
+            operation_record_from_manifest_observation(
+                unobserved,
+                environment="STAGING",
+                operation_id="version-unobserved",
+                occurred_at="2026-10-14T08:17:00Z",
+            )
+    with pytest.raises(OperationsEvidenceError, match="match its environment"):
+        OperationRecord("version-mismatch", "2026-10-14T08:15:00Z", "STAGING_VERSION", "PRODUCTION",
+                        "COMPLETED", "VERSION_OBSERVED", content_version=7,
+                        manifest_sha256=hashlib.sha256(observed).hexdigest())
+    with pytest.raises(OperationsEvidenceError, match="observed manifest version and digest"):
+        OperationRecord("version-missing", "2026-10-14T08:15:00Z", "STAGING_VERSION", "STAGING",
+                        "COMPLETED", "VERSION_OBSERVED")
 
 
 def test_backup_export_verifies_all_bytes_before_returning_recovered_objects() -> None:

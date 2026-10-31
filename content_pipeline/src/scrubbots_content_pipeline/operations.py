@@ -102,6 +102,15 @@ class OperationRecord:
             _digest(self.expected_object_sha256, "expected_object_sha256")
         if self.observed_object_sha256 is not None:
             _digest(self.observed_object_sha256, "observed_object_sha256")
+        version_event_environment = {
+            "STAGING_VERSION": "STAGING",
+            "PRODUCTION_VERSION": "PRODUCTION",
+        }.get(self.kind)
+        if version_event_environment is not None:
+            if self.environment != version_event_environment:
+                raise OperationsEvidenceError("version event kind must match its environment")
+            if self.content_version is None or self.manifest_sha256 is None:
+                raise OperationsEvidenceError("version events require an observed manifest version and digest")
         if self.kind == "OBJECT_VERIFY":
             if self.expected_object_sha256 is None or self.observed_object_sha256 is None:
                 raise OperationsEvidenceError("OBJECT_VERIFY requires expected and observed object digests")
@@ -213,6 +222,40 @@ def operation_record_from_publication_plan(
         outcome="PREPARED" if ready else "BLOCKED",
         reason_code=reason_code,
         batch_id=plan.content_id,
+    )
+
+
+def operation_record_from_manifest_observation(
+    observed_manifest_bytes: bytes | None,
+    *,
+    environment: str,
+    operation_id: str,
+    occurred_at: str,
+) -> OperationRecord:
+    """Record a staging/production version only from strict-parsed observed bytes.
+
+    This pure helper has no provider access. Missing observations fail closed;
+    the returned version and digest are derived from the exact same bytes.
+    """
+    if type(environment) is not str or environment not in {"STAGING", "PRODUCTION"}:
+        raise OperationsEvidenceError("version observations require STAGING or PRODUCTION environment")
+    if type(observed_manifest_bytes) is not bytes:
+        raise OperationsEvidenceError("manifest bytes must be explicitly observed before recording a version")
+    from .manifest_parser import ManifestParseError, parse_content_manifest_v1
+
+    try:
+        manifest = parse_content_manifest_v1(observed_manifest_bytes)
+    except ManifestParseError as exc:
+        raise OperationsEvidenceError("observed manifest is invalid") from exc
+    return OperationRecord(
+        operation_id=operation_id,
+        occurred_at=occurred_at,
+        kind="STAGING_VERSION" if environment == "STAGING" else "PRODUCTION_VERSION",
+        environment=environment,
+        outcome="COMPLETED",
+        reason_code="VERSION_OBSERVED",
+        content_version=manifest.content_version,
+        manifest_sha256=hashlib.sha256(observed_manifest_bytes).hexdigest(),
     )
 
 
