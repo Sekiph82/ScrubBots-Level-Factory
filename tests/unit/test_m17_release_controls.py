@@ -746,3 +746,45 @@ def test_due_run_blocks_each_failed_revalidation_gate_without_activation() -> No
         assert result.activated == ()
         assert result.rejected == ((schedule_id, "DUE_REVALIDATION_REJECTED"),)
         assert store.schedule_heads()[schedule_id].state is ScheduleState.BLOCKED
+
+
+def test_cp06_009_simulated_bad_active_release_rolls_back_with_monotonic_readback() -> None:
+    good = _manifest(1)
+    bad = _manifest(2, disabled=("Level-01",))
+    history = _history(good, bad)
+    provider = SQLiteLocalProvider(sqlite3.connect(":memory:"))
+    provider.put_object(Environment.PRODUCTION, "packs/campaign/v1.scrubpack", PACK)
+    from scrubbots_content_pipeline.manifest_history import serialize_manifest_history
+    provider.initialize_active(bad, serialize_manifest_history(history))
+
+    record = history.records[0]
+    receipt = _replay_receipt(record.manifest_bytes, "c", "PRODUCTION")
+    known = select_known_good(
+        history, record.manifest_sha256, provider, Environment.PRODUCTION,
+        lambda _raw, _packs: receipt, current_game_version="1.0.0",
+        supported_manifest_schema_versions={"scrubbots.content.manifest.v1": (1,)},
+    )
+    intended = ContentManifestV1(
+        packs=known.manifest.packs, levels=known.manifest.levels,
+        content_version=3, minimum_game_version=known.manifest.minimum_game_version,
+        disabled_levels=known.manifest.disabled_levels, schedules=known.manifest.schedules,
+    ).to_json_bytes()
+    approval = _approval_for(ControlAction.ROLLBACK, bad, intended)
+    candidate = prepare_rollback_candidate(
+        bad, history, known, target_id=TARGET, reason="simulated bad active release rollback",
+        approval=approval, approval_check=lambda: approval,
+        recorded_at_utc="2026-10-10T14:00:00Z",
+    )
+
+    assert ContentManifestV1.from_dict(__import__("json").loads(candidate.manifest_bytes)).content_version == 3
+    assert candidate.history.records[-1].manifest_bytes == candidate.manifest_bytes
+    serialized_history = serialize_manifest_history(candidate.history)
+    assert provider.compare_and_swap_active(
+        candidate.expected_current_sha256, 2, candidate.manifest_bytes, serialized_history,
+    )
+    readback, readback_history = provider.read_active()
+    assert readback == candidate.manifest_bytes
+    assert __import__("scrubbots_content_pipeline.manifest_history", fromlist=["parse_manifest_history"]).parse_manifest_history(readback_history) == candidate.history
+    assert not provider.compare_and_swap_active(
+        candidate.expected_current_sha256, 2, candidate.manifest_bytes, serialized_history,
+    )
