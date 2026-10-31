@@ -1,5 +1,11 @@
 # Codex Sync + Publish Standard V01
 
+## LATEST OWNER AUTO-CONTINUATION 2026-10-31
+
+After verified task code/tests/log publication and tracked Desktop/main parity, Codex MUST select its next eligible existing root TASKS.md open/partial requirement within the unchanged owner GOAL, update TASKS.md with exact actual task ID/receipt and proposed next eligible existing ID, normal-push the TASKS change, refetch/verify parity, rerun unchanged queue guard and continue. This owner authorization is NOT limited to prior A-E stages: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. No ChatGPT wait between safe tasks. Genuine paid provider/R2/Production/owner-data/unapproved-GUI operations still require separate explicit consent and are tracked independently without halting other safe work. Do not re-run passed suites/report-only loops, bypass tool-policy denials, create TEMP worktrees/clones, falsify evidence or promise unbounded background execution. User GOAL text unchanged.
+
+---
+
 ## OWNER OVERRIDE 2026-10-31: GOAL CONTINUITY
 
 The existing owner GOAL text remains unchanged. Codex now has explicit authority to update scoped root `TASKS.md` status/progress and move between PREAUTHORIZED goal stages without a mandatory ChatGPT audit/tracker handoff. Source/test changes -> builder log -> normal push/parity -> separate TASKS.md current/next/evidence commit -> normal push/parity -> next queue-guard validation -> next stage. Same stable prompt URL in both task fields. Owner authorization: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md. If external permission is missing, mark that action EXTERNAL_AUTH_REQUIRED and continue independent permitted work. Never invent tests, audit PASS, a new scope, paid provider calls, external R2/Production write permissions or a new worktree. `C:\Users\sekip\.codex\attachments` session-managed goal copies are not an approved project output location; do not write project artifacts there or delete system-managed files.
