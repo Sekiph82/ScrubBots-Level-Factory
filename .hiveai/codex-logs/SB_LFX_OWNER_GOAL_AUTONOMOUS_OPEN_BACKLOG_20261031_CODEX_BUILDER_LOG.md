@@ -66,3 +66,17 @@ Document role: CODEX BUILDER LOG
 - Added dated evidence `docs/security/MOBILE_STORE_POLICY_RECHECK_2026-10-31.md`, preserving the prior 2026-10-14 note. It maps current primary-source text to the declarative-only boundary and leaves client flow, download-size disclosure, shipped artifact, store decision and final review open.
 - `git diff --check`: passed. Tests: NOT RUN; documentation-only public-policy research, no product behavior changed. No Play Console or app submission was accessed; no store approval or legal conclusion is claimed.
 - Source/document commit: `8e68681cdb2a319d800daa010e86603545c9dc30` (`docs(policy): recheck Google Play remote content rules`).
+
+## SB-CP09-002 — Current Apple remote-content/code policy recheck
+
+### Start and research record
+- Started after the queue guard selected existing `SB-CP09-002`; canonical Desktop branch `codex/sb-lfx-018-r05-v13-cd-recovery-20261021`; starting `HEAD == origin/main == 57f67a7cbb735945fcf29f549161d11518dcb5c8`, 0 ahead/behind, tracked worktree clean.
+- Read the prior dated Apple/Google policy note and current declarative payload/threat-model boundaries.
+- Browsed current first-party Apple sources on 2026-10-31: App Review Guidelines (`https://developer.apple.com/app-store/review/guidelines/`), Apple Developer Program License Agreement (`https://developer.apple.com/support/terms/apple-developer-program-license-agreement/`), and Apple’s 2026-06-08 public update note (`https://developer.apple.com/news/?id=a233fmpw`).
+- Scope is public-policy engineering mapping only. No Apple developer account, App Store Connect, app artifact, game client, legal counsel, or submission review was accessed.
+
+### Apple policy recheck result — 2026-10-31
+- Current first-party App Review Guidelines 2.5.2 still constrain code that changes app features, 4.2.3(ii) addresses prompt/size disclosure where additional resources are needed at initial launch, and 5.1.1 requires app privacy-policy disclosure for data collection/use/sharing. Current Developer Program License Agreement 3.3.1(B)-(C) retains executable-code and alternate feature-enablement restrictions. The narrow educational interpreted-code exception and Guideline 4.7 were not treated as a general remote-level exception.
+- Apple’s public 2026-06-08 update announcement was also checked; the current live full-text pages were opened directly on 2026-10-31. Added dated mapping `docs/security/APPLE_STORE_POLICY_RECHECK_2026-10-31.md`; no old dated note was rewritten.
+- `git diff --check`: passed. Tests: NOT RUN; documentation-only public-policy research. No App Store Connect/account, iOS artifact, app review, game client, user data, or live release flow was accessed. No legal or acceptance conclusion is claimed.
+- Source/document commit: `3a10d9d8fa34ffba30854aa8c4ac2648b8fab098` (`docs(policy): recheck Apple remote content rules`).
