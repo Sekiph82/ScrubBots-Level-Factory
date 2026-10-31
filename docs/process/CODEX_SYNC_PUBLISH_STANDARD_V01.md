@@ -1,5 +1,9 @@
 # Codex Sync + Publish Standard V01
 
+## OWNER OVERRIDE 2026-10-31: GOAL CONTINUITY
+
+The existing owner GOAL text remains unchanged. Codex now has explicit authority to update scoped root `TASKS.md` status/progress and move between PREAUTHORIZED goal stages without a mandatory ChatGPT audit/tracker handoff. Source/test changes -> builder log -> normal push/parity -> separate TASKS.md current/next/evidence commit -> normal push/parity -> next queue-guard validation -> next stage. Same stable prompt URL in both task fields. Owner authorization: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md. If external permission is missing, mark that action EXTERNAL_AUTH_REQUIRED and continue independent permitted work. Never invent tests, audit PASS, a new scope, paid provider calls, external R2/Production write permissions or a new worktree. `C:\Users\sekip\.codex\attachments` session-managed goal copies are not an approved project output location; do not write project artifacts there or delete system-managed files.
+
 Status: OWNER-LOCKED STANDING BUILDER RULE
 Date: 2026-10-08
 Latest explicit owner workspace ruling: 2026-10-10, **DESKTOP ONLY / NO TEMP WORKTREES**
@@ -27,13 +31,13 @@ Preserve the established GitHub implementation and audit workflow without expand
 ## During every Codex task
 
 - Implement/test and keep small working evidence inside the existing Desktop LF repo. Avoid writing multi-GB temporary files, extra game clones, tar archives or extracted duplicates. Run tests in bounded serial form; use a project-owned disposable test directory only if needed and only with normal, demonstrably permitted cleanup. If cleanup is denied, stop generating additional large scratch instead of bypassing policy.
-- Maintain the single matching builder log, but **Codex never modifies root `TASKS.md` or `.hiveai/audits/**`**; ChatGPT is their sole writer. No second tracker.
+- Maintain the existing builder log. Under the latest owner delegation Codex MAY update the bounded current/next/actor/evidence and preapproved task checkboxes in root `TASKS.md`, after code/log commits have been published. `.hiveai/audits/**` and used prompts remain immutable. No second tracker.
 - Protect source/palette/solver/VOID/current-game authority and other owner data. No secrets in repo, logs, APK or any remote content.
 
 ## Mandatory finish / GitHub publication
 
 1. Test each actual product-code change once and record its exact commands/results in the builder log. **When a later task merely moves/publishes the same unchanged, previously tested commits, REUSE that original test evidence; do not repeat the test suite.** Read-only Git tree/object/diff verification is sufficient to establish code identity. Re-run only tests affected by a demonstrable product-code change, missing/corrupt evidence or an independently identified defect, and state the precise reason. Identify genuinely NOT RUN gates without falsely claiming PASS.
-2. Commit implementation/tests first, builder log/evidence separately.
+2. Commit implementation/tests first, builder log/evidence separately. Then, after their successful normal push and parity check, commit/publish the scoped TASKS.md current/next/status update with evidence SHA. Verify a second GitHub/Desktop parity check and rerun the task queue for the next PREAUTHORIZED stage. No ChatGPT handoff is required.
 3. `git fetch --prune origin` and require an actual safe fast-forward ancestor relationship before publish. If remote changed, reconcile safely in the Desktop checkout by inspection; do not manufacture a clean state, recreate worktrees, rewrite accepted commits or force push.
 4. Publish using normal `git push origin HEAD:main`.
 5. Fetch and verify `HEAD == origin/main`, 0 ahead / 0 behind and no task-created unstaged changes.
@@ -41,6 +45,6 @@ Preserve the established GitHub implementation and audit workflow without expand
 
 ## Independent audit
 
-ChatGPT reads actual published LF GitHub source/tests/logs, writes strict audit criteria/verdict and updates only LF root `TASKS.md`. Implementation publication does not itself equal audit PASS or an R2 production release.
+ChatGPT can independently audit published code/test evidence on request but is NOT a mandatory advancement gate. Codex updates owner-delegated TASKS.md builder-stage progress. Never label such builder verification an independent audit PASS, R2 publication, or Production release; those require their own actual evidence and permissions.
 
 The owner-facing durable Factory Studio release remains in its existing approved Desktop Release directory, never in a disposable worktree.
