@@ -27,6 +27,7 @@ _OUTCOMES = frozenset({"PREPARED", "COMPLETED", "BLOCKED", "FAILED", "MATCH", "M
 _ENVIRONMENTS = frozenset({"LOCAL", "STAGING", "PRODUCTION"})
 MAX_BACKUP_BYTES = 16 * 1024 * 1024
 MAX_BACKUP_OBJECTS = 128
+OPERATION_RECORD_SCHEMA_VERSION = 2
 
 
 class OperationsEvidenceError(ValueError):
@@ -72,6 +73,7 @@ class OperationRecord:
     outcome: str
     reason_code: str
     batch_id: str | None = None
+    target_id: str | None = None
     content_version: int | None = None
     manifest_sha256: str | None = None
     expected_object_sha256: str | None = None
@@ -94,6 +96,8 @@ class OperationRecord:
             raise OperationsEvidenceError("occurred_at must include a timezone")
         if self.batch_id is not None:
             _identifier(self.batch_id, "batch_id")
+        if self.target_id is not None:
+            _identifier(self.target_id, "target_id")
         if self.content_version is not None and (type(self.content_version) is not int or self.content_version < 1):
             raise OperationsEvidenceError("content_version must be a positive integer when provided")
         if self.manifest_sha256 is not None:
@@ -124,7 +128,7 @@ class OperationRecord:
     def as_dict(self) -> dict[str, object]:
         return {
             "schema": "scrubbots-content-operation-record",
-            "schema_version": 1,
+            "schema_version": OPERATION_RECORD_SCHEMA_VERSION,
             "operation_id": self.operation_id,
             "occurred_at": self.occurred_at,
             "kind": self.kind,
@@ -132,6 +136,7 @@ class OperationRecord:
             "outcome": self.outcome,
             "reason_code": self.reason_code,
             "batch_id": self.batch_id,
+            "target_id": self.target_id,
             "content_version": self.content_version,
             "manifest_sha256": self.manifest_sha256,
             "expected_object_sha256": self.expected_object_sha256,
@@ -290,6 +295,68 @@ def operation_record_from_object_observation(
         reason_code="HASH_MATCH" if matches else "HASH_MISMATCH",
         expected_object_sha256=expected,
         observed_object_sha256=observed,
+    )
+
+
+def operation_record_from_control_receipt(receipt: object, *, operation_id: str) -> OperationRecord:
+    """Record a validated local control intent without claiming remote activation."""
+    from .m17_release_controls import ControlReceipt, ReceiptOperation, make_control_receipt, serialize_control_receipt
+
+    if not isinstance(receipt, ControlReceipt):
+        raise OperationsEvidenceError("control receipt must be a canonical M17 ControlReceipt")
+    try:
+        operation = ReceiptOperation(receipt.operation)
+        verified = make_control_receipt(
+            actor_ref=receipt.actor_ref,
+            operation=operation,
+            occurred_at_utc=receipt.occurred_at_utc,
+            target_id=receipt.target_id,
+            current_version=receipt.current_version,
+            next_version=receipt.next_version,
+            prior_manifest_sha256=receipt.prior_manifest_sha256,
+            new_manifest_sha256=receipt.new_manifest_sha256,
+            pack_hashes=receipt.pack_hashes,
+            approval_id=receipt.approval_id,
+            provider_record_sha256=receipt.provider_record_sha256,
+            outcome=receipt.outcome,
+        )
+        if serialize_control_receipt(verified) != serialize_control_receipt(receipt):
+            raise OperationsEvidenceError("control receipt does not match its canonical evidence")
+    except OperationsEvidenceError:
+        raise
+    except Exception as exc:
+        raise OperationsEvidenceError("control receipt is invalid") from exc
+
+    operation_kinds = {
+        "ROLLBACK": "ROLLBACK",
+        "DISABLE": "DISABLE",
+        "REENABLE": "DISABLE",
+        "SCHEDULE": "SCHEDULE",
+        "CANCEL_SCHEDULE": "SCHEDULE_CANCEL",
+    }
+    kind = operation_kinds.get(operation.value)
+    if kind is None:
+        raise OperationsEvidenceError("control operation is not an auditable CP08 change")
+    expected_outcome = {
+        ("SCHEDULE", "INTENT_PERSISTED"): ("PREPARED", "SCHEDULE_INTENT_PREPARED"),
+        ("CANCEL_SCHEDULE", "INTENT_CANCELLED"): ("COMPLETED", "SCHEDULE_CANCEL_COMPLETED"),
+        ("ROLLBACK", "PREPARED"): ("PREPARED", "ROLLBACK_PREPARED"),
+        ("DISABLE", "PREPARED"): ("PREPARED", "DISABLE_PREPARED"),
+        ("REENABLE", "PREPARED"): ("PREPARED", "REENABLE_PREPARED"),
+    }.get((operation.value, receipt.outcome))
+    if expected_outcome is None:
+        raise OperationsEvidenceError("control receipt outcome is outside the local intent contract")
+    disposition, reason_code = expected_outcome
+    return OperationRecord(
+        operation_id=operation_id,
+        occurred_at=receipt.occurred_at_utc,
+        kind=kind,
+        environment="LOCAL",
+        outcome=disposition,
+        reason_code=reason_code,
+        target_id=receipt.target_id,
+        content_version=receipt.next_version,
+        manifest_sha256=receipt.new_manifest_sha256,
     )
 
 

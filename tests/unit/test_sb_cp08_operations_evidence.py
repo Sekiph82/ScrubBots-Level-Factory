@@ -14,6 +14,7 @@ from scrubbots_content_pipeline.operations import (
     export_recovery_bundle,
     operation_record_from_manifest_observation,
     operation_record_from_object_observation,
+    operation_record_from_control_receipt,
     render_jsonl,
     restore_recovery_bundle,
     verify_content_health,
@@ -99,8 +100,9 @@ def test_health_report_is_unknown_without_reads_and_healthy_only_for_exact_bytes
 def test_error_records_and_jsonl_schema_do_not_accept_free_form_secret_or_pii_fields() -> None:
     record = _record(kind="ERROR", outcome="FAILED", reason_code="PROVIDER_TIMEOUT")
     value = json.loads(render_jsonl((record,)))
+    assert value["schema_version"] == 2
     assert set(value) == {"schema", "schema_version", "operation_id", "occurred_at", "kind", "environment",
-                          "outcome", "reason_code", "batch_id", "content_version", "manifest_sha256",
+                          "outcome", "reason_code", "batch_id", "target_id", "content_version", "manifest_sha256",
                           "expected_object_sha256", "observed_object_sha256"}
     assert "message" not in value and "email" not in value and "credential" not in value
     with pytest.raises(OperationsEvidenceError, match="secret-like"):
@@ -193,6 +195,53 @@ def test_object_verification_records_only_exact_observed_hashes() -> None:
             expected_object_sha256=expected_sha256,
             observed_object_sha256=expected_sha256,
         )
+
+
+def test_m17_control_receipts_map_to_local_prepared_change_records_only() -> None:
+    from dataclasses import replace
+
+    from scrubbots_content_pipeline.m17_release_controls import ReceiptOperation, make_control_receipt
+
+    def receipt(operation: ReceiptOperation, outcome: str):
+        return make_control_receipt(
+            actor_ref="owner-01",
+            operation=operation,
+            occurred_at_utc="2026-10-14T10:00:00Z",
+            target_id="target-01",
+            current_version=4,
+            next_version=5,
+            prior_manifest_sha256="a" * 64,
+            new_manifest_sha256="b" * 64,
+            pack_hashes=(("campaign", "c" * 64),),
+            approval_id="approval-01",
+            provider_record_sha256="d" * 64,
+            outcome=outcome,
+        )
+
+    cases = (
+        (ReceiptOperation.DISABLE, "PREPARED", "DISABLE", "PREPARED", "DISABLE_PREPARED"),
+        (ReceiptOperation.REENABLE, "PREPARED", "DISABLE", "PREPARED", "REENABLE_PREPARED"),
+        (ReceiptOperation.ROLLBACK, "PREPARED", "ROLLBACK", "PREPARED", "ROLLBACK_PREPARED"),
+        (ReceiptOperation.SCHEDULE, "INTENT_PERSISTED", "SCHEDULE", "PREPARED", "SCHEDULE_INTENT_PREPARED"),
+        (ReceiptOperation.CANCEL_SCHEDULE, "INTENT_CANCELLED", "SCHEDULE_CANCEL", "COMPLETED", "SCHEDULE_CANCEL_COMPLETED"),
+    )
+    for operation, receipt_outcome, kind, outcome, reason in cases:
+        record = operation_record_from_control_receipt(receipt(operation, receipt_outcome),
+                                                        operation_id=f"control-{operation.value.lower()}")
+        assert (record.kind, record.environment, record.outcome, record.reason_code) == (
+            kind, "LOCAL", outcome, reason,
+        )
+        assert (record.target_id, record.content_version, record.manifest_sha256) == (
+            "target-01", 5, "b" * 64,
+        )
+
+    good = receipt(ReceiptOperation.DISABLE, "PREPARED")
+    with pytest.raises(OperationsEvidenceError):
+        operation_record_from_control_receipt(replace(good, target_id="tampered-target"),
+                                              operation_id="control-tampered")
+    with pytest.raises(OperationsEvidenceError, match="not an auditable CP08 change"):
+        operation_record_from_control_receipt(receipt(ReceiptOperation.PUBLISH, "PREPARED"),
+                                              operation_id="control-publish")
 
 
 def test_backup_export_verifies_all_bytes_before_returning_recovered_objects() -> None:
