@@ -575,8 +575,11 @@ def test_receipts_are_deterministic_and_weekly_batches_keep_distinct_lineage() -
     )
     assert serialize_control_receipt(receipt) == serialize_control_receipt(receipt)
     assert receipt.report_sha256 in render_control_receipt(receipt)
-    batch_a = make_weekly_accepted_batch("batch-a", "2026-W41", ("candidate-a",), sha, "b" * 64, "c" * 64)
+    batch_a = make_weekly_accepted_batch(
+        "batch-a", "2026-W41", ("candidate-a", "candidate-a2"), sha, "b" * 64, "c" * 64,
+    )
     batch_b = make_weekly_accepted_batch("batch-b", "2026-W41", ("candidate-b",), sha, "d" * 64, "e" * 64)
+    assert batch_a.accepted_candidate_ids == ("candidate-a", "candidate-a2")
     assert batch_a.immutable_identity_sha256 != batch_b.immutable_identity_sha256
     with pytest.raises(ReleaseControlError, match="INVALID_WEEKLY_BATCH"):
         make_weekly_accepted_batch("batch-a", "2026-W41", ("candidate-a", "candidate-a"), sha, "b" * 64, "c" * 64)
