@@ -22,3 +22,4 @@ Document role: CODEX BUILDER LOG
 
 - Builder verification log will be committed/pushed with a normal push and fetch parity check.
 - Next candidate is existing `SB-CP08-008` clean-machine publish dry run; inspect offline reproducibility and no-provider guarantees at its clean boundary.
+- Builder log commit `bdc4134d140f91cf26e020762146298f870bb0b5` was pushed normally; fetch verified `HEAD == origin/main`, 0 ahead / 0 behind. Verification remains partial for lack of a proven product alert-delivery path.
