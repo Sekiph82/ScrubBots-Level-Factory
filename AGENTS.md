@@ -1,5 +1,11 @@
 # H!veAI TASKS-only control-plane adapter
 
+## LATEST OWNER OVERRIDE 2026-10-31 20:30: AUTONOMOUS EXISTING-BACKLOG TASK PICKING
+
+OWNER expressly delegates to Codex: select its own NEXT SAFE task from existing unchecked/partial root `TASKS.md` requirements within the user's unchanged ScrubBots Level Factory GOAL, finish and verify it, update the same root TASKS.md task status/next selection, normal push/fetch and continue. **Do not stop merely because A–E were completed, old tracker text said "no next task" or ChatGPT did not independently audit.** Latest single stable authoritative prompt: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. It supersedes old "preauthorized stages A-E only" selection restriction, but it DOES NOT create new tasks or bypass actual cost, owner-data, cross-repo, CI, uncontrolled GUI, R2 or Production permissions. Existing [ ] backlog remains actionable. A tool-policy-denied removal of 8 untracked test fixture folders is a NONBLOCKING per-operation failure; do not bypass policy or delete owner data. Use genuine evidence and do not fake READY / WON_ROBUST / PASS or independent audit. No worktree or extra project files outside canonical Desktop checkout/GitHub. Original GOAL text unchanged. No background looping beyond current session.
+
+---
+
 ## LATEST OWNER RULE: CODEX CONTINUOUS GOAL AUTHORITY (2026-10-31)
 
 The owner explicitly directed that Codex, not ChatGPT, must autonomously advance the existing ScrubBots Level Factory GOAL. **The owner did NOT change the goal text.** Exact stable GitHub task envelope: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md
