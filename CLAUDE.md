@@ -1,5 +1,11 @@
 # H!veAI TASKS-only control-plane adapter
 
+## LATEST OWNER AUTO-BACKLOG AUTHORIZATION 2026-10-31
+
+The owner's original GOAL text is unchanged. Codex now chooses, closes and advances among existing root `TASKS.md` unchecked/partial in-scope SAFE tasks, even after A-E. Read https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. Update the one root TASKS.md with exact source/test/commit evidence and next selected EXISTING requirement after each real implemented task, push/refetch and verify Desktop = GitHub main, then continue without ChatGPT audit handoff. Prior restrictions on selection only from fixed A-E are superseded. Historical failures, paid-provider calls, owner data, R2/Production writes, CI, unapproved GUI and no TEMP clones remain protected; permission-limited operations stay pending without blocking other safe work. Do not make up tasks or background automation.
+
+---
+
 ## LATEST OWNER DIRECTIVE 2026-10-31: CODEX / CLAUDE CONTINUOUS GOAL
 
 The owner's existing GOAL is unchanged. The owner explicitly delegated continuous task-state progression to the executing Codex agent, WITHOUT waiting for ChatGPT audit or tracker updates. Stable authorization: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_CONTINUOUS_EXECUTION_20261031.md
