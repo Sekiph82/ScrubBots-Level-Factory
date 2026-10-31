@@ -23,6 +23,17 @@ Scope: the Level Factory content pipeline and a future SCRUBBOTS client that con
 | Content delivery collects unnecessary player data | Current project posture is offline generation and no telemetry requirement; operation records contain no player identity fields | No telemetry system or app privacy disclosure was assessed. Any future telemetry requires a separate data inventory, purpose, retention, consent, and privacy review. |
 | An attacker replaces both content and its digest | SHA-256 detects mismatch but does not authenticate the publisher | Signing or another authenticated trust root may be appropriate. Key ownership, provisioning, rotation, recovery, client verification, and migration are owner/security decisions; this task does not create keys or select a signing design. |
 
+## Authenticity upgrade options — NOT APPROVED / OWNER-SECURITY DECISION REQUIRED
+
+The existing SHA-256 manifest and pack digests provide integrity checks only. An attacker who can replace both the content and its recorded digest can produce a matching pair; hashes alone do not establish who published it. The following are decision options, not an adopted design:
+
+1. **Release-anchored manifest signature:** sign a canonical, versioned manifest (including the exact pack digests) with a publisher key, and verify it using a public key delivered through an independently trusted application release. Ed25519 is one standardized signature option (RFC 8032). This adds publisher authentication but does not by itself prevent replay, rollback, freeze, or stale signed content.
+2. **Delegated update metadata / TUF-like trust:** use separately scoped metadata roles, trusted-root versioning and rotation, and metadata version/expiry checks to address key compromise and rollback/freeze risks. This adds key custody, threshold and recovery operations, metadata lifecycle rules, and offline-client clock/availability tradeoffs (The Update Framework specification v1.0.36).
+
+Before choosing or implementing either option, owner/security must decide and review: the trust anchor and its delivery path; single-key versus threshold authorization and key custodians; protected storage, provisioning, rotation, revocation and compromise recovery; canonical bytes, signature context/domain separation, algorithm and format version; rollback/freeze/expiry policy and offline-device clock behavior; migration and rejection behavior for unsigned, unknown-key, unknown-schema, stale or invalidly signed content; and the independent client/security acceptance evidence required before remote content is trusted.
+
+Until those decisions are approved and the client verifier is independently reviewed, no signing key, signature verifier, publishing service, or authenticated-publishing claim is implemented or authorized here. Do not treat matching hashes as publisher authentication. References: [RFC 8032](https://www.rfc-editor.org/rfc/rfc8032.html); [The Update Framework specification v1.0.36](https://theupdateframework.github.io/specification/v1.0.36/).
+
 ## Fail-closed expectations
 
 1. Reject unknown schemas, fields, object keys, non-HTTPS endpoints, malformed digests, executable-like content, and stale state preconditions.
