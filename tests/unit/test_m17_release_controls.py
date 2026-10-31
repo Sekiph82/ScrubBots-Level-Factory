@@ -791,3 +791,35 @@ def test_cp06_009_simulated_bad_active_release_rolls_back_with_monotonic_readbac
     assert not provider.compare_and_swap_active(
         candidate.expected_current_sha256, 2, candidate.manifest_bytes, serialized_history,
     )
+
+
+def test_cp06_012_publish_and_rollback_receipts_are_reproducible() -> None:
+    import json
+
+    for operation in (ReceiptOperation.PUBLISH, ReceiptOperation.ROLLBACK):
+        receipt = make_control_receipt(
+            actor_ref="codex-owner-ref", operation=operation,
+            occurred_at_utc="2026-10-31T12:30:00Z", target_id="staging-main",
+            current_version=4, next_version=5,
+            prior_manifest_sha256="a" * 64, new_manifest_sha256="b" * 64,
+            pack_hashes=(("pack-z", "d" * 64), ("pack-a", "c" * 64)),
+            approval_id="approval-42", provider_record_sha256="e" * 64,
+            outcome="PREPARED",
+        )
+        machine_first = serialize_control_receipt(receipt)
+        machine_second = serialize_control_receipt(receipt)
+        human_first = render_control_receipt(receipt)
+        human_second = render_control_receipt(receipt)
+
+        assert machine_first == machine_second
+        assert human_first == human_second
+        fields = json.loads(machine_first)
+        assert fields["operation"] == operation.value
+        assert fields["actor_ref"] == "codex-owner-ref"
+        assert fields["approval_id"] == "approval-42"
+        assert fields["provider_record_sha256"] == "e" * 64
+        assert fields["pack_hashes"] == [
+            {"pack_id": "pack-a", "sha256": "c" * 64},
+            {"pack_id": "pack-z", "sha256": "d" * 64},
+        ]
+        assert fields["report_sha256"] in human_first
