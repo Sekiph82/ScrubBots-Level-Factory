@@ -720,3 +720,29 @@ def test_f02_interrupted_firing_stale_revalidation_blocks_without_activation() -
         lambda _revision, *, idempotency_key: pytest.fail("terminal blocked schedule must not activate"),
     )
     assert terminal.considered == 0
+
+
+def test_due_run_blocks_each_failed_revalidation_gate_without_activation() -> None:
+    from scrubbots_content_pipeline.m17_release_controls import DueRevalidationResult
+
+    failed_gate_values = (
+        (False, True, True, True),
+        (True, False, True, True),
+        (True, True, False, True),
+        (True, True, True, False),
+    )
+    for index, checks in enumerate(failed_gate_values):
+        schedule_id = f"cp06-007-gate-{index}"
+        _candidate, scheduled = _f02_scheduled_intent(schedule_id)
+        store = SQLiteLocalProvider(sqlite3.connect(":memory:"))
+        assert store.append_revision(scheduled, expected_revision_sha256=None)
+
+        result = run_due(
+            store, FixedClock(datetime(2026, 10, 10, 15, 0, tzinfo=timezone.utc)),
+            lambda _revision, checks=checks: DueRevalidationResult(*checks),
+            lambda _revision, *, idempotency_key: pytest.fail("unverified schedule must not activate"),
+        )
+
+        assert result.activated == ()
+        assert result.rejected == ((schedule_id, "DUE_REVALIDATION_REJECTED"),)
+        assert store.schedule_heads()[schedule_id].state is ScheduleState.BLOCKED
