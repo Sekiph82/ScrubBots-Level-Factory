@@ -105,3 +105,23 @@ def test_preflight_never_writes_the_protected_job_or_release_pool() -> None:
     assert "studio-extensions\\png-batches\\jobs" not in source
     assert "studio-extensions\\release-pool" not in source
     assert "if (-not $Apply" in source
+
+
+def test_repeat_v06_install_requires_exact_manifest_receipt_and_verify_hashes() -> None:
+    source = _installer()
+    assert "53d2305a67685e6a782b8273ca9f3d1024a5b7d9dd9a9ba14453c64b0be43367" in source
+    assert "a91f6627d24f48df953a3baf956db76f6a2fef12" in source
+    assert "Repeat R10 V06 install requires the exact published seven-file receipt" in source
+    assert "R10 V06 prior install receipt differs from its exact recorded bytes" in source
+    assert "R10 V06 manifest does not retain the exact published verify.py receipt" in source
+    assert "Installed verify.py differs from the exact R10 V06 manifest receipt" in source
+    for sha256 in (
+        "7d383e204588c8c4374ce06660087171de5b16f87ca8f71d8f027f632b9dee9b",
+        "5f08fe2a4884c3804964e5ee45f56081acc71887cddb0b741bb5e2fa01a324e1",
+        "3a7d046a35dacb6ea516179d6004e388c0962d195dc43d711981e8e14e86d27f",
+        "5f874c1b4b8de5227c7eb701c98f1e201ced3e0a78523fb918c446882d6163ac",
+        "74a11709f16caaca7ae21d5ed53331003e2754f3a33241ed83ee9d5e492a2a37",
+        "0a6ed1123ed6e1ce5204972ffe489e67e682a198e1c462006aea32c251d63b97",
+        "f93289e84276529b1404c64bf6b435c3c50a636db9c4d19cbaef941a2f4c8540",
+    ):
+        assert sha256 in source

@@ -220,6 +220,49 @@ elseif ($manifestSha256 -cin @(
     if ((Get-Sha256 (Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar)))) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') { throw 'Installed verify.py no longer matches its prior successful V05 receipt.' }
     $verifyRepairAuthorized = $true
 }
+elseif ($manifestSha256 -ceq '53d2305a67685e6a782b8273ca9f3d1024a5b7d9dd9a9ba14453c64b0be43367') {
+    # Exact R10 V06 Phase-5 manifest from the published a91f662 install.
+    # Accept only its complete seven-file receipt and unchanged historical
+    # verify.py bytes so a later scoped overlay can be repeated safely.
+    $priorReceipt = @($manifest.overlayReceipts)[-1]
+    $expectedV06Receipt = @{
+        'level_factory/scripts/factory_core_launcher.py' = @{ sha256 = '7d383e204588c8c4374ce06660087171de5b16f87ca8f71d8f027f632b9dee9b'; priorExists = $true; priorSha256 = '9b07dffcf9523ca748a0c7c9e353c740391b936454f7959569c7b51a0e94fe53'; bytes = 75879 }
+        'level_factory/scripts/factory_studio_exact_ui.gd' = @{ sha256 = '5f08fe2a4884c3804964e5ee45f56081acc71887cddb0b741bb5e2fa01a324e1'; priorExists = $true; priorSha256 = 'e4a64f70ace7a18b080d8453e09573b1f4cac4e3bb6d79194c96150c61c0ac4b'; bytes = 262005 }
+        'src/scrubbots_pixel_factory/studio_extensions.py' = @{ sha256 = '3a7d046a35dacb6ea516179d6004e388c0962d195dc43d711981e8e14e86d27f'; priorExists = $true; priorSha256 = 'c3df339ec0f4dc508fdb0cd10245143e4548cf99931a9e406aa66971e23ca7f2'; bytes = 187212 }
+        'src/scrubbots_pixel_factory/alpix_batch.py' = @{ sha256 = '5f874c1b4b8de5227c7eb701c98f1e201ced3e0a78523fb918c446882d6163ac'; priorExists = $true; priorSha256 = 'd30651a2c1d89720fc73e070a72282cbedcfa366159004aea327ae7937d12507'; bytes = 28718 }
+        'src/scrubbots_pixel_factory/owner_art_storage.py' = @{ sha256 = '74a11709f16caaca7ae21d5ed53331003e2754f3a33241ed83ee9d5e492a2a37'; priorExists = $false; priorSha256 = $null; bytes = 9998 }
+        'src/scrubbots_pixel_factory/owner_folder_batch.py' = @{ sha256 = '0a6ed1123ed6e1ce5204972ffe489e67e682a198e1c462006aea32c251d63b97'; priorExists = $false; priorSha256 = $null; bytes = 8718 }
+        'src/scrubbots_pixel_factory/owner_release_library.py' = @{ sha256 = 'f93289e84276529b1404c64bf6b435c3c50a636db9c4d19cbaef941a2f4c8540'; priorExists = $false; priorSha256 = $null; bytes = 25562 }
+    }
+    if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
+        $priorReceipt.sourceCommit -cne 'a91f6627d24f48df953a3baf956db76f6a2fef12' -or
+        $priorReceipt.sourceHead -cne 'a91f6627d24f48df953a3baf956db76f6a2fef12' -or
+        [string]$priorReceipt.writerExclusionMethod -cnotlike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -or
+        @($priorReceipt.files).Count -ne $expectedV06Receipt.Count) {
+        throw 'Repeat R10 V06 install requires the exact published seven-file receipt and writer-exclusion proof.'
+    }
+    foreach ($expectedPath in $expectedV06Receipt.Keys) {
+        $expected = $expectedV06Receipt[$expectedPath]
+        $receiptFile = @($priorReceipt.files | Where-Object { $_.path -ceq $expectedPath })
+        if ($receiptFile.Count -ne 1 -or
+            [string]$receiptFile[0].sha256 -cne $expected.sha256 -or
+            [bool]$receiptFile[0].priorExists -ne [bool]$expected.priorExists -or
+            [int64]$receiptFile[0].bytes -ne [int64]$expected.bytes -or
+            ($expected.priorExists -and [string]$receiptFile[0].priorSha256 -cne $expected.priorSha256) -or
+            (-not $expected.priorExists -and $null -ne $receiptFile[0].priorSha256)) {
+            throw "R10 V06 prior install receipt differs from its exact recorded bytes: $expectedPath"
+        }
+    }
+    if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') {
+        throw 'R10 V06 manifest does not retain the exact published verify.py receipt.'
+    }
+    $verifyTarget = Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+    Assert-NoReparsePath $verifyTarget
+    if ((Get-Sha256 $verifyTarget) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') {
+        throw 'Installed verify.py differs from the exact R10 V06 manifest receipt.'
+    }
+    $verifyRepairAuthorized = $true
+}
 else { throw 'Historical verify.py repair requires the exact legacy manifest or the exact prior V05 receipt manifest.' }
 if ($verifyRepairAuthorized) { $authorizedRepairHashes[$verifyPath] = $historicVerifyHash }
 $overlayAdditions = @()
