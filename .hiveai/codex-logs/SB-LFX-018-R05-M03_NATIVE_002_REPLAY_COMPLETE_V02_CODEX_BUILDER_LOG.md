@@ -1053,3 +1053,11 @@ Document role: CODEX BUILDER LOG
 - Corrected read-only inventory diagnostic loaded the exact installer helper and transaction module, processed **437** process records, returned `COMPLETE`, and identified no active Release Studio/writer process. It did not start or stop any process and did not touch installed files.
 - Source/test commit `2ef359de` (`Flatten completed installer process inventory`) contains the array-return fix and its contract assertion. Safe scoped apply is the next gate after normal publication/parity verification.
 - No GUI test, provider call, CI/Actions, owner data, Release Pool, original 140 PNG, R2, Staging, or Production action was performed.
+
+### R10 V06 scoped install after exact receipt and process fallback repair - 2026-10-31 15:23 +03:00
+
+- After source/test commit `2ef359de` was pushed and queue guard verified exact R10 V06 task/prompt with `HEAD == origin/main == 1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2`, reran the approved scoped overlay apply.
+- Install command `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/install_factory_studio_scoped_overlay.ps1 -Apply` returned `COMMITTED`. Exact changed path: `level_factory/scripts/factory_studio_exact_ui.gd`; verified SHA-256 `5fd2793482b81fbe2cb4b47458d2f13c7428aaba7cf3c02487e889609aa09a13`. The installer reported no manifest drift and all other 21 targets unchanged.
+- Independent post-transaction read-only hash check found source and installed UI bytes identical at that SHA. Updated manifest SHA-256 is `25bb54d083e8c654def98a8edc2b39e99346b3a1fd2ab557ca610ad52c5cfa2b`; latest receipt is bound to source head `1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2`, one exact file, and the expected Windows deny-write writer-exclusion proof. The managed manifest still has 2,322 entries; receipt count is 23.
+- GUI input, Godot launch, screenshot/coordinate test remain NOT RUN under the prior owner direction not to test on the laptop. The install receipt proves the scoped file deployment only; it does not prove the exact 38 native-pixel runtime gap or ALPIX visual parity.
+- No other Release data, owner data, PNGs, Release Pool, provider, CI/Actions, R2, Staging, or Production state was changed. Log-only commit and normal push/parity receipt follow.
