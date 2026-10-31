@@ -191,7 +191,7 @@ function Complete-ScopedProcessMetadata {
             CommandLine = $commandLine
         }
     }
-    return ,@($completed)
+    return @($completed)
 }
 
 function Assert-NoReparsePath([string]$Path) {

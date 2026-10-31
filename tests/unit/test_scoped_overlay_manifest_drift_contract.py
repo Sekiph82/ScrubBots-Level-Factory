@@ -133,6 +133,8 @@ def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() ->
     assert "QueryFullProcessImageName" in source
     assert "NtQueryInformationProcess" in source
     assert "function Complete-ScopedProcessMetadata" in source
+    assert "return @($completed)" in source
+    assert "return ,@($completed)" not in source
     assert "$completeInventory = @(Complete-ScopedProcessMetadata -Processes $freshInventory)" in source
     assert "Get-ScopedProcessInventoryState -Processes $completeInventory" in source
     assert "PROCESS_INVENTORY_INCOMPLETE" in _transaction()
