@@ -32,3 +32,4 @@ Document role: CODEX BUILDER LOG
 - Candidate next row is existing `SB-CP07-010` provider-specific isolation; its exact prompt/criteria and source will be read at the clean task boundary. No provider mutation is involved.
 
 - Evidence commit `904f5396a35afa6852570428a6490964fa0ff84f` was pushed normally. Fetch confirmed `HEAD == origin/main`, 0 ahead / 0 behind; no tracked product changes were made. The separate TASKS transition remains to be committed.
+- The first publication-receipt push command failed because `git fetch --prune origin` could not resolve `github.com`; no remote update occurred and commit `f08964e8` was preserved. Before retry, fetch and `git merge-base --is-ancestor origin/main HEAD` passed; the identical normal push succeeded. A second fetch verified `HEAD == origin/main == f08964e82982ee00ce2a5d6b7fe8add5a7b0c200`, 0/0.
