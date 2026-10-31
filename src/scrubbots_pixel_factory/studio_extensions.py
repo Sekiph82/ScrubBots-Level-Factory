@@ -407,10 +407,18 @@ def _validate_review_record(candidate: Mapping[str, Any], value: Mapping[str, An
     candidate_id = str(candidate["candidate_id"])
     sequence = value.get("sequence")
     expected_id = f"review-{candidate_id}-{expected_sequence:04d}"
-    expected_identity = _digest({"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]})
+    identity = {"candidate_id": candidate_id, "grid_hash": candidate["grid_hash"]}
+    expected_identities = {_digest(identity)}
+    # Early immutable review records used LF while current canonical records
+    # use CRLF. Accept that one historical serialization after every field is
+    # still bound to the live candidate; new records continue to write _digest.
+    legacy_lf_identity = json.dumps(
+        identity, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")
+    ) + "\n"
+    expected_identities.add(hashlib.sha256(legacy_lf_identity.encode("utf-8")).hexdigest())
     if value.get("schema") != REVIEW_SCHEMA or value.get("version") != 1 or value.get("review_id") != expected_id:
         raise StudioExtensionError("review schema or deterministic identity is invalid")
-    if value.get("candidate_id") != candidate_id or value.get("candidate_identity_hash") != expected_identity or value.get("artwork_sha256") != candidate["artwork_sha256"] or value.get("grid_hash") != candidate["grid_hash"]:
+    if value.get("candidate_id") != candidate_id or value.get("candidate_identity_hash") not in expected_identities or value.get("artwork_sha256") != candidate["artwork_sha256"] or value.get("grid_hash") != candidate["grid_hash"]:
         raise StudioExtensionError("review evidence is bound to a different candidate/artwork/grid identity")
     if value.get("disposition") not in {"ACCEPT", "REJECT"} or type(sequence) is not int or sequence != expected_sequence:
         raise StudioExtensionError("review disposition or sequence is invalid")
@@ -640,7 +648,14 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
         if expected_identity != primary.get("solver_supply_identity"):
             continue
         review = _latest_review(candidate_id, candidate["artwork_sha256"])
-        from .supply_pipeline.release_pool import ReleaseError, _canonical_official_difficulty, _official_profile, release_entries
+        from .supply_pipeline.release_pool import (
+            ReleaseError,
+            _canonical_official_difficulty,
+            _official_profile,
+            _pool_root,
+            _validate_release_entry_real_play,
+            release_entries,
+        )
         review_projection: dict[str, Any] = {"disposition": "NEEDS_REVIEW", "pool_state": "READY_AUTO_PENDING"}
         try:
             entries = release_entries()
@@ -654,7 +669,22 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
                 try:
                     official = _canonical_official_difficulty(primary)
                     _official_profile(official)
-                    reason = "Exact READY candidate/run is not in the Release Pool despite valid official Difficulty V1 fields."
+                    pool_path = _pool_root() / f"{candidate_id}-{run.get('run_id')}-{review.get('review_id')}.json"
+                    if pool_path.is_file():
+                        try:
+                            pool_record = json.loads(pool_path.read_text(encoding="utf-8"))
+                            has_current_real_play = _validate_release_entry_real_play(pool_record, pool_path.name)
+                        except (OSError, UnicodeError, json.JSONDecodeError, ReleaseError) as exc:
+                            reason = f"Stored Release Pool evidence failed current real-play verification: {exc}"
+                        else:
+                            reason = (
+                                "Stored immutable Release Pool entry lacks the required hash-bound "
+                                "real_play_v1 WON_ROBUST proof."
+                                if not has_current_real_play
+                                else "Exact READY candidate/run is not in the current Release Pool projection despite valid proof."
+                            )
+                    else:
+                        reason = "Exact READY candidate/run has no stored Release Pool entry with current real_play_v1 proof."
                 except ReleaseError as exc:
                     reason = str(exc)
                 review_projection = {"disposition": "ACCEPT", "pool_state": "ACCEPT_RECORDED_BUT_POOL_DENIED", "reason": reason, "pipeline_run_id": run.get("run_id")}

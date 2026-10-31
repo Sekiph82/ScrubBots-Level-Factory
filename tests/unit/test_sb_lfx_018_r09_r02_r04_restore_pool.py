@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from scrubbots_pixel_factory import studio_extensions
+from scrubbots_pixel_factory import owner_upload, studio_extensions
 from scrubbots_pixel_factory.supply_pipeline import pinned_game_source
 from scrubbots_pixel_factory.supply_pipeline.release_pool import (
     ReleaseError,
@@ -35,6 +35,8 @@ def test_release_adapter_reads_real_002_nested_official_difficulty_and_fails_clo
     if "profile" not in official:
         with patch.object(studio_extensions, "_repository_root", return_value=RELEASE_ROOT), patch.object(
             studio_extensions, "extensions_root", return_value=RELEASE_ROOT / "level_factory" / "output" / "studio-extensions"
+        ), patch.object(
+            owner_upload, "_repository_root", return_value=RELEASE_ROOT
         ):
             candidate = next(item for item in studio_extensions.list_candidates() if item["candidate_id"] == run["candidate_id"])
             try:
@@ -80,6 +82,8 @@ def test_latest_002_ready_run_restores_only_when_all_saved_identity_hashes_match
     assert source_dir.is_dir() and game.is_dir()
     with patch.object(studio_extensions, "_repository_root", return_value=RELEASE_ROOT), patch.object(
         studio_extensions, "extensions_root", return_value=output_root / "studio-extensions"
+    ), patch.object(
+        owner_upload, "_repository_root", return_value=RELEASE_ROOT
     ), patch.object(pinned_game_source, "expected_runtime_root", return_value=game):
         restored = studio_extensions.restore_source_run(
             SOURCE_ID_002, game_project=game, source_directory=source_dir
@@ -102,13 +106,15 @@ def test_latest_002_ready_run_restores_only_when_all_saved_identity_hashes_match
         assert restored["owner_review_status"]["entry_digest"] == matching[0]["entry_digest"]
     else:
         assert restored["owner_review_status"]["pool_state"] == "ACCEPT_RECORDED_BUT_POOL_DENIED"
-        assert "profile.dominant" in restored["owner_review_status"]["reason"]
+        assert "real_play_v1 WON_ROBUST" in restored["owner_review_status"]["reason"]
 
 
 def test_existing_002_accept_is_idempotent_and_does_not_create_duplicate_receipt():
     output_root = RELEASE_ROOT / "level_factory" / "output"
     with patch.object(studio_extensions, "_repository_root", return_value=RELEASE_ROOT), patch.object(
         studio_extensions, "extensions_root", return_value=output_root / "studio-extensions"
+    ), patch.object(
+        owner_upload, "_repository_root", return_value=RELEASE_ROOT
     ):
         candidate_id = next(
             run["candidate_id"]
