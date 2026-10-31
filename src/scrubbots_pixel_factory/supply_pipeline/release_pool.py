@@ -15,6 +15,7 @@ from ..contracts.candidate_provenance import CandidateClass, CandidateProvenance
 from .campaign_builder import CampaignError, build_campaign_plan, write_campaign_plan
 from .game_publisher import PublicationError, discover_game_project, publish_batch
 from .progression import load_progression_authority
+from .real_play_gate import REAL_PLAY_MODEL, RealPlayGateError, ensure_real_play_gate
 
 
 class ReleaseError(ValueError):
@@ -497,6 +498,53 @@ def _level_content_hash(path: Path) -> str:
     return _hash(path.read_bytes().replace(b"\r\n", b"\n"))
 
 
+def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str) -> bool:
+    """Return false for legacy rows and reject stale or mismatched real-play proof."""
+
+    real_play = value.get("real_play")
+    files = value.get("files")
+    if (
+        not isinstance(real_play, Mapping)
+        or real_play.get("model") != REAL_PLAY_MODEL
+        or real_play.get("verdict") != "WON_ROBUST"
+        or real_play.get("exitCode") != 0
+        or not isinstance(files, Mapping)
+    ):
+        return False
+    result_record = files.get("real_play_result")
+    if (
+        not isinstance(result_record, Mapping)
+        or result_record.get("path") != real_play.get("resultFile")
+        or result_record.get("sha256") != real_play.get("resultSha256")
+    ):
+        raise ReleaseError(f"Release Pool real-play result binding is missing or changed: {entry_name}")
+    try:
+        result_value = _json(Path(str(result_record.get("path", ""))))
+    except ReleaseError as exc:
+        raise ReleaseError(f"Release Pool real-play evidence is unavailable: {entry_name}") from exc
+    if (
+        result_value.get("schema") != "scrubbots.real_play_file_result.v1"
+        or result_value.get("model") != REAL_PLAY_MODEL
+        or result_value.get("verdict") != "WON_ROBUST"
+        or result_value.get("exitCode") != 0
+        or result_value.get("planSha256") != real_play.get("planSha256")
+        or result_value.get("levelSha256") != real_play.get("levelSha256")
+        or result_value.get("gameCommit") != real_play.get("gameCommit")
+    ):
+        raise ReleaseError(f"Release Pool real-play result does not match its bound acceptance: {entry_name}")
+    for file_name, hash_name in (("level", "levelSha256"), ("supply_plan", "planSha256")):
+        record = files.get(file_name)
+        if not isinstance(record, Mapping):
+            raise ReleaseError(f"Release Pool real-play {file_name} binding is missing: {entry_name}")
+        try:
+            normalized_hash = _hash(Path(str(record.get("path", ""))).read_bytes().replace(b"\r\n", b"\n"))
+        except OSError as exc:
+            raise ReleaseError(f"Release Pool real-play {file_name} is unavailable: {entry_name}") from exc
+        if normalized_hash != real_play.get(hash_name):
+            raise ReleaseError(f"Release Pool real-play {file_name} bytes changed after verification: {entry_name}")
+    return True
+
+
 def _pool_root() -> Path:
     from .. import studio_extensions as studio
     return studio.extensions_root() / "release-pool"
@@ -517,6 +565,16 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
             or source_record.get("source_bytes_sha256") != classification.get("source_sha256")):
         raise ReleaseError("candidate classification does not match the current immutable OWNER_UPLOAD bytes")
     primary = pipeline["primary"]
+    acceptance = primary.get("acceptance", {})
+    if (
+        not isinstance(acceptance, Mapping)
+        or acceptance.get("solver_status") != "SOLVED"
+        or acceptance.get("replay") != "WIN"
+    ):
+        return {
+            "disposition": "NOT_ENTERED_NOT_READY",
+            "reason": "Release Pool requires the canonical SOLVED + replay WIN acceptance before real-play verification.",
+        }
     difficulty = primary.get("difficulty", {})
     official = _canonical_official_difficulty(primary)
     vector = _official_challenge_vector(official)
@@ -531,7 +589,13 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     bundle_path = (studio._repository_root() / str(candidate["source_path"])).resolve()
     paths = {"artwork": bundle_path / "artwork.png", "level": Path(str(primary.get("files", {}).get("level", ""))).expanduser(), "supply_plan": Path(str(primary.get("files", {}).get("supply_plan", ""))).expanduser()}
     if any(not path.is_file() for path in paths.values()): raise ReleaseError("Release Pool requires existing canonical artwork, level, and supply files")
+    result_path = paths["level"].resolve().parent / "real_play_result_v1.json"
+    try:
+        real_play = ensure_real_play_gate(paths["level"], paths["supply_plan"], result_path)
+    except RealPlayGateError as exc:
+        raise ReleaseError(str(exc)) from exc
     file_digests = {name: {"path": str(path), "sha256": _hash(path.read_bytes())} for name, path in paths.items()}
+    file_digests["real_play_result"] = {"path": real_play["result_path"], "sha256": real_play["result_sha256"]}
     payload = {
         "schema": "scrubbots-release-pool-entry/v1", "candidate_id": candidate["candidate_id"],
         "width": candidate.get("width"), "height": candidate.get("height"), "used_colors": candidate.get("used_colors", []),
@@ -543,6 +607,16 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "session_load": official.get("sessionLoad") if isinstance(official, Mapping) else None,
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
         "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
+        "real_play": {
+            "model": REAL_PLAY_MODEL,
+            "verdict": real_play["result"]["verdict"],
+            "exitCode": real_play["result"]["exitCode"],
+            "planSha256": real_play["plan_sha256"],
+            "levelSha256": real_play["level_sha256"],
+            "gameCommit": real_play["result"]["gameCommit"],
+            "resultFile": real_play["result_path"],
+            "resultSha256": real_play["result_sha256"],
+        },
         "review_id": review.get("review_id") if review is not None else None,
         "eligibility_source": "OWNER_ACCEPT" if review is not None else "READY_AUTO",
         "candidate_classification": classification,
@@ -622,6 +696,10 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         actual = _hash(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
         value["entry_digest"] = expected
         if expected != actual: raise ReleaseError(f"Release Pool entry digest mismatch: {path.name}")
+        # Preserve older immutable rows on disk, but never expose rows lacking
+        # current hash-bound real-play proof as Release Pool READY entries.
+        if not _validate_release_entry_real_play(value, path.name):
+            continue
         candidate_id = str(value.get("candidate_id", ""))
         if candidate_id_filter is not None and candidate_id != candidate_id_filter:
             continue

@@ -78,6 +78,8 @@ var _prompt_dialog: ConfirmationDialog
 var _prompt_input: TextEdit
 var _settings_python: LineEdit
 var _settings_game: LineEdit
+var _settings_godot: LineEdit
+var _settings_real_play_timeout: LineEdit
 var _release_search: LineEdit
 var _release_filter_dialog: ConfirmationDialog
 var _filter_difficulty: OptionButton
@@ -2151,20 +2153,39 @@ func _build_secondary_surfaces() -> void:
 	_settings_dialog = AcceptDialog.new()
 	_settings_dialog.title = "Settings"
 	var settings := VBoxContainer.new()
-	settings.custom_minimum_size = Vector2(540, 170)
+	settings.custom_minimum_size = Vector2(540, 230)
 	_settings_python = LineEdit.new()
 	_settings_python.placeholder_text = "Factory Python executable"
 	_settings_python.text = OS.get_environment("SCRUBBOTS_FACTORY_PYTHON")
 	_settings_game = LineEdit.new()
-	_settings_game.placeholder_text = "ScrubBots project path"
-	_settings_game.text = OS.get_environment("SCRUBBOTS_PROJECT")
+	_settings_game.placeholder_text = "ScrubBots repo path (scrubbotsRepoPath)"
+	_settings_game.text = OS.get_environment("SCRUBBOTS_REPO")
+	if _settings_game.text.is_empty():
+		_settings_game.text = OS.get_environment("SCRUBBOTS_PROJECT")
+	if _settings_game.text.is_empty():
+		_settings_game.text = "C:/Users/sekip/Desktop/ScrubBots"
+	_settings_godot = LineEdit.new()
+	_settings_godot.placeholder_text = "Godot 4.7.2 console executable (godotExe)"
+	_settings_godot.text = OS.get_environment("GODOT")
+	if _settings_godot.text.is_empty():
+		_settings_godot.text = "C:/Users/sekip/AppData/Local/Microsoft/WinGet/Packages/GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe/Godot_v4.7.2-stable_win64_console.exe"
+	_settings_real_play_timeout = LineEdit.new()
+	_settings_real_play_timeout.placeholder_text = "Real-play timeout seconds (realPlayTimeoutSeconds)"
+	_settings_real_play_timeout.text = OS.get_environment("SCRUBBOTS_REAL_PLAY_TIMEOUT_SECONDS")
+	if _settings_real_play_timeout.text.is_empty():
+		_settings_real_play_timeout.text = "900"
 	settings.add_child(_settings_python)
 	settings.add_child(_settings_game)
+	settings.add_child(_settings_godot)
+	settings.add_child(_settings_real_play_timeout)
 	_settings_dialog.add_child(settings)
 	add_child(_settings_dialog)
 	_settings_dialog.confirmed.connect(func():
 		OS.set_environment("SCRUBBOTS_FACTORY_PYTHON", _settings_python.text.strip_edges())
 		OS.set_environment("SCRUBBOTS_PROJECT", _settings_game.text.strip_edges())
+		OS.set_environment("SCRUBBOTS_REPO", _settings_game.text.strip_edges())
+		OS.set_environment("GODOT", _settings_godot.text.strip_edges())
+		OS.set_environment("SCRUBBOTS_REAL_PLAY_TIMEOUT_SECONDS", _settings_real_play_timeout.text.strip_edges())
 		if _gateway != null:
 			_gateway.set("python_executable", _settings_python.text.strip_edges())
 			_gateway.call("_refresh_connection")

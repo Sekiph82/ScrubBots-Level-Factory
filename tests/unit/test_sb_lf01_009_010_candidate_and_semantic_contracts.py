@@ -380,7 +380,7 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
     with pytest.raises(ProvenancePassed):
         enter_release_pool(
             candidate,
-            {"disposition": "READY", "primary": {"state": "READY"}},
+            {"disposition": "READY", "primary": {"state": "READY", "acceptance": {"solver_status": "SOLVED", "replay": "WIN"}}},
             _owner_accept(candidate),
         )
 

@@ -19,10 +19,17 @@ def _ready_fixture(root: Path):
     output = root / "studio-extensions"
     pipelines = output / "pipelines"
     pipelines.mkdir(parents=True)
-    bundle = root / "candidate"
+    candidate_id = "candidate-fixture"
+    bundle = root / candidate_id
     bundle.mkdir()
     artwork = bundle / "artwork.png"
     artwork.write_bytes(b"PNG-fixture")
+    (bundle / "metadata.json").write_text(json.dumps({
+        "generator_metadata": {"payload": {"data": {"source_lineage": {
+            "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
+            "source_id": "owner-upload-fixture",
+        }}}},
+    }), encoding="utf-8")
     level = root / "level.json"
     plan = root / "plan.json"
     level.write_text("{}", encoding="utf-8")
@@ -34,10 +41,11 @@ def _ready_fixture(root: Path):
     }
     run = {
         "schema": "scrubbots-pipeline/v2", "version": 2, "run_id": "pipeline-fixture-one",
-        "candidate_id": "candidate-fixture", "request": {"activity_run_id": "run-a"},
+        "candidate_id": candidate_id, "request": {"activity_run_id": "run-a"},
         "disposition": "READY", "created_at": "2026-10-13T00:00:00Z",
         "primary": {
             "state": "READY", "column_count": 4,
+            "acceptance": {"solver_status": "SOLVED", "replay": "WIN"},
             "difficulty": {"score": 50.0, "class": "MEDIUM"},
             "files": {"level": str(level), "supply_plan": str(plan)},
             "solver_metrics": {"official_difficulty_v1": official},
@@ -46,7 +54,7 @@ def _ready_fixture(root: Path):
     pipeline_path = pipelines / f"{run['run_id']}.json"
     pipeline_path.write_text(json.dumps(run, sort_keys=True), encoding="utf-8")
     candidate = {
-        "candidate_id": run["candidate_id"], "source_path": "candidate",
+        "candidate_id": run["candidate_id"], "source_path": candidate_id,
         "artwork_sha256": _sha(artwork.read_bytes()), "grid_hash": "grid-fixture",
         "width": 1, "height": 1, "used_colors": ["C01"],
     }
@@ -72,12 +80,28 @@ def _pool_patches(root, output, candidate_list, latest_run, latest_review, pipel
 def test_ready_auto_release_pool_entry_reads_back_exactly_once(tmp_path):
     output, run, candidate, _path, candidates, latest, review, pipeline_file = _ready_fixture(tmp_path)
     context = _pool_patches(tmp_path, output, candidates, latest, review, pipeline_file)
-    with context[0], context[1], context[2], context[3], context[4], context[5], patch(
+    def fake_real_play(level_file, plan_file, result_file):
+        level_sha = hashlib.sha256(Path(level_file).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+        plan_sha = hashlib.sha256(Path(plan_file).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
+        result = {"schema": "scrubbots.real_play_file_result.v1", "model": "real_play_v1", "verdict": "WON_ROBUST", "exitCode": 0,
+                  "levelSha256": level_sha, "planSha256": plan_sha, "gameCommit": "a" * 40}
+        Path(result_file).write_text(json.dumps(result), encoding="utf-8")
+        raw = Path(result_file).read_bytes()
+        return {"result": result, "result_path": str(result_file), "result_sha256": hashlib.sha256(raw).hexdigest(),
+                "level_sha256": level_sha, "plan_sha256": plan_sha, "settings": {}}
+
+    with context[0], context[1], context[2], context[3], context[4], context[5], patch.object(
+        release_pool, "ensure_real_play_gate", side_effect=fake_real_play
+    ), patch(
         "scrubbots_pixel_factory.supply_pipeline.game_rules.GameRules"
     ) as rules, patch.object(
         release_pool,
         "validate_pool_candidate_provenance",
         return_value={"candidate_class": "PRODUCTION_CANDIDATE", "source_sha256": "a" * 64},
+    ), patch.object(
+        studio_extensions,
+        "verify_owner_source",
+        return_value={"source_sha256": "a" * 64, "source_bytes_sha256": "a" * 64},
     ):
         rules.return_value.classify.return_value = "MEDIUM"
         first = release_pool.enter_release_pool(candidate, run)
