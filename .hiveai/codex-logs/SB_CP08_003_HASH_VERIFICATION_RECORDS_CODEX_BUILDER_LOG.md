@@ -25,3 +25,4 @@ Document role: CODEX BUILDER LOG
 - Source/test commit and normal push receipt will be recorded after parity verification.
 - Next eligible existing row is `SB-CP08-004` disabled/scheduled/rollback change records; inspect only offline state/event contracts and do not run activation or mutate remote state.
 - Builder evidence commit `e80b5366cabc427051ace573844a131d1eb37328` was pushed normally; fetch verified `HEAD == origin/main`, 0 ahead / 0 behind. No remote provider read occurred. TASKS will mark offline support partial and select CP08-004.
+- Tracker transition administrative command note: the first CP08-003 progress-update script expected an unchecked `[ ]` row although CP08-003 was already correctly `[~]`. Its guard aborted before writing TASKS.md; no repository file changed. The selection script is corrected to match the actual partial row.
