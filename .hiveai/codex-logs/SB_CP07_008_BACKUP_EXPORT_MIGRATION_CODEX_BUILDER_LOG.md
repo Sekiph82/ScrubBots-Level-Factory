@@ -23,3 +23,9 @@ Document role: CODEX BUILDER LOG
 - The in-memory recovery bundle produced exact deterministic bytes, reloaded exact objects, rejected a bundle hash mismatch and unsafe path. The export test safely refused a destination inside the repository before creating output.
 - The production export tests that use `tmp_path` were **NOT RUN** because project instructions prohibit Windows system TEMP scratch. No narrow owner-safe repository fixture was authorized or needed for these selected checks. Real Production export, local export receipt on disk, R2 readback, and live restoration/migration remain NOT_RUN. Mark `SB-CP07-008` partial rather than complete.
 - `git diff --check`, builder-log publication/parity receipt and the separate TASKS update remain pending.
+
+## Publication receipt and next row
+
+- Builder evidence commit `ab324560` was pushed normally. Fetch verified `HEAD == origin/main == ab324560f539148a649fa892da23c538e9331526`, 0 ahead / 0 behind. The task-boundary queue guard passed at this pin.
+- Next eligible existing row is `SB-CP07-009` least-privilege publishing credentials. Review the documented permission boundary and local offline contract only; do not inspect live secret values or change external credentials.
+- The separate TASKS update will mark CP07-008 partial with the exact offline evidence and NOT_RUN export/live restoration scope, then select CP07-009.
