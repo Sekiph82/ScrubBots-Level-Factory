@@ -22,3 +22,9 @@ Document role: CODEX BUILDER LOG
 - Source emits `packs/{pack_id}/v{content_version}.scrubpack`. The deterministic upload tests bind this versioned key into canonical manifests, perform write/verify/read in order, and withhold manifest authority on a conflicting digest. The R2 adapter requests conditional create and refuses a repeated object key; cache-control marks immutable pack bytes. No source defect was demonstrated, so no product changes were necessary.
 - This satisfies the precise existing `SB-CP07-005` source/task requirement. These are fake-provider tests only; no real object is asserted to exist in R2.
 - `git diff --check`, builder-log commit/push, parity verification and the authorized separate `TASKS.md` update remain pending.
+
+## Publication receipt and next task
+
+- Builder evidence commit `329e8514` was pushed normally. Post-push fetch verified `HEAD == origin/main == 329e8514fd809895ea678455c0bac4a4e333e1f6`, 0 ahead / 0 behind. The task-boundary queue guard passed at the same pin.
+- Next eligible existing dependency row is `SB-CP07-006` (upload/download/hash round trip), initially limited to the existing local fake-provider implementation and tests. Real R2 read/write is separately unauthorized.
+- Root `TASKS.md` will be updated in a separate commit to close CP07-005 on this evidence and select CP07-006.
