@@ -116,7 +116,28 @@ def test_pro_4x4_submits_variable_dimensions_locked_v3_and_adjustable_max_colors
     assert post["payload"]["no_background"] is True
     assert post["payload"]["target_palette"]["colors"] == [color.hex.upper() for color in CANONICAL_PALETTE.colors]
     assert post["payload"]["target_palette"]["max_colors"] == 7
-    assert post["payload"]["style_options"] == {"color_palette": False}
+    assert "style_options" not in post["payload"]
+
+
+def test_semantic_dispatch_preserves_csv_prompt_verbatim_when_style_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = _launcher_module()
+    observed: dict[str, object] = {}
+
+    def dispatch(**kwargs: object) -> dict[str, object]:
+        observed.update(kwargs)
+        return {"state": "DISPATCHED"}
+
+    monkeypatch.setattr(launcher, "_semantic_generate_pixellab_pro_4x4", dispatch)
+    prompt = "CSV prompt with C01 #FF4500 and fixed sprite details."
+    result = launcher._semantic_generate({
+        "prompt": prompt, "style": "", "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
+        "width": 56, "height": 56, "max_colors": 12, "seed": 20261105,
+        "background_intent": "TRANSPARENT", "operation_id": "csv-prompt-style-empty",
+    })
+
+    assert result == {"state": "DISPATCHED"}
+    assert observed["prompt"] == prompt
+    assert observed["style"] == ""
 
 
 @pytest.mark.parametrize("width,height", [(50, 56), (60, 56), (56, 60), (64, 64)])

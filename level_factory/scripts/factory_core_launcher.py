@@ -452,12 +452,11 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
         raise ValueError("semantic generation request contains unsupported or missing fields")
     if request.get("provider_id") != "PIXELLAB":
         raise ValueError("only the configured PIXELLAB provider is currently executable")
-    from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest
-    from scrubbots_pixel_factory.semantic.providers.registry import create_provider, get_provider_descriptor
-    from scrubbots_pixel_factory import studio_extensions as extensions
-
     prompt = _text(request.get("prompt"), "prompt")
-    style = _text(request.get("style"), "style")
+    style_value = request.get("style", "")
+    if type(style_value) is not str:
+        raise ValueError("style must be a string")
+    style = style_value.strip()
     width, height = _exact_int(request.get("width"), "width"), _exact_int(request.get("height"), "height")
     seed = request.get("seed")
     if isinstance(seed, bool) or not isinstance(seed, (str, int)):

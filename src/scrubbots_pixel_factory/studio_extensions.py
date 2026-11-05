@@ -2513,7 +2513,6 @@ def generate_pixellab_pro_4x4_frames(
             "name": "ScrubBots Palette V3",
             "max_colors": max_colors,
         },
-        "style_options": {"color_palette": False},
     }
     base_url = "https://api.pixellab.ai/v2"
     if on_submission_started is not None:
