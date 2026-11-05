@@ -242,6 +242,26 @@ def test_http_400_detail_is_bounded_and_api_token_is_redacted(monkeypatch: pytes
     assert token not in str(caught.value)
 
 
+def test_http_400_validation_errors_keep_field_and_reason_without_echoing_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.error import HTTPError
+
+    token = "secret-test-token"
+    body = {"detail": [{"loc": ["body", "target_palette"], "msg": "invalid palette", "input": token}]}
+    monkeypatch.setattr(
+        extensions,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request", {}, BytesIO(json.dumps(body).encode()))
+        ),
+    )
+    with pytest.raises(PixelLabProviderError) as caught:
+        extensions._json_request("https://api.pixellab.ai/v2/generate-image-v2", secret=token, method="POST", payload={})
+
+    assert "Provider detail: body.target_palette: invalid palette" in str(caught.value)
+    assert token not in str(caught.value)
+    assert "input" not in str(caught.value)
+
+
 def test_incompatible_frame_count_fails_closed_after_one_post(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "in-memory-test-credential")
     calls: list[str] = []

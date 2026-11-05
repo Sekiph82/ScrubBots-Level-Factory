@@ -2403,13 +2403,33 @@ def _json_request(
         if exc.code == 400:
             try:
                 error_body = json.loads(exc.read(8192).decode("utf-8", errors="replace"))
-                detail = error_body.get("detail") if isinstance(error_body, dict) else None
-                if isinstance(detail, str):
-                    detail = detail.strip()
+                detail: str | None = None
+                if isinstance(error_body, dict):
+                    for key in ("detail", "message", "error", "reason"):
+                        candidate = error_body.get(key)
+                        if isinstance(candidate, str) and candidate.strip():
+                            detail = candidate.strip()
+                            break
+                        # FastAPI/Pydantic commonly returns a list of objects;
+                        # retain only field paths and messages, never input values.
+                        if isinstance(candidate, list):
+                            parts = []
+                            for item in candidate[:8]:
+                                if isinstance(item, str):
+                                    parts.append(item.strip())
+                                elif isinstance(item, dict):
+                                    location = item.get("loc")
+                                    reason = item.get("msg")
+                                    if isinstance(location, list) and isinstance(reason, str):
+                                        path = ".".join(str(part)[:48] for part in location[:8])
+                                        parts.append(f"{path}: {reason.strip()}")
+                            if parts:
+                                detail = "; ".join(part for part in parts if part)
+                                break
+                if detail:
                     if secret:
                         detail = detail.replace(secret, "[redacted]")
-                    if detail:
-                        message = f"{message} Provider detail: {detail[:240]}"
+                    message = f"{message} Provider detail: {detail[:240]}"
             except (OSError, UnicodeError, json.JSONDecodeError):
                 pass
         raise PixelLabProviderError(code, message) from None
