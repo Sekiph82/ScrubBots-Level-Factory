@@ -965,16 +965,24 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
         importer=import_png, default_size=(default_width, default_height))
     from scrubbots_pixel_factory.owner_art_storage import archive_alpix_png
     rows: list[dict[str, object]] = []
-    for row_value in job_result.rows:
+    job_artifact_root = (root / job_result.job_id).resolve()
+    for index, row_value in enumerate(job_result.rows):
         row = dict(row_value)
-        artifact_path = row.get("artifact_path")
+        artifact = job_artifact_root / f"row-{index + 1:05d}.png"
+        row["artifact_path"] = str(artifact)
         expected_sha = row.get("artifact_sha256")
-        if row.get("state") in {"DRAWN", "VALIDATED", "IMPORTED"} and isinstance(artifact_path, str):
-            artifact = Path(artifact_path)
+        if row.get("state") in {"DRAWN", "VALIDATED", "IMPORTED"}:
+            if (artifact.is_symlink() or not artifact.is_file()
+                    or artifact.resolve().parent != job_artifact_root):
+                row["owner_catalog_status"] = "ARTIFACT_MISSING_OR_UNSAFE"
+                rows.append(row)
+                continue
             raw_png = artifact.read_bytes()
             if not isinstance(expected_sha, str) or hashlib.sha256(raw_png).hexdigest() != expected_sha:
-                raise ValueError("ALPIX CSV artifact changed before owner-catalog archival")
-            row["owner_catalog_path"] = str(archive_alpix_png(raw_png, repository_root=_repository_root()))
+                row["owner_catalog_status"] = "ARTIFACT_SHA_MISMATCH"
+            else:
+                row["owner_catalog_path"] = str(archive_alpix_png(raw_png, repository_root=_repository_root()))
+                row["owner_catalog_status"] = "ARCHIVED"
         rows.append(row)
     return {"operation": "alpix-csv-job", **job_result.to_dict(), "rows": rows}
 def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
