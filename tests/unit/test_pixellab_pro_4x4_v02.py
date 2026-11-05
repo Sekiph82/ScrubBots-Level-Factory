@@ -403,6 +403,43 @@ def test_factory_imports_only_pass_frames_as_source_only_and_reuses_job_id(monke
         assert all(status["import_status"] == "IMPORTED" for status in imported_result["frame_statuses"])
 
 
+def test_factory_import_never_submits_rejected_atlas_slices(monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = _launcher_module()
+    imported_paths: list[Path] = []
+    with _runtime_sandbox() as sandbox:
+        fake_repo = sandbox / "repo"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+
+        def batch_import(paths: list[str]) -> dict[str, object]:
+            imported_paths.append(Path(paths[0]))
+            return {"items": [{"disposition": "IMPORTED", "source_id": f"accepted-{len(imported_paths)}"}]}
+
+        monkeypatch.setattr(extensions, "batch_import", batch_import)
+        atlas_image = Image.new("RGBA", (224, 224), (0, 0, 0, 0))
+        for index in range(16):
+            frame = Image.open(BytesIO(_varied_frame(index))).convert("RGBA")
+            if index == 6:
+                frame.putpixel((10, 10), (17, 19, 23, 255))
+            atlas_image.paste(frame, ((index % 4) * 56, (index // 4) * 56))
+        source_atlas = sandbox / "one-rejected-slice.png"
+        atlas_image.save(source_atlas, format="PNG")
+
+        result = launcher._semantic_import_pixellab_pro_4x4(
+            {"path": str(source_atlas), "max_colors": 7}
+        )
+
+        rejected = result["frame_statuses"][6]
+        assert result["state"] == "SOURCES_IMPORTED_NOT_READY"
+        assert result["pass_count"] == 15
+        assert result["rejected_count"] == 1
+        assert rejected["intake_status"] == "REJECTED"
+        assert "FOREIGN_COLORS" in rejected["reasons"]
+        assert rejected["import_status"] == "NOT_IMPORTED"
+        assert len(imported_paths) == 15
+        assert all("sprite-07" not in path.name for path in imported_paths)
+        assert all(path.name.startswith("sprite-") for path in imported_paths)
+
+
 @pytest.mark.parametrize(
     ("prior_state", "job_id"),
     [
