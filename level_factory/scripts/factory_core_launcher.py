@@ -483,8 +483,7 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
             seed=seed,
             operation_id=request.get("operation_id"),
         )
-    if model == "PRO_FLASH":
-        raise ValueError("Pro Flash is retired from active generation; select PRO_4X4.")
+    raise ValueError("PIXELLAB supports only the PRO_4X4 model.")
     descriptor = get_provider_descriptor("PIXELLAB")
     semantic_request = SemanticGenerationRequest(
         output_class=OutputClass.ASSET_ART,
@@ -530,150 +529,6 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     }
 
 
-def _semantic_generate_pixellab_pro_flash(
-    *, prompt: str, style: str, width: int, height: int, seed: str | int,
-    background: str, operation_id: object,
-) -> dict[str, object]:
-    """Submit one explicitly requested Pro Flash image and bind its exact result."""
-    import hashlib
-    import re
-    import uuid
-    from scrubbots_pixel_factory import studio_extensions as extensions
-    from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
-    PRO_FLASH_ENGINE = extensions.PRO_FLASH_ENGINE
-    ProFlashError = extensions.ProFlashError
-    generate_pro_flash_image = extensions.generate_pro_flash_image
-
-    resolved_operation_id = str(operation_id or uuid.uuid4().hex)
-    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", resolved_operation_id):
-        raise ValueError("Pro Flash operation_id is invalid")
-    description = f"{prompt}. Pixel art style: {style}." if style else prompt
-    palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
-    request_digest = hashlib.sha256(json.dumps({
-        "provider": "PIXELLAB", "model": PRO_FLASH_ENGINE, "adapter_version": "pixellab-pro-flash-v1",
-        "api_version": "v2", "palette_sha256": palette_sha256, "description": description,
-        "width": width, "height": height, "seed": seed, "background": background,
-    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
-    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
-    job_root.mkdir(parents=True, exist_ok=True)
-    job_path = (job_root / f"{resolved_operation_id}.json").resolve()
-    if not _inside_output(job_path, extensions.extensions_root().resolve()):
-        raise ValueError("Pro Flash job record escaped the Studio output directory")
-    uncertain_states = {"SUBMITTING", "SUBMISSION_UNKNOWN", "POLL_TIMEOUT", "CANCELLED"}
-    for prior_path in sorted(job_root.glob("*.json")):
-        if prior_path == job_path:
-            continue
-        try:
-            prior = json.loads(prior_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
-            continue
-        if (isinstance(prior, dict) and prior.get("request_sha256") == request_digest
-                and prior.get("state") in uncertain_states):
-            return {
-                "operation": STUDIO_EXTENSION_OPERATION,
-                "state": "NEEDS_REVIEW",
-                "reason": "An earlier identical Pro Flash request may still be processing; check its PixelLab job before retrying.",
-                "job_id": prior.get("job_id"),
-                "operation_id": prior.get("operation_id"),
-            }
-    if job_path.exists():
-        previous = json.loads(job_path.read_text(encoding="utf-8"))
-        return {
-            "operation": STUDIO_EXTENSION_OPERATION,
-            "state": "NEEDS_REVIEW",
-            "reason": "This operation ID already has a durable PixelLab job record; it was not submitted again.",
-            "job_id": previous.get("job_id"),
-            "job_state": previous.get("state"),
-        }
-
-    job_record: dict[str, object] = {
-        "schema": "scrubbots-pixellab-pro-flash-job-v1",
-        "operation_id": resolved_operation_id,
-        "request_sha256": request_digest,
-        "provider_id": "PIXELLAB",
-        "provider_model": PRO_FLASH_ENGINE,
-        "adapter_version": "pixellab-pro-flash-v1",
-        "api_version": "v2",
-        "state": "SUBMITTING",
-        "width": width,
-        "height": height,
-        "seed": seed,
-        "background_intent": background,
-        "palette_source": "data/palette/scrubbots_palette_v3.json",
-        "palette_sha256": palette_sha256,
-        "palette_enforcement": "API_TARGET_PALETTE_V3_AND_LOCAL_EXACT_VALIDATION",
-    }
-
-    def persist_job() -> None:
-        extensions._write_json(job_path, job_record)
-
-    persist_job()
-
-    def accepted(job_id: str) -> None:
-        job_record.update({"state": "POLLING", "job_id": job_id})
-        persist_job()
-
-    try:
-        generated = generate_pro_flash_image(
-            description=description,
-            width=width,
-            height=height,
-            seed=seed,
-            no_background=background == "TRANSPARENT",
-            on_job_accepted=accepted,
-        )
-    except ProFlashError as exc:
-        job_record.update({"state": exc.code, "job_id": exc.job_id or job_record.get("job_id"), "error": str(exc)})
-        persist_job()
-        raise ValueError(f"{exc.code}: {exc}") from None
-
-    content_sha256 = hashlib.sha256(generated.png_bytes).hexdigest()
-    candidate_id = f"pixellab-pro-flash-{generated.job_id[:24]}"
-    factory_output = (_repository_root() / "level_factory" / "output").resolve()
-    output_root = (factory_output / "semantic-generated").resolve()
-    output_root.mkdir(parents=True, exist_ok=True)
-    destination = (output_root / f"{candidate_id}.png").resolve()
-    if not _inside_output(destination, factory_output):
-        raise ValueError("semantic output path escaped the Factory output directory")
-    destination.write_bytes(generated.png_bytes)
-    imported = extensions.batch_import([str(destination)])
-    items = imported.get("items", [])
-    if not isinstance(items, list) or not items or not isinstance(items[0], Mapping):
-        raise ValueError("semantic output was not accepted by canonical artwork import")
-    item = items[0]
-    source_id = item.get("source_id")
-    if not isinstance(source_id, str) or not source_id:
-        raise ValueError(str(item.get("reason", item.get("state", "canonical artwork import failed"))))
-    job_record.update({
-        "state": "IMPORTED",
-        "source_id": source_id,
-        "source_image_id": generated.source_image_id,
-        "content_sha256": content_sha256,
-        "actual_usage": dict(generated.actual_usage or {}),
-        "used_palette_ids": list(generated.used_palette_ids),
-        "local_palette_validation": "PASS",
-    })
-    persist_job()
-    return {
-        "operation": STUDIO_EXTENSION_OPERATION,
-        "state": "IMPORTED",
-        "candidate_id": candidate_id,
-        "source_id": source_id,
-        "provider_id": "PIXELLAB",
-        "provider_version": "pixellab-pro-flash-v1",
-        "api_version": "v2",
-        "provider_model": PRO_FLASH_ENGINE,
-        "job_id": generated.job_id,
-        "operation_id": resolved_operation_id,
-        "source_image_id": generated.source_image_id,
-        "actual_usage": dict(generated.actual_usage or {}),
-        "width": generated.width,
-        "height": generated.height,
-        "content_sha256": content_sha256,
-        "used_palette_ids": list(generated.used_palette_ids),
-        "palette_validation": "PASS",
-        "source_path": str(destination),
-    }
 
 
 def _semantic_generate_pixellab_pro_4x4(
@@ -851,12 +706,16 @@ def _semantic_generate_pixellab_pro_4x4(
         job_record.update({"state": "POLLING", "job_id": job_id})
         persist_job()
 
+    def http_request_started(count: int) -> None:
+        job_record["provider_http_request_count"] = count
+        persist_job()
+
     persist_job()
     try:
         generated = extensions.generate_pixellab_pro_4x4_frames(
             description=normalized_description, width=width, height=height,
             max_colors=max_colors, seed=normalized_seed, on_submission_started=submission_started,
-            on_job_accepted=accepted,
+            on_job_accepted=accepted, on_http_request_started=http_request_started,
         )
         job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
         persist_job()
@@ -891,6 +750,7 @@ def _semantic_generate_pixellab_pro_4x4(
             "owner_catalog_path": owner_catalog["catalog_path"],
             "pass_count": pass_count, "rejected_count": rejected_count,
             "actual_usage": dict(generated.actual_usage or {}),
+            "provider_http_request_count": generated.http_request_count,
             "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
         })
         persist_job()
@@ -914,10 +774,12 @@ def _semantic_generate_pixellab_pro_4x4(
             "manifest_path": str(owner_catalog["catalog_path"]),
             "actual_usage": dict(generated.actual_usage or {}),
         }
-    except extensions.ProFlashError as exc:
+    except extensions.PixelLabProviderError as exc:
         state = exc.code if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
         job_record.update({"state": state, "job_id": exc.job_id or job_record.get("job_id"),
-                           "error_code": exc.code, "error": str(exc)})
+                           "error_code": exc.code, "error": str(exc),
+                           "provider_http_request_count": exc.http_request_count
+                           if exc.http_request_count is not None else job_record.get("provider_http_request_count", 0)})
         persist_job()
         raise ValueError(f"{exc.code}: {exc}") from None
     except Exception as exc:

@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw
 
 from scrubbots_pixel_factory import studio_extensions as extensions
 from scrubbots_pixel_factory.contracts import CANONICAL_PALETTE
-from scrubbots_pixel_factory.studio_extensions import ProFlashError, generate_pixellab_pro_4x4_frames
+from scrubbots_pixel_factory.studio_extensions import PixelLabProviderError, generate_pixellab_pro_4x4_frames
 
 
 def _frame(width: int = 56, height: int = 56) -> bytes:
@@ -107,6 +107,7 @@ def test_pro_4x4_submits_variable_dimensions_locked_v3_and_adjustable_max_colors
         request_json=request_json, sleep=lambda _: None, on_job_accepted=accepted.append,
     )
     assert len(result.frames_png) == 16
+    assert result.http_request_count == len(calls) == 2
     assert accepted == ["job-r10"]
     assert len([call for call in calls if call[1]["method"] == "POST"]) == 1
     post = next(call[1] for call in calls if call[1]["method"] == "POST")
@@ -124,7 +125,7 @@ def test_invalid_pro_4x4_dimensions_reject_before_credential_or_request(
 ) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: pytest.fail("credential lookup must not run"))
     calls: list[object] = []
-    with pytest.raises(ProFlashError, match="GAME_DIMENSIONS_OUT_OF_RANGE|PRO_4X4_FRAME_COUNT_INCOMPATIBLE"):
+    with pytest.raises(PixelLabProviderError, match="GAME_DIMENSIONS_OUT_OF_RANGE|PRO_4X4_FRAME_COUNT_INCOMPATIBLE"):
         generate_pixellab_pro_4x4_frames(
             description="no-spend invalid size", width=width, height=height, seed=1,
             request_json=lambda *args, **kwargs: calls.append(args),
@@ -137,7 +138,7 @@ def test_max_colors_out_of_range_rejects_before_credential_or_request(
     max_colors: int, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: pytest.fail("credential lookup must not run"))
-    with pytest.raises(ProFlashError, match="MAX_COLORS_OUT_OF_RANGE"):
+    with pytest.raises(PixelLabProviderError, match="MAX_COLORS_OUT_OF_RANGE"):
         generate_pixellab_pro_4x4_frames(
             description="no-spend invalid colors", width=56, height=56, max_colors=max_colors, seed=1,
             request_json=lambda *args, **kwargs: pytest.fail("network adapter must not run"),
@@ -154,7 +155,7 @@ def test_poll_retries_only_safe_job_lookup_and_never_reposts(monkeypatch: pytest
         if kwargs["method"] == "POST":
             return {"background_job_id": "durable-job"}, {}
         if calls.count("GET") == 1:
-            raise ProFlashError("POLL_NETWORK_ERROR", "offline")
+            raise PixelLabProviderError("POLL_NETWORK_ERROR", "offline")
         return _success(), {}
 
     result = generate_pixellab_pro_4x4_frames(
@@ -165,6 +166,39 @@ def test_poll_retries_only_safe_job_lookup_and_never_reposts(monkeypatch: pytest
     assert accepted == ["durable-job"]
     assert calls.count("POST") == 1
     assert calls.count("GET") == 2
+
+
+def test_http_request_budget_caps_one_generation_and_returns_persistable_job_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "in-memory-test-credential")
+    calls: list[str] = []
+
+    def request_json(_url: str, **kwargs: object):
+        calls.append(str(kwargs["method"]))
+        if kwargs["method"] == "POST":
+            return {"background_job_id": "budget-job"}, {}
+        return {"status": "processing"}, {}
+
+    request_counts: list[int] = []
+    with pytest.raises(PixelLabProviderError, match="HTTP_REQUEST_BUDGET_EXHAUSTED") as caught:
+        generate_pixellab_pro_4x4_frames(
+            description="bounded fake request test", width=56, height=56, seed=9,
+            request_json=request_json, sleep=lambda _: None, max_http_requests=2,
+            on_http_request_started=request_counts.append,
+        )
+
+    assert calls == ["POST", "GET"]
+    assert request_counts == [1, 2]
+    assert caught.value.job_id == "budget-job"
+    assert caught.value.http_request_count == 2
+
+
+def test_http_request_budget_rejects_values_above_owner_authorized_cap(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: pytest.fail("credential lookup must not run"))
+    with pytest.raises(PixelLabProviderError, match="INVALID_HTTP_REQUEST_BUDGET"):
+        generate_pixellab_pro_4x4_frames(
+            description="no-spend invalid budget", width=56, height=56, seed=10,
+            max_http_requests=11, request_json=lambda *_args, **_kwargs: pytest.fail("provider call must not run"),
+        )
 
 
 def test_incompatible_frame_count_fails_closed_after_one_post(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -178,7 +212,7 @@ def test_incompatible_frame_count_fails_closed_after_one_post(monkeypatch: pytes
             return {"background_job_id": "short-job"}, {}
         return {"status": "completed", "last_response": {"images": [{"base64": frame}] * 15}}, {}
 
-    with pytest.raises(ProFlashError, match="PRO_4X4_FRAME_COUNT_INCOMPATIBLE"):
+    with pytest.raises(PixelLabProviderError, match="PRO_4X4_FRAME_COUNT_INCOMPATIBLE"):
         generate_pixellab_pro_4x4_frames(
             description="short result", width=56, height=56, seed=7,
             request_json=request_json, sleep=lambda _: None,
@@ -556,7 +590,7 @@ def test_existing_known_unpaid_claim_stays_fail_closed_without_auto_release(
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "mock only"})
 
         def fail_before_post(**kwargs: object):
-            raise ProFlashError("CREDENTIALS_NOT_CONFIGURED", "synthetic pre-submit failure")
+            raise PixelLabProviderError("CREDENTIALS_NOT_CONFIGURED", "synthetic pre-submit failure")
 
         monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", fail_before_post)
         with pytest.raises(ValueError, match="CREDENTIALS_NOT_CONFIGURED"):
@@ -614,7 +648,7 @@ def test_explicit_recovery_requires_consent_and_uses_get_only(monkeypatch: pytes
             return {"status": "processing"}, {}
         return {"status": "completed", "last_response": {"images": []}}, {}
 
-    with pytest.raises(ProFlashError, match="NETWORK_CONSENT_REQUIRED"):
+    with pytest.raises(PixelLabProviderError, match="NETWORK_CONSENT_REQUIRED"):
         extensions.reconcile_pixellab_pro_4x4_job(
             "persisted-job", request_json=request_json, sleep=lambda _: None,
         )

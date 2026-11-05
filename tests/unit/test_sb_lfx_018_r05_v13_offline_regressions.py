@@ -200,7 +200,7 @@ def test_account_synced_alpix_probe_reports_authentication_required() -> None:
     assert "needs authentication" in result["reason"].lower()
 
 
-def test_unverified_account_synced_alpix_generation_fails_before_path_or_request(monkeypatch) -> None:
+def test_connected_account_synced_alpix_generation_uses_cli_and_validates_output(monkeypatch) -> None:
     identity = {
         "available": True,
         "status": "ALPIX_AVAILABLE_DISCOVERY_ONLY",
@@ -212,30 +212,51 @@ def test_unverified_account_synced_alpix_generation_fails_before_path_or_request
     }
     calls = []
 
+    class MemoryOutputPath:
+        def __init__(self, value: str) -> None:
+            self.value = value
+            self.parent = self
+
+        def resolve(self):
+            return self
+
+        def mkdir(self, **_kwargs):
+            return None
+
+        def exists(self):
+            return False
+
+        def is_file(self):
+            return True
+
+        def read_bytes(self):
+            return bytes((137, 80, 78, 71, 13, 10, 26, 10)) + b"fixture"
+
     def runner(*args, **kwargs):
         calls.append((args, kwargs))
-        raise AssertionError("Unverified account connector must not be invoked.")
+        return SimpleNamespace(returncode=0, stdout="saved", stderr="")
 
-    def forbidden_resolve(self, *args, **kwargs):
-        raise AssertionError("Unverified connector must be rejected before touching output paths.")
+    validations = []
+    monkeypatch.setattr(alpix_batch, "Path", MemoryOutputPath)
+    monkeypatch.setattr(alpix_batch, "_validate_png", lambda path, width, height: validations.append((path.value, width, height)))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-reach-child")
+    monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "must-not-reach-child")
+    result = alpix_batch.generate_alpix_png(
+        prompt="offline fake-cli test", width=16, height=16,
+        destination="account-route-proof.png", discovery=identity, runner=runner,
+    )
 
-    monkeypatch.setattr(Path, "resolve", forbidden_resolve)
-    try:
-        alpix_batch.generate_alpix_png(
-            prompt="offline test",
-            width=16,
-            height=16,
-            destination="unverified-account-route.png",
-            discovery=identity,
-            runner=runner,
-        )
-    except alpix_batch.AlpixUnavailable as exc:
-        assert "ALPIX_CLAUDEAI_CAPABILITY_UNVERIFIED" in str(exc)
-        assert "no request was sent" in str(exc)
-    else:
-        raise AssertionError("Unverified account connector unexpectedly proceeded.")
-
-    assert calls == []
+    assert len(calls) == 1
+    args, kwargs = calls[0]
+    assert args[0][0] == "C:/fixture/claude.exe"
+    assert args[0][1] == "-p"
+    assert "account-synced Claude Code MCP connector 'claude.ai Alpix'" in args[0][2]
+    assert "16x16" in args[0][2]
+    assert kwargs["env"].get("ANTHROPIC_API_KEY") is None
+    assert kwargs["env"].get("ANTHROPIC_AUTH_TOKEN") is None
+    assert validations == [("account-route-proof.png", 16, 16)]
+    assert result["provider_id"] == "ALPIX_CLAUDE"
+    assert len(str(result["sha256"])) == 64
 
 
 def test_alpix_discovery_applies_project_plugin_enablement(monkeypatch) -> None:
