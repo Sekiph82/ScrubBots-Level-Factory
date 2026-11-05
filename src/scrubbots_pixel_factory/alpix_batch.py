@@ -18,6 +18,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
+from .contracts import CANONICAL_PALETTE
+
 
 JOB_SCHEMA = "scrubbots-alpix-art-job"
 JOB_VERSION = 1
@@ -269,8 +271,11 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     else:
         route_instruction = (f"Use the installed Claude Code plugin {plugin_id!r} and its configured MCP server(s) "
                              f"{mcp_servers!r} to draw exactly one native-resolution pixel-art PNG. ")
+    palette_hexes = ", ".join(color.hex.upper() for color in CANONICAL_PALETTE.colors)
     task = (route_instruction
             + f"Owner prompt: {prompt.strip()}\nRequested dimensions: {width}x{height}. "
+            + f"Use only opaque ScrubBots Palette V3 colors {palette_hexes}; transparent pixels must have alpha 0. "
+            + "Do not use off-palette colors, semitransparency, antialiasing, or color blending. "
             f"Save the PNG bytes at this exact path: {str(output)}. Do not resize after drawing, "
             "do not create a prompt plan, and report completion only after the file exists.")
     child_env = os.environ.copy()
@@ -534,6 +539,14 @@ def _validate_png(path: Path, width: int, height: int) -> None:
         with Image.open(path) as image:
             if image.format != "PNG" or image.size != (width, height):
                 raise ValueError("Provider PNG dimensions do not match the requested size.")
+            rgba = image.convert("RGBA")
+            pixels = rgba.get_flattened_data() if hasattr(rgba, "get_flattened_data") else rgba.getdata()
+            allowed = {tuple(color.rgb) for color in CANONICAL_PALETTE.colors}
+            for red, green, blue, alpha in pixels:
+                if alpha not in (0, 255):
+                    raise ValueError("Provider PNG contains semitransparent pixels.")
+                if alpha == 255 and (red, green, blue) not in allowed:
+                    raise ValueError("Provider PNG contains colors outside ScrubBots Palette V3.")
     except ImportError as exc:
         raise ValueError("PNG validation capability is unavailable.") from exc
 

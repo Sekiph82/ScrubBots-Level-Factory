@@ -215,6 +215,12 @@ def test_alpix_resume_revalidates_persisted_validated_png_before_import() -> Non
         job_dir.mkdir(parents=True)
         artifact = job_dir / "row-00001.png"
         Image.new("RGBA", (2, 2), (0, 0, 0, 255)).save(artifact, format="PNG")
+        foreign_palette = root / "foreign-palette.png"
+        foreign_image = Image.new("RGBA", (8, 8), (255, 69, 0, 255))
+        foreign_image.putpixel((0, 0), (40, 80, 120, 255))
+        foreign_image.save(foreign_palette, format="PNG")
+        with pytest.raises(ValueError, match="outside ScrubBots Palette V3"):
+            alpix_batch._validate_png(foreign_palette, 8, 8)
         state_path = job_root / f"{job_id}.json"
         state = alpix_batch._read_job(state_path, job_id, raw_csv, alpix_batch.read_rows(raw_csv))
         state["rows"][0].update({
@@ -243,7 +249,7 @@ def test_alpix_resume_revalidates_persisted_validated_png_before_import() -> Non
 
         def valid_renderer(_prompt: str, width: int, height: int, destination: Path):
             renderer_calls.append((width, height))
-            Image.new("RGBA", (width, height), (40, 80, 120, 255)).save(destination, format="PNG")
+            Image.new("RGBA", (width, height), (255, 69, 0, 255)).save(destination, format="PNG")
             return {"path": str(destination)}
 
         resumed = alpix_batch.run_csv_job(
@@ -314,6 +320,8 @@ def test_connected_account_synced_alpix_generation_uses_cli_and_validates_output
     assert args[0][1] == "-p"
     assert "account-synced Claude Code MCP connector 'claude.ai Alpix'" in args[0][2]
     assert "16x16" in args[0][2]
+    assert "Use only opaque ScrubBots Palette V3 colors" in args[0][2]
+    assert "#FF4500" in args[0][2] and "#000000" in args[0][2]
     assert kwargs["env"].get("ANTHROPIC_API_KEY") is None
     assert kwargs["env"].get("ANTHROPIC_AUTH_TOKEN") is None
     assert validations == [("account-route-proof.png", 16, 16)]
