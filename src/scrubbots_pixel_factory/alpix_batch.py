@@ -287,14 +287,21 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
                            capture_output=True, text=True, timeout=1800, env=child_env, check=False,
                            cwd=working_directory)
     except subprocess.TimeoutExpired as exc:
+        _discard_provider_output(output)
         raise AlpixUnavailable("Claude Alpix generation timed out.") from exc
     output_text = "\n".join((str(getattr(completed, "stdout", "")), str(getattr(completed, "stderr", "")))).lower()
     if any(marker in output_text for marker in _LIMIT_MARKERS):
+        _discard_provider_output(output)
         raise AlpixUsageLimit("Claude subscription usage limit reached.")
     if getattr(completed, "returncode", 1) != 0 or not output.is_file():
+        _discard_provider_output(output)
         raise AlpixUnavailable("Claude Alpix did not produce the requested PNG.")
-    _validate_png(output, width, height)
-    raw = output.read_bytes()
+    try:
+        _validate_png(output, width, height)
+        raw = output.read_bytes()
+    except (OSError, ValueError):
+        _discard_provider_output(output)
+        raise
     return {"path": str(output), "sha256": hashlib.sha256(raw).hexdigest(), "width": width, "height": height,
             "provider_id": "ALPIX_CLAUDE", "plugin_id": plugin_id, "mcp_servers": mcp_servers}
 
@@ -549,6 +556,15 @@ def _validate_png(path: Path, width: int, height: int) -> None:
                     raise ValueError("Provider PNG contains colors outside ScrubBots Palette V3.")
     except ImportError as exc:
         raise ValueError("PNG validation capability is unavailable.") from exc
+
+
+def _discard_provider_output(path: Path) -> None:
+    """Remove only a failed, newly requested output file or symlink."""
+    try:
+        if path.is_file() or path.is_symlink():
+            path.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def _job_result(job_id: str, state: Mapping[str, object]) -> AlpixJobResult:

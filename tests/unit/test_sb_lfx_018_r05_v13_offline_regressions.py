@@ -268,6 +268,55 @@ def test_alpix_resume_revalidates_persisted_validated_png_before_import() -> Non
             shutil.rmtree(root)
 
 
+def test_factory_alpix_wrapper_rejects_and_removes_off_palette_output_before_import(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".r10-alpix-wrapper-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        import sys
+
+        scripts = str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        output = root / "alpix-output.png"
+        launcher = __import__("factory_core_launcher")
+        monkeypatch.setattr(launcher, "_alpix_output_path", lambda _value: output)
+        monkeypatch.setattr(launcher, "_repository_root", lambda: root / "fake-repo")
+        identity = {
+            "available": True,
+            "route_kind": "claude.ai_connector",
+            "executable": "C:/fixture/claude.exe",
+            "plugin_id": "claude.ai connector",
+            "mcp_servers": "claude.ai Alpix",
+            "route_scope": "claude.ai config",
+        }
+        monkeypatch.setattr(alpix_batch, "discover_alpix", lambda **_kwargs: identity)
+        real_generate = alpix_batch.generate_alpix_png
+
+        def write_off_palette_png(_args, **_kwargs):
+            Image.new("RGBA", (8, 8), (40, 80, 120, 255)).save(output, format="PNG")
+            return SimpleNamespace(returncode=0, stdout="saved", stderr="")
+
+        def generate_with_mocked_cli(**kwargs):
+            return real_generate(**kwargs, discovery=identity, runner=write_off_palette_png)
+
+        monkeypatch.setattr(alpix_batch, "generate_alpix_png", generate_with_mocked_cli)
+        monkeypatch.setattr(
+            studio_extensions, "batch_import",
+            lambda _paths: pytest.fail("invalid ALPIX palette must not reach canonical import"),
+        )
+
+        with pytest.raises(ValueError, match="outside ScrubBots Palette V3"):
+            launcher._alpix_generate({"prompt": "blue owl", "width": 8, "height": 8})
+
+        assert not output.exists()
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("ALPIX wrapper test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
 def test_connected_account_synced_alpix_generation_uses_cli_and_validates_output(monkeypatch) -> None:
     identity = {
         "available": True,
