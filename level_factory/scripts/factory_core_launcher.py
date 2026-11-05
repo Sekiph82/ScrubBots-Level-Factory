@@ -779,8 +779,11 @@ def _semantic_generate_pixellab_pro_4x4(
                            "error_code": exc.code, "error": str(exc),
                            "provider_http_request_count": exc.http_request_count
                            if exc.http_request_count is not None else job_record.get("provider_http_request_count", 0)})
+        if exc.provider_request_id is not None:
+            job_record["provider_request_id"] = exc.provider_request_id
         persist_job()
-        raise ValueError(f"{exc.code}: {exc}") from None
+        suffix = f" Provider request ID: {exc.provider_request_id}." if exc.provider_request_id else ""
+        raise ValueError(f"{exc.code}: {exc}{suffix}") from None
     except Exception as exc:
         state = "POST_SUBMISSION_ERROR" if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
         job_record.update({"state": state, "error": str(exc)[:512]})

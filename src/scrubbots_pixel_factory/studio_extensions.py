@@ -2362,11 +2362,27 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 class PixelLabProviderError(RuntimeError):
     def __init__(self, code: str, message: str, *, job_id: str | None = None,
-                 http_request_count: int | None = None) -> None:
+                 http_request_count: int | None = None,
+                 provider_request_id: str | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.job_id = job_id
         self.http_request_count = http_request_count
+        self.provider_request_id = provider_request_id
+
+
+def _provider_request_id_from_headers(headers: object) -> str | None:
+    """Retain only a bounded opaque provider correlation ID, never arbitrary headers."""
+    if not isinstance(headers, Mapping):
+        return None
+    accepted_names = {"x-request-id", "request-id", "x-correlation-id", "cf-ray", "x-amzn-requestid"}
+    for key, value in headers.items():
+        if str(key).lower() not in accepted_names or not isinstance(value, str):
+            continue
+        candidate = value.strip()
+        if 1 <= len(candidate) <= 128 and re.fullmatch(r"[A-Za-z0-9._:-]+", candidate):
+            return candidate
+    return None
 
 
 def _json_request(
@@ -2393,6 +2409,7 @@ def _json_request(
                 raise PixelLabProviderError("INVALID_RESPONSE", "PixelLab returned an invalid response.")
             return parsed, dict(response.headers.items())
     except HTTPError as exc:
+        provider_request_id = _provider_request_id_from_headers(exc.headers)
         messages = {
             401: ("AUTHENTICATION_FAILED", "PixelLab rejected the local API token."),
             402: ("INSUFFICIENT_CREDITS", "PixelLab reports insufficient generations or credits."),
@@ -2450,7 +2467,7 @@ def _json_request(
                     message = f"{message} Provider detail: {detail[:240]}"
             except (OSError, UnicodeError, json.JSONDecodeError):
                 pass
-        raise PixelLabProviderError(code, message) from None
+        raise PixelLabProviderError(code, message, provider_request_id=provider_request_id) from None
     except (TimeoutError, URLError) as exc:
         # A POST timeout can occur after the server accepted a paid job. Never retry it here.
         if method == "POST":
@@ -2612,7 +2629,8 @@ def generate_pixellab_pro_4x4_frames(
                 sleep(poll_seconds)
                 continue
             raise PixelLabProviderError(exc.code, str(exc), job_id=job_id,
-                                http_request_count=exc.http_request_count) from None
+                                http_request_count=exc.http_request_count,
+                                provider_request_id=exc.provider_request_id) from None
         if status.get("status") == "completed":
             last_response = status.get("last_response")
             if not isinstance(last_response, Mapping):

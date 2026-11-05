@@ -230,7 +230,8 @@ def test_http_400_detail_is_bounded_and_api_token_is_redacted(monkeypatch: pytes
         extensions,
         "urlopen",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
-            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request", {},
+            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request",
+                      {"x-request-id": "req_abc-123"},
                       BytesIO(json.dumps({"detail": f"Rejected {token}. Please update request."}).encode()))
         ),
     )
@@ -240,6 +241,27 @@ def test_http_400_detail_is_bounded_and_api_token_is_redacted(monkeypatch: pytes
     assert "HTTP_ERROR" in caught.value.code
     assert "Please update request." in str(caught.value)
     assert token not in str(caught.value)
+    assert caught.value.provider_request_id == "req_abc-123"
+
+
+@pytest.mark.parametrize("request_id", ["has whitespace", "line\nbreak", "x" * 129, "secret/test?value"])
+def test_unsafe_provider_request_ids_are_not_retained(request_id: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.error import HTTPError
+
+    monkeypatch.setattr(
+        extensions,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request",
+                      {"X-Request-ID": request_id}, BytesIO(b"{}"))
+        ),
+    )
+    with pytest.raises(PixelLabProviderError) as caught:
+        extensions._json_request(
+            "https://api.pixellab.ai/v2/generate-image-v2", secret="test-token", method="POST", payload={}
+        )
+
+    assert caught.value.provider_request_id is None
 
 
 def test_http_400_validation_errors_keep_field_and_reason_without_echoing_input(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -694,6 +716,43 @@ def test_existing_known_unpaid_claim_stays_fail_closed_without_auto_release(
         assert outcome["state"] == "NEEDS_OWNER_REVIEW_ACTIVE_OR_STALE_CLAIM"
         assert claim_path.read_bytes() == before_claim
         assert record_path.read_bytes() == before_record
+
+
+def test_provider_request_id_is_persisted_with_safe_paid_failure_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    launcher = _launcher_module()
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
+
+        def rejected_submission(**kwargs: object) -> None:
+            started = kwargs.get("on_submission_started")
+            if callable(started):
+                started()
+            raise PixelLabProviderError(
+                "HTTP_ERROR", "PixelLab returned HTTP 400.", http_request_count=1,
+                provider_request_id="req_support_123",
+            )
+
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", rejected_submission)
+        with pytest.raises(ValueError, match="Provider request ID: req_support_123"):
+            launcher._semantic_generate_pixellab_pro_4x4(
+                prompt="safe test prompt", style="CREATURE", width=56, height=56,
+                max_colors=12, seed=123, operation_id="provider-request-id-operation",
+            )
+
+        record_path = extensions_root / "pixellab-jobs" / "provider-request-id-operation.json"
+        record = json.loads(record_path.read_text(encoding="utf-8"))
+        assert record["state"] == "HTTP_ERROR"
+        assert record["paid_submission_possible"] is True
+        assert record["provider_http_request_count"] == 1
+        assert record["provider_request_id"] == "req_support_123"
+        assert "safe test prompt" not in json.dumps(record)
 
 
 def test_submission_marker_is_persisted_before_single_post(monkeypatch: pytest.MonkeyPatch) -> None:
