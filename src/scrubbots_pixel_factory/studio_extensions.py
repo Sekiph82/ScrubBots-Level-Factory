@@ -2404,28 +2404,46 @@ def _json_request(
             try:
                 error_body = json.loads(exc.read(8192).decode("utf-8", errors="replace"))
                 detail: str | None = None
+                safe_keys = {"detail", "message", "msg", "error", "reason", "description", "code", "type", "errors", "validation_errors"}
+                excluded_keys = {"input", "body", "request", "prompt", "token", "authorization", "headers"}
+
+                def safe_details(node: object, depth: int = 0) -> list[str]:
+                    if depth > 4:
+                        return []
+                    if isinstance(node, str):
+                        return [node.strip()[:160]] if node.strip() else []
+                    if isinstance(node, list):
+                        parts: list[str] = []
+                        for item in node[:8]:
+                            if isinstance(item, dict):
+                                location = item.get("loc")
+                                reason = item.get("msg") or item.get("message") or item.get("reason")
+                                if isinstance(location, list) and isinstance(reason, str) and reason.strip():
+                                    path = ".".join(str(part)[:48] for part in location[:8])
+                                    parts.append(f"{path}: {reason.strip()[:160]}")
+                                else:
+                                    parts.extend(safe_details(item, depth + 1))
+                            else:
+                                parts.extend(safe_details(item, depth + 1))
+                        return parts
+                    if isinstance(node, dict):
+                        parts: list[str] = []
+                        for key, value in node.items():
+                            key_text = str(key).lower()
+                            if key_text in excluded_keys or key_text not in safe_keys:
+                                continue
+                            if isinstance(value, (str, list, dict)):
+                                parts.extend(safe_details(value, depth + 1))
+                        return parts
+                    return []
+
                 if isinstance(error_body, dict):
-                    for key in ("detail", "message", "error", "reason"):
-                        candidate = error_body.get(key)
-                        if isinstance(candidate, str) and candidate.strip():
-                            detail = candidate.strip()
-                            break
-                        # FastAPI/Pydantic commonly returns a list of objects;
-                        # retain only field paths and messages, never input values.
-                        if isinstance(candidate, list):
-                            parts = []
-                            for item in candidate[:8]:
-                                if isinstance(item, str):
-                                    parts.append(item.strip())
-                                elif isinstance(item, dict):
-                                    location = item.get("loc")
-                                    reason = item.get("msg")
-                                    if isinstance(location, list) and isinstance(reason, str):
-                                        path = ".".join(str(part)[:48] for part in location[:8])
-                                        parts.append(f"{path}: {reason.strip()}")
-                            if parts:
-                                detail = "; ".join(part for part in parts if part)
-                                break
+                    parts: list[str] = []
+                    for key in ("detail", "message", "error", "reason", "errors", "validation_errors"):
+                        if key in error_body:
+                            parts.extend(safe_details(error_body[key]))
+                    if parts:
+                        detail = "; ".join(dict.fromkeys(parts[:8]))
                 if detail:
                     if secret:
                         detail = detail.replace(secret, "[redacted]")
@@ -2545,6 +2563,9 @@ def generate_pixellab_pro_4x4_frames(
             "name": "ScrubBots Palette V3",
             "max_colors": max_colors,
         },
+        # PixelLab requires palette recoloring from style references to be
+        # disabled when target_palette is supplied.
+        "style_options": {"color_palette": False},
     }
     base_url = "https://api.pixellab.ai/v2"
     if on_submission_started is not None:

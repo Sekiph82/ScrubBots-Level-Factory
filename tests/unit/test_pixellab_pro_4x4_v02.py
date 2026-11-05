@@ -116,7 +116,7 @@ def test_pro_4x4_submits_variable_dimensions_locked_v3_and_adjustable_max_colors
     assert post["payload"]["no_background"] is True
     assert post["payload"]["target_palette"]["colors"] == [color.hex.upper() for color in CANONICAL_PALETTE.colors]
     assert post["payload"]["target_palette"]["max_colors"] == 7
-    assert "style_options" not in post["payload"]
+    assert post["payload"]["style_options"] == {"color_palette": False}
 
 
 def test_semantic_dispatch_preserves_csv_prompt_verbatim_when_style_is_empty(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -260,6 +260,26 @@ def test_http_400_validation_errors_keep_field_and_reason_without_echoing_input(
     assert "Provider detail: body.target_palette: invalid palette" in str(caught.value)
     assert token not in str(caught.value)
     assert "input" not in str(caught.value)
+
+
+def test_http_400_nested_provider_errors_keep_safe_message_and_redact_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.error import HTTPError
+
+    token = "secret-test-token"
+    body = {"error": {"code": "INVALID_PALETTE", "message": f"Palette configuration rejected; {token}", "input": "private-prompt"}}
+    monkeypatch.setattr(
+        extensions,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request", {}, BytesIO(json.dumps(body).encode()))
+        ),
+    )
+    with pytest.raises(PixelLabProviderError) as caught:
+        extensions._json_request("https://api.pixellab.ai/v2/generate-image-v2", secret=token, method="POST", payload={})
+
+    assert "Provider detail: INVALID_PALETTE; Palette configuration rejected; [redacted]" in str(caught.value)
+    assert "private-prompt" not in str(caught.value)
+    assert token not in str(caught.value)
 
 
 def test_incompatible_frame_count_fails_closed_after_one_post(monkeypatch: pytest.MonkeyPatch) -> None:
