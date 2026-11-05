@@ -200,6 +200,68 @@ def test_account_synced_alpix_probe_reports_authentication_required() -> None:
     assert "needs authentication" in result["reason"].lower()
 
 
+def test_alpix_resume_revalidates_persisted_validated_png_before_import() -> None:
+    root = Path(__file__).resolve().parent / ".r10-alpix-validated-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        csv_path = root / "requests.csv"
+        csv_path.parent.mkdir(parents=True)
+        raw_csv = b"prompt,size\nBlue owl,8x8\n"
+        csv_path.write_bytes(raw_csv)
+        job_root = root / "jobs"
+        job_id = hashlib.sha256(raw_csv).hexdigest()
+        job_dir = job_root / job_id
+        job_dir.mkdir(parents=True)
+        artifact = job_dir / "row-00001.png"
+        Image.new("RGBA", (2, 2), (0, 0, 0, 255)).save(artifact, format="PNG")
+        state_path = job_root / f"{job_id}.json"
+        state = alpix_batch._read_job(state_path, job_id, raw_csv, alpix_batch.read_rows(raw_csv))
+        state["rows"][0].update({
+            "state": "VALIDATED",
+            "artifact_path": str(artifact),
+            "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+        })
+        alpix_batch._save_job(state_path, state)
+
+        renderer_calls: list[tuple[int, int]] = []
+        importer_calls: list[Path] = []
+
+        def paused_renderer(_prompt: str, width: int, height: int, _destination: Path):
+            renderer_calls.append((width, height))
+            raise alpix_batch.AlpixUnavailable("offline fixture pause")
+
+        first = alpix_batch.run_csv_job(
+            csv_path, job_root, renderer=paused_renderer,
+            importer=lambda path: importer_calls.append(path) or {"source_id": "unexpected"},
+        )
+        assert first.state == "UNAVAILABLE"
+        assert first.rows[0]["state"] == "PENDING"
+        assert renderer_calls == [(8, 8)]
+        assert importer_calls == []
+        assert not artifact.exists()
+
+        def valid_renderer(_prompt: str, width: int, height: int, destination: Path):
+            renderer_calls.append((width, height))
+            Image.new("RGBA", (width, height), (40, 80, 120, 255)).save(destination, format="PNG")
+            return {"path": str(destination)}
+
+        resumed = alpix_batch.run_csv_job(
+            csv_path, job_root, renderer=valid_renderer,
+            importer=lambda path: importer_calls.append(path) or {"source_id": "verified-source"},
+        )
+        assert resumed.state == "COMPLETE"
+        assert resumed.rows[0]["state"] == "IMPORTED"
+        assert len(importer_calls) == 1
+        assert Image.open(importer_calls[0]).size == (8, 8)
+        assert renderer_calls == [(8, 8), (8, 8)]
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("ALPIX test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
 def test_connected_account_synced_alpix_generation_uses_cli_and_validates_output(monkeypatch) -> None:
     identity = {
         "available": True,

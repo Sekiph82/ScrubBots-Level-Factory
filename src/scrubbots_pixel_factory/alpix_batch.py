@@ -412,19 +412,16 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
                 row.update({"state": "DRAWN", "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()})
                 _save_job(state_path, state)
                 row_state = "DRAWN"
-        if row_state in {"DRAWN", "VALIDATED", "IMPORTED"} and _is_valid_artifact(artifact, row):
-            if row_state == "IMPORTED":
-                continue
-            if row_state == "DRAWN":
+        if row_state in {"DRAWN", "VALIDATED"}:
+            valid_artifact = _is_valid_artifact(artifact, row)
+            if valid_artifact:
                 try:
                     _validate_png(artifact, int(row["width"]), int(row["height"]))
                 except (OSError, ValueError):
-                    row.update({"state": "PENDING", "artifact_sha256": None, "source_id": None})
-                    _save_job(state_path, state)
-                else:
-                    row["state"] = "VALIDATED"
-                    _save_job(state_path, state)
-            if row.get("state") == "VALIDATED":
+                    valid_artifact = False
+            if valid_artifact:
+                row["state"] = "VALIDATED"
+                _save_job(state_path, state)
                 imported = importer(artifact)
                 source_id = imported.get("source_id")
                 if not isinstance(source_id, str) or not source_id:
@@ -433,7 +430,11 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
                 else:
                     row.update({"state": "IMPORTED", "source_id": source_id})
                 _save_job(state_path, state)
-            continue
+                continue
+            # This path is the deterministic output of this task row. Remove only
+            # its file/symlink so a corrupt durable record can be safely retried.
+            if artifact.is_file() or artifact.is_symlink():
+                artifact.unlink(missing_ok=True)
         row.update({"state": "PENDING", "artifact_sha256": None, "source_id": None})
         _save_job(state_path, state)
         try:
