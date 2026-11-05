@@ -222,6 +222,26 @@ def test_http_request_budget_rejects_values_above_owner_authorized_cap(monkeypat
         )
 
 
+def test_http_400_detail_is_bounded_and_api_token_is_redacted(monkeypatch: pytest.MonkeyPatch) -> None:
+    from urllib.error import HTTPError
+
+    token = "secret-test-token"
+    monkeypatch.setattr(
+        extensions,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            HTTPError("https://api.pixellab.ai/v2/generate-image-v2", 400, "Bad Request", {},
+                      BytesIO(json.dumps({"detail": f"Rejected {token}. Please update request."}).encode()))
+        ),
+    )
+    with pytest.raises(PixelLabProviderError) as caught:
+        extensions._json_request("https://api.pixellab.ai/v2/generate-image-v2", secret=token, method="POST", payload={})
+
+    assert "HTTP_ERROR" in caught.value.code
+    assert "Please update request." in str(caught.value)
+    assert token not in str(caught.value)
+
+
 def test_incompatible_frame_count_fails_closed_after_one_post(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "in-memory-test-credential")
     calls: list[str] = []

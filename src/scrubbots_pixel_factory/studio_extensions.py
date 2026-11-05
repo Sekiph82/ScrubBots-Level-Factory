@@ -2400,6 +2400,18 @@ def _json_request(
             429: ("RATE_LIMITED", "PixelLab rate limit reached; no automatic resubmission was made."),
         }
         code, message = messages.get(exc.code, ("HTTP_ERROR", f"PixelLab returned HTTP {exc.code}."))
+        if exc.code == 400:
+            try:
+                error_body = json.loads(exc.read(8192).decode("utf-8", errors="replace"))
+                detail = error_body.get("detail") if isinstance(error_body, dict) else None
+                if isinstance(detail, str):
+                    detail = detail.strip()
+                    if secret:
+                        detail = detail.replace(secret, "[redacted]")
+                    if detail:
+                        message = f"{message} Provider detail: {detail[:240]}"
+            except (OSError, UnicodeError, json.JSONDecodeError):
+                pass
         raise PixelLabProviderError(code, message) from None
     except (TimeoutError, URLError) as exc:
         # A POST timeout can occur after the server accepted a paid job. Never retry it here.
