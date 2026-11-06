@@ -24,7 +24,14 @@ from .contracts import CANONICAL_PALETTE
 
 JOB_SCHEMA = "scrubbots-alpix-art-job"
 JOB_VERSION = 1
-_LIMIT_MARKERS = ("usage limit", "rate limit", "quota exceeded", "limit reached", "out of extra usage")
+_LIMIT_MARKERS = (
+    "usage limit", "session limit", "rate limit", "quota exceeded", "limit reached", "out of extra usage"
+)
+_TRUST_MARKERS = (
+    "this workspace has not been trusted",
+    "accept the trust dialog",
+    "run claude code interactively here once",
+)
 _SB_SPRITE_CATALOG_ID = re.compile(r"SB_SPRITE_\d{3}", re.IGNORECASE)
 _LEGACY_PALETTE_BLOCK = re.compile(
     r"\b(?:use|fuse)\s+only\s+the\s+fixed\s+C01-C16\b.*?\bpalette\b",
@@ -55,6 +62,14 @@ def _safe_unavailable_reason(reason: object) -> str:
                 return f"CLAUDE_EXIT_NONZERO: Claude Code exited with code {code}; no PNG was produced."
     safe_statuses = {
         "CLAUDE_CLI_MISSING": "CLAUDE_CLI_MISSING: Claude Code is not available to Factory Studio.",
+        "CLAUDE_WORKSPACE_TRUST_REQUIRED": (
+            "CLAUDE_WORKSPACE_TRUST_REQUIRED: Accept the workspace trust dialog interactively in Claude Code; "
+            "Factory will not change user trust settings."
+        ),
+        "CLAUDE_TRUST_AND_SESSION_LIMIT": (
+            "CLAUDE_TRUST_AND_SESSION_LIMIT: Accept workspace trust interactively and retry after the Claude "
+            "session limit resets."
+        ),
         "ALPIX_PLUGIN_MISSING": "ALPIX_PLUGIN_MISSING: No enabled Claude Alpix plugin or MCP route was found.",
         "ALPIX_AUTH_REQUIRED": "ALPIX_AUTH_REQUIRED: The Claude Alpix connector requires authentication.",
         "ALPIX_SYNC_UNVERIFIED": "ALPIX_SYNC_UNVERIFIED: The Claude Alpix connector status could not be verified.",
@@ -328,6 +343,11 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
         _discard_provider_output(output)
         raise AlpixUnavailable("Claude Alpix generation timed out.") from exc
     output_text = "\n".join((str(getattr(completed, "stdout", "")), str(getattr(completed, "stderr", "")))).lower()
+    if any(marker in output_text for marker in _TRUST_MARKERS):
+        _discard_provider_output(output)
+        if any(marker in output_text for marker in _LIMIT_MARKERS):
+            raise AlpixUnavailable("CLAUDE_TRUST_AND_SESSION_LIMIT: workspace trust and Claude session limit require owner action.")
+        raise AlpixUnavailable("CLAUDE_WORKSPACE_TRUST_REQUIRED: workspace trust must be accepted interactively by the owner.")
     if any(marker in output_text for marker in _LIMIT_MARKERS):
         _discard_provider_output(output)
         raise AlpixUsageLimit("Claude subscription usage limit reached.")

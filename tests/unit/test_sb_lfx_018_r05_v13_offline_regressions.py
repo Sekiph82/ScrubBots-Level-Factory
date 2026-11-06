@@ -248,6 +248,46 @@ def test_alpix_generation_reports_safe_cli_exit_and_missing_output_diagnostics()
     assert not destination.exists()
 
 
+def test_alpix_workspace_trust_failure_is_actionable_and_never_auto_accepted() -> None:
+    destination = Path(__file__).resolve().parent / ".codex-alpix-trust-diagnostic-never-created.png"
+    if destination.exists():
+        raise AssertionError(f"Refusing pre-existing diagnostic output: {destination}")
+    identity = {
+        "available": True,
+        "executable": "claude",
+        "plugin_id": "claude.ai connector",
+        "mcp_servers": "claude.ai Alpix",
+        "route_kind": "claude.ai_connector",
+        "route_scope": "claude.ai config",
+    }
+
+    def runner_with(stderr: str):
+        return lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr=stderr)
+
+    with pytest.raises(alpix_batch.AlpixUnavailable, match="CLAUDE_WORKSPACE_TRUST_REQUIRED") as trust_error:
+        alpix_batch.generate_alpix_png(
+            prompt="offline trust diagnostic", width=56, height=56, destination=destination,
+            discovery=identity,
+            runner=runner_with("This workspace has not been trusted. Accept the trust dialog interactively."),
+        )
+    assert alpix_batch._safe_unavailable_reason(trust_error.value) == (
+        "CLAUDE_WORKSPACE_TRUST_REQUIRED: Accept the workspace trust dialog interactively in Claude Code; "
+        "Factory will not change user trust settings."
+    )
+
+    with pytest.raises(alpix_batch.AlpixUnavailable, match="CLAUDE_TRUST_AND_SESSION_LIMIT") as combined_error:
+        alpix_batch.generate_alpix_png(
+            prompt="offline trust diagnostic", width=56, height=56, destination=destination,
+            discovery=identity,
+            runner=runner_with("This workspace has not been trusted. You've hit your session limit."),
+        )
+    assert alpix_batch._safe_unavailable_reason(combined_error.value) == (
+        "CLAUDE_TRUST_AND_SESSION_LIMIT: Accept workspace trust interactively and retry after the Claude "
+        "session limit resets."
+    )
+    assert not destination.exists()
+
+
 def test_alpix_unavailable_reason_is_safe_and_actionable() -> None:
     safe = alpix_batch._safe_unavailable_reason(
         "CLAUDE_EXIT_NONZERO: Claude Code exited with code 17; no PNG was produced. private-secret"
