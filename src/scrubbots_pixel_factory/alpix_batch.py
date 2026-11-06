@@ -293,9 +293,19 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     if any(marker in output_text for marker in _LIMIT_MARKERS):
         _discard_provider_output(output)
         raise AlpixUsageLimit("Claude subscription usage limit reached.")
-    if getattr(completed, "returncode", 1) != 0 or not output.is_file():
+    returncode = getattr(completed, "returncode", 1)
+    if type(returncode) is not int:
+        returncode = 1
+    if returncode != 0:
         _discard_provider_output(output)
-        raise AlpixUnavailable("Claude Alpix did not produce the requested PNG.")
+        raise AlpixUnavailable(
+            f"CLAUDE_EXIT_NONZERO: Claude Code exited with code {returncode}; no PNG was produced."
+        )
+    if not output.is_file():
+        _discard_provider_output(output)
+        raise AlpixUnavailable(
+            "ALPIX_OUTPUT_MISSING: Claude Code exited successfully but did not produce the requested PNG."
+        )
     try:
         _validate_png(output, width, height)
         raw = output.read_bytes()

@@ -215,6 +215,39 @@ def test_alpix_discovery_recognizes_account_synced_claude_ai_connector(monkeypat
     assert calls[0][1]["timeout"] == 10
 
 
+def test_alpix_generation_reports_safe_cli_exit_and_missing_output_diagnostics() -> None:
+    destination = Path(__file__).resolve().parent / ".codex-alpix-diagnostic-never-created.png"
+    if destination.exists():
+        raise AssertionError(f"Refusing pre-existing diagnostic output: {destination}")
+    identity = {
+        "available": True,
+        "executable": "claude",
+        "plugin_id": "claude.ai connector",
+        "mcp_servers": "claude.ai Alpix",
+        "route_kind": "claude.ai_connector",
+        "route_scope": "claude.ai config",
+    }
+
+    def runner_with_exit_code(exit_code: int):
+        def runner(*_args, **_kwargs):
+            return SimpleNamespace(returncode=exit_code, stdout="private CLI output", stderr="private CLI error")
+        return runner
+
+    with pytest.raises(alpix_batch.AlpixUnavailable, match="CLAUDE_EXIT_NONZERO.*code 17"):
+        alpix_batch.generate_alpix_png(
+            prompt="offline diagnostic", width=56, height=56, destination=destination,
+            discovery=identity, runner=runner_with_exit_code(17),
+        )
+
+    with pytest.raises(alpix_batch.AlpixUnavailable, match="ALPIX_OUTPUT_MISSING"):
+        alpix_batch.generate_alpix_png(
+            prompt="offline diagnostic", width=56, height=56, destination=destination,
+            discovery=identity, runner=runner_with_exit_code(0),
+        )
+
+    assert not destination.exists()
+
+
 def test_alpix_discovery_does_not_claim_missing_when_account_route_probe_fails(monkeypatch) -> None:
     home = Path("C:/account-sync-profile")
     executable = str(home / ".local" / "bin" / "claude.exe")
