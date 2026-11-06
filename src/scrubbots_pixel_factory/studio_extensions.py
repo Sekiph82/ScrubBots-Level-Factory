@@ -2283,6 +2283,7 @@ import os
 from pathlib import Path
 import time
 from typing import Any, Callable, Mapping
+from urllib.parse import urlparse
 from urllib.error import HTTPError, URLError
 
 PIXELLAB_CREDENTIAL_TARGET = "ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN"
@@ -2712,6 +2713,74 @@ def _mcp_inline_png(value: object) -> bytes | None:
     return None
 
 
+def _mcp_gallery_sheet_url(value: object, asset_id: str) -> str:
+    """Read the whole-sheet URL for a saved PixelLab gallery asset, fail closed."""
+    candidate = _mcp_find_value(value, {"download_url", "downloadUrl"})
+    if not isinstance(candidate, str):
+        match = re.search(r"\bdownload(?:_url)?\s*:\s*(https://\S+)", _mcp_result_text(value), re.IGNORECASE)
+        candidate = match.group(1).rstrip(".,)") if match else None
+    if not isinstance(candidate, str):
+        raise PixelLabProviderError("MCP_GALLERY_SHEET_MISSING", "PixelLab MCP did not return the saved 4x4 gallery sheet URL.")
+    try:
+        parsed = urlparse(candidate)
+        port = parsed.port
+    except ValueError:
+        parsed = None
+        port = -1
+    host = (parsed.hostname or "").lower() if parsed else ""
+    if (parsed is None or parsed.scheme != "https" or parsed.username or parsed.password or port
+            or not host.startswith("s3.") or not host.endswith(".backblazeb2.com")
+            or "/pixellab-generations/production/creator/" not in parsed.path
+            or not parsed.path.endswith(f"/{asset_id}/image.png") or not parsed.query or parsed.fragment):
+        raise PixelLabProviderError("MCP_GALLERY_SHEET_URL_REJECTED", "PixelLab MCP returned an unsupported gallery sheet URL.")
+    return candidate
+
+
+def _download_mcp_gallery_sheet(url: str, *, expected_size: tuple[int, int], job_id: str,
+                                asset_id: str, request_count: int) -> bytes:
+    """Fetch only the provider-signed full gallery sheet and validate its exact geometry."""
+    request = Request(url, headers={"Accept": "image/png"}, method="GET")
+    try:
+        with urlopen(request, timeout=30) as response:
+            final_url = response.geturl()
+            body = response.read(PRO_4X4_MCP_MAX_RESPONSE_BYTES + 1)
+    except (HTTPError, TimeoutError, URLError, OSError):
+        raise PixelLabProviderError("MCP_GALLERY_DOWNLOAD_FAILED", "Could not download the saved PixelLab 4x4 gallery sheet.",
+                                   job_id=job_id, http_request_count=request_count) from None
+    if len(body) > PRO_4X4_MCP_MAX_RESPONSE_BYTES:
+        raise PixelLabProviderError("MCP_RESPONSE_TOO_LARGE", "PixelLab MCP gallery sheet exceeded the local response limit.",
+                                   job_id=job_id, http_request_count=request_count)
+    # The signed GET carries no bearer token; validate its final URL after any provider redirect.
+    try:
+        final = urlparse(final_url)
+        final_port = final.port
+    except ValueError:
+        final = None
+        final_port = -1
+    final_host = (final.hostname or "").lower() if final else ""
+    if (final is None or final.scheme != "https" or final.username or final.password or final_port
+            or not final_host.startswith("s3.") or not final_host.endswith(".backblazeb2.com")
+            or "/pixellab-generations/production/creator/" not in final.path
+            or not final.path.endswith(f"/{asset_id}/image.png")):
+        raise PixelLabProviderError("MCP_GALLERY_SHEET_URL_REJECTED", "PixelLab gallery download redirected to an unsupported host.",
+                                   job_id=job_id, http_request_count=request_count)
+    if not body.startswith(PNG_SIGNATURE):
+        raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab gallery download was not a PNG sheet.",
+                                   job_id=job_id, http_request_count=request_count)
+    try:
+        with Image.open(BytesIO(body)) as image:
+            image.load()
+            if image.format != "PNG" or image.size != expected_size:
+                raise PixelLabProviderError("PRO_4X4_ATLAS_SIZE_MISMATCH", "PixelLab MCP gallery sheet is not the exact 4x4 size for the requested cells.",
+                                           job_id=job_id, http_request_count=request_count)
+    except PixelLabProviderError:
+        raise
+    except Exception:
+        raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned an unreadable gallery PNG sheet.",
+                                   job_id=job_id, http_request_count=request_count) from None
+    return body
+
+
 def _mcp_result_error(response: Mapping[str, object], tool_name: str) -> None:
     if response.get("error") is not None:
         raise PixelLabProviderError("MCP_PROTOCOL_ERROR", f"PixelLab MCP {tool_name} request failed.")
@@ -2880,16 +2949,20 @@ def generate_pixellab_pro_4x4_atlas_mcp(
             try:
                 with Image.open(BytesIO(atlas_png)) as image:
                     image.load()
-                    if image.format != "PNG" or image.size != (4 * width, 4 * height):
-                        raise PixelLabProviderError("PRO_4X4_ATLAS_SIZE_MISMATCH", "PixelLab MCP atlas is not the exact 4x4 size for the requested cells.")
+                    if image.format != "PNG":
+                        raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP inline image is not a PNG sheet.")
+                    inline_size = image.size
             except PixelLabProviderError:
                 raise
             except Exception:
                 raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned an unreadable PNG atlas.") from None
-            return PixelLabPro4x4McpResult(
-                atlas_png=atlas_png, job_id=job_id, width=width, height=height,
-                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
-            )
+            if inline_size == (4 * width, 4 * height):
+                return PixelLabPro4x4McpResult(
+                    atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+                    max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
+                )
+        else:
+            inline_size = None
         text = _mcp_result_text(result).lower()
         state = _mcp_find_value(result, {"status", "state"})
         state_text = str(state or "").lower()
@@ -2897,8 +2970,28 @@ def generate_pixellab_pro_4x4_atlas_mcp(
             raise PixelLabProviderError("JOB_FAILED", "PixelLab MCP image job did not complete.", job_id=job_id,
                                        http_request_count=request_count)
         if "completed" in state_text or "complete" in text and "process" not in text:
-            raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP reported completion without returning inline PNG content.",
-                                       job_id=job_id, http_request_count=request_count)
+            asset_id_value = _mcp_find_value(result, {"asset_id", "assetId"})
+            if not isinstance(asset_id_value, str):
+                asset_match = re.search(r"\basset[_ ]?id\s*[:=]\s*([A-Za-z0-9_-]{1,160})\b",
+                                        _mcp_result_text(result), re.IGNORECASE)
+                asset_id_value = asset_match.group(1) if asset_match else None
+            if not isinstance(asset_id_value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", asset_id_value.strip()):
+                code = "PRO_4X4_ATLAS_SIZE_MISMATCH" if inline_size is not None else "MCP_GALLERY_SHEET_MISSING"
+                message = ("PixelLab MCP returned a candidate frame instead of the exact 4x4 gallery sheet."
+                           if inline_size is not None else "PixelLab MCP reported completion without a saved gallery asset.")
+                raise PixelLabProviderError(code, message, job_id=job_id, http_request_count=request_count)
+            gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
+                "job_id": f"gallery:{asset_id_value.strip()}",
+            }}, tool_name="get_image")
+            sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value.strip())
+            atlas_png = _download_mcp_gallery_sheet(
+                sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
+                asset_id=asset_id_value.strip(), request_count=request_count,
+            )
+            return PixelLabPro4x4McpResult(
+                atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
+            )
         sleep(poll_seconds)
     raise PixelLabProviderError("POLL_TIMEOUT", "PixelLab MCP job remains unresolved; its job ID is saved and no new generation was sent.",
                                job_id=job_id, http_request_count=request_count)

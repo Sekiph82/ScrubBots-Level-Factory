@@ -25,6 +25,14 @@ def _atlas_png(width: int = 224, height: int = 224) -> bytes:
     return output.getvalue()
 
 
+def _frame_png(index: int, width: int = 56, height: int = 56) -> bytes:
+    image = Image.new("RGBA", (width, height), CANONICAL_PALETTE.colors[index % len(CANONICAL_PALETTE.colors)].rgb + (255,))
+    image.putpixel((index % width, (index * 3) % height), (0, 0, 0, 0))
+    output = BytesIO()
+    image.save(output, format="PNG")
+    return output.getvalue()
+
+
 def _image_result(raw: bytes) -> dict[str, object]:
     return {"jsonrpc": "2.0", "id": 4, "result": {"content": [
         {"type": "image", "mimeType": "image/png", "data": base64.b64encode(raw).decode("ascii")},
@@ -91,7 +99,7 @@ def test_mcp_pro_generation_uses_locked_palette_and_fetches_inline_4x4_atlas(mon
     assert all(call.get("method") != "tools/list" for call in calls)
 
 
-def test_mcp_rejects_wrong_atlas_size_without_resubmitting(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_mcp_rejects_missing_gallery_sheet_without_resubmitting(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "test-token")
     creates = 0
 
@@ -107,14 +115,93 @@ def test_mcp_rejects_wrong_atlas_size_without_resubmitting(monkeypatch: pytest.M
             return {"jsonrpc": "2.0", "id": message["id"], "result": {
                 "content": [{"type": "text", "text": "job_id: mcp-job-2"}],
             }}, {}
-        return {**_image_result(_atlas_png(56, 56)), "id": message["id"]}, {}
+        return {"jsonrpc": "2.0", "id": message["id"], "result": {"structuredContent": {
+            "status": "completed", "asset_id": "asset-wrong-size",
+        }, "content": [{"type": "image", "mimeType": "image/png",
+                         "data": base64.b64encode(_atlas_png(56, 56)).decode("ascii")}]}}, {}
 
-    with pytest.raises(PixelLabProviderError, match="exact 4x4 size"):
+    with pytest.raises(PixelLabProviderError) as caught:
         generate_pixellab_pro_4x4_atlas_mcp(
             description="wrong dimensions", width=56, height=56, seed=2,
             request_message=request_message,
         )
+    assert caught.value.code == "MCP_GALLERY_SHEET_MISSING"
     assert creates == 1
+
+
+def test_mcp_downloads_saved_224_gallery_sheet_instead_of_using_first_56_frame(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "test-token")
+    asset_id = "asset-4x4-sheet"
+    sheet_url = f"https://s3.eu-central-003.backblazeb2.com/pixellab-generations/production/creator/{asset_id}/image.png?signature=test"
+    sheet = _atlas_png()
+    calls: list[dict[str, object]] = []
+    downloads: list[object] = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return sheet_url
+
+        def read(self, limit: int):
+            assert limit >= len(sheet)
+            return sheet
+
+    def fake_urlopen(request, timeout: float):
+        downloads.append(request)
+        assert timeout == 30
+        return Response()
+
+    monkeypatch.setattr(extensions, "urlopen", fake_urlopen)
+
+    def request_message(**kwargs: object):
+        message = kwargs["message"]
+        assert isinstance(message, dict)
+        calls.append(message)
+        if message.get("method") == "initialize":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {"protocolVersion": "2025-11-25"}}, {}
+        if message.get("method") == "notifications/initialized":
+            return {}, {}
+        name = message["params"]["name"]
+        args = message["params"]["arguments"]
+        if name == "create_image_pro":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "content": [{"type": "text", "text": "job_id: mcp-job-gallery"}],
+            }}, {}
+        if args["job_id"] == "mcp-job-gallery":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "structuredContent": {"status": "completed", "asset_id": asset_id, "frames": 16},
+                "content": [{"type": "image", "mimeType": "image/png",
+                             "data": base64.b64encode(_frame_png(0)).decode("ascii")}],
+            }}, {}
+        assert args["job_id"] == f"gallery:{asset_id}"
+        return {"jsonrpc": "2.0", "id": message["id"], "result": {
+            "structuredContent": {"asset_id": asset_id, "download_url": sheet_url, "frames": 16},
+            "content": [{"type": "text", "text": f"sheet: 224x224, 4x4; download: {sheet_url}"}],
+        }}, {}
+
+    result = generate_pixellab_pro_4x4_atlas_mcp(
+        description="mushroomkin bell keeper", width=56, height=56, seed=17,
+        request_message=request_message,
+    )
+
+    assert result.atlas_png == sheet
+    with Image.open(BytesIO(result.atlas_png)) as decoded:
+        assert decoded.size == (224, 224)
+    assert result.mcp_request_count == 5
+    assert [call.get("params", {}).get("arguments", {}).get("job_id")
+            for call in calls if call.get("method") == "tools/call"] == [
+        None, "mcp-job-gallery", f"gallery:{asset_id}",
+    ]
+    assert len(downloads) == 1
+    assert downloads[0].get_method() == "GET"
+    assert downloads[0].get_header("Authorization") is None
 
 
 def test_mcp_credential_preflight_is_free_and_sends_no_request(monkeypatch: pytest.MonkeyPatch) -> None:
