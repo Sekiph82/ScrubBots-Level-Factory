@@ -153,6 +153,53 @@ def test_mcp_unknown_paid_submission_is_never_retried(monkeypatch: pytest.Monkey
     assert creates == 1
 
 
+def test_mcp_shutdown_cancels_accepted_job_and_keeps_job_id(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "test-token")
+    shutting_down = False
+    calls: list[str] = []
+
+    def shutdown_requested() -> bool:
+        return shutting_down
+
+    monkeypatch.setattr("scrubbots_pixel_factory.studio_lifecycle.studio_shutdown_requested", shutdown_requested)
+
+    def request_message(**kwargs: object):
+        nonlocal shutting_down
+        message = kwargs["message"]
+        method = str(message.get("method", ""))
+        if method == "initialize":
+            calls.append("initialize")
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {"protocolVersion": "2025-11-25"}}, {}
+        if method == "notifications/initialized":
+            calls.append("initialized")
+            return {}, {}
+        name = str(message["params"]["name"])
+        calls.append(name)
+        if name == "create_image_pro":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "content": [{"type": "text", "text": "job_id: mcp-shutdown-job"}],
+            }}, {}
+        if name == "cancel_job":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "content": [{"type": "text", "text": "cancelled"}],
+            }}, {}
+        raise AssertionError(f"unexpected MCP tool request: {name}")
+
+    def accepted(_job_id: str) -> None:
+        nonlocal shutting_down
+        shutting_down = True
+
+    with pytest.raises(PixelLabProviderError) as caught:
+        generate_pixellab_pro_4x4_atlas_mcp(
+            description="a blue slime", width=56, height=56, seed=17,
+            request_message=request_message, on_job_accepted=accepted,
+        )
+
+    assert caught.value.code == "STUDIO_SHUTDOWN_CANCELLED"
+    assert caught.value.job_id == "mcp-shutdown-job"
+    assert calls == ["initialize", "initialized", "create_image_pro", "cancel_job"]
+
+
 @pytest.mark.parametrize(
     ("status", "expected_code"),
     [(401, "MCP_AUTHENTICATION_FAILED"), (402, "INSUFFICIENT_CREDITS"), (429, "RATE_LIMITED")],

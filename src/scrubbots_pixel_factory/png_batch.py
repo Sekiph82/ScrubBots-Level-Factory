@@ -929,6 +929,14 @@ def run_png_batch(
         job["updated_at"] = _now()
         job = _write_job(job)
         for item_index, item in enumerate(job["items"]):
+            from .studio_lifecycle import studio_shutdown_requested
+            if studio_shutdown_requested():
+                job["state"] = "INTERRUPTED"
+                job["current_index"] = None
+                job["updated_at"] = _now()
+                _clear_control(job_id)
+                job = _write_job(job)
+                return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
             if item.get("status") in {"READY", "FAILED", "REJECTED", "SKIPPED_DUPLICATE"}:
                 continue
             action = _control_action(job_id)

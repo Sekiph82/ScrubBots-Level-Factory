@@ -160,12 +160,14 @@ var _pixel_art_thread: Thread
 var _pixel_art_mutex := Mutex.new()
 var _pixel_art_worker_done := false
 var _pixel_art_worker_result: Dictionary = {}
+var _pixel_art_worker_kind := "PIXELLAB"
 var _candidate_inbox_cache: Dictionary = {}
 var _candidate_inbox_last_request_msec := -60000
 var _selection_restore_token := ""
 var _batch_worker_active := false
 var _studio_cancel_marker_path := ""
 var _studio_cancel_previous_environment := ""
+var _studio_pid_previous_environment := ""
 var _shutdown_requested := false
 var _activity_file_path := ""
 var _activity_stream_reader_override: Object
@@ -265,63 +267,57 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_poll_studio_read_extension()
-	_start_next_studio_read_extension()
-	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
-		get_tree().quit()
-		return
+	if not _shutdown_requested:
+		_start_next_studio_read_extension()
 	_poll_pixel_art_worker()
-	if not _batch_job_id.is_empty() and not _batch_job_source_mismatch:
+	if not _shutdown_requested and not _batch_job_id.is_empty() and not _batch_job_source_mismatch:
 		_refresh_batch_progress()
-	if not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
+	if not _shutdown_requested and not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
 		_poll_pipeline_activity()
 		_refresh_activity_header()
-	if _pipeline_thread == null:
-		return
-	_pipeline_mutex.lock()
-	var completed := _pipeline_worker_done
-	var result := _pipeline_worker_result.duplicate(true) if completed else {}
-	_pipeline_mutex.unlock()
-	if completed and not _pipeline_thread.is_alive():
-		_pipeline_thread.wait_to_finish()
-		_pipeline_thread = null
+	if _pipeline_thread != null:
+		_pipeline_mutex.lock()
+		var completed := _pipeline_worker_done
+		var result := _pipeline_worker_result.duplicate(true) if completed else {}
+		_pipeline_mutex.unlock()
+		if not _pipeline_thread.is_alive():
+			_pipeline_thread.wait_to_finish()
+			_pipeline_thread = null
+			if _shutdown_requested:
+				_operation_running = false
+			else:
+				_complete_level_pipeline(result if completed else {"state": "ERROR", "error": "Pipeline worker exited without returning a result."})
+	if _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
 		_finish_worker_cancel_marker()
-		_complete_level_pipeline(result)
-		if _shutdown_requested:
-			get_tree().quit()
+	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
+		get_tree().quit()
 
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		if _studio_read_thread != null:
-			_shutdown_requested = true
-			_studio_read_queue.clear()
-			_activity_message = "Closing after the active local read finishes."
-			_activity_stage = "CLOSING"
-			_refresh_activity_header()
-			return
-		if _operation_running and _pipeline_thread != null:
-			_shutdown_requested = true
+		_shutdown_requested = true
+		_studio_read_queue.clear()
+		var active_worker := _studio_read_thread != null or _pipeline_thread != null or _pixel_art_thread != null
+		if active_worker:
 			_signal_worker_cancel_marker()
-			if not _batch_job_id.is_empty():
+			if _batch_worker_active and not _batch_job_id.is_empty():
 				_request_batch_control("CANCEL_NOW")
-			_activity_message = "Closing after the active Python and game solver processes stop."
+			_activity_message = "Closing after all active Studio workers and child processes stop."
 			_activity_stage = "CANCELLING"
 			_refresh_activity_header()
 			return
-		if _operation_running and _pixel_art_thread != null:
-			_shutdown_requested = true
-			_signal_worker_cancel_marker()
-			_report("Closing after the active PixelLab job is cancelled or reaches a terminal state.")
-			return
+		_finish_worker_cancel_marker()
 		get_tree().quit()
 
 
 func _prepare_worker_cancel_marker() -> void:
 	if not _studio_cancel_marker_path.is_empty():
-		_finish_worker_cancel_marker()
+		return
 	_studio_cancel_marker_path = ProjectSettings.globalize_path("res://output/.studio-cancel-%d.flag" % Time.get_ticks_usec())
 	_studio_cancel_previous_environment = OS.get_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE")
+	_studio_pid_previous_environment = OS.get_environment("SCRUBBOTS_FACTORY_STUDIO_PID")
 	OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_marker_path)
+	OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_PID", str(OS.get_process_id()))
 
 
 func _signal_worker_cancel_marker() -> void:
@@ -336,10 +332,12 @@ func _signal_worker_cancel_marker() -> void:
 func _finish_worker_cancel_marker() -> void:
 	if not _studio_cancel_marker_path.is_empty():
 		OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_previous_environment)
+		OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_PID", _studio_pid_previous_environment)
 	if not _studio_cancel_marker_path.is_empty() and FileAccess.file_exists(_studio_cancel_marker_path):
 		DirAccess.remove_absolute(_studio_cancel_marker_path)
 	_studio_cancel_marker_path = ""
 	_studio_cancel_previous_environment = ""
+	_studio_pid_previous_environment = ""
 
 
 func _capture_responsive_layout() -> void:
@@ -1490,7 +1488,7 @@ func _update_live_chrome() -> void:
 		if panel != null: panel.visible = true
 	var title := get_node_or_null("RuntimeTitle") as Label
 	if title != null: title.text = "SCRUBBOTS  /  " + _screen
-	if _activity_panel != null: _activity_panel.visible = _screen == "LEVEL FACTORY"
+	_sync_pipeline_activity_visibility()
 	if _batch_issue_panel != null: _batch_issue_panel.visible = _screen == "LEVEL FACTORY"
 	if _release_candidate_scroll != null: _release_candidate_scroll.visible = _screen == "RELEASE POOL"
 	if _release_activity_title != null: _release_activity_title.visible = _screen == "RELEASE POOL"
@@ -1500,6 +1498,11 @@ func _update_live_chrome() -> void:
 		_preview_host.size = Vector2(780, 640)
 	_refresh_live_data()
 	_apply_responsive_layout()
+
+
+func _sync_pipeline_activity_visibility() -> void:
+	if _activity_panel != null:
+		_activity_panel.visible = _screen == "LEVEL FACTORY"
 
 
 func _refresh_live_data() -> void:
@@ -2454,8 +2457,7 @@ func _on_owner_folder_selected(folder: String) -> void:
 	_operation_running = true
 	_activity_stage = "FOLDER PREVIEW"
 	_activity_message = "Scanning and validating direct PNG files in a background worker; no solver or provider call is running."
-	if _activity_panel != null:
-		_activity_panel.visible = true
+	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
 	if not _queue_studio_read_extension("owner-folder-preview", {
 		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
@@ -2516,8 +2518,7 @@ func _confirm_owner_folder_import() -> void:
 	_operation_running = true
 	_activity_stage = "SOURCE IMPORT"
 	_activity_message = "Rechecking %d PNG files against the confirmed preview in a background worker." % all_paths.size()
-	if _activity_panel != null:
-		_activity_panel.visible = true
+	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
 	if not _queue_studio_read_extension("owner-folder-preview", {
 		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
@@ -2864,6 +2865,12 @@ func _generate_art() -> void:
 		_record_pixel_art_activity("SINGLE", "CONFIRMATION_REQUIRED", "One paid PixelLab Pro 4×4 request awaits explicit confirmation.")
 		_confirm_pro_4x4_generation()
 		return
+	if _provider_model == "ALPIX (Claude)":
+		if _start_alpix_generate_worker({"prompt": _prompt, "width": _width, "height": _height}):
+			_record_pixel_art_activity("SINGLE", "SUBMITTED", "Submitting one ALPIX/Claude request through the tracked Studio worker.")
+		else:
+			_report("ALPIX/Claude worker could not start; no request was sent.")
+		return
 	var result := _generate_request({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
 	_finish_generation(result)
 
@@ -2883,36 +2890,50 @@ func _confirm_pro_4x4_generation() -> void:
 
 
 func _start_pixel_art_worker(request: Dictionary) -> bool:
+	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_4X4", "width": request.get("width", 56), "height": request.get("height", 56), "max_colors": request.get("max_colors", 12), "seed": request.get("seed", ""), "background_intent": "TRANSPARENT", "operation_id": "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]}
+	return _start_pixel_art_extension("semantic-generate", payload, "PIXELLAB")
+
+
+func _start_alpix_generate_worker(request: Dictionary) -> bool:
+	return _start_pixel_art_extension("alpix-generate", request, "ALPIX_SINGLE")
+
+
+func _start_pixel_art_extension(operation: String, payload: Dictionary, worker_kind: String) -> bool:
 	if _gateway == null or _operation_running or _pixel_art_thread != null:
 		return false
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
-		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core gateway is not ready.")
+		_report("Pixel Art worker is unavailable because the local Factory Core gateway is not ready.")
 		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Factory Core gateway is not ready; no provider request was sent.")
 		return false
-	var operation_id := "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
-	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_4X4", "width": request.get("width", 56), "height": request.get("height", 56), "max_colors": request.get("max_colors", 12), "seed": request.get("seed", ""), "background_intent": "TRANSPARENT", "operation_id": operation_id}
-	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "semantic-generate", payload)
+	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", operation, payload)
 	if prepared.is_empty():
-		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core cannot start.")
-		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Factory Core could not prepare the provider operation; no provider request was sent.")
+		_report("Pixel Art worker is unavailable because the local Factory Core could not prepare the operation.")
+		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Factory Core could not prepare the operation; no provider request was sent.")
 		return false
 	_prepare_worker_cancel_marker()
 	_pixel_art_mutex.lock()
 	_pixel_art_worker_done = false
 	_pixel_art_worker_result.clear()
+	_pixel_art_worker_kind = worker_kind
 	_pixel_art_mutex.unlock()
 	_pixel_art_thread = Thread.new()
 	var error := _pixel_art_thread.start(Callable(self, "_pixel_art_worker").bind(prepared))
 	if error != OK:
 		_pixel_art_thread = null
-		_finish_worker_cancel_marker()
-		_report("PixelLab Pro 4×4 worker could not start.")
+		_maybe_finish_worker_cancel_marker()
+		_report("Pixel Art worker could not start.")
 		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Provider worker could not start; no request was sent.")
 		return false
 	_operation_running = true
 	_semantic_progress = {"completed": 0, "failed": 0, "remaining": 1, "state": "RUNNING"}
-	_report("PIXELLAB PRO · submitting one 4×4 request · %d × %d sprites · atlas %d × %d · V3 locked · max %d colours" % [int(payload.width), int(payload.height), int(payload.width) * 4, int(payload.height) * 4, int(payload.max_colors)])
+	if worker_kind == "PIXELLAB":
+		_report("PIXELLAB PRO · submitting one 4×4 request · %d × %d sprites · atlas %d × %d · V3 locked · max %d colours" % [int(payload.width), int(payload.height), int(payload.width) * 4, int(payload.height) * 4, int(payload.max_colors)])
 	return true
+
+
+func _maybe_finish_worker_cancel_marker() -> void:
+	if _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
+		_finish_worker_cancel_marker()
 
 
 func _pixel_art_worker(prepared: Dictionary) -> void:
@@ -2930,16 +2951,32 @@ func _poll_pixel_art_worker() -> void:
 	var completed := _pixel_art_worker_done
 	var result := _pixel_art_worker_result.duplicate(true) if completed else {}
 	_pixel_art_mutex.unlock()
-	if not completed or _pixel_art_thread.is_alive():
+	if _pixel_art_thread.is_alive():
 		return
 	_pixel_art_thread.wait_to_finish()
 	_pixel_art_thread = null
-	_finish_worker_cancel_marker()
 	_pixel_art_mutex.lock()
 	_pixel_art_worker_done = false
 	_pixel_art_worker_result.clear()
+	var worker_kind := _pixel_art_worker_kind
 	_pixel_art_mutex.unlock()
 	_operation_running = false
+	if _shutdown_requested:
+		return
+	if not completed:
+		result = {"state": "ERROR", "error": "Pixel Art worker exited without returning a result."}
+	if worker_kind == "ALPIX_SINGLE":
+		if str(result.get("state", "")) == "IMPORTED":
+			_semantic_progress = {"completed": 1, "failed": 0, "remaining": 0, "state": "IMPORTED"}
+			_finish_generation(result)
+		else:
+			_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
+			_report("ALPIX/Claude · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
+		_record_pixel_art_activity("ALPIX RESULT", str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
+		return
+	if worker_kind == "ALPIX_CSV":
+		_handle_alpix_csv_job(result)
+		return
 	if str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"]:
 		var source_ids: Array = result.get("source_ids", [])
 		_semantic_progress = {"completed": source_ids.size(), "failed": 16 - source_ids.size(), "remaining": 0, "state": str(result.get("state", "SOURCE_ONLY")), "frame_statuses": result.get("frame_statuses", [])}
@@ -3007,25 +3044,9 @@ func _generate_batch_csv(path: String) -> void:
 		_report("Factory Core is unavailable.")
 		return
 	if _provider_model == "ALPIX (Claude)":
-		_operation_running = true
-		var job := _extension("alpix-csv-job", {"csv_path": path, "default_width": _width, "default_height": _height})
-		_operation_running = false
-		_semantic_progress = {"job_id": job.get("job_id", ""), "completed": job.get("completed", 0), "failed": job.get("failed", 0), "retired": job.get("retired", 0), "remaining": job.get("remaining", 0), "state": job.get("state", "ERROR")}
-		_set_batch_action_label(str(job.get("state", "ERROR")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY"])
-		var rows: Array = job.get("rows", [])
-		var provider_error := ""
-		for row in rows:
-			if str(row.get("state", "")) == "IMPORTED":
-				_last_source_id = str(row.get("source_id", _last_source_id))
-				_selected_art_path = str(row.get("artifact_path", _selected_art_path))
-			elif not str(row.get("error", "")).strip_edges().is_empty():
-				provider_error = str(row.get("error", "")).strip_edges().left(180)
-		if not _selected_art_path.is_empty():
-			_load_selected_art_preview(_selected_art_path)
-		var summary := "ALPIX %s · %d imported · %d failed · %d retired · %d left" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("failed", 0)), int(job.get("retired", 0)), int(job.get("remaining", 0))]
-		if not provider_error.is_empty():
-			summary += " · " + provider_error
-		_report(summary)
+		if not _start_pixel_art_extension("alpix-csv-job", {"csv_path": path, "default_width": _width, "default_height": _height}, "ALPIX_CSV"):
+			_report("ALPIX CSV worker could not start; no generation request was sent.")
+			_record_pixel_art_activity("ALPIX CSV", "NOT_STARTED", "Tracked provider worker could not start.")
 		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
@@ -3067,6 +3088,29 @@ func _generate_batch_csv(path: String) -> void:
 	_report("Batch: %d succeeded · %d failed" % [succeeded, failed])
 	file.close()
 	_record_pixel_art_activity("ALPIX CSV BATCH", "COMPLETE", "Batch finished: %d succeeded, %d failed." % [succeeded, failed])
+	_batch_csv_path = ""
+	var csv_button := get_node_or_null("BatchCsvPath") as Button
+	if csv_button != null: csv_button.text = "CSV file…"
+
+
+func _handle_alpix_csv_job(job: Dictionary) -> void:
+	_semantic_progress = {"job_id": job.get("job_id", ""), "completed": job.get("completed", 0), "failed": job.get("failed", 0), "retired": job.get("retired", 0), "remaining": job.get("remaining", 0), "state": job.get("state", "ERROR")}
+	_set_batch_action_label(str(job.get("state", "ERROR")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY", "INTERRUPTED"])
+	var rows: Array = job.get("rows", [])
+	var provider_error := ""
+	for row in rows:
+		if str(row.get("state", "")) == "IMPORTED":
+			_last_source_id = str(row.get("source_id", _last_source_id))
+			_selected_art_path = str(row.get("artifact_path", _selected_art_path))
+		elif not str(row.get("error", "")).strip_edges().is_empty():
+			provider_error = str(row.get("error", "")).strip_edges().left(180)
+	if not _selected_art_path.is_empty():
+		_load_selected_art_preview(_selected_art_path)
+	var summary := "ALPIX %s · %d imported · %d failed · %d retired · %d left" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("failed", 0)), int(job.get("retired", 0)), int(job.get("remaining", 0))]
+	if not provider_error.is_empty():
+		summary += " · " + provider_error
+	_report(summary)
+	_record_pixel_art_activity("ALPIX CSV BATCH", str(job.get("state", "ERROR")), summary)
 	_batch_csv_path = ""
 	var csv_button := get_node_or_null("BatchCsvPath") as Button
 	if csv_button != null: csv_button.text = "CSV file…"
@@ -3383,7 +3427,7 @@ func _run_single_level_pipeline() -> void:
 	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
 	if thread_error != OK:
 		_pipeline_thread = null
-		_finish_worker_cancel_marker()
+		_maybe_finish_worker_cancel_marker()
 		_complete_local_pipeline_failure("Pipeline worker could not start.")
 		return
 	_activity_message = "Waiting for the first backend stage."
@@ -3446,7 +3490,7 @@ func _run_png_batch() -> void:
 		_activity_backend_disposition = _activity_stage
 		_activity_terminal_state = _activity_stage
 		_activity_message = terminal if prior_failed > 0 or prior_rejected > 0 else "Loaded batch complete · %d READY · %d SKIPPED · no solver was run." % [prior_ready, prior_skipped] if prior_skipped > 0 else "Loaded batch already has verified READY results; no solver was run."
-		if _activity_panel != null: _activity_panel.visible = true
+		_sync_pipeline_activity_visibility()
 		_render_batch_item_results(_batch_snapshot)
 		_refresh_activity_header()
 		_refresh_live_data()
@@ -3486,7 +3530,7 @@ func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
 	var thread_error := _pipeline_thread.start(Callable(self, "_pipeline_worker").bind(prepared))
 	if thread_error != OK:
 		_pipeline_thread = null
-		_finish_worker_cancel_marker()
+		_maybe_finish_worker_cancel_marker()
 		_report("PNG batch worker could not start.")
 		return
 	_batch_worker_active = true
@@ -3505,7 +3549,7 @@ func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
 	_activity_terminal_state = ""
 	if _activity_rows != null:
 		for child in _activity_rows.get_children(): child.queue_free()
-	if _activity_panel != null: _activity_panel.visible = true
+	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
 	_refresh_run_button_caption()
 	if _batch_pause_button != null: _batch_pause_button.visible = true
@@ -3809,7 +3853,7 @@ func _complete_png_batch(result: Dictionary) -> void:
 func _render_batch_item_results(job: Dictionary, force_selected_item: bool = false) -> void:
 	if _activity_rows == null or not _batch_job_matches_loaded_sources():
 		return
-	if _activity_panel != null: _activity_panel.visible = true
+	_sync_pipeline_activity_visibility()
 	var source_id := _activity_source_id if not _activity_source_id.is_empty() else _selected_import_source_id
 	var items: Array = job.get("items", [])
 	for index in range(items.size()):
@@ -4269,9 +4313,10 @@ func _request_candidate_inbox_refresh(force: bool = false) -> void:
 
 
 func _start_next_studio_read_extension() -> void:
-	if _studio_read_thread != null or _studio_read_queue.is_empty():
+	if _shutdown_requested or _studio_read_thread != null or _studio_read_queue.is_empty():
 		return
 	var queued: Dictionary = _studio_read_queue.pop_front()
+	_prepare_worker_cancel_marker()
 	_studio_read_mutex.lock()
 	_studio_read_done = false
 	_studio_read_result.clear()
@@ -4318,7 +4363,7 @@ func _poll_studio_read_extension() -> void:
 	var result := _studio_read_result.duplicate(true) if completed else {}
 	var context := _studio_read_context.duplicate(true) if completed else {}
 	_studio_read_mutex.unlock()
-	if not completed or _studio_read_thread.is_alive():
+	if _studio_read_thread.is_alive():
 		return
 	_studio_read_thread.wait_to_finish()
 	_studio_read_thread = null
@@ -4327,6 +4372,14 @@ func _poll_studio_read_extension() -> void:
 	_studio_read_result.clear()
 	_studio_read_context.clear()
 	_studio_read_mutex.unlock()
+	if _shutdown_requested:
+		_studio_read_queue.clear()
+		_operation_running = false
+		return
+	if not completed:
+		_operation_running = false
+		_report("Studio read worker exited without returning a result.")
+		return
 	var kind := str(context.get("kind", ""))
 	if kind == "pixellab-batch-inspect":
 		_operation_running = false
@@ -4525,7 +4578,7 @@ func _generate_request(request: Dictionary) -> Dictionary:
 	var result: Dictionary
 	var selected_provider := str(request.get("provider", _provider_model))
 	if selected_provider == "ALPIX (Claude)":
-		result = _extension("alpix-generate", {"prompt": request.get("prompt", ""), "width": request.get("width", 32), "height": request.get("height", 32)})
+		result = {"state": "ASYNC_REQUIRED", "reason": "ALPIX generation must use the tracked Studio worker."}
 	elif selected_provider == "PIXELLAB":
 		# Paid requests only pass through explicit confirmation and the async worker.
 		result = {"state": "PAID_CONFIRMATION_REQUIRED", "reason": "Start one explicit Generate/Regenerate request to confirm PixelLab Pro 4×4 cost."}

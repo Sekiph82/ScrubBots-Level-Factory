@@ -2399,6 +2399,28 @@ class PixelLabProviderError(RuntimeError):
         self.http_status = http_status
 
 
+def _raise_if_studio_shutdown(*, job_id: str | None = None,
+                              request_count: int | None = None) -> None:
+    """Stop provider work when the owning Studio process requests shutdown."""
+    try:
+        from .studio_lifecycle import studio_shutdown_requested
+        cancelled = studio_shutdown_requested()
+    except Exception:
+        raise PixelLabProviderError(
+            "STUDIO_SHUTDOWN_SIGNAL_UNREADABLE",
+            "Factory Studio shutdown state could not be verified; provider work was stopped safely.",
+            job_id=job_id,
+            http_request_count=request_count,
+        ) from None
+    if cancelled:
+        raise PixelLabProviderError(
+            "STUDIO_SHUTDOWN_CANCELLED",
+            "Factory Studio closed; provider polling stopped and any accepted job ID was retained.",
+            job_id=job_id,
+            http_request_count=request_count,
+        )
+
+
 def _provider_request_id_from_headers(headers: object) -> str | None:
     """Retain only a bounded opaque provider correlation ID, never arbitrary headers."""
     if not isinstance(headers, Mapping):
@@ -2721,8 +2743,18 @@ def generate_pixellab_pro_4x4_atlas_mcp(
     session_id: str | None = None
     protocol_version = PRO_4X4_MCP_PROTOCOL_VERSION
 
-    def post(message: Mapping[str, object], *, timeout: float = 30) -> dict[str, object]:
+    def post(message: Mapping[str, object], *, timeout: float = 30,
+             allow_shutdown: bool = False) -> dict[str, object]:
         nonlocal request_count, session_id
+        current_job_id = None
+        params = message.get("params")
+        if isinstance(params, Mapping):
+            arguments = params.get("arguments")
+            if isinstance(arguments, Mapping):
+                value = arguments.get("job_id")
+                current_job_id = value if isinstance(value, str) else None
+        if not allow_shutdown:
+            _raise_if_studio_shutdown(job_id=current_job_id, request_count=request_count)
         request_count += 1
         if on_mcp_request_started is not None:
             on_mcp_request_started(request_count)
@@ -2737,13 +2769,14 @@ def generate_pixellab_pro_4x4_atlas_mcp(
             session_id = returned_session
         return response
 
-    def rpc(method: str, params: Mapping[str, object] | None = None, *, tool_name: str | None = None) -> dict[str, object]:
+    def rpc(method: str, params: Mapping[str, object] | None = None, *, tool_name: str | None = None,
+            allow_shutdown: bool = False, timeout: float = 30) -> dict[str, object]:
         nonlocal message_id
         message_id += 1
         payload: dict[str, object] = {"jsonrpc": "2.0", "id": message_id, "method": method}
         if params is not None:
             payload["params"] = dict(params)
-        response = post(payload)
+        response = post(payload, timeout=timeout, allow_shutdown=allow_shutdown)
         if response.get("id") != message_id:
             raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response ID did not match its request.")
         _mcp_result_error(response, tool_name or method)
@@ -2752,6 +2785,26 @@ def generate_pixellab_pro_4x4_atlas_mcp(
             raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response had no result object.")
         return result
 
+    def cancel_accepted_job_for_shutdown(job_id: str) -> None:
+        try:
+            _raise_if_studio_shutdown(job_id=job_id, request_count=request_count)
+        except PixelLabProviderError as shutdown_error:
+            try:
+                rpc("tools/call", {"name": "cancel_job", "arguments": {"job_id": job_id}},
+                    tool_name="cancel_job", allow_shutdown=True, timeout=10)
+            except PixelLabProviderError:
+                raise PixelLabProviderError(
+                    "STUDIO_SHUTDOWN_CANCEL_UNCONFIRMED",
+                    "Factory Studio closed; PixelLab cancel_job could not be confirmed. The provider job ID was retained.",
+                    job_id=job_id, http_request_count=request_count,
+                ) from None
+            raise PixelLabProviderError(
+                "STUDIO_SHUTDOWN_CANCELLED",
+                "Factory Studio closed; a PixelLab cancel_job request was sent and the provider job ID was retained.",
+                job_id=job_id, http_request_count=request_count,
+            ) from shutdown_error
+
+    _raise_if_studio_shutdown()
     initialize = rpc("initialize", {
         "protocolVersion": protocol_version,
         "capabilities": {},
@@ -2760,6 +2813,7 @@ def generate_pixellab_pro_4x4_atlas_mcp(
     negotiated = initialize.get("protocolVersion")
     if isinstance(negotiated, str) and negotiated:
         protocol_version = negotiated
+    _raise_if_studio_shutdown(request_count=request_count)
     request_count += 1
     if on_mcp_request_started is not None:
         on_mcp_request_started(request_count)
@@ -2776,6 +2830,7 @@ def generate_pixellab_pro_4x4_atlas_mcp(
         session_id = returned_session
 
     if on_submission_started is not None:
+        _raise_if_studio_shutdown(request_count=request_count)
         on_submission_started()
     create_result = rpc("tools/call", {"name": "create_image_pro", "arguments": {
         "description": description.strip(),
@@ -2801,7 +2856,13 @@ def generate_pixellab_pro_4x4_atlas_mcp(
 
     deadline = monotonic() + max_wait_seconds
     while monotonic() < deadline:
-        result = rpc("tools/call", {"name": "get_image", "arguments": {"job_id": job_id}}, tool_name="get_image")
+        cancel_accepted_job_for_shutdown(job_id)
+        try:
+            result = rpc("tools/call", {"name": "get_image", "arguments": {"job_id": job_id}}, tool_name="get_image")
+        except PixelLabProviderError:
+            cancel_accepted_job_for_shutdown(job_id)
+            raise
+        cancel_accepted_job_for_shutdown(job_id)
         atlas_png = _mcp_inline_png(result)
         if atlas_png is not None:
             try:
@@ -2851,9 +2912,11 @@ def reconcile_pixellab_pro_4x4_job_mcp(
 
     def send(message: Mapping[str, object]) -> dict[str, object]:
         nonlocal session_id
+        _raise_if_studio_shutdown(job_id=job_id, request_count=request_id)
         response, headers = request_message(secret=secret, message=message, session_id=session_id,
                                             protocol_version=version if message.get("method") != "initialize" else None,
                                             timeout=30)
+        _raise_if_studio_shutdown(job_id=job_id, request_count=request_id + 1)
         session_id = next((str(value) for key, value in headers.items()
                            if str(key).lower() == "mcp-session-id" and value), session_id)
         return response
@@ -2869,8 +2932,10 @@ def reconcile_pixellab_pro_4x4_job_mcp(
         raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP initialization returned no result.", job_id=job_id)
     if isinstance(result.get("protocolVersion"), str):
         version = str(result["protocolVersion"])
+    _raise_if_studio_shutdown(job_id=job_id, request_count=request_id)
     _, headers = request_message(secret=secret, message={"jsonrpc": "2.0", "method": "notifications/initialized"},
                                  session_id=session_id, protocol_version=version, timeout=30)
+    _raise_if_studio_shutdown(job_id=job_id, request_count=request_id + 1)
     session_id = next((str(value) for key, value in headers.items()
                        if str(key).lower() == "mcp-session-id" and value), session_id)
     request_id += 1
@@ -2981,12 +3046,14 @@ def generate_pixellab_pro_4x4_frames(
     }
     base_url = "https://api.pixellab.ai/v2"
     if on_submission_started is not None:
+        _raise_if_studio_shutdown()
         on_submission_started()
     request_count = 0
     current_job_id: str | None = None
 
     def bounded_request(url: str, **kwargs: object) -> tuple[dict[str, object], Mapping[str, str]]:
         nonlocal request_count
+        _raise_if_studio_shutdown(job_id=current_job_id, request_count=request_count)
         if request_count >= max_http_requests:
             raise PixelLabProviderError(
                 "HTTP_REQUEST_BUDGET_EXHAUSTED",
@@ -3017,8 +3084,10 @@ def generate_pixellab_pro_4x4_frames(
         on_job_accepted(job_id)
     deadline = monotonic() + max_wait_seconds
     while monotonic() < deadline:
+        _raise_if_studio_shutdown(job_id=job_id, request_count=request_count)
         try:
             status, _ = bounded_request(f"{base_url}/background-jobs/{job_id}", secret=secret, method="GET", timeout=30)
+            _raise_if_studio_shutdown(job_id=job_id, request_count=request_count)
         except PixelLabProviderError as exc:
             if exc.code == "POLL_NETWORK_ERROR":
                 sleep(poll_seconds)
@@ -3074,8 +3143,10 @@ def reconcile_pixellab_pro_4x4_job(
     url = f"https://api.pixellab.ai/v2/background-jobs/{job_id}"
     deadline = monotonic() + max_wait_seconds
     while monotonic() < deadline:
+        _raise_if_studio_shutdown(job_id=job_id)
         try:
             status, _ = request_json(url, secret=secret, method="GET", timeout=30)
+            _raise_if_studio_shutdown(job_id=job_id)
         except PixelLabProviderError as exc:
             if exc.code == "POLL_NETWORK_ERROR":
                 sleep(poll_seconds)

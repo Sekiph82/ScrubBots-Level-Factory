@@ -264,6 +264,13 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             raise ValueError("request-json must be an object")
         from scrubbots_pixel_factory import studio_extensions as extensions
         operation = args.operation
+        if operation != "png-batch-control":
+            from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
+            if studio_shutdown_requested():
+                print(json.dumps({"operation": STUDIO_EXTENSION_OPERATION, "state": "CANCELLED",
+                                  "disposition": "STUDIO_SHUTDOWN", "error": "Factory Studio is closing."},
+                                 ensure_ascii=False, sort_keys=True, separators=(",", ":")))
+                return 0
         if operation == "owner-pages":
             payload = extensions.owner_pages_snapshot()
         elif operation == "library-refresh":
@@ -360,9 +367,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
             assert_solver_allowed(sources)
             payload = extensions.png_batch_run(str(request["job_id"]), request.get("expected_batch_id"))
-            from scrubbots_pixel_factory.owner_release_library import record_batch_outcomes
             completed_job = payload.get("job", {}) if isinstance(payload, Mapping) else {}
-            payload["owner_release_archive"] = record_batch_outcomes(completed_job) if isinstance(completed_job, Mapping) else []
+            if isinstance(completed_job, Mapping) and completed_job.get("state") != "INTERRUPTED":
+                from scrubbots_pixel_factory.owner_release_library import record_batch_outcomes
+                payload["owner_release_archive"] = record_batch_outcomes(completed_job)
         elif operation == "session-save":
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":
@@ -1094,6 +1102,10 @@ def _alpix_generate(request: Mapping[str, object]) -> dict[str, object]:
     generated = generate_alpix_png(prompt=_text(request.get("prompt"), "prompt"),
         width=_exact_int(request.get("width"), "width"), height=_exact_int(request.get("height"), "height"),
         destination=output, project_root=Path(_repository_root()))
+    from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
+    if studio_shutdown_requested():
+        return {"operation": "alpix-generate", "state": "CANCELLED",
+                "reason": "Factory Studio closed after the provider completed; the generated PNG was preserved."}
     imported = extensions.batch_import([str(output)])
     items = imported.get("items", [])
     item = items[0] if isinstance(items, list) and items else {}
@@ -1129,10 +1141,16 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
 
     job_result = run_csv_job(csv_path, root, renderer=render,
         importer=import_png, default_size=(default_width, default_height))
+    if job_result.state == "INTERRUPTED":
+        return {"operation": "alpix-csv-job", **job_result.to_dict()}
     from scrubbots_pixel_factory.owner_art_storage import archive_alpix_png
     rows: list[dict[str, object]] = []
     job_artifact_root = (root / job_result.job_id).resolve()
     for index, row_value in enumerate(job_result.rows):
+        from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
+        if studio_shutdown_requested():
+            return {"operation": "alpix-csv-job", **job_result.to_dict(), "state": "INTERRUPTED",
+                    "rows": rows + [dict(value) for value in job_result.rows[index:]]}
         row = dict(row_value)
         artifact = job_artifact_root / f"row-{index + 1:05d}.png"
         row["artifact_path"] = str(artifact)

@@ -157,6 +157,10 @@ class ScrubBotsSolver:
                 reader_error.append(f"stdout read failed: {type(exc).__name__}")
 
         def studio_cancel_requested():
+            from ..studio_lifecycle import studio_shutdown_requested
+
+            if studio_shutdown_requested():
+                return True
             marker_path = os.environ.get("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", "").strip()
             if marker_path and Path(marker_path).is_file():
                 return True
@@ -170,23 +174,9 @@ class ScrubBotsSolver:
             return control.get("action") == "CANCEL_NOW"
 
         def terminate_solver_tree(process):
-            if os.name == "nt":
-                taskkill = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32" / "taskkill.exe"
-                if taskkill.is_file():
-                    try:
-                        subprocess.run([str(taskkill), "/PID", str(process.pid), "/T", "/F"],
-                                       capture_output=True, text=True, timeout=5,
-                                       creationflags=NO_WINDOW, check=False)
-                        process.wait(timeout=5)
-                        return
-                    except (OSError, subprocess.TimeoutExpired):
-                        pass
-            process.terminate()
-            try:
-                process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait()
+            from ..studio_lifecycle import terminate_studio_child_tree
+
+            terminate_studio_child_tree(process)
 
         flags = NO_WINDOW
         if attested_runtime and os.name == "nt":
@@ -202,7 +192,7 @@ class ScrubBotsSolver:
                                   "--", str(work / "req.json"), str(work / "res.json")],
                                  stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                  encoding="utf-8", errors="replace", creationflags=flags,
-                                 env=process_env, bufsize=1)
+                                 env=process_env, bufsize=1, start_new_session=(os.name != "nt"))
             reader = threading.Thread(target=drain_output, args=(p.stdout,), daemon=True)
             reader.start()
             timed_out = False

@@ -15,6 +15,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
@@ -85,6 +86,40 @@ def _safe_unavailable_reason(reason: object) -> str:
     if message == "Claude Alpix tool identity is incomplete.":
         return message
     return "ALPIX_UNAVAILABLE: Claude Alpix did not produce a validated PNG."
+
+
+def _terminate_process_tree(process: subprocess.Popen[str]) -> None:
+    from .studio_lifecycle import terminate_studio_child_tree
+
+    terminate_studio_child_tree(process)
+
+
+def _run_claude_interruptibly(args: Sequence[str], *, env: Mapping[str, str],
+                              cwd: str | None) -> subprocess.CompletedProcess[str]:
+    from .studio_lifecycle import studio_shutdown_requested
+
+    if studio_shutdown_requested():
+        raise AlpixUnavailable("STUDIO_SHUTDOWN_CANCELLED: Factory Studio is closing.")
+    flags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0) if os.name == "nt" else 0
+    process = subprocess.Popen(
+        list(args), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        encoding="utf-8", errors="replace", cwd=cwd, env=dict(env),
+        creationflags=flags, start_new_session=(os.name != "nt"),
+    )
+    deadline = time.monotonic() + 1800
+    while True:
+        if studio_shutdown_requested():
+            _terminate_process_tree(process)
+            raise AlpixUnavailable("STUDIO_SHUTDOWN_CANCELLED: Factory Studio closed; Claude Code was stopped.")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _terminate_process_tree(process)
+            raise subprocess.TimeoutExpired(args, 1800)
+        try:
+            stdout, stderr = process.communicate(timeout=min(0.25, remaining))
+            return subprocess.CompletedProcess(args, int(process.returncode or 0), stdout, stderr)
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def find_claude(*, user_home: Path | None = None) -> str | None:
@@ -300,7 +335,7 @@ def discover_alpix(*, user_home: Path | None = None,
 def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str | Path,
                        discovery: Mapping[str, object] | None = None,
                        project_root: Path | None = None,
-                       runner: Callable[..., object] = subprocess.run) -> dict[str, object]:
+                       runner: Callable[..., object] | None = None) -> dict[str, object]:
     """Ask the discovered Alpix integration to write one exact-size PNG."""
     if type(prompt) is not str or not prompt.strip():
         raise ValueError("Prompt is required.")
@@ -336,9 +371,20 @@ def generate_alpix_png(*, prompt: str, width: int, height: int, destination: str
     child_env.pop("ANTHROPIC_AUTH_TOKEN", None)
     working_directory = str(Path(project_root).resolve()) if project_root is not None else None
     try:
-        completed = runner([str(executable), "-p", task, "--output-format", "text"],
-                           capture_output=True, text=True, timeout=1800, env=child_env, check=False,
-                           cwd=working_directory)
+        command = [str(executable), "-p", task, "--output-format", "text"]
+        if runner is None:
+            completed = _run_claude_interruptibly(command, env=child_env, cwd=working_directory)
+        else:
+            from .studio_lifecycle import studio_shutdown_requested
+            if studio_shutdown_requested():
+                raise AlpixUnavailable("STUDIO_SHUTDOWN_CANCELLED: Factory Studio is closing.")
+            completed = runner(command, capture_output=True, text=True, timeout=1800,
+                               env=child_env, check=False, cwd=working_directory)
+            if studio_shutdown_requested():
+                raise AlpixUnavailable("STUDIO_SHUTDOWN_CANCELLED: Factory Studio closed during Claude Code.")
+    except AlpixUnavailable:
+        _discard_provider_output(output)
+        raise
     except subprocess.TimeoutExpired as exc:
         _discard_provider_output(output)
         raise AlpixUnavailable("Claude Alpix generation timed out.") from exc
@@ -485,6 +531,11 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
     state["state"] = "RUNNING"
     _save_job(state_path, state)
     for index, row in enumerate(state["rows"]):
+        from .studio_lifecycle import studio_shutdown_requested
+        if studio_shutdown_requested():
+            state["state"] = "INTERRUPTED"
+            _save_job(state_path, state)
+            return _job_result(job_id, state)
         row_state = str(row.get("state", "PENDING"))
         provider_id = str(row.get("provider_id", "ALPIX (Claude)")).strip().upper()
         if row_state == "IMPORTED":
@@ -519,6 +570,10 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
                 except (OSError, ValueError):
                     valid_artifact = False
             if valid_artifact:
+                if studio_shutdown_requested():
+                    state["state"] = "INTERRUPTED"
+                    _save_job(state_path, state)
+                    return _job_result(job_id, state)
                 row["state"] = "VALIDATED"
                 _save_job(state_path, state)
                 imported = importer(artifact)
@@ -551,6 +606,12 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
             if rendered.get("path") != str(artifact):
                 raise ValueError("Provider output path did not match the current row.")
             _validate_png(artifact, int(row["width"]), int(row["height"]))
+            if studio_shutdown_requested():
+                row.update({"state": "DRAWN", "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+                            "error": "Studio closed after drawing; the row is saved and was not imported."})
+                state["state"] = "INTERRUPTED"
+                _save_job(state_path, state)
+                return _job_result(job_id, state)
         except AlpixUsageLimit:
             artifact.unlink(missing_ok=True)
             row.update({"state": "PENDING", "error": "CLAUDE_USAGE_LIMIT: Claude subscription usage limit reached."})
@@ -558,9 +619,18 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
             _save_job(state_path, state)
             return _job_result(job_id, state)
         except AlpixUnavailable as exc:
-            artifact.unlink(missing_ok=True)
             row.update({"state": "PENDING", "error": _safe_unavailable_reason(exc)})
-            state["state"] = "UNAVAILABLE"
+            is_shutdown = "STUDIO_SHUTDOWN_CANCELLED" in str(exc)
+            if is_shutdown and artifact.is_file():
+                try:
+                    _validate_png(artifact, int(row["width"]), int(row["height"]))
+                except (OSError, ValueError):
+                    artifact.unlink(missing_ok=True)
+                else:
+                    row.update({"state": "DRAWN", "artifact_sha256": hashlib.sha256(artifact.read_bytes()).hexdigest()})
+            elif not is_shutdown:
+                artifact.unlink(missing_ok=True)
+            state["state"] = "INTERRUPTED" if is_shutdown else "UNAVAILABLE"
             _save_job(state_path, state)
             return _job_result(job_id, state)
         except Exception:
