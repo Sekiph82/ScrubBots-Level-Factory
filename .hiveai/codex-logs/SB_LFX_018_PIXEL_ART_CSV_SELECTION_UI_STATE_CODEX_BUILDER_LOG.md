@@ -1,0 +1,39 @@
+# SB-LFX OWNER GOAL | AUTONOMOUS OPEN-BACKLOG EXECUTION | 2026-10-31
+
+Document role: CODEX BUILDER LOG
+
+## Start and scope
+
+- Started: 2026-11-06 12:09 UTC.
+- Existing task: `SB-LFX-018`, the three-screen Factory Studio workflow, worker shutdown and activity-panel scope. This is a narrow correction discovered during the owner's requested native UI acceptance: keep the selected Pixel Art batch CSV visibly identified after navigating away and returning to Pixel Art.
+- Canonical root: `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`; repository `Sekiph82/ScrubBots-Level-Factory`; origin `https://github.com/Sekiph82/ScrubBots-Level-Factory.git`; execution branch `codex/sb-lfx-018-r05-v13-cd-recovery-20261021`.
+- Queue guard refreshed GitHub state and passed. Starting `HEAD == origin/main == 3628e7888e972f25ceb8973b12326e4718dac6ba`, ahead/behind `0/0`; tracked worktree clean. Existing untracked owner data was left untouched.
+- Active prompt: `.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md`; prompt blob `3cafdbd2168ff4cbdea1d7ceed2b91f11d08a648`; TASKS blob `53d25496dfea17fdb7c1472cadfdbac657d728bc`.
+- Read active prompt, current root `TASKS.md` task fields, existing matching builder-log header, and `docs/process/CODEX_SYNC_PUBLISH_STANDARD_V01.md`.
+- User requested manual, button-by-button native UI checking. The source DEBUG Studio window was opened through the existing local launcher and closed via its window close button. No provider generation, pipeline solve/resume, candidate acceptance, Release build, R2/Production operation or owner-data write was triggered.
+
+## Native UI observations before correction
+
+- Pixel Art Single/Batch toggle changed the displayed mode. Prompt editor, Size dialog and Provider dialog opened and were canceled without edits. PixelLab Pro and ALPIX provider choices appeared in the Provider selector.
+- Selecting `scrubbots_2000_prompts.csv` through the native CSV picker closed the picker and showed `CSV: scrubbots_2000_prompts.csv` on the Batch screen. After switching to LEVEL FACTORY and back, the label reverted to `CSV file…` while the activity history retained the CSV selection. Source review confirmed `_batch_csv_path` remains set, but `_refresh_action_visibility()` restored the default caption. This is a misleading UI state; paid batch submission was not attempted.
+- LEVEL FACTORY displayed its Pipeline Activity; after switching to RELEASE POOL and waiting 2.5 seconds, the Level Factory table did not appear there. Release Pool showed one READY owner candidate; `Preview Replay` safely reported missing replay evidence. No resume/solve/accept/reject operation was triggered.
+- Release Pool Search and Difficulty/Columns dialogs opened and were canceled. Select All and Clear changed and cleared the in-memory selection. Canvas zoom, 1:1, Fit and Grid controls responded. Release operation help panels opened and were closed. No upload, pack build, Production target or preflight action was run.
+- Clicking the Studio window X closed the app. Process inspection confirmed the task-launched Godot and launcher processes were gone and no matching Studio worker remained.
+
+## Planned change and safety
+
+- Add one helper that renders the CSV button caption and tooltip from `_batch_csv_path`; call it whenever the action visibility/state refreshes, so tab navigation does not hide a still-selected file.
+- Add a focused local regression check for selected and cleared CSV display state. Preserve the user's existing CSVs, current goal text, output folders, candidate data, release data and all unrelated untracked files.
+- Reopen the app for a focused native retest of select CSV -> navigate tabs -> return -> confirm caption persists -> close X -> verify no app process. Do not press Run Batch: the selected CSV may trigger provider requests, and this task does not authorize additional paid/provider calls.
+- No CI/Actions, provider requests, owner PNG edits, solver run, R2/Production write, Release Apply, or destructive cleanup.
+
+## Implementation and verification
+
+- Updated `level_factory/scripts/factory_studio_exact_ui.gd`: the Pixel Art Batch CSV picker button now refreshes its caption and full-path tooltip from `_batch_csv_path` whenever the master-screen controls are refreshed. The empty state remains `CSV file…`.
+- Added focused regression suite `level_factory/tests/factory_studio_batch_csv_ui_state_suite.gd` for selected-file caption/tooltip restoration and clearing the selection. A first invocation through the non-console WinGet Godot link returned only the engine banner with no test marker; reran using the installed console binary directly.
+- Focused local verification: `Godot_v4.7.2-stable_win64_console.exe --headless --path "C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\level_factory" -s res://tests/factory_studio_batch_csv_ui_state_suite.gd` -> literal `Factory Studio batch CSV UI state PASS`, exit 0. No CI/Actions or TEMP/worktree was used.
+- Native GUI retest: selected `scrubbots_2000_prompts.csv`; after switching to LEVEL FACTORY and RELEASE POOL and returning to PIXEL ART, the button still showed `CSV: scrubbots_2000_prompts.csv`. The focused regression asserts that the full path is stored in the tooltip. No paid request was sent.
+- Native UI recheck: Release Pool loaded and its read-only Refresh completed, but both showed `READY levels: 0`, `Visible: 0`, `Selected: 0`. In the prior opening of this same inspection session it showed one READY owner candidate. This inconsistent/empty pool state remains unresolved; no owner PNG/JSON was moved, restored, deleted or edited. The Level Factory activity table did not appear on Release Pool after waiting.
+- Previously observed safe UI controls remain as listed above: search/filter dialogs opened and canceled, selection controls changed and cleared in-memory selection, zoom/1:1/Fit/Grid and settings open/close responded; provider, prompt and size dialogs were inspected/canceled. Destructive, paid or external-write actions were not run: Run Batch, batch resume, solver, accept/reject, preflight, validate/build, upload, manifest publication, R2 and Production.
+- Closed the DEBUG Studio using its window X. The window disappeared and process inspection found no remaining process command line referencing the canonical Studio root. Unrelated Godot/Godot-AI processes were not touched.
+- `git diff --check` passed (Git reported the existing LF-to-CRLF working-copy warning for the modified GDScript). No claim is made that all app pipelines or Release Pool data are verified; owner-native full acceptance remains open because the pool currently reads zero and risky pipelines were not executed.
