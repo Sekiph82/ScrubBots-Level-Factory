@@ -15,6 +15,7 @@ from scrubbots_pixel_factory.output import (
     logical_rgb_bytes,
 )
 from scrubbots_pixel_factory.core import FailureCode, GenerationResult
+from scrubbots_pixel_factory.output.bundle import OutputContractError, _validated_bundle_file_names
 
 
 def _cells(width: int = 20, height: int = 20) -> list[str]:
@@ -27,6 +28,17 @@ def _rectangular_cells(width: int = 20, height: int = 21) -> list[str]:
         for y in range(height)
         for x in range(width)
     ]
+
+
+def test_bundle_file_set_ignores_only_godot_artwork_import_sidecar() -> None:
+    required = {"artwork.json", "metadata.json", "artwork.png"}
+    assert _validated_bundle_file_names(required | {"artwork.png.import"}) == required
+    preview_files = required | {"artwork.preview.png", "artwork.png.import"}
+    assert _validated_bundle_file_names(preview_files) == required | {"artwork.preview.png"}
+    with pytest.raises(OutputContractError, match="unexpected files"):
+        _validated_bundle_file_names(required | {"owner-note.json", "artwork.png.import"})
+    with pytest.raises(OutputContractError, match="incomplete"):
+        _validated_bundle_file_names({"artwork.json", "metadata.json", "artwork.png.import"})
 
 
 def test_artwork_json_contract_and_rectangular_row_major_index() -> None:

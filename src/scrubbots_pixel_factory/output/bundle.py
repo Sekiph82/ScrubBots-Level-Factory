@@ -786,10 +786,7 @@ def read_bundle(directory: str | os.PathLike[str]) -> ExportBundle:
     root = Path(directory)
     if not root.is_dir():
         raise OutputContractError("bundle directory does not exist")
-    allowed = {"artwork.json", "metadata.json", "artwork.png", "artwork.preview.png"}
-    actual = {path.name for path in root.iterdir() if path.is_file()}
-    if not {"artwork.json", "metadata.json", "artwork.png"}.issubset(actual) or not actual.issubset(allowed):
-        raise OutputContractError("bundle file set is incomplete or contains unexpected files")
+    actual = _validated_bundle_file_names({path.name for path in root.iterdir() if path.is_file()})
     try:
         artwork_json = (root / "artwork.json").read_bytes()
         metadata_json = (root / "metadata.json").read_bytes()
@@ -823,6 +820,17 @@ def read_bundle(directory: str | os.PathLike[str]) -> ExportBundle:
     except (OSError, PNGContractError, TypeError, KeyError, ValueError) as exc:
         raise OutputContractError(str(exc)) from exc
     return ExportBundle(artwork, _mapping_copy(metadata, "metadata"), artwork_json, metadata_json, artwork_png, preview_png)
+
+
+def _validated_bundle_file_names(actual: set[str]) -> set[str]:
+    """Ignore only Godot's non-authoritative texture import sidecar."""
+
+    payload = actual - {"artwork.png.import"}
+    allowed = {"artwork.json", "metadata.json", "artwork.png", "artwork.preview.png"}
+    required = {"artwork.json", "metadata.json", "artwork.png"}
+    if not required.issubset(payload) or not payload.issubset(allowed):
+        raise OutputContractError("bundle file set is incomplete or contains unexpected files")
+    return payload
 
 
 def write_bundle(bundle: ExportBundle, destination: str | os.PathLike[str]) -> Path:
