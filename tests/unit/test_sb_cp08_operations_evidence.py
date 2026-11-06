@@ -354,10 +354,12 @@ def test_object_verification_records_only_exact_observed_hashes() -> None:
 
 
 def test_publisher_verified_staging_pack_bytes_bridge_to_object_verification_records() -> None:
-    manifest_bytes = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
     pack_bytes = b"exact staged pack bytes"
     pack_sha256 = hashlib.sha256(pack_bytes).hexdigest()
-    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+    manifest_bytes = ContentManifestV1(
+        packs=(ManifestPackV1("pack-01", 1, "packs/pack-01/main.scrubpack", pack_sha256, len(pack_bytes)),),
+    ).to_json_bytes()
+    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01/main.scrubpack", pack_sha256,
                                              len(pack_bytes), ("level-01",))
     staging_receipt = StagingDownloadVerificationReceipt(
         "1.0", manifest_bytes, hashlib.sha256(manifest_bytes).hexdigest(), len(manifest_bytes), 7,
@@ -370,7 +372,7 @@ def test_publisher_verified_staging_pack_bytes_bridge_to_object_verification_rec
     report = PublisherRunReport(
         True, PublisherMode.PRODUCTION, "CURRENT_MAIN_REPLAY_VERIFIED", PublisherStage.CURRENT_MAIN_REPLAY,
         (), staging_download=staging,
-        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01/main.scrubpack", pack_sha256,
                                                len(pack_bytes), pack_bytes),),
     )
 
@@ -386,13 +388,18 @@ def test_publisher_verified_staging_pack_bytes_bridge_to_object_verification_rec
     assert records[0].expected_object_sha256 == pack_sha256
     assert records[0].observed_object_sha256 == pack_sha256
     assert records[0].reason_code == "HASH_MATCH"
+    health = report.observed_content_health()
+    assert health["status"] == "HEALTHY"
+    assert health["reason"] == "ALL_EXPECTED_BYTES_OBSERVED"
 
 
 def test_publisher_object_verification_bridge_requires_complete_exact_bytes() -> None:
-    manifest_bytes = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
     pack_bytes = b"exact staged pack bytes"
     pack_sha256 = hashlib.sha256(pack_bytes).hexdigest()
-    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+    manifest_bytes = ContentManifestV1(
+        packs=(ManifestPackV1("pack-01", 1, "packs/pack-01/main.scrubpack", pack_sha256, len(pack_bytes)),),
+    ).to_json_bytes()
+    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01/main.scrubpack", pack_sha256,
                                              len(pack_bytes), ("level-01",))
     staging_receipt = StagingDownloadVerificationReceipt(
         "1.0", manifest_bytes, hashlib.sha256(manifest_bytes).hexdigest(), len(manifest_bytes), 7,
@@ -409,17 +416,19 @@ def test_publisher_object_verification_bridge_requires_complete_exact_bytes() ->
     assert without_observation.observed_object_verification_operation_records(
         operation_id_prefix="verify-run-02", occurred_at="2026-11-06T01:00:00Z",
     ) == ()
+    assert without_observation.observed_content_health()["status"] == "UNKNOWN"
 
     drifted = PublisherRunReport(
         True, PublisherMode.PRODUCTION, "CURRENT_MAIN_REPLAY_VERIFIED", PublisherStage.CURRENT_MAIN_REPLAY,
         (), staging_download=staging,
-        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01/main.scrubpack", pack_sha256,
                                                len(pack_bytes), b"different bytes"),),
     )
     with pytest.raises(OperationsEvidenceError, match="disagrees with its canonical receipt"):
         drifted.observed_object_verification_operation_records(
             operation_id_prefix="verify-run-03", occurred_at="2026-11-06T01:00:00Z",
         )
+    assert drifted.observed_content_health()["status"] == "FAIL"
 
 
 def test_m17_control_receipts_map_to_local_prepared_change_records_only() -> None:

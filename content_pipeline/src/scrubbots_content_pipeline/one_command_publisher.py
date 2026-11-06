@@ -292,6 +292,52 @@ class PublisherRunReport:
             records.append(record)
         return tuple(records)
 
+    def observed_content_health(self) -> dict[str, object]:
+        """Evaluate health only from a verified manifest receipt and exact object bytes."""
+        from .operations import OperationsEvidenceError, verify_content_health
+        from .staging_download_verify import (
+            StagingDownloadReasonCode,
+            StagingDownloadVerificationReceipt,
+            StagingDownloadedPackEvidence,
+        )
+
+        staging = self.staging_download
+        if (not isinstance(staging, StagingDownloadVerificationReport)
+                or staging.accepted is not True
+                or staging.reason_code is not StagingDownloadReasonCode.VERIFIED):
+            return {"status": "UNKNOWN", "reason": "MANIFEST_BYTES_NOT_OBSERVED", "objects": []}
+        receipt = staging.receipt
+        if not isinstance(receipt, StagingDownloadVerificationReceipt):
+            raise OperationsEvidenceError("verified staging report has no canonical health receipt")
+        if (not isinstance(receipt.packs, tuple)
+                or any(not isinstance(item, StagingDownloadedPackEvidence) for item in receipt.packs)):
+            raise OperationsEvidenceError("verified staging receipt has malformed pack evidence")
+        expected_objects = {item.object_key: item.sha256 for item in receipt.packs}
+        if not expected_objects:
+            return {"status": "UNKNOWN", "reason": "NO_EXPECTED_OBJECTS", "objects": []}
+
+        observed_packs = self.replay_pack_bytes
+        observed_objects: dict[str, bytes] | None = None
+        if observed_packs:
+            if (not isinstance(observed_packs, tuple)
+                    or any(not isinstance(item, DownloadedPackBytes) for item in observed_packs)):
+                raise OperationsEvidenceError("publisher report has malformed observed pack bytes")
+            expected_by_id = {item.pack_id: item for item in receipt.packs}
+            observed_objects = {}
+            for item in observed_packs:
+                expected = expected_by_id.get(item.pack_id)
+                if (expected is None or item.object_key != expected.object_key
+                        or type(item.content_bytes) is not bytes or item.object_key in observed_objects):
+                    raise OperationsEvidenceError("publisher pack bytes do not match the verified manifest identity")
+                observed_objects[item.object_key] = item.content_bytes
+
+        return verify_content_health(
+            receipt.manifest_bytes,
+            expected_manifest_sha256=receipt.manifest_sha256,
+            expected_objects=expected_objects,
+            observed_objects=observed_objects,
+        )
+
     def to_dict(self) -> dict[str, object]:
         return {
             "accepted": self.accepted,

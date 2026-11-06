@@ -338,6 +338,7 @@ def test_production_mode_composes_cpx002_through_no_silent_overwrite_fence(monke
     assert [item.observed_object_sha256 for item in object_records] == [
         item.sha256 for item in result.replay_pack_bytes
     ]
+    assert result.observed_content_health()["status"] == "HEALTHY"
     assert approval.manifest_sha256 == candidate.manifest_sha256
 
 
