@@ -682,7 +682,7 @@ def _semantic_generate_pixellab_pro_4x4(
     from scrubbots_pixel_factory import studio_extensions as extensions
     from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
     from scrubbots_pixel_factory.owner_art_storage import archive_pixellab_export
-    from scrubbots_pixel_factory.pixellab_pro_atlas import export_frames
+    from scrubbots_pixel_factory.pixellab_pro_atlas import export_atlas
 
     resolved_operation_id = str(operation_id or uuid.uuid4().hex)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", resolved_operation_id):
@@ -812,7 +812,8 @@ def _semantic_generate_pixellab_pro_4x4(
         "operation_id": resolved_operation_id, "request_sha256": request_digest,
         "legacy_request_sha256": legacy_request_digest,
         "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
-        "adapter_version": "pixellab-pro-4x4-v1", "api_version": "v2",
+        "adapter_version": "pixellab-pro-4x4-mcp-v1", "api_version": "mcp",
+        "transport": "PIXELLAB_REMOTE_MCP_HTTP", "mcp_endpoint": "https://api.pixellab.ai/mcp",
         "state": "CLAIMED_BEFORE_POST", "paid_submission_possible": False,
         "width": width, "height": height, "max_colors": max_colors,
         "seed": normalized_seed, "description_sha256": hashlib.sha256(normalized_description.encode("utf-8")).hexdigest(),
@@ -865,16 +866,16 @@ def _semantic_generate_pixellab_pro_4x4(
         job_record.update({"state": "POLLING", "job_id": job_id})
         persist_job()
 
-    def http_request_started(count: int) -> None:
-        job_record["provider_http_request_count"] = count
+    def mcp_request_started(count: int) -> None:
+        job_record["provider_mcp_request_count"] = count
         persist_job()
 
     persist_job()
     try:
-        generated = extensions.generate_pixellab_pro_4x4_frames(
+        generated = extensions.generate_pixellab_pro_4x4_atlas_mcp(
             description=normalized_description, width=width, height=height,
             max_colors=max_colors, seed=normalized_seed, on_submission_started=submission_started,
-            on_job_accepted=accepted, on_http_request_started=http_request_started,
+            on_job_accepted=accepted, on_mcp_request_started=mcp_request_started,
         )
         job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
         persist_job()
@@ -883,7 +884,7 @@ def _semantic_generate_pixellab_pro_4x4(
                        f"pixellab-pro-4x4-{generated.job_id[:20]}-{resolved_operation_id[:12]}").resolve()
         if not _inside_output(source_root, factory_output):
             raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
-        manifest = export_frames(generated.frames_png, source_root, max_colors=max_colors)
+        manifest = export_atlas(generated.atlas_png, source_root, max_colors=max_colors)
         owner_catalog = archive_pixellab_export(source_root, manifest)
         imported_sources: list[dict[str, object]] = []
         for frame in manifest["frames"]:
@@ -908,8 +909,7 @@ def _semantic_generate_pixellab_pro_4x4(
             "frames": manifest["frames"], "imported_sources": imported_sources,
             "owner_catalog_path": owner_catalog["catalog_path"],
             "pass_count": pass_count, "rejected_count": rejected_count,
-            "actual_usage": dict(generated.actual_usage or {}),
-            "provider_http_request_count": generated.http_request_count,
+            "provider_mcp_request_count": generated.mcp_request_count,
             "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
         })
         persist_job()
@@ -931,15 +931,16 @@ def _semantic_generate_pixellab_pro_4x4(
             "frame_statuses": statuses, "source_ids": imported_source_ids,
             "atlas_path": str(owner_catalog["atlas_path"]),
             "manifest_path": str(owner_catalog["catalog_path"]),
-            "actual_usage": dict(generated.actual_usage or {}),
+            "provider_transport": "PIXELLAB_REMOTE_MCP_HTTP",
+            "provider_mcp_request_count": generated.mcp_request_count,
         }
     except extensions.PixelLabProviderError as exc:
         state = exc.code if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
         job_record.update({"state": state, "job_id": exc.job_id or job_record.get("job_id"),
                            "error_code": exc.code, "error": str(exc),
                            "provider_http_status": exc.http_status,
-                           "provider_http_request_count": exc.http_request_count
-                           if exc.http_request_count is not None else job_record.get("provider_http_request_count", 0)})
+                           "provider_mcp_request_count": exc.http_request_count
+                           if exc.http_request_count is not None else job_record.get("provider_mcp_request_count", 0)})
         if exc.provider_request_id is not None:
             job_record["provider_request_id"] = exc.provider_request_id
         persist_job()
@@ -981,7 +982,11 @@ def _semantic_reconcile_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[
                 "operation_id": operation_id, "job_state": record.get("state"),
                 "paid_submission_possible": True, "network_requests": 0,
                 "reason": "No provider job ID was persisted; manually reconcile PixelLab account history before any new generation."}
-    reconciled = extensions.reconcile_pixellab_pro_4x4_job(job_id, network_consent=True)
+    if record.get("transport") == "PIXELLAB_REMOTE_MCP_HTTP":
+        reconciled = extensions.reconcile_pixellab_pro_4x4_job_mcp(job_id, network_consent=True)
+    else:
+        # Historical v2 REST jobs remain GET-only reconciled on their original route.
+        reconciled = extensions.reconcile_pixellab_pro_4x4_job(job_id, network_consent=True)
     provider_status = reconciled.get("provider_status", {})
     provider_state = str(reconciled.get("state", "UNKNOWN"))
     record["last_reconciliation_state"] = provider_state

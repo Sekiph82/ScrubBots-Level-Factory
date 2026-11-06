@@ -2336,7 +2336,7 @@ def pixellab_secret_status() -> dict[str, str | bool]:
         return {"configured": True, "status": "READY_CREDENTIALS_CONFIGURED",
                 "reason": "PixelLab credential is present in Windows Credential Manager. This checks configuration only, not account credits."}
     return {"configured": False, "status": "PIXELLAB_API_TOKEN_NOT_CONFIGURED",
-            "reason": "PIXELLAB_API_TOKEN_NOT_CONFIGURED: In Windows Credential Manager, add a Generic Credential with address ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN, user name token, and the PixelLab API token as password. Restart Studio, then reopen Provider to refresh. PixelLab Creator/MCP login is separate."}
+            "reason": "PIXELLAB_API_TOKEN_NOT_CONFIGURED: In Windows Credential Manager, add a Generic Credential with address ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN, user name token, and the PixelLab account token as password. Restart Studio, then reopen Provider to refresh. The same token authenticates the PixelLab MCP connection."}
 
 
 def get_pixellab_secret() -> str:
@@ -2357,6 +2357,11 @@ PRO_4X4_ENGINE = "PRO_4X4"
 PRO_4X4_MAX_HTTP_REQUESTS = 10
 PRO_4X4_MAX_WAIT_SECONDS = 240
 PRO_4X4_POLL_SECONDS = 5
+PRO_4X4_MCP_ENDPOINT = "https://api.pixellab.ai/mcp"
+PRO_4X4_MCP_PROTOCOL_VERSION = "2025-11-25"
+PRO_4X4_MCP_MAX_WAIT_SECONDS = 600
+PRO_4X4_MCP_POLL_SECONDS = 5
+PRO_4X4_MCP_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -2501,6 +2506,371 @@ class PixelLabPro4x4Result:
     max_colors: int
     request_seed: int
     http_request_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class PixelLabPro4x4McpResult:
+    """One PixelLab MCP Pro job's unmodified 4x4 candidate atlas."""
+
+    atlas_png: bytes
+    job_id: str
+    width: int
+    height: int
+    max_colors: int
+    request_seed: int
+    mcp_request_count: int = 0
+
+
+def _mcp_http_request(
+    *, secret: str, message: Mapping[str, object], session_id: str | None,
+    protocol_version: str | None, timeout: float = 30,
+) -> tuple[dict[str, object], Mapping[str, str]]:
+    """Send one Streamable HTTP MCP message and decode JSON or an SSE response."""
+    headers = {
+        "Authorization": f"Bearer {secret}",
+        "Accept": "application/json, text/event-stream",
+        "Content-Type": "application/json",
+    }
+    if session_id:
+        headers["MCP-Session-Id"] = session_id
+    if protocol_version:
+        headers["MCP-Protocol-Version"] = protocol_version
+    request = Request(
+        PRO_4X4_MCP_ENDPOINT,
+        data=json.dumps(message, sort_keys=True, separators=(",", ":")).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            body = response.read(PRO_4X4_MCP_MAX_RESPONSE_BYTES + 1)
+            response_headers = dict(response.headers.items())
+    except HTTPError as exc:
+        messages = {
+            401: "PixelLab rejected the configured MCP bearer token.",
+            402: "PixelLab reports insufficient generations or credits.",
+            429: "PixelLab MCP rate limit reached.",
+        }
+        error_codes = {401: "MCP_AUTHENTICATION_FAILED", 402: "INSUFFICIENT_CREDITS", 429: "RATE_LIMITED"}
+        raise PixelLabProviderError(
+            error_codes.get(exc.code, "MCP_HTTP_ERROR"),
+            messages.get(exc.code, f"PixelLab MCP returned HTTP {exc.code}."),
+            http_status=exc.code,
+        ) from None
+    except (TimeoutError, URLError):
+        method = str(message.get("method", ""))
+        code = "SUBMISSION_UNKNOWN" if method == "tools/call" and _mcp_tool_name(message) == "create_image_pro" else "MCP_NETWORK_ERROR"
+        text = ("PixelLab MCP create_image_pro submission outcome is unknown; check PixelLab before trying again."
+                if code == "SUBMISSION_UNKNOWN" else "Could not complete the PixelLab MCP request.")
+        raise PixelLabProviderError(code, text) from None
+    if len(body) > PRO_4X4_MCP_MAX_RESPONSE_BYTES:
+        raise PixelLabProviderError("MCP_RESPONSE_TOO_LARGE", "PixelLab MCP response exceeded the local response limit.")
+    content_type = str(response_headers.get("Content-Type", "")).lower()
+    try:
+        if "text/event-stream" in content_type:
+            messages: list[dict[str, object]] = []
+            event_data: list[str] = []
+            for line in body.decode("utf-8").splitlines() + [""]:
+                if not line:
+                    if event_data:
+                        decoded = json.loads("\n".join(event_data))
+                        if isinstance(decoded, dict):
+                            messages.append(decoded)
+                    event_data = []
+                elif line.startswith("data:"):
+                    event_data.append(line[5:].lstrip())
+            matching = [item for item in messages if item.get("id") == message.get("id")]
+            if matching:
+                parsed = matching[-1]
+            elif len(messages) == 1:
+                parsed = messages[0]
+            else:
+                raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP event stream did not contain the matching JSON-RPC response.")
+        else:
+            if not body and "id" not in message:
+                return {}, response_headers
+            parsed = json.loads(body.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP returned an invalid JSON-RPC response.") from None
+    if not isinstance(parsed, dict):
+        raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP returned an invalid JSON-RPC response.")
+    return parsed, response_headers
+
+
+def _mcp_tool_name(message: Mapping[str, object]) -> str:
+    params = message.get("params")
+    return str(params.get("name", "")) if isinstance(params, Mapping) else ""
+
+
+def _mcp_find_value(value: object, keys: set[str]) -> object | None:
+    if isinstance(value, Mapping):
+        for key in keys:
+            candidate = value.get(key)
+            if candidate is not None:
+                return candidate
+        for nested in value.values():
+            found = _mcp_find_value(nested, keys)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _mcp_find_value(nested, keys)
+            if found is not None:
+                return found
+    return None
+
+
+def _mcp_result_text(value: object) -> str:
+    chunks: list[str] = []
+    if isinstance(value, Mapping):
+        if value.get("type") == "text" and isinstance(value.get("text"), str):
+            chunks.append(value["text"])
+        for nested in value.values():
+            chunks.append(_mcp_result_text(nested))
+    elif isinstance(value, list):
+        chunks.extend(_mcp_result_text(nested) for nested in value)
+    return "\n".join(chunk for chunk in chunks if chunk)
+
+
+def _mcp_inline_png(value: object) -> bytes | None:
+    """Extract image/png MCP content only; never fetch a provider URL fallback."""
+    if isinstance(value, Mapping):
+        if value.get("type") == "image" and value.get("mimeType") == "image/png":
+            encoded = value.get("data")
+            if isinstance(encoded, str):
+                try:
+                    raw = base64.b64decode(encoded, validate=True)
+                except (ValueError, base64.binascii.Error):
+                    raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned invalid inline PNG data.") from None
+                if raw.startswith(PNG_SIGNATURE):
+                    return raw
+                raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP inline image is not a PNG.")
+        for nested in value.values():
+            found = _mcp_inline_png(nested)
+            if found is not None:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _mcp_inline_png(nested)
+            if found is not None:
+                return found
+    return None
+
+
+def _mcp_result_error(response: Mapping[str, object], tool_name: str) -> None:
+    if response.get("error") is not None:
+        raise PixelLabProviderError("MCP_PROTOCOL_ERROR", f"PixelLab MCP {tool_name} request failed.")
+    result = response.get("result")
+    if isinstance(result, Mapping) and result.get("isError") is True:
+        raise PixelLabProviderError("MCP_TOOL_ERROR", f"PixelLab MCP {tool_name} tool failed.")
+
+
+def generate_pixellab_pro_4x4_atlas_mcp(
+    *,
+    description: str,
+    width: int,
+    height: int,
+    max_colors: int = 12,
+    seed: str | int,
+    request_message: Callable[..., tuple[dict[str, object], Mapping[str, str]]] = _mcp_http_request,
+    sleep: Callable[[float], None] = time.sleep,
+    monotonic: Callable[[], float] = time.monotonic,
+    max_wait_seconds: int = PRO_4X4_MCP_MAX_WAIT_SECONDS,
+    poll_seconds: int = PRO_4X4_MCP_POLL_SECONDS,
+    on_submission_started: Callable[[], None] | None = None,
+    on_job_accepted: Callable[[str], None] | None = None,
+    on_mcp_request_started: Callable[[int], None] | None = None,
+) -> PixelLabPro4x4McpResult:
+    """Generate and fetch one transparent 4x4 Pro atlas through PixelLab MCP."""
+    if type(width) is not int or type(height) is not int or not 51 <= width <= 59 or not 51 <= height <= 59:
+        raise PixelLabProviderError("GAME_DIMENSIONS_OUT_OF_RANGE", "ScrubBots Pro 4x4 axes must each be 51..59 pixels.")
+    if type(max_colors) is not int or not 3 <= max_colors <= 12:
+        raise PixelLabProviderError("MAX_COLORS_OUT_OF_RANGE", "ScrubBots Pro 4x4 max colors must be 3..12.")
+    if type(description) is not str or not description.strip() or len(description) > 2000:
+        raise PixelLabProviderError("INVALID_DESCRIPTION", "Pro 4x4 description must contain 1–2000 characters.")
+    if not 1 <= max_wait_seconds <= 600 or not 1 <= poll_seconds <= 30:
+        raise PixelLabProviderError("INVALID_POLL_POLICY", "Pro 4x4 MCP polling bounds are invalid.")
+    secret = get_pixellab_secret()
+    if not secret:
+        raise PixelLabProviderError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: configure the PixelLab MCP bearer token in Windows Credential Manager.")
+
+    actual_seed = _resolved_seed(seed)
+    request_count = 0
+    message_id = 0
+    session_id: str | None = None
+    protocol_version = PRO_4X4_MCP_PROTOCOL_VERSION
+
+    def post(message: Mapping[str, object], *, timeout: float = 30) -> dict[str, object]:
+        nonlocal request_count, session_id
+        request_count += 1
+        if on_mcp_request_started is not None:
+            on_mcp_request_started(request_count)
+        response, headers = request_message(
+            secret=secret, message=message, session_id=session_id,
+            protocol_version=protocol_version if message.get("method") != "initialize" else None,
+            timeout=timeout,
+        )
+        returned_session = next((str(value) for key, value in headers.items()
+                                 if str(key).lower() == "mcp-session-id" and value), None)
+        if returned_session:
+            session_id = returned_session
+        return response
+
+    def rpc(method: str, params: Mapping[str, object] | None = None, *, tool_name: str | None = None) -> dict[str, object]:
+        nonlocal message_id
+        message_id += 1
+        payload: dict[str, object] = {"jsonrpc": "2.0", "id": message_id, "method": method}
+        if params is not None:
+            payload["params"] = dict(params)
+        response = post(payload)
+        if response.get("id") != message_id:
+            raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response ID did not match its request.")
+        _mcp_result_error(response, tool_name or method)
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response had no result object.")
+        return result
+
+    initialize = rpc("initialize", {
+        "protocolVersion": protocol_version,
+        "capabilities": {},
+        "clientInfo": {"name": "scrubbots-factory-studio", "version": "1"},
+    })
+    negotiated = initialize.get("protocolVersion")
+    if isinstance(negotiated, str) and negotiated:
+        protocol_version = negotiated
+    request_count += 1
+    if on_mcp_request_started is not None:
+        on_mcp_request_started(request_count)
+    notification = {
+        "jsonrpc": "2.0", "method": "notifications/initialized",
+    }
+    _, notification_headers = request_message(
+        secret=secret, message=notification, session_id=session_id,
+        protocol_version=protocol_version, timeout=30,
+    )
+    returned_session = next((str(value) for key, value in notification_headers.items()
+                             if str(key).lower() == "mcp-session-id" and value), None)
+    if returned_session:
+        session_id = returned_session
+
+    if on_submission_started is not None:
+        on_submission_started()
+    create_result = rpc("tools/call", {"name": "create_image_pro", "arguments": {
+        "description": description.strip(),
+        "width": width,
+        "height": height,
+        "no_background": True,
+        "palette": [color.hex.upper() for color in CANONICAL_PALETTE.colors],
+        "palette_name": "ScrubBots Palette V3",
+        "max_colors": max_colors,
+        "seed": actual_seed,
+    }}, tool_name="create_image_pro")
+    job_id_value = _mcp_find_value(create_result, {"job_id", "jobId"})
+    if not isinstance(job_id_value, str):
+        job_match = re.search(r"\b(?:job[_ ]?id|job)\s*[:=]\s*([A-Za-z0-9_-]{1,160})\b",
+                              _mcp_result_text(create_result), re.IGNORECASE)
+        job_id_value = job_match.group(1) if job_match else None
+    if not isinstance(job_id_value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", job_id_value.strip()):
+        raise PixelLabProviderError("INVALID_SUBMISSION_RESPONSE", "PixelLab MCP create_image_pro did not return a valid job ID.",
+                                   http_request_count=request_count)
+    job_id = job_id_value.strip()
+    if on_job_accepted is not None:
+        on_job_accepted(job_id)
+
+    deadline = monotonic() + max_wait_seconds
+    while monotonic() < deadline:
+        result = rpc("tools/call", {"name": "get_image", "arguments": {"job_id": job_id}}, tool_name="get_image")
+        atlas_png = _mcp_inline_png(result)
+        if atlas_png is not None:
+            try:
+                with Image.open(BytesIO(atlas_png)) as image:
+                    image.load()
+                    if image.format != "PNG" or image.size != (4 * width, 4 * height):
+                        raise PixelLabProviderError("PRO_4X4_ATLAS_SIZE_MISMATCH", "PixelLab MCP atlas is not the exact 4x4 size for the requested cells.")
+            except PixelLabProviderError:
+                raise
+            except Exception:
+                raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned an unreadable PNG atlas.") from None
+            return PixelLabPro4x4McpResult(
+                atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
+            )
+        text = _mcp_result_text(result).lower()
+        state = _mcp_find_value(result, {"status", "state"})
+        state_text = str(state or "").lower()
+        if any(word in state_text for word in ("failed", "cancelled", "canceled", "error")):
+            raise PixelLabProviderError("JOB_FAILED", "PixelLab MCP image job did not complete.", job_id=job_id,
+                                       http_request_count=request_count)
+        if "completed" in state_text or "complete" in text and "process" not in text:
+            raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP reported completion without returning inline PNG content.",
+                                       job_id=job_id, http_request_count=request_count)
+        sleep(poll_seconds)
+    raise PixelLabProviderError("POLL_TIMEOUT", "PixelLab MCP job remains unresolved; its job ID is saved and no new generation was sent.",
+                               job_id=job_id, http_request_count=request_count)
+
+
+def reconcile_pixellab_pro_4x4_job_mcp(
+    job_id: str,
+    *,
+    network_consent: bool = False,
+    request_message: Callable[..., tuple[dict[str, object], Mapping[str, str]]] = _mcp_http_request,
+) -> dict[str, object]:
+    """Check an existing MCP job through tools/call get_image; never create work."""
+    if network_consent is not True:
+        raise PixelLabProviderError("NETWORK_CONSENT_REQUIRED", "Explicit owner consent is required before PixelLab MCP reconciliation.", job_id=job_id)
+    if type(job_id) is not str or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", job_id):
+        raise PixelLabProviderError("INVALID_JOB_ID", "PixelLab MCP reconciliation requires a valid persisted job ID.")
+    secret = get_pixellab_secret()
+    if not secret:
+        raise PixelLabProviderError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: configure the PixelLab MCP bearer token.", job_id=job_id)
+    session_id: str | None = None
+    version = PRO_4X4_MCP_PROTOCOL_VERSION
+    request_id = 0
+
+    def send(message: Mapping[str, object]) -> dict[str, object]:
+        nonlocal session_id
+        response, headers = request_message(secret=secret, message=message, session_id=session_id,
+                                            protocol_version=version if message.get("method") != "initialize" else None,
+                                            timeout=30)
+        session_id = next((str(value) for key, value in headers.items()
+                           if str(key).lower() == "mcp-session-id" and value), session_id)
+        return response
+
+    request_id += 1
+    initialized = send({"jsonrpc": "2.0", "id": request_id, "method": "initialize", "params": {
+        "protocolVersion": version, "capabilities": {},
+        "clientInfo": {"name": "scrubbots-factory-studio", "version": "1"},
+    }})
+    _mcp_result_error(initialized, "initialize")
+    result = initialized.get("result")
+    if not isinstance(result, Mapping):
+        raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP initialization returned no result.", job_id=job_id)
+    if isinstance(result.get("protocolVersion"), str):
+        version = str(result["protocolVersion"])
+    _, headers = request_message(secret=secret, message={"jsonrpc": "2.0", "method": "notifications/initialized"},
+                                 session_id=session_id, protocol_version=version, timeout=30)
+    session_id = next((str(value) for key, value in headers.items()
+                       if str(key).lower() == "mcp-session-id" and value), session_id)
+    request_id += 1
+    response = send({"jsonrpc": "2.0", "id": request_id, "method": "tools/call",
+                     "params": {"name": "get_image", "arguments": {"job_id": job_id}}})
+    if response.get("id") != request_id:
+        raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response ID did not match its request.", job_id=job_id)
+    _mcp_result_error(response, "get_image")
+    provider_result = response.get("result")
+    if not isinstance(provider_result, Mapping):
+        raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP job status returned no result.", job_id=job_id)
+    provider_state = _mcp_find_value(provider_result, {"status", "state"})
+    state_text = str(provider_state or "").upper()
+    if _mcp_inline_png(provider_result) is not None:
+        state_text = "COMPLETED"
+    elif any(value in state_text or value in _mcp_result_text(provider_result).upper()
+             for value in ("FAILED", "CANCELLED", "CANCELED", "ERROR")):
+        state_text = "FAILED"
+    elif not state_text:
+        state_text = "UNKNOWN"
+    return {"job_id": job_id, "state": state_text, "provider_status": {"state": state_text}}
 
 
 def _pro_4x4_frames_from_response(last_response: Mapping[str, object], *, width: int, height: int) -> tuple[bytes, ...]:
@@ -2698,4 +3068,9 @@ def reconcile_pixellab_pro_4x4_job(
     raise PixelLabProviderError("POLL_TIMEOUT", "PixelLab job remains unresolved; no new submission was sent.", job_id=job_id)
 
 
-__all__ = ["PRO_4X4_ENGINE", "PRO_4X4_MAX_HTTP_REQUESTS", "PixelLabProviderError", "PixelLabPro4x4Result", "generate_pixellab_pro_4x4_frames", "reconcile_pixellab_pro_4x4_job"]
+__all__ = [
+    "PRO_4X4_ENGINE", "PRO_4X4_MAX_HTTP_REQUESTS", "PRO_4X4_MCP_ENDPOINT",
+    "PixelLabProviderError", "PixelLabPro4x4Result", "PixelLabPro4x4McpResult",
+    "generate_pixellab_pro_4x4_frames", "generate_pixellab_pro_4x4_atlas_mcp",
+    "reconcile_pixellab_pro_4x4_job", "reconcile_pixellab_pro_4x4_job_mcp",
+]
