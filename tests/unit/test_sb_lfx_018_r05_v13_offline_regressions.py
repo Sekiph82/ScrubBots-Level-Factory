@@ -874,7 +874,7 @@ def test_owner_art_layout_and_alpix_archive_are_idempotent_and_repo_local() -> N
             shutil.rmtree(root)
 
 
-def test_pixellab_catalog_archives_all_sixteen_verified_slices_without_overwrite() -> None:
+def test_pixellab_catalog_archives_slices_without_sidecars_in_owner_output_root() -> None:
     root = Path(__file__).resolve().parent / ".r10-owner-art-storage-test-output"
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
@@ -909,6 +909,8 @@ def test_pixellab_catalog_archives_all_sixteen_verified_slices_without_overwrite
         assert [item["index"] for item in first["slices"]] == list(range(1, 17))
         assert all(Path(item["path"]).parent == final_paths["pixellab_final"] for item in first["slices"])
         assert len(list(final_paths["pixellab_final"].glob("*.png"))) == 16
+        assert Path(first["catalog_path"]).parent == source
+        assert not list(final_paths["pixellab"].glob("*.json"))
         assert json.loads(Path(first["catalog_path"]).read_text(encoding="utf-8")) == {
             key: value for key, value in first.items() if key != "catalog_path"
         }

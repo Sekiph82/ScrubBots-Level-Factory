@@ -191,7 +191,10 @@ def archive_pixellab_export(
         "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
         "slices": slices,
     }
-    record_path = paths["pixellab"] / f"atlas-{atlas_sha}-{source_kind.lower()}.json"
+    # Keep the operational owner catalog with the import/generation work item.
+    # The two owner-facing PixelLab folders are intentionally art-only: Grid
+    # Files contains atlases and Final contains their sixteen PNG slices.
+    record_path = source_root / "owner-catalog.json"
     encoded = (json.dumps(record, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
     if _is_reparse_point(record_path):
         raise OwnerArtStorageError("PixelLab atlas catalog target is a symlink or reparse point")
