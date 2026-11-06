@@ -27,7 +27,7 @@ def test_alpix_job_stats_separate_retired_provider_rows() -> None:
         root.mkdir(parents=True)
         csv_path = root / "requests.csv"
         csv_path.write_text(
-            "prompt,size,provider\nOld bird,8x8,MAGNIFIC\nCurrent owl,8x8,ALPIX (Claude)\n",
+            "prompt,size,provider\nOld bird,8x8,MAGNIFIC\nCurrent owl,8x8,ALPIX (Claude)\nRetry fox,8x8,ALPIX (Claude)\n",
             encoding="utf-8",
         )
         renderer_prompts: list[str] = []
@@ -37,20 +37,23 @@ def test_alpix_job_stats_separate_retired_provider_rows() -> None:
             Image.new("RGBA", (width, height), (255, 69, 0, 255)).save(destination, format="PNG")
             return {"path": str(destination)}
 
+        def importer(path: Path):
+            return {} if path.name == "row-00003.png" else {"source_id": "offline-fixture-source"}
+
         result = alpix_batch.run_csv_job(
             csv_path,
             root / "jobs",
             renderer=renderer,
-            importer=lambda _path: {"source_id": "offline-fixture-source"},
+            importer=importer,
         )
 
-        assert renderer_prompts == ["Current owl"]
-        assert [row["state"] for row in result.rows] == ["PROVIDER_RETIRED", "IMPORTED"]
-        assert result.state == "COMPLETE"
+        assert renderer_prompts == ["Current owl", "Retry fox"]
+        assert [row["state"] for row in result.rows] == ["PROVIDER_RETIRED", "IMPORTED", "FAILED"]
+        assert result.state == "NEEDS_RETRY"
         assert result.completed == 1
-        assert result.failed == 0
+        assert result.failed == 1
         assert result.retired == 1
-        assert result.remaining == 0
+        assert result.remaining == 1
         assert result.to_dict()["retired"] == 1
         ui_source = (Path(__file__).resolve().parents[2] / "level_factory" / "scripts" /
                      "factory_studio_exact_ui.gd").read_text(encoding="utf-8")
