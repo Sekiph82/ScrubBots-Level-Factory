@@ -44,3 +44,10 @@ Document role: CODEX BUILDER LOG
 - Initial builder evidence commit: `54413282` (`Log native CSV label regression verification`).
 - Normal `git push origin HEAD:main` succeeded after a fetch and ancestry check; post-push fetch verified local `HEAD == origin/main == 544132825b4e185f371c4469225fec412eee6010`, 0 ahead / 0 behind. Only the three scoped source/test files and this builder log were staged; unrelated untracked owner data was left untouched.
 - `TASKS.md` progress is still pending publication; this inspection does not close `SB-LFX-018` because Release Pool READY is 0 and full worker/pipeline acceptance remains incomplete.
+
+## Follow-up lifecycle evidence
+
+- Ran existing bounded lifecycle tests: `python -B tests/unit/test_studio_lifecycle.py` -> 6 tests passed, exit 0. They cover cancel-marker detection, dead-parent detection, fail-closed unreadable marker behavior, and targeting only the held child PID tree.
+- Native X-close was performed with no operation active; the Studio window closed and no process command line remained for the canonical Studio root. This verifies idle close only. A live paid/provider or solver job was not launched to demonstrate active cancellation in the GUI.
+- The read-only Codex queue guard passed after the tracker update and confirmed the same active goal prompt, `Required Actor: CODEX`, and `HEAD == origin/main`.
+- TASKS status evidence was published in commit `55b5a277` without closing the existing task. Full active-worker GUI shutdown remains unverified; any operation that requests paid provider or remote release activity remains unrun.
