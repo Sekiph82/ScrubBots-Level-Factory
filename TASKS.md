@@ -1511,7 +1511,7 @@ Capability source family: `SB-CP08-xxx` from the main Scrubbots master plan.
 
 ### M19.03 - Clean-machine dry run, disaster recovery and secret-free logs
 
-- [ ] SB-CP08-008 — Clean-machine publish dry run. [PARTIAL]
+- [~] SB-CP08-008 — Clean-machine publish dry run. Local deterministic fail-closed CLI dry-run is builder-verified (2 focused tests, test commit `65950136`, log commit `026cef14`, log `.hiveai/codex-logs/SB_CP08_008_CLEAN_DRY_RUN_CODEX_BUILDER_LOG.md`). Genuine clean-machine workspace and live Staging/Production/R2 checks remain NOT_RUN under current no-clone/no-provider rules.
 - [~] SB-CP08-009 — Disaster recovery from backups. Bounded in-memory recovery schema/integrity checks passed 2/2 after fixing JSON boolean acceptance for schema_version; source commit `b18fdec7`, builder log `.hiveai/codex-logs/SB_CP08_009_BACKUP_RECOVERY_CODEX_BUILDER_LOG.md`, receipt `ecfa701e`. Live/clean-machine restore NOT_RUN; no provider state touched.
 - [~] SB-CP08-010 — Logs free of secrets. Fixed-field operation records, provider-error normalization and deterministic credential redaction have prior source tests 4/4 (builder log `.hiveai/codex-logs/SB_CP08_006_SAFE_ERRORS_ALERTS_CODEX_BUILDER_LOG.md`). No new leak path was demonstrated; no secret values were accessed. Actual operational/Production log review remains NOT_RUN.
 
