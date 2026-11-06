@@ -160,7 +160,15 @@ def select_current_task(source: str) -> CurrentTask:
     )
 
 
-def validate_checkout(root: Path) -> None:
+def validate_checkout(root: Path, *, allow_existing_work: bool = False) -> list[str]:
+    """Validate Git/task authority; optionally preserve tracked edits already on disk.
+
+    The owner-authorized recovery flag is not a reset, claim, or permission to
+    overwrite. It merely allows the agent to inspect and finish tracked work
+    without being rejected before it can review the existing diff.
+    TASKS.md and the active prompt are STILL checked against origin/main by
+    validate_file_matches_origin() in main().
+    """
     root = root.resolve()
     if root != CANONICAL_ROOT.resolve():
         raise ValueError(f"task execution is limited to the canonical checkout: {CANONICAL_ROOT}")
@@ -181,8 +189,15 @@ def validate_checkout(root: Path) -> None:
     ancestry = _run_git(root, "merge-base", "--is-ancestor", "origin/main", "HEAD", check=False)
     if ancestry.returncode != 0:
         raise ValueError("HEAD is behind or diverged from origin/main; safe fast-forward sync is required")
-    if git("status", "--porcelain", "--untracked-files=no"):
-        raise ValueError("Tracked working-tree changes exist; refusing to start an automated task")
+    tracked_status = git("status", "--porcelain=v1", "--untracked-files=no")
+    dirty_entries = tracked_status.splitlines() if tracked_status else []
+    if dirty_entries and not allow_existing_work:
+        raise ValueError(
+            "Tracked working-tree changes exist. Preserve the existing edits; "
+            "rerun with --allow-existing-work to inspect and finish only "
+            "authorized, nonconflicting files without resetting or stashing."
+        )
+    return dirty_entries
 
 
 def fetch_origin(root: Path) -> None:
@@ -242,9 +257,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--json", action="store_true", help="Print the validated task envelope as JSON")
+    parser.add_argument(
+        "--allow-existing-work",
+        action="store_true",
+        help="Owner-authorized: permit tracked edits for read-only task discovery; "
+        "never overwrite or auto-stage those files. Task and prompt must still match origin/main.",
+    )
     args = parser.parse_args(argv)
     try:
-        validate_checkout(args.root)
+        tracked_work = validate_checkout(args.root, allow_existing_work=args.allow_existing_work)
         task = select_current_task((args.root / "TASKS.md").read_text(encoding="utf-8"))
         if not (args.root / task.prompt_path).is_file():
             raise ValueError(f"Authoritative prompt is missing from this checkout: {task.prompt_path}")
@@ -255,9 +276,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))
     if args.json:
-        print(json.dumps({**asdict(task), **asdict(pins)}, ensure_ascii=False, sort_keys=True))
+        print(
+            json.dumps(
+                {
+                    **asdict(task),
+                    **asdict(pins),
+                    "preexisting_tracked_work": tracked_work,
+                    "recovery_mode": bool(args.allow_existing_work),
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+        )
     else:
         print(f"Current task validated; prompt={task.prompt_path}; status={task.status}")
+        if tracked_work:
+            print(f"Owner-authorized existing-work mode: {len(tracked_work)} tracked paths preserved.")
         print("Read-only mode: TASKS.md was not changed.")
     return 0
 
