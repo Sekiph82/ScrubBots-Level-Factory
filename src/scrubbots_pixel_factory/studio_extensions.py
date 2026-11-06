@@ -2276,6 +2276,30 @@ from urllib.error import HTTPError, URLError
 PIXELLAB_CREDENTIAL_TARGET = "ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN"
 
 
+def _decode_windows_credential_blob(raw: bytes) -> str:
+    """Decode a textual Windows Generic Credential blob without accepting NULs."""
+    if not raw:
+        return ""
+    try:
+        utf8_value = raw.decode("utf-8").strip()
+    except UnicodeDecodeError:
+        utf8_value = ""
+    # UTF-16LE ASCII text is valid UTF-8 too, but contains an embedded NUL after
+    # each character. Detect it before treating the credential as a Bearer token.
+    if utf8_value and "\x00" not in utf8_value:
+        return utf8_value
+    if len(raw) % 2 == 0:
+        try:
+            utf16_value = raw.decode("utf-16-le").rstrip("\x00").strip()
+        except UnicodeDecodeError:
+            utf16_value = ""
+        if utf16_value and not any(ord(char) < 32 or ord(char) == 127 for char in utf16_value):
+            return utf16_value
+    if utf8_value and not any(ord(char) < 32 or ord(char) == 127 for char in utf8_value):
+        return utf8_value
+    return ""
+
+
 def _credential_manager_secret(target: str = PIXELLAB_CREDENTIAL_TARGET) -> str:
     """Read the supported Windows Generic credential in memory only."""
     import ctypes
@@ -2312,10 +2336,7 @@ def _credential_manager_secret(target: str = PIXELLAB_CREDENTIAL_TARGET) -> str:
         if not credential.CredentialBlob or credential.CredentialBlobSize == 0:
             return ""
         raw = ctypes.string_at(credential.CredentialBlob, credential.CredentialBlobSize)
-        try:
-            return raw.decode("utf-8").strip()
-        except UnicodeDecodeError:
-            return raw.decode("utf-16-le").strip().rstrip("\x00")
+        return _decode_windows_credential_blob(raw)
     finally:
         advapi32.CredFree(credential_ptr)
 

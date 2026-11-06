@@ -31,6 +31,13 @@ def _image_result(raw: bytes) -> dict[str, object]:
     ]}}
 
 
+def test_windows_credential_blob_decodes_utf8_and_utf16le_without_nuls() -> None:
+    token = "pixl_test-token-012345"
+    assert extensions._decode_windows_credential_blob(token.encode("utf-8")) == token
+    assert extensions._decode_windows_credential_blob((token + "\x00").encode("utf-16-le")) == token
+    assert extensions._decode_windows_credential_blob((token + "\x00").encode("utf-8")) == ""
+
+
 def test_mcp_pro_generation_uses_locked_palette_and_fetches_inline_4x4_atlas(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "test-token")
     atlas = _atlas_png()
