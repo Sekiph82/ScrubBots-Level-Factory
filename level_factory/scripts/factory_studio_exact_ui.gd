@@ -2284,6 +2284,7 @@ func _update_master_control_visibility() -> void:
 		if batch_path != null: batch_path.visible = _generation_mode == "BATCH"
 		if run_batch != null: run_batch.visible = _generation_mode == "BATCH"
 		if batch_select != null: batch_select.visible = false
+		_refresh_batch_csv_button()
 	if _release_candidate_scroll != null:
 		_release_candidate_scroll.visible = _screen == "RELEASE POOL"
 	if _release_activity_title != null:
@@ -2291,6 +2292,18 @@ func _update_master_control_visibility() -> void:
 	if _release_activity_scroll != null:
 		_release_activity_scroll.visible = _screen == "RELEASE POOL"
 	_refresh_run_button_caption()
+
+
+func _refresh_batch_csv_button() -> void:
+	var batch_path_button := get_node_or_null("BatchCsvPath") as Button
+	if batch_path_button == null:
+		return
+	if _batch_csv_path.is_empty():
+		batch_path_button.text = "CSV file…"
+		batch_path_button.tooltip_text = ""
+		return
+	batch_path_button.text = "CSV: " + _batch_csv_path.get_file().left(38)
+	batch_path_button.tooltip_text = _batch_csv_path
 
 
 func _report(message: String) -> void:
