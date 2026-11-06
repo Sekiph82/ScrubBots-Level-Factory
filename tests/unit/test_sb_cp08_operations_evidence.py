@@ -23,6 +23,7 @@ from scrubbots_content_pipeline.operations import (
 )
 from scrubbots_content_pipeline.one_command_publisher import (
     DownloadedPackBytes,
+    PublisherJournalEntry,
     PublisherMode,
     PublisherRunReport,
     PublisherStage,
@@ -166,6 +167,51 @@ def test_error_records_and_jsonl_schema_do_not_accept_free_form_secret_or_pii_fi
         _record(operation_id="api_key-secret")
     with pytest.raises(OperationsEvidenceError, match="timezone"):
         _record(occurred_at="2026-10-14T08:15:00")
+
+
+def test_publisher_failed_journal_maps_only_fixed_stage_error_fields() -> None:
+    report = PublisherRunReport(
+        False,
+        PublisherMode.STAGING_ONLY,
+        "PUBLISHER_FAILED",
+        PublisherStage.STAGING_OBJECT_INTEGRITY,
+        (
+            PublisherJournalEntry(
+                1, PublisherStage.STAGING_OBJECT_INTEGRITY, False,
+                "player@example.test SECRET=must-not-copy", "a" * 64,
+            ),
+            PublisherJournalEntry(
+                2, PublisherStage.STAGING_MANIFEST_PUBLISH, True,
+                "ignored-safe-detail", "b" * 64,
+            ),
+        ),
+    )
+
+    records = report.error_operation_records(
+        operation_id_prefix="error-run-01", occurred_at="2026-11-06T01:00:00Z",
+    )
+    serialized = render_jsonl(records).decode("utf-8")
+
+    assert len(records) == 1
+    assert (records[0].operation_id, records[0].kind, records[0].environment) == (
+        "error-run-01:1", "ERROR", "STAGING",
+    )
+    assert (records[0].outcome, records[0].reason_code) == (
+        "FAILED", "STAGING_OBJECT_INTEGRITY_FAILED",
+    )
+    assert "player@example.test" not in serialized and "must-not-copy" not in serialized
+    assert "message" not in json.loads(serialized)
+
+
+def test_publisher_error_adapter_rejects_out_of_sequence_journal() -> None:
+    report = PublisherRunReport(
+        False, PublisherMode.VALIDATION_ONLY, "INVALID", PublisherStage.REQUEST_PREFLIGHT,
+        (PublisherJournalEntry(2, PublisherStage.REQUEST_PREFLIGHT, False, "raw", "c" * 64),),
+    )
+    with pytest.raises(OperationsEvidenceError, match="malformed or out of sequence"):
+        report.error_operation_records(
+            operation_id_prefix="error-run-02", occurred_at="2026-11-06T01:00:00Z",
+        )
 
 
 def test_staging_and_production_versions_require_and_bind_observed_manifest_bytes() -> None:

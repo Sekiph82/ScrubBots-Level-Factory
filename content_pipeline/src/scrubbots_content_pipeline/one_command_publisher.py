@@ -338,6 +338,44 @@ class PublisherRunReport:
             observed_objects=observed_objects,
         )
 
+    def error_operation_records(
+        self,
+        *,
+        operation_id_prefix: str,
+        occurred_at: str,
+    ) -> tuple[OperationRecord, ...]:
+        """Map failed journal stages to fixed-field errors without copying details."""
+        from .operations import OperationRecord, OperationsEvidenceError
+
+        environment = {
+            PublisherMode.VALIDATION_ONLY: "LOCAL",
+            PublisherMode.STAGING_ONLY: "STAGING",
+            PublisherMode.PRODUCTION: "PRODUCTION",
+        }.get(self.mode)
+        if environment is None:
+            raise OperationsEvidenceError("publisher mode is invalid for an operational error record")
+        if not isinstance(self.journal, tuple):
+            raise OperationsEvidenceError("publisher journal must be an ordered tuple")
+
+        records = []
+        for expected_sequence, entry in enumerate(self.journal, start=1):
+            if (not isinstance(entry, PublisherJournalEntry)
+                    or entry.sequence != expected_sequence
+                    or type(entry.accepted) is not bool
+                    or not isinstance(entry.stage, PublisherStage)):
+                raise OperationsEvidenceError("publisher journal entry is malformed or out of sequence")
+            if entry.accepted is True:
+                continue
+            records.append(OperationRecord(
+                operation_id=f"{operation_id_prefix}:{entry.sequence}",
+                occurred_at=occurred_at,
+                kind="ERROR",
+                environment=environment,
+                outcome="FAILED",
+                reason_code=f"{entry.stage.value}_FAILED",
+            ))
+        return tuple(records)
+
     def to_dict(self) -> dict[str, object]:
         return {
             "accepted": self.accepted,

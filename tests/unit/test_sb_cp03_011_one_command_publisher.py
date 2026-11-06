@@ -352,6 +352,13 @@ def test_missing_explicit_owner_approval_blocks_before_factory_or_provider_work(
     result = orchestrator.run_one_command_publisher(request)
     assert not result.accepted and result.reason_code == "EXPLICIT_PRODUCTION_AUTHORITY_REQUIRED"
     assert not called and provider.calls == []
+    error_records = result.error_operation_records(
+        operation_id_prefix="missing-approval", occurred_at="2026-11-06T01:00:00Z",
+    )
+    assert len(error_records) == 1
+    assert (error_records[0].kind, error_records[0].environment, error_records[0].reason_code) == (
+        "ERROR", "PRODUCTION", "REQUEST_PREFLIGHT_FAILED",
+    )
 
 
 @pytest.mark.parametrize(
