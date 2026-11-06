@@ -981,6 +981,24 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
             if not isinstance(expected_sha, str) or hashlib.sha256(raw_png).hexdigest() != expected_sha:
                 row["owner_catalog_status"] = "ARTIFACT_SHA_MISMATCH"
             else:
+                if row.get("state") == "IMPORTED":
+                    source_id = row.get("source_id")
+                    expected_source_id = f"owner-upload-{expected_sha}"
+                    if source_id != expected_source_id:
+                        row["owner_catalog_status"] = "SOURCE_IDENTITY_MISMATCH"
+                        rows.append(row)
+                        continue
+                    try:
+                        source = extensions.verify_owner_source(expected_source_id)
+                    except Exception:
+                        row["owner_catalog_status"] = "SOURCE_IDENTITY_UNVERIFIED"
+                        rows.append(row)
+                        continue
+                    if (source.get("source_sha256") != expected_sha
+                            or source.get("source_bytes_sha256") != expected_sha):
+                        row["owner_catalog_status"] = "SOURCE_IDENTITY_MISMATCH"
+                        rows.append(row)
+                        continue
                 row["owner_catalog_path"] = str(archive_alpix_png(raw_png, repository_root=_repository_root()))
                 row["owner_catalog_status"] = "ARCHIVED"
         rows.append(row)

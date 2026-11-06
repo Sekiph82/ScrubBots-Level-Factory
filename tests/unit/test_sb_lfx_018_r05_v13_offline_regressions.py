@@ -368,8 +368,13 @@ def test_alpix_csv_archive_ignores_forged_persisted_artifact_path(monkeypatch) -
         expected_artifact = job_root / job_id / "row-00001.png"
         expected_artifact.parent.mkdir(parents=True, exist_ok=True)
         Image.new("RGBA", (32, 32), (255, 69, 0, 255)).save(expected_artifact, format="PNG")
-        state["rows"][0]["artifact_sha256"] = hashlib.sha256(expected_artifact.read_bytes()).hexdigest()
+        expected_sha = hashlib.sha256(expected_artifact.read_bytes()).hexdigest()
+        state["rows"][0]["artifact_sha256"] = expected_sha
+        state["rows"][0]["source_id"] = f"owner-upload-{expected_sha}"
         alpix_batch._save_job(state_path, state)
+        monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
+            "source_sha256": expected_sha, "source_bytes_sha256": expected_sha,
+        })
         archived_result = launcher._alpix_csv_job({"csv_path": str(csv_path)})
         archived_row = archived_result["rows"][0]
         assert archived_row["owner_catalog_status"] == "ARCHIVED"
@@ -380,6 +385,91 @@ def test_alpix_csv_archive_ignores_forged_persisted_artifact_path(monkeypatch) -
         if root.exists():
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("ALPIX CSV test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_alpix_csv_resume_restores_csv_intent_and_verifies_imported_source(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".r10-alpix-csv-state-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        import sys
+
+        scripts = str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts")
+        if scripts not in sys.path:
+            sys.path.insert(0, scripts)
+        launcher = __import__("factory_core_launcher")
+        csv_path = root / "requests.csv"
+        csv_path.parent.mkdir(parents=True)
+        raw_csv = b"prompt,size,provider\nOriginal owl,8x9,ALPIX (Claude)\n"
+        csv_path.write_bytes(raw_csv)
+        job_id = hashlib.sha256(raw_csv).hexdigest()
+        extensions_root = root / "runtime"
+        job_root = extensions_root / "alpix-jobs"
+        state_path = job_root / f"{job_id}.json"
+        state = alpix_batch._read_job(state_path, job_id, raw_csv, alpix_batch.read_rows(raw_csv))
+        state["rows"][0].update({
+            "prompt": "Injected replacement prompt",
+            "width": 99,
+            "height": 99,
+            "reference": "C:/owner/private/reference.png",
+            "provider_id": "MAGNIFIC",
+            "state": "PENDING",
+        })
+        alpix_batch._save_job(state_path, state)
+        fake_repo = root / "fake-repo"
+        fake_repo.mkdir()
+        monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        renderer_calls: list[tuple[str, int, int]] = []
+
+        def render(prompt: str, width: int, height: int, destination: Path, **_kwargs):
+            renderer_calls.append((prompt, width, height))
+            Image.new("RGBA", (width, height), (255, 69, 0, 255)).save(destination, format="PNG")
+            return {"path": str(destination)}
+
+        monkeypatch.setattr(alpix_batch, "generate_alpix_png", render)
+        importer_calls: list[bytes] = []
+
+        def import_png(paths: list[str]) -> dict[str, object]:
+            raw = Path(paths[0]).read_bytes()
+            importer_calls.append(raw)
+            return {"items": [{"disposition": "IMPORTED", "source_id": "owner-upload-" + "0" * 64}]}
+
+        monkeypatch.setattr(studio_extensions, "batch_import", import_png)
+        monkeypatch.setattr(
+            studio_extensions, "verify_owner_source",
+            lambda _source_id: pytest.fail("mismatched imported source must not be verified or archived"),
+        )
+
+        mismatched = launcher._alpix_csv_job({"csv_path": str(csv_path)})
+
+        assert renderer_calls == [("Original owl", 8, 9)]
+        assert len(importer_calls) == 1
+        row = mismatched["rows"][0]
+        assert row["prompt"] == "Original owl"
+        assert (row["width"], row["height"], row["provider_id"]) == (8, 9, "ALPIX (Claude)")
+        assert row["owner_catalog_status"] == "SOURCE_IDENTITY_MISMATCH"
+        assert not (fake_repo / "data" / "output" / "Alpix").exists()
+
+        expected_sha = hashlib.sha256(importer_calls[0]).hexdigest()
+        state = json.loads(state_path.read_text(encoding="utf-8"))
+        state["rows"][0]["source_id"] = f"owner-upload-{expected_sha}"
+        alpix_batch._save_job(state_path, state)
+        monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
+            "source_sha256": expected_sha, "source_bytes_sha256": expected_sha,
+        })
+
+        verified = launcher._alpix_csv_job({"csv_path": str(csv_path)})
+
+        assert renderer_calls == [("Original owl", 8, 9)]
+        verified_row = verified["rows"][0]
+        assert verified_row["owner_catalog_status"] == "ARCHIVED"
+        assert Path(verified_row["owner_catalog_path"]).read_bytes() == importer_calls[0]
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("ALPIX CSV state test output escaped its owned directory")
             shutil.rmtree(root)
 
 

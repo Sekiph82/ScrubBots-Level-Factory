@@ -508,7 +508,34 @@ def _read_job(path: Path, job_id: str, raw_csv: bytes, rows: Sequence[Mapping[st
                     and value.get("job_id") == job_id and value.get("csv_sha256") == job_id
                     and value.get("csv_bytes") == len(raw_csv) and isinstance(value.get("rows"), list)
                     and len(value["rows"]) == len(rows)):
-                return value
+                allowed_states = {"PENDING", "DRAWN", "VALIDATED", "IMPORTED", "FAILED", "PROVIDER_RETIRED"}
+                restored_rows: list[dict[str, object]] = []
+                for index, (request_row, saved_row) in enumerate(zip(rows, value["rows"])):
+                    saved = saved_row if isinstance(saved_row, Mapping) else {}
+                    state = saved.get("state")
+                    if not isinstance(state, str) or state not in allowed_states:
+                        state = "PENDING"
+                    digest = saved.get("artifact_sha256")
+                    if (not isinstance(digest, str) or len(digest) != 64
+                            or any(character not in "0123456789abcdef" for character in digest)):
+                        digest = None
+                    source_id = saved.get("source_id")
+                    if not isinstance(source_id, str) or not source_id or len(source_id) > 240:
+                        source_id = None
+                    error = saved.get("error")
+                    if not isinstance(error, str):
+                        error = None
+                    restored_rows.append({
+                        **dict(request_row), "index": index, "state": state,
+                        "artifact_sha256": digest, "source_id": source_id, "error": error,
+                    })
+                saved_state = value.get("state")
+                return {
+                    "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": job_id,
+                    "csv_sha256": job_id, "csv_bytes": len(raw_csv),
+                    "state": saved_state if isinstance(saved_state, str) else "PENDING",
+                    "rows": restored_rows,
+                }
         except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
             pass
     return {"schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": job_id, "csv_sha256": job_id,
