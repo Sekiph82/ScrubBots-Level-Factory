@@ -257,6 +257,13 @@ def test_staging_only_composes_all_staging_gates_and_never_touches_production(mo
     result = orchestrator.run_one_command_publisher(request)
     assert result.accepted and result.staging_download is not None and result.staging_download.accepted
     assert result.terminal_stage is orchestrator.PublisherStage.STAGING_DOWNLOAD_VERIFY
+    version_records = result.observed_version_operation_records(
+        operation_id_prefix="staging-run-01", occurred_at="2026-11-06T01:00:00Z",
+    )
+    assert len(version_records) == 1
+    assert (version_records[0].kind, version_records[0].environment) == ("STAGING_VERSION", "STAGING")
+    assert version_records[0].manifest_sha256 == result.staging_download.receipt.manifest_sha256
+    assert version_records[0].content_version == result.staging_download.receipt.content_version
     stages = [item.stage for item in result.journal]
     assert stages == [
         orchestrator.PublisherStage.CONFIG_VALIDATION,
@@ -312,6 +319,16 @@ def test_production_mode_composes_cpx002_through_no_silent_overwrite_fence(monke
     assert result.publisher_validation is not None and result.publisher_validation.accepted
     assert result.staging_upload is not None and result.staging_publish is not None
     assert result.staging_download is not None and result.replay_pack_bytes
+    version_records = result.observed_version_operation_records(
+        operation_id_prefix="production-run-01", occurred_at="2026-11-06T01:00:00Z",
+    )
+    assert [(item.kind, item.environment) for item in version_records] == [
+        ("STAGING_VERSION", "STAGING"), ("PRODUCTION_VERSION", "PRODUCTION"),
+    ]
+    assert [item.manifest_sha256 for item in version_records] == [
+        result.staging_download.receipt.manifest_sha256,
+        result.production_activation.receipt.manifest_sha256,
+    ]
     assert approval.manifest_sha256 == candidate.manifest_sha256
 
 

@@ -8,7 +8,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 from .candidate_manifest import CandidateManifestBuildResult, build_candidate_manifest
 from .config import PRODUCTION_TARGET, STAGING_TARGET, Environment, EnvironmentTarget, PipelineConfig
@@ -42,6 +42,9 @@ from .staging_manifest_publish import (
 )
 from .staging_pack_upload import StagingPackUploadReport, upload_candidate_packs_to_staging
 from .validation import DryRunReport, validate_only
+
+if TYPE_CHECKING:
+    from .operations import OperationRecord
 
 
 class PublisherMode(StrEnum):
@@ -156,6 +159,79 @@ class PublisherRunReport:
     current_main_replay: CurrentMainReplayReceipt | None = None
     production_promotion: ProductionPromotionReport | None = None
     production_activation: ProductionManifestActivationReport | None = None
+
+    def observed_version_operation_records(
+        self,
+        *,
+        operation_id_prefix: str,
+        occurred_at: str,
+    ) -> tuple[OperationRecord, ...]:
+        """Build CP08 version events only from successful canonical read-back receipts.
+
+        This is a pure adapter: it neither contacts a provider nor infers that an
+        observation occurred. Callers supply the timestamp and operation prefix;
+        the exact bytes must already be present in verified publisher receipts.
+        """
+        from .operations import OperationsEvidenceError, operation_record_from_manifest_observation
+        from .staging_download_verify import (
+            StagingDownloadReasonCode,
+            StagingDownloadVerificationReport,
+            StagingDownloadVerificationReceipt,
+        )
+        from .production_manifest_activation import (
+            ProductionManifestActivationReport,
+            ProductionManifestReasonCode,
+            ProductionManifestReceipt,
+        )
+
+        records = []
+        staging = self.staging_download
+        if isinstance(staging, StagingDownloadVerificationReport) and staging.accepted is True:
+            if staging.reason_code is not StagingDownloadReasonCode.VERIFIED or staging.manifest_read is not True:
+                raise OperationsEvidenceError("accepted staging report lacks a verified manifest read-back")
+            receipt = staging.receipt
+            if not isinstance(receipt, StagingDownloadVerificationReceipt):
+                raise OperationsEvidenceError("accepted staging report has no canonical read-back receipt")
+            record = operation_record_from_manifest_observation(
+                receipt.manifest_bytes,
+                environment="STAGING",
+                operation_id=f"{operation_id_prefix}:staging",
+                occurred_at=occurred_at,
+            )
+            if (receipt.target_environment != Environment.STAGING.value
+                    or receipt.manifest_sha256 != record.manifest_sha256
+                    or receipt.content_version != record.content_version
+                    or receipt.manifest_byte_length != len(receipt.manifest_bytes)):
+                raise OperationsEvidenceError("verified staging receipt disagrees with its exact manifest bytes")
+            records.append(record)
+
+        production = self.production_activation
+        if (isinstance(production, ProductionManifestActivationReport)
+                and production.accepted is True):
+            if (production.reason_code not in {
+                    ProductionManifestReasonCode.ACTIVATED,
+                    ProductionManifestReasonCode.ALREADY_CURRENT,
+                }):
+                raise OperationsEvidenceError("accepted production report has an unsupported activation result")
+            receipt = production.receipt
+            if (receipt is None
+                    and production.reason_code is ProductionManifestReasonCode.ALREADY_CURRENT):
+                # The idempotent path confirms current identity but does not
+                # return exact observed bytes, so there is no version event.
+                return tuple(records)
+            if not isinstance(receipt, ProductionManifestReceipt):
+                raise OperationsEvidenceError("accepted production report has no canonical read-back receipt")
+            record = operation_record_from_manifest_observation(
+                receipt.manifest_bytes,
+                environment="PRODUCTION",
+                operation_id=f"{operation_id_prefix}:production",
+                occurred_at=occurred_at,
+            )
+            if (receipt.manifest_sha256 != record.manifest_sha256
+                    or receipt.content_version != record.content_version):
+                raise OperationsEvidenceError("verified production receipt disagrees with its exact manifest bytes")
+            records.append(record)
+        return tuple(records)
 
     def to_dict(self) -> dict[str, object]:
         return {

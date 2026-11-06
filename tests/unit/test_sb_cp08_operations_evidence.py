@@ -21,6 +21,21 @@ from scrubbots_content_pipeline.operations import (
     verify_content_health,
     weekly_batch_summary,
 )
+from scrubbots_content_pipeline.one_command_publisher import (
+    PublisherMode,
+    PublisherRunReport,
+    PublisherStage,
+)
+from scrubbots_content_pipeline.production_manifest_activation import (
+    ProductionManifestActivationReport,
+    ProductionManifestReasonCode,
+    ProductionManifestReceipt,
+)
+from scrubbots_content_pipeline.staging_download_verify import (
+    StagingDownloadReasonCode,
+    StagingDownloadVerificationReceipt,
+    StagingDownloadVerificationReport,
+)
 
 
 def _record(**changes: object) -> OperationRecord:
@@ -187,6 +202,105 @@ def test_staging_and_production_versions_require_and_bind_observed_manifest_byte
     with pytest.raises(OperationsEvidenceError, match="observed manifest version and digest"):
         OperationRecord("version-missing", "2026-10-14T08:15:00Z", "STAGING_VERSION", "STAGING",
                         "COMPLETED", "VERSION_OBSERVED")
+
+
+def test_publisher_verified_readbacks_bridge_to_staging_and_production_version_records() -> None:
+    observed = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
+    digest = hashlib.sha256(observed).hexdigest()
+    staging_receipt = StagingDownloadVerificationReceipt(
+        "1.0", observed, digest, len(observed), 7, "manifests/current.json", "staging",
+        "staging:default", "provider", "1.0", "1.0", "capability", "1.0", "1.0.0",
+        (), (), (), (), ("manifest_sha256",),
+    )
+    staging = StagingDownloadVerificationReport(
+        True, StagingDownloadReasonCode.VERIFIED, staging_receipt, None, True, (),
+    )
+    production_receipt = ProductionManifestReceipt(
+        manifest_bytes=observed,
+        manifest_sha256=digest,
+        content_version=7,
+        production_target_id="production:default",
+        manifest_object_key="manifests/current.json",
+        provider_id="provider",
+        prior_manifest_sha256=None,
+        prior_content_version=None,
+        compatibility=object(),
+        reference_validation=object(),
+        packs=(),
+        history_record=object(),
+        manifest_history=object(),
+        history_tip_sha256="a" * 64,
+        promotion_pending_event_digest="b" * 64,
+        production_promoted_event=object(),
+        game_commit="c" * 40,
+    )
+    production = ProductionManifestActivationReport(
+        True, ProductionManifestReasonCode.ACTIVATED, True, production_receipt, object(),
+    )
+    report = PublisherRunReport(
+        True, PublisherMode.PRODUCTION, "ACTIVATED", PublisherStage.CURRENT_STATE_FENCE, (),
+        staging_download=staging, production_activation=production,
+    )
+
+    records = report.observed_version_operation_records(
+        operation_id_prefix="publish-01", occurred_at="2026-11-06T01:00:00Z",
+    )
+
+    assert [(item.kind, item.environment, item.content_version, item.manifest_sha256) for item in records] == [
+        ("STAGING_VERSION", "STAGING", 7, digest),
+        ("PRODUCTION_VERSION", "PRODUCTION", 7, digest),
+    ]
+    assert [item.operation_id for item in records] == ["publish-01:staging", "publish-01:production"]
+    summary = weekly_batch_summary(records, date(2026, 11, 2), date(2026, 11, 9))
+    assert [row["content_version"] for row in summary["records"]] == [7, 7]  # type: ignore[index]
+
+
+def test_publisher_version_bridge_ignores_unverified_reads_and_rejects_receipt_byte_drift() -> None:
+    observed = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
+    digest = hashlib.sha256(observed).hexdigest()
+    receipt = StagingDownloadVerificationReceipt(
+        "1.0", observed, digest, len(observed), 7, "manifests/current.json", "staging",
+        "staging:default", "provider", "1.0", "1.0", "capability", "1.0", "1.0.0",
+        (), (), (), (), ("manifest_sha256",),
+    )
+    unverified = StagingDownloadVerificationReport(
+        False, StagingDownloadReasonCode.MANIFEST_READ_FAILED, None, None, False, (),
+    )
+    failed_report = PublisherRunReport(
+        False, PublisherMode.STAGING_ONLY, "MANIFEST_READ_FAILED", PublisherStage.STAGING_DOWNLOAD_VERIFY, (),
+        staging_download=unverified,
+    )
+    assert failed_report.observed_version_operation_records(
+        operation_id_prefix="publish-02", occurred_at="2026-11-06T01:00:00Z",
+    ) == ()
+
+    already_current = ProductionManifestActivationReport(
+        True, ProductionManifestReasonCode.ALREADY_CURRENT, False, None, object(),
+    )
+    already_current_report = PublisherRunReport(
+        True, PublisherMode.PRODUCTION, "ALREADY_CURRENT", PublisherStage.CURRENT_STATE_FENCE, (),
+        production_activation=already_current,
+    )
+    assert already_current_report.observed_version_operation_records(
+        operation_id_prefix="publish-02-current", occurred_at="2026-11-06T01:00:00Z",
+    ) == ()
+
+    mismatched_receipt = StagingDownloadVerificationReceipt(
+        "1.0", observed, "0" * 64, len(observed), 7, "manifests/current.json", "staging",
+        "staging:default", "provider", "1.0", "1.0", "capability", "1.0", "1.0.0",
+        (), (), (), (), ("manifest_sha256",),
+    )
+    mismatched = StagingDownloadVerificationReport(
+        True, StagingDownloadReasonCode.VERIFIED, mismatched_receipt, None, True, (),
+    )
+    mismatched_report = PublisherRunReport(
+        True, PublisherMode.STAGING_ONLY, "STAGING_VERIFIED", PublisherStage.STAGING_DOWNLOAD_VERIFY, (),
+        staging_download=mismatched,
+    )
+    with pytest.raises(OperationsEvidenceError, match="disagrees with its exact manifest bytes"):
+        mismatched_report.observed_version_operation_records(
+            operation_id_prefix="publish-03", occurred_at="2026-11-06T01:00:00Z",
+        )
 
 
 def test_object_verification_records_only_exact_observed_hashes() -> None:
