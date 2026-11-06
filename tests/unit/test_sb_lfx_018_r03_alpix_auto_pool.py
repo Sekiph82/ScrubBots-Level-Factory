@@ -70,8 +70,8 @@ def test_legacy_csv_forms_normalize_prompts_size_aliases_and_disabled_rows() -> 
         default_size=(28, 28),
     )
     assert rows == [
-        {"prompt": "Blue owl", "width": 24, "height": 32, "reference": ""},
-        {"prompt": "Red fish", "width": 28, "height": 28, "reference": ""},
+        {"prompt": "Blue owl", "width": 24, "height": 32, "reference": "", "provider_id": "ALPIX (Claude)"},
+        {"prompt": "Red fish", "width": 28, "height": 28, "reference": "", "provider_id": "ALPIX (Claude)"},
     ]
     plain = alpix_batch.read_rows(b"prompt;size\nTree;20x22\n", default_size=(30, 30))
     assert plain[0]["width"] == 20 and plain[0]["height"] == 22
