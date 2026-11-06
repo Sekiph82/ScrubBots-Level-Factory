@@ -233,6 +233,65 @@ class PublisherRunReport:
             records.append(record)
         return tuple(records)
 
+    def observed_object_verification_operation_records(
+        self,
+        *,
+        operation_id_prefix: str,
+        occurred_at: str,
+    ) -> tuple[OperationRecord, ...]:
+        """Build STAGING object hash events from exact publisher read-back bytes.
+
+        Only the canonical verified staging receipt and complete bytes retained
+        by the pack read-back/replay boundary are considered. A digest or byte
+        count alone is not treated as an observation.
+        """
+        from .operations import OperationsEvidenceError, operation_record_from_object_observation
+        from .staging_download_verify import (
+            StagingDownloadReasonCode,
+            StagingDownloadVerificationReceipt,
+            StagingDownloadedPackEvidence,
+        )
+
+        staging = self.staging_download
+        if (not isinstance(staging, StagingDownloadVerificationReport)
+                or staging.accepted is not True
+                or staging.reason_code is not StagingDownloadReasonCode.VERIFIED):
+            return ()
+        receipt = staging.receipt
+        if not isinstance(receipt, StagingDownloadVerificationReceipt):
+            raise OperationsEvidenceError("verified staging report has no canonical pack receipt")
+        expected_packs = receipt.packs
+        observed_packs = self.replay_pack_bytes
+        if not expected_packs or not observed_packs:
+            return ()
+        if (not isinstance(expected_packs, tuple)
+                or any(not isinstance(item, StagingDownloadedPackEvidence) for item in expected_packs)
+                or not isinstance(observed_packs, tuple)
+                or any(not isinstance(item, DownloadedPackBytes) for item in observed_packs)
+                or len(expected_packs) != len(observed_packs)):
+            raise OperationsEvidenceError("staging read-back bytes do not cover the canonical pack receipt")
+
+        records = []
+        for expected, observed in zip(expected_packs, observed_packs, strict=True):
+            if (observed.pack_id != expected.pack_id
+                    or observed.object_key != expected.object_key
+                    or observed.sha256 != expected.sha256
+                    or observed.byte_length != expected.byte_length
+                    or type(observed.content_bytes) is not bytes
+                    or len(observed.content_bytes) != expected.byte_length):
+                raise OperationsEvidenceError("staging pack observation disagrees with its canonical receipt")
+            record = operation_record_from_object_observation(
+                expected.sha256,
+                observed.content_bytes,
+                environment=Environment.STAGING.value.upper(),
+                operation_id=f"{operation_id_prefix}:{expected.pack_id}",
+                occurred_at=occurred_at,
+            )
+            if record.outcome != "MATCH":
+                raise OperationsEvidenceError("accepted staging read-back bytes do not match the receipt digest")
+            records.append(record)
+        return tuple(records)
+
     def to_dict(self) -> dict[str, object]:
         return {
             "accepted": self.accepted,

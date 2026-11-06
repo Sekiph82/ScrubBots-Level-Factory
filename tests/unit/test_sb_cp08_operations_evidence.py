@@ -22,6 +22,7 @@ from scrubbots_content_pipeline.operations import (
     weekly_batch_summary,
 )
 from scrubbots_content_pipeline.one_command_publisher import (
+    DownloadedPackBytes,
     PublisherMode,
     PublisherRunReport,
     PublisherStage,
@@ -33,6 +34,7 @@ from scrubbots_content_pipeline.production_manifest_activation import (
 )
 from scrubbots_content_pipeline.staging_download_verify import (
     StagingDownloadReasonCode,
+    StagingDownloadedPackEvidence,
     StagingDownloadVerificationReceipt,
     StagingDownloadVerificationReport,
 )
@@ -348,6 +350,75 @@ def test_object_verification_records_only_exact_observed_hashes() -> None:
             "HASH_MATCH",
             expected_object_sha256=expected_sha256,
             observed_object_sha256=expected_sha256,
+        )
+
+
+def test_publisher_verified_staging_pack_bytes_bridge_to_object_verification_records() -> None:
+    manifest_bytes = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
+    pack_bytes = b"exact staged pack bytes"
+    pack_sha256 = hashlib.sha256(pack_bytes).hexdigest()
+    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+                                             len(pack_bytes), ("level-01",))
+    staging_receipt = StagingDownloadVerificationReceipt(
+        "1.0", manifest_bytes, hashlib.sha256(manifest_bytes).hexdigest(), len(manifest_bytes), 7,
+        "manifests/current.json", "staging", "staging:default", "provider", "1.0", "1.0",
+        "capability", "1.0", "0.0.0", (), (), (evidence,), (), (),
+    )
+    staging = StagingDownloadVerificationReport(
+        True, StagingDownloadReasonCode.VERIFIED, staging_receipt, None, True, ("pack-01",),
+    )
+    report = PublisherRunReport(
+        True, PublisherMode.PRODUCTION, "CURRENT_MAIN_REPLAY_VERIFIED", PublisherStage.CURRENT_MAIN_REPLAY,
+        (), staging_download=staging,
+        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+                                               len(pack_bytes), pack_bytes),),
+    )
+
+    records = report.observed_object_verification_operation_records(
+        operation_id_prefix="verify-run-01", occurred_at="2026-11-06T01:00:00Z",
+    )
+
+    assert len(records) == 1
+    assert (records[0].kind, records[0].environment, records[0].outcome) == (
+        "OBJECT_VERIFY", "STAGING", "MATCH",
+    )
+    assert records[0].operation_id == "verify-run-01:pack-01"
+    assert records[0].expected_object_sha256 == pack_sha256
+    assert records[0].observed_object_sha256 == pack_sha256
+    assert records[0].reason_code == "HASH_MATCH"
+
+
+def test_publisher_object_verification_bridge_requires_complete_exact_bytes() -> None:
+    manifest_bytes = b'{"content_version":7,"disabled_levels":[],"levels":[],"minimum_game_version":"0.0.0","packs":[],"schedules":[],"schema":"scrubbots.content.manifest.v1","schema_version":1}'
+    pack_bytes = b"exact staged pack bytes"
+    pack_sha256 = hashlib.sha256(pack_bytes).hexdigest()
+    evidence = StagingDownloadedPackEvidence("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+                                             len(pack_bytes), ("level-01",))
+    staging_receipt = StagingDownloadVerificationReceipt(
+        "1.0", manifest_bytes, hashlib.sha256(manifest_bytes).hexdigest(), len(manifest_bytes), 7,
+        "manifests/current.json", "staging", "staging:default", "provider", "1.0", "1.0",
+        "capability", "1.0", "0.0.0", (), (), (evidence,), (), (),
+    )
+    staging = StagingDownloadVerificationReport(
+        True, StagingDownloadReasonCode.VERIFIED, staging_receipt, None, True, ("pack-01",),
+    )
+    without_observation = PublisherRunReport(
+        True, PublisherMode.STAGING_ONLY, "STAGING_VERIFIED", PublisherStage.STAGING_DOWNLOAD_VERIFY,
+        (), staging_download=staging,
+    )
+    assert without_observation.observed_object_verification_operation_records(
+        operation_id_prefix="verify-run-02", occurred_at="2026-11-06T01:00:00Z",
+    ) == ()
+
+    drifted = PublisherRunReport(
+        True, PublisherMode.PRODUCTION, "CURRENT_MAIN_REPLAY_VERIFIED", PublisherStage.CURRENT_MAIN_REPLAY,
+        (), staging_download=staging,
+        replay_pack_bytes=(DownloadedPackBytes("pack-01", "packs/pack-01.scrubpack", pack_sha256,
+                                               len(pack_bytes), b"different bytes"),),
+    )
+    with pytest.raises(OperationsEvidenceError, match="disagrees with its canonical receipt"):
+        drifted.observed_object_verification_operation_records(
+            operation_id_prefix="verify-run-03", occurred_at="2026-11-06T01:00:00Z",
         )
 
 

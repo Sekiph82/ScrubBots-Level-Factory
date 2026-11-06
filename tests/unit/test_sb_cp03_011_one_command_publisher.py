@@ -329,6 +329,15 @@ def test_production_mode_composes_cpx002_through_no_silent_overwrite_fence(monke
         result.staging_download.receipt.manifest_sha256,
         result.production_activation.receipt.manifest_sha256,
     ]
+    object_records = result.observed_object_verification_operation_records(
+        operation_id_prefix="production-run-01-object", occurred_at="2026-11-06T01:00:00Z",
+    )
+    assert len(object_records) == len(result.staging_download.receipt.packs) == len(result.replay_pack_bytes)
+    assert all(item.kind == "OBJECT_VERIFY" and item.environment == "STAGING"
+               and item.outcome == "MATCH" for item in object_records)
+    assert [item.observed_object_sha256 for item in object_records] == [
+        item.sha256 for item in result.replay_pack_bytes
+    ]
     assert approval.manifest_sha256 == candidate.manifest_sha256
 
 
