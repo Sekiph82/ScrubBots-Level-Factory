@@ -374,12 +374,14 @@ class AlpixJobResult:
     state: str
     completed: int
     failed: int
+    retired: int
     remaining: int
     rows: tuple[Mapping[str, object], ...]
 
     def to_dict(self) -> dict[str, object]:
         return {"job_id": self.job_id, "state": self.state, "completed": self.completed,
-                "failed": self.failed, "remaining": self.remaining, "rows": [dict(row) for row in self.rows]}
+                "failed": self.failed, "retired": self.retired, "remaining": self.remaining,
+                "rows": [dict(row) for row in self.rows]}
 
 
 def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
@@ -597,9 +599,10 @@ def _discard_provider_output(path: Path) -> None:
 def _job_result(job_id: str, state: Mapping[str, object]) -> AlpixJobResult:
     rows = tuple(dict(item) for item in state.get("rows", []) if isinstance(item, Mapping))
     completed = sum(item.get("state") == "IMPORTED" for item in rows)
-    failed = sum(item.get("state") in {"FAILED", "PROVIDER_RETIRED"} for item in rows)
-    return AlpixJobResult(job_id, str(state.get("state", "ERROR")), completed, failed,
-                          sum(item.get("state") != "IMPORTED" for item in rows), rows)
+    failed = sum(item.get("state") == "FAILED" for item in rows)
+    retired = sum(item.get("state") == "PROVIDER_RETIRED" for item in rows)
+    remaining = sum(item.get("state") not in {"IMPORTED", "PROVIDER_RETIRED"} for item in rows)
+    return AlpixJobResult(job_id, str(state.get("state", "ERROR")), completed, failed, retired, remaining, rows)
 
 
 __all__ = ["AlpixJobResult", "AlpixUnavailable", "AlpixUsageLimit", "discover_alpix", "find_claude",

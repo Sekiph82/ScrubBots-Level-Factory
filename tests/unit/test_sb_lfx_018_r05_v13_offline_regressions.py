@@ -19,6 +19,50 @@ from PIL import Image
 from concurrent.futures import ThreadPoolExecutor
 
 
+def test_alpix_job_stats_separate_retired_provider_rows() -> None:
+    root = Path(__file__).resolve().parent / ".r10-alpix-retired-counter-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        root.mkdir(parents=True)
+        csv_path = root / "requests.csv"
+        csv_path.write_text(
+            "prompt,size,provider\nOld bird,8x8,MAGNIFIC\nCurrent owl,8x8,ALPIX (Claude)\n",
+            encoding="utf-8",
+        )
+        renderer_prompts: list[str] = []
+
+        def renderer(prompt: str, width: int, height: int, destination: Path):
+            renderer_prompts.append(prompt)
+            Image.new("RGBA", (width, height), (255, 69, 0, 255)).save(destination, format="PNG")
+            return {"path": str(destination)}
+
+        result = alpix_batch.run_csv_job(
+            csv_path,
+            root / "jobs",
+            renderer=renderer,
+            importer=lambda _path: {"source_id": "offline-fixture-source"},
+        )
+
+        assert renderer_prompts == ["Current owl"]
+        assert [row["state"] for row in result.rows] == ["PROVIDER_RETIRED", "IMPORTED"]
+        assert result.state == "COMPLETE"
+        assert result.completed == 1
+        assert result.failed == 0
+        assert result.retired == 1
+        assert result.remaining == 0
+        assert result.to_dict()["retired"] == 1
+        ui_source = (Path(__file__).resolve().parents[2] / "level_factory" / "scripts" /
+                     "factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+        assert '"retired": job.get("retired", 0)' in ui_source
+        assert "%d retired · %d left" in ui_source
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("ALPIX test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
 def _virtual_files(monkeypatch, files: dict[str, str], executable: str) -> None:
     paths = {str(Path(name)): value for name, value in files.items()}
     original_is_file = Path.is_file
