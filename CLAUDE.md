@@ -1,5 +1,11 @@
 # H!veAI TASKS-only control-plane adapter
 
+## LATEST OWNER 2026-11-06: DON'T STOP ON DIRTY TRACKED SOURCE FILES
+
+Codex must use `python -B scripts/codex/scrubbots_task_queue.py --json --allow-existing-work` for read-only queue discovery when existing tracked implementation edits are present. This mode retains full task/prompt/branch/root verification but DOES NOT treat unrelated tracked dirty status as a reason to stop the owner GOAL. First inspect exact existing diffs, hashes and ownership; safely finish only authorized nonconflicting PixelLab/Studio source fixes, stage exact owned files, focused-test and normal-push. No blind restore/reset/stash/clean or unknown-owner staging. Source/installed Studio differences must be diagnosed against the reported 224x224 paid PixelLab gallery asset and 16x56x56 split, not guessed; don't trigger another paid generation. Full instruction in .codex/skills/scrubbots-factory/SKILL.md. Owner GOAL text unchanged.
+
+---
+
 ## LATEST OWNER AUTO-BACKLOG AUTHORIZATION 2026-10-31
 
 The owner's original GOAL text is unchanged. Codex now chooses, closes and advances among existing root `TASKS.md` unchecked/partial in-scope SAFE tasks, even after A-E. Read https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. Update the one root TASKS.md with exact source/test/commit evidence and next selected EXISTING requirement after each real implemented task, push/refetch and verify Desktop = GitHub main, then continue without ChatGPT audit handoff. Prior restrictions on selection only from fixed A-E are superseded. Historical failures, paid-provider calls, owner data, R2/Production writes, CI, unapproved GUI and no TEMP clones remain protected; permission-limited operations stay pending without blocking other safe work. Do not make up tasks or background automation.
