@@ -37,6 +37,18 @@ var _alpix_height := 32
 var _provider_model := "ALPIX (Claude)"
 var _generation_mode := "SINGLE"
 var _batch_csv_path := ""
+var _pixel_batch_rows: Array[Dictionary] = []
+var _pixel_batch_index := 0
+var _pixel_batch_succeeded := 0
+var _pixel_batch_failed := 0
+var _pixel_batch_active := false
+var _pixel_batch_skipped := 0
+var _pixel_batch_source_count := 0
+var _pixel_batch_monthly_used := 0
+var _pixel_art_activity_events: Array[Dictionary] = []
+var _pixel_art_activity_table: PanelContainer
+var _pixel_art_activity_grid: GridContainer
+var _pixel_batch_source_sha256 := ""
 var _batch_resume := false
 var _release_target := "STAGING"
 var _release_query := ""
@@ -762,7 +774,7 @@ func _control_caption(control_name: String) -> String:
 		"SettingsGear": "Settings",
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
-		"GenerationPrompt": "Prompt", "RandomSeed": "↻", "GenerationSize": "Size",
+		"GenerationPrompt": "Prompt", "GenerationSize": "Size",
 		"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
@@ -794,7 +806,7 @@ func _level_number_caption() -> String:
 func _build_selected_size_value_panel() -> void:
 	_selected_size_panel = PanelContainer.new()
 	_selected_size_panel.name = "SelectedSizeValuePanel"
-	_selected_size_panel.position = Vector2(198, 348)
+	_selected_size_panel.position = Vector2(198, 312)
 	_selected_size_panel.size = Vector2(163, 42)
 	_selected_size_panel.add_theme_stylebox_override("panel", _control_style(Color("#17243a"), Color("#30415e")))
 	_selected_size_value = Label.new()
@@ -2011,20 +2023,20 @@ func _build_master_controls() -> void:
 	_place_control("ReleasePoolTab", Rect2(918, 22, 270, 72), _show_screen.bind("RELEASE POOL"))
 	_place_control("SettingsGear", Rect2(1320, 15, 55, 60), _open_settings)
 	# PIXEL ART actions and Batch-CSV path.
-	_place_control("GeneratePixelArt", Rect2(27, 558, 334, 49), _generate_art)
+	_place_control("GeneratePixelArt", Rect2(27, 424, 334, 49), _generate_art)
 	_place_control("BatchCsvSelect", Rect2(199, 155, 161, 43), _open_batch_csv)
-	_place_control("RunBatch", Rect2(27, 610, 334, 50), _run_batch)
+	_place_control("RunBatch", Rect2(27, 476, 334, 50), _run_batch)
 	_place_control("Regenerate", Rect2(1208, 452, 294, 48), _generate_art)
 	_place_control("EditPrompt", Rect2(1208, 506, 294, 48), _edit_prompt)
 	_place_control("AddToLevelFactory", Rect2(1208, 560, 294, 48), _send_to_level_factory)
 	_place_control("GenerationPrompt", Rect2(26, 208, 334, 92), _edit_prompt)
-	_place_control("RandomSeed", Rect2(315, 296, 42, 40), _new_seed)
-	_place_control("GenerationSize", Rect2(27, 348, 160, 42), _choose_size)
+	_place_control("GenerationSize", Rect2(27, 312, 160, 42), _choose_size)
 	_build_selected_size_value_panel()
-	_place_control("GenerationProvider", Rect2(27, 446, 334, 42), _choose_provider)
+	_place_control("GenerationProvider", Rect2(27, 366, 334, 42), _choose_provider)
 	_place_control("SingleMode", Rect2(27, 151, 160, 45), _set_generation_mode.bind("SINGLE"))
 	_place_control("BatchMode", Rect2(198, 151, 162, 45), _set_generation_mode.bind("BATCH"))
-	_place_control("BatchCsvPath", Rect2(27, 558, 334, 42), _open_batch_csv)
+	_place_control("BatchCsvPath", Rect2(27, 424, 334, 42), _open_batch_csv)
+	_build_pixel_art_activity_table()
 	_place_control("ArtworkVariation1", Rect2(1208, 300, 92, 108), _select_artwork.bind(0))
 	_place_control("ArtworkVariation2", Rect2(1310, 300, 92, 108), _select_artwork.bind(1))
 	_place_control("ArtworkVariation3", Rect2(1412, 300, 92, 108), _select_artwork.bind(2))
@@ -2252,11 +2264,13 @@ func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
-	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "RandomSeed", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
+	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
+	if _pixel_art_activity_table != null:
+		_pixel_art_activity_table.visible = _screen == "PIXEL ART"
 	_refresh_selected_size_value()
 	if _screen == "PIXEL ART":
 		var generate := get_node_or_null("GeneratePixelArt") as Button
@@ -2286,6 +2300,90 @@ func _report(message: String) -> void:
 		if _status != null and _status.text == message:
 			_status.visible = false
 	)
+
+
+func _record_pixel_art_activity(stage: String, state: String, message: String) -> void:
+	var safe_message := message.strip_edges().left(320)
+	for pattern in ["(?i)(bearer\\s+)[A-Za-z0-9._~+/-]+=*", "(?i)(api[_ -]?token\\s*[:=]\\s*)[^\\s,;]+", "(?i)(authorization\\s*[:=]\\s*)[^\\s,;]+"]:
+		var secret_pattern := RegEx.new()
+		if secret_pattern.compile(pattern) == OK:
+			safe_message = secret_pattern.sub(safe_message, "$1[redacted]", true)
+	_pixel_art_activity_events.append({
+		"time": Time.get_datetime_string_from_system(false, true),
+		"stage": stage.left(40), "state": state.left(40), "message": safe_message,
+	})
+	while _pixel_art_activity_events.size() > 200:
+		_pixel_art_activity_events.pop_front()
+	_refresh_pixel_art_activity_table()
+
+
+func _build_pixel_art_activity_table() -> void:
+	_pixel_art_activity_table = PanelContainer.new()
+	_pixel_art_activity_table.name = "PixelArtActivityTable"
+	_pixel_art_activity_table.position = Vector2(27, 538)
+	_pixel_art_activity_table.size = Vector2(334, 924)
+	_pixel_art_activity_table.add_theme_stylebox_override("panel", _control_style(Color("#111d30"), Color("#30415e")))
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 8)
+	var title := Label.new()
+	title.text = "PIXEL ART ACTIVITY"
+	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_color_override("font_color", Color("#9bb1cd"))
+	content.add_child(title)
+	var subheading := Label.new()
+	subheading.text = "IN-MEMORY · THIS SESSION"
+	subheading.add_theme_font_size_override("font_size", 10)
+	subheading.add_theme_color_override("font_color", Color("#7188a6"))
+	content.add_child(subheading)
+	var scroll := ScrollContainer.new()
+	scroll.name = "PixelArtActivityScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_pixel_art_activity_grid = GridContainer.new()
+	_pixel_art_activity_grid.name = "PixelArtActivityRows"
+	_pixel_art_activity_grid.columns = 2
+	_pixel_art_activity_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(_pixel_art_activity_grid)
+	content.add_child(scroll)
+	_pixel_art_activity_table.add_child(content)
+	add_child(_pixel_art_activity_table)
+	_refresh_pixel_art_activity_table()
+	_pixel_art_activity_table.visible = _screen == "PIXEL ART"
+
+
+func _refresh_pixel_art_activity_table() -> void:
+	if _pixel_art_activity_grid == null:
+		return
+	while _pixel_art_activity_grid.get_child_count() > 0:
+		var old_child := _pixel_art_activity_grid.get_child(0)
+		_pixel_art_activity_grid.remove_child(old_child)
+		old_child.queue_free()
+	var time_header := Label.new()
+	time_header.custom_minimum_size = Vector2(105, 24)
+	time_header.text = "TIME / STATUS"
+	var detail_header := Label.new()
+	detail_header.custom_minimum_size = Vector2(190, 24)
+	detail_header.text = "EVENT / DETAILS"
+	for header in [time_header, detail_header]:
+		header.add_theme_font_size_override("font_size", 10)
+		header.add_theme_color_override("font_color", Color("#9bb1cd"))
+	_pixel_art_activity_grid.add_child(time_header)
+	_pixel_art_activity_grid.add_child(detail_header)
+	for item in _pixel_art_activity_events:
+		var time_status := Label.new()
+		time_status.custom_minimum_size = Vector2(105, 38)
+		time_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		time_status.text = "%s\n%s" % [str(item.get("time", "")).right(8), str(item.get("state", ""))]
+		time_status.add_theme_font_size_override("font_size", 10)
+		time_status.add_theme_color_override("font_color", Color("#dce8f8"))
+		_pixel_art_activity_grid.add_child(time_status)
+		var detail := Label.new()
+		detail.custom_minimum_size = Vector2(190, 38)
+		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.text = "%s\n%s" % [str(item.get("stage", "")), str(item.get("message", ""))]
+		detail.add_theme_font_size_override("font_size", 10)
+		detail.add_theme_color_override("font_color", Color("#b9cbe0"))
+		_pixel_art_activity_grid.add_child(detail)
 
 
 func _open_files(multiple: bool) -> void:
@@ -2439,6 +2537,7 @@ func _open_batch_csv() -> void:
 	_file_dialog.title = "Select artwork batch CSV"
 	_file_dialog.clear_filters()
 	_file_dialog.add_filter("*.csv ; CSV batch")
+	_record_pixel_art_activity("CSV PICKER", "OPEN", "Choose a CSV, then press Run Batch to review and start.")
 	_file_dialog.popup_centered_ratio(0.72)
 
 
@@ -2492,7 +2591,13 @@ func _process_level_csv(path: String) -> void:
 
 func _on_file_selected(path: String) -> void:
 	if _file_selection_action == "PIXEL_ART_BATCH":
-		_generate_batch_csv(path)
+		_batch_csv_path = path
+		_record_pixel_art_activity("CSV SELECTION", "SELECTED", "Selected %s. Press Run Batch to review and start." % path.get_file())
+		var batch_path_button := get_node_or_null("BatchCsvPath") as Button
+		if batch_path_button != null:
+			batch_path_button.text = "CSV: " + path.get_file().left(38)
+			batch_path_button.tooltip_text = path
+		_refresh_live_data()
 		return
 	if _provider_model == "PIXELLAB":
 		_import_pro_4x4_source(path)
@@ -2756,6 +2861,7 @@ func _generate_art() -> void:
 		if _max_used_colors < 3 or _max_used_colors > 12:
 			_report("Max colours must be 3..12.")
 			return
+		_record_pixel_art_activity("SINGLE", "CONFIRMATION_REQUIRED", "One paid PixelLab Pro 4×4 request awaits explicit confirmation.")
 		_confirm_pro_4x4_generation()
 		return
 	var result := _generate_request({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
@@ -2768,6 +2874,7 @@ func _confirm_pro_4x4_generation() -> void:
 	dialog.dialog_text = "This submits one paid request for 16 frames at %d × %d each (%d × %d atlas), V3 palette locked, maximum %d used colours. API cost is account-dependent and not verified here. An uncertain request will not be submitted again automatically." % [_width, _height, _width * 4, _height * 4, _max_used_colors]
 	dialog.confirmed.connect(func():
 		if is_instance_valid(dialog): dialog.queue_free()
+		_record_pixel_art_activity("SINGLE", "SUBMITTED", "Submitting one confirmed PixelLab Pro 4×4 request.")
 		_start_pixel_art_worker({"prompt": _prompt, "width": _width, "height": _height, "max_colors": _max_used_colors, "provider": _provider_model, "seed": _seed, "background_intent": "TRANSPARENT"})
 	)
 	dialog.canceled.connect(func(): dialog.queue_free())
@@ -2775,18 +2882,20 @@ func _confirm_pro_4x4_generation() -> void:
 	dialog.popup_centered()
 
 
-func _start_pixel_art_worker(request: Dictionary) -> void:
+func _start_pixel_art_worker(request: Dictionary) -> bool:
 	if _gateway == null or _operation_running or _pixel_art_thread != null:
-		return
+		return false
 	if not _gateway.has_method("prepare_studio_extension_call") or not _gateway.has_method("execute_prepared_studio_extension_call"):
 		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core gateway is not ready.")
-		return
+		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Factory Core gateway is not ready; no provider request was sent.")
+		return false
 	var operation_id := "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
 	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_4X4", "width": request.get("width", 56), "height": request.get("height", 56), "max_colors": request.get("max_colors", 12), "seed": request.get("seed", ""), "background_intent": "TRANSPARENT", "operation_id": operation_id}
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", "semantic-generate", payload)
 	if prepared.is_empty():
 		_report("PixelLab Pro 4×4 is unavailable because the local Factory Core cannot start.")
-		return
+		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Factory Core could not prepare the provider operation; no provider request was sent.")
+		return false
 	_prepare_worker_cancel_marker()
 	_pixel_art_mutex.lock()
 	_pixel_art_worker_done = false
@@ -2798,10 +2907,12 @@ func _start_pixel_art_worker(request: Dictionary) -> void:
 		_pixel_art_thread = null
 		_finish_worker_cancel_marker()
 		_report("PixelLab Pro 4×4 worker could not start.")
-		return
+		_record_pixel_art_activity("LOCAL PREFLIGHT", "ERROR", "Provider worker could not start; no request was sent.")
+		return false
 	_operation_running = true
 	_semantic_progress = {"completed": 0, "failed": 0, "remaining": 1, "state": "RUNNING"}
 	_report("PIXELLAB PRO · submitting one 4×4 request · %d × %d sprites · atlas %d × %d · V3 locked · max %d colours" % [int(payload.width), int(payload.height), int(payload.width) * 4, int(payload.height) * 4, int(payload.max_colors)])
+	return true
 
 
 func _pixel_art_worker(prepared: Dictionary) -> void:
@@ -2851,23 +2962,49 @@ func _poll_pixel_art_worker() -> void:
 	else:
 		_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
 		_report("PIXELLAB PRO · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
+	_record_pixel_art_activity("PIXELLAB RESULT", str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
+	if _pixel_batch_active:
+		var row_succeeded := str(result.get("state", "")) == "IMPORTED" or (str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"] and int(result.get("pass_count", 0)) == 16)
+		if not row_succeeded:
+			_pixel_batch_failed += 1
+			_pixel_batch_active = false
+			var remaining := maxi(0, _pixel_batch_rows.size() - _pixel_batch_index - 1)
+			_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "STOPPED_AFTER_FAILURE"}
+			_record_pixel_art_activity("BATCH", "STOPPED_AFTER_FAILURE", "Stopped after the first unsuccessful row; %d prompts remain. No retry or additional paid request was sent." % remaining)
+			_report("PixelLab batch stopped after first failure · %d succeeded · %d failed · %d not sent" % [_pixel_batch_succeeded, _pixel_batch_failed, remaining])
+			_batch_csv_path = ""
+			_pixel_batch_rows.clear()
+			var csv_button := get_node_or_null("BatchCsvPath") as Button
+			if csv_button != null: csv_button.text = "CSV file…"
+			return
+		_pixel_batch_succeeded += 1
+		_pixel_batch_index += 1
+		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": 0, "remaining": _pixel_batch_rows.size() - _pixel_batch_index, "state": "RUNNING"}
+		_start_next_pixellab_batch_row()
+		return
 	if _shutdown_requested:
 		get_tree().quit()
 
 
 func _run_batch() -> void:
-	if not _batch_csv_path.is_empty() and str(_semantic_progress.get("state", "")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY"]:
+	if _pixel_batch_active or _operation_running:
+		_record_pixel_art_activity("BATCH", "ALREADY_RUNNING", "Wait for the current Pixel Art operation to reach a terminal state.")
+		return
+	if not _batch_csv_path.is_empty():
 		_generate_batch_csv(_batch_csv_path)
 		return
 	_open_batch_csv()
 
 
 func _generate_batch_csv(path: String) -> void:
-	if _gateway == null or _operation_running:
+	if _operation_running:
 		return
 	_batch_csv_path = path
 	if _provider_model == "PIXELLAB":
-		_report("PixelLab Pro 4×4 CSV batch is disabled to prevent unconfirmed paid calls. Use one confirmed Generate/Regenerate request at a time.")
+		_prepare_pixellab_csv_batch(path)
+		return
+	if _gateway == null:
+		_report("Factory Core is unavailable.")
 		return
 	if _provider_model == "ALPIX (Claude)":
 		_operation_running = true
@@ -2929,6 +3066,210 @@ func _generate_batch_csv(path: String) -> void:
 	_semantic_progress = {"completed": succeeded, "failed": failed, "remaining": 0}
 	_report("Batch: %d succeeded · %d failed" % [succeeded, failed])
 	file.close()
+	_record_pixel_art_activity("ALPIX CSV BATCH", "COMPLETE", "Batch finished: %d succeeded, %d failed." % [succeeded, failed])
+	_batch_csv_path = ""
+	var csv_button := get_node_or_null("BatchCsvPath") as Button
+	if csv_button != null: csv_button.text = "CSV file…"
+
+
+func _prepare_pixellab_csv_batch(path: String) -> void:
+	_pixel_batch_rows.clear()
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "Could not open the selected CSV.")
+		_report("Could not read the selected CSV file.")
+		return
+	var source_bytes := file.get_buffer(file.get_length())
+	file.close()
+	var source_hash := HashingContext.new()
+	source_hash.start(HashingContext.HASH_SHA256)
+	source_hash.update(source_bytes)
+	_pixel_batch_source_sha256 = source_hash.finish().hex_encode()
+	file = FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "Selected CSV could not be reopened for parsing.")
+		_report("Could not read the selected CSV file.")
+		return
+	var first_row := file.get_csv_line()
+	if first_row.size() < 2:
+		file.close()
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "CSV must contain an ID and prompt column or header.")
+		_report("CSV must contain an ID and prompt column or header.")
+		return
+	var first_cell := first_row[0].strip_edges().trim_prefix("\uFEFF").to_lower()
+	var has_header := first_cell in ["id", "prompt_id", "sprite_id", "prompt"]
+	var prompt_column := 1
+	if has_header:
+		var normalized_header := PackedStringArray()
+		for field in first_row:
+			normalized_header.append(field.strip_edges().trim_prefix("\uFEFF").to_lower())
+		prompt_column = normalized_header.find("prompt")
+		if prompt_column < 0: prompt_column = normalized_header.find("description")
+		if prompt_column < 0:
+			file.close()
+			_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "CSV header must contain a prompt column.")
+			_report("CSV header must contain a prompt column.")
+			return
+	var source_rows: Array[PackedStringArray] = []
+	if not has_header: source_rows.append(first_row)
+	while not file.eof_reached():
+		var row := file.get_csv_line()
+		if row.size() == 1 and row[0].strip_edges().is_empty(): continue
+		if source_rows.size() >= 2000:
+			file.close()
+			_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "The prompt file exceeds the 2000-row monthly workflow limit.")
+			_report("This PixelLab batch workflow accepts at most 2000 CSV prompts.")
+			return
+		source_rows.append(row)
+	file.close()
+	var rows: Array[Dictionary] = []
+	for row in source_rows:
+		if row.size() <= prompt_column:
+			_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "A CSV row is missing its prompt field.")
+			_report("A CSV row is missing its prompt field.")
+			return
+		var prompt_text := row[prompt_column].strip_edges()
+		if prompt_text.is_empty() or prompt_text.length() > 2000:
+			_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "A prompt is empty or exceeds 2000 characters.")
+			_report("Each CSV prompt must contain 1–2000 characters.")
+			return
+		var row_index := rows.size() + 1
+		var prompt_hash := HashingContext.new()
+		prompt_hash.start(HashingContext.HASH_SHA256)
+		prompt_hash.update(prompt_text.to_utf8_buffer())
+		var prompt_sha256 := prompt_hash.finish().hex_encode()
+		var identity := row[0].strip_edges() if not row[0].strip_edges().to_lower() in ["id", "prompt_id", "sprite_id", "prompt"] else str(row_index)
+		var stable_seed := "sb-lfx018-csv:%s:%s" % [identity, prompt_sha256]
+		rows.append({"prompt": prompt_text, "seed": stable_seed, "row_index": row_index, "description_sha256": prompt_sha256})
+	if rows.is_empty():
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "The selected CSV contains no prompts.")
+		_report("The selected CSV contains no prompts.")
+		return
+	_pixel_batch_source_count = rows.size()
+	_operation_running = true
+	_record_pixel_art_activity("CSV PREFLIGHT", "CHECKING RESUME", "Validated %d prompts at fixed 56×56; checking the local request ledger for completed rows and this month's usage." % rows.size())
+	if not _queue_studio_read_extension("pixellab-batch-inspect", {"csv_path": path, "source_sha256": _pixel_batch_source_sha256, "width": 56, "height": 56, "max_colors": 12}, {"kind": "pixellab-batch-inspect", "token": str(Time.get_ticks_usec()), "rows": rows, "source_sha256": _pixel_batch_source_sha256}):
+		_operation_running = false
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "Local request ledger inspection could not be queued; no generation was submitted.")
+		_report("PixelLab resume check could not start. No request was submitted.")
+
+
+func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_rows: Array) -> void:
+	var inspected_rows: Variant = inspection.get("rows", null)
+	if str(inspection.get("state", "")) != "READY" or not inspected_rows is Array or inspected_rows.size() != source_rows.size() or int(inspection.get("source_prompt_count", -1)) != source_rows.size() or str(inspection.get("source_sha256", "")) != _pixel_batch_source_sha256:
+		_record_pixel_art_activity("CSV RESUME CHECK", "ERROR", str(inspection.get("error", "The local PixelLab request ledger could not be verified.")))
+		_report("PixelLab resume check failed closed: %s" % str(inspection.get("error", "request ledger unavailable")))
+		return
+	var attempted_by_index := {}
+	for item in inspected_rows:
+		if item is Dictionary and int(item.get("row_index", 0)) > 0:
+			attempted_by_index[int(item.get("row_index", 0))] = item
+	var eligible: Array[Dictionary] = []
+	var attempted_count := 0
+	for row in source_rows:
+		var status: Dictionary = attempted_by_index.get(int(row.get("row_index", 0)), {})
+		if str(status.get("disposition", "")) == "ALREADY_ATTEMPTED":
+			attempted_count += 1
+		else:
+			eligible.append(row)
+	_pixel_batch_skipped = attempted_count
+	_pixel_batch_monthly_used = int(inspection.get("monthly_paid_requests", 0))
+	var monthly_remaining := maxi(0, 200 - _pixel_batch_monthly_used)
+	if monthly_remaining == 0:
+		_record_pixel_art_activity("CSV RESUME CHECK", "MONTHLY LIMIT REACHED", "%d of 200 Factory-recorded paid requests are already marked this UTC month; %d previously attempted CSV rows will not be repeated." % [_pixel_batch_monthly_used, attempted_count])
+		_report("PixelLab monthly limit reached · %d/200 Factory-recorded requests · %d CSV rows already attempted" % [_pixel_batch_monthly_used, attempted_count])
+		return
+	var queue_count := mini(eligible.size(), monthly_remaining)
+	_pixel_batch_rows.clear()
+	for index in range(queue_count):
+		_pixel_batch_rows.append(eligible[index])
+	if _pixel_batch_rows.is_empty():
+		_record_pixel_art_activity("CSV RESUME CHECK", "NO NEW ROWS", "All %d CSV prompts already have durable PixelLab request records; no paid request will be repeated." % attempted_count)
+		_report("All CSV rows were already attempted; no request was repeated.")
+		return
+	var later_count := eligible.size() - queue_count
+	_record_pixel_art_activity("CSV RESUME CHECK", "READY", "Queued CSV rows %d–%d of %d; %d prior rows will be skipped, %d later rows remain for next month, local monthly usage is %d/200." % [int(_pixel_batch_rows[0].row_index), int(_pixel_batch_rows[-1].row_index), source_rows.size(), attempted_count, later_count, _pixel_batch_monthly_used])
+	var dialog := ConfirmationDialog.new()
+	dialog.title = "Confirm PixelLab Pro 4×4 batch"
+	dialog.dialog_text = ""
+	dialog.min_size = Vector2i(760, 310)
+	var confirm_content := VBoxContainer.new()
+	confirm_content.add_theme_constant_override("separation", 10)
+	var count_row := HBoxContainer.new()
+	var count_caption := Label.new()
+	count_caption.text = "Prompts to submit this run"
+	count_row.add_child(count_caption)
+	var request_count_input := SpinBox.new()
+	request_count_input.name = "PixelLabBatchRequestCount"
+	request_count_input.min_value = 1
+	request_count_input.max_value = _pixel_batch_rows.size()
+	request_count_input.step = 1
+	request_count_input.value = _pixel_batch_rows.size()
+	request_count_input.custom_minimum_size = Vector2(120, 40)
+	count_row.add_child(request_count_input)
+	confirm_content.add_child(count_row)
+	var quote_label := Label.new()
+	quote_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	quote_label.custom_minimum_size = Vector2(680, 170)
+	quote_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quote_label.add_theme_font_size_override("font_size", 13)
+	var update_batch_quote := func(value: float) -> void:
+		var count := int(value)
+		var first_row_index := int(_pixel_batch_rows[0].row_index)
+		var last_row_index := int(_pixel_batch_rows[count - 1].row_index)
+		var deferred_count := eligible.size() - attempted_count - count
+		quote_label.text = "This submits %d separate paid PixelLab Pro requests for CSV rows %d–%d at 56×56.\nEstimated use: %d credits at the owner-reported rate of 10 per atlas.\nFactory-recorded usage: %d/200 requests in %s UTC; %d previously attempted rows will be skipped.\nOther PixelLab routes or purchases are not included. %d eligible prompts will remain for a later run. No request is retried automatically. Continue?" % [count, first_row_index, last_row_index, count * 10, _pixel_batch_monthly_used, str(inspection.get("current_month_utc", "current month")), attempted_count, deferred_count]
+	request_count_input.value_changed.connect(update_batch_quote)
+	update_batch_quote.call(request_count_input.value)
+	confirm_content.add_child(quote_label)
+	dialog.add_child(confirm_content)
+	dialog.confirmed.connect(func():
+		if is_instance_valid(dialog): dialog.queue_free()
+		var confirmed_count := int(request_count_input.value)
+		_pixel_batch_rows.resize(confirmed_count)
+		_pixel_batch_index = 0
+		_pixel_batch_succeeded = 0
+		_pixel_batch_failed = 0
+		_pixel_batch_active = true
+		_record_pixel_art_activity("BATCH", "CONFIRMED", "Confirmed %d PixelLab Pro requests, CSV rows %d–%d; estimated %d credits." % [_pixel_batch_rows.size(), int(_pixel_batch_rows[0].row_index), int(_pixel_batch_rows[-1].row_index), _pixel_batch_rows.size() * 10])
+		_start_next_pixellab_batch_row()
+	)
+	dialog.canceled.connect(func():
+		_record_pixel_art_activity("BATCH", "CANCELLED", "Paid batch confirmation was cancelled; no request was submitted.")
+		dialog.queue_free()
+	)
+	add_child(dialog)
+	dialog.popup_centered()
+
+
+func _start_next_pixellab_batch_row() -> void:
+	if not _pixel_batch_active or _pixel_batch_index >= _pixel_batch_rows.size():
+		_pixel_batch_active = false
+		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": 0, "state": "COMPLETE" if _pixel_batch_failed == 0 else "COMPLETE_WITH_FAILURES"}
+		_record_pixel_art_activity("BATCH", str(_semantic_progress.state), "Batch complete: %d succeeded, %d failed, 0 remaining. No automatic retry was attempted." % [_pixel_batch_succeeded, _pixel_batch_failed])
+		_report("PixelLab batch: %d succeeded · %d failed · no retries" % [_pixel_batch_succeeded, _pixel_batch_failed])
+		_batch_csv_path = ""
+		_pixel_batch_rows.clear()
+		var csv_button := get_node_or_null("BatchCsvPath") as Button
+		if csv_button != null: csv_button.text = "CSV file…"
+		return
+	var row: Dictionary = _pixel_batch_rows[_pixel_batch_index]
+	_width = 56
+	_height = 56
+	_max_used_colors = 12
+	_refresh_selected_size_value()
+	_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": _pixel_batch_rows.size() - _pixel_batch_index, "state": "RUNNING"}
+	_record_pixel_art_activity("BATCH ROW %d/%d" % [_pixel_batch_index + 1, _pixel_batch_rows.size()], "SUBMITTED", str(row.get("prompt", "")).left(220))
+	if not _start_pixel_art_worker({"prompt": row.get("prompt", ""), "width": 56, "height": 56, "max_colors": 12, "provider": "PIXELLAB", "seed": row.get("seed", ""), "background_intent": "TRANSPARENT"}):
+		_pixel_batch_active = false
+		_pixel_batch_failed += 1
+		var remaining := maxi(0, _pixel_batch_rows.size() - _pixel_batch_index)
+		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "STOPPED_BEFORE_SUBMISSION"}
+		_record_pixel_art_activity("BATCH", "STOPPED_BEFORE_SUBMISSION", "Local worker setup failed; no provider request was sent. %d prompts remain." % remaining)
+		_batch_csv_path = ""
+		_pixel_batch_rows.clear()
+		var csv_button := get_node_or_null("BatchCsvPath") as Button
+		if csv_button != null: csv_button.text = "CSV file…"
 
 
 func _edit_prompt() -> void:
@@ -3955,6 +4296,10 @@ func _start_next_studio_read_extension() -> void:
 			if _screen == "RELEASE POOL":
 				_append_release_pool_activity("REFRESH POOL", "UNAVAILABLE", _release_pool_load_error, _selected_release_ids)
 				_report(_release_pool_load_error)
+		elif str(failed_context.get("kind", "")) == "pixellab-batch-inspect":
+			_operation_running = false
+			_record_pixel_art_activity("CSV RESUME CHECK", "ERROR", "Local request-ledger inspection worker could not start; no provider request was sent.")
+			_report("PixelLab resume check could not start. No request was submitted.")
 
 
 func _studio_read_extension_worker(prepared: Dictionary) -> void:
@@ -3983,6 +4328,10 @@ func _poll_studio_read_extension() -> void:
 	_studio_read_context.clear()
 	_studio_read_mutex.unlock()
 	var kind := str(context.get("kind", ""))
+	if kind == "pixellab-batch-inspect":
+		_operation_running = false
+		_confirm_pixellab_batch_after_inspection(result, context.get("rows", []))
+		return
 	if kind == "owner-folder-preview":
 		_operation_running = false
 		if not result.has("entries"):

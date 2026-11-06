@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import base64
+import csv
+from datetime import datetime, timezone
 import hashlib
 import json
 import os
@@ -394,6 +396,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = _semantic_generate(request)
         elif operation == "pixellab-pro-4x4-reconcile":
             payload = _semantic_reconcile_pixellab_pro_4x4(request)
+        elif operation == "pixellab-batch-inspect":
+            payload = _inspect_pixellab_batch(request, extensions)
         elif operation == "pixellab-pro-4x4-import":
             payload = _semantic_import_pixellab_pro_4x4(request)
         elif operation == "provider-options":
@@ -495,6 +499,127 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
         provider_model=model,
         provider_config_version=descriptor.config_version,
     )
+
+
+def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -> dict[str, object]:
+    """Read prior Pro 4x4 request claims and this month's local request count."""
+    import re
+
+    if set(request) != {"csv_path", "source_sha256", "width", "height", "max_colors"}:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_REQUEST_INVALID"}
+    csv_path_value = request.get("csv_path")
+    expected_source_sha256 = request.get("source_sha256")
+    if (type(csv_path_value) is not str or not csv_path_value.strip()
+            or not isinstance(expected_source_sha256, str)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_source_sha256)
+            or request.get("width") != 56 or request.get("height") != 56
+            or request.get("max_colors") != 12):
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_REQUEST_INVALID"}
+
+    csv_path = Path(csv_path_value).resolve()
+    if not csv_path.is_file() or csv_path.suffix.lower() != ".csv" or csv_path.stat().st_size > 16 * 1024 * 1024:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_INVALID"}
+    source_sha256 = hashlib.sha256(csv_path.read_bytes()).hexdigest()
+    if source_sha256 != expected_source_sha256:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_CHANGED_DURING_PREFLIGHT"}
+    try:
+        with csv_path.open("r", encoding="utf-8-sig", newline="") as csv_file:
+            source_rows = list(csv.reader(csv_file))
+    except (OSError, UnicodeError, csv.Error):
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_UNREADABLE"}
+    source_rows = [row for row in source_rows if row and any(cell.strip() for cell in row)]
+    if not source_rows or len(source_rows) > 2001:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_ROW_COUNT_INVALID"}
+    first_cell = source_rows[0][0].strip().lower()
+    has_header = first_cell in {"id", "prompt_id", "sprite_id", "prompt"}
+    prompt_column = 1
+    if has_header:
+        normalized_header = [field.strip().lower() for field in source_rows[0]]
+        prompt_column = normalized_header.index("prompt") if "prompt" in normalized_header else normalized_header.index("description") if "description" in normalized_header else -1
+        if prompt_column < 0:
+            return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_PROMPT_HEADER_MISSING"}
+        source_rows = source_rows[1:]
+    if not source_rows or len(source_rows) > 2000:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_ROW_COUNT_INVALID"}
+
+    normalized_rows: list[tuple[int, str, int]] = []
+    seen_indexes: set[int] = set()
+    try:
+        for row_index, row in enumerate(source_rows, start=1):
+            if len(row) <= prompt_column:
+                return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_ROW_INVALID"}
+            prompt = row[prompt_column].strip()
+            if not prompt or len(prompt) > 2000:
+                return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_PROMPT_INVALID"}
+            description_sha256 = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+            identity = row[0].strip() if row[0].strip().lower() not in {"id", "prompt_id", "sprite_id", "prompt"} else str(row_index)
+            seed = f"sb-lfx018-csv:{identity}:{description_sha256}"
+            seen_indexes.add(row_index)
+            normalized_rows.append((row_index, description_sha256, extensions._resolved_seed(seed)))
+    except Exception:
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_ROW_INVALID"}
+
+    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
+    request_records: list[dict[str, object]] = []
+    month = datetime.now(timezone.utc).strftime("%Y-%m")
+    monthly_paid_requests = 0
+    if job_root.exists():
+        if not job_root.is_dir():
+            return {"state": "ERROR", "error": "PIXELLAB_JOB_LEDGER_UNAVAILABLE"}
+        for record_path in sorted(job_root.glob("*.json")):
+            if record_path.name.endswith(".claim.json"):
+                continue
+            try:
+                resolved_path = record_path.resolve()
+                resolved_path.relative_to(job_root)
+                record = json.loads(resolved_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+                return {"state": "ERROR", "error": "PIXELLAB_JOB_LEDGER_UNREADABLE"}
+            if (not isinstance(record, dict)
+                    or record.get("schema") != "scrubbots-pixellab-pro-4x4-job-v1"
+                    or record.get("provider_id") != "PIXELLAB"
+                    or record.get("provider_model") != "PRO_4X4"):
+                continue
+            if record.get("paid_submission_possible") is True:
+                created_at = record.get("created_at_utc")
+                try:
+                    created_month = datetime.fromisoformat(created_at.replace("Z", "+00:00")).astimezone(timezone.utc).strftime("%Y-%m") if isinstance(created_at, str) else ""
+                except ValueError:
+                    created_month = ""
+                if not created_month:
+                    # Older durable records predate the explicit timestamp.
+                    # Their filesystem creation time is the conservative local
+                    # fallback so a monthly rollover cannot forget a request.
+                    try:
+                        created_month = datetime.fromtimestamp(record_path.stat().st_mtime, timezone.utc).strftime("%Y-%m")
+                    except OSError:
+                        return {"state": "ERROR", "error": "PIXELLAB_JOB_LEDGER_UNREADABLE"}
+                if created_month == month:
+                    monthly_paid_requests += 1
+            request_records.append(record)
+
+    result_rows: list[dict[str, object]] = []
+    for row_index, description_sha256, seed in normalized_rows:
+        matches = [record for record in request_records
+                   if record.get("description_sha256") == description_sha256
+                   and record.get("seed") == seed
+                   and record.get("width") == 56 and record.get("height") == 56
+                   and record.get("max_colors") == 12]
+        if matches:
+            prior = matches[0]
+            result_rows.append({
+                "row_index": row_index, "disposition": "ALREADY_ATTEMPTED",
+                "state": str(prior.get("state", "UNKNOWN")),
+                "paid_submission_possible": prior.get("paid_submission_possible") is True,
+            })
+        else:
+            result_rows.append({"row_index": row_index, "disposition": "NEW"})
+    return {
+        "state": "READY", "current_month_utc": month,
+        "monthly_paid_requests": monthly_paid_requests,
+        "monthly_request_limit": 200, "source_sha256": source_sha256,
+        "source_prompt_count": len(normalized_rows), "rows": result_rows,
+    }
     provider = create_provider("PIXELLAB", engine=model)
     candidate = provider.generate_checked(semantic_request)
     if candidate.status.value != "SUCCESS":
@@ -646,6 +771,7 @@ def _semantic_generate_pixellab_pro_4x4(
         "palette_source": "data/palette/scrubbots_palette_v3.json",
         "palette_sha256": palette_sha256,
         "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
     }
 
     # Read legacy V02 records before acquiring a new claim. They used a raw
