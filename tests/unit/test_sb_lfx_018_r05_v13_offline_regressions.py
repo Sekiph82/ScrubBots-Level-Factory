@@ -293,6 +293,26 @@ def test_alpix_csv_keeps_safe_unavailable_reason_for_studio_status() -> None:
             shutil.rmtree(root)
 
 
+def test_alpix_sb_sprite_catalog_uses_descriptions_v3_palette_and_fixed_56px() -> None:
+    raw = (
+        'SB_SPRITE_014,"A jade-inlaid dragon, in a proud pose. Create one original visible sprite. '
+        'use only the fixed C01-C16 (C01 `#E94B4B`, C02 `#F28C3C`) '
+        '(C01 `#E94B4B`, C02 `#F28C3C`) palette and keep detail readable.",40,48\n'
+        'SB_SPRITE_015,"A pearl-adorned dragon, facing forward. Fuse only the fixed C01-C16 '
+        '(C01 `#E94B4B`) (C01 `#E94B4B`) palette and use crisp clusters.",44,52\n'
+    ).encode("utf-8")
+
+    rows = alpix_batch.read_rows(raw, default_size=(32, 32))
+
+    assert [row["prompt_id"] for row in rows] == ["SB_SPRITE_014", "SB_SPRITE_015"]
+    assert [row["width"] for row in rows] == [56, 56]
+    assert [row["height"] for row in rows] == [56, 56]
+    assert "jade-inlaid dragon" in rows[0]["prompt"]
+    assert "pearl-adorned dragon" in rows[1]["prompt"]
+    assert all("only canonical ScrubBots Palette V3" in row["prompt"] for row in rows)
+    assert all("#E94B4B" not in row["prompt"] and "#F28C3C" not in row["prompt"] for row in rows)
+
+
 def test_alpix_discovery_does_not_claim_missing_when_account_route_probe_fails(monkeypatch) -> None:
     home = Path("C:/account-sync-profile")
     executable = str(home / ".local" / "bin" / "claude.exe")

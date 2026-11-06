@@ -11,6 +11,7 @@ import csv
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -24,6 +25,11 @@ from .contracts import CANONICAL_PALETTE
 JOB_SCHEMA = "scrubbots-alpix-art-job"
 JOB_VERSION = 1
 _LIMIT_MARKERS = ("usage limit", "rate limit", "quota exceeded", "limit reached", "out of extra usage")
+_SB_SPRITE_CATALOG_ID = re.compile(r"SB_SPRITE_\d{3}", re.IGNORECASE)
+_LEGACY_PALETTE_BLOCK = re.compile(
+    r"\b(?:use|fuse)\s+only\s+the\s+fixed\s+C01-C16\b.*?\bpalette\b",
+    re.IGNORECASE | re.DOTALL,
+)
 
 
 class AlpixUnavailable(RuntimeError):
@@ -369,6 +375,23 @@ def read_rows(raw_csv: bytes, *, default_size: tuple[int, int] = (32, 32)) -> li
     header = [cell.strip().lower() for cell in records[0]]
     has_header = bool(set(header) & aliases)
     output: list[dict[str, object]] = []
+    is_sb_sprite_catalog = bool(records) and all(
+        len(row) == 4
+        and _SB_SPRITE_CATALOG_ID.fullmatch(row[0].strip()) is not None
+        and bool(row[1].strip())
+        and row[2].strip().isdigit()
+        and row[3].strip().isdigit()
+        for row in records
+    )
+    if not has_header and is_sb_sprite_catalog:
+        for raw in records:
+            prompt_id = raw[0].strip()
+            prompt = _LEGACY_PALETTE_BLOCK.sub(
+                "use only canonical ScrubBots Palette V3", raw[1].strip(), count=1
+            )
+            output.append({"prompt_id": prompt_id, "prompt": prompt, "width": 56, "height": 56,
+                           "reference": "", "provider_id": "ALPIX (Claude)"})
+        return output
     if has_header:
         positions = {key: index for index, key in enumerate(header)}
         for raw in records[1:]:
