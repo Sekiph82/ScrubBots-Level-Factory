@@ -84,8 +84,18 @@ try {
     }
 
     $godotSha256 = Get-Sha256Hash $godotPath
-    $quotedProjectPath = '"{0}"' -f $projectPath
-    $studioProcess = Start-Process -FilePath $godotPath -ArgumentList @('--path', $quotedProjectPath) -WorkingDirectory $repoRoot -PassThru
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $godotPath
+    $startInfo.Arguments = '--path "{0}"' -f $projectPath
+    $startInfo.WorkingDirectory = $repoRoot
+    $startInfo.UseShellExecute = $false
+    # Godot's console build otherwise opens a visible terminal over the Studio.
+    # CreateNoWindow suppresses only a console window; the Godot GUI remains visible.
+    $startInfo.CreateNoWindow = $true
+    $studioProcess = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $studioProcess) {
+        throw 'Factory Studio process could not be started.'
+    }
     $studioProcessId = $studioProcess.Id
     $windowTitle = 'ScrubBots Factory Studio'
     $allowedWindowTitles = @($windowTitle, "$windowTitle (DEBUG)")
