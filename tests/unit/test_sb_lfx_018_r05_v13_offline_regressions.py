@@ -248,6 +248,51 @@ def test_alpix_generation_reports_safe_cli_exit_and_missing_output_diagnostics()
     assert not destination.exists()
 
 
+def test_alpix_unavailable_reason_is_safe_and_actionable() -> None:
+    safe = alpix_batch._safe_unavailable_reason(
+        "CLAUDE_EXIT_NONZERO: Claude Code exited with code 17; no PNG was produced. private-secret"
+    )
+    assert safe == "CLAUDE_EXIT_NONZERO: Claude Code exited with code 17; no PNG was produced."
+    assert "private-secret" not in safe
+    assert alpix_batch._safe_unavailable_reason("provider response contained private-secret") == (
+        "ALPIX_UNAVAILABLE: Claude Alpix did not produce a validated PNG."
+    )
+
+
+def test_alpix_csv_keeps_safe_unavailable_reason_for_studio_status() -> None:
+    root = Path(__file__).resolve().parent / ".r10-alpix-unavailable-message-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        root.mkdir(parents=True)
+        csv_path = root / "requests.csv"
+        csv_path.write_text("prompt,size,provider\nJade dragon,56x56,ALPIX (Claude)\n", encoding="utf-8")
+
+        def renderer(*_args):
+            raise alpix_batch.AlpixUnavailable(
+                "CLAUDE_EXIT_NONZERO: Claude Code exited with code 17; no PNG was produced. private-secret"
+            )
+
+        result = alpix_batch.run_csv_job(
+            csv_path, root / "jobs", renderer=renderer,
+            importer=lambda _path: (_ for _ in ()).throw(AssertionError("unavailable art must not import")),
+        )
+        assert result.state == "UNAVAILABLE"
+        assert result.rows[0]["state"] == "PENDING"
+        assert result.rows[0]["error"] == "CLAUDE_EXIT_NONZERO: Claude Code exited with code 17; no PNG was produced."
+        assert result.remaining == 1 and result.completed == 0 and result.failed == 0
+
+        ui = (Path(__file__).resolve().parents[2] / "level_factory" / "scripts" /
+              "factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+        assert 'var provider_error := ""' in ui
+        assert 'summary += " · " + provider_error' in ui
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("ALPIX test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
 def test_alpix_discovery_does_not_claim_missing_when_account_route_probe_fails(monkeypatch) -> None:
     home = Path("C:/account-sync-profile")
     executable = str(home / ".local" / "bin" / "claude.exe")

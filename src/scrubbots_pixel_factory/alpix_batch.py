@@ -34,6 +34,38 @@ class AlpixUsageLimit(RuntimeError):
     pass
 
 
+def _safe_unavailable_reason(reason: object) -> str:
+    """Return a bounded diagnostic without exposing arbitrary CLI/provider text."""
+    message = str(reason).strip()
+    if message.startswith("CLAUDE_EXIT_NONZERO:"):
+        prefix = "CLAUDE_EXIT_NONZERO: Claude Code exited with code "
+        if message.startswith(prefix):
+            raw_code = message[len(prefix):].split(";", 1)[0].strip()
+            try:
+                code = int(raw_code)
+            except ValueError:
+                code = None
+            if code is not None and -32768 <= code <= 32767:
+                return f"CLAUDE_EXIT_NONZERO: Claude Code exited with code {code}; no PNG was produced."
+    safe_statuses = {
+        "CLAUDE_CLI_MISSING": "CLAUDE_CLI_MISSING: Claude Code is not available to Factory Studio.",
+        "ALPIX_PLUGIN_MISSING": "ALPIX_PLUGIN_MISSING: No enabled Claude Alpix plugin or MCP route was found.",
+        "ALPIX_AUTH_REQUIRED": "ALPIX_AUTH_REQUIRED: The Claude Alpix connector requires authentication.",
+        "ALPIX_SYNC_UNVERIFIED": "ALPIX_SYNC_UNVERIFIED: The Claude Alpix connector status could not be verified.",
+        "CONFIG_SCOPE_UNREAD": "CONFIG_SCOPE_UNREAD: Claude configuration could not be read safely.",
+        "ALPIX_INVALID_CONFIG": "ALPIX_INVALID_CONFIG: Claude Alpix configuration is invalid.",
+        "ALPIX_OUTPUT_MISSING": "ALPIX_OUTPUT_MISSING: Claude Code exited successfully but produced no PNG.",
+    }
+    code = message.split(":", 1)[0]
+    if code in safe_statuses:
+        return safe_statuses[code]
+    if message == "Claude Alpix generation timed out.":
+        return message
+    if message == "Claude Alpix tool identity is incomplete.":
+        return message
+    return "ALPIX_UNAVAILABLE: Claude Alpix did not produce a validated PNG."
+
+
 def find_claude(*, user_home: Path | None = None) -> str | None:
     """Resolve the installed Claude Code executable without scanning other apps."""
     home = user_home or Path.home()
@@ -478,13 +510,13 @@ def run_csv_job(csv_path: str | Path, job_root: str | Path, *,
             _validate_png(artifact, int(row["width"]), int(row["height"]))
         except AlpixUsageLimit:
             artifact.unlink(missing_ok=True)
-            row.update({"state": "PENDING", "error": None})
+            row.update({"state": "PENDING", "error": "CLAUDE_USAGE_LIMIT: Claude subscription usage limit reached."})
             state["state"] = "LIMIT"
             _save_job(state_path, state)
             return _job_result(job_id, state)
-        except AlpixUnavailable:
+        except AlpixUnavailable as exc:
             artifact.unlink(missing_ok=True)
-            row.update({"state": "PENDING", "error": None})
+            row.update({"state": "PENDING", "error": _safe_unavailable_reason(exc)})
             state["state"] = "UNAVAILABLE"
             _save_job(state_path, state)
             return _job_result(job_id, state)

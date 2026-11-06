@@ -2876,13 +2876,19 @@ func _generate_batch_csv(path: String) -> void:
 		_semantic_progress = {"job_id": job.get("job_id", ""), "completed": job.get("completed", 0), "failed": job.get("failed", 0), "retired": job.get("retired", 0), "remaining": job.get("remaining", 0), "state": job.get("state", "ERROR")}
 		_set_batch_action_label(str(job.get("state", "ERROR")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY"])
 		var rows: Array = job.get("rows", [])
+		var provider_error := ""
 		for row in rows:
 			if str(row.get("state", "")) == "IMPORTED":
 				_last_source_id = str(row.get("source_id", _last_source_id))
 				_selected_art_path = str(row.get("artifact_path", _selected_art_path))
+			elif not str(row.get("error", "")).strip_edges().is_empty():
+				provider_error = str(row.get("error", "")).strip_edges().left(180)
 		if not _selected_art_path.is_empty():
 			_load_selected_art_preview(_selected_art_path)
-		_report("ALPIX %s · %d imported · %d failed · %d retired · %d left" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("failed", 0)), int(job.get("retired", 0)), int(job.get("remaining", 0))])
+		var summary := "ALPIX %s · %d imported · %d failed · %d retired · %d left" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("failed", 0)), int(job.get("retired", 0)), int(job.get("remaining", 0))]
+		if not provider_error.is_empty():
+			summary += " · " + provider_error
+		_report(summary)
 		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
