@@ -1,5 +1,13 @@
 # Codex Sync + Publish Standard V01
 
+## LATEST OWNER 2026-11-06: SAFE DIRTY-WORK RECOVERY IS PART OF THE JOB
+
+The owner expressly authorizes a read-only task queue `--allow-existing-work` mode when there are preexisting tracked source/test/log modifications. Default strict mode still rejects dirty files, but the recovery mode is permitted and MUST be used when the usual guard would strand current authorized implementation. It does NOT skip verifying origin/main ancestry, canonical Desktop location, TASKS.md and active prompt exact origin/main bytes; it does not create a worktree. First inspect all relevant diffs/hashes and isolate task-owned vs owner-unknown modifications. Commit/push only authorized safe completed source/test files and append-only log receipts. Do not auto-stage unrelated files, touch owner untracked assets, or delete to manufacture a clean state.
+
+If local HEAD is behind origin/main, safely inspect overlap and fast-forward only if permitted without overwriting any existing edits. If no safe FF exists for one overlapping operation, preserve it and perform other authorized independent work. A dirty worktree is NOT itself a reason to mark Goal blocked or ask the owner to code. Fix PixelLab full gallery atlas selection/retrieval and installed source mismatch from existing 224x224 generation evidence, not another billed generation. This is the newest owner permission, superseding older mandatory dirty-status refusal only. No external provider POST, Production/R2 writes, CI/Actions, unauthorized GUI or owner data mutation. Preserve original Goal content.
+
+---
+
 ## LATEST OWNER AUTO-CONTINUATION 2026-10-31
 
 After verified task code/tests/log publication and tracked Desktop/main parity, Codex MUST select its next eligible existing root TASKS.md open/partial requirement within the unchanged owner GOAL, update TASKS.md with exact actual task ID/receipt and proposed next eligible existing ID, normal-push the TASKS change, refetch/verify parity, rerun unchanged queue guard and continue. This owner authorization is NOT limited to prior A-E stages: https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_GOAL_AUTONOMOUS_OPEN_BACKLOG_20261031.md. No ChatGPT wait between safe tasks. Genuine paid provider/R2/Production/owner-data/unapproved-GUI operations still require separate explicit consent and are tracked independently without halting other safe work. Do not re-run passed suites/report-only loops, bypass tool-policy denials, create TEMP worktrees/clones, falsify evidence or promise unbounded background execution. User GOAL text unchanged.
