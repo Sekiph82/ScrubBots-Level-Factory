@@ -1415,7 +1415,17 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
     run_root = (_repository_root() / "level_factory" / "output" / "studio-reproductions" / f"{candidate_id}-{candidate['artwork_sha256'][:16]}").resolve()
     destination = run_root / candidate_id
     launcher = _repository_root() / "level_factory" / "scripts" / "factory_core_launcher.py"
-    process = subprocess.run([sys.executable, str(launcher), "reproduce", str(metadata_path), "--output", str(run_root)], cwd=_repository_root(), capture_output=True, text=True, check=False)
+    from .studio_lifecycle import StudioShutdownRequested, run_studio_child_interruptibly, studio_shutdown_requested
+
+    try:
+        process = run_studio_child_interruptibly(
+            [sys.executable, str(launcher), "reproduce", str(metadata_path), "--output", str(run_root)],
+            cwd=_repository_root(),
+        )
+    except StudioShutdownRequested as exc:
+        raise StudioExtensionError(str(exc)) from exc
+    if studio_shutdown_requested():
+        raise StudioExtensionError("Factory Studio is closing; exact reproduction output was not imported or recorded.")
     if process.returncode != 0 or "MATCH" not in process.stdout:
         raise StudioExtensionError(f"canonical Reproduce failed: {(process.stderr or process.stdout).strip()[:512]}")
     reproduced = read_bundle(destination)
@@ -1424,6 +1434,8 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
     if reproduced.files != original.files:
         raise StudioExtensionError("canonical Reproduce did not preserve exact bundle bytes")
     evidence = {"schema": "scrubbots-studio-exact-reproduction", "version": 1, "reproduction_id": f"reproduction-{candidate_id}-{candidate['artwork_sha256'][:24]}", "candidate_id": candidate_id, "source_metadata_path": _relative(metadata_path), "reproduced_output_path": _relative(destination), "disposition": "MATCH", "match": True, "original_file_sha256": original_files, "reproduced_file_sha256": files, "canonical_stdout": process.stdout.strip()[:2048]}
+    if studio_shutdown_requested():
+        raise StudioExtensionError("Factory Studio is closing; exact reproduction evidence was not recorded.")
     evidence_path = extensions_root() / "reproductions" / f"{evidence['reproduction_id']}.json"
     _write_json(evidence_path, evidence, immutable=True)
     return {"state": "SUCCESS", "disposition": "MATCH", "capability": capability, "candidate_id": candidate_id, "output_path": _relative(destination), "evidence": evidence, "evidence_path": _relative(evidence_path)}
