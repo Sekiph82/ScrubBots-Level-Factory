@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from ..contracts.candidate_provenance import CandidateClass, CandidateProvenanceError, validate_verified_owner_upload_classification
+from ..studio_lifecycle import StudioShutdownRequested, run_studio_child_interruptibly
 from .campaign_builder import CampaignError, build_campaign_plan, write_campaign_plan
 from .game_publisher import PublicationError, discover_game_project, publish_batch
 from .progression import load_progression_authority
@@ -307,7 +308,9 @@ def _pinned_profile_from_godot(vector: list[float]) -> tuple[dict[str, Any], str
     vector_object = dict(zip(("W", "C", "A", "U", "B", "R", "S"), vector, strict=True))
     command = [executable, "--headless", "--path", str(runtime), "--script", str(probe), "--", json.dumps(vector_object, separators=(",", ":"))]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=45, check=False)
+        result = run_studio_child_interruptibly(command, cwd=runtime, timeout=45)
+    except StudioShutdownRequested as exc:
+        raise ReleaseError("pinned Difficulty V1 profile probe cancelled during Factory Studio shutdown") from exc
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise ReleaseError("pinned Difficulty V1 profile probe could not complete") from exc
     if result.returncode != 0:

@@ -12,6 +12,8 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
+from ..studio_lifecycle import StudioShutdownRequested, run_studio_child_interruptibly
+
 
 RESULT_SCHEMA = "scrubbots.real_play_file_result.v1"
 REAL_PLAY_MODEL = "real_play_v1"
@@ -137,17 +139,13 @@ def _preflight(
         raise RealPlayGateError("realPlayTimeoutSeconds setting must be a positive finite number")
     process_env = None if environ is None else dict(environ)
     try:
-        version = subprocess.run(
+        version = run_studio_child_interruptibly(
             [str(executable), "--version"],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=min(timeout, 15.0),
-            shell=False,
             env=process_env,
-            check=False,
         )
+    except StudioShutdownRequested as exc:
+        raise RealPlayGateError("godotExe preflight cancelled during Factory Studio shutdown") from exc
     except subprocess.TimeoutExpired as exc:
         raise RealPlayGateError("godotExe preflight timed out while checking --version") from exc
     except OSError as exc:
@@ -262,17 +260,13 @@ def _invoke(
     if search:
         arguments.append("--search")
     try:
-        completed = subprocess.run(
+        completed = run_studio_child_interruptibly(
             arguments,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
             timeout=timeout,
-            shell=False,
             env=process_env,
-            check=False,
         )
+    except StudioShutdownRequested as exc:
+        raise RealPlayGateError("real_play_v1 cancelled during Factory Studio shutdown; candidate is not ready") from exc
     except subprocess.TimeoutExpired as exc:
         raise RealPlayGateError(
             f"real_play_v1 timed out after {timeout:g}s; candidate is not ready"

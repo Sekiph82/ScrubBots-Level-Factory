@@ -28,6 +28,7 @@ from .compact_solver_state import (
     verify_authority_source_contract,
 )
 from .simulation_boundary import REQUIRED_CANONICAL_SOURCE_PATHS
+from .studio_lifecycle import StudioShutdownRequested, run_studio_child_interruptibly
 
 
 CANONICAL_BRIDGE_SCHEMA = "scrubbots-canonical-headless-bridge"
@@ -267,7 +268,11 @@ class CanonicalHeadlessBridge:
             request_path.write_bytes(_canonical_bytes(request.runner_payload()))
             command = [self._configuration.godot_executable, "--headless", "--path", str(checkout), "--script", str(runner_file), "--", "--request", str(request_path), "--response", str(response_path)]
             try:
-                completed = subprocess.run(command, capture_output=True, text=True, check=False, timeout=self._configuration.timeout_seconds)
+                completed = run_studio_child_interruptibly(
+                    command, cwd=checkout, timeout=self._configuration.timeout_seconds
+                )
+            except StudioShutdownRequested:
+                return CanonicalBridgeResponse(CanonicalBridgeDisposition.ERROR, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, "canonical bridge invocation cancelled during Studio shutdown")
             except (OSError, subprocess.TimeoutExpired) as exc:
                 return CanonicalBridgeResponse(CanonicalBridgeDisposition.ERROR, request.digest(), request.authority.commit_sha, CANONICAL_PROOF_STATE_SOURCE_SHA256, request.operation, None, f"canonical bridge invocation failed: {type(exc).__name__}")
             if completed.returncode != 0 or not response_path.is_file():
@@ -312,14 +317,13 @@ class CanonicalHeadlessBridge:
         if verification.disposition.value != "VERIFIED":
             return False, verification.reason
         try:
-            status = subprocess.run(
+            status = run_studio_child_interruptibly(
                 ["git", "status", "--porcelain", "--untracked-files=all"],
                 cwd=checkout,
-                capture_output=True,
-                text=True,
-                check=False,
                 timeout=10,
             )
+        except StudioShutdownRequested:
+            return False, "canonical checkout verification cancelled during Studio shutdown"
         except (OSError, subprocess.TimeoutExpired) as exc:
             return False, f"canonical checkout status verification failed: {type(exc).__name__}"
         if status.returncode != 0:

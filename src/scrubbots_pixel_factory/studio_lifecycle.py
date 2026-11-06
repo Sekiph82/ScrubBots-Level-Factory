@@ -113,9 +113,10 @@ def run_studio_child_interruptibly(
     env: Mapping[str, str] | None = None,
     timeout: float | None = None,
     poll_interval: float = 0.25,
+    check_shutdown: bool = True,
 ) -> subprocess.CompletedProcess[str]:
     """Run one owned child while observing Studio shutdown and stop its PID tree."""
-    if studio_shutdown_requested():
+    if check_shutdown and studio_shutdown_requested():
         raise StudioShutdownRequested("Factory Studio is closing; child process was not started.")
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     if os.name == "nt":
@@ -128,7 +129,7 @@ def run_studio_child_interruptibly(
     )
     deadline = None if timeout is None else time.monotonic() + max(0.0, timeout)
     while True:
-        if studio_shutdown_requested():
+        if check_shutdown and studio_shutdown_requested():
             terminate_studio_child_tree(process)
             try:
                 process.communicate(timeout=2)

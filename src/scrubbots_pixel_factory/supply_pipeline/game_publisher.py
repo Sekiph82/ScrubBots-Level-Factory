@@ -287,6 +287,7 @@ def _stage_current_game_authority(root: Path, stage: Path, catalog: Mapping[str,
 
 def _validate_proposed_catalog(project: Path) -> None:
     from .game_rules import find_godot
+    from ..studio_lifecycle import run_studio_child_interruptibly
 
     godot = find_godot()
     if godot is None:
@@ -321,7 +322,11 @@ func _initialize():
 \tquit(0)
 ''', encoding="utf-8")
     try:
-        result = subprocess.run([godot, "--headless", "--path", str(project), "--script", "res://tests/factory_proposed_catalog_check.gd"], capture_output=True, text=True, timeout=300)
+        result = run_studio_child_interruptibly(
+            [godot, "--headless", "--path", str(project), "--script", "res://tests/factory_proposed_catalog_check.gd"],
+            cwd=project,
+            timeout=300,
+        )
     except subprocess.TimeoutExpired as exc:
         raise PublicationError(f"current-game proposed catalog validation timed out; no production files were written: {exc}") from exc
     if result.returncode != 0 or "FACTORY_PROPOSED_CATALOG_PASS" not in result.stdout:

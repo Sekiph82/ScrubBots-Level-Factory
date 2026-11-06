@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import os
 import subprocess
 import sys
@@ -126,6 +127,60 @@ class InterruptibleStudioChildTests(unittest.TestCase):
             timer.cancel()
         self.assertEqual(len(started), 1)
         self.assertIsNotNone(started[0].poll(), "the Studio-owned child remained alive after shutdown")
+
+
+class StudioGodotCallSiteTests(unittest.TestCase):
+    def test_studio_godot_call_sites_use_shutdown_aware_process_runner(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        targets = (
+            ("src/scrubbots_pixel_factory/canonical_bridge.py", "CanonicalHeadlessBridge", "invoke"),
+            ("src/scrubbots_pixel_factory/canonical_bridge.py", "CanonicalHeadlessBridge", "_verify"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py", None, "_preflight"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py", None, "_invoke"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/release_pool.py", None, "_pinned_profile_from_godot"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/game_publisher.py", None, "_validate_proposed_catalog"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/release_route_a.py", None, "_verify_game"),
+            ("src/scrubbots_pixel_factory/supply_pipeline/release_route_a.py", None, "_run"),
+        )
+
+        for relative, class_name, function_name in targets:
+            with self.subTest(module=relative, function=function_name):
+                tree = ast.parse((root / relative).read_text(encoding="utf-8"))
+                if class_name is None:
+                    function = next(node for node in ast.walk(tree)
+                                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                                    and node.name == function_name)
+                else:
+                    class_node = next(node for node in tree.body
+                                      if isinstance(node, ast.ClassDef) and node.name == class_name)
+                    function = next(node for node in class_node.body
+                                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                                    and node.name == function_name)
+
+                calls = []
+                for node in ast.walk(function):
+                    if not isinstance(node, ast.Call):
+                        continue
+                    parts = []
+                    current = node.func
+                    while isinstance(current, ast.Attribute):
+                        parts.append(current.attr)
+                        current = current.value
+                    if isinstance(current, ast.Name):
+                        parts.append(current.id)
+                    calls.append(".".join(reversed(parts)))
+
+                self.assertIn("run_studio_child_interruptibly", calls)
+                self.assertNotIn("subprocess.run", calls)
+
+    def test_level_factory_activity_panel_is_screen_scoped(self) -> None:
+        root = Path(__file__).resolve().parents[2]
+        source = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+        helper = source.split("func _sync_pipeline_activity_visibility() -> void:", 1)[1].split("\n\n", 1)[0]
+
+        self.assertIn("_activity_panel.visible = _screen == \"LEVEL FACTORY\"", helper)
+        self.assertEqual(source.count("_activity_panel.visible ="), 3)
+        self.assertIn("_sync_pipeline_activity_visibility()", source.split("func _update_live_chrome() -> void:", 1)[1].split("\n\n", 1)[0])
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

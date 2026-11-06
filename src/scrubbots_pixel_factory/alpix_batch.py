@@ -145,15 +145,18 @@ def _discover_account_synced_alpix(
     runner: Callable[..., object] | None = None,
 ) -> dict[str, object] | None:
     """Probe Claude Code's account-synced Alpix connector without invoking tools."""
-    run = runner or subprocess.run
     try:
-        completed = run(
-            [executable, "mcp", "get", "claude.ai Alpix"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
+        if runner is None:
+            from .studio_lifecycle import run_studio_child_interruptibly
+
+            completed = run_studio_child_interruptibly(
+                [executable, "mcp", "get", "claude.ai Alpix"], timeout=10,
+            )
+        else:
+            completed = runner(
+                [executable, "mcp", "get", "claude.ai Alpix"],
+                capture_output=True, text=True, timeout=10, check=False,
+            )
     except subprocess.TimeoutExpired:
         return {
             "state": "unverified",

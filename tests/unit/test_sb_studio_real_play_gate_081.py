@@ -313,14 +313,14 @@ def test_runtime_timeout_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_path:
     fixture = _fixture(tmp_path)
     _script, env = _fake_cli(tmp_path, fixture, [])
     settings = json.loads(env.pop("_settings_json"))
-    actual_run = subprocess.run
+    actual_run = real_play_gate.run_studio_child_interruptibly
 
     def timeout_after_version(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         if len(args) == 2 and args[1] == "--version":
             return actual_run(args, **kwargs)
         raise subprocess.TimeoutExpired(args, timeout=0.1)
 
-    monkeypatch.setattr(real_play_gate.subprocess, "run", timeout_after_version)
+    monkeypatch.setattr(real_play_gate, "run_studio_child_interruptibly", timeout_after_version)
     with pytest.raises(real_play_gate.RealPlayGateError, match="timed out after"):
         real_play_gate.ensure_real_play_gate(
             fixture["level"], fixture["plan"], Path(fixture["run"]) / "real_play_result_v1.json",

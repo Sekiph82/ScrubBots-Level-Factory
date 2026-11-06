@@ -4,12 +4,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from contextvars import ContextVar
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
 from typing import Any, Callable, Mapping
 
 from .release_pool import ReleaseError, _json, approve_release_plan, validate_release_plan
+from ..studio_lifecycle import run_studio_child_interruptibly
 
 
 class RouteAError(RuntimeError):
@@ -23,10 +25,13 @@ class RouteARollbackError(RouteAError):
 _GAME_REMOTE = "https://github.com/Sekiph82/Scrubbots.git"
 _ALLOWED_FIXED = "data/levels/catalog/production_catalog_v1.json"
 _ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+_SHUTDOWN_ROLLBACK = ContextVar("route_a_shutdown_rollback", default=False)
 
 
 def _run(args: list[str], cwd: Path, *, check: bool = True, timeout: int = 120) -> subprocess.CompletedProcess[str]:
-    result = subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    result = run_studio_child_interruptibly(
+        args, cwd=cwd, timeout=timeout, check_shutdown=not _SHUTDOWN_ROLLBACK.get()
+    )
     if check and result.returncode:
         raise RouteAError(f"command failed ({result.returncode}): {' '.join(args)}\n{(result.stdout + result.stderr)[-2000:]}")
     return result
@@ -272,7 +277,10 @@ func _fail(message: String):
     env["FACTORY_ROUTE_IDS"] = json.dumps(ids)
     env["FACTORY_ROUTE_ORDERS"] = json.dumps(orders)
     try:
-        result = subprocess.run([godot, "--headless", "--path", str(project), "--script", "res://tests/factory_route_a_verify.gd"], cwd=project, env=env, capture_output=True, text=True, timeout=600)
+        result = run_studio_child_interruptibly(
+            [godot, "--headless", "--path", str(project), "--script", "res://tests/factory_route_a_verify.gd"],
+            cwd=project, env=env, timeout=600,
+        )
     except subprocess.TimeoutExpired as exc:
         raise RouteAError(f"current-game verification timed out: {exc}") from exc
     finally:
@@ -386,52 +394,59 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
     except Exception as exc:
         failures: list[str] = []
         if snapshot:
-            if not pr_url:
-                try:
-                    listed = run(["gh", "pr", "list", "--head", branch_name, "--state", "open", "--json", "url", "--jq", ".[0].url"], check=False)
-                    if listed.returncode != 0:
-                        failures.append("could not determine whether a Route A PR was created")
-                    elif listed.stdout.strip():
-                        pr_url = listed.stdout.strip()
-                except Exception as cleanup_exc:
-                    failures.append(f"PR discovery failed: {cleanup_exc}")
-            if pr_url:
-                try:
-                    closed = run(["gh", "pr", "close", pr_url], check=False)
-                    if closed.returncode != 0: failures.append("created PR could not be confirmed closed")
-                except Exception as cleanup_exc:
-                    failures.append(f"PR close failed: {cleanup_exc}")
+            rollback_token = _SHUTDOWN_ROLLBACK.set(True)
             try:
-                remote_ref = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
-                if remote_ref.returncode != 0:
-                    failures.append("could not inspect remote release branch")
-                elif remote_ref.stdout.strip():
-                    deleted = _git(root, "push", "origin", "--delete", branch_name, check=False)
-                    if deleted.returncode != 0: failures.append("remote release branch deletion failed")
+                if not pr_url:
+                    try:
+                        listed = run(["gh", "pr", "list", "--head", branch_name, "--state", "open", "--json", "url", "--jq", ".[0].url"], check=False)
+                        if listed.returncode != 0:
+                            failures.append("could not determine whether a Route A PR was created")
+                        elif listed.stdout.strip():
+                            pr_url = listed.stdout.strip()
+                    except Exception as cleanup_exc:
+                        failures.append(f"PR discovery failed: {cleanup_exc}")
+                if pr_url:
+                    try:
+                        closed = run(["gh", "pr", "close", pr_url], check=False)
+                        if closed.returncode != 0: failures.append("created PR could not be confirmed closed")
+                    except Exception as cleanup_exc:
+                        failures.append(f"PR close failed: {cleanup_exc}")
+                try:
+                    remote_ref = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
+                    if remote_ref.returncode != 0:
+                        failures.append("could not inspect remote release branch")
+                    elif remote_ref.stdout.strip():
+                        deleted = _git(root, "push", "origin", "--delete", branch_name, check=False)
+                        if deleted.returncode != 0: failures.append("remote release branch deletion failed")
+                        else:
+                            remaining = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
+                            if remaining.returncode != 0 or remaining.stdout.strip(): failures.append("remote release branch remains after deletion")
+                except Exception as cleanup_exc:
+                    failures.append(f"remote branch cleanup failed: {cleanup_exc}")
+                try:
+                    main_head = _git(root, "rev-parse", f"refs/heads/{snapshot['branch']}", check=False)
+                    if main_head.returncode != 0 or main_head.stdout.strip() != snapshot["head"]:
+                        failures.append("original branch ref changed during Route A; refusing to overwrite it")
                     else:
-                        remaining = _git(root, "ls-remote", "--heads", "origin", branch_name, check=False)
-                        if remaining.returncode != 0 or remaining.stdout.strip(): failures.append("remote release branch remains after deletion")
-            except Exception as cleanup_exc:
-                failures.append(f"remote branch cleanup failed: {cleanup_exc}")
-            try:
-                main_head = _git(root, "rev-parse", f"refs/heads/{snapshot['branch']}", check=False)
-                if main_head.returncode != 0 or main_head.stdout.strip() != snapshot["head"]:
-                    failures.append("original branch ref changed during Route A; refusing to overwrite it")
-                else:
-                    switched = _git(root, "switch", "--force", str(snapshot["branch"]), check=False)
-                    if switched.returncode != 0: failures.append("could not return to the original branch")
-                    else:
-                        reset = _git(root, "reset", "--hard", str(snapshot["head"]), check=False)
-                        if reset.returncode != 0: failures.append("tracked/index reset to preflight HEAD failed")
-                        try: _remove_new_paths(root, snapshot)
-                        except Exception as cleanup_exc: failures.append(f"created-path cleanup failed: {cleanup_exc}")
-                        branch_ref = _git(root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}", check=False)
-                        if branch_ref.returncode == 0:
-                            removed = _git(root, "branch", "-D", branch_name, check=False)
-                            if removed.returncode != 0: failures.append("deterministic local release branch deletion failed")
-            except Exception as cleanup_exc:
-                failures.append(f"local checkout cleanup failed: {cleanup_exc}")
-            failures.extend(_verify_checkout_snapshot(root, snapshot))
+                        switched = _git(root, "switch", "--force", str(snapshot["branch"]), check=False)
+                        if switched.returncode != 0: failures.append("could not return to the original branch")
+                        else:
+                            reset = _git(root, "reset", "--hard", str(snapshot["head"]), check=False)
+                            if reset.returncode != 0: failures.append("tracked/index reset to preflight HEAD failed")
+                            try: _remove_new_paths(root, snapshot)
+                            except Exception as cleanup_exc: failures.append(f"created-path cleanup failed: {cleanup_exc}")
+                            branch_ref = _git(root, "show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}", check=False)
+                            if branch_ref.returncode == 0:
+                                removed = _git(root, "branch", "-D", branch_name, check=False)
+                                if removed.returncode != 0: failures.append("deterministic local release branch deletion failed")
+                except Exception as cleanup_exc:
+                    failures.append(f"local checkout cleanup failed: {cleanup_exc}")
+                try:
+                    failures.extend(_verify_checkout_snapshot(root, snapshot))
+                except Exception as cleanup_exc:
+                    failures.append(f"rollback verification failed: {cleanup_exc}")
+            finally:
+                _SHUTDOWN_ROLLBACK.reset(rollback_token)
         if failures:
             raise RouteARollbackError(f"Route A failed ({exc}); rollback could not be verified: " + "; ".join(failures)) from exc
         if isinstance(exc, RouteAError):
