@@ -37,3 +37,10 @@ Document role: CODEX BUILDER LOG
 - Previously observed safe UI controls remain as listed above: search/filter dialogs opened and canceled, selection controls changed and cleared in-memory selection, zoom/1:1/Fit/Grid and settings open/close responded; provider, prompt and size dialogs were inspected/canceled. Destructive, paid or external-write actions were not run: Run Batch, batch resume, solver, accept/reject, preflight, validate/build, upload, manifest publication, R2 and Production.
 - Closed the DEBUG Studio using its window X. The window disappeared and process inspection found no remaining process command line referencing the canonical Studio root. Unrelated Godot/Godot-AI processes were not touched.
 - `git diff --check` passed (Git reported the existing LF-to-CRLF working-copy warning for the modified GDScript). No claim is made that all app pipelines or Release Pool data are verified; owner-native full acceptance remains open because the pool currently reads zero and risky pipelines were not executed.
+
+## Publication
+
+- Source and focused suite commit: `5907a817` (`Fix Pixel Art CSV selection label refresh`).
+- Initial builder evidence commit: `54413282` (`Log native CSV label regression verification`).
+- Normal `git push origin HEAD:main` succeeded after a fetch and ancestry check; post-push fetch verified local `HEAD == origin/main == 544132825b4e185f371c4469225fec412eee6010`, 0 ahead / 0 behind. Only the three scoped source/test files and this builder log were staged; unrelated untracked owner data was left untouched.
+- `TASKS.md` progress is still pending publication; this inspection does not close `SB-LFX-018` because Release Pool READY is 0 and full worker/pipeline acceptance remains incomplete.
