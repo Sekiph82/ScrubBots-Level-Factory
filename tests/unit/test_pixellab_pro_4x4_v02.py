@@ -878,7 +878,7 @@ def test_csv_resume_retries_only_explicit_unaccepted_http_400_rows(monkeypatch: 
     prompt = row[prompt_column].strip()
     identity = row[0].strip()
     description_sha256 = sha256(prompt.encode("utf-8")).hexdigest()
-    seed = extensions._resolved_seed(f"sb-lfx018-csv:{identity}:{description_sha256}")
+    seed = extensions._resolved_seed(extensions._resolved_seed(f"sb-lfx018-csv:{identity}:{description_sha256}"))
 
     class FakeExtensions:
         @staticmethod
@@ -920,6 +920,15 @@ def test_csv_resume_retries_only_explicit_unaccepted_http_400_rows(monkeypatch: 
         with_ambiguous = launcher._inspect_pixellab_batch(request, FakeExtensions)
         assert with_ambiguous["monthly_paid_requests"] == 1
         assert with_ambiguous["rows"][0]["disposition"] == "ALREADY_ATTEMPTED"
+
+
+def test_batch_preflight_seed_matches_paid_submission_normalization() -> None:
+    launcher = _launcher_module()
+    csv_seed = "sb-lfx018-csv:storm-moth:example-prompt-hash"
+    expected = extensions._resolved_seed(extensions._resolved_seed(csv_seed))
+
+    assert launcher._resolved_pixellab_batch_seed(csv_seed, extensions) == expected
+    assert launcher._resolved_pixellab_batch_seed(csv_seed, extensions) != extensions._resolved_seed(csv_seed)
 
 
 def test_submission_marker_is_persisted_before_single_post(monkeypatch: pytest.MonkeyPatch) -> None:

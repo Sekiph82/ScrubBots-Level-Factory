@@ -204,6 +204,98 @@ def test_mcp_downloads_saved_224_gallery_sheet_instead_of_using_first_56_frame(
     assert downloads[0].get_header("Authorization") is None
 
 
+@pytest.mark.parametrize("saved_charged", [True, False])
+def test_mcp_recovers_saved_charged_gallery_asset_after_cancel_status(
+    monkeypatch: pytest.MonkeyPatch, saved_charged: bool,
+) -> None:
+    """A terminal cancel/error label must not discard an already charged saved atlas."""
+    monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "test-token")
+    asset_id = "saved-after-cancel"
+    sheet_url = f"https://s3.eu-central-003.backblazeb2.com/pixellab-generations/production/creator/{asset_id}/image.png?signature=test"
+    sheet = _atlas_png()
+    calls: list[dict[str, object]] = []
+    downloads: list[object] = []
+    creates = 0
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def geturl(self):
+            return sheet_url
+
+        def read(self, limit: int):
+            assert limit >= len(sheet)
+            return sheet
+
+    def fake_urlopen(request, timeout: float):
+        downloads.append(request)
+        assert timeout == 30
+        return Response()
+
+    monkeypatch.setattr(extensions, "urlopen", fake_urlopen)
+
+    def request_message(**kwargs: object):
+        nonlocal creates
+        message = kwargs["message"]
+        assert isinstance(message, dict)
+        calls.append(message)
+        if message.get("method") == "initialize":
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {"protocolVersion": "2025-11-25"}}, {}
+        if message.get("method") == "notifications/initialized":
+            return {}, {}
+        name = message["params"]["name"]
+        args = message["params"]["arguments"]
+        if name == "create_image_pro":
+            creates += 1
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "content": [{"type": "text", "text": "job_id: mcp-cancel-saved"}],
+            }}, {}
+        if args["job_id"] == "mcp-cancel-saved":
+            message_text = (
+                'the generation finished after the cancel and was saved (and charged): '
+                f'get_image(job_id="gallery:{asset_id}")'
+                if saved_charged else "Generation ended with an error; result was not saved."
+            )
+            return {"jsonrpc": "2.0", "id": message["id"], "result": {
+                "structuredContent": {"status": "failed", "message": message_text},
+                "content": [
+                    {"type": "text", "text": message_text},
+                    {"type": "image", "mimeType": "image/png",
+                     "data": base64.b64encode(_frame_png(0)).decode("ascii")},
+                ],
+            }}, {}
+        assert args["job_id"] == f"gallery:{asset_id}"
+        return {"jsonrpc": "2.0", "id": message["id"], "result": {
+            "structuredContent": {"asset_id": asset_id, "download_url": sheet_url, "frames": 16},
+            "content": [{"type": "text", "text": f"sheet: 224x224, 4x4; download: {sheet_url}"}],
+        }}, {}
+
+    if saved_charged:
+        result = generate_pixellab_pro_4x4_atlas_mcp(
+            description="existing saved generation", width=56, height=56, seed=19,
+            request_message=request_message,
+        )
+        assert result.atlas_png == sheet
+        with Image.open(BytesIO(result.atlas_png)) as decoded:
+            assert decoded.size == (224, 224)
+    else:
+        with pytest.raises(PixelLabProviderError) as caught:
+            generate_pixellab_pro_4x4_atlas_mcp(
+                description="unsaved failed generation", width=56, height=56, seed=19,
+                request_message=request_message,
+            )
+        assert caught.value.code == "JOB_FAILED"
+    assert creates == 1
+    assert len(downloads) == int(saved_charged)
+    assert [call["params"]["arguments"].get("job_id") for call in calls if call.get("method") == "tools/call"] == (
+        [None, "mcp-cancel-saved", f"gallery:{asset_id}"] if saved_charged else [None, "mcp-cancel-saved"]
+    )
+
+
 def test_mcp_credential_preflight_is_free_and_sends_no_request(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extensions, "get_pixellab_secret", lambda: "")
     requests: list[object] = []

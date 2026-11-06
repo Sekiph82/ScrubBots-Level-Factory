@@ -519,6 +519,11 @@ def _pixellab_explicit_http_400_rejection(record: Mapping[str, object]) -> bool:
     return record.get("error_code") == "HTTP_ERROR" and record.get("error") == "PixelLab returned HTTP 400."
 
 
+def _resolved_pixellab_batch_seed(seed: str | int, extensions: object) -> int:
+    """Return the exact canonical seed used by the paid PixelLab request path."""
+    return extensions._resolved_seed(extensions._resolved_seed(seed))
+
+
 def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -> dict[str, object]:
     """Read prior Pro 4x4 request claims and this month's local request count."""
     import re
@@ -573,7 +578,7 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
             identity = row[0].strip() if row[0].strip().lower() not in {"id", "prompt_id", "sprite_id", "prompt"} else str(row_index)
             seed = f"sb-lfx018-csv:{identity}:{description_sha256}"
             seen_indexes.add(row_index)
-            normalized_rows.append((row_index, description_sha256, extensions._resolved_seed(seed)))
+            normalized_rows.append((row_index, description_sha256, _resolved_pixellab_batch_seed(seed, extensions)))
     except Exception:
         return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_ROW_INVALID"}
 
@@ -708,7 +713,7 @@ def _semantic_generate_pixellab_pro_4x4(
     normalized_description = description.strip()
     if len(normalized_description) > 2000:
         raise ValueError("INVALID_DESCRIPTION: Pro 4x4 description exceeds 2000 characters.")
-    normalized_seed = extensions._resolved_seed(extensions._resolved_seed(seed))
+    normalized_seed = _resolved_pixellab_batch_seed(seed, extensions)
     palette_sha256 = hashlib.sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
     request_digest = hashlib.sha256(json.dumps({
         "provider": "PIXELLAB", "model": "PRO_4X4", "adapter_version": "pixellab-pro-4x4-v1",

@@ -444,6 +444,8 @@ func _apply_responsive_layout() -> void:
 	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
 	_layout_release_pool_dashboard(left_scale, right_start, float(geometry.get("right_width", 313.0)), scale_y)
 	_layout_pixellab_details_artwork_gap()
+	if _screen == "PIXEL ART" and _pixel_art_activity_table != null:
+		_refresh_pixel_art_activity_table()
 
 
 func _layout_batch_issue_panel() -> void:
@@ -699,8 +701,11 @@ func responsive_geometry(viewport_size: Vector2) -> Dictionary:
 		return {"scale": 1.0, "scale_x": 1.0, "scale_y": 1.0, "offset": Vector2.ZERO, "content_size": _REFERENCE_SIZE}
 	var margin := minf(18.0, viewport_size.x * 0.02)
 	var gap := minf(16.0, viewport_size.x * 0.018)
-	var left_width := clampf(viewport_size.x * 0.23, 285.0, 354.0)
-	var right_width := clampf(viewport_size.x * 0.204, 300.0, 420.0)
+	# Keep the three master regions proportional on wide displays. Capping the
+	# side panels at their 1536px reference widths made the review canvas absorb
+	# nearly all extra width and left activity text unreadably narrow.
+	var left_width := maxf(285.0, viewport_size.x * 0.23)
+	var right_width := maxf(300.0, viewport_size.x * 0.204)
 	var usable := maxf(300.0, viewport_size.x - margin * 2.0 - gap * 2.0)
 	var center_width := maxf(300.0, usable - left_width - right_width)
 	var center_start := margin + left_width + gap
@@ -2343,12 +2348,12 @@ func _build_pixel_art_activity_table() -> void:
 	content.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "PIXEL ART ACTIVITY"
-	title.add_theme_font_size_override("font_size", 13)
+	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", Color("#9bb1cd"))
 	content.add_child(title)
 	var subheading := Label.new()
 	subheading.text = "IN-MEMORY · THIS SESSION"
-	subheading.add_theme_font_size_override("font_size", 10)
+	subheading.add_theme_font_size_override("font_size", 13)
 	subheading.add_theme_color_override("font_color", Color("#7188a6"))
 	content.add_child(subheading)
 	var scroll := ScrollContainer.new()
@@ -2375,29 +2380,33 @@ func _refresh_pixel_art_activity_table() -> void:
 		_pixel_art_activity_grid.remove_child(old_child)
 		old_child.queue_free()
 	var time_header := Label.new()
-	time_header.custom_minimum_size = Vector2(105, 24)
+	var grid_width := maxf(320.0, _pixel_art_activity_table.size.x - 20.0)
+	var time_width := clampf(grid_width * 0.34, 105.0, 155.0)
+	var detail_width := maxf(205.0, grid_width - time_width - 8.0)
+	time_header.custom_minimum_size = Vector2(time_width, 28)
 	time_header.text = "TIME / STATUS"
 	var detail_header := Label.new()
-	detail_header.custom_minimum_size = Vector2(190, 24)
+	detail_header.custom_minimum_size = Vector2(detail_width, 28)
 	detail_header.text = "EVENT / DETAILS"
 	for header in [time_header, detail_header]:
-		header.add_theme_font_size_override("font_size", 10)
+		header.add_theme_font_size_override("font_size", 16)
 		header.add_theme_color_override("font_color", Color("#9bb1cd"))
 	_pixel_art_activity_grid.add_child(time_header)
 	_pixel_art_activity_grid.add_child(detail_header)
 	for item in _pixel_art_activity_events:
 		var time_status := Label.new()
-		time_status.custom_minimum_size = Vector2(105, 38)
+		time_status.custom_minimum_size = Vector2(time_width, 72)
 		time_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		time_status.text = "%s\n%s" % [str(item.get("time", "")).right(8), str(item.get("state", ""))]
-		time_status.add_theme_font_size_override("font_size", 10)
+		time_status.add_theme_font_size_override("font_size", 16)
 		time_status.add_theme_color_override("font_color", Color("#dce8f8"))
 		_pixel_art_activity_grid.add_child(time_status)
 		var detail := Label.new()
-		detail.custom_minimum_size = Vector2(190, 38)
+		detail.custom_minimum_size = Vector2(detail_width, 72)
+		detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.text = "%s\n%s" % [str(item.get("stage", "")), str(item.get("message", ""))]
-		detail.add_theme_font_size_override("font_size", 10)
+		detail.add_theme_font_size_override("font_size", 16)
 		detail.add_theme_color_override("font_color", Color("#b9cbe0"))
 		_pixel_art_activity_grid.add_child(detail)
 
@@ -3316,7 +3325,7 @@ func _start_next_pixellab_batch_row() -> void:
 	_max_used_colors = 12
 	_refresh_selected_size_value()
 	_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": _pixel_batch_rows.size() - _pixel_batch_index, "state": "RUNNING"}
-	_record_pixel_art_activity("BATCH ROW %d/%d" % [_pixel_batch_index + 1, _pixel_batch_rows.size()], "SUBMITTED", str(row.get("prompt", "")).left(220))
+	_record_pixel_art_activity("BATCH ROW %d/%d" % [_pixel_batch_index + 1, _pixel_batch_rows.size()], "PREPARING", "Local worker started; provider acceptance is not confirmed yet. %s" % str(row.get("prompt", "")).left(180))
 	if not _start_pixel_art_worker({"prompt": row.get("prompt", ""), "width": 56, "height": 56, "max_colors": 12, "provider": "PIXELLAB", "seed": row.get("seed", ""), "background_intent": "TRANSPARENT"}):
 		_pixel_batch_active = false
 		_pixel_batch_failed += 1

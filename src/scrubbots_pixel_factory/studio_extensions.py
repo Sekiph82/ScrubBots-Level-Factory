@@ -2688,6 +2688,26 @@ def _mcp_result_text(value: object) -> str:
     return "\n".join(chunk for chunk in chunks if chunk)
 
 
+def _mcp_asset_id(value: object) -> str | None:
+    asset_id = _mcp_find_value(value, {"asset_id", "assetId"})
+    if not isinstance(asset_id, str):
+        text = _mcp_result_text(value)
+        asset_match = re.search(r"\basset[_ ]?id\s*[:=]\s*([A-Za-z0-9_-]{1,160})\b",
+                                text, re.IGNORECASE)
+        # PixelLab can return a terminal failure/cancel status after the paid
+        # image was saved. Its actual error text identifies that saved image as
+        # get_image(job_id="gallery:<asset-id>") without an asset_id field.
+        # This ID is only used after the caller also verifies saved + charged.
+        gallery_match = re.search(
+            r"\bget_image\s*\(\s*job_id\s*=\s*['\"]gallery:([A-Za-z0-9_-]{1,160})['\"]\s*\)",
+            text, re.IGNORECASE,
+        )
+        asset_id = asset_match.group(1) if asset_match else gallery_match.group(1) if gallery_match else None
+    if isinstance(asset_id, str) and re.fullmatch(r"[A-Za-z0-9_-]{1,160}", asset_id.strip()):
+        return asset_id.strip()
+    return None
+
+
 def _mcp_inline_png(value: object) -> bytes | None:
     """Extract image/png MCP content only; never fetch a provider URL fallback."""
     if isinstance(value, Mapping):
@@ -2967,26 +2987,39 @@ def generate_pixellab_pro_4x4_atlas_mcp(
         state = _mcp_find_value(result, {"status", "state"})
         state_text = str(state or "").lower()
         if any(word in state_text for word in ("failed", "cancelled", "canceled", "error")):
+            # PixelLab can report an error/cancel state after the paid generation
+            # finished and was saved. Recover only an explicitly saved-and-charged
+            # gallery asset; never create or retry another request.
+            asset_id_value = _mcp_asset_id(result)
+            if asset_id_value and "saved" in text and "charged" in text:
+                gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
+                    "job_id": f"gallery:{asset_id_value}",
+                }}, tool_name="get_image")
+                sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value)
+                atlas_png = _download_mcp_gallery_sheet(
+                    sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
+                    asset_id=asset_id_value, request_count=request_count,
+                )
+                return PixelLabPro4x4McpResult(
+                    atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+                    max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
+                )
             raise PixelLabProviderError("JOB_FAILED", "PixelLab MCP image job did not complete.", job_id=job_id,
                                        http_request_count=request_count)
         if "completed" in state_text or "complete" in text and "process" not in text:
-            asset_id_value = _mcp_find_value(result, {"asset_id", "assetId"})
-            if not isinstance(asset_id_value, str):
-                asset_match = re.search(r"\basset[_ ]?id\s*[:=]\s*([A-Za-z0-9_-]{1,160})\b",
-                                        _mcp_result_text(result), re.IGNORECASE)
-                asset_id_value = asset_match.group(1) if asset_match else None
-            if not isinstance(asset_id_value, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", asset_id_value.strip()):
+            asset_id_value = _mcp_asset_id(result)
+            if not asset_id_value:
                 code = "PRO_4X4_ATLAS_SIZE_MISMATCH" if inline_size is not None else "MCP_GALLERY_SHEET_MISSING"
                 message = ("PixelLab MCP returned a candidate frame instead of the exact 4x4 gallery sheet."
                            if inline_size is not None else "PixelLab MCP reported completion without a saved gallery asset.")
                 raise PixelLabProviderError(code, message, job_id=job_id, http_request_count=request_count)
             gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
-                "job_id": f"gallery:{asset_id_value.strip()}",
+                "job_id": f"gallery:{asset_id_value}",
             }}, tool_name="get_image")
-            sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value.strip())
+            sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value)
             atlas_png = _download_mcp_gallery_sheet(
                 sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
-                asset_id=asset_id_value.strip(), request_count=request_count,
+                asset_id=asset_id_value, request_count=request_count,
             )
             return PixelLabPro4x4McpResult(
                 atlas_png=atlas_png, job_id=job_id, width=width, height=height,

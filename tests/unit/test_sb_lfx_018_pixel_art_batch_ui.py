@@ -51,6 +51,20 @@ def test_pixel_art_activity_log_is_bounded_and_provider_failures_stop_the_batch(
     refresh = _function(source, "_refresh_pixel_art_activity_table")
     assert '"PixelArtActivityTable"' in table
     assert '"TIME / STATUS"' in refresh and '"EVENT / DETAILS"' in refresh
+    assert '"font_size", 16' in refresh
+    assert "var time_width := clampf(grid_width * 0.34, 105.0, 155.0)" in refresh
+    assert "var detail_width := maxf(205.0, grid_width - time_width - 8.0)" in refresh
+    assert "detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL" in refresh
+    layout = _function(source, "_apply_responsive_layout")
+    assert '_screen == "PIXEL ART" and _pixel_art_activity_table != null' in layout
+    assert "_refresh_pixel_art_activity_table()" in layout
+    geometry = _function(source, "responsive_geometry")
+    assert "viewport_size.x * 0.23" in geometry
+    assert "viewport_size.x * 0.204" in geometry
+    assert "285.0, 354.0" not in geometry and "300.0, 420.0" not in geometry
+    batch_row = _function(source, "_start_next_pixellab_batch_row")
+    assert '"PREPARING"' in batch_row
+    assert '"SUBMITTED"' not in batch_row
     assert "while _pixel_art_activity_events.size() > 200" in recorder
     assert "secret_pattern.sub" in recorder
     assert '"STOPPED_AFTER_FAILURE"' in poll
