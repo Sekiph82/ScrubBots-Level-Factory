@@ -1,6 +1,7 @@
 """Offline R10 Pro 4x4 request contract tests; request_json is always mocked."""
 
 import base64
+import csv
 from contextlib import contextmanager
 from hashlib import sha256
 from io import BytesIO
@@ -242,6 +243,7 @@ def test_http_400_detail_is_bounded_and_api_token_is_redacted(monkeypatch: pytes
     assert "Please update request." in str(caught.value)
     assert token not in str(caught.value)
     assert caught.value.provider_request_id == "req_abc-123"
+    assert caught.value.http_status == 400
 
 
 @pytest.mark.parametrize("request_id", ["has whitespace", "line\nbreak", "x" * 129, "secret/test?value"])
@@ -790,6 +792,134 @@ def test_provider_request_id_is_persisted_with_safe_paid_failure_record(
         assert record["provider_http_request_count"] == 1
         assert record["provider_request_id"] == "req_support_123"
         assert "safe test prompt" not in json.dumps(record)
+
+
+def test_explicit_http_400_failure_can_be_retried_in_a_later_user_intent(monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = _launcher_module()
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
+        calls: list[str] = []
+
+        def rejected_submission(**kwargs: object) -> None:
+            calls.append("POST")
+            started = kwargs.get("on_submission_started")
+            if callable(started):
+                started()
+            count = kwargs.get("on_http_request_started")
+            if callable(count):
+                count(1)
+            raise PixelLabProviderError(
+                "HTTP_ERROR", "PixelLab returned HTTP 400.", http_request_count=1, http_status=400
+            )
+
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", rejected_submission)
+        common = {
+            "prompt": "offline test prompt", "style": "", "width": 56, "height": 56,
+            "max_colors": 12, "seed": 777,
+        }
+        for operation_id in ("known-http-400-first", "known-http-400-retry"):
+            with pytest.raises(ValueError, match="HTTP_ERROR"):
+                launcher._semantic_generate_pixellab_pro_4x4(**common, operation_id=operation_id)
+
+        jobs_root = extensions_root / "pixellab-jobs"
+        records = [json.loads(path.read_text(encoding="utf-8")) for path in jobs_root.glob("*.json")
+                   if not path.name.endswith(".claim.json")]
+        assert calls == ["POST", "POST"]
+        assert len(records) == 2
+        assert all(record["provider_http_status"] == 400 for record in records)
+        assert all(record["state"] == "HTTP_ERROR" for record in records)
+        assert len(list(jobs_root.glob("*.claim.json"))) == 2
+
+
+def test_ambiguous_matching_record_remains_fail_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = _launcher_module()
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
+        monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
+            "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
+        })
+        called: list[bool] = []
+
+        def unknown_submission(**kwargs: object) -> None:
+            called.append(True)
+            started = kwargs.get("on_submission_started")
+            if callable(started):
+                started()
+            raise PixelLabProviderError(
+                "SUBMISSION_UNKNOWN", "submission outcome unknown", http_request_count=1
+            )
+
+        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", unknown_submission)
+        params = {"prompt": "ambiguous offline prompt", "style": "", "width": 56,
+                  "height": 56, "max_colors": 12, "seed": 778}
+        with pytest.raises(ValueError, match="SUBMISSION_UNKNOWN"):
+            launcher._semantic_generate_pixellab_pro_4x4(**params, operation_id="ambiguous-first")
+        blocked = launcher._semantic_generate_pixellab_pro_4x4(**params, operation_id="ambiguous-retry")
+
+        assert called == [True]
+        assert blocked["state"] == "NEEDS_OWNER_REVIEW_UNKNOWN_SUBMISSION"
+
+
+def test_csv_resume_retries_only_explicit_unaccepted_http_400_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    launcher = _launcher_module()
+    csv_path = Path(__file__).resolve().parents[2] / "data" / "input" / "scrubbots_2000_prompts.csv"
+    with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
+        rows = [row for row in csv.reader(file) if row and any(cell.strip() for cell in row)]
+    header = [cell.strip().lower() for cell in rows[0]]
+    prompt_column = header.index("prompt") if "prompt" in header else header.index("description")
+    row = rows[1]
+    prompt = row[prompt_column].strip()
+    identity = row[0].strip()
+    description_sha256 = sha256(prompt.encode("utf-8")).hexdigest()
+    seed = extensions._resolved_seed(f"sb-lfx018-csv:{identity}:{description_sha256}")
+
+    class FakeExtensions:
+        @staticmethod
+        def extensions_root() -> Path:
+            return extensions_root
+
+        @staticmethod
+        def _resolved_seed(value: str | int) -> int:
+            return extensions._resolved_seed(value)
+
+    with _runtime_sandbox() as sandbox:
+        extensions_root = sandbox / "extensions"
+        ledger = extensions_root / "pixellab-jobs"
+        ledger.mkdir(parents=True)
+        common_record = {
+            "schema": "scrubbots-pixellab-pro-4x4-job-v1", "provider_id": "PIXELLAB",
+            "provider_model": "PRO_4X4", "description_sha256": description_sha256,
+            "seed": seed, "width": 56, "height": 56, "max_colors": 12,
+            "created_at_utc": "2026-11-06T07:45:34+00:00", "paid_submission_possible": True,
+            "job_id": None,
+        }
+        (ledger / "rejected.json").write_text(json.dumps({
+            **common_record, "operation_id": "rejected", "state": "HTTP_ERROR",
+            "error_code": "HTTP_ERROR", "error": "PixelLab returned HTTP 400.",
+            "provider_http_status": 400,
+        }), encoding="utf-8")
+        request = {
+            "csv_path": str(csv_path), "source_sha256": sha256(csv_path.read_bytes()).hexdigest(),
+            "width": 56, "height": 56, "max_colors": 12,
+        }
+        rejected_only = launcher._inspect_pixellab_batch(request, FakeExtensions)
+        assert rejected_only["monthly_paid_requests"] == 0
+        assert rejected_only["rows"][0]["disposition"] == "RETRY_ELIGIBLE"
+
+        (ledger / "ambiguous.json").write_text(json.dumps({
+            **common_record, "operation_id": "ambiguous", "state": "SUBMISSION_UNKNOWN",
+            "error_code": "SUBMISSION_UNKNOWN", "error": "submission outcome unknown",
+        }), encoding="utf-8")
+        with_ambiguous = launcher._inspect_pixellab_batch(request, FakeExtensions)
+        assert with_ambiguous["monthly_paid_requests"] == 1
+        assert with_ambiguous["rows"][0]["disposition"] == "ALREADY_ATTEMPTED"
 
 
 def test_submission_marker_is_persisted_before_single_post(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -501,6 +501,16 @@ def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     )
 
 
+def _pixellab_explicit_http_400_rejection(record: Mapping[str, object]) -> bool:
+    """Recognize only a definite 400 response without an accepted provider job."""
+    if record.get("state") != "HTTP_ERROR" or record.get("job_id"):
+        return False
+    if record.get("provider_http_status") == 400:
+        return True
+    # Compatibility with durable records written before HTTP status was stored.
+    return record.get("error_code") == "HTTP_ERROR" and record.get("error") == "PixelLab returned HTTP 400."
+
+
 def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -> dict[str, object]:
     """Read prior Pro 4x4 request claims and this month's local request count."""
     import re
@@ -580,7 +590,7 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
                     or record.get("provider_id") != "PIXELLAB"
                     or record.get("provider_model") != "PRO_4X4"):
                 continue
-            if record.get("paid_submission_possible") is True:
+            if record.get("paid_submission_possible") is True and not _pixellab_explicit_http_400_rejection(record):
                 created_at = record.get("created_at_utc")
                 try:
                     created_month = datetime.fromisoformat(created_at.replace("Z", "+00:00")).astimezone(timezone.utc).strftime("%Y-%m") if isinstance(created_at, str) else ""
@@ -606,9 +616,16 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
                    and record.get("width") == 56 and record.get("height") == 56
                    and record.get("max_colors") == 12]
         if matches:
-            prior = matches[0]
+            # A definite provider-side 400 with no job ID is a failed attempt,
+            # not a completed or consumed generation. Permit it in a future
+            # user-confirmed run. Any ambiguous or accepted matching attempt
+            # keeps the row fail-closed.
+            retry_eligible = all(_pixellab_explicit_http_400_rejection(record) for record in matches)
+            prior = next((record for record in matches
+                          if not _pixellab_explicit_http_400_rejection(record)), matches[-1])
             result_rows.append({
-                "row_index": row_index, "disposition": "ALREADY_ATTEMPTED",
+                "row_index": row_index,
+                "disposition": "RETRY_ELIGIBLE" if retry_eligible else "ALREADY_ATTEMPTED",
                 "state": str(prior.get("state", "UNKNOWN")),
                 "paid_submission_possible": prior.get("paid_submission_possible") is True,
             })
@@ -750,6 +767,35 @@ def _semantic_generate_pixellab_pro_4x4(
                 "job_id": prior_job_id, "job_state": prior_state,
                 "prior_operation_id": prior_id, "operation_id": resolved_operation_id}
 
+    matching_prior_records: list[dict[str, object]] = []
+    if job_root.exists():
+        for prior_path in sorted(job_root.glob("*.json")):
+            if prior_path.name.endswith(".claim.json") or prior_path == job_path:
+                continue
+            try:
+                prior_resolved = prior_path.resolve()
+                prior_resolved.relative_to(job_root)
+                prior = json.loads(prior_resolved.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError):
+                return blocked_claim(None)
+            if isinstance(prior, dict) and {request_digest, legacy_request_digest}.intersection({
+                    prior.get("request_sha256"), prior.get("legacy_request_sha256")
+            }):
+                matching_prior_records.append(prior)
+
+    prior_match_needs_block: dict[str, object] | None = None
+    if matching_prior_records:
+        # Keep each failed 400 attempt and its claim immutable. A later
+        # user-confirmed retry gets a distinct exclusive claim slot; any
+        # ambiguous, active, accepted, or completed matching record blocks it.
+        if all(_pixellab_explicit_http_400_rejection(record) for record in matching_prior_records):
+            retry_number = len(matching_prior_records)
+            claim_path = (job_root / f"{request_digest}.retry-{retry_number}.claim.json").resolve()
+            if not _inside_output(claim_path, job_root):
+                raise ValueError("PixelLab Pro 4x4 retry claim escaped its ledger directory")
+        else:
+            prior_match_needs_block = matching_prior_records[-1]
+
     if claim_path.exists():
         try:
             previous_claim = json.loads(claim_path.read_text(encoding="utf-8"))
@@ -758,6 +804,8 @@ def _semantic_generate_pixellab_pro_4x4(
         if not isinstance(previous_claim, dict) or previous_claim.get("request_sha256") != request_digest:
             return blocked_claim(None)
         return blocked_claim(previous_claim)
+    if prior_match_needs_block is not None:
+        return blocked_claim(prior_match_needs_block)
 
     job_record: dict[str, object] = {
         "schema": "scrubbots-pixellab-pro-4x4-job-v1",
@@ -773,20 +821,6 @@ def _semantic_generate_pixellab_pro_4x4(
         "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
         "created_at_utc": datetime.now(timezone.utc).isoformat(),
     }
-
-    # Read legacy V02 records before acquiring a new claim. They used a raw
-    # prompt/seed digest, so matching either fingerprint must fail closed.
-    for prior_path in sorted(job_root.glob("*.json")):
-        if prior_path == claim_path or prior_path == job_path:
-            continue
-        try:
-            prior = json.loads(prior_path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeError, json.JSONDecodeError):
-            return blocked_claim(None)
-        if isinstance(prior, dict) and {request_digest, legacy_request_digest}.intersection({
-                prior.get("request_sha256"), prior.get("legacy_request_sha256")
-        }):
-            return blocked_claim(prior)
 
     # This status-only check may consult Windows Credential Manager, but it
     # never returns or persists a credential value. Do it before creating the
@@ -903,6 +937,7 @@ def _semantic_generate_pixellab_pro_4x4(
         state = exc.code if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
         job_record.update({"state": state, "job_id": exc.job_id or job_record.get("job_id"),
                            "error_code": exc.code, "error": str(exc),
+                           "provider_http_status": exc.http_status,
                            "provider_http_request_count": exc.http_request_count
                            if exc.http_request_count is not None else job_record.get("provider_http_request_count", 0)})
         if exc.provider_request_id is not None:

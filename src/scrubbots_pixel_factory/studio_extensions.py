@@ -2363,12 +2363,14 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 class PixelLabProviderError(RuntimeError):
     def __init__(self, code: str, message: str, *, job_id: str | None = None,
                  http_request_count: int | None = None,
-                 provider_request_id: str | None = None) -> None:
+                 provider_request_id: str | None = None,
+                 http_status: int | None = None) -> None:
         super().__init__(message)
         self.code = code
         self.job_id = job_id
         self.http_request_count = http_request_count
         self.provider_request_id = provider_request_id
+        self.http_status = http_status
 
 
 def _provider_request_id_from_headers(headers: object) -> str | None:
@@ -2467,7 +2469,9 @@ def _json_request(
                     message = f"{message} Provider detail: {detail[:240]}"
             except (OSError, UnicodeError, json.JSONDecodeError):
                 pass
-        raise PixelLabProviderError(code, message, provider_request_id=provider_request_id) from None
+        raise PixelLabProviderError(
+            code, message, provider_request_id=provider_request_id, http_status=exc.code
+        ) from None
     except (TimeoutError, URLError) as exc:
         # A POST timeout can occur after the server accepted a paid job. Never retry it here.
         if method == "POST":
