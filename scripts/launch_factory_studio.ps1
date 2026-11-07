@@ -33,6 +33,47 @@ function Test-Godot4Executable {
     return ($versionInfo.FileDescription -match '^Godot Engine' -and $versionInfo.ProductVersion -match '^4(?:\.|$)')
 }
 
+function Test-Godot4GuiExecutable {
+    param([Parameter(Mandatory)][string]$Candidate)
+
+    if (-not (Test-Godot4Executable -Candidate $Candidate)) {
+        return $false
+    }
+
+    $stream = $null
+    $reader = $null
+    try {
+        $stream = [IO.File]::OpenRead($Candidate)
+        $reader = [IO.BinaryReader]::new($stream)
+        if ($reader.ReadUInt16() -ne 0x5A4D) {
+            return $false
+        }
+        $stream.Position = 0x3C
+        $peOffset = $reader.ReadInt32()
+        if ($peOffset -lt 64 -or $peOffset -gt ($stream.Length - 96)) {
+            return $false
+        }
+        $stream.Position = $peOffset
+        if ($reader.ReadUInt32() -ne 0x00004550) {
+            return $false
+        }
+        $stream.Position = $peOffset + 24
+        $optionalHeaderMagic = $reader.ReadUInt16()
+        if ($optionalHeaderMagic -notin @(0x010B, 0x020B)) {
+            return $false
+        }
+        $stream.Position = $peOffset + 24 + 68
+        return ($reader.ReadUInt16() -eq 2)
+    }
+    catch {
+        return $false
+    }
+    finally {
+        if ($null -ne $reader) { $reader.Dispose() }
+        elseif ($null -ne $stream) { $stream.Dispose() }
+    }
+}
+
 function Resolve-GodotExecutable {
     $override = [Environment]::GetEnvironmentVariable('SCRUBBOTS_FACTORY_GODOT')
     if (-not [string]::IsNullOrWhiteSpace($override)) {
@@ -40,17 +81,30 @@ function Resolve-GodotExecutable {
             throw "SCRUBBOTS_FACTORY_GODOT does not point to a file: $override"
         }
         $candidate = (Resolve-Path -LiteralPath $override).Path
-        if (-not (Test-Godot4Executable -Candidate $candidate)) {
-            throw "SCRUBBOTS_FACTORY_GODOT must point to a working Godot 4 executable: $candidate"
+        if (-not (Test-Godot4GuiExecutable -Candidate $candidate)) {
+            throw "SCRUBBOTS_FACTORY_GODOT must point to a working Godot 4 GUI executable (not a console build): $candidate"
         }
         return $candidate
+    }
+
+    $packagePattern = Join-Path $env:LOCALAPPDATA 'Microsoft\WinGet\Packages\GodotEngine.GodotEngine_*'
+    $packageDirectories = Get-ChildItem -Path $packagePattern -Directory -ErrorAction SilentlyContinue |
+        Sort-Object -Property Name -Descending
+    foreach ($packageDirectory in $packageDirectories) {
+        $guiCandidates = Get-ChildItem -LiteralPath $packageDirectory.FullName -Filter 'Godot_v*-stable_win64.exe' -File -ErrorAction SilentlyContinue |
+            Sort-Object -Property Name -Descending
+        foreach ($candidate in $guiCandidates) {
+            if (Test-Godot4GuiExecutable -Candidate $candidate.FullName) {
+                return $candidate.FullName
+            }
+        }
     }
 
     foreach ($commandName in @('godot.exe', 'godot')) {
         $commands = Get-Command -Name $commandName -CommandType Application -All -ErrorAction SilentlyContinue
         foreach ($command in $commands) {
             $candidate = $command.Source
-            if ($candidate -and (Test-Godot4Executable -Candidate $candidate)) {
+            if ($candidate -and (Test-Godot4GuiExecutable -Candidate $candidate)) {
                 return (Resolve-Path -LiteralPath $candidate).Path
             }
         }
@@ -62,12 +116,12 @@ function Resolve-GodotExecutable {
         (Join-Path $env:LOCALAPPDATA 'Programs\Godot\godot.exe')
     )
     foreach ($candidate in $knownLocations) {
-        if (Test-Godot4Executable -Candidate $candidate) {
+        if (Test-Godot4GuiExecutable -Candidate $candidate) {
             return (Resolve-Path -LiteralPath $candidate).Path
         }
     }
 
-    throw 'Godot 4 was not found. Install Godot 4 or set SCRUBBOTS_FACTORY_GODOT to its godot.exe path, then retry.'
+    throw 'Godot 4 GUI was not found. Install the windowed Godot 4 build or set SCRUBBOTS_FACTORY_GODOT to its GUI executable, then retry.'
 }
 
 try {

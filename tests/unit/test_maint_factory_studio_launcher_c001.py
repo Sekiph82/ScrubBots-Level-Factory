@@ -53,10 +53,18 @@ def test_launcher_resolves_from_script_location_and_runs_project_not_editor() ->
     assert "Join-Path $PSScriptRoot '..'" in launcher
     assert "SCRUBBOTS_FACTORY_GODOT" in launcher
     assert "Test-Godot4Executable" in launcher
+    assert "Test-Godot4GuiExecutable" in launcher
+    assert "optionalHeaderMagic -notin @(0x010B, 0x020B)" in launcher
+    assert "($reader.ReadUInt16() -eq 2)" in launcher
+    assert "GodotEngine.GodotEngine_*" in launcher
+    assert "Godot_v*-stable_win64.exe" in launcher
+    assert "$packageDirectories" in launcher
     assert "$versionInfo.ProductVersion" in launcher
     assert "Get-Command -Name $commandName" in launcher
-    assert "Start-Process -FilePath $godotPath" in launcher
-    assert "'--path', $quotedProjectPath" in launcher
+    assert "$startInfo.FileName = $godotPath" in launcher
+    assert "$startInfo.CreateNoWindow = $true" in launcher
+    assert "[System.Diagnostics.Process]::Start($startInfo)" in launcher
+    assert "$startInfo.Arguments = '--path \"{0}\"' -f $projectPath" in launcher
     assert "SetWindowText" in launcher
     assert "LoadImage" in launcher
     assert "SendMessage" in launcher
