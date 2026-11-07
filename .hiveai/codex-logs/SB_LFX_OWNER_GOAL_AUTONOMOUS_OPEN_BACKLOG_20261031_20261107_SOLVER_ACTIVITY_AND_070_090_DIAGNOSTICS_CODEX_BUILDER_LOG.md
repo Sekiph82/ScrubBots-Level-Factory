@@ -628,3 +628,15 @@ Verification:
 Protected `Final` and `Grid Files` remain unopened and untouched. No production PNG inventory was changed; no game repository, provider, CI, R2, Production, or historical batch mutation occurred.
 
 Remaining: final status transitions of completed work artifacts, policy for explicit output overrides, complete PixelLab actual-file evidence (blocked by user instruction not to touch those folders), Priority D exact identity/quiescence for legacy deletion, and separately scoped game-side 60 Hz host support.
+
+## 2026-11-07 15:49 UTC — Priority C explicit primary output override boundary
+
+Continued the existing goal from synced tracker/current task state. The default primary-supply work directory was already routed under canonical Pending; this slice closes the remaining request-level escape: a caller-supplied `output_dir` must now be absolute, remain under the canonical repository's `data/Release Pool/Pending/Pipelines/Work`, and pass ancestor/reparse-point checks. Relative paths, output locations in old Studio folders, and paths outside Release Pool fail before starting the primary runner. Updated the opt-in current-game topology integration fixture to use its own temporary repository's canonical Pending work path.
+
+Verification:
+
+- `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-output-override-focus1 tests/unit/test_p3_headless_batch_pipeline.py tests/unit/test_sb_lfx_018_r05_v13_offline_regressions.py tests/unit/test_sb_lfx_018_r09_r02_r04_r01_profile_pool.py tests/unit/test_sb_lfx_018_r09_r02_r04_r02_png_batch.py tests/unit/test_sb_lfx_018_r09_r02_r04_r03_batch_binding.py tests/unit/test_sb_lfx_018_r06_stable_composite_resume.py tests/unit/test_sb_lfx_018_r05_r05_loaded_batch.py` — 109 passed.
+- `git diff --check` passed with LF/CRLF working-copy warnings only.
+- The `test_sb_lfx_019_void_game_parity.py` integration test was not run: it requires `SCRUBBOTS_PROJECT` and executes against the live game checkout, so local game-host/native acceptance remains unverified under the read-only game-repo/zero-native-change boundary.
+
+This validates the output-path boundary and synthetic pipeline regressions only; it is not end-to-end gameplay or installed-app acceptance. No protected PNG access, artwork deletion/move, game-repo write, paid API, CI, R2, or Production action occurred.
