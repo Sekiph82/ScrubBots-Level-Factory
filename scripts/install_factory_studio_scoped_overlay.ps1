@@ -17,11 +17,14 @@ $authorizedNewManagedPaths = @(
     'src/scrubbots_pixel_factory/owner_art_storage.py',
     'src/scrubbots_pixel_factory/owner_folder_batch.py',
     'src/scrubbots_pixel_factory/owner_release_library.py',
-    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py',
+    'src/scrubbots_pixel_factory/studio_lifecycle.py'
 )
 $relativePaths = @(
 	'level_factory/scripts/factory_core_launcher.py',
     'level_factory/scripts/factory_studio_exact_ui.gd',
+    'level_factory/scripts/factory_studio_pipeline.gd',
 	'scripts/launch_factory_studio.ps1',
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_studio_workspace_page.gd',
@@ -41,7 +44,10 @@ $relativePaths = @(
 	'src/scrubbots_pixel_factory/owner_art_storage.py',
 	'src/scrubbots_pixel_factory/owner_folder_batch.py',
 	'src/scrubbots_pixel_factory/owner_release_library.py',
-    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py',
+    'src/scrubbots_pixel_factory/studio_lifecycle.py',
+    'src/scrubbots_pixel_factory/pipeline_activity.py'
 )
 if ($OnlyPaths.Count -gt 0) {
     $requestedPaths = @($OnlyPaths | Select-Object -Unique)
@@ -57,6 +63,7 @@ $authorizedOverlayAdditions = @(
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_studio_workspace_page.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
+    'level_factory/scripts/factory_studio_pipeline.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
@@ -68,7 +75,10 @@ $authorizedOverlayAdditions = @(
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
-    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
+    'src/scrubbots_pixel_factory/pixellab_pro_atlas.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py',
+    'src/scrubbots_pixel_factory/studio_lifecycle.py',
+    'src/scrubbots_pixel_factory/pipeline_activity.py'
 )
 # One exact installed solver variant was verified to be missing the Studio
 # cancel-marker/process-tree handling. Permit repairing only those measured

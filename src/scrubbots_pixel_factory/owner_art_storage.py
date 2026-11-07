@@ -35,8 +35,20 @@ class OwnerArtStorageError(ValueError):
     """Raised when an owner-art path or immutable artifact is unsafe."""
 
 
+def factory_repository_root(anchor: str | Path | None = None) -> Path:
+    """Resolve the canonical checkout root for both source and installed Release code."""
+
+    location = Path(anchor if anchor is not None else __file__).resolve()
+    start = location if location.is_dir() else location.parent
+    for candidate in (start, *start.parents):
+        git_metadata = candidate / ".git"
+        if ((git_metadata.is_dir() or git_metadata.is_file()) and (candidate / "TASKS.md").is_file()):
+            return candidate
+    return Path(__file__).resolve().parents[2]
+
+
 def owner_art_paths(repository_root: str | Path | None = None) -> dict[str, Path]:
-    root = Path(repository_root).resolve() if repository_root is not None else Path(__file__).resolve().parents[2]
+    root = Path(repository_root).resolve() if repository_root is not None else factory_repository_root()
     return {key: root / relative for key, relative in _FOLDER_RELATIVE_PATHS.items()}
 
 
@@ -370,4 +382,4 @@ def archive_pixellab_export(
         raise
 
 
-__all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "owner_art_paths", "validate_owner_input_csv"]
+__all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "factory_repository_root", "owner_art_paths", "validate_owner_input_csv"]

@@ -160,6 +160,30 @@ def test_unselected_verify_file_must_match_manifest_without_requiring_repair_his
     assert "Historical verify.py repair requires the exact legacy manifest or an exact recognized prior overlay receipt manifest." in source
 
 
+def test_real_play_gate_can_be_added_as_an_explicit_new_managed_overlay() -> None:
+    source = _installer()
+    gate = "src/scrubbots_pixel_factory/supply_pipeline/real_play_gate.py"
+    assert source.count(f"'{gate}'") == 3
+    assert "$isNewManagedPath = $relative -cin $authorizedNewManagedPaths -and -not $managed.ContainsKey($relative)" in source
+
+
+def test_solver_runtime_dependencies_and_pipeline_page_are_explicit_overlay_paths() -> None:
+    source = _installer()
+    assert source.count("'src/scrubbots_pixel_factory/studio_lifecycle.py'") == 3
+    assert source.count("'src/scrubbots_pixel_factory/pipeline_activity.py'") == 2
+    pipeline_page = "level_factory/scripts/factory_studio_pipeline.gd"
+    assert source.count(f"'{pipeline_page}'") == 2
+
+
+def test_installed_factory_resolves_data_against_canonical_checkout_root() -> None:
+    owner_storage = (ROOT / "src" / "scrubbots_pixel_factory" / "owner_art_storage.py").read_text(encoding="utf-8")
+    extensions = (ROOT / "src" / "scrubbots_pixel_factory" / "studio_extensions.py").read_text(encoding="utf-8")
+    assert "def factory_repository_root(anchor: str | Path | None = None) -> Path:" in owner_storage
+    assert "git_metadata.is_dir() or git_metadata.is_file()" in owner_storage
+    assert "else factory_repository_root()" in owner_storage
+    assert "return factory_repository_root(__file__)" in extensions
+
+
 def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() -> None:
     source = _installer()
     assert "OpenProcess(0x1000" in source

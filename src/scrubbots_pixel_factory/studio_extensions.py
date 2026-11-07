@@ -55,7 +55,9 @@ class StudioExtensionError(ValueError):
 
 
 def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    from .owner_art_storage import factory_repository_root
+
+    return factory_repository_root(__file__)
 
 
 def extensions_root() -> Path:
