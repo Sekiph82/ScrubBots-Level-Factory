@@ -812,6 +812,22 @@ def test_owner_art_folder_contract_uses_exact_owner_spelling() -> None:
     assert paths["rejected"] == root / "data/Release Pool/Rejected"
 
 
+def test_owner_csv_path_is_restricted_to_direct_canonical_input_files(tmp_path: Path) -> None:
+    repository = tmp_path / "factory"
+    canonical_input = repository / "data" / "input"
+    canonical_input.mkdir(parents=True)
+    csv_path = canonical_input / "prompts.csv"
+    csv_path.write_text("prompt,width,height\nflower,56,56\n", encoding="utf-8")
+
+    assert owner_art_storage.validate_owner_input_csv(csv_path, repository_root=repository) == csv_path
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="outside the canonical"):
+        owner_art_storage.validate_owner_input_csv(tmp_path / "old-input" / "prompts.csv", repository_root=repository)
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="direct .csv"):
+        owner_art_storage.validate_owner_input_csv(canonical_input / "nested" / "prompts.csv", repository_root=repository)
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="direct .csv"):
+        owner_art_storage.validate_owner_input_csv(canonical_input / "prompts.txt", repository_root=repository)
+
+
 def test_owner_art_archivers_reject_invalid_inputs_before_filesystem_access(monkeypatch) -> None:
     def forbidden_layout(*_args, **_kwargs):
         pytest.fail("invalid artifact must be rejected before creating owner folders")
@@ -842,6 +858,9 @@ def test_owner_art_outputs_route_only_through_explicit_catalog_functions() -> No
     assert 'archive_alpix_png(raw_png, repository_root=_repository_root())' in launcher
     csv_picker = ui.split("func _open_batch_csv() -> void:", 1)[1].split("func _process_level_csv", 1)[0]
     assert 'globalize_path("res://../data/input")' in csv_picker
+    assert 'func _is_canonical_input_csv(path: String)' in ui
+    assert 'validate_owner_input_csv(csv_path_value, repository_root=_repository_root())' in launcher
+    assert 'validate_owner_input_csv(_text(request.get("csv_path"), "csv_path"), repository_root=_repository_root())' in launcher
     assert "data/output/Alpix/**" in ignore
     assert "data/output/Pixellab/Grid Files/**" in ignore
     assert "data/output/Pixellab/Final/**" in ignore

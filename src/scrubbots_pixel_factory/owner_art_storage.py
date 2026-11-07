@@ -83,6 +83,28 @@ def ensure_owner_art_layout(repository_root: str | Path | None = None) -> dict[s
     return paths
 
 
+def validate_owner_input_csv(csv_path: str | Path, *, repository_root: str | Path | None = None) -> Path:
+    """Require a CSV to be a direct regular file in the canonical owner input folder."""
+
+    candidate = Path(csv_path).expanduser()
+    if not candidate.is_absolute():
+        raise OwnerArtStorageError("CSV path must be absolute and selected from data/input")
+    candidate = Path(os.path.abspath(candidate))
+    paths = owner_art_paths(repository_root)
+    root = paths["input"].parents[1]
+    try:
+        _verify_path_under_root(root, candidate.parent)
+    except OwnerArtStorageError as exc:
+        raise OwnerArtStorageError("CSV path is outside the canonical data/input directory or contains a reparse point") from exc
+    if candidate.parent != paths["input"] or candidate.suffix.lower() != ".csv":
+        raise OwnerArtStorageError("CSV must be a direct .csv file in the canonical data/input directory")
+    if _is_reparse_point(candidate):
+        raise OwnerArtStorageError("canonical data/input CSV must not be a symlink or reparse point")
+    if not candidate.is_file():
+        raise OwnerArtStorageError("canonical data/input CSV is missing or not a regular file")
+    return candidate
+
+
 def _hash(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
@@ -219,4 +241,4 @@ def archive_pixellab_export(
     return {**record, "catalog_path": str(record_path)}
 
 
-__all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "owner_art_paths"]
+__all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "owner_art_paths", "validate_owner_input_csv"]

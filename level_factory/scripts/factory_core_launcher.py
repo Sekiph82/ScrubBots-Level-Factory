@@ -539,8 +539,12 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
             or request.get("max_colors") != 12):
         return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_REQUEST_INVALID"}
 
-    csv_path = Path(csv_path_value).resolve()
-    if not csv_path.is_file() or csv_path.suffix.lower() != ".csv" or csv_path.stat().st_size > 16 * 1024 * 1024:
+    try:
+        from scrubbots_pixel_factory.owner_art_storage import OwnerArtStorageError, validate_owner_input_csv
+        csv_path = validate_owner_input_csv(csv_path_value, repository_root=_repository_root())
+    except (OwnerArtStorageError, OSError, ValueError):
+        return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_OUTSIDE_CANONICAL_INPUT"}
+    if csv_path.stat().st_size > 16 * 1024 * 1024:
         return {"state": "ERROR", "error": "PIXELLAB_BATCH_CSV_INVALID"}
     source_sha256 = hashlib.sha256(csv_path.read_bytes()).hexdigest()
     if source_sha256 != expected_source_sha256:
@@ -1126,10 +1130,14 @@ def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
     """Open or resume the CSV-SHA job and pass each row through canonical import."""
     from scrubbots_pixel_factory.alpix_batch import generate_alpix_png, run_csv_job
     from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.owner_art_storage import OwnerArtStorageError, validate_owner_input_csv
 
     if set(request) - {"csv_path", "default_width", "default_height"}:
         raise ValueError("ALPIX batch request contains unsupported fields")
-    csv_path = Path(_text(request.get("csv_path"), "csv_path")).resolve()
+    try:
+        csv_path = validate_owner_input_csv(_text(request.get("csv_path"), "csv_path"), repository_root=_repository_root())
+    except (OwnerArtStorageError, OSError, ValueError) as exc:
+        raise ValueError("ALPIX_BATCH_CSV_OUTSIDE_CANONICAL_INPUT: select a .csv directly from data/input") from exc
     root = extensions.extensions_root() / "alpix-jobs"
     default_width = _exact_int(request.get("default_width", 32), "default_width")
     default_height = _exact_int(request.get("default_height", 32), "default_height")

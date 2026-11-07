@@ -2566,8 +2566,10 @@ func _open_batch_csv() -> void:
 		return
 	_file_selection_action = "PIXEL_ART_BATCH"
 	var input_directory := ProjectSettings.globalize_path("res://../data/input")
-	if DirAccess.dir_exists_absolute(input_directory):
-		_file_dialog.current_dir = input_directory
+	if not DirAccess.dir_exists_absolute(input_directory):
+		_report("Canonical CSV folder is missing: %s" % input_directory)
+		return
+	_file_dialog.current_dir = input_directory
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
 	_file_dialog.title = "Select artwork batch CSV"
 	_file_dialog.clear_filters()
@@ -2576,7 +2578,16 @@ func _open_batch_csv() -> void:
 	_file_dialog.popup_centered_ratio(0.72)
 
 
+func _is_canonical_input_csv(path: String) -> bool:
+	var input_directory := ProjectSettings.globalize_path("res://../data/input").simplify_path().to_lower()
+	var selected := path.simplify_path()
+	return selected.is_absolute_path() and selected.get_extension().to_lower() == "csv" and selected.get_base_dir().to_lower() == input_directory
+
+
 func _process_level_csv(path: String) -> void:
+	if not _is_canonical_input_csv(path):
+		_report("CSV must be selected directly from the canonical data/input folder.")
+		return
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
 		_report("Could not read the level batch CSV")
@@ -2626,8 +2637,13 @@ func _process_level_csv(path: String) -> void:
 
 func _on_file_selected(path: String) -> void:
 	if _file_selection_action == "PIXEL_ART_BATCH":
+		if not _is_canonical_input_csv(path):
+			_batch_csv_path = ""
+			_report("CSV must be selected directly from the canonical data/input folder.")
+			_refresh_batch_csv_button()
+			return
 		_batch_csv_path = path
-		_record_pixel_art_activity("CSV SELECTION", "SELECTED", "Selected %s. Press Run Batch to review and start." % path.get_file())
+		_record_pixel_art_activity("CSV SELECTION", "SELECTED", "Selected %s at %s. Press Run Batch to review and start." % [path.get_file(), path])
 		var batch_path_button := get_node_or_null("BatchCsvPath") as Button
 		if batch_path_button != null:
 			batch_path_button.text = "CSV: " + path.get_file().left(38)
@@ -3070,6 +3086,11 @@ func _run_batch() -> void:
 func _generate_batch_csv(path: String) -> void:
 	if _operation_running:
 		return
+	if not _is_canonical_input_csv(path):
+		_batch_csv_path = ""
+		_report("CSV must be selected directly from the canonical data/input folder.")
+		_refresh_batch_csv_button()
+		return
 	_batch_csv_path = path
 	if _provider_model == "PIXELLAB":
 		_prepare_pixellab_csv_batch(path)
@@ -3151,6 +3172,12 @@ func _handle_alpix_csv_job(job: Dictionary) -> void:
 
 
 func _prepare_pixellab_csv_batch(path: String) -> void:
+	if not _is_canonical_input_csv(path):
+		_batch_csv_path = ""
+		_record_pixel_art_activity("CSV PREFLIGHT", "ERROR", "Selected CSV is outside the canonical data/input folder.")
+		_report("CSV must be selected directly from the canonical data/input folder.")
+		_refresh_batch_csv_button()
+		return
 	_pixel_batch_rows.clear()
 	var file := FileAccess.open(path, FileAccess.READ)
 	if file == null:
