@@ -37,3 +37,10 @@ Document role: CODEX BUILDER LOG
 - Local manifest SHA-256 after recording actual outcome: `dee2dd624489a7a6d57da96a67086008d64e7a16c1ff6aba2e32376582811212`.
 - No product source/configuration changes were made. This log and the bounded TASKS current/next/status fields are the only intended Git changes. The local retained inventories and cleanup manifest are untracked owner data and must not be staged.
 - Task remains PARTIAL and the overall goal remains active. Do not resume unrelated backlog. Completion requires recovery of the exact 20 original owner-upload payloads/records from an owner-controlled backup and resolution of the eight installed ACL blocks. Do not reconstruct or substitute those owner assets.
+
+## Publication addendum
+
+- Builder evidence commit `fe802dc6362f5045688a6e098f57c62ad49ed2d9` was pushed normally to `origin/main`; tracker/status commit `7e7ec6de129607f3763d7a3af730333a395446a3` was pushed normally afterward.
+- Final synchronization check at tracker publication: local `HEAD` and `origin/main` both `7e7ec6de129607f3763d7a3af730333a395446a3`; ahead/behind `0/0`. The task queue guard passed with the stable prompt URL and no preexisting tracked changes.
+- `git diff --check` passed. The tracked execution tree was clean after publication. Existing and newly created untracked owner data, including `Release\`, tests, and the local retention/cleanup manifests, was left unstaged and intact.
+- These commits record builder evidence and truthful partial task state only. They do not certify independent audit, native Studio acceptance, full legacy cleanup, or recovery of owner-upload source bytes.
