@@ -99,7 +99,9 @@ def test_shortcut_installer_repairs_one_named_com_shortcut() -> None:
 
     assert "WScript.Shell" in installer
     assert "ScrubBots Factory Studio.lnk" in installer
-    assert "$shortcut.TargetPath = $powerShellPath" in installer
+    assert "$godotPath = (& $godotResolver -ResolveOnly | Select-Object -Last 1)" in installer
+    assert "$shortcut.TargetPath = $godotPath" in installer
+    assert "$arguments = '--path \"{0}\"' -f $projectPath" in installer
     assert "$shortcut.Arguments = $arguments" in installer
     assert "$shortcut.WorkingDirectory = $runtimeRoot" in installer
     assert "$shortcut.Description = 'ScrubBots Factory Studio'" in installer
@@ -115,7 +117,7 @@ def test_installer_uses_the_authorized_stable_runtime_and_rejects_temp() -> None
     assert "$releaseRoot = Split-Path -Parent $runtimeRoot" in installer
     assert "Test-PathWithin -Path $runtimeRoot -Parent $tempRoot" in installer
     assert "Factory Studio runtime may not be installed under TEMP" in installer
-    assert "Join-Path $runtimeRoot 'scripts\\launch_factory_studio.ps1'" in installer
+    assert "Join-Path $repoRoot 'scripts\\launch_factory_studio.ps1'" in installer
     assert "--editor" not in installer
 
 

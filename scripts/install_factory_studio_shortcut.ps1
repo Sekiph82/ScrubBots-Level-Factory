@@ -12,7 +12,6 @@ $ownerIconPath = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\ScrubBo
 $repositoryIconRelativePath = 'level_factory/assets/icons/ScrubBots_Factory_Studio.ico'
 $manifestName = '.factory-studio-install-manifest.json'
 $manifestPath = Join-Path $runtimeRoot $manifestName
-$powerShellPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 
 function Get-NormalizedPath {
     param([Parameter(Mandatory)][string]$Path)
@@ -179,9 +178,12 @@ function Get-RuntimePath {
 if (-not (Test-Path -LiteralPath (Join-Path $repoRoot 'scripts\launch_factory_studio.ps1') -PathType Leaf)) {
     throw "Committed launcher script is missing: $repoRoot"
 }
-if (-not (Test-Path -LiteralPath $powerShellPath -PathType Leaf)) {
-    throw "Windows PowerShell executable is missing: $powerShellPath"
+$godotResolver = Join-Path $repoRoot 'scripts\launch_factory_studio.ps1'
+$godotPath = (& $godotResolver -ResolveOnly | Select-Object -Last 1)
+if ([string]::IsNullOrWhiteSpace([string]$godotPath) -or -not (Test-Path -LiteralPath ([string]$godotPath).Trim() -PathType Leaf)) {
+    throw 'The shortcut can only target the verified windowed Godot 4 executable.'
 }
+$godotPath = ([string]$godotPath).Trim()
 $tempRoot = Get-NormalizedPath -Path $env:TEMP
 if (Test-PathWithin -Path $runtimeRoot -Parent $tempRoot) {
     throw "Factory Studio runtime may not be installed under TEMP: $runtimeRoot"
@@ -322,9 +324,9 @@ finally {
 
 $shell = New-Object -ComObject WScript.Shell
 $shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $powerShellPath
-$quotedLauncherPath = '"{0}"' -f (Join-Path $runtimeRoot 'scripts\launch_factory_studio.ps1')
-$arguments = '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File {0}' -f $quotedLauncherPath
+$shortcut.TargetPath = $godotPath
+$projectPath = Join-Path $runtimeRoot 'level_factory'
+$arguments = '--path "{0}"' -f $projectPath
 $shortcut.Arguments = $arguments
 $shortcut.WorkingDirectory = $runtimeRoot
 $shortcut.Description = 'ScrubBots Factory Studio'
