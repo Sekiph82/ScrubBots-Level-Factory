@@ -588,3 +588,25 @@ Verification:
 Scope guard: no enumeration, read, hash, copy, move, or write was performed in `data/output/Pixellab/Final` or `data/output/Pixellab/Grid Files`. No game-repository writes, paid provider calls, CI, R2, Production, historical batch retry, or legacy PNG deletion/move occurred. Priority D remains inventory-only; unresolved non-exact source identities and active-writer quiescence still prevent physical cleanup.
 
 Remaining technical limits: this commit slice moves only pipeline-run records and READY receipts into Release Pool status folders. Supply-plan, level, QA, search/replay working outputs, and pipeline job-event streams still have legacy producers and need additional scoped routing/readback work. Canonical game-host 60 Hz execution still needs the separate game-repository authorization/change noted in the tracker. No native Godot/installed Release runtime claim is made.
+
+## 2026-11-07 15:36 UTC — Priority C supply workdir and headless event routing (continuation)
+
+Continued from source/log/tracker parity at `6ece54684f0a28d655ddeebb59e91fc1597b8a92`, with the read-only queue guard passing before this stage. No new task or prompt was introduced.
+
+Implementation:
+
+- Canonical per-activity solver output now allocates under `data/Release Pool/Pending/Pipelines/Work/<identity>/<activity-hash>/`, with identity validation and repository/reparse-point containment checks.
+- The primary-supply pipeline default output now uses the same canonical Pending work tree. Explicit `output_dir` requests remain supported for existing caller/test compatibility; production callers should omit it to use the canonical directory.
+- New headless pipeline event streams use `data/Release Pool/Pending/Pipelines/Jobs/<manifest-sha>/events/`. If a prior job has a legacy event directory and no canonical event directory, resume continues against that existing stream without moving/re-hashing/re-writing its previous events. Pipeline status records and Release Pool receipts retain their READY/FAILED/PENDING folders from the prior slice.
+- Added tests for unique per-activity paths, primary default output, canonical event output, and exact legacy event resume selection.
+
+Verification:
+
+- `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-release-workdir-focus4 tests/unit/test_p3_headless_batch_pipeline.py tests/unit/test_sb_lfx_018_r09_r02_r04_r01_profile_pool.py tests/unit/test_sb_lfx_018_r05_v13_offline_regressions.py tests/unit/test_sb_lfx_018_r09_r02_r04_r02_png_batch.py -k "not 150_item_fake_campaign_orchestration_only_is_sequential_and_bounded"` — 82 passed, 1 deselected.
+- `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-release-workdir-png150-2 tests/unit/test_sb_lfx_018_r09_r02_r04_r02_png_batch.py::test_150_item_fake_campaign_orchestration_only_is_sequential_and_bounded` — 1 passed.
+- The first version of the new default-output test supplied a live activity ID without an imported OWNER_UPLOAD source, so it correctly returned the activity API's `ERROR` contract before reaching the target branch. The isolated fixture was corrected to exercise the non-live primary-image path; it then passed. No production source or owner data was involved.
+- `git diff --check` passed with only Git LF/CRLF working-copy warnings.
+
+Protected-path status is unchanged: `data/output/Pixellab/Final` and `Grid Files` were not listed, read, hashed, copied, moved, or written. No PNG deletion/move, game-repository write, provider charge, CI, R2, Production, or historical batch retry occurred.
+
+Remaining Priority C work includes routing explicit external output overrides safely and completing all status finalization/copy/reference contracts for the working artifacts. Legacy PNG cleanup remains read-only because identity mapping/quiescence is incomplete. Canonical actual-game 60 Hz solver authority still requires the separate game-repository change; native installed runtime remains unverified.
