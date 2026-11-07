@@ -420,12 +420,12 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
     factory = tmp_path / "factory"
-    run_dir = factory / "level_factory" / "output" / "studio-extensions" / "canonical-supply" / "candidate-owner-test" / "run"
+    run_dir = factory / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work" / "candidate-owner-test" / "run"
     bundle_dir = factory / "bundles" / "owner-test"
     run_dir.mkdir(parents=True)
     bundle_dir.mkdir(parents=True)
     output_dir = factory / "level_factory" / "output" / "studio-extensions"
-    pipeline_path = output_dir / "pipelines" / "run-one.json"
+    pipeline_path = factory / "data" / "Release Pool" / "Ready" / "Pipelines" / "run-one.json"
     pipeline_path.parent.mkdir(parents=True)
     artwork = bundle_dir / "artwork.png"
     artwork.write_bytes(b"test artwork")
@@ -452,7 +452,7 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
         "height": 1, "used_colors": ["C01"],
     }
     pipeline: dict[str, Any] = {
-        "run_id": "run-one", "disposition": "READY", "primary": {
+        "run_id": "run-one", "version": 2, "disposition": "READY", "primary": {
             "state": "READY", "acceptance": {"solver_status": "SOLVED", "replay": "WIN"},
             "difficulty": {"class": "MEDIUM"},
             "files": {"level": str(level), "supply_plan": str(plan), "real_play_result": str(real_play_path)},
@@ -468,16 +468,48 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
     monkeypatch.setattr(release_pool, "_official_challenge_vector", lambda _official: [0.1] * 7)
     monkeypatch.setattr(release_pool, "_resolve_official_profile", lambda *_args: ({"dominant": "FLOW"}, {"kind": "DERIVED"}))
     monkeypatch.setattr(release_pool, "_validate_score_and_class", lambda *_args: None)
-    monkeypatch.setattr(release_pool, "_pool_root", lambda: output_dir / "release-pool")
-    monkeypatch.setattr(studio_extensions, "_pipeline_path", lambda _run_id: pipeline_path)
+    monkeypatch.setattr(studio_extensions, "_pipeline_path", lambda _run_id, **_kwargs: pipeline_path)
 
     pooled = release_pool.enter_release_pool(candidate, pipeline)
-    entry_path = output_dir / "release-pool" / "candidate-owner-test-run-one-ready.json"
+    entry_path = factory / "data" / "Release Pool" / "Ready" / "candidate-owner-test-run-one-ready.json"
     entry = json.loads(entry_path.read_text(encoding="utf-8"))
     assert pooled["disposition"] == "ENTERED_RELEASE_POOL"
     assert entry["real_play"]["verdict"] == "WON_CANONICAL"
+    assert entry["real_play"]["storagePolicy"] == release_pool.CANONICAL_WORK_STORAGE_POLICY
     assert entry["files"]["real_play_result"]["path"].endswith("real_play_result_v2.json")
     assert entry["files"]["supply_plan"]["sha256"] == _sha(plan.read_bytes())
+    assert release_pool._validate_release_entry_real_play(entry, entry_path.name) is True
+    external_level = tmp_path / "external-level.json"
+    external_level.write_bytes(level.read_bytes())
+    moved_reference = json.loads(json.dumps(entry))
+    moved_reference["files"]["level"]["path"] = str(external_level)
+    with pytest.raises(release_pool.ReleaseError, match="canonical work evidence is unavailable"):
+        release_pool._validate_release_entry_real_play(moved_reference, entry_path.name)
+
+    from scrubbots_pixel_factory import owner_art_storage
+    is_reparse_point = owner_art_storage._is_reparse_point
+    with monkeypatch.context() as scoped:
+        scoped.setattr(owner_art_storage, "_is_reparse_point", lambda path: Path(path) == real_play_path or is_reparse_point(Path(path)))
+        with pytest.raises(release_pool.ReleaseError, match="result is a symlink or reparse point"):
+            release_pool._pipeline_real_play_proof(
+                pipeline["primary"], {"level": level, "supply_plan": plan}, source_sha,
+            )
+
+    mismatched_mapping = json.loads(json.dumps(pipeline))
+    mismatched_mapping["primary"]["files"]["level"] = str(output_dir / "forged-level.json")
+    with pytest.raises(release_pool.ReleaseError, match="differs from its canonical persisted record"):
+        release_pool.enter_release_pool(candidate, mismatched_mapping)
+    numeric_type_mismatch = json.loads(json.dumps(pipeline))
+    numeric_type_mismatch["version"] = 2.0
+    with pytest.raises(release_pool.ReleaseError, match="differs from its canonical persisted record"):
+        release_pool.enter_release_pool(candidate, numeric_type_mismatch)
+
+    external_plan = tmp_path / "external-plan.json"
+    external_plan.write_bytes(plan.read_bytes())
+    pipeline["primary"]["files"]["supply_plan"] = str(external_plan)
+    pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
+    with pytest.raises(release_pool.ReleaseError, match="escapes Release Pool work"):
+        release_pool.enter_release_pool(candidate, pipeline)
 
     pipeline["primary"]["acceptance"]["replay"] = "LOSE"
     result = release_pool.enter_release_pool(candidate, pipeline)

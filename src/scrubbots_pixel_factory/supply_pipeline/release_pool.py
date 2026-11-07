@@ -32,6 +32,7 @@ class ReleaseError(ValueError):
 
 
 _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALANCED"}
+CANONICAL_WORK_STORAGE_POLICY = "CANONICAL_RELEASE_POOL_WORK_V1"
 
 
 def validate_pool_candidate_provenance(
@@ -509,6 +510,30 @@ def _level_content_hash(path: Path) -> str:
     return _hash(path.read_bytes().replace(b"\r\n", b"\n"))
 
 
+def _canonical_work_file(value: object, name: str, repository_root: Path, work_root: Path) -> Path:
+    """Resolve an existing regular evidence file only after checking its raw path and ancestors."""
+
+    from .. import owner_art_storage
+
+    candidate = Path(str(value)).expanduser()
+    if not candidate.is_absolute() or ".." in candidate.parts:
+        raise ReleaseError(f"canonical real-play {name} path is not absolute and normalized")
+    candidate = Path(os.path.abspath(candidate))
+    try:
+        owner_art_storage._verify_path_under_root(repository_root, candidate.parent)
+    except owner_art_storage.OwnerArtStorageError as exc:
+        raise ReleaseError(f"canonical real-play {name} path escapes Release Pool work") from exc
+    if owner_art_storage._is_reparse_point(candidate):
+        raise ReleaseError(f"canonical real-play {name} is a symlink or reparse point")
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise ReleaseError(f"canonical real-play {name} is unavailable") from exc
+    if not resolved.is_relative_to(work_root.resolve()) or not resolved.is_file():
+        raise ReleaseError(f"canonical real-play {name} is outside Release Pool work")
+    return resolved
+
+
 def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str) -> bool:
     """Return false for legacy rows and reject stale or mismatched real-play proof."""
 
@@ -522,6 +547,32 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
         or not isinstance(files, Mapping)
     ):
         return False
+    canonical_paths: dict[str, Path] = {}
+    storage_policy = real_play.get("storagePolicy")
+    if storage_policy is not None:
+        if storage_policy != CANONICAL_WORK_STORAGE_POLICY:
+            raise ReleaseError(f"Release Pool real-play storage policy is unsupported: {entry_name}")
+        from .. import owner_art_storage
+        from .. import studio_extensions as studio
+
+        repository_root = Path(studio._repository_root()).resolve()
+        work_root = owner_art_storage.owner_art_paths(repository_root)["pending"] / "Pipelines" / "Work"
+        try:
+            owner_art_storage._verify_path_under_root(repository_root, work_root)
+            for file_name, label in (
+                ("level", "level"),
+                ("supply_plan", "supply plan"),
+                ("real_play_result", "result"),
+            ):
+                record = files.get(file_name)
+                if not isinstance(record, Mapping):
+                    raise ReleaseError(f"Release Pool real-play {label} binding is missing: {entry_name}")
+                canonical_paths[file_name] = _canonical_work_file(
+                    record.get("path"), label, repository_root, work_root,
+                )
+        except (owner_art_storage.OwnerArtStorageError, ReleaseError) as exc:
+            raise ReleaseError(f"Release Pool canonical work evidence is unavailable: {entry_name}: {exc}") from exc
+
     result_record = files.get("real_play_result")
     if (
         not isinstance(result_record, Mapping)
@@ -530,7 +581,7 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
     ):
         raise ReleaseError(f"Release Pool real-play result binding is missing or changed: {entry_name}")
     try:
-        result_path = Path(str(result_record.get("path", "")))
+        result_path = canonical_paths.get("real_play_result", Path(str(result_record.get("path", ""))))
         result_raw = result_path.read_bytes()
         result_value = json.loads(result_raw.decode("utf-8"))
     except ReleaseError as exc:
@@ -590,13 +641,14 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
         if not isinstance(record, Mapping):
             raise ReleaseError(f"Release Pool real-play {file_name} binding is missing: {entry_name}")
         try:
-            normalized_hash = _hash(Path(str(record.get("path", ""))).read_bytes().replace(b"\r\n", b"\n"))
+            evidence_path = canonical_paths.get(file_name, Path(str(record.get("path", ""))))
+            normalized_hash = _hash(evidence_path.read_bytes().replace(b"\r\n", b"\n"))
         except OSError as exc:
             raise ReleaseError(f"Release Pool real-play {file_name} is unavailable: {entry_name}") from exc
         if normalized_hash != real_play.get(hash_name):
             raise ReleaseError(f"Release Pool real-play {file_name} bytes changed after verification: {entry_name}")
         if file_name == "supply_plan" and result_value.get("schema") == CANONICAL_RESULT_SCHEMA:
-            plan_value = _json(Path(str(record.get("path", ""))))
+            plan_value = _json(canonical_paths.get(file_name, Path(str(record.get("path", "")))))
             if result_value.get("planClicks") != plan_value.get("intendedColumnClicks"):
                 raise ReleaseError(f"Release Pool real-play click sequence changed after verification: {entry_name}")
     return True
@@ -649,18 +701,32 @@ def _pipeline_real_play_proof(
 ) -> tuple[dict[str, Any], Path, str]:
     """Verify the solver's existing canonical proof without starting another search or replay."""
 
+    from .. import owner_art_storage
+    from .. import studio_extensions as studio
+
+    repository_root = Path(studio._repository_root()).resolve()
+    work_root = owner_art_storage.owner_art_paths(repository_root)["pending"] / "Pipelines" / "Work"
+    try:
+        owner_art_storage._verify_path_under_root(repository_root, work_root)
+    except owner_art_storage.OwnerArtStorageError as exc:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical Release Pool work path is unsafe") from exc
+
     pipeline_files = primary.get("files")
     if not isinstance(pipeline_files, Mapping) or not pipeline_files.get("real_play_result"):
         raise ReleaseError("RELEASE_ENTRY_ERROR: current pipeline has no canonical real-play result")
-    result_path = Path(str(pipeline_files["real_play_result"])).expanduser().resolve()
-    if result_path.is_symlink() or not result_path.is_file():
-        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play result is missing or not a regular file")
-    if result_path.parent != paths["level"].resolve().parent or result_path.parent != paths["supply_plan"].resolve().parent:
+
+    try:
+        result_path = _canonical_work_file(pipeline_files["real_play_result"], "result", repository_root, work_root)
+        level_path = _canonical_work_file(paths["level"], "level", repository_root, work_root)
+        plan_path = _canonical_work_file(paths["supply_plan"], "supply plan", repository_root, work_root)
+    except ReleaseError as exc:
+        raise ReleaseError(f"RELEASE_ENTRY_ERROR: {exc}") from exc
+    if result_path.parent != level_path.parent or result_path.parent != plan_path.parent:
         raise ReleaseError("RELEASE_ENTRY_ERROR: canonical result is not stored beside the exact level and plan")
     try:
         result = _json(result_path)
-        plan = _json(paths["supply_plan"])
-        level = _json(paths["level"])
+        plan = _json(plan_path)
+        level = _json(level_path)
     except ReleaseError as exc:
         raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play input or result is unreadable") from exc
     if (
@@ -673,10 +739,10 @@ def _pipeline_real_play_proof(
         or result.get("sourceSha256") != source_sha256
         or result.get("levelId") != level.get("id")
         or result.get("planClicks") != plan.get("intendedColumnClicks")
-        or result.get("levelFile") != str(paths["level"].resolve())
-        or result.get("planFile") != str(paths["supply_plan"].resolve())
-        or result.get("levelSha256") != _level_content_hash(paths["level"])
-        or result.get("planSha256") != _level_content_hash(paths["supply_plan"])
+        or result.get("levelFile") != str(level_path)
+        or result.get("planFile") != str(plan_path)
+        or result.get("levelSha256") != _level_content_hash(level_path)
+        or result.get("planSha256") != _level_content_hash(plan_path)
         or not isinstance(result.get("gameCommit"), str)
         or not result.get("gameCommit")
         or not isinstance(result.get("runId"), str)
@@ -699,6 +765,40 @@ def _pipeline_real_play_proof(
     ):
         raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play proof lacks complete game-host WIN final state")
     return result, result_path, _hash(result_path.read_bytes())
+
+
+def _verified_ready_pipeline_record(pipeline: Mapping[str, Any], studio: Any) -> tuple[Path, str]:
+    """Require the caller's READY mapping to be the exact canonical on-disk record."""
+
+    from .. import owner_art_storage
+
+    run_id = pipeline.get("run_id")
+    if type(run_id) is not str or not run_id:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical READY pipeline run identity is missing")
+    repository_root = Path(studio._repository_root()).resolve()
+    expected = owner_art_storage.owner_art_paths(repository_root)["ready"] / "Pipelines" / f"{run_id}.json"
+    try:
+        located = studio._pipeline_path(run_id, status="READY")
+        owner_art_storage._verify_path_under_root(repository_root, expected.parent)
+    except (studio.StudioExtensionError, owner_art_storage.OwnerArtStorageError) as exc:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical READY pipeline record path is unsafe") from exc
+    if located != expected or owner_art_storage._is_reparse_point(expected) or not expected.is_file():
+        raise ReleaseError("RELEASE_ENTRY_ERROR: READY pipeline record is missing from canonical Release Pool storage")
+    try:
+        raw = expected.read_bytes()
+        persisted = json.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical READY pipeline record is unreadable") from exc
+    if not isinstance(persisted, dict):
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical READY pipeline record is malformed")
+    try:
+        persisted_identity = json.dumps(persisted, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":"))
+        supplied_identity = json.dumps(dict(pipeline), ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError) as exc:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: supplied pipeline mapping is not canonical JSON") from exc
+    if persisted_identity != supplied_identity:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: supplied pipeline mapping differs from its canonical persisted record")
+    return expected, _hash(raw)
 
 
 def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], review: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -726,6 +826,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
             "disposition": "NOT_ENTERED_NOT_READY",
             "reason": "Release Pool requires solver and replay WIN evidence before canonical real-play readback.",
         }
+    _pipeline_record_path, pipeline_sha256 = _verified_ready_pipeline_record(pipeline, studio)
     difficulty = primary.get("difficulty", {})
     official = _canonical_official_difficulty(primary)
     vector = _official_challenge_vector(official)
@@ -755,7 +856,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "frustration_risk": official.get("frustrationRisk") if isinstance(official, Mapping) else None,
         "session_load": official.get("sessionLoad") if isinstance(official, Mapping) else None,
         "signature": {"dimensions": [candidate.get("width"), candidate.get("height")], "paletteSet": candidate.get("used_colors", []), "challengeVector": vector, "dominantProfile": dominant, "silhouetteHash": candidate.get("grid_hash")},
-        "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
+        "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": pipeline_sha256,
         "real_play": {
             "model": REAL_PLAY_MODEL,
             "verdict": real_play_result["verdict"],
@@ -765,6 +866,7 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
             "sourceSha256": real_play_result.get("sourceSha256"),
             "runId": real_play_result.get("runId"),
             "timestamp": real_play_result.get("timestamp"),
+            "storagePolicy": CANONICAL_WORK_STORAGE_POLICY,
             "planSha256": real_play_result["planSha256"],
             "levelSha256": real_play_result["levelSha256"],
             "gameCommit": real_play_result["gameCommit"],
