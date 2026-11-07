@@ -961,6 +961,13 @@ def test_pixellab_catalog_archives_exact_slices_and_finalizes_atomically() -> No
             shutil.rmtree(root)
 
 
+def test_pixellab_atlas_frame_dimensions_follow_approved_51_to_59_range() -> None:
+    assert owner_art_storage._dimension_pair([51, 59], "fixture") == (51, 59)
+    for dimensions in ([50, 56], [56, 60], [True, 56], [56, 56.0]):
+        with pytest.raises(owner_art_storage.OwnerArtStorageError, match="approved 51..59"):
+            owner_art_storage._dimension_pair(dimensions, "fixture")
+
+
 def test_pixellab_interrupted_archive_rolls_back_new_pngs_and_keeps_in_progress_marker(tmp_path: Path, monkeypatch) -> None:
     repository = tmp_path / "repo"
     source = tmp_path / "source"

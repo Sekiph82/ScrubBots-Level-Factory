@@ -133,8 +133,8 @@ def _dimension_pair(value: object, label: str) -> tuple[int, int]:
         width, height = value
     else:
         raise OwnerArtStorageError(f"{label} dimensions are invalid")
-    if type(width) is not int or type(height) is not int or not 1 <= width <= 59 or not 1 <= height <= 59:
-        raise OwnerArtStorageError(f"{label} dimensions are outside the supported 1..59 range")
+    if type(width) is not int or type(height) is not int or not 51 <= width <= 59 or not 51 <= height <= 59:
+        raise OwnerArtStorageError(f"{label} dimensions are outside the approved 51..59 range")
     return width, height
 
 

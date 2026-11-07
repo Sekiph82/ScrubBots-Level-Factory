@@ -48,7 +48,7 @@ def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, s
         if (not isinstance(value, dict) or value.get("schema") != "scrubbots-pixellab-atlas-transaction/v1"
                 or type(atlas_sha) is not str or len(atlas_sha) != 64
                 or state not in {"IN_PROGRESS", "FINALIZED"}
-                or not isinstance(frames, list) or len(frames) != 2 or any(type(part) is not int or not 1 <= part <= 59 for part in frames)
+                or not isinstance(frames, list) or len(frames) != 2 or any(type(part) is not int or not 51 <= part <= 59 for part in frames)
                 or atlas_dimensions != [frames[0] * 4, frames[1] * 4]
                 or value.get("atlas_filename") != f"atlas-{atlas_sha}.png"
                 or not isinstance(slices, list) or len(slices) != 16
