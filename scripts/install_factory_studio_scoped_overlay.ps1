@@ -1,5 +1,8 @@
 [CmdletBinding()]
-param([switch]$Apply)
+param(
+    [switch]$Apply,
+    [string[]]$OnlyPaths = @()
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -40,6 +43,15 @@ $relativePaths = @(
 	'src/scrubbots_pixel_factory/owner_release_library.py',
     'src/scrubbots_pixel_factory/pixellab_pro_atlas.py'
 )
+if ($OnlyPaths.Count -gt 0) {
+    $requestedPaths = @($OnlyPaths | Select-Object -Unique)
+    if ($requestedPaths.Count -ne $OnlyPaths.Count) { throw 'OnlyPaths contains a duplicate managed path.' }
+    foreach ($requestedPath in $requestedPaths) {
+        if ($requestedPath -cnotin $relativePaths) { throw "OnlyPaths contains a path outside the scoped overlay allowlist: $requestedPath" }
+    }
+    $relativePaths = @($relativePaths | Where-Object { $_ -cin $requestedPaths })
+    if ($relativePaths.Count -ne $requestedPaths.Count) { throw 'OnlyPaths could not be resolved to the scoped overlay allowlist.' }
+}
 $authorizedOverlayAdditions = @(
 	'level_factory/project.godot',
 	'level_factory/scripts/factory_studio_shell.gd',
@@ -294,6 +306,35 @@ elseif ($manifestSha256 -cin @(
     $priorCanonicalCrlf = [Text.UTF8Encoding]::new($false).GetBytes($priorCanonicalLf.Replace("`n", "`r`n"))
     if ((Get-Sha256Bytes $priorCanonicalCrlf) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') { throw 'Prior V05 verify.py receipt does not reproduce exact source-at-install bytes.' }
     if ((Get-Sha256 (Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar)))) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') { throw 'Installed verify.py no longer matches its prior successful V05 receipt.' }
+    $verifyRepairAuthorized = $true
+}
+elseif ($manifestSha256 -ceq '25bb54d083e8c654def98a8edc2b39e99346b3a1fd2ab557ca610ad52c5cfa2b') {
+    # Exact published R10 V06 scoped-install manifest, verified by the
+    # append-only builder record at 1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2.
+    # Trust this state only when its final exact UI receipt and historical
+    # verify.py bytes still match the published receipt chain.
+    $priorReceipt = @($manifest.overlayReceipts)[-1]
+    $uiPath = 'level_factory/scripts/factory_studio_exact_ui.gd'
+    $uiReceipt = @($priorReceipt.files | Where-Object path -ceq $uiPath)
+    if ($priorReceipt.taskId -cne 'SB-LFX-018-R05-M03' -or
+        $priorReceipt.sourceCommit -cne '1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2' -or
+        $priorReceipt.sourceHead -cne '1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2' -or
+        [string]$priorReceipt.writerExclusionMethod -cnotlike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -or
+        $uiReceipt.Count -ne 1 -or
+        -not [bool]$uiReceipt[0].priorExists -or
+        [string]$uiReceipt[0].priorSha256 -cne '5f08fe2a4884c3804964e5ee45f56081acc71887cddb0b741bb5e2fa01a324e1' -or
+        [string]$uiReceipt[0].sha256 -cne '5fd2793482b81fbe2cb4b47458d2f13c7428aaba7cf3c02487e889609aa09a13' -or
+        [int64]$uiReceipt[0].bytes -ne 265253) {
+        throw 'Exact R10 V06 installed UI receipt or writer-exclusion proof is missing or inconsistent.'
+    }
+    if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') {
+        throw 'R10 V06 manifest does not retain the exact published verify.py receipt.'
+    }
+    $verifyTarget = Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+    Assert-NoReparsePath $verifyTarget
+    if ((Get-Sha256 $verifyTarget) -cne '151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3') {
+        throw 'Installed verify.py differs from the exact R10 V06 manifest receipt.'
+    }
     $verifyRepairAuthorized = $true
 }
 elseif ($manifestSha256 -ceq '53d2305a67685e6a782b8273ca9f3d1024a5b7d9dd9a9ba14453c64b0be43367') {

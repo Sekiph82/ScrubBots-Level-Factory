@@ -15,6 +15,9 @@ from pathlib import Path
 import re
 import sys
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+
 ROOT = Path(__file__).resolve().parents[1]
 JOBS = ROOT / "level_factory" / "output" / "studio-extensions" / "png-batches" / "jobs"
 PIPELINES = ROOT / "level_factory" / "output" / "studio-extensions" / "pipelines"
@@ -58,6 +61,10 @@ def _name_match(item: dict) -> str | None:
 def _explain(reason: str) -> str:
     r = reason.upper()
     if "READY_POOL_ENTRY_FAILED" in r:
+        if "REAL_PLAY_V1 TIMED OUT AFTER" in r:
+            return "Gerçek oyun doğrulaması süre sınırına ulaştı; bu sonuç seviyenin çözümsüz olduğunu kanıtlamaz."
+        if "WON_ROBUST" in r and "1/30" in r and "1/60" in r and "1/120" in r:
+            return "Eski kabul kuralı üç FPS hızının da kazanılmasını istiyordu. Kayıt, 1/30, 1/60 ve 1/120'nin hepsinde kazanıldığını kanıtlamadı; bu, 1/60'ta kaybedildiğini göstermez."
         if "REAL_PLAY_V1 LOST" in r:
             return "Solver buldu ve replay WIN gördü, ama gerçek oyun oynatımında tık sırası kaybetti veya tıkandı. Release Pool bu yüzden reddetti."
         if "REAL_PLAY_V1 WON_CANONICAL_ONLY" in r:

@@ -127,6 +127,30 @@ def test_repeat_v06_install_requires_exact_manifest_receipt_and_verify_hashes() 
         assert sha256 in source
 
 
+def test_current_r10_v06_manifest_requires_its_exact_ui_receipt_and_verify_hashes() -> None:
+    source = _installer()
+    for value in (
+        "25bb54d083e8c654def98a8edc2b39e99346b3a1fd2ab557ca610ad52c5cfa2b",
+        "1c669f50d6f44666c6d99dbc5b6c7f1f12d634d2",
+        "5f08fe2a4884c3804964e5ee45f56081acc71887cddb0b741bb5e2fa01a324e1",
+        "5fd2793482b81fbe2cb4b47458d2f13c7428aaba7cf3c02487e889609aa09a13",
+        "151a95682b83ffdc9fe44368ab7ddf04c5dd89923e8a4192297019b02fc525a3",
+        "Exact R10 V06 installed UI receipt or writer-exclusion proof is missing or inconsistent.",
+    ):
+        assert value in source
+    assert "Windows FileStream deny-write handles on every existing replacement target and install manifest;*" in source
+    assert "[int64]$uiReceipt[0].bytes -ne 265253" in source
+
+
+def test_scoped_overlay_can_be_narrowed_to_exact_allowlisted_paths() -> None:
+    source = _installer()
+    assert "[string[]]$OnlyPaths = @()" in source
+    assert "OnlyPaths contains a duplicate managed path." in source
+    assert "OnlyPaths contains a path outside the scoped overlay allowlist" in source
+    assert "$relativePaths = @($relativePaths | Where-Object { $_ -cin $requestedPaths })" in source
+    assert "OnlyPaths could not be resolved to the scoped overlay allowlist." in source
+
+
 def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() -> None:
     source = _installer()
     assert "OpenProcess(0x1000" in source
