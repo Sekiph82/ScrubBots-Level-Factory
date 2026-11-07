@@ -151,6 +151,15 @@ def test_scoped_overlay_can_be_narrowed_to_exact_allowlisted_paths() -> None:
     assert "OnlyPaths could not be resolved to the scoped overlay allowlist." in source
 
 
+def test_unselected_verify_file_must_match_manifest_without_requiring_repair_history() -> None:
+    source = _installer()
+    assert "elseif ($verifyPath -cin $relativePaths)" in source
+    assert "Unselected verify.py is missing from the installed runtime." in source
+    assert "Unselected verify.py differs from its installed manifest hash." in source
+    assert "(Get-Sha256 $verifyTarget).ToLowerInvariant() -cne $expectedVerifySha256" in source
+    assert "Historical verify.py repair requires the exact legacy manifest or an exact recognized prior overlay receipt manifest." in source
+
+
 def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() -> None:
     source = _installer()
     assert "OpenProcess(0x1000" in source

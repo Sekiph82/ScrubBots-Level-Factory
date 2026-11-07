@@ -380,7 +380,23 @@ elseif ($manifestSha256 -ceq '53d2305a67685e6a782b8273ca9f3d1024a5b7d9dd9a9ba144
     }
     $verifyRepairAuthorized = $true
 }
-else { throw 'Historical verify.py repair requires the exact legacy manifest or the exact prior V05 receipt manifest.' }
+elseif ($verifyPath -cin $relativePaths) {
+    throw 'Historical verify.py repair requires the exact legacy manifest or an exact recognized prior overlay receipt manifest.'
+}
+else {
+    # A scoped overlay that does not touch verify.py does not need historical
+    # repair provenance. Still fail closed if the installed bytes have drifted
+    # from the exact manifest entry; only skip the unrelated repair-chain gate.
+    $verifyTarget = Join-Path $runtimeRoot ($verifyPath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+    Assert-NoReparsePath $verifyTarget
+    if (-not (Test-Path -LiteralPath $verifyTarget -PathType Leaf)) {
+        throw 'Unselected verify.py is missing from the installed runtime.'
+    }
+    $expectedVerifySha256 = ([string]$verifyEntries[0].sha256).ToLowerInvariant()
+    if ((Get-Sha256 $verifyTarget).ToLowerInvariant() -cne $expectedVerifySha256) {
+        throw 'Unselected verify.py differs from its installed manifest hash.'
+    }
+}
 if ($verifyRepairAuthorized) { $authorizedRepairHashes[$verifyPath] = $historicVerifyHash }
 $overlayAdditions = @()
 $plan = @()
