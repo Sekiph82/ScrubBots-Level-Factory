@@ -75,7 +75,9 @@ def _pipeline_status_dir(disposition: object) -> str:
         return _PIPELINE_STATUS_DIRS["FAILED"]
     if state == "REJECTED":
         return _PIPELINE_STATUS_DIRS["REJECTED"]
-    return _PIPELINE_STATUS_DIRS["PENDING"]
+    if state in {"PENDING", "RUNNING", "INTERRUPTED", "PARTIAL / STOPPED", "COMPLETE"}:
+        return _PIPELINE_STATUS_DIRS["PENDING"]
+    raise StudioExtensionError(f"pipeline disposition is not recognized for canonical storage: {state or 'EMPTY'}")
 
 
 def _pipeline_paths() -> list[Path]:

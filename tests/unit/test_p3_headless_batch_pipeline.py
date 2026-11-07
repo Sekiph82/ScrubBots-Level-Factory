@@ -20,6 +20,46 @@ from scrubbots_pixel_factory.headless_pipeline import (
 from scrubbots_pixel_factory.output.png import encode_logical_png
 
 
+@pytest.mark.parametrize(
+    ("disposition", "expected"),
+    [
+        ("READY", "ready"),
+        ("FAILED", "failed"),
+        ("UNAVAILABLE", "failed"),
+        ("ERROR", "failed"),
+        ("REJECTED", "rejected"),
+        ("PENDING", "pending"),
+        ("RUNNING", "pending"),
+        ("INTERRUPTED", "pending"),
+        ("PARTIAL / STOPPED", "pending"),
+        ("COMPLETE", "pending"),
+    ],
+)
+def test_pipeline_dispositions_route_to_known_release_pool_status(disposition: str, expected: str) -> None:
+    assert studio._pipeline_status_dir(disposition) == expected
+
+
+def test_unknown_pipeline_disposition_fails_closed() -> None:
+    with pytest.raises(studio.StudioExtensionError, match="not recognized"):
+        studio._pipeline_status_dir("INVENTED_STATE")
+
+
+@pytest.mark.parametrize(
+    ("disposition", "expected_directory"),
+    [("READY", "Ready"), ("FAILED", "Failed"), ("REJECTED", "Rejected"), ("PENDING", "Pending")],
+)
+def test_new_pipeline_records_are_written_to_canonical_status_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, disposition: str, expected_directory: str,
+) -> None:
+    monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path)
+    run_id = f"pipeline-status-{disposition.lower()}"
+
+    path = studio._write_pipeline_record({"run_id": run_id, "disposition": disposition})
+
+    assert path == tmp_path / "data" / "Release Pool" / expected_directory / "Pipelines" / f"{run_id}.json"
+    assert json.loads(path.read_text(encoding="utf-8"))["disposition"] == disposition
+
+
 def test_headless_job_events_use_release_pool_and_keep_legacy_resume_path(tmp_path: Path, monkeypatch) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
