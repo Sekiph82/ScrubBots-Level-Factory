@@ -136,6 +136,16 @@ var _activity_phase_label: Label
 var _activity_scroll: ScrollContainer
 var _activity_rows: VBoxContainer
 var _activity_events: Array[Dictionary] = []
+# The canonical JSONL still records every solver heartbeat. Only the visible
+# Activity row is compacted; the verified event chain must remain untouched.
+var _activity_solver_row: Label
+var _activity_solver_start_event_ms := -1
+var _activity_solver_start_tick_ms := -1
+var _activity_solver_latest_event_ms := -1
+var _activity_solver_terminal_elapsed_ms := -1
+var _activity_solver_last_bucket := -1
+var _activity_solver_state := "RUNNING"
+var _activity_solver_last_message := ""
 var _pipeline_thread: Thread
 var _pipeline_mutex := Mutex.new()
 var _pipeline_worker_done := false
@@ -275,6 +285,8 @@ func _process(_delta: float) -> void:
 	if not _shutdown_requested and not _activity_run_id.is_empty() and _activity_terminal_state.is_empty() and _operation_running:
 		_poll_pipeline_activity()
 		_refresh_activity_header()
+	if not _shutdown_requested:
+		_refresh_solver_activity_summary()
 	if _pipeline_thread != null:
 		_pipeline_mutex.lock()
 		var completed := _pipeline_worker_done
@@ -3422,8 +3434,7 @@ func _run_single_level_pipeline() -> void:
 	_activity_backend_disposition = ""
 	_activity_event_backend_disposition = ""
 	_activity_integrity_error = ""
-	_activity_events.clear()
-	for child in _activity_rows.get_children(): child.queue_free()
+	_clear_activity_rows()
 	var run_button := get_node_or_null("RunLevelPipeline") as Button
 	if run_button != null: run_button.disabled = true
 	var solve_button := get_node_or_null("SolveAgain") as Button
@@ -4036,9 +4047,85 @@ func _consume_activity_bytes(chunk: PackedByteArray) -> void:
 		_refresh_activity_header()
 
 
+func _solver_heartbeat_elapsed_ms(message: String) -> int:
+	# E.g. "game solver: BRIDGE_SOLVER_PROGRESS ... elapsed=15.2s".
+	# Use actual bridge solver time when present, not pipeline startup time.
+	var marker := message.find("elapsed=")
+	if marker < 0:
+		return -1
+	var tail := message.substr(marker + "elapsed=".length())
+	var value := tail.get_slice("s", 0).strip_edges()
+	if not value.is_valid_float():
+		return -1
+	var seconds := value.to_float()
+	if not is_finite(seconds) or seconds < 0.0 or seconds > 86400.0:
+		return -1
+	return roundi(seconds * 1000.0)
+
+
+func _refresh_solver_activity_summary(force: bool = false) -> void:
+	if _activity_solver_row == null or not is_instance_valid(_activity_solver_row):
+		return
+	var elapsed_ms := _activity_solver_terminal_elapsed_ms
+	if elapsed_ms < 0:
+		elapsed_ms = maxi(0, Time.get_ticks_msec() - _activity_solver_start_tick_ms)
+		if _activity_solver_latest_event_ms >= 0:
+			elapsed_ms = maxi(elapsed_ms, _activity_solver_latest_event_ms - _activity_solver_start_event_ms)
+	# While running, update this SINGLE row every five seconds, not by appending.
+	# On completion, display the precise terminal duration in the same row.
+	var elapsed_seconds := maxi(0, floori(float(elapsed_ms) / 1000.0))
+	var shown_seconds := elapsed_seconds if _activity_solver_terminal_elapsed_ms >= 0 else (elapsed_seconds / 5) * 5
+	if not force and shown_seconds == _activity_solver_last_bucket:
+		return
+	_activity_solver_last_bucket = shown_seconds
+	var icon := "•"
+	if _activity_solver_state == "PASS":
+		icon = "✓"
+	elif _activity_solver_state not in ["RUNNING", "INCOMPLETE"]:
+		icon = "!"
+	var caption := "Total" if _activity_solver_terminal_elapsed_ms >= 0 else "Elapsed"
+	_activity_solver_row.text = "%s SOLVE · %s · %s %02d:%02d" % [
+		icon, _activity_solver_state.replace("_", " "), caption,
+		floori(float(shown_seconds) / 60.0), posmod(shown_seconds, 60),
+	]
+	_activity_solver_row.tooltip_text = _activity_solver_last_message
+	var color := Color("#7bd6a2") if icon == "✓" else Color("#f09a8a") if icon == "!" else Color("#c5d2e5")
+	_activity_solver_row.add_theme_color_override("font_color", color)
+
+
 func _append_activity_row(body: Dictionary) -> void:
 	if _activity_rows == null or str(body.get("source_id", _selected_import_source_id)) != _selected_import_source_id:
 		return
+	var stage := str(body.get("stage", "UNKNOWN"))
+	var state := str(body.get("state", "UNKNOWN"))
+	var full_message := str(body.get("message", ""))
+	var elapsed_ms := maxi(0, int(body.get("elapsed_ms", 0)))
+	# Solver heartbeats sometimes arrive as ANALYZE/PLAN with a "game solver:"
+	# prefix, not as SOLVE. Treat either as progress of the same solver row.
+	var is_solver_heartbeat := state == "RUNNING" and (
+		stage == "SOLVE" or full_message.contains("BRIDGE_SOLVER_PROGRESS")
+		or full_message.contains("BRIDGE_SOLVER_BUDGET_EXTENDED")
+	)
+	var solver_terminal := stage == "SOLVE" and state != "RUNNING"
+	if is_solver_heartbeat and _activity_solver_terminal_elapsed_ms >= 0:
+		return
+	if is_solver_heartbeat and _activity_solver_row != null and is_instance_valid(_activity_solver_row):
+		_activity_solver_latest_event_ms = elapsed_ms
+		_activity_solver_last_message = full_message
+		_refresh_solver_activity_summary(true)
+		return
+	if solver_terminal and _activity_solver_row != null and is_instance_valid(_activity_solver_row):
+		_activity_solver_terminal_elapsed_ms = maxi(0, elapsed_ms - _activity_solver_start_event_ms)
+		_activity_solver_state = state
+		_activity_solver_last_message = full_message
+		_refresh_solver_activity_summary(true)
+		return
+	if stage == "PIPELINE" and _activity_solver_row != null and is_instance_valid(_activity_solver_row) and _activity_solver_terminal_elapsed_ms < 0:
+		# An interrupted solver has no terminal SOLVE verdict; don't fake PASS.
+		_activity_solver_terminal_elapsed_ms = maxi(0, elapsed_ms - _activity_solver_start_event_ms)
+		_activity_solver_state = "INCOMPLETE"
+		_activity_solver_last_message = "No terminal solver verdict; " + full_message
+		_refresh_solver_activity_summary(true)
 	var scrollbar := _activity_scroll.get_v_scroll_bar()
 	var follow_latest := scrollbar.value >= scrollbar.max_value - scrollbar.page - 12.0
 	var row := Label.new()
@@ -4048,18 +4135,33 @@ func _append_activity_row(body: Dictionary) -> void:
 	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_theme_font_size_override("font_size", 10)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var state := str(body.get("state", "UNKNOWN"))
-	var icon := "✓" if state in ["PASS", "READY"] else "!" if state in ["FAIL", "ERROR", "BLOCKED", "UNAVAILABLE", "TIMEOUT"] else "•"
-	var elapsed := floori(float(maxi(0, int(body.get("elapsed_ms", 0)))) / 1000.0)
-	var message := str(body.get("message", "")).replace("\n", " ").left(76)
-	row.text = "%02d:%02d  %s %s · %s — %s" % [floori(float(elapsed) / 60.0), posmod(elapsed, 60), icon, str(body.get("stage", "UNKNOWN")), state.replace("_", " "), message]
-	var color := Color("#7bd6a2") if icon == "✓" else Color("#f09a8a") if icon == "!" else Color("#e5bd73") if state == "WARNING" else Color("#c5d2e5")
-	row.add_theme_color_override("font_color", color)
+	if is_solver_heartbeat:
+		_activity_solver_row = row
+		var reported_ms := _solver_heartbeat_elapsed_ms(full_message)
+		var seed_ms := maxi(0, reported_ms)
+		_activity_solver_start_tick_ms = Time.get_ticks_msec() - seed_ms
+		_activity_solver_start_event_ms = maxi(0, elapsed_ms - seed_ms)
+		_activity_solver_latest_event_ms = elapsed_ms
+		_activity_solver_terminal_elapsed_ms = -1
+		_activity_solver_last_bucket = -1
+		_activity_solver_state = "RUNNING"
+		_activity_solver_last_message = full_message
+	else:
+		var icon := "✓" if state in ["PASS", "READY"] else "!" if state in ["FAIL", "ERROR", "BLOCKED", "UNAVAILABLE", "TIMEOUT"] else "•"
+		var elapsed := floori(float(elapsed_ms) / 1000.0)
+		var message := full_message.replace("\n", " ").left(76)
+		row.text = "%02d:%02d  %s %s · %s — %s" % [floori(float(elapsed) / 60.0), posmod(elapsed, 60), icon, stage, state.replace("_", " "), message]
+		var color := Color("#7bd6a2") if icon == "✓" else Color("#f09a8a") if icon == "!" else Color("#e5bd73") if state == "WARNING" else Color("#c5d2e5")
+		row.add_theme_color_override("font_color", color)
 	_activity_rows.add_child(row)
 	_activity_events.append(body.duplicate(true))
+	if is_solver_heartbeat:
+		_refresh_solver_activity_summary(true)
 	while _activity_events.size() > 200:
 		_activity_events.pop_front()
 		var first := _activity_rows.get_child(0)
+		if first == _activity_solver_row:
+			_activity_solver_row = null
 		_activity_rows.remove_child(first)
 		first.queue_free()
 	if follow_latest:
@@ -4068,6 +4170,14 @@ func _append_activity_row(body: Dictionary) -> void:
 
 func _clear_activity_rows() -> void:
 	_activity_events.clear()
+	_activity_solver_row = null
+	_activity_solver_start_event_ms = -1
+	_activity_solver_start_tick_ms = -1
+	_activity_solver_latest_event_ms = -1
+	_activity_solver_terminal_elapsed_ms = -1
+	_activity_solver_last_bucket = -1
+	_activity_solver_state = "RUNNING"
+	_activity_solver_last_message = ""
 	if _activity_rows == null:
 		return
 	for child in _activity_rows.get_children():
