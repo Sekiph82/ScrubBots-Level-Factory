@@ -32,8 +32,21 @@ def _ready_fixture(root: Path):
     }), encoding="utf-8")
     level = root / "level.json"
     plan = root / "plan.json"
-    level.write_text("{}", encoding="utf-8")
-    plan.write_text("{}", encoding="utf-8")
+    level.write_text(json.dumps({"id": "level-fixture"}), encoding="utf-8")
+    plan.write_text(json.dumps({"levelId": "level-fixture", "intendedColumnClicks": [1]}), encoding="utf-8")
+    real_play_path = root / "real_play_result_v2.json"
+    real_play = {
+        "schema": "scrubbots.real_play_file_result.v2", "model": "real_play_v1",
+        "mode": "canonical_60hz", "canonicalDt": "1/60", "verdict": "WON_CANONICAL", "exitCode": 0,
+        "levelFile": str(level.resolve()), "planFile": str(plan.resolve()), "levelId": "level-fixture",
+        "levelSha256": hashlib.sha256(level.read_bytes()).hexdigest(),
+        "planSha256": hashlib.sha256(plan.read_bytes()).hexdigest(), "planClicks": [1],
+        "sourceSha256": "a" * 64, "gameCommit": "a" * 40, "runId": "fixture-run", "timestamp": "2026-11-07T12:00:00Z",
+        "searched": False,
+        "perDt": {"1/60": {"won": True, "final": {"supplyExhausted": True, "targetsCleared": True,
+            "slotsEmpty": True, "activeRobots": 0, "boardResidue": 0}}},
+    }
+    real_play_path.write_text(json.dumps(real_play), encoding="utf-8")
     official = {
         "ok": True, "vector": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7],
         "challengeScore": 50.0,
@@ -47,7 +60,7 @@ def _ready_fixture(root: Path):
             "state": "READY", "column_count": 4,
             "acceptance": {"solver_status": "SOLVED", "replay": "WIN"},
             "difficulty": {"score": 50.0, "class": "MEDIUM"},
-            "files": {"level": str(level), "supply_plan": str(plan)},
+            "files": {"level": str(level), "supply_plan": str(plan), "real_play_result": str(real_play_path)},
             "solver_metrics": {"official_difficulty_v1": official},
         },
     }
@@ -80,19 +93,7 @@ def _pool_patches(root, output, candidate_list, latest_run, latest_review, pipel
 def test_ready_auto_release_pool_entry_reads_back_exactly_once(tmp_path):
     output, run, candidate, _path, candidates, latest, review, pipeline_file = _ready_fixture(tmp_path)
     context = _pool_patches(tmp_path, output, candidates, latest, review, pipeline_file)
-    def fake_real_play(level_file, plan_file, result_file):
-        level_sha = hashlib.sha256(Path(level_file).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-        plan_sha = hashlib.sha256(Path(plan_file).read_bytes().replace(b"\r\n", b"\n")).hexdigest()
-        result = {"schema": "scrubbots.real_play_file_result.v1", "model": "real_play_v1", "verdict": "WON_ROBUST", "exitCode": 0,
-                  "levelSha256": level_sha, "planSha256": plan_sha, "gameCommit": "a" * 40}
-        Path(result_file).write_text(json.dumps(result), encoding="utf-8")
-        raw = Path(result_file).read_bytes()
-        return {"result": result, "result_path": str(result_file), "result_sha256": hashlib.sha256(raw).hexdigest(),
-                "level_sha256": level_sha, "plan_sha256": plan_sha, "settings": {}}
-
-    with context[0], context[1], context[2], context[3], context[4], context[5], patch.object(
-        release_pool, "ensure_real_play_gate", side_effect=fake_real_play
-    ), patch(
+    with context[0], context[1], context[2], context[3], context[4], context[5], patch(
         "scrubbots_pixel_factory.supply_pipeline.game_rules.GameRules"
     ) as rules, patch.object(
         release_pool,

@@ -16,9 +16,13 @@ from ..studio_lifecycle import StudioShutdownRequested, run_studio_child_interru
 
 
 RESULT_SCHEMA = "scrubbots.real_play_file_result.v1"
+CANONICAL_RESULT_SCHEMA = "scrubbots.real_play_file_result.v2"
 REAL_PLAY_MODEL = "real_play_v1"
+CANONICAL_MODE = "canonical_60hz"
+CANONICAL_DT = "1/60"
 SUPPORTED_VERDICTS = {
     "WON_ROBUST",
+    "WON_CANONICAL",
     "WON_CANONICAL_ONLY",
     "LOST",
     "SEARCH_EXHAUSTED",
@@ -181,9 +185,11 @@ def _validate_result(
     plan_clicks: list[int],
     level_sha: str,
     plan_sha: str,
+    source_sha: str | None,
     allow_search: bool,
 ) -> None:
-    if result.get("schema") != RESULT_SCHEMA:
+    schema = result.get("schema")
+    if schema not in {RESULT_SCHEMA, CANONICAL_RESULT_SCHEMA}:
         raise RealPlayGateError(f"real_play_v1 result has wrong schema: {result.get('schema')!r}")
     if result.get("model") != REAL_PLAY_MODEL:
         raise RealPlayGateError(f"real_play_v1 result has wrong model: {result.get('model')!r}")
@@ -193,7 +199,7 @@ def _validate_result(
         )
     if result.get("verdict") not in SUPPORTED_VERDICTS:
         raise RealPlayGateError(f"real_play_v1 returned unsupported verdict: {result.get('verdict')!r}")
-    expected_exit = 0 if result["verdict"] == "WON_ROBUST" else 2 if result["verdict"] == "INVALID_INPUT" else 1
+    expected_exit = 0 if result["verdict"] in {"WON_ROBUST", "WON_CANONICAL"} else 2 if result["verdict"] == "INVALID_INPUT" else 1
     if process_exit != expected_exit:
         raise RealPlayGateError(
             f"real_play_v1 verdict/exit mismatch: {result['verdict']} with process exit {process_exit}"
@@ -218,7 +224,33 @@ def _validate_result(
         raise RealPlayGateError("real_play_v1 reported searched=true for a run without --search")
     if not isinstance(result.get("gameCommit"), str) or not result["gameCommit"]:
         raise RealPlayGateError("real_play_v1 result gameCommit is missing")
-    if result["verdict"] == "WON_ROBUST":
+    if schema == CANONICAL_RESULT_SCHEMA:
+        if result.get("mode") != CANONICAL_MODE or result.get("canonicalDt") != CANONICAL_DT:
+            raise RealPlayGateError("canonical real-play result must declare canonical_60hz at 1/60")
+        if result.get("verdict") == "WON_ROBUST":
+            raise RealPlayGateError("canonical-only schema must use WON_CANONICAL; WON_ROBUST retains its historical meaning")
+        if source_sha is not None and result.get("sourceSha256") != source_sha:
+            raise RealPlayGateError("canonical real-play sourceSha256 does not match the exact source artwork")
+        if not isinstance(result.get("runId"), str) or not result["runId"]:
+            raise RealPlayGateError("canonical real-play result runId is missing")
+        if not isinstance(result.get("timestamp"), str) or not result["timestamp"]:
+            raise RealPlayGateError("canonical real-play result timestamp is missing")
+        if result["verdict"] == "WON_CANONICAL":
+            per_dt = result.get("perDt")
+            canonical = per_dt.get(CANONICAL_DT) if isinstance(per_dt, dict) else None
+            final = canonical.get("final") if isinstance(canonical, dict) else None
+            if (
+                not isinstance(canonical, dict)
+                or canonical.get("won") is not True
+                or not isinstance(final, dict)
+                or final.get("supplyExhausted") is not True
+                or final.get("targetsCleared") is not True
+                or final.get("slotsEmpty") is not True
+                or final.get("activeRobots") != 0
+                or final.get("boardResidue") != 0
+            ):
+                raise RealPlayGateError("WON_CANONICAL result lacks complete 1/60 game-host WIN final-state evidence")
+    elif result["verdict"] == "WON_ROBUST":
         per_dt = result.get("perDt")
         if not isinstance(per_dt, dict) or any(
             not isinstance(per_dt.get(dt), dict) or per_dt[dt].get("won") is not True
@@ -238,6 +270,7 @@ def _invoke(
     level: dict[str, Any],
     level_sha: str,
     plan_sha: str,
+    source_sha: str | None,
     *,
     search: bool,
     process_env: dict[str, str] | None,
@@ -256,9 +289,12 @@ def _invoke(
         str(plan_path),
         "--out",
         str(result_path),
+        "--canonical-only",
     ]
     if search:
         arguments.append("--search")
+    if source_sha is not None:
+        arguments.extend(["--source-sha256", source_sha])
     try:
         completed = run_studio_child_interruptibly(
             arguments,
@@ -296,8 +332,13 @@ def _invoke(
         clicks,
         level_sha,
         plan_sha,
+        source_sha,
         search,
     )
+    if result.get("schema") != CANONICAL_RESULT_SCHEMA:
+        raise RealPlayGateError(
+            "ScrubBots file tool does not support the required canonical-only result contract; refusing legacy FPS-gated output"
+        )
     if result.get("verdict") != "INVALID_INPUT" and result.get("levelId") != level.get("id"):
         raise RealPlayGateError("supply plan levelId does not match the exact level id")
     return result
@@ -321,11 +362,11 @@ def _format_rejection(result: dict[str, Any], result_path: Path) -> str:
             ]
         detail = f"stuck after click {stuck}; " + (", ".join(slot_states) if slot_states else "slot state unavailable")
     elif verdict == "WON_CANONICAL_ONLY":
-        detail = "wins at 1/60 only; failed a sensitivity dt"
+        detail = "legacy result does not satisfy the current canonical-only proof contract"
     elif verdict == "SEARCH_EXHAUSTED":
         detail = "no supply-column order won under real play"
     elif verdict == "SEARCH_BUDGET":
-        detail = "search budget exhausted without a robust win"
+        detail = "canonical 60-Hz search budget exhausted without a win; this is inconclusive, not proof of impossibility"
     else:
         detail = "real-play verdict did not authorize readiness"
     return f"real_play_v1 {verdict}: {detail}. Result evidence: {result_path}"
@@ -384,8 +425,9 @@ def ensure_real_play_gate(
     settings: dict[str, Any] | None = None,
     studio_root: str | Path | None = None,
     environ: dict[str, str] | None = None,
+    source_sha256: str | None = None,
 ) -> dict[str, Any]:
-    """Run real_play_v1 and require a hash-bound robust win before acceptance."""
+    """Run real_play_v1 in canonical-only mode and require a hash-bound game-host win."""
 
     from .. import studio_extensions as studio
 
@@ -422,6 +464,8 @@ def ensure_real_play_gate(
         raise RealPlayGateError("supply plan intendedColumnClicks must be a non-empty array of positive integer columns")
     if not isinstance(plan.get("levelId"), str) or plan.get("levelId") != level.get("id"):
         raise RealPlayGateError("supply plan levelId must exactly match the level id")
+    if source_sha256 is not None and not re.fullmatch(r"[0-9a-f]{64}", source_sha256):
+        raise RealPlayGateError("source_sha256 must be a lowercase SHA-256 digest")
     if not result_path.is_file() and result_path.exists():
         raise RealPlayGateError(f"real-play evidence path is not a regular file: {result_path}")
 
@@ -436,10 +480,11 @@ def ensure_real_play_gate(
         level,
         level_sha,
         plan_sha,
+        source_sha256,
         search=False,
         process_env=process_env,
     )
-    if initial.get("verdict") == "WON_ROBUST" and initial.get("searched") is False:
+    if initial.get("verdict") in {"WON_ROBUST", "WON_CANONICAL"} and initial.get("searched") is False:
         result = initial
     elif initial.get("verdict") in {"LOST", "WON_CANONICAL_ONLY"}:
         searched = _invoke(
@@ -453,14 +498,16 @@ def ensure_real_play_gate(
             level,
             level_sha,
             plan_sha,
+            source_sha256,
             search=True,
             process_env=process_env,
         )
-        if searched.get("verdict") != "WON_ROBUST" or searched.get("searched") is not True:
+        if searched.get("verdict") not in {"WON_ROBUST", "WON_CANONICAL"} or searched.get("searched") is not True:
             raise RealPlayGateError(_format_rejection(searched, result_path))
         search_result = searched.get("search")
-        if not isinstance(search_result, dict) or search_result.get("status") != "SOLVED" or search_result.get("robust") is not True:
-            raise RealPlayGateError("real_play_v1 search result did not prove a robust SOLVED order")
+        search_win_key = "canonicalWin" if searched.get("schema") == CANONICAL_RESULT_SCHEMA else "robust"
+        if not isinstance(search_result, dict) or search_result.get("status") != "SOLVED" or search_result.get(search_win_key) is not True:
+            raise RealPlayGateError("real_play_v1 search result did not prove a winning order under its declared game mode")
         searched_clicks = searched.get("searchedClicks")
         if not isinstance(searched_clicks, list) or len(searched_clicks) != len(clicks):
             raise RealPlayGateError("real_play_v1 search returned a missing or wrong-length searchedClicks order")
@@ -476,10 +523,11 @@ def ensure_real_play_gate(
             level,
             level_sha,
             plan_sha,
+            source_sha256,
             search=False,
             process_env=process_env,
         )
-        if result.get("verdict") != "WON_ROBUST" or result.get("searched") is not False:
+        if result.get("verdict") not in {"WON_ROBUST", "WON_CANONICAL"} or result.get("searched") is not False:
             raise RealPlayGateError(_format_rejection(result, result_path))
     else:
         raise RealPlayGateError(_format_rejection(initial, result_path))

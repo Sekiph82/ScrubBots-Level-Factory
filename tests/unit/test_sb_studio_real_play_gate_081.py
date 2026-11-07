@@ -73,7 +73,7 @@ def _fixture(root: Path) -> dict[str, Path | dict[str, Any]]:
 def _result(
     fixture: dict[str, Path | dict[str, Any]],
     *,
-    verdict: str = "WON_ROBUST",
+    verdict: str = "WON_CANONICAL",
     exit_code: int = 0,
     searched: bool = False,
     plan_sha: str | None = None,
@@ -93,18 +93,32 @@ def _result(
         "levelId": "level_fake" if verdict != "INVALID_INPUT" else None,
         "levelSha256": level_sha or _normalized_sha(level) if verdict != "INVALID_INPUT" else None,
         "model": "real_play_v1",
+        "runId": "test-run-001",
+        "timestamp": "2026-11-07T12:00:00Z",
+        "sourceSha256": "d" * 64,
+        "mode": "canonical_60hz",
+        "canonicalDt": "1/60",
         "perDt": {
-            "1/30": {"won": verdict == "WON_ROBUST"},
-            "1/60": {"won": verdict == "WON_ROBUST", "stuckClickIndex": 27 if verdict == "LOST" else None, "slots": [{"index": 0, "state": "WAITING"}] if verdict == "LOST" else None},
-            "1/120": {"won": verdict == "WON_ROBUST"},
+            "1/60": {
+                "won": verdict == "WON_CANONICAL",
+                "stuckClickIndex": 27 if verdict == "LOST" else None,
+                "slots": [{"index": 0, "state": "WAITING"}] if verdict == "LOST" else None,
+                "final": {
+                    "supplyExhausted": verdict == "WON_CANONICAL",
+                    "targetsCleared": verdict == "WON_CANONICAL",
+                    "slotsEmpty": verdict == "WON_CANONICAL",
+                    "activeRobots": 0 if verdict == "WON_CANONICAL" else 1,
+                    "boardResidue": 0 if verdict == "WON_CANONICAL" else 1,
+                },
+            },
         } if verdict != "INVALID_INPUT" else {},
         "planClicks": list(clicks if clicks is not None else plan_value.get("intendedColumnClicks", [])) if verdict != "INVALID_INPUT" else [],
         "planFile": str(plan.resolve()) if verdict != "INVALID_INPUT" else None,
         "planSha256": plan_sha or _normalized_sha(plan) if verdict != "INVALID_INPUT" else None,
-        "schema": "scrubbots.real_play_file_result.v1",
-        "search": {"status": "SOLVED", "robust": True} if searched else None,
+        "schema": "scrubbots.real_play_file_result.v2",
+        "search": {"status": "SOLVED", "canonicalWin": True} if searched else None,
         "searched": searched,
-        "searchedClicks": [3, 2, 1] if searched and verdict == "WON_ROBUST" else None,
+        "searchedClicks": [3, 2, 1] if searched and verdict == "WON_CANONICAL" else None,
         "verdict": verdict,
     }
     return result
@@ -156,6 +170,7 @@ def _run_gate(fixture: dict[str, Path | dict[str, Any]], env: dict[str, str]) ->
         settings=settings,
         studio_root=fixture["factory"],
         environ=env,
+        source_sha256="d" * 64,
     )
 
 
@@ -163,18 +178,19 @@ def _stdout(result: dict[str, Any]) -> str:
     return "startup banner\nREAL_PLAY_RESULT " + json.dumps(result, sort_keys=True, separators=(",", ":")) + "\n"
 
 
-def test_fake_cli_won_robust_is_accepted_and_stdout_out_match(tmp_path: Path) -> None:
+def test_fake_cli_canonical_win_is_accepted_and_stdout_out_match(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path)
     result = _result(fixture)
     _script, env = _fake_cli(tmp_path, fixture, [(_stdout(result), 0)])
     evidence = _run_gate(fixture, env)
-    assert evidence["result"]["verdict"] == "WON_ROBUST"
+    assert evidence["result"]["verdict"] == "WON_CANONICAL"
     assert evidence["result"]["searched"] is False
     assert evidence["plan_sha256"] == _normalized_sha(Path(fixture["plan"]))
     assert Path(evidence["result_path"]).is_file()
     assert evidence["result_sha256"] == _sha(Path(evidence["result_path"]).read_bytes())
     args = (tmp_path / "args.txt").read_text(encoding="utf-8")
     assert "--level-file" in args and "--plan-file" in args and "--out" in args
+    assert "--canonical-only" in args
     assert "--search" not in args
 
 
@@ -206,7 +222,8 @@ def test_searched_clicks_splice_only_the_array_and_require_no_search_replay(tmp_
     assert evidence["plan_sha256"] == new_plan_sha
     assert evidence["result"]["searched"] is False
     calls = (tmp_path / "args.txt").read_text(encoding="utf-8").splitlines()
-    assert len(calls) == 3 and "--search" not in calls[0] and "--search" in calls[1] and "--search" not in calls[2]
+    assert len(calls) == 3 and all("--canonical-only" in call for call in calls)
+    assert "--search" not in calls[0] and "--search" in calls[1] and "--search" not in calls[2]
 
 
 @pytest.mark.parametrize(
@@ -246,6 +263,10 @@ def test_invalid_input_is_rejected_with_game_error_detail(tmp_path: Path) -> Non
         (lambda result: result.update(verdict="WON_ROBUST", exitCode=3), 3, "verdict/exit mismatch"),
         (lambda result: result.update(planSha256="0" * 64), 0, "planSha256 does not match"),
         (lambda result: result.update(levelSha256="0" * 64), 0, "levelSha256 does not match"),
+        (lambda result: result.update(schema="scrubbots.real_play_file_result.v1"), 0, "canonical-only result contract"),
+        (lambda result: result.update(canonicalDt="1/30"), 0, "canonical_60hz at 1/60"),
+        (lambda result: result.update(sourceSha256="0" * 64), 0, "sourceSha256 does not match"),
+        (lambda result: result["perDt"]["1/60"]["final"].update(slotsEmpty=False), 0, "complete 1/60 game-host WIN"),
     ],
 )
 def test_result_contract_mismatches_fail_closed(
@@ -336,6 +357,8 @@ def test_plan_change_after_pass_invalidates_release_pool_ready_evidence(tmp_path
     result = {
         "schema": "scrubbots.real_play_file_result.v1", "model": "real_play_v1",
         "verdict": "WON_ROBUST", "exitCode": 0,
+        "perDt": {dt: {"won": True} for dt in ("1/30", "1/60", "1/120")},
+        "planClicks": json.loads(plan.read_text(encoding="utf-8"))["intendedColumnClicks"],
         "levelSha256": _normalized_sha(level), "planSha256": _normalized_sha(plan), "gameCommit": "a" * 40,
     }
     result_path.write_text(json.dumps(result), encoding="utf-8")
@@ -359,6 +382,40 @@ def test_plan_change_after_pass_invalidates_release_pool_ready_evidence(tmp_path
         release_pool._validate_release_entry_real_play(entry, "fixture.json")
 
 
+def test_release_pool_accepts_only_complete_canonical_60hz_proof(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path)
+    level, plan = Path(fixture["level"]), Path(fixture["plan"])
+    result_path = Path(fixture["run"]) / "real_play_result_v2.json"
+    result = _result(fixture)
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    files = {
+        "level": {"path": str(level), "sha256": _sha(level.read_bytes())},
+        "supply_plan": {"path": str(plan), "sha256": _sha(plan.read_bytes())},
+        "real_play_result": {"path": str(result_path), "sha256": _sha(result_path.read_bytes())},
+    }
+    entry = {
+        "files": files,
+        "candidate_classification": {"source_sha256": result["sourceSha256"]},
+        "real_play": {
+            "model": result["model"], "verdict": result["verdict"], "exitCode": 0,
+            "resultSchema": result["schema"], "mode": result["mode"],
+            "sourceSha256": result["sourceSha256"], "runId": result["runId"],
+            "timestamp": result["timestamp"], "levelSha256": result["levelSha256"],
+            "planSha256": result["planSha256"], "gameCommit": result["gameCommit"],
+            "resultFile": str(result_path), "resultSha256": files["real_play_result"]["sha256"],
+        },
+    }
+    assert release_pool._validate_release_entry_real_play(entry, "canonical.json") is True
+    result["perDt"]["1/60"]["final"]["targetsCleared"] = False
+    changed_raw = json.dumps(result).encode("utf-8")
+    result_path.write_bytes(changed_raw)
+    changed_sha = _sha(changed_raw)
+    files["real_play_result"]["sha256"] = changed_sha
+    entry["real_play"]["resultSha256"] = changed_sha
+    with pytest.raises(release_pool.ReleaseError, match="canonical 60-Hz result is incomplete"):
+        release_pool._validate_release_entry_real_play(entry, "canonical.json")
+
+
 def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_proofs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
 ) -> None:
@@ -374,8 +431,21 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
     artwork.write_bytes(b"test artwork")
     level = run_dir / "level.json"
     plan = run_dir / "plan.json"
+    real_play_path = run_dir / "real_play_result_v2.json"
     level.write_text('{"id":"level_fake"}\n', encoding="utf-8")
     plan.write_text('{"levelId":"level_fake","intendedColumnClicks":[1]}\n', encoding="utf-8")
+    source_sha = "b" * 64
+    real_play_body = {
+        "schema": "scrubbots.real_play_file_result.v2", "model": "real_play_v1",
+        "mode": "canonical_60hz", "canonicalDt": "1/60", "verdict": "WON_CANONICAL", "exitCode": 0,
+        "levelFile": str(level.resolve()), "planFile": str(plan.resolve()), "levelId": "level_fake",
+        "levelSha256": _normalized_sha(level), "planSha256": _normalized_sha(plan), "planClicks": [1],
+        "sourceSha256": source_sha, "gameCommit": "c" * 40, "runId": "fixture-run", "timestamp": "2026-11-07T12:00:00Z",
+        "searched": False,
+        "perDt": {"1/60": {"won": True, "final": {"supplyExhausted": True, "targetsCleared": True,
+            "slotsEmpty": True, "activeRobots": 0, "boardResidue": 0}}},
+    }
+    real_play_path.write_text(json.dumps(real_play_body), encoding="utf-8")
     candidate = {
         "candidate_id": "candidate-owner-test", "source_path": "bundles/owner-test",
         "artwork_sha256": _sha(artwork.read_bytes()), "grid_hash": "grid-hash", "width": 1,
@@ -385,11 +455,10 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
         "run_id": "run-one", "disposition": "READY", "primary": {
             "state": "READY", "acceptance": {"solver_status": "SOLVED", "replay": "WIN"},
             "difficulty": {"class": "MEDIUM"},
-            "files": {"level": str(level), "supply_plan": str(plan)},
+            "files": {"level": str(level), "supply_plan": str(plan), "real_play_result": str(real_play_path)},
         },
     }
     pipeline_path.write_text(json.dumps(pipeline), encoding="utf-8")
-    source_sha = "b" * 64
     classification = {"source_sha256": source_sha}
     monkeypatch.setattr(release_pool, "validate_pool_candidate_provenance", lambda *_args: classification)
     monkeypatch.setattr(release_pool, "_candidate_source_lineage", lambda _candidate: {"source_id": "owner-test"})
@@ -402,30 +471,15 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
     monkeypatch.setattr(release_pool, "_pool_root", lambda: output_dir / "release-pool")
     monkeypatch.setattr(studio_extensions, "_pipeline_path", lambda _run_id: pipeline_path)
 
-    def fake_gate(level_file: Path, plan_file: Path, result_file: Path) -> dict[str, Any]:
-        body = {
-            "schema": "scrubbots.real_play_file_result.v1", "model": "real_play_v1",
-            "verdict": "WON_ROBUST", "exitCode": 0,
-            "levelSha256": _normalized_sha(level_file), "planSha256": _normalized_sha(plan_file),
-            "gameCommit": "c" * 40,
-        }
-        result_file.write_text(json.dumps(body), encoding="utf-8")
-        return {
-            "result": body, "result_path": str(result_file), "result_sha256": _sha(result_file.read_bytes()),
-            "level_sha256": body["levelSha256"], "plan_sha256": body["planSha256"], "settings": {},
-        }
-
-    monkeypatch.setattr(release_pool, "ensure_real_play_gate", fake_gate)
     pooled = release_pool.enter_release_pool(candidate, pipeline)
     entry_path = output_dir / "release-pool" / "candidate-owner-test-run-one-ready.json"
     entry = json.loads(entry_path.read_text(encoding="utf-8"))
     assert pooled["disposition"] == "ENTERED_RELEASE_POOL"
-    assert entry["real_play"]["verdict"] == "WON_ROBUST"
-    assert entry["files"]["real_play_result"]["path"].endswith("real_play_result_v1.json")
+    assert entry["real_play"]["verdict"] == "WON_CANONICAL"
+    assert entry["files"]["real_play_result"]["path"].endswith("real_play_result_v2.json")
     assert entry["files"]["supply_plan"]["sha256"] == _sha(plan.read_bytes())
 
     pipeline["primary"]["acceptance"]["replay"] = "LOSE"
-    monkeypatch.setattr(release_pool, "ensure_real_play_gate", lambda *_args: pytest.fail("real play must not run without solver + replay proof"))
     result = release_pool.enter_release_pool(candidate, pipeline)
     assert result["disposition"] == "NOT_ENTERED_NOT_READY"
-    assert "SOLVED + replay WIN" in result["reason"]
+    assert "solver and replay WIN" in result["reason"]

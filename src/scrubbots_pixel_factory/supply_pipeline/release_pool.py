@@ -16,7 +16,13 @@ from ..studio_lifecycle import StudioShutdownRequested, run_studio_child_interru
 from .campaign_builder import CampaignError, build_campaign_plan, write_campaign_plan
 from .game_publisher import PublicationError, discover_game_project, publish_batch
 from .progression import load_progression_authority
-from .real_play_gate import REAL_PLAY_MODEL, RealPlayGateError, ensure_real_play_gate
+from .real_play_gate import (
+    CANONICAL_DT,
+    CANONICAL_MODE,
+    CANONICAL_RESULT_SCHEMA,
+    REAL_PLAY_MODEL,
+    RESULT_SCHEMA,
+)
 
 
 class ReleaseError(ValueError):
@@ -509,7 +515,7 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
     if (
         not isinstance(real_play, Mapping)
         or real_play.get("model") != REAL_PLAY_MODEL
-        or real_play.get("verdict") != "WON_ROBUST"
+        or real_play.get("verdict") not in {"WON_ROBUST", "WON_CANONICAL"}
         or real_play.get("exitCode") != 0
         or not isinstance(files, Mapping)
     ):
@@ -522,19 +528,61 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
     ):
         raise ReleaseError(f"Release Pool real-play result binding is missing or changed: {entry_name}")
     try:
-        result_value = _json(Path(str(result_record.get("path", ""))))
+        result_path = Path(str(result_record.get("path", "")))
+        result_raw = result_path.read_bytes()
+        result_value = json.loads(result_raw.decode("utf-8"))
     except ReleaseError as exc:
         raise ReleaseError(f"Release Pool real-play evidence is unavailable: {entry_name}") from exc
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ReleaseError(f"Release Pool real-play evidence is unavailable: {entry_name}") from exc
+    if _hash(result_raw) != result_record.get("sha256"):
+        raise ReleaseError(f"Release Pool real-play result bytes changed after verification: {entry_name}")
     if (
-        result_value.get("schema") != "scrubbots.real_play_file_result.v1"
+        result_value.get("schema") not in {RESULT_SCHEMA, CANONICAL_RESULT_SCHEMA}
         or result_value.get("model") != REAL_PLAY_MODEL
-        or result_value.get("verdict") != "WON_ROBUST"
+        or result_value.get("verdict") != real_play.get("verdict")
         or result_value.get("exitCode") != 0
         or result_value.get("planSha256") != real_play.get("planSha256")
         or result_value.get("levelSha256") != real_play.get("levelSha256")
         or result_value.get("gameCommit") != real_play.get("gameCommit")
     ):
         raise ReleaseError(f"Release Pool real-play result does not match its bound acceptance: {entry_name}")
+    if result_value.get("schema") == CANONICAL_RESULT_SCHEMA:
+        canonical = result_value.get("perDt", {}).get(CANONICAL_DT) if isinstance(result_value.get("perDt"), Mapping) else None
+        final = canonical.get("final") if isinstance(canonical, Mapping) else None
+        if (
+            result_value.get("verdict") != "WON_CANONICAL"
+            or result_value.get("mode") != CANONICAL_MODE
+            or result_value.get("canonicalDt") != CANONICAL_DT
+            or result_value.get("searched") is not False
+            or not isinstance(result_value.get("runId"), str)
+            or not result_value.get("runId")
+            or not isinstance(result_value.get("timestamp"), str)
+            or not result_value.get("timestamp")
+            or not isinstance(canonical, Mapping)
+            or canonical.get("won") is not True
+            or not isinstance(final, Mapping)
+            or final.get("supplyExhausted") is not True
+            or final.get("targetsCleared") is not True
+            or final.get("slotsEmpty") is not True
+            or final.get("activeRobots") != 0
+            or final.get("boardResidue") != 0
+        ):
+            raise ReleaseError(f"Release Pool canonical 60-Hz result is incomplete: {entry_name}")
+        if real_play.get("resultSchema") not in {None, CANONICAL_RESULT_SCHEMA}:
+            raise ReleaseError(f"Release Pool canonical result schema binding changed: {entry_name}")
+        if real_play.get("sourceSha256") not in {None, result_value.get("sourceSha256")}:
+            raise ReleaseError(f"Release Pool source-artwork binding changed: {entry_name}")
+        classification = value.get("candidate_classification")
+        if not isinstance(classification, Mapping) or classification.get("source_sha256") != result_value.get("sourceSha256"):
+            raise ReleaseError(f"Release Pool canonical result is not bound to the original source artwork: {entry_name}")
+    else:
+        per_dt = result_value.get("perDt")
+        if result_value.get("verdict") != "WON_ROBUST" or not isinstance(per_dt, Mapping) or any(
+            not isinstance(per_dt.get(dt), Mapping) or per_dt[dt].get("won") is not True
+            for dt in ("1/30", "1/60", "1/120")
+        ):
+            raise ReleaseError(f"Release Pool historical robust proof is incomplete: {entry_name}")
     for file_name, hash_name in (("level", "levelSha256"), ("supply_plan", "planSha256")):
         record = files.get(file_name)
         if not isinstance(record, Mapping):
@@ -545,12 +593,73 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
             raise ReleaseError(f"Release Pool real-play {file_name} is unavailable: {entry_name}") from exc
         if normalized_hash != real_play.get(hash_name):
             raise ReleaseError(f"Release Pool real-play {file_name} bytes changed after verification: {entry_name}")
+        if file_name == "supply_plan" and result_value.get("schema") == CANONICAL_RESULT_SCHEMA:
+            plan_value = _json(Path(str(record.get("path", ""))))
+            if result_value.get("planClicks") != plan_value.get("intendedColumnClicks"):
+                raise ReleaseError(f"Release Pool real-play click sequence changed after verification: {entry_name}")
     return True
 
 
 def _pool_root() -> Path:
     from .. import studio_extensions as studio
     return studio.extensions_root() / "release-pool"
+
+
+def _pipeline_real_play_proof(
+    primary: Mapping[str, Any], paths: Mapping[str, Path], source_sha256: str,
+) -> tuple[dict[str, Any], Path, str]:
+    """Verify the solver's existing canonical proof without starting another search or replay."""
+
+    pipeline_files = primary.get("files")
+    if not isinstance(pipeline_files, Mapping) or not pipeline_files.get("real_play_result"):
+        raise ReleaseError("RELEASE_ENTRY_ERROR: current pipeline has no canonical real-play result")
+    result_path = Path(str(pipeline_files["real_play_result"])).expanduser().resolve()
+    if result_path.is_symlink() or not result_path.is_file():
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play result is missing or not a regular file")
+    if result_path.parent != paths["level"].resolve().parent or result_path.parent != paths["supply_plan"].resolve().parent:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical result is not stored beside the exact level and plan")
+    try:
+        result = _json(result_path)
+        plan = _json(paths["supply_plan"])
+        level = _json(paths["level"])
+    except ReleaseError as exc:
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play input or result is unreadable") from exc
+    if (
+        result.get("schema") != CANONICAL_RESULT_SCHEMA
+        or result.get("mode") != CANONICAL_MODE
+        or result.get("canonicalDt") != CANONICAL_DT
+        or result.get("verdict") != "WON_CANONICAL"
+        or result.get("exitCode") != 0
+        or result.get("searched") is not False
+        or result.get("sourceSha256") != source_sha256
+        or result.get("levelId") != level.get("id")
+        or result.get("planClicks") != plan.get("intendedColumnClicks")
+        or result.get("levelFile") != str(paths["level"].resolve())
+        or result.get("planFile") != str(paths["supply_plan"].resolve())
+        or result.get("levelSha256") != _level_content_hash(paths["level"])
+        or result.get("planSha256") != _level_content_hash(paths["supply_plan"])
+        or not isinstance(result.get("gameCommit"), str)
+        or not result.get("gameCommit")
+        or not isinstance(result.get("runId"), str)
+        or not result.get("runId")
+        or not isinstance(result.get("timestamp"), str)
+        or not result.get("timestamp")
+    ):
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play proof is stale or does not match current source, level, plan, game, or sequence")
+    canonical = result.get("perDt", {}).get(CANONICAL_DT) if isinstance(result.get("perDt"), Mapping) else None
+    final = canonical.get("final") if isinstance(canonical, Mapping) else None
+    if (
+        not isinstance(canonical, Mapping)
+        or canonical.get("won") is not True
+        or not isinstance(final, Mapping)
+        or final.get("supplyExhausted") is not True
+        or final.get("targetsCleared") is not True
+        or final.get("slotsEmpty") is not True
+        or final.get("activeRobots") != 0
+        or final.get("boardResidue") != 0
+    ):
+        raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play proof lacks complete game-host WIN final state")
+    return result, result_path, _hash(result_path.read_bytes())
 
 
 def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any], review: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -571,12 +680,12 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     acceptance = primary.get("acceptance", {})
     if (
         not isinstance(acceptance, Mapping)
-        or acceptance.get("solver_status") != "SOLVED"
-        or acceptance.get("replay") != "WIN"
+        or acceptance.get("solver_status") not in {"SOLVED", "WON_CANONICAL"}
+        or acceptance.get("replay") not in {"WIN", "WON_CANONICAL"}
     ):
         return {
             "disposition": "NOT_ENTERED_NOT_READY",
-            "reason": "Release Pool requires the canonical SOLVED + replay WIN acceptance before real-play verification.",
+            "reason": "Release Pool requires solver and replay WIN evidence before canonical real-play readback.",
         }
     difficulty = primary.get("difficulty", {})
     official = _canonical_official_difficulty(primary)
@@ -592,13 +701,11 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
     bundle_path = (studio._repository_root() / str(candidate["source_path"])).resolve()
     paths = {"artwork": bundle_path / "artwork.png", "level": Path(str(primary.get("files", {}).get("level", ""))).expanduser(), "supply_plan": Path(str(primary.get("files", {}).get("supply_plan", ""))).expanduser()}
     if any(not path.is_file() for path in paths.values()): raise ReleaseError("Release Pool requires existing canonical artwork, level, and supply files")
-    result_path = paths["level"].resolve().parent / "real_play_result_v1.json"
-    try:
-        real_play = ensure_real_play_gate(paths["level"], paths["supply_plan"], result_path)
-    except RealPlayGateError as exc:
-        raise ReleaseError(str(exc)) from exc
+    real_play_result, result_path, real_play_result_sha = _pipeline_real_play_proof(
+        primary, paths, str(classification.get("source_sha256", ""))
+    )
     file_digests = {name: {"path": str(path), "sha256": _hash(path.read_bytes())} for name, path in paths.items()}
-    file_digests["real_play_result"] = {"path": real_play["result_path"], "sha256": real_play["result_sha256"]}
+    file_digests["real_play_result"] = {"path": str(result_path), "sha256": real_play_result_sha}
     payload = {
         "schema": "scrubbots-release-pool-entry/v1", "candidate_id": candidate["candidate_id"],
         "width": candidate.get("width"), "height": candidate.get("height"), "used_colors": candidate.get("used_colors", []),
@@ -612,13 +719,18 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "files": file_digests, "pipeline_run_id": pipeline["run_id"], "pipeline_sha256": _hash(studio._pipeline_path(str(pipeline["run_id"])).read_bytes()),
         "real_play": {
             "model": REAL_PLAY_MODEL,
-            "verdict": real_play["result"]["verdict"],
-            "exitCode": real_play["result"]["exitCode"],
-            "planSha256": real_play["plan_sha256"],
-            "levelSha256": real_play["level_sha256"],
-            "gameCommit": real_play["result"]["gameCommit"],
-            "resultFile": real_play["result_path"],
-            "resultSha256": real_play["result_sha256"],
+            "verdict": real_play_result["verdict"],
+            "exitCode": real_play_result["exitCode"],
+            "resultSchema": real_play_result.get("schema"),
+            "mode": real_play_result.get("mode"),
+            "sourceSha256": real_play_result.get("sourceSha256"),
+            "runId": real_play_result.get("runId"),
+            "timestamp": real_play_result.get("timestamp"),
+            "planSha256": real_play_result["planSha256"],
+            "levelSha256": real_play_result["levelSha256"],
+            "gameCommit": real_play_result["gameCommit"],
+            "resultFile": str(result_path),
+            "resultSha256": real_play_result_sha,
         },
         "review_id": review.get("review_id") if review is not None else None,
         "eligibility_source": "OWNER_ACCEPT" if review is not None else "READY_AUTO",

@@ -974,6 +974,31 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         ) if files.get("level") and files.get("supply_plan") else {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "reason": "full-canvas level and supply plan are required"}
         if load_check.get("state") != "READY":
             raise StudioExtensionError(f"shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")
+        if not isinstance(source_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", source_sha256):
+            raise StudioExtensionError("canonical real-play requires the verified original source SHA-256")
+        from .supply_pipeline.real_play_gate import ensure_real_play_gate
+        real_play_result_path = output_dir / "real_play_result_v2.json"
+        real_play = ensure_real_play_gate(
+            files["level"], files["supply_plan"], real_play_result_path, source_sha256=source_sha256
+        )
+        files["real_play_result"] = real_play["result_path"]
+        result["real_play"] = {
+            "schema": real_play["result"].get("schema"),
+            "mode": real_play["result"].get("mode"),
+            "verdict": real_play["result"].get("verdict"),
+            "sourceSha256": real_play["result"].get("sourceSha256"),
+            "gameCommit": real_play["result"].get("gameCommit"),
+            "runId": real_play["result"].get("runId"),
+            "timestamp": real_play["result"].get("timestamp"),
+            "searched": real_play["result"].get("searched"),
+        }
+        load_check = verify_exported_supply(
+            files.get("level", ""), files.get("supply_plan", ""), request_data.get("game_project"),
+            max_visited=solver_max_visited, timeout_seconds=solver_timeout,
+            solver_evidence=result.get("solver_evidence"),
+        )
+        if load_check.get("state") != "READY":
+            raise StudioExtensionError(f"post-search shipping load-check is not READY: {load_check.get('reason', load_check.get('disposition', 'UNAVAILABLE'))}")
         from .supply_pipeline.scrubpack_identity import derive_solver_supply_identity
         level_bytes = Path(str(files["level"])).read_bytes()
         plan_bytes = Path(str(files["supply_plan"])).read_bytes()
@@ -983,18 +1008,18 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             json.dumps({key: value for key, value in result.items() if not key.startswith("_")}, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )
-        solve = "PASS" if result.get("solver_status") == "SOLVED" else "FAIL"
-        replay = "PASS" if result.get("solution_final") == "WIN" else "FAIL"
+        solve = "PASS" if real_play["result"].get("verdict") == "WON_CANONICAL" else "FAIL"
+        replay = "PASS" if real_play["result"].get("searched") is False else "FAIL"
         difficulty = "PASS" if result.get("difficulty") is not None and str(result.get("difficulty_basis", "")).startswith("ScrubBots Difficulty V1") else "FAIL"
         emit("ANALYZE/PLAN", "PASS", "Canonical supply analysis and plan generation completed.")
         emit("SCREEN", "RANKED", "Bounded offline screening ranked the canonical plans.")
-        emit("SOLVE", solve, "Canonical solver result: %s." % str(result.get("solver_status", "UNAVAILABLE")))
-        emit("REPLAY", replay, "Canonical replay result: %s." % str(result.get("solution_final", "UNAVAILABLE")))
+        emit("SOLVE", solve, "ProductionGameplayHost canonical solver result: %s." % str(real_play["result"].get("verdict", "UNAVAILABLE")))
+        emit("REPLAY", replay, "Fresh exact-plan 1/60 replay result: %s." % str(real_play["result"].get("verdict", "UNAVAILABLE")))
         emit("DIFFICULTY", difficulty, str(result.get("difficulty_basis", "Difficulty V1 evidence is unavailable."))[:200])
         emit("QA", "PASS" if solve == replay == difficulty == "PASS" and load_check.get("state") == "READY" else "FAIL", "Conservation, replay, Difficulty V1, and shipping load-check were evaluated.")
         stages.extend([
-            _pipeline_stage("SOLVE", solve, inputs=[level_id], outputs=[level_id] if solve == "PASS" else (), evidence=str(files.get("result", "")), reason="Canonical ScrubBots SolvabilitySolver proved the selected supply."),
-            _pipeline_stage("REPLAY", replay, inputs=[level_id], outputs=[level_id] if replay == "PASS" else (), evidence=str(files.get("result", "")), reason="The canonical solver replay reached WIN on a fresh proof state."),
+            _pipeline_stage("SOLVE", solve, inputs=[level_id], outputs=[level_id] if solve == "PASS" else (), evidence=str(files.get("real_play_result", "")), reason="Current ProductionGameplayHost found a canonical 1/60 winning supply sequence."),
+            _pipeline_stage("REPLAY", replay, inputs=[level_id], outputs=[level_id] if replay == "PASS" else (), evidence=str(files.get("real_play_result", "")), reason="Fresh ProductionGameplayHost replay reached WIN with the exact persisted sequence at 1/60."),
             _pipeline_stage("DIFFICULTY", difficulty, inputs=[level_id], outputs=[level_id] if difficulty == "PASS" else (), evidence=str(files.get("result", "")), reason=str(result.get("difficulty_basis", "Official Difficulty V1 evidence is unavailable."))),
             _pipeline_stage("QA", "PASS", inputs=[level_id], outputs=[level_id], evidence=str(files.get("result", "")), reason="Supply conservation, selected columns, solver status, replay, and official Difficulty V1 evidence are present."),
             _pipeline_stage("REVIEW", "NOT_AVAILABLE", inputs=[level_id], evidence=str(files.get("result", "")), reason="Owner acceptance remains the independent review boundary."),
@@ -1002,15 +1027,16 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         primary = {
             "schema": "scrubbots-primary-supply-pipeline/v1", "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "state": "READY", "disposition": "READY",
             "level_id": level_id, "column_count": selected, "visible_preview_depth": 3, "output": str(output_dir), "files": files,
-            "authority": rules.authority, "acceptance": {"solver": "ScrubBots SolvabilitySolver", "replay": result["solution_final"], "difficulty": result["difficulty_basis"], "solver_status": result["solver_status"]},
+            "authority": rules.authority, "acceptance": {"solver": "ScrubBots ProductionGameplayHost", "replay": real_play["result"]["verdict"], "difficulty": result["difficulty_basis"], "solver_status": real_play["result"]["verdict"]},
+            "real_play": result["real_play"],
             "difficulty": {"class": result["difficulty"], "score": result["difficulty_score"], "basis": result["difficulty_basis"]}, "load_check": load_check, "solver_supply_identity": solver_supply_identity, "result": {key: value for key, value in result.items() if not key.startswith("_")},
         }
         primary["artifact_sha256"] = {
             key: hashlib.sha256(Path(str(files[key])).read_bytes()).hexdigest()
-            for key in ("level", "supply_plan", "result")
+            for key in ("level", "supply_plan", "result", "real_play_result")
             if files.get(key) and Path(str(files[key])).is_file()
         }
-        if set(primary["artifact_sha256"]) != {"level", "supply_plan", "result"}:
+        if set(primary["artifact_sha256"]) != {"level", "supply_plan", "result", "real_play_result"}:
             raise StudioExtensionError("canonical READY run is missing a SHA-bound level, supply plan, or result artifact")
         disposition = "READY"
     except (FileNotFoundError, NoValidSupply, OSError, RuntimeError, ValueError, StudioExtensionError) as exc:

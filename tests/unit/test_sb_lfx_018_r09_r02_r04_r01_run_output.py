@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from scrubbots_pixel_factory import studio_extensions as studio
-from scrubbots_pixel_factory.supply_pipeline import game_rules, scrubpack_identity, supply_exporter, supply_optimizer, verify
+from scrubbots_pixel_factory.supply_pipeline import game_rules, real_play_gate, scrubpack_identity, supply_exporter, supply_optimizer, verify
 
 
 def _sha(path: Path) -> str:
@@ -44,7 +44,7 @@ def test_two_fake_successful_same_source_runs_keep_three_and_four_column_artifac
             directory.mkdir(parents=True)
             files = {}
             for name, value in (("level", {"columns": self.rules.column_count, "id": level_id}),
-                                ("supply_plan", {"columns": self.rules.column_count}),
+                                ("supply_plan", {"levelId": level_id, "intendedColumnClicks": [1]}),
                                 ("result", result)):
                 path = directory / f"{name}.json"
                 path.write_text(json.dumps(value, sort_keys=True), encoding="utf-8")
@@ -62,6 +62,26 @@ def test_two_fake_successful_same_source_runs_keep_three_and_four_column_artifac
     monkeypatch.setattr(verify, "verify_exported_supply", FakeModule.verify_exported_supply)
     monkeypatch.setattr(scrubpack_identity, "derive_solver_supply_identity", lambda *_args: {"identity_sha256": "fixture"})
 
+    def fake_real_play(level_path, plan_path, result_path, *, source_sha256=None, **_kwargs):
+        level_value = json.loads(Path(level_path).read_text(encoding="utf-8"))
+        plan_value = json.loads(Path(plan_path).read_text(encoding="utf-8"))
+        result = {
+            "schema": "scrubbots.real_play_file_result.v2", "model": "real_play_v1",
+            "mode": "canonical_60hz", "canonicalDt": "1/60", "verdict": "WON_CANONICAL", "exitCode": 0,
+            "levelFile": str(Path(level_path).resolve()), "planFile": str(Path(plan_path).resolve()),
+            "levelId": level_value["id"], "levelSha256": hashlib.sha256(Path(level_path).read_bytes()).hexdigest(),
+            "planSha256": hashlib.sha256(Path(plan_path).read_bytes()).hexdigest(), "planClicks": plan_value["intendedColumnClicks"],
+            "sourceSha256": source_sha256, "gameCommit": "c" * 40, "runId": "fixture-run", "timestamp": "2026-11-07T12:00:00Z",
+            "searched": False,
+            "perDt": {"1/60": {"won": True, "final": {"supplyExhausted": True, "targetsCleared": True,
+                "slotsEmpty": True, "activeRobots": 0, "boardResidue": 0}}},
+        }
+        Path(result_path).write_text(json.dumps(result), encoding="utf-8")
+        return {"result": result, "result_path": str(result_path), "result_sha256": _sha(Path(result_path)),
+                "level_sha256": result["levelSha256"], "plan_sha256": result["planSha256"], "settings": {}}
+
+    monkeypatch.setattr(real_play_gate, "ensure_real_play_gate", fake_real_play)
+
     def write_direct(path, payload, *, immutable=False):
         path.parent.mkdir(parents=True, exist_ok=True)
         raw = studio._canonical_bytes(payload)
@@ -75,7 +95,7 @@ def test_two_fake_successful_same_source_runs_keep_three_and_four_column_artifac
     for activity_id, columns in (("activity-three", 3), ("activity-four", 4)):
         pipeline = studio._run_canonical_artwork_route(
             identity="candidate-same-source", cells=["C01"], width=1, height=1,
-            evidence="test fixture", request={"activity_run_id": activity_id, "column_count": columns},
+            evidence="test fixture", request={"activity_run_id": activity_id, "column_count": columns, "source_sha256": "e" * 64},
             source_kind="OWNER_UPLOAD",
         )
         assert pipeline["disposition"] == "READY"
@@ -85,7 +105,7 @@ def test_two_fake_successful_same_source_runs_keep_three_and_four_column_artifac
 
     first_hashes = {key: _sha(path) for key, path in outputs[0].items()}
     second_hashes = {key: _sha(path) for key, path in outputs[1].items()}
-    assert set(first_hashes) == {"level", "supply_plan", "result"}
+    assert set(first_hashes) == {"level", "supply_plan", "result", "real_play_result"}
     assert outputs[0]["level"].parent != outputs[1]["level"].parent
     assert json.loads(outputs[0]["level"].read_text())["columns"] == 3
     assert json.loads(outputs[1]["level"].read_text())["columns"] == 4
