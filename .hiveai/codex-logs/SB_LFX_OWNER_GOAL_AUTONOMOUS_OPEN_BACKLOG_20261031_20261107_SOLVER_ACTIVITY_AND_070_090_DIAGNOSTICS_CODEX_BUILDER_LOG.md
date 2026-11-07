@@ -712,3 +712,7 @@ Executed `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-cur
 A fresh read-only `psutil` process-CWD snapshot found 12 other `python.exe`/`pythonw.exe` processes with working directories beneath the Factory checkout (8 `python.exe`, 4 `pythonw.exe`); their invocations could not be attributed to an owner workflow from this snapshot. This corrects the earlier, narrower WMI command-line observation: writer quiescence remains unproven, so ambiguous legacy PNGs stay in place and no archive/delete/move is attempted. No process was stopped.
 
 Re-read `C:\Users\sekip\Desktop\ScrubBots Factory Studio.lnk` metadata without launching it. It invokes PowerShell hidden with `scripts\launch_factory_studio.ps1` from the canonical Release directory; the target, working directory, and icon path exist. No installation files were changed. The user's `data/output/Pixellab/Final` and `Grid Files` PNGs were not enumerated, opened, hashed, copied, moved, or modified.
+
+## 2026-11-07 16:33 UTC — Tracker authority check and correction
+
+After publishing the scoped TASKS update, the required read-only queue guard rejected it because `Current Task` did not repeat the exact stable active prompt URL present in `Next Task/Action`. No implementation or owner files were affected by the failed guard. Correct the current-task field to include the exact same URL, republish only the builder log and scoped tracker fields, then rerun the guard before continuing.
