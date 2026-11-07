@@ -37,9 +37,10 @@ def scan_owner_source_folder(
 ) -> dict[str, Any]:
     """List direct-child PNG candidates; the canonical importer validates bytes.
 
-    Approved provider folders are exact-match only. An alternate path is accepted
-    only when the UI passes the explicit owner-selected flag. Traversal is never
-    recursive and PixelLab raw atlas storage is always excluded.
+    Only the three canonical owner folders are accepted. The legacy explicit
+    alternative flag is retained for wire compatibility but grants no access to
+    other artwork locations. Traversal is never recursive and PixelLab raw atlas
+    storage is always excluded.
     """
     paths = owner_art_paths(repository_root)
     root = paths["input"].parents[1]
@@ -61,10 +62,8 @@ def scan_owner_source_folder(
 
     provider = next((name for name, approved in approved_owner_source_folders(root).items()
                      if resolved_folder == approved.resolve(strict=False)), "")
-    if not provider and not explicit_alternative:
-        raise OwnerFolderBatchError("source folder is not an approved provider folder")
-    if explicit_alternative:
-        provider = "OWNER_SELECTED_ALTERNATIVE"
+    if not provider:
+        raise OwnerFolderBatchError("source folder is not one of the canonical owner artwork folders")
 
     png_files: list[Path] = []
     for entry in resolved_folder.iterdir():

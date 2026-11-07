@@ -2443,8 +2443,6 @@ func _open_owner_folder_sources() -> void:
 	menu.add_item("ALPIX · Finished PNGs", 0)
 	menu.add_item("PixelLab · Final slices only", 1)
 	menu.add_item("Owner Suggestions", 2)
-	menu.add_separator()
-	menu.add_item("Browse another folder…", 3)
 	menu.id_pressed.connect(_on_owner_folder_provider_selected)
 	add_child(menu)
 	menu.popup(Rect2(get_global_mouse_position(), Vector2.ZERO))
@@ -2473,9 +2471,9 @@ func _on_owner_folder_provider_selected(id: int) -> void:
 			_file_dialog.current_dir = data_root.path_join("Owner Suggestions")
 			_file_dialog.title = "Select Owner Suggestions folder"
 		_:
-			_owner_folder_provider = "OWNER_SELECTED_ALTERNATIVE"
-			_file_dialog.current_dir = data_root
-			_file_dialog.title = "Select an explicitly chosen artwork folder · Grid Files is blocked"
+			_owner_folder_explicit_alternative = false
+			_report("Select one of the canonical ALPIX, PixelLab Final, or Owner Suggestions folders.")
+			return
 	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
 	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
 	_file_dialog.clear_filters()

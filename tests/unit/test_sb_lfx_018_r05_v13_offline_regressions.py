@@ -861,6 +861,11 @@ def test_owner_art_outputs_route_only_through_explicit_catalog_functions() -> No
     assert 'func _is_canonical_input_csv(path: String)' in ui
     assert 'validate_owner_input_csv(csv_path_value, repository_root=_repository_root())' in launcher
     assert 'validate_owner_input_csv(_text(request.get("csv_path"), "csv_path"), repository_root=_repository_root())' in launcher
+    owner_source_menu = ui.split("func _open_owner_folder_sources() -> void:", 1)[1].split("func _on_owner_folder_provider_selected", 1)[0]
+    assert 'menu.add_item("ALPIX · Finished PNGs", 0)' in owner_source_menu
+    assert 'menu.add_item("PixelLab · Final slices only", 1)' in owner_source_menu
+    assert 'menu.add_item("Owner Suggestions", 2)' in owner_source_menu
+    assert "Browse another folder" not in owner_source_menu
     assert "data/output/Alpix/**" in ignore
     assert "data/output/Pixellab/Grid Files/**" in ignore
     assert "data/output/Pixellab/Final/**" in ignore
@@ -974,12 +979,13 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
             owner_folder_batch.scan_owner_source_folder(grid, repository_root=repository, explicit_alternative=True)
         alternative = root / "manually-selected"
         alternative.mkdir()
-        explicit = owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
-        assert explicit["provider"] == "OWNER_SELECTED_ALTERNATIVE"
-        for index in range(owner_folder_batch.MAX_OWNER_FOLDER_PNGS + 1):
-            (alternative / f"{index:03d}.png").write_bytes(b"")
-        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="no files were imported"):
+        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="canonical owner artwork folders"):
             owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
+        oversized = folders["OWNER_SUGGESTIONS"]
+        for index in range(owner_folder_batch.MAX_OWNER_FOLDER_PNGS + 1):
+            (oversized / f"{index:03d}.png").write_bytes(b"")
+        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="no files were imported"):
+            owner_folder_batch.scan_owner_source_folder(oversized, repository_root=repository)
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():

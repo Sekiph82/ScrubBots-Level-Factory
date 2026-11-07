@@ -1746,7 +1746,7 @@ def batch_import(
     pre_rejected: Sequence[Mapping[str, object]] = (),
     path_indices: Sequence[int] | None = None,
 ) -> dict[str, Any]:
-    allowed_providers = {"OWNER_UPLOAD", "ALPIX", "PIXELLAB", "OWNER_SUGGESTIONS", "OWNER_SELECTED_ALTERNATIVE"}
+    allowed_providers = {"OWNER_UPLOAD", "ALPIX", "PIXELLAB", "OWNER_SUGGESTIONS"}
     if source_provider not in allowed_providers:
         raise StudioExtensionError("batch source provider is not an approved owner-art source")
     if path_indices is not None and len(path_indices) != len(paths):
