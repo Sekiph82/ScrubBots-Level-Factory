@@ -80,11 +80,17 @@ def _pipeline_status_dir(disposition: object) -> str:
 def _pipeline_paths() -> list[Path]:
     """Read new status-scoped pipeline runs and immutable legacy runs."""
 
-    paths = owner_art_storage.owner_art_paths(_repository_root())
+    repository_root = Path(_repository_root()).resolve()
+    paths = owner_art_storage.owner_art_paths(repository_root)
     roots = [paths[key] / "Pipelines" for key in ("pending", "ready", "failed", "rejected")]
     roots.append(extensions_root() / "pipelines")
     found: dict[str, Path] = {}
     for root in roots:
+        if root != extensions_root() / "pipelines":
+            try:
+                owner_art_storage._verify_path_under_root(repository_root, root)
+            except OwnerArtStorageError as exc:
+                raise StudioExtensionError("canonical pipeline status path contains a reparse point or escapes the repository") from exc
         if owner_art_storage._is_reparse_point(root) or not root.is_dir():
             continue
         for path in root.glob("pipeline-*.json"):
@@ -879,6 +885,11 @@ def _pipeline_path(run_id: str, *, status: str | None = None) -> Path:
     candidates = canonical + [legacy]
     existing = []
     for path in candidates:
+        if path in canonical:
+            try:
+                owner_art_storage._verify_path_under_root(Path(_repository_root()).resolve(), path.parent)
+            except OwnerArtStorageError as exc:
+                raise StudioExtensionError("canonical pipeline identity path contains a reparse point or escapes the repository") from exc
         if owner_art_storage._is_reparse_point(path):
             raise StudioExtensionError("pipeline run identity is a symlink or reparse point")
         if path.exists():
@@ -1015,11 +1026,16 @@ def _canonical_run_output_dir(identity: str, activity_run_id: str) -> Path:
         raise StudioExtensionError("canonical run identity contains unsafe path characters")
     if not activity_run_id or len(activity_run_id) > 256:
         raise StudioExtensionError("canonical per-run output requires a bounded activity_run_id")
-    base = (extensions_root() / "canonical-supply" / identity).resolve()
+    from .owner_art_storage import owner_art_paths, _verify_path_under_root
+    repository_root = Path(_repository_root()).resolve()
+    release_root = owner_art_paths(repository_root)["release_pool"]
+    base = release_root / "Pending" / "Pipelines" / "Work" / identity
     run_scope = hashlib.sha256(activity_run_id.encode("utf-8")).hexdigest()[:20]
-    destination = (base / run_scope).resolve()
-    if not destination.is_relative_to(base):
-        raise StudioExtensionError("canonical per-run output escaped its identity directory")
+    destination = base / run_scope
+    try:
+        _verify_path_under_root(repository_root, destination)
+    except OwnerArtStorageError as exc:
+        raise StudioExtensionError("canonical per-run output escaped the Release Pool work directory") from exc
     if destination.exists():
         raise StudioExtensionError("canonical per-run output already exists; refusing to overwrite prior run evidence")
     return destination
@@ -1283,7 +1299,14 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
         from .supply_pipeline.primary import run_primary_supply_pipeline
 
         image_path = Path(str(primary_image)).expanduser().resolve()
-        output_dir = Path(str(request_data.get("output_dir") or (extensions_root() / "primary-supply"))).expanduser().resolve()
+        requested_output = request_data.get("output_dir")
+        if requested_output:
+            output_dir = Path(str(requested_output)).expanduser().resolve()
+        else:
+            output_dir = _canonical_run_output_dir(
+                "primary-image",
+                str(request_data.get("activity_run_id") or datetime.now(timezone.utc).isoformat()),
+            )
         primary = run_primary_supply_pipeline(
             image_path,
             output=output_dir,

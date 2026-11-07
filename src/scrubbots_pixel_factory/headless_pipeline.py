@@ -46,11 +46,16 @@ def _sha256(value: bytes) -> str:
 
 
 def _job_root() -> Path:
-    return studio.extensions_root() / "pipelines" / "jobs"
+    from .owner_art_storage import owner_art_paths
+    return owner_art_paths(studio._repository_root())["pending"] / "Pipelines" / "Jobs"
 
 
 def _event_dir(job_key: str) -> Path:
-    return _job_root() / job_key / "events"
+    canonical = _job_root() / job_key / "events"
+    legacy = studio.extensions_root() / "pipelines" / "jobs" / job_key / "events"
+    if canonical.exists() or not legacy.exists():
+        return canonical
+    return legacy
 
 
 def _json_file(path: Path, label: str) -> dict[str, Any]:

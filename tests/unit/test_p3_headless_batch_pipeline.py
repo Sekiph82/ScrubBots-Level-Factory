@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scrubbots_pixel_factory import owner_upload, studio_extensions as studio
+from scrubbots_pixel_factory import headless_pipeline as headless, owner_upload, studio_extensions as studio
 from scrubbots_pixel_factory.cli.main import main
 from scrubbots_pixel_factory.headless_pipeline import (
     EVENT_SCHEMA,
@@ -18,6 +18,23 @@ from scrubbots_pixel_factory.headless_pipeline import (
     status_job,
 )
 from scrubbots_pixel_factory.output.png import encode_logical_png
+
+
+def test_headless_job_events_use_release_pool_and_keep_legacy_resume_path(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    extension_root = repository / "level_factory" / "output" / "studio-extensions"
+    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda: extension_root)
+    job_key = "a" * 64
+
+    canonical = headless._event_dir(job_key)
+    assert canonical == repository / "data/Release Pool/Pending/Pipelines/Jobs" / job_key / "events"
+    assert canonical.is_relative_to(repository / "data" / "Release Pool")
+
+    legacy = extension_root / "pipelines" / "jobs" / job_key / "events"
+    legacy.mkdir(parents=True)
+    assert headless._event_dir(job_key) == legacy
 
 
 def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, object]:
@@ -160,7 +177,7 @@ def test_pipeline_resume_reuses_every_completed_stage_and_is_idempotent(monkeypa
     source_png = fixture["source_root"] / fixture["source_id"] / "source.png"
     with pytest.raises(PipelineInterruption):
         run_job(fixture["job_path"], after_checkpoint=_interrupt_after(interrupt_stage))
-    interrupted_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    interrupted_events = sorted(headless._job_root().rglob("*.json"))
     assert interrupted_events, "the interrupted stage should already have durable event evidence"
     interrupted_stage_events = [
         json.loads(path.read_text(encoding="utf-8"))
@@ -177,10 +194,10 @@ def test_pipeline_resume_reuses_every_completed_stage_and_is_idempotent(monkeypa
     assert len(fixture["route_calls"]) == 1
 
     # A completed rerun only reads immutable job/pipeline evidence.
-    completed_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    completed_events = sorted(headless._job_root().rglob("*.json"))
     repeated = run_job(fixture["job_path"])
     assert repeated == resumed
-    assert sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json")) == completed_events
+    assert sorted(headless._job_root().rglob("*.json")) == completed_events
     assert len(fixture["route_calls"]) == 1
     assert source_png.read_bytes() == fixture["source_bytes"]
     assert fixture["job_path"].read_bytes() == fixture["job_bytes"]
@@ -218,7 +235,7 @@ def test_zip_resume_reuses_canonical_run_after_record_before_job_checkpoint(monk
     assert len(pipeline_records) == 1
     assert pipeline_records[0].is_relative_to(fixture["repository"] / "data" / "Release Pool")
     pipeline_bytes = pipeline_records[0].read_bytes()
-    interrupted_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    interrupted_events = sorted(headless._job_root().rglob("*.json"))
     zip_events = [json.loads(path.read_text(encoding="utf-8")) for path in interrupted_events if json.loads(path.read_text(encoding="utf-8")).get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY"]
     assert zip_events[-1]["disposition"] == "RUNNING"
 
@@ -229,7 +246,7 @@ def test_zip_resume_reuses_canonical_run_after_record_before_job_checkpoint(monk
     assert pipeline_records[0].read_bytes() == pipeline_bytes
     assert fixture["job_path"].read_bytes() == fixture["job_bytes"]
     assert (fixture["source_root"] / fixture["source_id"] / "source.png").read_bytes() == fixture["source_bytes"]
-    completed_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
+    completed_events = sorted(headless._job_root().rglob("*.json"))
     final_zip_event = [json.loads(path.read_text(encoding="utf-8")) for path in completed_events if json.loads(path.read_text(encoding="utf-8")).get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY"][-1]
     assert final_zip_event["disposition"] == "PASS"
     assert final_zip_event["identities"]["pipeline_run_id"] == "pipeline-test-1"

@@ -616,9 +616,15 @@ def _pool_roots() -> tuple[Path, Path]:
 def entry_paths(candidate_id_filter: str | None = None) -> list[Path]:
     """Return canonical Ready entries plus read-only legacy receipt paths."""
 
-    from ..owner_art_storage import _is_reparse_point
+    from .. import studio_extensions as studio
+    from ..owner_art_storage import OwnerArtStorageError, _is_reparse_point, _verify_path_under_root
     found: dict[str, Path] = {}
     for root in _pool_roots():
+        if root == _pool_root():
+            try:
+                _verify_path_under_root(Path(studio._repository_root()).resolve(), root)
+            except OwnerArtStorageError as exc:
+                raise ReleaseError("canonical Release Pool Ready path contains a reparse point or escapes the repository") from exc
         if _is_reparse_point(root) or not root.is_dir():
             continue
         pattern = f"{candidate_id_filter}-*.json" if candidate_id_filter and re.fullmatch(r"[A-Za-z0-9_-]+", candidate_id_filter) else "*.json"

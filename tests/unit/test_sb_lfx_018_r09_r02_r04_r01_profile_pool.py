@@ -158,11 +158,36 @@ def test_official_vector_and_profile_shape_reject_tampered_values():
 
 
 def test_canonical_output_is_per_activity_run_and_rejects_traversal(tmp_path, monkeypatch):
-    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: tmp_path)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: tmp_path)
     first = studio_extensions._canonical_run_output_dir("candidate-abc", "activity-one")
     second = studio_extensions._canonical_run_output_dir("candidate-abc", "activity-two")
     assert first.parent == second.parent
     assert first != second
     assert first.parent.name == "candidate-abc"
+    assert first.is_relative_to(tmp_path / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work")
     with pytest.raises(studio_extensions.StudioExtensionError, match="unsafe path"):
         studio_extensions._canonical_run_output_dir("../escape", "activity-three")
+
+
+def test_primary_supply_default_workdir_uses_release_pool_pending(tmp_path, monkeypatch):
+    from scrubbots_pixel_factory.supply_pipeline import primary
+
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: repository / "level_factory" / "output" / "studio-extensions")
+    image = tmp_path / "input.png"
+    image.write_bytes(b"fixture image path; primary runner is isolated")
+    observed = {}
+
+    def unavailable_primary(_image_path, *, output, **_kwargs):
+        observed["output"] = output
+        return {"state": "UNAVAILABLE", "reason": "isolated fixture"}
+
+    monkeypatch.setattr(primary, "run_primary_supply_pipeline", unavailable_primary)
+    result = studio_extensions.run_pipeline(request={"image_path": str(image)})
+
+    expected_root = repository / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work"
+    assert result["disposition"] == "UNAVAILABLE", result
+    assert observed["output"].is_relative_to(expected_root)
+    assert not (repository / "level_factory" / "output" / "studio-extensions" / "primary-supply").exists()
