@@ -26,6 +26,7 @@ from .contracts.palette import VOID_CELL_ID
 from .output.bundle import read_bundle
 from .output.png import decode_logical_png
 from .owner_upload import OWNER_UPLOAD_ORIGIN, OWNER_UPLOAD_STATUS, OWNER_UPLOAD_VALIDATION_STATE, owner_upload_root, import_owner_upload
+from .owner_art_storage import OwnerArtStorageError
 from .quality.core import QualityPolicy, evaluate_grid, logical_grid_hash
 from .semantic.normalization.core import SUPPORTED_MEDIA_TYPE, _decode_raw
 
@@ -204,18 +205,76 @@ def save_library_metadata(source_id: str, label: str = "", tags: Sequence[str] =
     return {**source, "catalog": metadata}
 
 
-def library_refresh() -> dict[str, Any]:
-    """Build a fresh catalog from verified OWNER_UPLOAD directories."""
+def _sync_current_pixellab_final_sources(repository_root: str | Path | None = None) -> tuple[set[str], list[dict[str, str]]]:
+    """Idempotently register only validated direct PNGs currently in PixelLab Final."""
+
+    from . import owner_art_storage
+    from .owner_folder_batch import scan_owner_source_folder
+
+    paths = owner_art_storage.owner_art_paths(repository_root)
+    scan = scan_owner_source_folder(paths["pixellab_final"], repository_root=repository_root)
+    if scan.get("provider") != "PIXELLAB":
+        raise StudioExtensionError("canonical PixelLab Final source authority could not be established")
+    active: set[str] = set()
+    invalid: list[dict[str, str]] = []
+    for entry in scan.get("entries", []):
+        if not isinstance(entry, Mapping):
+            continue
+        disposition = str(entry.get("disposition", ""))
+        digest = str(entry.get("source_sha256", ""))
+        if disposition not in {"ELIGIBLE", "ALREADY_IMPORTED"} or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            invalid.append({
+                "source_id": f"owner-upload-{digest}" if re.fullmatch(r"[0-9a-f]{64}", digest) else str(entry.get("display_path", "")),
+                "disposition": "NOT_ACTIVE / INVALID_FINAL_SOURCE",
+                "reason": str(entry.get("reason", "PixelLab Final source did not pass direct PNG validation."))[:512],
+            })
+            continue
+        source_id = f"owner-upload-{digest}"
+        source_directory = owner_upload_root(repository_root) / source_id
+        if disposition == "ELIGIBLE":
+            imported = import_owner_upload(str(entry.get("path", "")), repository_root=repository_root)
+            if imported.get("state") not in {"IMPORTED", "ALREADY_IMPORTED"} or imported.get("source_id") != source_id:
+                invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IMPORT_FAILED", "reason": str(imported.get("error", "Canonical Final source could not be registered."))[:512]})
+                continue
+        try:
+            verify_owner_source(source_id, source_directory=source_directory)
+            validation = validate_owner_source(source_id, persist=False, source_directory=source_directory)
+            void_state = str(validation.get("void_capability", {}).get("state", "NOT_REQUIRED"))
+            if (validation.get("exact_logical_source") is not True
+                    or validation.get("structural", {}).get("disposition") != "PASS"
+                    or void_state not in {"OPEN", "NOT_REQUIRED"}):
+                invalid.append({
+                    "source_id": source_id, "disposition": "NOT_ACTIVE / SOURCE_VALIDATION_FAILED",
+                    "reason": str(validation.get("reason", "PixelLab Final source did not pass canonical source validation."))[:512],
+                })
+                continue
+        except (StudioExtensionError, OSError, ValueError) as exc:
+            invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IDENTITY_INVALID", "reason": str(exc)[:512]})
+            continue
+        active.add(source_id)
+    return active, invalid
+
+
+def library_refresh(*, repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Expose only current PixelLab Final art as active sources; retain old provenance separately."""
 
     sources: list[dict[str, Any]] = []
+    historical: list[dict[str, Any]] = []
     invalid: list[dict[str, str]] = []
-    root = owner_upload_root()
+    try:
+        active_ids, final_invalid = _sync_current_pixellab_final_sources(repository_root)
+        invalid.extend(final_invalid)
+    except (StudioExtensionError, OSError, OwnerArtStorageError, ValueError) as exc:
+        active_ids = set()
+        invalid.append({"source_id": "PIXELLAB_FINAL", "disposition": "ACTIVE_INVENTORY_UNAVAILABLE", "reason": str(exc)[:512]})
+    root = owner_upload_root(repository_root)
     if root.exists():
         for directory in sorted((item for item in root.iterdir() if item.is_dir()), key=lambda item: item.name):
             try:
-                source = verify_owner_source(directory.name)
+                source_directory = root / directory.name
+                source = verify_owner_source(directory.name, source_directory=source_directory)
                 metadata = _read_catalog_metadata(directory.name)
-                sources.append({
+                row = {
                     "source_id": source["source_id"], "origin": source["origin"], "source_sha256": source["source_sha256"],
                     "original_filename": source["original_filename"], "original_width": source["original_width"], "original_height": source["original_height"],
                     "status": source["status"], "validation_state": source["validation_state"], "immutable_source_path": source["source_path"],
@@ -224,13 +283,15 @@ def library_refresh() -> dict[str, Any]:
                     "derived_dimensions": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
                     "palette": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
                     "usages": {"disposition": "NOT AVAILABLE", "reason": "No canonical candidate/level usage index is connected."},
-                })
+                }
+                (sources if directory.name in active_ids else historical).append(row)
             except (StudioExtensionError, OSError) as exc:
                 invalid.append({"source_id": directory.name, "disposition": "INVALID / QUARANTINED", "reason": str(exc)[:512]})
     return {
-        "schema": "scrubbots-source-library-view", "version": 1, "state": "READY", "disposition": "DERIVED_CATALOG",
-        "sources": sources, "invalid_sources": invalid,
-        "notice": "ASSET CATALOG ONLY — source art is not training data and Library membership is not owner acceptance.",
+        "schema": "scrubbots-source-library-view", "version": 2, "state": "READY", "disposition": "DERIVED_CATALOG",
+        "sources": sources, "historical_sources": historical, "invalid_sources": invalid,
+        "source_policy": "ACTIVE_SOLVER_INPUTS_FROM_CURRENT_DATA_OUTPUT_PIXELLAB_FINAL_ONLY",
+        "notice": "ACTIVE SOURCES ARE THE VERIFIED CURRENT PIXELLAB FINAL INVENTORY. Historical source records remain available separately and do not enter new solver queues.",
     }
 
 
@@ -2071,6 +2132,7 @@ def owner_pages_snapshot() -> dict[str, Any]:
         "pipelines": pipelines,
         "candidates": inbox.get("candidates", []),
         "sources": library.get("sources", []),
+        "historical_sources": library.get("historical_sources", []),
         "failures": failures.get("failures", []),
         "release_entries": release,
         "mutated": False,

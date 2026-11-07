@@ -72,6 +72,25 @@ def _text(value: object, label: str) -> str:
     return value
 
 
+def _canonical_final_source_gate(source_ids: Sequence[object]) -> dict[str, object] | None:
+    """Fail closed unless every requested source is a current valid PixelLab Final PNG."""
+
+    from scrubbots_pixel_factory import studio_extensions
+
+    requested = [str(source_id) for source_id in source_ids if str(source_id)]
+    try:
+        active_ids, inventory_errors = studio_extensions._sync_current_pixellab_final_sources(_repository_root())
+    except Exception as exc:
+        return {"state": "BLOCKED", "disposition": "CANONICAL_FINAL_INVENTORY_UNAVAILABLE",
+                "error": str(exc)[:512], "invalid_final_sources": []}
+    excluded = sorted(set(requested) - active_ids)
+    if excluded:
+        return {"state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY",
+                "error": "New solving accepts only currently validated PNGs in data/output/Pixellab/Final.",
+                "excluded_source_ids": excluded, "invalid_final_sources": inventory_errors}
+    return None
+
+
 def _cells(value: object, label: str) -> list[str]:
     if not isinstance(value, list) or any(type(cell) is not str for cell in value):
         raise ValueError(f"{label} must be an array of logical color IDs")
@@ -347,13 +366,24 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "batch-load":
             payload = extensions.batch_load(str(request["batch_id"]))
         elif operation == "loaded-png-batch-create":
-            payload = extensions.loaded_png_batch_create(request.get("source_ids", []))
+            source_ids = request.get("source_ids", [])
+            gate = _canonical_final_source_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
+                "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical Final identities."}
+            payload = gate if gate is not None else extensions.loaded_png_batch_create(source_ids)
         elif operation == "loaded-png-batch-find":
             payload = extensions.loaded_png_batch_find(request.get("source_ids", []))
         elif operation == "png-batch-create":
-            payload = extensions.png_batch_create(str(request["batch_id"]), request.get("settings", {}))
+            loaded = extensions.batch_load(str(request["batch_id"]))
+            batch = loaded.get("batch", {})
+            source_ids = [str(item.get("source_id", "")) for item in batch.get("items", []) if isinstance(item, Mapping)]
+            gate = _canonical_final_source_gate(source_ids)
+            payload = gate if gate is not None else extensions.png_batch_create(str(request["batch_id"]), request.get("settings", {}))
         elif operation == "png-batch-retry-failed":
-            payload = extensions.png_batch_retry_failed(str(request["job_id"]))
+            status = extensions.png_batch_status(str(request["job_id"]))
+            job = status.get("job", {})
+            source_ids = [str(item.get("source_id", "")) for item in job.get("items", []) if isinstance(item, Mapping)]
+            gate = _canonical_final_source_gate(source_ids)
+            payload = gate if gate is not None else extensions.png_batch_retry_failed(str(request["job_id"]))
         elif operation == "png-batch-status":
             payload = extensions.png_batch_status(str(request["job_id"]))
         elif operation == "png-batch-latest":
@@ -364,13 +394,17 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             before = extensions.png_batch_status(str(request["job_id"]))
             job = before.get("job", {}) if isinstance(before, Mapping) else {}
             sources = [str(item.get("source_id", "")) for item in job.get("items", []) if isinstance(item, Mapping)]
-            from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
-            assert_solver_allowed(sources)
-            payload = extensions.png_batch_run(str(request["job_id"]), request.get("expected_batch_id"))
-            completed_job = payload.get("job", {}) if isinstance(payload, Mapping) else {}
-            if isinstance(completed_job, Mapping) and completed_job.get("state") != "INTERRUPTED":
-                from scrubbots_pixel_factory.owner_release_library import record_batch_outcomes
-                payload["owner_release_archive"] = record_batch_outcomes(completed_job)
+            gate = _canonical_final_source_gate(sources)
+            if gate is not None:
+                payload = gate
+            else:
+                from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
+                assert_solver_allowed(sources)
+                payload = extensions.png_batch_run(str(request["job_id"]), request.get("expected_batch_id"))
+                completed_job = payload.get("job", {}) if isinstance(payload, Mapping) else {}
+                if isinstance(completed_job, Mapping) and completed_job.get("state") != "INTERRUPTED":
+                    from scrubbots_pixel_factory.owner_release_library import record_batch_outcomes
+                    payload["owner_release_archive"] = record_batch_outcomes(completed_job)
         elif operation == "session-save":
             payload = extensions.save_session(str(request["session_id"]), request.get("state", {}))
         elif operation == "session-restore":
@@ -379,10 +413,17 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.similarity_canonical(str(request["left_id"]), str(request["right_id"]), float(request.get("threshold", 0.92)))
         elif operation == "pipeline":
             if request.get("source_id"):
-                from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
-                assert_solver_allowed([str(request["source_id"])])
-            payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
-            if request.get("source_id"):
+                gate = _canonical_final_source_gate([str(request["source_id"])])
+            else:
+                gate = None
+            if gate is not None:
+                payload = gate
+            else:
+                if request.get("source_id"):
+                    from scrubbots_pixel_factory.owner_release_library import assert_solver_allowed
+                    assert_solver_allowed([str(request["source_id"])])
+                payload = extensions.run_pipeline(source_id=request.get("source_id"), candidate_id=request.get("candidate_id"), request=request.get("request"))
+            if request.get("source_id") and gate is None:
                 from scrubbots_pixel_factory.owner_release_library import transition_pipeline
                 payload["owner_release_status"] = transition_pipeline(str(request["source_id"]), payload)
         elif operation == "comparison":

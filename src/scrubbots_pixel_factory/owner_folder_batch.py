@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import hashlib
+import json
+import re
 import stat
 from typing import Any
 
@@ -22,6 +24,77 @@ _PROVIDER_KEYS = {
 
 class OwnerFolderBatchError(ValueError):
     """Raised when an owner-selected source folder is outside the safe scope."""
+
+
+def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, str]]:
+    """Index atlas commit markers so interrupted 4x4 outputs cannot enter intake."""
+
+    index: dict[str, dict[str, str]] = {}
+    pending = paths["pending"]
+    if not pending.exists():
+        return index
+    for manifest_path in sorted(pending.glob("pixellab-atlas-*.json"), key=lambda item: item.name):
+        if _is_reparse_point(manifest_path) or not manifest_path.is_file():
+            raise OwnerFolderBatchError("PixelLab atlas transaction manifest is unsafe")
+        try:
+            value = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise OwnerFolderBatchError("PixelLab atlas transaction manifest is unreadable") from exc
+        atlas_sha = value.get("source_atlas_sha256") if isinstance(value, dict) else None
+        state = value.get("state") if isinstance(value, dict) else None
+        frames = value.get("frame_dimensions") if isinstance(value, dict) else None
+        atlas_dimensions = value.get("atlas_dimensions") if isinstance(value, dict) else None
+        slices = value.get("slices") if isinstance(value, dict) else None
+        if (not isinstance(value, dict) or value.get("schema") != "scrubbots-pixellab-atlas-transaction/v1"
+                or type(atlas_sha) is not str or len(atlas_sha) != 64
+                or state not in {"IN_PROGRESS", "FINALIZED"}
+                or not isinstance(frames, list) or len(frames) != 2 or any(type(part) is not int or not 1 <= part <= 59 for part in frames)
+                or atlas_dimensions != [frames[0] * 4, frames[1] * 4]
+                or value.get("atlas_filename") != f"atlas-{atlas_sha}.png"
+                or not isinstance(slices, list) or len(slices) != 16
+                or manifest_path.name != f"pixellab-atlas-{atlas_sha}.json"):
+            raise OwnerFolderBatchError("PixelLab atlas transaction manifest contract is invalid")
+        expected: dict[str, str] = {}
+        for frame in slices:
+            if not isinstance(frame, dict):
+                raise OwnerFolderBatchError("PixelLab atlas transaction slice record is invalid")
+            frame_index, frame_sha, filename = frame.get("index"), frame.get("sha256"), frame.get("filename")
+            if (type(frame_index) is not int or not 1 <= frame_index <= 16
+                    or type(frame_sha) is not str or len(frame_sha) != 64
+                    or filename != f"atlas-{atlas_sha}-sprite-{frame_index:02d}-{frame_sha}.png"
+                    or filename in expected):
+                raise OwnerFolderBatchError("PixelLab atlas transaction slice identity is invalid")
+            expected[filename] = frame_sha
+        if set(expected) != {
+                f"atlas-{atlas_sha}-sprite-{frame_index:02d}-{frame['sha256']}.png"
+                for frame_index, frame in enumerate(sorted(slices, key=lambda row: int(row["index"])), 1)
+        }:
+            raise OwnerFolderBatchError("PixelLab atlas transaction must cover all sixteen row-major identities")
+        group_valid = state == "FINALIZED"
+        if group_valid:
+            atlas_path = paths["pixellab_grid_files"] / str(value["atlas_filename"])
+            group_valid = not _is_reparse_point(atlas_path) and atlas_path.is_file()
+            if group_valid:
+                group_valid = hashlib.sha256(atlas_path.read_bytes()).hexdigest() == atlas_sha
+            for filename, digest in expected.items():
+                slice_path = paths["pixellab_final"] / filename
+                if _is_reparse_point(slice_path) or not slice_path.is_file():
+                    group_valid = False
+                    break
+                try:
+                    artifact = SemanticRawArtifact.from_local_file(slice_path, media_type=SUPPORTED_MEDIA_TYPE)
+                    actual_sha = hashlib.sha256(bytes(artifact.raw_bytes)).hexdigest()
+                except (OSError, TypeError, ValueError):
+                    group_valid = False
+                    break
+                if (actual_sha != digest or (artifact.returned_width, artifact.returned_height) != tuple(frames)):
+                    group_valid = False
+                    break
+        for filename, digest in expected.items():
+            if filename in index:
+                raise OwnerFolderBatchError("PixelLab transaction manifests reuse a Final filename")
+            index[filename] = {"state": str(state), "sha256": digest, "group_valid": "true" if group_valid else "false"}
+    return index
 
 
 def approved_owner_source_folders(repository_root: str | Path | None = None) -> dict[str, Path]:
@@ -44,7 +117,11 @@ def scan_owner_source_folder(
     """
     paths = owner_art_paths(repository_root)
     root = paths["input"].parents[1]
-    raw_folder = Path(folder_path).absolute()
+    raw_text = str(folder_path)
+    raw_folder = Path(raw_text).expanduser()
+    path_parts = re.split(r"[\\/]+", raw_text)
+    if not raw_folder.is_absolute() or any(part in {".", ".."} for part in path_parts):
+        raise OwnerFolderBatchError("selected source path must be an absolute canonical folder path")
     resolved_folder = raw_folder.resolve(strict=True)
     if _is_reparse_point(root):
         raise OwnerFolderBatchError("canonical repository root is a reparse point")
@@ -64,6 +141,7 @@ def scan_owner_source_folder(
                      if resolved_folder == approved.resolve(strict=False)), "")
     if not provider:
         raise OwnerFolderBatchError("source folder is not one of the canonical owner artwork folders")
+    transaction_index = _pixellab_transaction_index(paths) if provider == "PIXELLAB" else {}
 
     png_files: list[Path] = []
     for entry in resolved_folder.iterdir():
@@ -87,14 +165,41 @@ def scan_owner_source_folder(
     rejected: list[dict[str, Any]] = []
     seen_digests: set[str] = set()
     seen_names: dict[str, str] = {}
-    existing_sources = owner_upload_root()
+    existing_sources = owner_upload_root(repository_root)
     for index, item in enumerate(png_files):
+        transaction = transaction_index.get(item.name)
+        if transaction is not None and (transaction["state"] != "FINALIZED" or transaction["group_valid"] != "true"):
+            result = {
+                "index": index, "path": str(item), "display_path": item.name,
+                "disposition": "REJECTED", "reason": "PIXELLAB_ATLAS_TRANSACTION_INCOMPLETE_OR_INVALID",
+            }
+            entries.append(result)
+            rejected.append({
+                "index": index, "display_path": item.name, "original_source_path": str(item),
+                "error": result["reason"],
+            })
+            continue
         try:
             if item.stat().st_size > RAW_ARTIFACT_MAX_BYTES:
                 raise OwnerFolderBatchError("PNG exceeds the bounded source size")
             artifact = SemanticRawArtifact.from_local_file(item, media_type=SUPPORTED_MEDIA_TYPE)
             width, height = artifact.returned_width, artifact.returned_height
             digest = hashlib.sha256(bytes(artifact.raw_bytes)).hexdigest()
+            if provider == "PIXELLAB" and not (51 <= width <= 59 and 51 <= height <= 59):
+                result = {
+                    "index": index, "path": str(item), "display_path": item.name,
+                    "source_sha256": digest, "width": width, "height": height,
+                    "disposition": "REJECTED", "reason": "PIXELLAB_FINAL_DIMENSIONS_MUST_BE_51_TO_59_PIXELS",
+                }
+                entries.append(result)
+                rejected.append({
+                    "index": index, "display_path": item.name, "original_source_path": str(item),
+                    "source_sha256": digest, "original_width": width, "original_height": height,
+                    "error": result["reason"],
+                })
+                continue
+            if transaction is not None and digest != transaction["sha256"]:
+                raise OwnerFolderBatchError("PixelLab Final PNG no longer matches its finalized atlas manifest")
             result = {
                 "index": index, "path": str(item), "display_path": item.name, "source_sha256": digest,
                 "width": width, "height": height, "disposition": "ELIGIBLE",

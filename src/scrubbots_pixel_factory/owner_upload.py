@@ -81,8 +81,8 @@ def _path_is_reparse_point(path: Path) -> bool:
     return False
 
 
-def owner_upload_root() -> Path:
-    repository = _repository_root().resolve()
+def owner_upload_root(repository_root: str | Path | None = None) -> Path:
+    repository = Path(repository_root).resolve() if repository_root is not None else _repository_root().resolve()
     root = repository / "level_factory" / "output" / "owner-uploads"
     for component in (repository / "level_factory", repository / "level_factory" / "output", root):
         if _path_is_reparse_point(component):
@@ -224,7 +224,7 @@ def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
     return payload
 
 
-def import_owner_upload(source_path: str | Path) -> dict[str, object]:
+def import_owner_upload(source_path: str | Path, *, repository_root: str | Path | None = None) -> dict[str, object]:
     """Import one explicitly selected strict PNG without transforming it."""
 
     try:
@@ -232,7 +232,7 @@ def import_owner_upload(source_path: str | Path) -> dict[str, object]:
         source_id = f"owner-upload-{source_sha256}"
         if not _SOURCE_ID.fullmatch(source_id):
             raise OwnerUploadError("derived source identity is malformed")
-        destination = owner_upload_root() / source_id
+        destination = owner_upload_root(repository_root) / source_id
         expected = _record(source_id, source_sha256, len(raw), original_filename, width, height)
         if destination.exists():
             record = _verify_concurrent_existing(destination, expected, raw)

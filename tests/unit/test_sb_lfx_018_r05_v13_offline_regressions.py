@@ -898,7 +898,7 @@ def test_owner_art_layout_and_alpix_archive_are_idempotent_and_repo_local() -> N
             shutil.rmtree(root)
 
 
-def test_pixellab_catalog_archives_slices_without_sidecars_in_owner_output_root() -> None:
+def test_pixellab_catalog_archives_exact_slices_and_finalizes_atomically() -> None:
     root = Path(__file__).resolve().parent / ".r10-owner-art-storage-test-output"
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
@@ -907,19 +907,31 @@ def test_pixellab_catalog_archives_slices_without_sidecars_in_owner_output_root(
         source = root / "source"
         (repository / "unused").mkdir(parents=True)
         source.mkdir(parents=True)
-        raw_png = b"\x89PNG\r\n\x1a\nowner-art-storage-offline-test"
-        digest = hashlib.sha256(raw_png).hexdigest()
-        (source / "original-atlas.png").write_bytes(raw_png)
+        atlas = Image.new("RGBA", (208, 208), (0, 0, 0, 0))
         frames = []
         for index in range(1, 17):
             filename = f"sprite-{index:02d}.png"
-            (source / filename).write_bytes(raw_png)
-            frames.append({"index": index, "filename": filename, "sha256": digest})
+            color = (index * 11, index * 7, index * 5, 255)
+            sprite = Image.new("RGBA", (52, 52), color)
+            buffer = BytesIO()
+            sprite.save(buffer, format="PNG")
+            raw_sprite = buffer.getvalue()
+            (source / filename).write_bytes(raw_sprite)
+            x = ((index - 1) % 4) * 52
+            y = ((index - 1) // 4) * 52
+            atlas.paste(sprite, (x, y))
+            frames.append({"index": index, "filename": filename, "sha256": hashlib.sha256(raw_sprite).hexdigest()})
+        atlas_buffer = BytesIO()
+        atlas.save(atlas_buffer, format="PNG")
+        raw_png = atlas_buffer.getvalue()
+        digest = hashlib.sha256(raw_png).hexdigest()
+        (source / "original-atlas.png").write_bytes(raw_png)
         manifest = {
             "schema": "scrubbots-pixellab-pro-4x4-source/v2",
             "source_atlas_sha256": digest,
             "source_kind": "IMPORTED_ATLAS",
-            "frame_dimensions": {"width": 52, "height": 52},
+            "source_dimensions": [208, 208],
+            "frame_dimensions": [52, 52],
             "frames": frames,
         }
 
@@ -934,15 +946,71 @@ def test_pixellab_catalog_archives_slices_without_sidecars_in_owner_output_root(
         assert all(Path(item["path"]).parent == final_paths["pixellab_final"] for item in first["slices"])
         assert len(list(final_paths["pixellab_final"].glob("*.png"))) == 16
         assert Path(first["catalog_path"]).parent == source
+        assert first["transaction_state"] == "FINALIZED"
+        transaction = json.loads(Path(first["transaction_path"]).read_text(encoding="utf-8"))
+        assert transaction["state"] == "FINALIZED"
+        assert len(transaction["slices"]) == 16
         assert not list(final_paths["pixellab"].glob("*.json"))
         assert json.loads(Path(first["catalog_path"]).read_text(encoding="utf-8")) == {
-            key: value for key, value in first.items() if key != "catalog_path"
+            key: value for key, value in first.items() if key not in {"catalog_path", "transaction_path", "transaction_state"}
         }
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("Owner-art test output escaped its owned directory")
             shutil.rmtree(root)
+
+
+def test_pixellab_interrupted_archive_rolls_back_new_pngs_and_keeps_in_progress_marker(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repo"
+    source = tmp_path / "source"
+    repository.mkdir()
+    source.mkdir()
+    atlas = Image.new("RGBA", (208, 208), (0, 0, 0, 0))
+    frames = []
+    for index in range(1, 17):
+        sprite = Image.new("RGBA", (52, 52), (index * 11, index * 7, index * 5, 255))
+        buffer = BytesIO()
+        sprite.save(buffer, format="PNG")
+        raw = buffer.getvalue()
+        filename = f"sprite-{index:02d}.png"
+        (source / filename).write_bytes(raw)
+        atlas.paste(sprite, (((index - 1) % 4) * 52, ((index - 1) // 4) * 52))
+        frames.append({"index": index, "filename": filename, "sha256": hashlib.sha256(raw).hexdigest()})
+    atlas_buffer = BytesIO()
+    atlas.save(atlas_buffer, format="PNG")
+    raw_atlas = atlas_buffer.getvalue()
+    (source / "original-atlas.png").write_bytes(raw_atlas)
+    atlas_sha = hashlib.sha256(raw_atlas).hexdigest()
+    manifest = {
+        "schema": "scrubbots-pixellab-pro-4x4-source/v2", "source_atlas_sha256": atlas_sha,
+        "source_kind": "IMPORTED_ATLAS", "source_dimensions": [208, 208],
+        "frame_dimensions": [52, 52], "frames": frames,
+    }
+    original_write = owner_art_storage._write_content_addressed
+    calls = 0
+
+    def interrupt_on_fourth_write(directory: Path, filename: str, raw: bytes, digest: str) -> Path:
+        nonlocal calls
+        calls += 1
+        if calls == 4:
+            raise OSError("fixture interrupted publication")
+        return original_write(directory, filename, raw, digest)
+
+    monkeypatch.setattr(owner_art_storage, "_write_content_addressed", interrupt_on_fourth_write)
+    with pytest.raises(OSError, match="fixture interrupted"):
+        owner_art_storage.archive_pixellab_export(source, manifest, repository_root=repository)
+    paths = owner_art_storage.owner_art_paths(repository)
+    assert not list(paths["pixellab_grid_files"].glob("*.png"))
+    assert not list(paths["pixellab_final"].glob("*.png"))
+    transaction_path = paths["pending"] / f"pixellab-atlas-{atlas_sha}.json"
+    transaction = json.loads(transaction_path.read_text(encoding="utf-8"))
+    assert transaction["state"] == "IN_PROGRESS"
+    partial_name = f"atlas-{atlas_sha}-sprite-01-{frames[0]['sha256']}.png"
+    (paths["pixellab_final"] / partial_name).write_bytes((source / frames[0]["filename"]).read_bytes())
+    scanned = owner_folder_batch.scan_owner_source_folder(paths["pixellab_final"], repository_root=repository)
+    assert scanned["entries"][0]["disposition"] == "REJECTED"
+    assert scanned["entries"][0]["reason"] == "PIXELLAB_ATLAS_TRANSACTION_INCOMPLETE_OR_INVALID"
 
 
 def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_files() -> None:
@@ -1245,6 +1313,42 @@ def test_owner_release_ready_verification_requires_exact_source_run_entry(monkey
     monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [bad])
     with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
         owner_release_library._verified_ready_entry(source_id, "run-exact")
+
+
+def test_new_solve_gate_accepts_only_current_canonical_final_sources(monkeypatch) -> None:
+    import sys
+
+    scripts = str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    launcher = __import__("factory_core_launcher")
+    from scrubbots_pixel_factory import studio_extensions
+
+    current = "owner-upload-" + "1" * 64
+    legacy = "owner-upload-" + "2" * 64
+    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources", lambda _root: ({current}, []))
+    assert launcher._canonical_final_source_gate([current]) is None
+    blocked = launcher._canonical_final_source_gate([legacy])
+    assert blocked is not None
+    assert blocked["state"] == "BLOCKED"
+    assert blocked["disposition"] == "PIXELLAB_FINAL_ONLY"
+    assert blocked["excluded_source_ids"] == [legacy]
+
+
+def test_new_solve_gate_fails_closed_when_final_inventory_cannot_be_verified(monkeypatch) -> None:
+    import sys
+
+    scripts = str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts")
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    launcher = __import__("factory_core_launcher")
+    from scrubbots_pixel_factory import studio_extensions
+
+    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources", lambda _root: (_ for _ in ()).throw(OSError("synthetic inventory failure")))
+    blocked = launcher._canonical_final_source_gate(["owner-upload-" + "3" * 64])
+    assert blocked is not None
+    assert blocked["state"] == "BLOCKED"
+    assert blocked["disposition"] == "CANONICAL_FINAL_INVENTORY_UNAVAILABLE"
 
 
 def test_pixellab_provider_dialog_uses_non_overlapping_scrollable_vertical_layout() -> None:

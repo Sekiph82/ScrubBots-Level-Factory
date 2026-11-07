@@ -10,6 +10,9 @@ import re
 import stat
 import tempfile
 from typing import Any, Mapping
+from io import BytesIO
+
+from PIL import Image
 
 
 _FOLDER_RELATIVE_PATHS = {
@@ -109,6 +112,77 @@ def _hash(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def _image_dimensions(raw: bytes, label: str) -> tuple[int, int]:
+    try:
+        with Image.open(BytesIO(raw)) as image:
+            if image.format != "PNG":
+                raise OwnerArtStorageError(f"{label} is not a PNG image")
+            image.verify()
+        with Image.open(BytesIO(raw)) as image:
+            return image.size
+    except OwnerArtStorageError:
+        raise
+    except Exception as exc:
+        raise OwnerArtStorageError(f"{label} failed PNG integrity validation") from exc
+
+
+def _dimension_pair(value: object, label: str) -> tuple[int, int]:
+    if isinstance(value, Mapping):
+        width, height = value.get("width"), value.get("height")
+    elif isinstance(value, (list, tuple)) and len(value) == 2:
+        width, height = value
+    else:
+        raise OwnerArtStorageError(f"{label} dimensions are invalid")
+    if type(width) is not int or type(height) is not int or not 1 <= width <= 59 or not 1 <= height <= 59:
+        raise OwnerArtStorageError(f"{label} dimensions are outside the supported 1..59 range")
+    return width, height
+
+
+def _write_atlas_transaction(path: Path, value: Mapping[str, Any], *, finalized: bool) -> None:
+    payload_value = dict(value)
+    payload_value["state"] = "FINALIZED" if finalized else "IN_PROGRESS"
+    payload = (json.dumps(payload_value, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    if _is_reparse_point(path):
+        raise OwnerArtStorageError("PixelLab transaction manifest path is a reparse point")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise OwnerArtStorageError("PixelLab transaction manifest is unreadable") from exc
+        if not isinstance(existing, dict) or any(existing.get(key) != payload_value.get(key) for key in value):
+            raise OwnerArtStorageError("PixelLab transaction manifest conflicts with the current atlas identity")
+        if existing.get("state") == "FINALIZED" and not finalized:
+            return
+        if finalized and existing.get("state") == "FINALIZED":
+            if path.read_bytes() != payload:
+                raise OwnerArtStorageError("finalized PixelLab transaction manifest bytes conflict")
+            return
+        if existing.get("state") not in {"IN_PROGRESS", "FINALIZED"}:
+            raise OwnerArtStorageError("PixelLab transaction manifest has an invalid state")
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.{os.urandom(6).hex()}.partial")
+        try:
+            with temporary.open("xb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{os.urandom(6).hex()}.partial")
+    try:
+        with temporary.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary, path)
+    except FileExistsError:
+        raise OwnerArtStorageError("concurrent PixelLab transaction manifest already exists") from None
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _write_content_addressed(directory: Path, filename: str, raw: bytes, expected_sha256: str) -> Path:
     if not _SHA256.fullmatch(expected_sha256) or _hash(raw) != expected_sha256:
         raise OwnerArtStorageError("artifact bytes do not match their SHA-256 identity")
@@ -174,9 +248,17 @@ def archive_pixellab_export(
     atlas_bytes = original.read_bytes()
     if _hash(atlas_bytes) != atlas_sha:
         raise OwnerArtStorageError("PixelLab original atlas does not match its manifest")
-    atlas_target = _write_content_addressed(paths["pixellab_grid_files"], f"atlas-{atlas_sha}.png", atlas_bytes, atlas_sha)
+    atlas_dimensions = _image_dimensions(atlas_bytes, "PixelLab original atlas")
+    width, height = _dimension_pair(manifest.get("frame_dimensions"), "PixelLab frame")
+    if atlas_dimensions != (4 * width, 4 * height):
+        raise OwnerArtStorageError("PixelLab atlas dimensions do not match the exact 4x4 frame geometry")
+    declared_atlas = manifest.get("source_dimensions")
+    if declared_atlas is not None and declared_atlas != list(atlas_dimensions):
+        raise OwnerArtStorageError("PixelLab atlas dimensions do not match the export manifest")
 
-    slices: list[dict[str, Any]] = []
+    with Image.open(BytesIO(atlas_bytes)) as atlas_image:
+        atlas_rgba = atlas_image.convert("RGBA")
+    prepared: list[dict[str, Any]] = []
     seen: set[int] = set()
     for frame in frames:
         if not isinstance(frame, Mapping):
@@ -196,49 +278,96 @@ def archive_pixellab_export(
         slice_bytes = slice_path.read_bytes()
         if _hash(slice_bytes) != frame_sha:
             raise OwnerArtStorageError("PixelLab slice bytes do not match the export manifest")
-        slice_target = _write_content_addressed(
-            paths["pixellab_final"], f"atlas-{atlas_sha}-sprite-{index:02d}-{frame_sha}.png", slice_bytes, frame_sha
-        )
-        slices.append({"index": index, "sha256": frame_sha, "path": str(slice_target)})
+        if _image_dimensions(slice_bytes, f"PixelLab slice {index}") != (width, height):
+            raise OwnerArtStorageError("PixelLab slice dimensions do not match the declared frame size")
+        with Image.open(BytesIO(slice_bytes)) as slice_image:
+            slice_rgba = slice_image.convert("RGBA")
+        x = ((index - 1) % 4) * width
+        y = ((index - 1) // 4) * height
+        if slice_rgba.tobytes() != atlas_rgba.crop((x, y, x + width, y + height)).tobytes():
+            raise OwnerArtStorageError("PixelLab slice pixels or alpha do not match the row-major source atlas cell")
+        target_name = f"atlas-{atlas_sha}-sprite-{index:02d}-{frame_sha}.png"
+        target = paths["pixellab_final"] / target_name
+        if _is_reparse_point(target):
+            raise OwnerArtStorageError("PixelLab Final slice target is a symlink or reparse point")
+        if target.exists() and (not target.is_file() or _hash(target.read_bytes()) != frame_sha):
+            raise OwnerArtStorageError("content-addressed PixelLab Final target has conflicting bytes")
+        prepared.append({"index": index, "sha256": frame_sha, "filename": target_name, "path": target, "bytes": slice_bytes})
         seen.add(index)
     if seen != set(range(1, 17)):
         raise OwnerArtStorageError("PixelLab export is missing a row-major slice")
-    slices.sort(key=lambda item: int(item["index"]))
-    record = {
-        "schema": "scrubbots-owner-pixellab-atlas-catalog/v1",
+    prepared.sort(key=lambda item: int(item["index"]))
+
+    atlas_target = paths["pixellab_grid_files"] / f"atlas-{atlas_sha}.png"
+    if atlas_target.exists() and (not atlas_target.is_file() or _hash(atlas_target.read_bytes()) != atlas_sha):
+        raise OwnerArtStorageError("content-addressed PixelLab atlas target has conflicting bytes")
+    transaction = {
+        "schema": "scrubbots-pixellab-atlas-transaction/v1",
         "source_atlas_sha256": atlas_sha,
         "source_kind": source_kind,
-        "atlas_path": str(atlas_target),
-        "frame_dimensions": manifest.get("frame_dimensions"),
-        "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
-        "slices": slices,
+        "frame_dimensions": [width, height],
+        "atlas_dimensions": list(atlas_dimensions),
+        "atlas_filename": atlas_target.name,
+        "slices": [{key: item[key] for key in ("index", "sha256", "filename")} for item in prepared],
     }
-    # Keep the operational owner catalog with the import/generation work item.
-    # The two owner-facing PixelLab folders are intentionally art-only: Grid
-    # Files contains atlases and Final contains their sixteen PNG slices.
-    record_path = source_root / "owner-catalog.json"
-    encoded = (json.dumps(record, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
-    if _is_reparse_point(record_path):
-        raise OwnerArtStorageError("PixelLab atlas catalog target is a symlink or reparse point")
-    if record_path.exists():
-        if record_path.read_bytes() != encoded:
-            raise OwnerArtStorageError("PixelLab atlas catalog record conflicts with existing bytes")
-    else:
-        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{atlas_sha}.", suffix=".partial", dir=record_path.parent)
-        temporary = Path(temporary_name)
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(encoded)
-                handle.flush()
-                os.fsync(handle.fileno())
+    transaction_path = paths["pending"] / f"pixellab-atlas-{atlas_sha}.json"
+    _write_atlas_transaction(transaction_path, transaction, finalized=False)
+
+    created_targets: list[Path] = []
+    finalized = False
+    try:
+        if not atlas_target.exists():
+            _write_content_addressed(paths["pixellab_grid_files"], atlas_target.name, atlas_bytes, atlas_sha)
+            created_targets.append(atlas_target)
+        slices: list[dict[str, Any]] = []
+        for item in prepared:
+            target = item["path"]
+            if not target.exists():
+                _write_content_addressed(paths["pixellab_final"], item["filename"], item["bytes"], item["sha256"])
+                created_targets.append(target)
+            slices.append({"index": item["index"], "sha256": item["sha256"], "path": str(target)})
+        record = {
+            "schema": "scrubbots-owner-pixellab-atlas-catalog/v1",
+            "source_atlas_sha256": atlas_sha,
+            "source_kind": source_kind,
+            "atlas_path": str(atlas_target),
+            "frame_dimensions": [width, height],
+            "palette_enforcement": "FULL_V3_TARGET_PALETTE_AND_PER_FRAME_LOCAL_VALIDATION",
+            "slices": slices,
+        }
+        record_path = source_root / "owner-catalog.json"
+        encoded = (json.dumps(record, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        if _is_reparse_point(record_path):
+            raise OwnerArtStorageError("PixelLab atlas catalog target is a symlink or reparse point")
+        if record_path.exists():
+            if record_path.read_bytes() != encoded:
+                raise OwnerArtStorageError("PixelLab atlas catalog record conflicts with existing bytes")
+        else:
+            descriptor, temporary_name = tempfile.mkstemp(prefix=f".{atlas_sha}.", suffix=".partial", dir=source_root)
+            temporary = Path(temporary_name)
             try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(encoded)
+                    handle.flush()
+                    os.fsync(handle.fileno())
                 os.link(temporary, record_path)
             except FileExistsError:
                 if record_path.read_bytes() != encoded:
-                    raise OwnerArtStorageError("concurrent PixelLab atlas record conflicts")
-        finally:
-            temporary.unlink(missing_ok=True)
-    return {**record, "catalog_path": str(record_path)}
+                    raise OwnerArtStorageError("concurrent PixelLab atlas catalog conflicts")
+            finally:
+                temporary.unlink(missing_ok=True)
+        _write_atlas_transaction(transaction_path, transaction, finalized=True)
+        finalized = True
+        return {**record, "catalog_path": str(record_path), "transaction_path": str(transaction_path), "transaction_state": "FINALIZED"}
+    except Exception:
+        if not finalized:
+            for created in reversed(created_targets):
+                try:
+                    if created.is_file() and not _is_reparse_point(created):
+                        created.unlink()
+                except OSError:
+                    pass
+        raise
 
 
 __all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "owner_art_paths", "validate_owner_input_csv"]
