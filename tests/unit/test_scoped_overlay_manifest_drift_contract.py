@@ -178,10 +178,12 @@ def test_solver_runtime_dependencies_and_pipeline_page_are_explicit_overlay_path
 def test_installed_factory_resolves_data_against_canonical_checkout_root() -> None:
     owner_storage = (ROOT / "src" / "scrubbots_pixel_factory" / "owner_art_storage.py").read_text(encoding="utf-8")
     extensions = (ROOT / "src" / "scrubbots_pixel_factory" / "studio_extensions.py").read_text(encoding="utf-8")
+    launcher = (ROOT / "level_factory" / "scripts" / "factory_core_launcher.py").read_text(encoding="utf-8")
     assert "def factory_repository_root(anchor: str | Path | None = None) -> Path:" in owner_storage
     assert "git_metadata.is_dir() or git_metadata.is_file()" in owner_storage
     assert "else factory_repository_root()" in owner_storage
     assert "return factory_repository_root(__file__)" in extensions
+    assert "return factory_repository_root(__file__)" in launcher
 
 
 def test_missing_cim_process_fields_use_native_query_without_bypassing_gate() -> None:

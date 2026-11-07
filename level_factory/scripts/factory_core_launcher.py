@@ -41,7 +41,9 @@ _MAX_STUDIO_REQUEST_BYTES = 384 * 1024
 
 
 def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    from scrubbots_pixel_factory.owner_art_storage import factory_repository_root
+
+    return factory_repository_root(__file__)
 
 
 def _studio_error(message: str) -> dict[str, object]:
