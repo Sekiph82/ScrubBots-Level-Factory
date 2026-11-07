@@ -30,6 +30,23 @@ def test_assignments_are_deterministic_interleaved_and_exact() -> None:
     assert max((len(list(group)) for _key, group in __import__("itertools").groupby(assignment))) <= 3
 
 
+def test_new_png_batch_jobs_use_release_pool_pending_and_legacy_job_ids_resume_in_place(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    extensions = repository / "level_factory" / "output" / "studio-extensions"
+    monkeypatch.setattr(png_batch, "_root", lambda: repository / "data/Release Pool/Pending/Pipelines/BatchJobs")
+    monkeypatch.setattr(png_batch, "_legacy_root", lambda: extensions / "png-batches")
+
+    new_path = png_batch._job_path("png-batch-new-fixture")
+    assert new_path == repository / "data/Release Pool/Pending/Pipelines/BatchJobs/jobs/png-batch-new-fixture.json"
+
+    legacy_id = "png-batch-legacy-fixture"
+    legacy_path = extensions / "png-batches/jobs" / f"{legacy_id}.json"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text('{"job_id":"png-batch-legacy-fixture"}', encoding="utf-8")
+    assert png_batch._job_path(legacy_id) == legacy_path
+
+
 def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: int = 4) -> tuple[str, list[dict[str, object]]]:
     """Build synthetic inputs for batch-orchestration contracts only.
 

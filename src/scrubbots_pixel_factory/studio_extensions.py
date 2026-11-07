@@ -93,7 +93,7 @@ def _pipeline_paths() -> list[Path]:
                 raise StudioExtensionError("canonical pipeline status path contains a reparse point or escapes the repository") from exc
         if owner_art_storage._is_reparse_point(root) or not root.is_dir():
             continue
-        for path in root.glob("pipeline-*.json"):
+        for path in root.glob("*.json"):
             if owner_art_storage._is_reparse_point(path) or not path.is_file():
                 continue
             previous = found.get(path.name)

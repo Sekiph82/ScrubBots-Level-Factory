@@ -116,13 +116,21 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
             result_path.write_text(json.dumps(result), encoding="utf-8")
             return {"level": str(level), "supply_plan": str(plan), "result": str(result_path)}
 
-    from scrubbots_pixel_factory.supply_pipeline import game_rules, supply_exporter, supply_optimizer, solver_budget, verify
+    from scrubbots_pixel_factory.supply_pipeline import game_rules, real_play_gate, supply_exporter, supply_optimizer, solver_budget, verify
 
     monkeypatch.setattr(game_rules, "GameRules", Rules)
     monkeypatch.setattr(supply_optimizer, "SupplyOptimizer", Optimizer)
     monkeypatch.setattr(supply_exporter, "SupplyExporter", Exporter)
     monkeypatch.setattr(solver_budget, "normalize_solver_budget", lambda *_args: (25_000, 90.0))
     monkeypatch.setattr(verify, "verify_exported_supply", lambda *_args, **_kwargs: {"state": "READY"})
+    def fake_real_play(level_path: str, plan_path: str, result_path: Path, *, source_sha256: str):
+        result = {
+            "schema": "scrubbots-real-play-result/v2", "mode": "canonical-60hz",
+            "verdict": "WON_CANONICAL", "searched": False, "sourceSha256": source_sha256,
+        }
+        result_path.write_text(json.dumps(result), encoding="utf-8")
+        return {"result": result, "result_path": str(result_path)}
+    monkeypatch.setattr(real_play_gate, "ensure_real_play_gate", fake_real_play)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": candidate_id}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda *_args, **_kwargs: {"readback_verified": True, "entry_digest": "pool-proof"})
     monkeypatch.setattr("scrubbots_pixel_factory.supply_pipeline.scrubpack_identity.derive_solver_supply_identity", lambda *_args: {"identity": "bound"})
@@ -170,7 +178,7 @@ def test_legacy_null_source_recovers_only_exact_attempt_and_same_source(monkeypa
         def glob(self, _pattern: str) -> list[str]:
             return ["real-producer-shaped.json"]
 
-    monkeypatch.setattr(extensions, "extensions_root", PipelineRoot)
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("real-producer-shaped.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     candidate = {"candidate_id": pipeline["candidate_id"]}
     monkeypatch.setattr(extensions, "list_candidates", lambda: [candidate])
@@ -270,7 +278,7 @@ def test_legacy_run_with_wrong_attempt_binding_is_not_recovered(monkeypatch: pyt
         def glob(self, _pattern: str) -> list[str]:
             return ["wrong-attempt.json"]
 
-    monkeypatch.setattr(extensions, "extensions_root", PipelineRoot)
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("wrong-attempt.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     item = {
         "index": 0, "attempt_id": "attempt-exact", "activity_run_id": "activity-exact",
@@ -408,8 +416,10 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     pool_row["entry_digest"] = hashlib.sha256(json.dumps(
         pool_row, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8")).hexdigest()
-    (pool_root / "entry.json").write_text(json.dumps(pool_row), encoding="utf-8")
+    pool_entry_path = pool_root / "candidate-exact-pipeline-exact-ready.json"
+    pool_entry_path.write_text(json.dumps(pool_row), encoding="utf-8")
     monkeypatch.setattr(extensions, "extensions_root", lambda: root)
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [pipeline_path])
     monkeypatch.setattr(extensions, "_read_json", lambda path: json.loads(Path(path).read_text(encoding="utf-8")))
     from scrubbots_pixel_factory.supply_pipeline import release_pool
 
@@ -433,7 +443,7 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     pool_row["entry_digest"] = hashlib.sha256(json.dumps(
         pool_row, ensure_ascii=False, sort_keys=True, separators=(",", ":"),
     ).encode("utf-8")).hexdigest()
-    (pool_root / "entry.json").write_text(json.dumps(pool_row), encoding="utf-8")
+    pool_entry_path.write_text(json.dumps(pool_row), encoding="utf-8")
     monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [pool_row])
     assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
     monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [])

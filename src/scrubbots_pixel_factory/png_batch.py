@@ -68,6 +68,13 @@ def assign_columns(source_ids: Sequence[str]) -> list[int]:
 
 
 def _root() -> Path:
+    from . import studio_extensions
+    from .owner_art_storage import owner_art_paths
+
+    return owner_art_paths(studio_extensions._repository_root())["pending"] / "Pipelines" / "BatchJobs"
+
+
+def _legacy_root() -> Path:
     from .studio_extensions import extensions_root
 
     return extensions_root() / "png-batches"
@@ -76,11 +83,33 @@ def _root() -> Path:
 def _job_path(job_id: str) -> Path:
     if not isinstance(job_id, str) or not job_id.startswith("png-batch-") or len(job_id) > 80 or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in job_id):
         raise ValueError("PNG batch job identity is malformed")
-    return _root() / "jobs" / f"{job_id}.json"
+    from . import studio_extensions
+    from .owner_art_storage import OwnerArtStorageError, _is_reparse_point, _verify_path_under_root, owner_art_paths
+
+    filename = f"{job_id}.json"
+    canonical_root = _root()
+    canonical = canonical_root / "jobs" / filename
+    legacy = _legacy_root() / "jobs" / filename
+    expected_root = owner_art_paths(studio_extensions._repository_root())["pending"] / "Pipelines" / "BatchJobs"
+    if canonical_root == expected_root:
+        try:
+            _verify_path_under_root(Path(studio_extensions._repository_root()).resolve(), canonical.parent)
+        except OwnerArtStorageError as exc:
+            raise ValueError("canonical PNG batch path contains a reparse point or escapes the repository") from exc
+    if ((isinstance(canonical, Path) and _is_reparse_point(canonical))
+            or (isinstance(legacy, Path) and _is_reparse_point(legacy))):
+        raise ValueError("PNG batch job path is a symlink or reparse point")
+    if canonical.exists() and legacy.exists():
+        if canonical.read_bytes() != legacy.read_bytes():
+            raise ValueError("PNG batch job identity has conflicting canonical and legacy state")
+        return canonical
+    if legacy.exists():
+        return legacy
+    return canonical
 
 
 def _control_path(job_id: str) -> Path:
-    return _root() / "control" / f"{job_id}.json"
+    return _job_path(job_id).parent.parent / "control" / f"{job_id}.json"
 
 
 def _seal(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -133,7 +162,7 @@ def _job_lock(job_id: str):
         lock = _PROCESS_LOCKS.setdefault(key, threading.Lock())
     if not lock.acquire(blocking=False):
         raise ValueError("another sequential runner already owns this PNG batch")
-    lock_path = _root() / "locks" / f"{job_id}.lock"
+    lock_path = _job_path(job_id).parent.parent / "locks" / f"{job_id}.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     handle = lock_path.open("a+b")
     try:
@@ -278,8 +307,9 @@ def _verify_column_artifacts(pipeline: Mapping[str, Any], expected_columns: int)
     except (OSError, UnicodeError, json.JSONDecodeError):
         return False
     saved_hashes = primary.get("artifact_sha256")
-    if saved_hashes is not None and saved_hashes != artifact_hashes:
-        return False
+    if saved_hashes is not None:
+        if not isinstance(saved_hashes, Mapping) or any(saved_hashes.get(key) != digest for key, digest in artifact_hashes.items()):
+            return False
     if stored_result != dict(result) or supply_plan.get("columnCount") != expected_columns:
         return False
     try:
@@ -317,7 +347,7 @@ def _candidate_has_source_lineage(candidate: Mapping[str, Any], source_id: str, 
 
 
 def _pool_row_matches(run: Mapping[str, Any], candidate: Mapping[str, Any], source_id: str, expected_columns: int) -> bool:
-    from .studio_extensions import _read_json, extensions_root
+    from .studio_extensions import _pipeline_path, _read_json, extensions_root
     from .supply_pipeline.release_pool import release_entries
 
     run_id = run.get("run_id")
