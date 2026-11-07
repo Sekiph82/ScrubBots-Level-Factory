@@ -126,6 +126,18 @@ def test_provider_control_caption_tracks_the_selected_provider_after_confirmatio
     assert provider_dialog.index("_provider_model = str(choice.get_item_metadata(choice.selected))") < provider_dialog.index("_refresh_provider_control_caption()")
 
 
+def test_installed_studio_resolves_csv_output_and_palette_from_canonical_repository_data() -> None:
+    assert 'func _factory_repository_root() -> String:' in UI
+    assert 'FileAccess.file_exists(current.path_join("TASKS.md")) and DirAccess.dir_exists_absolute(current.path_join(".git"))' in UI
+    assert 'func _factory_data_path(relative_path: String) -> String:' in UI
+    assert '_factory_data_path("input")' in UI
+    assert '_factory_data_path("output")' in UI
+    assert '_factory_data_path("palette/scrubbots_palette_v3.json")' in UI
+    assert 'ProjectSettings.globalize_path("res://../data/input")' not in UI
+    assert 'ProjectSettings.globalize_path("res://../data/output")' not in UI
+    assert 'ProjectSettings.globalize_path("res://../data/palette' not in UI
+
+
 def test_production_screens_are_native_controls_and_master_textures_are_not_live_underlays() -> None:
     assert "_canvas.texture = null" in UI
     assert "_canvas.visible = false" in UI

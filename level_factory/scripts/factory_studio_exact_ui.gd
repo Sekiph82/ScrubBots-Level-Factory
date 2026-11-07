@@ -1613,11 +1613,34 @@ func _refresh_live_data() -> void:
 	_layout_pixellab_details_artwork_gap()
 
 
+func _factory_repository_root() -> String:
+	var current := ProjectSettings.globalize_path("res://").simplify_path()
+	while not current.is_empty():
+		if FileAccess.file_exists(current.path_join("TASKS.md")) and DirAccess.dir_exists_absolute(current.path_join(".git")):
+			return current
+		var parent := current.get_base_dir()
+		if parent == current:
+			break
+		current = parent
+	return ""
+
+
+func _factory_data_path(relative_path: String) -> String:
+	if relative_path.is_absolute_path() or ".." in relative_path.replace("\\", "/").split("/"):
+		return ""
+	var root := _factory_repository_root()
+	if root.is_empty():
+		return ""
+	return root.path_join("data").path_join(relative_path).simplify_path()
+
+
 func _ensure_canonical_palette_loaded() -> void:
 	if not _canonical_palette_hex_by_id.is_empty():
 		return
 	# Read the canonical JSON locally; do not spawn Python or block a screen switch.
-	var palette_path := ProjectSettings.globalize_path("res://../data/palette/scrubbots_palette_v3.json")
+	var palette_path := _factory_data_path("palette/scrubbots_palette_v3.json")
+	if palette_path.is_empty():
+		return
 	var palette_file := FileAccess.open(palette_path, FileAccess.READ)
 	if palette_file == null:
 		return
@@ -2456,7 +2479,10 @@ func _on_owner_folder_provider_selected(id: int) -> void:
 		return
 	_owner_folder_explicit_alternative = id == 3
 	_file_selection_action = "OWNER_FOLDER_IMPORT"
-	var data_root := ProjectSettings.globalize_path("res://../data/output")
+	var data_root := _factory_data_path("output")
+	if data_root.is_empty():
+		_report("Could not locate the canonical Factory data directory from this installation.")
+		return
 	match id:
 		0:
 			_owner_folder_provider = "ALPIX"
@@ -2563,7 +2589,10 @@ func _open_batch_csv() -> void:
 	if _file_dialog == null:
 		return
 	_file_selection_action = "PIXEL_ART_BATCH"
-	var input_directory := ProjectSettings.globalize_path("res://../data/input")
+	var input_directory := _factory_data_path("input")
+	if input_directory.is_empty():
+		_report("Could not locate the canonical Factory data directory from this installation.")
+		return
 	if not DirAccess.dir_exists_absolute(input_directory):
 		_report("Canonical CSV folder is missing: %s" % input_directory)
 		return
@@ -2577,7 +2606,7 @@ func _open_batch_csv() -> void:
 
 
 func _is_canonical_input_csv(path: String) -> bool:
-	var input_directory := ProjectSettings.globalize_path("res://../data/input").simplify_path().to_lower()
+	var input_directory := _factory_data_path("input").simplify_path().to_lower()
 	var selected := path.simplify_path()
 	return selected.is_absolute_path() and selected.get_extension().to_lower() == "csv" and selected.get_base_dir().to_lower() == input_directory
 
