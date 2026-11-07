@@ -4074,7 +4074,7 @@ func _refresh_solver_activity_summary(force: bool = false) -> void:
 	# While running, update this SINGLE row every five seconds, not by appending.
 	# On completion, display the precise terminal duration in the same row.
 	var elapsed_seconds := maxi(0, floori(float(elapsed_ms) / 1000.0))
-	var shown_seconds := elapsed_seconds if _activity_solver_terminal_elapsed_ms >= 0 else (elapsed_seconds / 5) * 5
+	var shown_seconds := elapsed_seconds if _activity_solver_terminal_elapsed_ms >= 0 else floori(float(elapsed_seconds) / 5.0) * 5
 	if not force and shown_seconds == _activity_solver_last_bucket:
 		return
 	_activity_solver_last_bucket = shown_seconds
