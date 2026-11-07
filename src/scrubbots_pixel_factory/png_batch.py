@@ -336,13 +336,14 @@ def _pool_row_matches(run: Mapping[str, Any], candidate: Mapping[str, Any], sour
         plan = json.loads(Path(str(files.get("supply_plan", ""))).read_text(encoding="utf-8"))
         if plan.get("columnCount") != expected_columns:
             return False
+        from .supply_pipeline import release_pool as release_pool_store
         row = next(
-            path for path in (extensions_root() / "release-pool").glob("*.json")
+            path for path in release_pool_store.entry_paths(str(candidate_id))
             if _read_json(path).get("candidate_id") == candidate_id
             and _read_json(path).get("pipeline_run_id") == run_id
         )
         saved = _read_json(row)
-        pipeline_path = extensions_root() / "pipelines" / f"{run_id}.json"
+        pipeline_path = _pipeline_path(run_id)
         if not pipeline_path.is_file() or saved.get("pipeline_sha256") != hashlib.sha256(pipeline_path.read_bytes()).hexdigest():
             return False
         return (
@@ -721,26 +722,24 @@ def _clear_control(job_id: str) -> None:
 
 
 def _recover_attempt(job: Mapping[str, Any], item: Mapping[str, Any]) -> dict[str, Any] | None:
-    from .studio_extensions import _read_json, _enter_candidate_release_pool, extensions_root, list_candidates
+    from .studio_extensions import _read_json, _enter_candidate_release_pool, _pipeline_paths, list_candidates
 
-    pipeline_root = extensions_root() / "pipelines"
     matches = []
-    if pipeline_root.exists():
-        for path in pipeline_root.glob("*.json"):
-            try:
-                payload = _read_json(path)
-            except Exception:
-                continue
-            request = payload.get("request", {})
-            if (request.get("png_batch_job_id") == job.get("job_id")
-                    and request.get("png_batch_item_index") == item.get("index")
-                    and request.get("png_batch_attempt_id") == item.get("attempt_id")
-                    and request.get("source_id") == item.get("source_id")
-                    and request.get("activity_source_sha256") == item.get("source_sha256")
-                    and request.get("activity_run_id") == item.get("activity_run_id")
-                    and request.get("column_count") == item.get("column_count")
-                    and payload.get("source_id") in (None, item.get("source_id"))):
-                matches.append(payload)
+    for path in _pipeline_paths():
+        try:
+            payload = _read_json(path)
+        except Exception:
+            continue
+        request = payload.get("request", {})
+        if (request.get("png_batch_job_id") == job.get("job_id")
+                and request.get("png_batch_item_index") == item.get("index")
+                and request.get("png_batch_attempt_id") == item.get("attempt_id")
+                and request.get("source_id") == item.get("source_id")
+                and request.get("activity_source_sha256") == item.get("source_sha256")
+                and request.get("activity_run_id") == item.get("activity_run_id")
+                and request.get("column_count") == item.get("column_count")
+                and payload.get("source_id") in (None, item.get("source_id"))):
+            matches.append(payload)
     if len(matches) > 1:
         raise ValueError("multiple canonical runs match the interrupted batch item; refusing ambiguous resume")
     if not matches:

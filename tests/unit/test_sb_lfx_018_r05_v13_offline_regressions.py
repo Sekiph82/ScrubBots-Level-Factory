@@ -390,7 +390,9 @@ def test_alpix_resume_revalidates_persisted_validated_png_before_import() -> Non
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
     try:
-        csv_path = root / "requests.csv"
+        fake_repo = root / "fake-repo"
+        fake_repo.mkdir(parents=True)
+        csv_path = fake_repo / "data" / "input" / "requests.csv"
         csv_path.parent.mkdir(parents=True)
         raw_csv = b"prompt,size\nBlue owl,8x8\n"
         csv_path.write_bytes(raw_csv)
@@ -513,7 +515,9 @@ def test_alpix_csv_archive_ignores_forged_persisted_artifact_path(monkeypatch) -
         if scripts not in sys.path:
             sys.path.insert(0, scripts)
         launcher = __import__("factory_core_launcher")
-        csv_path = root / "requests.csv"
+        fake_repo = root / "fake-repo"
+        fake_repo.mkdir(parents=True)
+        csv_path = fake_repo / "data" / "input" / "requests.csv"
         csv_path.parent.mkdir(parents=True)
         raw_csv = b"prompt\nBlue owl\n"
         csv_path.write_bytes(raw_csv)
@@ -521,8 +525,6 @@ def test_alpix_csv_archive_ignores_forged_persisted_artifact_path(monkeypatch) -
         extensions_root = root / "runtime"
         job_root = extensions_root / "alpix-jobs"
         state_path = job_root / f"{job_id}.json"
-        fake_repo = root / "fake-repo"
-        fake_repo.mkdir()
         state = alpix_batch._read_job(state_path, job_id, raw_csv, alpix_batch.read_rows(raw_csv))
         outside = root / "untrusted-owner-file.png"
         Image.new("RGBA", (2, 2), (255, 69, 0, 255)).save(outside, format="PNG")
@@ -584,7 +586,9 @@ def test_alpix_csv_resume_restores_csv_intent_and_verifies_imported_source(monke
         if scripts not in sys.path:
             sys.path.insert(0, scripts)
         launcher = __import__("factory_core_launcher")
-        csv_path = root / "requests.csv"
+        fake_repo = root / "fake-repo"
+        fake_repo.mkdir(parents=True)
+        csv_path = fake_repo / "data" / "input" / "requests.csv"
         csv_path.parent.mkdir(parents=True)
         raw_csv = b"prompt,size,provider\nOriginal owl,8x9,ALPIX (Claude)\n"
         csv_path.write_bytes(raw_csv)
@@ -602,8 +606,6 @@ def test_alpix_csv_resume_restores_csv_intent_and_verifies_imported_source(monke
             "state": "PENDING",
         })
         alpix_batch._save_job(state_path, state)
-        fake_repo = root / "fake-repo"
-        fake_repo.mkdir()
         monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
         renderer_calls: list[tuple[str, int, int]] = []
@@ -1135,7 +1137,7 @@ def test_concurrent_and_interrupted_owner_uploads_fail_or_reuse_without_overwrit
         source_path = source_dir / "same.png"
         source_path.write_bytes(raw)
         upload_root = root / "owner-uploads"
-        monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: upload_root)
+        monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args: upload_root)
 
         with ThreadPoolExecutor(max_workers=8) as pool:
             results = list(pool.map(lambda _index: owner_upload.import_owner_upload(source_path), range(8)))
@@ -1356,6 +1358,36 @@ def test_new_solve_gate_fails_closed_when_final_inventory_cannot_be_verified(mon
     assert blocked is not None
     assert blocked["state"] == "BLOCKED"
     assert blocked["disposition"] == "CANONICAL_FINAL_INVENTORY_UNAVAILABLE"
+
+
+def test_new_pipeline_records_use_release_pool_status_folders_and_legacy_reads_remain(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    extension_root = repository / "level_factory" / "output" / "studio-extensions"
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
+
+    ready = studio_extensions._write_pipeline_record({"run_id": "pipeline-ready-fixture", "disposition": "READY"})
+    failed = studio_extensions._write_pipeline_record({"run_id": "pipeline-failed-fixture", "disposition": "UNAVAILABLE"})
+    pending = studio_extensions._write_pipeline_record({"run_id": "pipeline-pending-fixture", "disposition": "INTERRUPTED"})
+    assert ready == repository / "data/Release Pool/Ready/Pipelines/pipeline-ready-fixture.json"
+    assert failed == repository / "data/Release Pool/Failed/Pipelines/pipeline-failed-fixture.json"
+    assert pending == repository / "data/Release Pool/Pending/Pipelines/pipeline-pending-fixture.json"
+    assert studio_extensions._pipeline_path("pipeline-ready-fixture") == ready
+
+    legacy = extension_root / "pipelines" / "pipeline-legacy-fixture.json"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text('{"run_id":"pipeline-legacy-fixture"}', encoding="utf-8")
+    assert studio_extensions._pipeline_path("pipeline-legacy-fixture") == legacy
+    assert legacy in studio_extensions._pipeline_paths()
+    conflicting_legacy = extension_root / "pipelines" / ready.name
+    conflicting_legacy.write_text('{"run_id":"pipeline-ready-fixture","disposition":"FAILED"}', encoding="utf-8")
+    with pytest.raises(studio_extensions.StudioExtensionError, match="conflicting"):
+        studio_extensions._pipeline_paths()
+    with pytest.raises(studio_extensions.StudioExtensionError, match="conflicting"):
+        studio_extensions._pipeline_path("pipeline-ready-fixture")
+    with pytest.raises(studio_extensions.StudioExtensionError, match="unsafe"):
+        studio_extensions._pipeline_path("../escape")
 
 
 def test_pixellab_provider_dialog_uses_non_overlapping_scrollable_vertical_layout() -> None:

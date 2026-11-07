@@ -5,8 +5,10 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import re
 import subprocess
+import tempfile
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -602,7 +604,38 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
 
 def _pool_root() -> Path:
     from .. import studio_extensions as studio
-    return studio.extensions_root() / "release-pool"
+    from ..owner_art_storage import owner_art_paths
+    return owner_art_paths(studio._repository_root())["ready"]
+
+
+def _pool_roots() -> tuple[Path, Path]:
+    from .. import studio_extensions as studio
+    return _pool_root(), studio.extensions_root() / "release-pool"
+
+
+def entry_paths(candidate_id_filter: str | None = None) -> list[Path]:
+    """Return canonical Ready entries plus read-only legacy receipt paths."""
+
+    from ..owner_art_storage import _is_reparse_point
+    found: dict[str, Path] = {}
+    for root in _pool_roots():
+        if _is_reparse_point(root) or not root.is_dir():
+            continue
+        pattern = f"{candidate_id_filter}-*.json" if candidate_id_filter and re.fullmatch(r"[A-Za-z0-9_-]+", candidate_id_filter) else "*.json"
+        for path in sorted(root.glob(pattern)):
+            if _is_reparse_point(path) or not path.is_file():
+                continue
+            previous = found.get(path.name)
+            if previous is not None:
+                try:
+                    same_bytes = previous.read_bytes() == path.read_bytes()
+                except OSError as exc:
+                    raise ReleaseError(f"duplicate Release Pool evidence is unreadable: {path.name}") from exc
+                if not same_bytes:
+                    raise ReleaseError(f"Release Pool identity has conflicting canonical/legacy records: {path.name}")
+                continue
+            found[path.name] = path
+    return [found[name] for name in sorted(found)]
 
 
 def _pipeline_real_play_proof(
@@ -738,12 +771,33 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
         "source_bundle": candidate["source_path"], "candidate": dict(candidate), "pipeline": dict(pipeline),
     }
     payload["entry_digest"] = _hash(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode())
-    path = _pool_root() / f"{candidate['candidate_id']}-{pipeline['run_id']}-{review.get('review_id') if review is not None else 'ready'}.json"
+    from ..owner_art_storage import ensure_owner_art_layout
+    pool_root = ensure_owner_art_layout(studio._repository_root())["ready"]
+    path = pool_root / f"{candidate['candidate_id']}-{pipeline['run_id']}-{review.get('review_id') if review is not None else 'ready'}.json"
     raw = (json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
-    if path.exists() and path.read_bytes() != raw:
-        raise ReleaseError("candidate already has different immutable Release Pool evidence")
-    path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(raw)
-    return {"disposition": "ENTERED_RELEASE_POOL", "candidate_id": candidate["candidate_id"], "entry_digest": payload["entry_digest"], "pool_size": len(list(_pool_root().glob("*.json")))}
+    from ..owner_art_storage import _is_reparse_point
+    if _is_reparse_point(path):
+        raise ReleaseError("Release Pool evidence path is a symlink or reparse point")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.exists():
+        if not path.is_file() or path.read_bytes() != raw:
+            raise ReleaseError("candidate already has different immutable Release Pool evidence")
+    else:
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".partial", dir=path.parent)
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(raw)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                os.link(temporary, path)
+            except FileExistsError:
+                if not path.is_file() or path.read_bytes() != raw:
+                    raise ReleaseError("concurrent Release Pool evidence has different immutable bytes")
+        finally:
+            temporary.unlink(missing_ok=True)
+    return {"disposition": "ENTERED_RELEASE_POOL", "candidate_id": candidate["candidate_id"], "entry_digest": payload["entry_digest"], "pool_size": len(entry_paths())}
 
 
 def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: Any) -> dict[str, dict[str, Any]]:
@@ -786,15 +840,9 @@ def _cached_latest_review(
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
-    root = _pool_root()
-    if not root.exists():
-        paths = ()
-    elif candidate_id_filter and re.fullmatch(r"[A-Za-z0-9_-]+", candidate_id_filter):
-        # Entry filenames begin with the canonical candidate id. A filtered
-        # read must not revalidate every other candidate's pipeline and assets.
-        paths = sorted(root.glob(f"{candidate_id_filter}-*.json"))
-    else:
-        paths = sorted(root.glob("*.json"))
+    # Entry filenames begin with the canonical candidate id. A filtered read
+    # must not revalidate every other candidate's pipeline and assets.
+    paths = entry_paths(candidate_id_filter)
     # Candidate discovery is a full canonical projection. Build it once for the
     # pool snapshot instead of repeating the same scan and validation for each
     # immutable entry (which made larger pools scale quadratically).
@@ -802,7 +850,7 @@ def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, An
         str(item.get("candidate_id", "")): item
         for item in studio.list_candidates()
     } if paths else {}
-    pipeline_paths = (studio.extensions_root() / "pipelines").glob("*.json") if paths else ()
+    pipeline_paths = studio._pipeline_paths() if paths else ()
     latest_ready_by_candidate = _latest_ready_pipeline_index(pipeline_paths, studio)
     latest_review_by_candidate: dict[str, dict[str, Any] | None] = {}
     for path in paths:

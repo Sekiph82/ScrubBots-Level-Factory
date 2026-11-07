@@ -26,7 +26,7 @@ def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, obje
     evidence_root = repository / "level_factory" / "output" / "studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args: source_root)
     monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
     monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
     monkeypatch.setattr(studio, "_repository_root", lambda: repository)
@@ -100,7 +100,7 @@ def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, obje
             "disposition": "READY",
             "created_at": f"2026-10-02T00:00:0{len(route_calls)}+00:00",
         }
-        path = studio._pipeline_path(run_id)
+        path = studio._pipeline_path(run_id, status="READY")
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(pipeline, sort_keys=True), encoding="utf-8")
         return pipeline
@@ -113,6 +113,7 @@ def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, obje
         "source_sha256": source_sha,
         "source_root": source_root,
         "source_bytes": source_bytes,
+        "repository": repository,
         "route_calls": route_calls,
         "candidate_id": candidate_id,
         "bundle": bundle,
@@ -213,8 +214,9 @@ def test_zip_resume_reuses_canonical_run_after_record_before_job_checkpoint(monk
         run_job(fixture["job_path"])
     assert interrupted
     assert len(fixture["route_calls"]) == 1
-    pipeline_records = list((studio.extensions_root() / "pipelines").glob("pipeline-*.json"))
+    pipeline_records = [path for path in studio._pipeline_paths() if path.name.startswith("pipeline-")]
     assert len(pipeline_records) == 1
+    assert pipeline_records[0].is_relative_to(fixture["repository"] / "data" / "Release Pool")
     pipeline_bytes = pipeline_records[0].read_bytes()
     interrupted_events = sorted((studio.extensions_root() / "pipelines" / "jobs").rglob("*.json"))
     zip_events = [json.loads(path.read_text(encoding="utf-8")) for path in interrupted_events if json.loads(path.read_text(encoding="utf-8")).get("stage") == "ZIP_SUPPLY_SOLVE_DIFFICULTY"]
@@ -223,7 +225,7 @@ def test_zip_resume_reuses_canonical_run_after_record_before_job_checkpoint(monk
     resumed = run_job(fixture["job_path"])
     assert resumed["state"] == "COMPLETE"
     assert len(fixture["route_calls"]) == 1
-    assert list((studio.extensions_root() / "pipelines").glob("pipeline-*.json")) == pipeline_records
+    assert [path for path in studio._pipeline_paths() if path.name.startswith("pipeline-")] == pipeline_records
     assert pipeline_records[0].read_bytes() == pipeline_bytes
     assert fixture["job_path"].read_bytes() == fixture["job_bytes"]
     assert (fixture["source_root"] / fixture["source_id"] / "source.png").read_bytes() == fixture["source_bytes"]

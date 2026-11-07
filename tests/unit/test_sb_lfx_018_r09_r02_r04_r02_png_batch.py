@@ -295,7 +295,7 @@ def test_interrupted_ready_recovery_orchestration_only_uses_isolated_gate_stubs(
         def glob(self, _pattern: str) -> list[str]:
             return ["exact-run.json"]
 
-    monkeypatch.setattr(extensions, "extensions_root", PipelineRoot)
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("exact-run.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(extensions, "list_candidates", lambda: [{"candidate_id": pipeline["candidate_id"]}])
     monkeypatch.setattr(extensions, "_enter_candidate_release_pool", lambda candidate, *, pipeline: {"readback_verified": True, "entry_digest": "exact"})
@@ -347,7 +347,7 @@ def test_interrupted_run_missing_qa_proof_is_not_recovered_as_ready(monkeypatch:
         def glob(self, _pattern: str) -> list[str]:
             return ["proof-gap.json"]
 
-    monkeypatch.setattr(extensions, "extensions_root", PipelineRoot)
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("proof-gap.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(extensions, "list_candidates", lambda: pytest.fail("candidate lookup must follow full proof validation"))
 
@@ -488,16 +488,7 @@ def test_pool_reentry_returns_existing_exact_row_without_rewriting_immutable_fil
     existing_entry = {"candidate_id": candidate_id, "pipeline_run_id": pipeline["run_id"],
                       "entry_digest": "verified-digest", "eligibility_source": "READY_AUTO"}
 
-    class PipelineDirectory:
-        def glob(self, _pattern: str) -> list[str]:
-            return ["pipeline-idempotent.json"]
-
-    class ExtensionRoot:
-        def __truediv__(self, child: str) -> PipelineDirectory:
-            assert child == "pipelines"
-            return PipelineDirectory()
-
-    monkeypatch.setattr(extensions, "extensions_root", lambda: ExtensionRoot())
+    monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("pipeline-idempotent.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
     monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [existing_entry])
     monkeypatch.setattr(release_pool, "enter_release_pool", lambda *_args, **_kwargs: pytest.fail("immutable existing row must not be rewritten"))
@@ -517,14 +508,15 @@ def test_candidate_filtered_release_pool_read_scans_only_that_candidate(monkeypa
     observed: list[str] = []
 
     class PoolRoot:
-        def exists(self) -> bool:
+        def is_dir(self) -> bool:
             return True
 
         def glob(self, pattern: str) -> list[Path]:
             observed.append(pattern)
             return []
 
-    monkeypatch.setattr(release_pool, "_pool_root", lambda: PoolRoot())
+    monkeypatch.setattr(release_pool, "_pool_roots", lambda: (PoolRoot(),))
+    monkeypatch.setattr("scrubbots_pixel_factory.owner_art_storage._is_reparse_point", lambda _path: False)
     candidate_id = "candidate-owner-" + "a" * 48
 
     assert release_pool.release_entries(candidate_id) == []

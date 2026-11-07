@@ -27,6 +27,7 @@ from .output.bundle import read_bundle
 from .output.png import decode_logical_png
 from .owner_upload import OWNER_UPLOAD_ORIGIN, OWNER_UPLOAD_STATUS, OWNER_UPLOAD_VALIDATION_STATE, owner_upload_root, import_owner_upload
 from .owner_art_storage import OwnerArtStorageError
+from . import owner_art_storage
 from .quality.core import QualityPolicy, evaluate_grid, logical_grid_hash
 from .semantic.normalization.core import SUPPORTED_MEDIA_TYPE, _decode_raw
 
@@ -58,6 +59,48 @@ def _repository_root() -> Path:
 
 def extensions_root() -> Path:
     return (_repository_root() / "level_factory" / "output" / "studio-extensions").resolve()
+
+
+_PIPELINE_STATUS_DIRS = {
+    "PENDING": "pending", "READY": "ready", "FAILED": "failed", "REJECTED": "rejected",
+}
+
+
+def _pipeline_status_dir(disposition: object) -> str:
+    state = str(disposition).strip().upper()
+    if state == "READY":
+        return _PIPELINE_STATUS_DIRS["READY"]
+    if state in {"FAILED", "UNAVAILABLE", "ERROR"}:
+        return _PIPELINE_STATUS_DIRS["FAILED"]
+    if state == "REJECTED":
+        return _PIPELINE_STATUS_DIRS["REJECTED"]
+    return _PIPELINE_STATUS_DIRS["PENDING"]
+
+
+def _pipeline_paths() -> list[Path]:
+    """Read new status-scoped pipeline runs and immutable legacy runs."""
+
+    paths = owner_art_storage.owner_art_paths(_repository_root())
+    roots = [paths[key] / "Pipelines" for key in ("pending", "ready", "failed", "rejected")]
+    roots.append(extensions_root() / "pipelines")
+    found: dict[str, Path] = {}
+    for root in roots:
+        if owner_art_storage._is_reparse_point(root) or not root.is_dir():
+            continue
+        for path in root.glob("pipeline-*.json"):
+            if owner_art_storage._is_reparse_point(path) or not path.is_file():
+                continue
+            previous = found.get(path.name)
+            if previous is not None:
+                try:
+                    same_bytes = previous.read_bytes() == path.read_bytes()
+                except OSError as exc:
+                    raise StudioExtensionError(f"duplicate pipeline record is unreadable: {path.name}") from exc
+                if not same_bytes:
+                    raise StudioExtensionError(f"pipeline identity has conflicting status/legacy records: {path.name}")
+                continue
+            found[path.name] = path
+    return [found[name] for name in sorted(found)]
 
 
 def _accounting_root() -> Path:
@@ -582,7 +625,7 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
     """Include a true READY candidate; owner ACCEPT is optional and never publishes."""
 
     runs = []
-    for path in (extensions_root() / "pipelines").glob("*.json"):
+    for path in _pipeline_paths():
         try:
             value = _read_json(path)
         except StudioExtensionError:
@@ -621,7 +664,7 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
 
 def _latest_ready_pipeline(candidate_id: str) -> dict[str, Any] | None:
     ready: list[dict[str, Any]] = []
-    for path in (extensions_root() / "pipelines").glob("*.json"):
+    for path in _pipeline_paths():
         try:
             value = _read_json(path)
         except StudioExtensionError:
@@ -639,7 +682,7 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
     if not validation.get("exact_logical_source") or validation.get("structural", {}).get("disposition") != "PASS":
         return {"state": "SOURCE_ONLY", "source_id": source_id, "source_sha256": source_sha, "validation": validation, "pipeline": {}}
     candidates: list[dict[str, Any]] = []
-    for path in (extensions_root() / "pipelines").glob("*.json"):
+    for path in _pipeline_paths():
         try:
             run = _read_json(path)
         except StudioExtensionError:
@@ -825,8 +868,42 @@ def compare_candidates(candidate_ids: Sequence[str]) -> dict[str, Any]:
     return {"schema": "scrubbots-candidate-comparison-view", "version": 1, "read_only": True, "candidates": selected, "similarity_advisory": similarity_evidence, "winner": {"disposition": "NOT AVAILABLE", "reason": "Comparison never computes a winner."}}
 
 
-def _pipeline_path(run_id: str) -> Path:
-    return extensions_root() / "pipelines" / f"{run_id}.json"
+def _pipeline_path(run_id: str, *, status: str | None = None) -> Path:
+    if (type(run_id) is not str or not run_id or len(run_id) > 128
+            or run_id in {".", ".."} or any(char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for char in run_id)):
+        raise StudioExtensionError("pipeline run identity is unsafe")
+    filename = f"{run_id}.json"
+    paths = owner_art_storage.owner_art_paths(_repository_root())
+    canonical = [paths[key] / "Pipelines" / filename for key in ("pending", "ready", "failed", "rejected")]
+    legacy = extensions_root() / "pipelines" / filename
+    candidates = canonical + [legacy]
+    existing = []
+    for path in candidates:
+        if owner_art_storage._is_reparse_point(path):
+            raise StudioExtensionError("pipeline run identity is a symlink or reparse point")
+        if path.exists():
+            existing.append(path)
+    if len(existing) > 1:
+        try:
+            same_bytes = all(path.read_bytes() == existing[0].read_bytes() for path in existing[1:])
+        except OSError as exc:
+            raise StudioExtensionError("duplicate pipeline record is unreadable") from exc
+        if not same_bytes:
+            raise StudioExtensionError("pipeline run identity exists with conflicting canonical or legacy evidence")
+        return next((path for path in canonical if path in existing), existing[0])
+    if existing:
+        return existing[0]
+    chosen = _pipeline_status_dir(status) if status is not None else _PIPELINE_STATUS_DIRS["PENDING"]
+    return paths[chosen] / "Pipelines" / filename
+
+
+def _write_pipeline_record(payload: Mapping[str, Any]) -> Path:
+    run_id = str(payload.get("run_id", ""))
+    root = _repository_root()
+    owner_art_storage.ensure_owner_art_layout(root)
+    path = _pipeline_path(run_id, status=str(payload.get("disposition", "PENDING")))
+    _write_json(path, payload, immutable=True)
+    return path
 
 
 def _pipeline_stage(
@@ -1115,7 +1192,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     source_identity = binding.get("source_id", identity if source_kind == "OWNER_UPLOAD" else None)
     candidate_identity = identity if source_kind == "CANDIDATE" else None
     payload = {"schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id, "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": source_identity, "candidate_id": candidate_identity, "derived_candidate_id": candidate_identity if binding else None, "source_lineage": request_data.get("source_lineage") if binding else None, "owner_source_binding": binding or None, "request": request_data, "stages": stages, "disposition": disposition, "primary": primary, "created_at": datetime.now(timezone.utc).isoformat()}
-    _write_json(_pipeline_path(run_id), payload, immutable=True)
+    _write_pipeline_record(payload)
     if disposition == "READY":
         candidate = next((item for item in list_candidates() if item.get("candidate_id") == identity), None)
         if candidate is not None:
@@ -1244,7 +1321,7 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
             "request": request_data, "stages": stages, "disposition": final_state,
             "primary": primary, "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        _write_json(_pipeline_path(run_id), payload, immutable=True)
+        _write_pipeline_record(payload)
         return payload
     if (source_id is None) == (candidate_id is None):
         raise StudioExtensionError("pipeline requires exactly one source or candidate identity")
@@ -1325,7 +1402,7 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
     unavailable_gate = source_id is not None and validation.get("structural", {}).get("disposition") == "UNAVAILABLE"
     disposition = "INTERRUPTED" if interrupted else "UNAVAILABLE" if unavailable_gate else "PARTIAL / STOPPED" if hard_stop else "COMPLETE"
     payload = {"schema": PIPELINE_SCHEMA, "version": 1, "run_id": run_id, "source_id": source_id, "candidate_id": candidate_id, "request": dict(request or {}), "stages": stages, "disposition": disposition, "created_at": datetime.now(timezone.utc).isoformat()}
-    _write_json(_pipeline_path(run_id), payload, immutable=True)
+    _write_pipeline_record(payload)
     return payload
 
 
@@ -1751,8 +1828,7 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
                 add(evidence_id=str(value.get("source_id", path.stem)), evidence_path=path, operation="import-validation", stage="VALIDATE", disposition="REJECTED", reason="; ".join(value.get("palette", {}).get("foreign_color_count", []) if isinstance(value.get("palette", {}).get("foreign_color_count"), list) else value.get("structural", {}).get("rejection_codes", [])) or str(structural.get("reason", "SOURCE_INVALID")), inputs={"source_id": value.get("source_id")}, retryable=True)
         except (StudioExtensionError, OSError):
             continue
-    pipeline_root = extensions_root() / "pipelines"
-    for path in sorted(pipeline_root.glob("*.json")) if pipeline_root.exists() else []:
+    for path in _pipeline_paths():
         try:
             value = _read_json(path)
             for stage in value.get("stages", []):
@@ -2110,8 +2186,7 @@ def owner_pages_snapshot() -> dict[str, Any]:
             continue
 
     pipelines: list[dict[str, Any]] = []
-    pipeline_root = root / "pipelines"
-    for path in sorted(pipeline_root.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True) if pipeline_root.exists() else []:
+    for path in sorted(_pipeline_paths(), key=lambda item: item.stat().st_mtime, reverse=True):
         try:
             value = _read_json(path)
             if value.get("schema") == PIPELINE_SCHEMA and value.get("run_id") == path.stem and isinstance(value.get("stages"), list):

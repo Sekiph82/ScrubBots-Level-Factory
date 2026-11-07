@@ -288,9 +288,8 @@ def _load_validation_checkpoint(event: Mapping[str, Any], source: Mapping[str, A
 def _pipeline_for_job(job: Mapping[str, Any], source: Mapping[str, Any], candidate_id: str) -> dict[str, Any] | None:
     """Recover a canonical Studio run written just before a job checkpoint."""
 
-    directory = studio.extensions_root() / "pipelines"
     matches: list[dict[str, Any]] = []
-    for path in directory.glob("pipeline-*.json") if directory.exists() else ():
+    for path in studio._pipeline_paths():
         try:
             value = studio._read_json(path)
         except studio.StudioExtensionError:
@@ -314,8 +313,10 @@ def _verify_pipeline_event(event: Mapping[str, Any]) -> dict[str, Any]:
     if len(references) != 1:
         raise HeadlessPipelineError("canonical pipeline event must reference exactly one pipeline record")
     path = (studio._repository_root() / str(references[0])).resolve()
-    root = studio.extensions_root().resolve()
-    if root not in path.parents:
+    from .owner_art_storage import owner_art_paths
+    extension_root = studio.extensions_root().resolve()
+    release_root = owner_art_paths(studio._repository_root())["release_pool"].resolve()
+    if not (path.is_relative_to(extension_root) or path.is_relative_to(release_root)):
         raise HeadlessPipelineError("canonical pipeline event escaped the Studio evidence root")
     payload = studio._read_json(path)
     digest = _sha256(path.read_bytes())

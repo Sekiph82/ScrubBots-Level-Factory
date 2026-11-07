@@ -107,12 +107,30 @@ def test_ready_auto_release_pool_entry_reads_back_exactly_once(tmp_path):
         rules.return_value.classify.return_value = "MEDIUM"
         first = release_pool.enter_release_pool(candidate, run)
         assert first["disposition"] == "ENTERED_RELEASE_POOL"
+        canonical_ready = tmp_path / "data" / "Release Pool" / "Ready"
+        assert release_pool._pool_root() == canonical_ready
+        assert any(path.parent == canonical_ready for path in release_pool.entry_paths(candidate["candidate_id"]))
         entries = release_pool.release_entries()
         assert len(entries) == 1
         assert entries[0]["eligibility_source"] == "READY_AUTO"
         assert entries[0]["official_profile_provenance"]["kind"] == "DIRECT"
         assert release_pool.enter_release_pool(candidate, run)["entry_digest"] == first["entry_digest"]
         assert len(release_pool.release_entries()) == 1
+
+
+def test_release_pool_lists_canonical_ready_and_legacy_receipt_paths_read_only(tmp_path, monkeypatch):
+    repository = tmp_path / "repository"
+    extension_root = repository / "level_factory" / "output" / "studio-extensions"
+    legacy = extension_root / "release-pool"
+    legacy.mkdir(parents=True)
+    legacy_receipt = legacy / "candidate-legacy-pipeline-legacy-ready.json"
+    legacy_receipt.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
+
+    assert release_pool._pool_root() == repository / "data" / "Release Pool" / "Ready"
+    assert release_pool.entry_paths("candidate-legacy") == [legacy_receipt]
+    assert not (repository / "data" / "Release Pool" / "Ready").exists()
 
 
 def test_score_and_class_gates_reject_mismatch_and_only_allow_documented_derived_rounding():
