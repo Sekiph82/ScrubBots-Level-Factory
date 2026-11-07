@@ -89,6 +89,22 @@ def test_all_activity_tables_show_newest_first_and_leave_raw_event_order_intact(
     assert '"seq"' in source and '"previous_sha256"' in source
 
 
+def test_owner_folder_preview_and_import_stream_per_file_progress_to_pipeline_activity() -> None:
+    root = Path(__file__).resolve().parents[2]
+    ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    launcher = (root / "level_factory/scripts/factory_core_launcher.py").read_text(encoding="utf-8")
+    scanner = (root / "src/scrubbots_pixel_factory/owner_folder_batch.py").read_text(encoding="utf-8")
+    importer = (root / "src/scrubbots_pixel_factory/studio_extensions.py").read_text(encoding="utf-8")
+
+    assert "_begin_owner_folder_activity(folder" in _function(ui, "_on_owner_folder_selected")
+    assert '"activity_run_id": _activity_run_id' in _function(ui, "_on_owner_folder_selected")
+    assert "owner-folder-preview-" in _function(ui, "_begin_owner_folder_activity")
+    assert "activity_source_id" in launcher and '"stage": "FILE CHECK"' in scanner
+    assert '"stage": "FILE IMPORT"' in importer
+    assert "writer.emit(\"PIPELINE\", \"COMPLETE\"" in launcher
+    assert "studio-pipeline-activity" in ui
+
+
 def test_pixel_art_left_controls_are_compact_and_prompt_refresh_is_removed() -> None:
     root = Path(__file__).resolve().parents[2]
     source = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")

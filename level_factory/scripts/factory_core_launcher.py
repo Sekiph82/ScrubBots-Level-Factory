@@ -46,6 +46,66 @@ def _repository_root() -> Path:
     return factory_repository_root(__file__)
 
 
+def _folder_activity_context(request: Mapping[str, object]):
+    run_id = str(request.get("activity_run_id", ""))
+    source_id = str(request.get("activity_source_id", ""))
+    source_sha = str(request.get("activity_source_sha256", ""))
+    if not run_id and not source_id and not source_sha:
+        return None, None, []
+    folder_identity = Path(str(request.get("folder", ""))).expanduser().resolve(strict=False).as_posix().lower()
+    expected_sha = hashlib.sha256(folder_identity.encode("utf-8")).hexdigest()
+    if source_id != "owner-folder-preview-" + expected_sha or source_sha != expected_sha:
+        raise ValueError("folder activity identity does not match the selected canonical path")
+    from scrubbots_pixel_factory.pipeline_activity import PipelineActivityWriter
+
+    writer = PipelineActivityWriter(_repository_root(), run_id, source_id, source_sha)
+    errors: list[str] = []
+
+    def emit(event: Mapping[str, object]) -> None:
+        writer.emit(
+            str(event.get("stage", "FOLDER")),
+            str(event.get("state", "RUNNING")),
+            str(event.get("message", "")),
+        )
+
+    emit({"stage": "FOLDER", "state": "RUNNING", "message": "Selected folder: " + str(request.get("folder", ""))})
+    return writer, emit, errors
+
+
+def _finish_folder_activity(writer, emit, errors: list[str], payload: dict[str, object], *, phase: str) -> dict[str, object]:
+    if writer is None:
+        return payload
+    try:
+        if phase == "PREVIEW":
+            entries = payload.get("entries", [])
+            dispositions = [str(item.get("disposition", "REJECTED")) for item in entries if isinstance(item, Mapping)] if isinstance(entries, list) else []
+            eligible = sum(value == "ELIGIBLE" for value in dispositions)
+            existing = sum(value in {"ALREADY_IMPORTED", "SKIPPED_DUPLICATE"} for value in dispositions)
+            rejected = sum(value == "REJECTED" for value in dispositions)
+            failed = sum(value == "FAILED" for value in dispositions)
+            message = "Preview complete: %d/%d checked · %d new · %d already imported · %d failed · %d rejected." % (
+                len(dispositions), int(payload.get("png_count", len(dispositions))), eligible, existing, failed, rejected,
+            )
+            writer.emit("PIPELINE", "COMPLETE", message, backend_disposition="FOLDER_PREVIEW_COMPLETE")
+        else:
+            counts = payload.get("counts", {})
+            counts = counts if isinstance(counts, Mapping) else {}
+            items = payload.get("items", [])
+            total = len(items) if isinstance(items, list) else 0
+            writer.emit("PIPELINE", "COMPLETE", "Import complete: %d/%d processed · %d imported · %d already present · %d failed · %d rejected." % (
+                total, total, int(counts.get("imported", 0)), int(counts.get("skipped", 0)),
+                int(counts.get("failed", 0)), int(counts.get("rejected", 0)),
+            ), backend_disposition="FOLDER_IMPORT_COMPLETE")
+    except Exception as exc:
+        if not errors:
+            errors.append(str(exc)[:160])
+    payload["activity_log_path"] = str(writer.path)
+    payload["activity_log_state"] = "COMPLETE" if not errors and writer.terminal_emitted else "INCOMPLETE"
+    if errors:
+        payload["activity_log_error"] = errors[0]
+    return payload
+
+
 def _studio_error(message: str) -> dict[str, object]:
     return {
         "operation": STUDIO_OPERATION,
@@ -353,18 +413,40 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload["owner_release_archive"] = record_import_items(payload)
         elif operation == "owner-folder-import":
             from scrubbots_pixel_factory.owner_folder_batch import import_owner_source_folder
-            payload = import_owner_source_folder(
-                str(request.get("folder", "")),
-                explicit_alternative=request.get("explicit_alternative") is True,
-            )
-            from scrubbots_pixel_factory.owner_release_library import record_import_items
-            payload["owner_release_archive"] = record_import_items(payload)
+            activity_writer, progress_callback, activity_errors = _folder_activity_context(request)
+            try:
+                payload = import_owner_source_folder(
+                    str(request.get("folder", "")),
+                    explicit_alternative=request.get("explicit_alternative") is True,
+                    progress_callback=progress_callback,
+                )
+                from scrubbots_pixel_factory.owner_release_library import record_import_items
+                payload["owner_release_archive"] = record_import_items(payload)
+            except Exception as exc:
+                if activity_writer is not None and not activity_writer.terminal_emitted:
+                    try:
+                        activity_writer.emit("PIPELINE", "ERROR", "Folder import failed: " + str(exc)[:180], backend_disposition="FOLDER_IMPORT_ERROR")
+                    except Exception:
+                        pass
+                raise
+            payload = _finish_folder_activity(activity_writer, progress_callback, activity_errors, payload, phase="IMPORT")
         elif operation == "owner-folder-preview":
             from scrubbots_pixel_factory.owner_folder_batch import scan_owner_source_folder
-            payload = scan_owner_source_folder(
-                str(request.get("folder", "")),
-                explicit_alternative=request.get("explicit_alternative") is True,
-            )
+            activity_writer, progress_callback, activity_errors = _folder_activity_context(request)
+            try:
+                payload = scan_owner_source_folder(
+                    str(request.get("folder", "")),
+                    explicit_alternative=request.get("explicit_alternative") is True,
+                    progress_callback=progress_callback,
+                )
+            except Exception as exc:
+                if activity_writer is not None and not activity_writer.terminal_emitted:
+                    try:
+                        activity_writer.emit("PIPELINE", "ERROR", "Folder preview failed: " + str(exc)[:180], backend_disposition="FOLDER_PREVIEW_ERROR")
+                    except Exception:
+                        pass
+                raise
+            payload = _finish_folder_activity(activity_writer, progress_callback, activity_errors, payload, phase="PREVIEW")
         elif operation == "batch-load":
             payload = extensions.batch_load(str(request["batch_id"]))
         elif operation == "loaded-png-batch-create":

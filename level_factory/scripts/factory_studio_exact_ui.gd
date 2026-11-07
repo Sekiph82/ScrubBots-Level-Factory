@@ -2532,14 +2532,65 @@ func _on_owner_folder_selected(folder: String) -> void:
 	_owner_folder_preview.clear()
 	_operation_running = true
 	_activity_stage = "FOLDER PREVIEW"
-	_activity_message = "Scanning and validating direct PNG files in a background worker; no solver or provider call is running."
+	_begin_owner_folder_activity(folder, "Folder selected; discovering direct PNGs and starting per-file checks. No solver or provider call is running.")
 	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
 	if not _queue_studio_read_extension("owner-folder-preview", {
 		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
+		"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
+		"activity_source_sha256": _activity_source_sha256,
 	}, {"kind": "owner-folder-preview"}):
 		_operation_running = false
 		_report("Folder preview worker could not start.")
+		_complete_owner_folder_activity_error("Folder preview worker could not start.")
+
+
+func _begin_owner_folder_activity(folder: String, message: String) -> void:
+	var folder_identity := folder.simplify_path().replace("\\", "/").trim_suffix("/").to_lower()
+	var identity_hash := HashingContext.new()
+	identity_hash.start(HashingContext.HASH_SHA256)
+	identity_hash.update(folder_identity.to_utf8_buffer())
+	_activity_source_sha256 = identity_hash.finish().hex_encode()
+	_activity_source_id = "owner-folder-preview-" + _activity_source_sha256
+	var now := Time.get_datetime_dict_from_system(true)
+	var timestamp := "%04d%02d%02dT%02d%02d%02dZ" % [now.year, now.month, now.day, now.hour, now.minute, now.second]
+	var suffix_hash := HashingContext.new()
+	suffix_hash.start(HashingContext.HASH_SHA256)
+	suffix_hash.update((str(Time.get_ticks_usec()) + _activity_source_id).to_utf8_buffer())
+	_activity_run_id = "pipeline-ui-%s-%s" % [timestamp, suffix_hash.finish().hex_encode().left(12)]
+	_activity_source_filename = "Folder · " + folder.get_file()
+	_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(_activity_run_id + ".jsonl")
+	_activity_started_msec = Time.get_ticks_msec()
+	_activity_finished_msec = 0
+	_activity_seen_sequence = 0
+	_activity_read_offset = 0
+	_activity_pending_bytes.clear()
+	_activity_previous_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+	_activity_stage = "FOLDER PREVIEW"
+	_activity_message = message
+	_activity_terminal_state = ""
+	_activity_backend_disposition = ""
+	_activity_event_backend_disposition = ""
+	_activity_integrity_error = ""
+	_activity_stream_reader_override = null
+	_clear_activity_rows()
+	_refresh_activity_header()
+
+
+func _complete_owner_folder_activity_error(message: String) -> void:
+	_activity_terminal_state = "ERROR"
+	_activity_backend_disposition = "FOLDER_ACTIVITY_UNAVAILABLE"
+	_activity_message = message
+	_activity_finished_msec = Time.get_ticks_msec()
+	_refresh_activity_header()
+
+
+func _owner_folder_activity_request() -> Dictionary:
+	return {
+		"activity_run_id": _activity_run_id,
+		"activity_source_id": _activity_source_id,
+		"activity_source_sha256": _activity_source_sha256,
+	}
 
 
 func _show_owner_folder_preview(preview: Dictionary) -> void:
@@ -2592,15 +2643,17 @@ func _confirm_owner_folder_import() -> void:
 		if item is Dictionary:
 			all_paths.append(str(item.get("path", "")))
 	_operation_running = true
-	_activity_stage = "SOURCE IMPORT"
-	_activity_message = "Rechecking %d PNG files against the confirmed preview in a background worker." % all_paths.size()
+	_begin_owner_folder_activity(folder, "Confirm accepted; rechecking %d PNG files against the preview before import." % all_paths.size())
 	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
 	if not _queue_studio_read_extension("owner-folder-preview", {
 		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
+		"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
+		"activity_source_sha256": _activity_source_sha256,
 	}, {"kind": "owner-folder-recheck", "paths": all_paths, "entries": old_entries, "folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}):
 		_operation_running = false
 		_report("Folder confirmation recheck could not start; no source was imported.")
+		_complete_owner_folder_activity_error("Folder confirmation recheck could not start; no source was imported.")
 
 
 func _open_batch_csv() -> void:
@@ -4064,9 +4117,9 @@ func _poll_pipeline_activity() -> void:
 			_fail_activity_monitor("Activity event file cannot be opened.")
 			return
 		length = file.get_length()
-	if length > 256 * 1024 or length < _activity_read_offset:
+	if length > 64 * 1024 * 1024 or length < _activity_read_offset:
 		if file != null: file.close()
-		_fail_activity_monitor("Activity stream exceeded 256 KiB or was truncated while active.")
+		_fail_activity_monitor("Activity stream exceeded its 64 MiB safety bound or was truncated while active.")
 		return
 	if file != null:
 		file.seek(_activity_read_offset)
@@ -4177,7 +4230,8 @@ func _refresh_solver_activity_summary(force: bool = false) -> void:
 
 
 func _append_activity_row(body: Dictionary) -> void:
-	if _activity_rows == null or str(body.get("source_id", _selected_import_source_id)) != _selected_import_source_id:
+	var expected_source_id := _activity_source_id if not _activity_source_id.is_empty() else _selected_import_source_id
+	if _activity_rows == null or str(body.get("source_id", expected_source_id)) != expected_source_id:
 		return
 	var scrollbar := _activity_scroll.get_v_scroll_bar()
 	var follow_latest := scrollbar.value <= 12.0
@@ -4233,7 +4287,7 @@ func _append_activity_row(body: Dictionary) -> void:
 		_activity_solver_state = "RUNNING"
 		_activity_solver_last_message = full_message
 	else:
-		var icon := "✓" if state in ["PASS", "READY"] else "!" if state in ["FAIL", "ERROR", "BLOCKED", "UNAVAILABLE", "TIMEOUT"] else "•"
+		var icon := "✓" if state in ["PASS", "READY", "COMPLETE", "IMPORTED", "ALREADY_IMPORTED", "SKIPPED_DUPLICATE", "ELIGIBLE"] else "!" if state in ["FAIL", "ERROR", "BLOCKED", "UNAVAILABLE", "TIMEOUT", "FAILED", "REJECTED"] else "•"
 		var elapsed := floori(float(elapsed_ms) / 1000.0)
 		var message := full_message.replace("\n", " ").left(76)
 		row.text = "%02d:%02d  %s %s · %s — %s" % [floori(float(elapsed) / 60.0), posmod(elapsed, 60), icon, stage, state.replace("_", " "), message]
@@ -4291,7 +4345,8 @@ func _fail_activity_monitor(reason: String) -> void:
 func _refresh_activity_header() -> void:
 	if _activity_state_label == null:
 		return
-	if not _batch_job_id.is_empty() and _operation_running:
+	var folder_activity_active := _activity_source_id.begins_with("owner-folder-preview-") and not _activity_run_id.is_empty()
+	if not folder_activity_active and not _batch_job_id.is_empty() and _operation_running:
 		var counts: Dictionary = _batch_snapshot.get("counts", {})
 		var current_index: Variant = _batch_snapshot.get("current_index")
 		var items: Array = _batch_snapshot.get("items", [])
@@ -4309,7 +4364,7 @@ func _refresh_activity_header() -> void:
 		_activity_phase_label.text = "Canonical pipeline · %d READY · %d failed" % [int(counts.get("ready", 0)), int(counts.get("failed", 0))]
 		_activity_phase_label.tooltip_text = _activity_message
 		return
-	var activity_matches_selection := _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
+	var activity_matches_selection := folder_activity_active or _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
 	if not activity_matches_selection:
 		_activity_state_label.text = "SOURCE ONLY"
 		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(Color("#34425a"), Color("#536783")))
@@ -4322,7 +4377,7 @@ func _refresh_activity_header() -> void:
 	_activity_state_label.text = state.replace("_", " ").left(13)
 	var bg := Color("#34425a")
 	if state == "RUNNING": bg = Color("#245478")
-	elif state == "READY": bg = Color("#216444")
+	elif state in ["READY", "COMPLETE", "FOLDER_PREVIEW_COMPLETE", "FOLDER_IMPORT_COMPLETE"]: bg = Color("#216444")
 	elif state in ["BLOCKED", "UNAVAILABLE", "PARTIAL_STOPPED"]: bg = Color("#7a5824")
 	elif state in ["ERROR", "TIMEOUT", "INTERRUPTED"]: bg = Color("#743d3c")
 	_activity_state_chip.add_theme_stylebox_override("panel", _control_style(bg, bg.lightened(0.22)))
@@ -4630,12 +4685,15 @@ func _poll_studio_read_extension() -> void:
 			return
 		var folder := str(context.get("folder", ""))
 		var paths: Array = context.get("paths", [])
-		_activity_message = "SHA-bound folder import worker running for %d PNG files; solver has not started." % paths.size()
+		_begin_owner_folder_activity(folder, "Preview recheck passed; importing %d selected PNG files one by one. Solver has not started." % paths.size())
 		if not _queue_studio_read_extension("owner-folder-import", {
 			"folder": folder, "explicit_alternative": bool(context.get("explicit_alternative", false)),
+			"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
+			"activity_source_sha256": _activity_source_sha256,
 		}, {"kind": "owner-folder-import", "paths": paths}):
 			_operation_running = false
 			_report("Owner folder import worker could not start; no source was imported.")
+			_complete_owner_folder_activity_error("Owner folder import worker could not start; no source was imported.")
 		return
 	if kind == "owner-folder-import":
 		_operation_running = false

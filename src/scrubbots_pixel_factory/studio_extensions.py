@@ -7,7 +7,7 @@ solver, difficulty, owner-review, provider, or production truth.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -1945,6 +1945,7 @@ def batch_import(
     source_folder: str = "",
     pre_rejected: Sequence[Mapping[str, object]] = (),
     path_indices: Sequence[int] | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     allowed_providers = {"OWNER_UPLOAD", "ALPIX", "PIXELLAB", "OWNER_SUGGESTIONS"}
     if source_provider not in allowed_providers:
@@ -1998,8 +1999,16 @@ def batch_import(
                     batch_item["collision_with_source_id"] = historical
             prior_filename_sources.setdefault(filename_key, []).append((source_sha, str(result.get("source_id", ""))))
         items.append(batch_item)
+        if progress_callback is not None:
+            detail = "%d/%d %s — %s" % (index + 1, len(paths) + len(pre_rejected), source_path.name, disposition)
+            if error:
+                detail += " — " + str(error)
+            progress_callback({"stage": "FILE IMPORT", "state": disposition,
+                               "completed": index + 1, "total": len(paths) + len(pre_rejected),
+                               "filename": source_path.name, "disposition": disposition,
+                               "message": detail[:240]})
     for rejected in pre_rejected:
-        items.append({
+        rejected_item = {
             "index": int(rejected.get("index", len(items))),
             "display_path": str(rejected.get("display_path", "")),
             "original_source_path": str(rejected.get("original_source_path", "")),
@@ -2008,7 +2017,17 @@ def batch_import(
             "disposition": "FAILED" if rejected.get("disposition") == "FAILED" else "REJECTED",
             "error": str(rejected.get("error", "SOURCE_REJECTED")),
             "original_width": rejected.get("original_width"), "original_height": rejected.get("original_height"),
-        })
+        }
+        items.append(rejected_item)
+        if progress_callback is not None:
+            detail = "%d/%d %s — %s — %s" % (
+                len(items), len(paths) + len(pre_rejected), rejected_item["display_path"],
+                rejected_item["disposition"], rejected_item["error"],
+            )
+            progress_callback({"stage": "FILE IMPORT", "state": rejected_item["disposition"],
+                               "completed": len(items), "total": len(paths) + len(pre_rejected),
+                               "filename": rejected_item["display_path"],
+                               "disposition": rejected_item["disposition"], "message": detail[:240]})
     items.sort(key=lambda item: int(item["index"]))
     batch_id = f"batch-import-{_digest(items)[:24]}-{uuid.uuid4().hex[:12]}"
     payload = {

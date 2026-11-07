@@ -7,7 +7,7 @@ import hashlib
 import json
 import re
 import stat
-from typing import Any
+from typing import Any, Callable
 
 from .owner_art_storage import OwnerArtStorageError, _is_reparse_point, owner_art_paths
 from .semantic.normalization.core import RAW_ARTIFACT_MAX_BYTES, SUPPORTED_MEDIA_TYPE, SemanticRawArtifact
@@ -23,6 +23,10 @@ _PROVIDER_KEYS = {
 
 class OwnerFolderBatchError(ValueError):
     """Raised when an owner-selected source folder is outside the safe scope."""
+
+
+class OwnerFolderProgressError(RuntimeError):
+    """Raised when a progress event could not be durably recorded."""
 
 
 def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, str]]:
@@ -106,6 +110,7 @@ def scan_owner_source_folder(
     *,
     repository_root: str | Path | None = None,
     explicit_alternative: bool = False,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """List direct-child PNG candidates; the canonical importer validates bytes.
 
@@ -140,7 +145,24 @@ def scan_owner_source_folder(
                      if resolved_folder == approved.resolve(strict=False)), "")
     if not provider:
         raise OwnerFolderBatchError("source folder is not one of the canonical owner artwork folders")
-    transaction_index = _pixellab_transaction_index(paths) if provider == "PIXELLAB" else {}
+    if progress_callback is not None:
+        try:
+            progress_callback({"stage": "FOLDER", "state": "RUNNING", "message": "Canonical folder selected; checking atlas provenance and listing direct PNG files."})
+        except Exception as exc:
+            raise OwnerFolderProgressError("folder preview progress could not be recorded") from exc
+    transaction_index: dict[str, dict[str, str]] = {}
+    if provider == "PIXELLAB":
+        if progress_callback is not None:
+            try:
+                progress_callback({"stage": "ATLAS PROVENANCE", "state": "RUNNING", "message": "Checking PixelLab atlas transaction manifests before PNG discovery."})
+            except Exception as exc:
+                raise OwnerFolderProgressError("atlas provenance progress could not be recorded") from exc
+        transaction_index = _pixellab_transaction_index(paths)
+        if progress_callback is not None:
+            try:
+                progress_callback({"stage": "ATLAS PROVENANCE", "state": "PASS", "message": f"Atlas provenance check complete; {len(transaction_index)} transaction records indexed."})
+            except Exception as exc:
+                raise OwnerFolderProgressError("atlas provenance result could not be recorded") from exc
 
     png_files: list[Path] = []
     for entry in resolved_folder.iterdir():
@@ -155,12 +177,39 @@ def scan_owner_source_folder(
             continue
         png_files.append(entry)
     png_files.sort(key=lambda item: (item.name.casefold(), item.name))
+    if progress_callback is not None:
+        try:
+            progress_callback({"stage": "DISCOVERY", "state": "RUNNING", "completed": 0,
+                               "total": len(png_files), "message": f"Found {len(png_files)} direct PNG files; starting per-file validation."})
+        except Exception as exc:
+            raise OwnerFolderProgressError("folder discovery progress could not be recorded") from exc
     entries: list[dict[str, Any]] = []
     valid_paths: list[str] = []
     rejected: list[dict[str, Any]] = []
     seen_digests: set[str] = set()
     seen_names: dict[str, str] = {}
     existing_sources = owner_upload_root(repository_root)
+
+    def record_entry(result: dict[str, Any], item_index: int) -> None:
+        entries.append(result)
+        if progress_callback is None:
+            return
+        disposition = str(result.get("disposition", "REJECTED"))
+        reason = str(result.get("reason", ""))
+        dimensions = ""
+        if type(result.get("width")) is int and type(result.get("height")) is int:
+            dimensions = f" {result['width']}x{result['height']}"
+        detail = f"{item_index + 1}/{len(png_files)} {item.name}{dimensions} — {disposition}"
+        if reason:
+            detail += f" — {reason}"
+        try:
+            progress_callback({"stage": "FILE CHECK", "state": disposition,
+                               "completed": item_index + 1, "total": len(png_files),
+                               "filename": item.name, "disposition": disposition,
+                               "message": detail[:240]})
+        except Exception as exc:
+            raise OwnerFolderProgressError("per-file folder preview progress could not be recorded") from exc
+
     for index, item in enumerate(png_files):
         transaction = transaction_index.get(item.name)
         if transaction is not None and (transaction["state"] != "FINALIZED" or transaction["group_valid"] != "true"):
@@ -168,7 +217,7 @@ def scan_owner_source_folder(
                 "index": index, "path": str(item), "display_path": item.name,
                 "disposition": "REJECTED", "reason": "PIXELLAB_ATLAS_TRANSACTION_INCOMPLETE_OR_INVALID",
             }
-            entries.append(result)
+            record_entry(result, index)
             rejected.append({
                 "index": index, "display_path": item.name, "original_source_path": str(item),
                 "error": result["reason"],
@@ -186,7 +235,7 @@ def scan_owner_source_folder(
                     "source_sha256": digest, "width": width, "height": height,
                     "disposition": "REJECTED", "reason": "PIXELLAB_FINAL_DIMENSIONS_MUST_BE_51_TO_59_PIXELS",
                 }
-                entries.append(result)
+                record_entry(result, index)
                 rejected.append({
                     "index": index, "display_path": item.name, "original_source_path": str(item),
                     "source_sha256": digest, "original_width": width, "original_height": height,
@@ -240,12 +289,12 @@ def scan_owner_source_folder(
                 seen_digests.add(digest)
                 if result["disposition"] != "FAILED":
                     valid_paths.append(str(item))
-            entries.append(result)
+            record_entry(result, index)
         except (OSError, TypeError, ValueError, OwnerArtStorageError) as exc:
             reason = str(exc)[:400] or "PNG could not be validated"
             result = {"index": index, "path": str(item), "display_path": item.name,
                       "disposition": "REJECTED", "reason": reason}
-            entries.append(result)
+            record_entry(result, index)
             rejected.append({"index": index, "display_path": item.name,
                              "original_source_path": str(item), "error": reason})
     return {
@@ -263,12 +312,14 @@ def import_owner_source_folder(
     *,
     repository_root: str | Path | None = None,
     explicit_alternative: bool = False,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Import a bounded owner folder through canonical OWNER_UPLOAD hashing."""
     scanned = scan_owner_source_folder(
         folder_path,
         repository_root=repository_root,
         explicit_alternative=explicit_alternative,
+        progress_callback=progress_callback,
     )
     from . import studio_extensions
 
@@ -278,6 +329,7 @@ def import_owner_source_folder(
         source_folder=scanned["selected_folder"],
         pre_rejected=scanned["pre_rejected"],
         path_indices=[int(item["index"]) for item in scanned["entries"] if item.get("disposition") == "ELIGIBLE"],
+        progress_callback=progress_callback,
     )
     return {**payload, "source_provider": scanned["provider"],
             "source_folder": scanned["selected_folder"], "png_count": scanned["png_count"]}

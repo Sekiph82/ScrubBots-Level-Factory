@@ -1101,10 +1101,20 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
         large_folder = folders["OWNER_SUGGESTIONS"]
         for index in range(151):
             (large_folder / f"{index:03d}.png").write_bytes(b"")
-        large_scan = owner_folder_batch.scan_owner_source_folder(large_folder, repository_root=repository)
+        progress_events = []
+        large_scan = owner_folder_batch.scan_owner_source_folder(
+            large_folder, repository_root=repository, progress_callback=progress_events.append,
+        )
         assert large_scan["png_count"] == 151
         assert len(large_scan["entries"]) == 151
         assert all(item["disposition"] == "REJECTED" for item in large_scan["entries"])
+        assert progress_events[0]["stage"] == "FOLDER"
+        assert progress_events[1]["stage"] == "DISCOVERY"
+        assert progress_events[1]["total"] == 151
+        file_events = [event for event in progress_events if event["stage"] == "FILE CHECK"]
+        assert len(file_events) == 151
+        assert file_events[-1]["completed"] == 151
+        assert file_events[-1]["total"] == 151
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():

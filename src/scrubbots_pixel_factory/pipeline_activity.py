@@ -11,9 +11,11 @@ from typing import Any
 
 
 _RUN_ID = re.compile(r"^pipeline-ui-[0-9]{8}T[0-9]{6}Z-[0-9a-f]{12}$")
-_SOURCE_ID = re.compile(r"^owner-upload-[0-9a-f]{64}$")
+_SOURCE_ID = re.compile(r"^(?:owner-upload|owner-folder-preview)-[0-9a-f]{64}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_MAX_BYTES = 256 * 1024
+# Folder review emits a durable row per direct PNG plus a second import row.
+# Keep a generous safety ceiling without truncating ordinary uncapped reviews.
+_MAX_BYTES = 64 * 1024 * 1024
 
 
 class PipelineActivityWriter:
@@ -60,7 +62,7 @@ class PipelineActivityWriter:
         digest = hashlib.sha256(canonical).hexdigest()
         line = json.dumps({"body": body, "body_sha256": digest}, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")).encode("utf-8") + b"\n"
         if self.size_bytes + len(line) > _MAX_BYTES:
-            raise ValueError("pipeline activity log exceeded its 256 KiB bound")
+            raise ValueError("pipeline activity log exceeded its 64 MiB safety bound")
         with self.path.open("ab") as stream:
             stream.write(line)
             stream.flush()

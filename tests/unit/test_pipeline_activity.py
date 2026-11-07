@@ -53,5 +53,47 @@ def test_activity_events_are_bounded_ordered_and_sha256_chained_without_files(mo
         previous = digest
 
     writer.size_bytes = _MAX_BYTES
-    with pytest.raises(ValueError, match="256 KiB"):
+    with pytest.raises(ValueError, match="64 MiB"):
         writer.emit("QA", "PASS", "too large")
+
+
+def test_folder_preview_activity_identity_uses_persistent_chain_contract(monkeypatch):
+    captured = io.BytesIO()
+
+    class MemoryAppend:
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def write(self, value): return captured.write(value)
+        def flush(self): return None
+
+    def open_memory(_path, mode):
+        assert mode == "ab"
+        captured.seek(0, io.SEEK_END)
+        return MemoryAppend()
+
+    monkeypatch.setattr(Path, "open", open_memory)
+    writer = object.__new__(PipelineActivityWriter)
+    writer.path = Path("activity.jsonl")
+    writer.run_id = "pipeline-ui-20261108T011000Z-0123456789ab"
+    writer.source_id = "owner-folder-preview-" + "b" * 64
+    writer.source_sha256 = "b" * 64
+    writer.started_ns = 100
+    writer.sequence = 0
+    writer.previous_sha256 = "0" * 64
+    writer.size_bytes = 0
+    writer.terminal_emitted = False
+
+    writer.emit("FOLDER", "RUNNING", "Folder selected")
+    writer.emit("DISCOVERY", "RUNNING", "Found 304 direct PNG files")
+    writer.emit("FILE CHECK", "ELIGIBLE", "5/304 bot.png — ELIGIBLE")
+    # A review of 304 PNGs can emit scan and import rows for every file.
+    # The live stream and the durable receipt must keep working beyond 256 KiB.
+    for index in range(800):
+        writer.emit("FILE CHECK", "ELIGIBLE", f"{index + 1}/304 cleaning-robot-sprite-{index:04d}.png — ELIGIBLE")
+    assert writer.size_bytes > 256 * 1024
+    writer.emit("PIPELINE", "COMPLETE", "Preview complete: 304/304 checked")
+    lines = [json.loads(line) for line in captured.getvalue().decode("utf-8").splitlines()]
+    assert [item["body"]["seq"] for item in lines] == list(range(1, 805))
+    assert lines[2]["body"]["message"].startswith("5/304")
+    assert lines[-1]["body"]["stage"] == "PIPELINE"
+    assert writer.terminal_emitted
