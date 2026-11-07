@@ -56,10 +56,11 @@ The authorized installer was run without `-Apply`, scoped to the required source
   - `src/scrubbots_pixel_factory/studio_extensions.py`: `81c946339d8ab1d728d39c98638bead92bae02f7a42a4f1e594aec3a6f2f3e2e`.
 - New installed manifest SHA-256: `479df5dee360ac5d635266e0b78e2e3dee35b4cac3fa3ae38ef4322bb901f20e`. Its latest receipt binds both files to source commit `80bfb86090787fbf3b863349fdf5c9e580327187` and records the writer-exclusion method.
 - Source verification: the launcher now calls `generate_pixellab_pro_4x4_atlas_mcp`; the extension requests `get_image(job_id="gallery:<asset_id>")`, extracts the full-sheet URL, and validates atlas dimensions before slicing. The existing paid generation was not repeated.
-- The Desktop shortcut already targets this Release launcher and did not need modification. No GUI was launched; native visible behavior remains NOT RUN.
+- Read the Desktop `ScrubBots Factory Studio.lnk`: it targets `powershell.exe` with `-WindowStyle Hidden` and the existing `Release\ScrubBots Factory Studio\scripts\launch_factory_studio.ps1`; that launcher exists. No shortcut update was necessary. No GUI was launched; native visible behavior remains NOT RUN.
 - The two protected PixelLab PNG directories and all PNG files within them were not accessed. The separate ScrubBots game repository was not accessed or changed. No CI/Actions or provider calls were made.
 
 ### Publication and final state
 
-- Builder-log commit and final parity verification will be recorded here after publication.
+- Builder-log commit `a3dbc6101240ef9a1f72ce034f5f959dcff2cd20` was pushed to `main`; a final small append records the exact shortcut target and final-state check.
+- Final local/remote parity is verified after the final append commit below. The tracked task changes are limited to the installer, its focused regression test, and this builder log; unrelated pre-existing untracked owner files remain untouched.
 - The published source commit is verified at `origin/main`; the Release folder is owner-local/untracked and was not staged.
