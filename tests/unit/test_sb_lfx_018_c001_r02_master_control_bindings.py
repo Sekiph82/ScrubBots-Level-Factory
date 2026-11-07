@@ -119,6 +119,7 @@ def test_provider_picker_exposes_owner_provider_choices_with_truthful_availabili
 
 
 def test_provider_control_caption_tracks_the_selected_provider_after_confirmation() -> None:
+    assert 'var _provider_model := "PIXELLAB"' in UI
     assert '"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)"' in UI
     assert "func _refresh_provider_control_caption() -> void:" in UI
     provider_dialog = UI.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
