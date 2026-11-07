@@ -716,3 +716,7 @@ Re-read `C:\Users\sekip\Desktop\ScrubBots Factory Studio.lnk` metadata without l
 ## 2026-11-07 16:33 UTC — Tracker authority check and correction
 
 After publishing the scoped TASKS update, the required read-only queue guard rejected it because `Current Task` did not repeat the exact stable active prompt URL present in `Next Task/Action`. No implementation or owner files were affected by the failed guard. Correct the current-task field to include the exact same URL, republish only the builder log and scoped tracker fields, then rerun the guard before continuing.
+
+## 2026-11-07 16:37 UTC — Focused canonical proof and exact-plan regression
+
+Executed three existing focused tests with repository-local bounded pytest scratch: `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-canonical-release-proof-focus1 tests/unit/test_sb_studio_real_play_gate_081.py::test_fake_cli_canonical_win_is_accepted_and_stdout_out_match tests/unit/test_sb_studio_real_play_gate_081.py::test_plan_change_after_pass_invalidates_release_pool_ready_evidence tests/unit/test_sb_studio_real_play_gate_081.py::test_release_pool_accepts_only_complete_canonical_60hz_proof` — 3 passed in 0.65s. This exercises canonical-60Hz adapter acceptance with a fake CLI, invalidation when the bound plan changes, and Release Pool acceptance only with complete canonical proof. It is mocked/local evidence, not actual ScrubBots game-host execution or native Factory Studio acceptance. Protected PixelLab PNG folders were not accessed.
