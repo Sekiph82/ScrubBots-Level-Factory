@@ -191,3 +191,16 @@ def test_primary_supply_default_workdir_uses_release_pool_pending(tmp_path, monk
     assert result["disposition"] == "UNAVAILABLE", result
     assert observed["output"].is_relative_to(expected_root)
     assert not (repository / "level_factory" / "output" / "studio-extensions" / "primary-supply").exists()
+
+
+def test_explicit_primary_workdir_rejects_external_output_path(tmp_path, monkeypatch):
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    outside = tmp_path / "outside-work"
+
+    with pytest.raises(studio_extensions.StudioExtensionError, match="must stay under data/Release Pool"):
+        studio_extensions._primary_work_output_dir(
+            str(outside), identity="primary-image", activity_run_id="activity-external-fixture",
+        )
+    assert not outside.exists()

@@ -11,6 +11,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -1041,6 +1042,29 @@ def _canonical_run_output_dir(identity: str, activity_run_id: str) -> Path:
     return destination
 
 
+def _primary_work_output_dir(requested: object, *, identity: str, activity_run_id: str) -> Path:
+    if requested in (None, ""):
+        return _canonical_run_output_dir(identity, activity_run_id)
+    if type(requested) is not str or not requested.strip():
+        raise StudioExtensionError("explicit primary output directory must be an absolute Release Pool work path")
+    candidate = Path(requested).expanduser()
+    if not candidate.is_absolute():
+        raise StudioExtensionError("explicit primary output directory must be absolute")
+    candidate = Path(os.path.abspath(candidate))
+    repository_root = Path(_repository_root()).resolve()
+    paths = owner_art_storage.owner_art_paths(repository_root)
+    work_root = paths["pending"] / "Pipelines" / "Work"
+    if not candidate.is_relative_to(work_root):
+        raise StudioExtensionError("explicit primary output directory must stay under data/Release Pool/Pending/Pipelines/Work")
+    try:
+        owner_art_storage._verify_path_under_root(repository_root, candidate.parent)
+    except OwnerArtStorageError as exc:
+        raise StudioExtensionError("explicit primary output path contains a reparse point or escapes the repository") from exc
+    if owner_art_storage._is_reparse_point(candidate):
+        raise StudioExtensionError("explicit primary output directory is a symlink or reparse point")
+    return candidate
+
+
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
                                  evidence: str, request: Mapping[str, Any], source_kind: str,
                                  activity_writer: Any = None,
@@ -1299,14 +1323,11 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
         from .supply_pipeline.primary import run_primary_supply_pipeline
 
         image_path = Path(str(primary_image)).expanduser().resolve()
-        requested_output = request_data.get("output_dir")
-        if requested_output:
-            output_dir = Path(str(requested_output)).expanduser().resolve()
-        else:
-            output_dir = _canonical_run_output_dir(
-                "primary-image",
-                str(request_data.get("activity_run_id") or datetime.now(timezone.utc).isoformat()),
-            )
+        output_dir = _primary_work_output_dir(
+            request_data.get("output_dir"),
+            identity="primary-image",
+            activity_run_id=str(request_data.get("activity_run_id") or datetime.now(timezone.utc).isoformat()),
+        )
         primary = run_primary_supply_pipeline(
             image_path,
             output=output_dir,

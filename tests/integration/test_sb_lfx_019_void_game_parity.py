@@ -144,7 +144,7 @@ def test_void_topology_fixtures_pass_the_current_game_pipeline(
             "viability_budget": 3000,
             "column_count": 3,
             "level_id": f"void-fixture-{fixture_name}",
-            "output_dir": str(tmp_path / "canonical-supply"),
+            "output_dir": str(repository / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work" / f"void-{fixture_name}"),
         },
     )
     assert run["disposition"] == "READY", run
