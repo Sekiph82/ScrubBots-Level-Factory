@@ -618,7 +618,9 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
             or final.get("supplyExhausted") is not True
             or final.get("targetsCleared") is not True
             or final.get("slotsEmpty") is not True
+            or type(final.get("activeRobots")) is not int
             or final.get("activeRobots") != 0
+            or type(final.get("boardResidue")) is not int
             or final.get("boardResidue") != 0
         ):
             raise ReleaseError(f"Release Pool canonical 60-Hz result is incomplete: {entry_name}")
@@ -630,12 +632,9 @@ def _validate_release_entry_real_play(value: Mapping[str, Any], entry_name: str)
         if not isinstance(classification, Mapping) or classification.get("source_sha256") != result_value.get("sourceSha256"):
             raise ReleaseError(f"Release Pool canonical result is not bound to the original source artwork: {entry_name}")
     else:
-        per_dt = result_value.get("perDt")
-        if result_value.get("verdict") != "WON_ROBUST" or not isinstance(per_dt, Mapping) or any(
-            not isinstance(per_dt.get(dt), Mapping) or per_dt[dt].get("won") is not True
-            for dt in ("1/30", "1/60", "1/120")
-        ):
-            raise ReleaseError(f"Release Pool historical robust proof is incomplete: {entry_name}")
+        # v1 robust rows stay readable as history, but they no longer authorize a
+        # current Release Pool READY acceptance or trigger FPS-rate verification.
+        return False
     for file_name, hash_name in (("level", "levelSha256"), ("supply_plan", "planSha256")):
         record = files.get(file_name)
         if not isinstance(record, Mapping):
@@ -760,7 +759,9 @@ def _pipeline_real_play_proof(
         or final.get("supplyExhausted") is not True
         or final.get("targetsCleared") is not True
         or final.get("slotsEmpty") is not True
+        or type(final.get("activeRobots")) is not int
         or final.get("activeRobots") != 0
+        or type(final.get("boardResidue")) is not int
         or final.get("boardResidue") != 0
     ):
         raise ReleaseError("RELEASE_ENTRY_ERROR: canonical real-play proof lacks complete game-host WIN final state")

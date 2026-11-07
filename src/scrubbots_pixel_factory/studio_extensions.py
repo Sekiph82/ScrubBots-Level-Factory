@@ -792,7 +792,7 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
                         else:
                             reason = (
                                 "Stored immutable Release Pool entry lacks the required hash-bound "
-                                "real_play_v1 WON_ROBUST proof."
+                                "canonical real-game WIN proof."
                                 if not has_current_real_play
                                 else "Exact READY candidate/run is not in the current Release Pool projection despite valid proof."
                             )
@@ -1044,6 +1044,36 @@ def _canonical_run_output_dir(identity: str, activity_run_id: str) -> Path:
     return destination
 
 
+def _require_canonical_ready_real_play(result: object, source_sha256: str) -> None:
+    """Keep historical real-play formats readable, but never use them for a new READY run."""
+
+    from .supply_pipeline.real_play_gate import CANONICAL_DT, CANONICAL_MODE, CANONICAL_RESULT_SCHEMA
+
+    if not isinstance(result, Mapping):
+        raise StudioExtensionError("current Level Factory READY requires canonical real-play result evidence")
+    canonical = result.get("perDt", {}).get(CANONICAL_DT) if isinstance(result.get("perDt"), Mapping) else None
+    final = canonical.get("final") if isinstance(canonical, Mapping) else None
+    if (
+        result.get("schema") != CANONICAL_RESULT_SCHEMA
+        or result.get("mode") != CANONICAL_MODE
+        or result.get("canonicalDt") != CANONICAL_DT
+        or result.get("verdict") != "WON_CANONICAL"
+        or result.get("searched") is not False
+        or result.get("sourceSha256") != source_sha256
+        or not isinstance(canonical, Mapping)
+        or canonical.get("won") is not True
+        or not isinstance(final, Mapping)
+        or final.get("supplyExhausted") is not True
+        or final.get("targetsCleared") is not True
+        or final.get("slotsEmpty") is not True
+        or type(final.get("activeRobots")) is not int
+        or final.get("activeRobots") != 0
+        or type(final.get("boardResidue")) is not int
+        or final.get("boardResidue") != 0
+    ):
+        raise StudioExtensionError("new Level Factory READY requires a complete WON_CANONICAL result from the exact 1/60 replay")
+
+
 def _primary_work_output_dir(requested: object, *, identity: str, activity_run_id: str) -> Path:
     if requested in (None, ""):
         return _canonical_run_output_dir(identity, activity_run_id)
@@ -1161,6 +1191,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         real_play = ensure_real_play_gate(
             files["level"], files["supply_plan"], real_play_result_path, source_sha256=source_sha256
         )
+        _require_canonical_ready_real_play(real_play.get("result"), source_sha256)
         files["real_play_result"] = real_play["result_path"]
         result["real_play"] = {
             "schema": real_play["result"].get("schema"),
@@ -1191,6 +1222,8 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         solve = "PASS" if real_play["result"].get("verdict") == "WON_CANONICAL" else "FAIL"
         replay = "PASS" if real_play["result"].get("searched") is False else "FAIL"
         difficulty = "PASS" if result.get("difficulty") is not None and str(result.get("difficulty_basis", "")).startswith("ScrubBots Difficulty V1") else "FAIL"
+        if difficulty != "PASS":
+            raise StudioExtensionError("new Level Factory READY requires validated ScrubBots Difficulty V1 evidence")
         emit("ANALYZE/PLAN", "PASS", "Canonical supply analysis and plan generation completed.")
         emit("SCREEN", "RANKED", "Bounded offline screening ranked the canonical plans.")
         emit("SOLVE", solve, "ProductionGameplayHost canonical solver result: %s." % str(real_play["result"].get("verdict", "UNAVAILABLE")))
@@ -1322,53 +1355,35 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
     activity_source_sha256 = str(request_data.get("activity_source_sha256", ""))
     primary_image = request_data.get("image_path") or request_data.get("primary_image_path")
     if primary_image is not None:
-        from .supply_pipeline.primary import run_primary_supply_pipeline
-
-        image_path = Path(str(primary_image)).expanduser().resolve()
-        output_dir = _primary_work_output_dir(
-            request_data.get("output_dir"),
-            identity="primary-image",
-            activity_run_id=str(request_data.get("activity_run_id") or datetime.now(timezone.utc).isoformat()),
+        # Direct image-path requests were a legacy Factory bypass: they could run the
+        # older ZIP solver and write READY without Final inventory identity binding,
+        # canonical 60-Hz replay proof, and the current Difficulty V1 acceptance path.
+        # Keep the request observable, but require all new Factory solves to enter via
+        # the owner-source/candidate route that binds those checks.
+        reason = (
+            "direct image-path solving is retired for new Level Factory runs; "
+            "select a validated Pixellab/Final owner source so canonical identity, "
+            "real-play proof, Difficulty V1, and Release Pool checks are enforced"
         )
-        primary = run_primary_supply_pipeline(
-            image_path,
-            output=output_dir,
-            level_id=str(request_data.get("level_id", "pixelart_level")),
-            seed=int(request_data.get("seed", 0)),
-            candidates=int(request_data.get("candidates", 300)),
-            column_count=int(request_data.get("column_count", 3)),
-            verify_top=int(request_data.get("verify_top", 1)),
-            screen_budget=int(request_data.get("screen_budget", 3000)),
-            metric_top=int(request_data.get("metric_top", 12)),
-            viability_budget=int(request_data.get("viability_budget", 3000)),
-            real_max_visited=request_data.get("real_max_visited"),
-            level_number=int(request_data.get("level_number", 1)),
-            game_project=request_data.get("game_project"),
-        )
-        state = str(primary.get("state", "ERROR"))
-        solve_state = "PASS" if primary.get("acceptance", {}).get("solver_status") == "SOLVED" else state
-        replay_state = "PASS" if primary.get("acceptance", {}).get("replay") == "WIN" else state
-        difficulty_state = "PASS" if primary.get("difficulty", {}).get("basis", "").startswith("ScrubBots Difficulty V1") else state
-        final_state = "READY" if state == "READY" else state
-        stages = [
-            _pipeline_stage("SOURCE", "PASS" if image_path.is_file() else "UNAVAILABLE", inputs=[str(image_path)], outputs=[str(image_path)] if image_path.is_file() else (), evidence=str(image_path), reason="Local logical-grid image accepted without a PNG round-trip." if image_path.is_file() else "Local image input is unavailable."),
-            _pipeline_stage("ANALYZE/PLAN", "PASS" if state == "READY" else state, inputs=[str(image_path)], outputs=[str(output_dir)], reason="ZIP-derived PixelAnalyzer and DifficultyModel produced dynamic supply sizing." if state == "READY" else str(primary.get("reason", "Primary supply analysis unavailable."))),
-            _pipeline_stage("SCREEN", "RANKED" if state == "READY" else state, inputs=[str(output_dir)], outputs=[str(output_dir)], reason="ScreeningSimulator is ranking-only; it never grants acceptance."),
-            _pipeline_stage("SOLVE", solve_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if solve_state == "PASS" else (), reason="Canonical ScrubBots SolvabilitySolver is the acceptance authority." if solve_state == "PASS" else str(primary.get("reason", "Canonical game solver unavailable."))),
-            _pipeline_stage("REPLAY", replay_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if replay_state == "PASS" else (), reason="Canonical solver replay reached WIN on a fresh proof state." if replay_state == "PASS" else "Replay evidence unavailable."),
-            _pipeline_stage("DIFFICULTY", difficulty_state, inputs=[str(output_dir)], outputs=[str(output_dir)] if difficulty_state == "PASS" else (), reason=str(primary.get("difficulty", {}).get("basis", "Difficulty V1 unavailable."))),
-            _pipeline_stage("QA", "PASS" if state == "READY" else state, inputs=[str(output_dir)], outputs=[str(output_dir)] if state == "READY" else (), reason="Supply conservation, positive per-plan bound, solver status and replay were verified." if state == "READY" else "Primary pipeline did not produce a QA-ready result."),
-            _pipeline_stage("REVIEW", "NOT_AVAILABLE", inputs=[str(output_dir)], evidence=None, reason="Owner acceptance remains an independent review boundary; builder evidence is not acceptance."),
-        ]
-        run_id = f"pipeline-{_digest({'primary_image': str(image_path), 'request': request_data, 'sequence': datetime.now(timezone.utc).isoformat()})[:24]}"
-        payload = {
-            "schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id,
-            "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": None, "candidate_id": None,
-            "request": request_data, "stages": stages, "disposition": final_state,
-            "primary": primary, "created_at": datetime.now(timezone.utc).isoformat(),
+        return {
+            "schema": PIPELINE_SCHEMA,
+            "version": 2,
+            "run_id": f"pipeline-blocked-{_digest({'request': request_data, 'source': str(primary_image)})[:24]}",
+            "route": "DIRECT_IMAGE_PATH_RETIRED",
+            "source_id": None,
+            "candidate_id": None,
+            "request": request_data,
+            "stages": [
+                _pipeline_stage("SOURCE", "BLOCKED", inputs=[str(primary_image)], reason=reason),
+                _pipeline_stage("SOLVE", "NOT_AVAILABLE", reason="No solver was run because the request has no canonical Final source identity."),
+                _pipeline_stage("REPLAY", "NOT_AVAILABLE", reason="No canonical source-bound plan exists to replay."),
+                _pipeline_stage("DIFFICULTY", "NOT_AVAILABLE", reason="Difficulty V1 was not evaluated."),
+                _pipeline_stage("QA", "BLOCKED", reason="This request cannot produce a new READY level."),
+            ],
+            "disposition": "BLOCKED",
+            "reason": reason,
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        _write_pipeline_record(payload)
-        return payload
     if (source_id is None) == (candidate_id is None):
         raise StudioExtensionError("pipeline requires exactly one source or candidate identity")
     stages: list[dict[str, Any]] = []

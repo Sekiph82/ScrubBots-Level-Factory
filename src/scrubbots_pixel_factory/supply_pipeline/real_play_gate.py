@@ -246,17 +246,16 @@ def _validate_result(
                 or final.get("supplyExhausted") is not True
                 or final.get("targetsCleared") is not True
                 or final.get("slotsEmpty") is not True
+                or type(final.get("activeRobots")) is not int
                 or final.get("activeRobots") != 0
+                or type(final.get("boardResidue")) is not int
                 or final.get("boardResidue") != 0
             ):
                 raise RealPlayGateError("WON_CANONICAL result lacks complete 1/60 game-host WIN final-state evidence")
     elif result["verdict"] == "WON_ROBUST":
-        per_dt = result.get("perDt")
-        if not isinstance(per_dt, dict) or any(
-            not isinstance(per_dt.get(dt), dict) or per_dt[dt].get("won") is not True
-            for dt in ("1/30", "1/60", "1/120")
-        ):
-            raise RealPlayGateError("WON_ROBUST result does not prove wins at 1/30, 1/60, and 1/120")
+        # Historical v1 evidence remains parseable, but current execution below requires
+        # the v2 canonical contract. Never launch or require legacy multi-rate checks.
+        return
 
 
 def _invoke(
@@ -484,9 +483,9 @@ def ensure_real_play_gate(
         search=False,
         process_env=process_env,
     )
-    if initial.get("verdict") in {"WON_ROBUST", "WON_CANONICAL"} and initial.get("searched") is False:
+    if initial.get("verdict") == "WON_CANONICAL" and initial.get("searched") is False:
         result = initial
-    elif initial.get("verdict") in {"LOST", "WON_CANONICAL_ONLY"}:
+    elif initial.get("verdict") == "LOST":
         searched = _invoke(
             executable,
             game_repo,
@@ -502,10 +501,10 @@ def ensure_real_play_gate(
             search=True,
             process_env=process_env,
         )
-        if searched.get("verdict") not in {"WON_ROBUST", "WON_CANONICAL"} or searched.get("searched") is not True:
+        if searched.get("verdict") != "WON_CANONICAL" or searched.get("searched") is not True:
             raise RealPlayGateError(_format_rejection(searched, result_path))
         search_result = searched.get("search")
-        search_win_key = "canonicalWin" if searched.get("schema") == CANONICAL_RESULT_SCHEMA else "robust"
+        search_win_key = "canonicalWin"
         if not isinstance(search_result, dict) or search_result.get("status") != "SOLVED" or search_result.get(search_win_key) is not True:
             raise RealPlayGateError("real_play_v1 search result did not prove a winning order under its declared game mode")
         searched_clicks = searched.get("searchedClicks")
@@ -527,7 +526,7 @@ def ensure_real_play_gate(
             search=False,
             process_env=process_env,
         )
-        if result.get("verdict") not in {"WON_ROBUST", "WON_CANONICAL"} or result.get("searched") is not False:
+        if result.get("verdict") != "WON_CANONICAL" or result.get("searched") is not False:
             raise RealPlayGateError(_format_rejection(result, result_path))
     else:
         raise RealPlayGateError(_format_rejection(initial, result_path))

@@ -194,6 +194,41 @@ def test_fake_cli_canonical_win_is_accepted_and_stdout_out_match(tmp_path: Path)
     assert "--search" not in args
 
 
+def test_new_factory_ready_requires_canonical_60hz_and_does_not_accept_legacy_robust() -> None:
+    source_sha = "d" * 64
+    canonical = {
+        "schema": "scrubbots.real_play_file_result.v2",
+        "mode": "canonical_60hz",
+        "canonicalDt": "1/60",
+        "verdict": "WON_CANONICAL",
+        "searched": False,
+        "sourceSha256": source_sha,
+        "perDt": {"1/60": {"won": True, "final": {
+            "supplyExhausted": True,
+            "targetsCleared": True,
+            "slotsEmpty": True,
+            "activeRobots": 0,
+            "boardResidue": 0,
+        }}},
+    }
+    assert studio_extensions._require_canonical_ready_real_play(canonical, source_sha) is None
+    boolean_count = json.loads(json.dumps(canonical))
+    boolean_count["perDt"]["1/60"]["final"]["activeRobots"] = False
+    with pytest.raises(studio_extensions.StudioExtensionError, match="complete WON_CANONICAL result"):
+        studio_extensions._require_canonical_ready_real_play(boolean_count, source_sha)
+
+    legacy_robust = {
+        **canonical,
+        "schema": "scrubbots.real_play_file_result.v1",
+        "mode": None,
+        "canonicalDt": None,
+        "verdict": "WON_ROBUST",
+        "perDt": {rate: {"won": True} for rate in ("1/30", "1/60", "1/120")},
+    }
+    with pytest.raises(studio_extensions.StudioExtensionError, match="complete WON_CANONICAL result"):
+        studio_extensions._require_canonical_ready_real_play(legacy_robust, source_sha)
+
+
 def test_searched_clicks_splice_only_the_array_and_require_no_search_replay(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path)
     plan = Path(fixture["plan"])
@@ -267,6 +302,8 @@ def test_invalid_input_is_rejected_with_game_error_detail(tmp_path: Path) -> Non
         (lambda result: result.update(canonicalDt="1/30"), 0, "canonical_60hz at 1/60"),
         (lambda result: result.update(sourceSha256="0" * 64), 0, "sourceSha256 does not match"),
         (lambda result: result["perDt"]["1/60"]["final"].update(slotsEmpty=False), 0, "complete 1/60 game-host WIN"),
+        (lambda result: result["perDt"]["1/60"]["final"].update(activeRobots=False), 0, "complete 1/60 game-host WIN"),
+        (lambda result: result["perDt"]["1/60"]["final"].update(boardResidue=False), 0, "complete 1/60 game-host WIN"),
     ],
 )
 def test_result_contract_mismatches_fail_closed(
@@ -349,7 +386,7 @@ def test_runtime_timeout_fails_closed(monkeypatch: pytest.MonkeyPatch, tmp_path:
         )
 
 
-def test_plan_change_after_pass_invalidates_release_pool_ready_evidence(tmp_path: Path) -> None:
+def test_legacy_v1_robust_receipt_is_readable_but_not_current_release_acceptance(tmp_path: Path) -> None:
     fixture = _fixture(tmp_path)
     level = Path(fixture["level"])
     plan = Path(fixture["plan"])
@@ -357,7 +394,7 @@ def test_plan_change_after_pass_invalidates_release_pool_ready_evidence(tmp_path
     result = {
         "schema": "scrubbots.real_play_file_result.v1", "model": "real_play_v1",
         "verdict": "WON_ROBUST", "exitCode": 0,
-        "perDt": {dt: {"won": True} for dt in ("1/30", "1/60", "1/120")},
+        "perDt": {},
         "planClicks": json.loads(plan.read_text(encoding="utf-8"))["intendedColumnClicks"],
         "levelSha256": _normalized_sha(level), "planSha256": _normalized_sha(plan), "gameCommit": "a" * 40,
     }
@@ -376,10 +413,7 @@ def test_plan_change_after_pass_invalidates_release_pool_ready_evidence(tmp_path
             "resultSha256": files["real_play_result"]["sha256"],
         },
     }
-    assert release_pool._validate_release_entry_real_play(entry, "fixture.json") is True
-    plan.write_text(plan.read_text(encoding="utf-8").replace("[\n    1,\n    2,\n    3\n  ]", "[9]"), encoding="utf-8")
-    with pytest.raises(release_pool.ReleaseError, match="supply_plan bytes changed"):
-        release_pool._validate_release_entry_real_play(entry, "fixture.json")
+    assert release_pool._validate_release_entry_real_play(entry, "fixture.json") is False
 
 
 def test_release_pool_accepts_only_complete_canonical_60hz_proof(tmp_path: Path) -> None:

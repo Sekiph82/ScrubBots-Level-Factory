@@ -169,7 +169,7 @@ def test_canonical_output_is_per_activity_run_and_rejects_traversal(tmp_path, mo
         studio_extensions._canonical_run_output_dir("../escape", "activity-three")
 
 
-def test_primary_supply_default_workdir_uses_release_pool_pending(tmp_path, monkeypatch):
+def test_primary_image_path_cannot_bypass_canonical_factory_acceptance(tmp_path, monkeypatch):
     from scrubbots_pixel_factory.supply_pipeline import primary
 
     repository = tmp_path / "repository"
@@ -178,18 +178,20 @@ def test_primary_supply_default_workdir_uses_release_pool_pending(tmp_path, monk
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: repository / "level_factory" / "output" / "studio-extensions")
     image = tmp_path / "input.png"
     image.write_bytes(b"fixture image path; primary runner is isolated")
-    observed = {}
+    calls = []
 
     def unavailable_primary(_image_path, *, output, **_kwargs):
-        observed["output"] = output
+        calls.append((str(_image_path), str(output)))
         return {"state": "UNAVAILABLE", "reason": "isolated fixture"}
 
     monkeypatch.setattr(primary, "run_primary_supply_pipeline", unavailable_primary)
     result = studio_extensions.run_pipeline(request={"image_path": str(image)})
 
-    expected_root = repository / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work"
-    assert result["disposition"] == "UNAVAILABLE", result
-    assert observed["output"].is_relative_to(expected_root)
+    assert result["disposition"] == "BLOCKED", result
+    assert result["route"] == "DIRECT_IMAGE_PATH_RETIRED"
+    assert "Pixellab/Final" in result["reason"]
+    assert calls == []
+    assert not (repository / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work").exists()
     assert not (repository / "level_factory" / "output" / "studio-extensions" / "primary-supply").exists()
 
 
