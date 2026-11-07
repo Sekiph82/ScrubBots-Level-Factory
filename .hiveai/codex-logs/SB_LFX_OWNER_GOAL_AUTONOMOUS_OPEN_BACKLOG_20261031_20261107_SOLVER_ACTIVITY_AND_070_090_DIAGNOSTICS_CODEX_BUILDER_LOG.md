@@ -610,3 +610,21 @@ Verification:
 Protected-path status is unchanged: `data/output/Pixellab/Final` and `Grid Files` were not listed, read, hashed, copied, moved, or written. No PNG deletion/move, game-repository write, provider charge, CI, R2, Production, or historical batch retry occurred.
 
 Remaining Priority C work includes routing explicit external output overrides safely and completing all status finalization/copy/reference contracts for the working artifacts. Legacy PNG cleanup remains read-only because identity mapping/quiescence is incomplete. Canonical actual-game 60 Hz solver authority still requires the separate game-repository change; native installed runtime remains unverified.
+
+## 2026-11-07 15:41 UTC — Priority C PNG batch state routing (continuation)
+
+Read-only queue guard had passed after the previous TASKS sync. No additional task was selected.
+
+New PNG batch state now defaults to `data/Release Pool/Pending/Pipelines/BatchJobs/jobs`, with control and lock records alongside it. Existing legacy job IDs remain readable and resume in their old location when only the old job state exists; if both old and canonical files exist with conflicting bytes, path resolution refuses the ambiguous identity. New automatic job listings continue to use only the canonical root, avoiding stale legacy queues reappearing in the active selector. `_job_path` checks the canonical path under repository root and rejects reparse points.
+
+Also corrected Release Pool batch readback to compare the three artifact hashes required by the quota gate while allowing additional SHA-bound artifacts such as the canonical real-play result. Updated batch-binding fixtures to use the current pipeline-path reader, a candidate-prefixed legacy receipt name, and an isolated real-play gate stub for the owner-binding test (that test proves persistence/binding, not actual game acceptance).
+
+Verification:
+
+- `python -B -m pytest -q -p no:cacheprovider --basetemp=tests/.codex-release-routing-fullfocus1 tests/unit/test_p3_headless_batch_pipeline.py tests/unit/test_sb_lfx_018_r05_v13_offline_regressions.py tests/unit/test_sb_lfx_018_r09_r02_r04_r01_profile_pool.py tests/unit/test_sb_lfx_018_r09_r02_r04_r02_png_batch.py tests/unit/test_sb_lfx_018_r09_r02_r04_r03_batch_binding.py tests/unit/test_sb_lfx_018_r06_stable_composite_resume.py tests/unit/test_sb_lfx_018_r05_r05_loaded_batch.py` — 108 passed.
+- `git diff --check` passed with only LF/CRLF working-copy warnings.
+- An initial wider batch-binding run had 7 failures: old `PipelineRoot` stubs bypassed the new path reader, the old synthetic receipt filename did not match candidate-filtered enumeration, the producer fixture's plan omitted required clicks and reached the correct UNAVAILABLE gate, and `_pool_row_matches` had not imported the shared pipeline resolver. Updated the path/receipt fixtures, isolated the real-play call for the binding-only test, and fixed the missing resolver import; the final seven-file focused run passed 108/108. The isolated fake solver/runtime did not create or claim canonical game WIN evidence.
+
+Protected `Final` and `Grid Files` remain unopened and untouched. No production PNG inventory was changed; no game repository, provider, CI, R2, Production, or historical batch mutation occurred.
+
+Remaining: final status transitions of completed work artifacts, policy for explicit output overrides, complete PixelLab actual-file evidence (blocked by user instruction not to touch those folders), Priority D exact identity/quiescence for legacy deletion, and separately scoped game-side 60 Hz host support.
