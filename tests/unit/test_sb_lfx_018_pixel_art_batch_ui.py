@@ -71,6 +71,24 @@ def test_pixel_art_activity_log_is_bounded_and_provider_failures_stop_the_batch(
     assert "No retry or additional paid request was sent." in poll
 
 
+def test_all_activity_tables_show_newest_first_and_leave_raw_event_order_intact() -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    pixel_refresh = _function(source, "_refresh_pixel_art_activity_table")
+    pipeline_append = _function(source, "_append_activity_row")
+    batch_append = _function(source, "_append_batch_item_activity_row")
+    release_refresh = _function(source, "_refresh_release_pool_activity")
+    release_scroll = _function(source, "_scroll_release_pool_activity_to_latest")
+
+    assert "range(_pixel_art_activity_events.size() - 1, -1, -1)" in pixel_refresh
+    assert "_activity_rows.move_child(row, 0)" in pipeline_append
+    assert "_activity_rows.move_child(row, 0)" in batch_append
+    assert "_activity_rows.move_child(_activity_solver_row, 0)" in pipeline_append
+    assert "range(_release_activity_events.size() - 1, -1, -1)" in release_refresh
+    assert "_release_activity_scroll.scroll_vertical = 0" in release_scroll
+    assert '"seq"' in source and '"previous_sha256"' in source
+
+
 def test_pixel_art_left_controls_are_compact_and_prompt_refresh_is_removed() -> None:
     root = Path(__file__).resolve().parents[2]
     source = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")

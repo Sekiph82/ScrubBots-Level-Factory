@@ -48,6 +48,7 @@ var _pixel_batch_monthly_used := 0
 var _pixel_art_activity_events: Array[Dictionary] = []
 var _pixel_art_activity_table: PanelContainer
 var _pixel_art_activity_grid: GridContainer
+var _pixel_art_activity_scroll: ScrollContainer
 var _pixel_batch_source_sha256 := ""
 var _batch_resume := false
 var _release_target := "STAGING"
@@ -1361,7 +1362,8 @@ func _refresh_release_pool_activity() -> void:
 	if _release_activity_rows == null:
 		return
 	var scroll := _release_activity_scroll.get_v_scroll_bar() if _release_activity_scroll != null else null
-	var follow_tail := scroll == null or _release_activity_scroll.scroll_vertical >= scroll.max_value - 2
+	var follow_latest := scroll == null or _release_activity_scroll.scroll_vertical <= 2
+	var previous_scroll := _release_activity_scroll.scroll_vertical if _release_activity_scroll != null else 0
 	for child in _release_activity_rows.get_children():
 		child.queue_free()
 	if _release_activity_events.is_empty():
@@ -1372,7 +1374,8 @@ func _refresh_release_pool_activity() -> void:
 		empty.add_theme_font_size_override("font_size", 10)
 		_release_activity_rows.add_child(empty)
 	else:
-		for event in _release_activity_events:
+		for index in range(_release_activity_events.size() - 1, -1, -1):
+			var event: Dictionary = _release_activity_events[index]
 			var row := RichTextLabel.new()
 			row.bbcode_enabled = false
 			row.selection_enabled = true
@@ -1383,13 +1386,15 @@ func _refresh_release_pool_activity() -> void:
 			row.tooltip_text = row.text
 			row.add_theme_font_size_override("normal_font_size", 10)
 			_release_activity_rows.add_child(row)
-	if follow_tail and _release_activity_scroll != null:
-		call_deferred("_scroll_release_pool_activity_to_tail")
+	if follow_latest and _release_activity_scroll != null:
+		call_deferred("_scroll_release_pool_activity_to_latest")
+	elif _release_activity_scroll != null:
+		_release_activity_scroll.call_deferred("set_v_scroll", previous_scroll)
 
 
-func _scroll_release_pool_activity_to_tail() -> void:
+func _scroll_release_pool_activity_to_latest() -> void:
 	if _release_activity_scroll != null:
-		_release_activity_scroll.scroll_vertical = int(_release_activity_scroll.get_v_scroll_bar().max_value)
+		_release_activity_scroll.scroll_vertical = 0
 
 
 func _build_inline_results() -> void:
@@ -2395,6 +2400,7 @@ func _build_pixel_art_activity_table() -> void:
 	scroll.name = "PixelArtActivityScroll"
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_pixel_art_activity_scroll = scroll
 	_pixel_art_activity_grid = GridContainer.new()
 	_pixel_art_activity_grid.name = "PixelArtActivityRows"
 	_pixel_art_activity_grid.columns = 2
@@ -2410,6 +2416,8 @@ func _build_pixel_art_activity_table() -> void:
 func _refresh_pixel_art_activity_table() -> void:
 	if _pixel_art_activity_grid == null:
 		return
+	var follow_latest := _pixel_art_activity_scroll == null or _pixel_art_activity_scroll.scroll_vertical <= 2
+	var previous_scroll := _pixel_art_activity_scroll.scroll_vertical if _pixel_art_activity_scroll != null else 0
 	while _pixel_art_activity_grid.get_child_count() > 0:
 		var old_child := _pixel_art_activity_grid.get_child(0)
 		_pixel_art_activity_grid.remove_child(old_child)
@@ -2428,7 +2436,8 @@ func _refresh_pixel_art_activity_table() -> void:
 		header.add_theme_color_override("font_color", Color("#9bb1cd"))
 	_pixel_art_activity_grid.add_child(time_header)
 	_pixel_art_activity_grid.add_child(detail_header)
-	for item in _pixel_art_activity_events:
+	for index in range(_pixel_art_activity_events.size() - 1, -1, -1):
+		var item: Dictionary = _pixel_art_activity_events[index]
 		var time_status := Label.new()
 		time_status.custom_minimum_size = Vector2(time_width, 72)
 		time_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -2444,6 +2453,15 @@ func _refresh_pixel_art_activity_table() -> void:
 		detail.add_theme_font_size_override("font_size", 16)
 		detail.add_theme_color_override("font_color", Color("#b9cbe0"))
 		_pixel_art_activity_grid.add_child(detail)
+	if follow_latest and _pixel_art_activity_scroll != null:
+		call_deferred("_scroll_pixel_art_activity_to_latest")
+	elif _pixel_art_activity_scroll != null:
+		_pixel_art_activity_scroll.call_deferred("set_v_scroll", previous_scroll)
+
+
+func _scroll_pixel_art_activity_to_latest() -> void:
+	if _pixel_art_activity_scroll != null:
+		_pixel_art_activity_scroll.scroll_vertical = 0
 
 
 func _open_files(multiple: bool) -> void:
@@ -4008,7 +4026,18 @@ func _append_batch_item_activity_row(item: Dictionary, job: Dictionary, force: b
 	row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), int(item.get("index", 0)), attempt_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
 	row.add_theme_font_size_override("font_size", 10)
 	row.add_theme_color_override("font_color", Color("#dce8f8"))
+	var scrollbar := _activity_scroll.get_v_scroll_bar()
+	var follow_latest := scrollbar.value <= 12.0
 	_activity_rows.add_child(row)
+	_activity_rows.move_child(row, 0)
+	while _activity_rows.get_child_count() > 200:
+		var oldest := _activity_rows.get_child(_activity_rows.get_child_count() - 1)
+		if oldest == _activity_solver_row:
+			_activity_solver_row = null
+		_activity_rows.remove_child(oldest)
+		oldest.queue_free()
+	if follow_latest:
+		_activity_scroll.call_deferred("set_v_scroll", 0)
 
 
 func _pipeline_worker(prepared: Dictionary) -> void:
@@ -4150,6 +4179,8 @@ func _refresh_solver_activity_summary(force: bool = false) -> void:
 func _append_activity_row(body: Dictionary) -> void:
 	if _activity_rows == null or str(body.get("source_id", _selected_import_source_id)) != _selected_import_source_id:
 		return
+	var scrollbar := _activity_scroll.get_v_scroll_bar()
+	var follow_latest := scrollbar.value <= 12.0
 	var stage := str(body.get("stage", "UNKNOWN"))
 	var state := str(body.get("state", "UNKNOWN"))
 	var full_message := str(body.get("message", ""))
@@ -4172,7 +4203,10 @@ func _append_activity_row(body: Dictionary) -> void:
 		_activity_solver_terminal_elapsed_ms = maxi(0, elapsed_ms - _activity_solver_start_event_ms)
 		_activity_solver_state = state
 		_activity_solver_last_message = full_message
+		_activity_rows.move_child(_activity_solver_row, 0)
 		_refresh_solver_activity_summary(true)
+		if follow_latest:
+			_activity_scroll.call_deferred("set_v_scroll", 0)
 		return
 	if stage == "PIPELINE" and _activity_solver_row != null and is_instance_valid(_activity_solver_row) and _activity_solver_terminal_elapsed_ms < 0:
 		# An interrupted solver has no terminal SOLVE verdict; don't fake PASS.
@@ -4180,8 +4214,6 @@ func _append_activity_row(body: Dictionary) -> void:
 		_activity_solver_state = "INCOMPLETE"
 		_activity_solver_last_message = "No terminal solver verdict; " + full_message
 		_refresh_solver_activity_summary(true)
-	var scrollbar := _activity_scroll.get_v_scroll_bar()
-	var follow_latest := scrollbar.value >= scrollbar.max_value - scrollbar.page - 12.0
 	var row := Label.new()
 	row.name = "ActivityEvent%03d" % int(body.get("seq", 0))
 	row.custom_minimum_size = Vector2(292, 30)
@@ -4208,18 +4240,25 @@ func _append_activity_row(body: Dictionary) -> void:
 		var color := Color("#7bd6a2") if icon == "✓" else Color("#f09a8a") if icon == "!" else Color("#e5bd73") if state == "WARNING" else Color("#c5d2e5")
 		row.add_theme_color_override("font_color", color)
 	_activity_rows.add_child(row)
+	_activity_rows.move_child(row, 0)
 	_activity_events.append(body.duplicate(true))
 	if is_solver_heartbeat:
 		_refresh_solver_activity_summary(true)
 	while _activity_events.size() > 200:
 		_activity_events.pop_front()
-		var first := _activity_rows.get_child(0)
-		if first == _activity_solver_row:
+		var trimmed_row := _activity_rows.get_child(_activity_rows.get_child_count() - 1)
+		if trimmed_row == _activity_solver_row:
 			_activity_solver_row = null
-		_activity_rows.remove_child(first)
-		first.queue_free()
+		_activity_rows.remove_child(trimmed_row)
+		trimmed_row.queue_free()
+	while _activity_rows.get_child_count() > 200:
+		var overflow_row := _activity_rows.get_child(_activity_rows.get_child_count() - 1)
+		if overflow_row == _activity_solver_row:
+			_activity_solver_row = null
+		_activity_rows.remove_child(overflow_row)
+		overflow_row.queue_free()
 	if follow_latest:
-		_activity_scroll.call_deferred("set_v_scroll", 999999)
+		_activity_scroll.call_deferred("set_v_scroll", 0)
 
 
 func _clear_activity_rows() -> void:

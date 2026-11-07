@@ -155,7 +155,7 @@ def _png_chunks(raw: bytes) -> list[tuple[bytes, bytes]]:
         raise SemanticDecodeError("PNG must begin with IHDR and end with IEND")
     if chunks[-1][1] != b"":
         raise SemanticDecodeError("PNG IEND payload must be empty")
-    if any(kind not in {b"IHDR", b"IDAT", b"IEND"} and kind[0] in range(ord("A"), ord("Z") + 1) for kind, _data in chunks):
+    if any(kind not in {b"IHDR", b"PLTE", b"IDAT", b"IEND"} and kind[0] in range(ord("A"), ord("Z") + 1) for kind, _data in chunks):
         raise SemanticDecodeError("PNG contains an unsupported critical chunk")
     if sum(kind == b"IHDR" for kind, _data in chunks) != 1 or sum(kind == b"IEND" for kind, _data in chunks) != 1:
         raise SemanticDecodeError("PNG must contain exactly one IHDR and IEND")
@@ -174,12 +174,54 @@ def _decode_png_rgba(raw: bytes) -> _DecodedRGBA:
         raise SemanticDecodeError("PNG dimensions exceed the semantic raw-raster bound")
     if width * height > MAX_DECODE_PIXELS:
         raise SemanticDecodeError("PNG exceeds the bounded normalization pixel budget")
-    if (bit_depth, compression, filter_method, interlace) != (8, 0, 0, 0):
-        raise SemanticDecodeError("PNG must be 8-bit, non-interlaced, with standard compression/filter methods")
-    channels = {0: 1, 2: 3, 4: 2, 6: 4}.get(color_type)
+    if (compression, filter_method, interlace) != (0, 0, 0):
+        raise SemanticDecodeError("PNG must use standard compression/filter methods and be non-interlaced")
+    if color_type == 3:
+        if bit_depth not in {1, 2, 4, 8}:
+            raise SemanticDecodeError("indexed PNG bit depth must be 1, 2, 4, or 8")
+        palette_chunks = [data for kind, data in chunks if kind == b"PLTE"]
+        transparency_chunks = [data for kind, data in chunks if kind == b"tRNS"]
+        if len(palette_chunks) != 1:
+            raise SemanticDecodeError("indexed PNG must contain exactly one PLTE palette")
+        palette_data = palette_chunks[0]
+        if not palette_data or len(palette_data) > 768 or len(palette_data) % 3:
+            raise SemanticDecodeError("indexed PNG PLTE palette length is invalid")
+        palette_size = len(palette_data) // 3
+        if palette_size > (1 << bit_depth):
+            raise SemanticDecodeError("indexed PNG PLTE has more entries than its bit depth permits")
+        if len(transparency_chunks) > 1:
+            raise SemanticDecodeError("indexed PNG contains duplicate tRNS transparency chunks")
+        if transparency_chunks and len(transparency_chunks[0]) > palette_size:
+            raise SemanticDecodeError("indexed PNG tRNS exceeds the PLTE palette")
+        plte_index = next(index for index, (kind, _data) in enumerate(chunks) if kind == b"PLTE")
+        idat_index = next(index for index, (kind, _data) in enumerate(chunks) if kind == b"IDAT")
+        if plte_index >= idat_index:
+            raise SemanticDecodeError("indexed PNG PLTE must precede IDAT")
+        if transparency_chunks:
+            trns_index = next(index for index, (kind, _data) in enumerate(chunks) if kind == b"tRNS")
+            if trns_index <= plte_index or trns_index >= idat_index:
+                raise SemanticDecodeError("indexed PNG tRNS must follow PLTE and precede IDAT")
+        channels = 1
+    else:
+        palette_chunks = [data for kind, data in chunks if kind == b"PLTE"]
+        if palette_chunks:
+            if color_type not in {2, 6}:
+                raise SemanticDecodeError("PNG PLTE is not permitted for this color type")
+            palette_data = palette_chunks[0]
+            if len(palette_chunks) != 1 or not palette_data or len(palette_data) > 768 or len(palette_data) % 3:
+                raise SemanticDecodeError("PNG PLTE palette length is invalid")
+            plte_index = next(index for index, (kind, _data) in enumerate(chunks) if kind == b"PLTE")
+            idat_index = next(index for index, (kind, _data) in enumerate(chunks) if kind == b"IDAT")
+            if plte_index >= idat_index:
+                raise SemanticDecodeError("PNG PLTE must precede IDAT")
+        if any(kind == b"tRNS" for kind, _data in chunks):
+            raise SemanticDecodeError("PNG tRNS transparency is unsupported for this color type")
+        if bit_depth != 8:
+            raise SemanticDecodeError("PNG must be 8-bit, non-interlaced, with standard compression/filter methods")
+        channels = {0: 1, 2: 3, 4: 2, 6: 4}.get(color_type)
     if channels is None:
-        raise SemanticDecodeError("C001 supports grayscale, RGB, grayscale-alpha, and RGBA PNG only")
-    row_bytes = width * channels
+        raise SemanticDecodeError("C001 supports grayscale, RGB, indexed, grayscale-alpha, and RGBA PNG only")
+    row_bytes = (width * bit_depth + 7) // 8 if color_type == 3 else width * channels
     expected_length = height * (row_bytes + 1)
     compressed = b"".join(data for kind, data in chunks if kind == b"IDAT")
     decompressor = zlib.decompressobj()
@@ -218,10 +260,11 @@ def _decode_png_rgba(raw: bytes) -> _DecodedRGBA:
         if len(encoded) != row_bytes:
             raise SemanticDecodeError("PNG scanline is truncated")
         reconstructed = bytearray(row_bytes)
+        filter_bpp = max(1, (channels * bit_depth + 7) // 8)
         for index, value in enumerate(encoded):
-            left = reconstructed[index - channels] if index >= channels else 0
+            left = reconstructed[index - filter_bpp] if index >= filter_bpp else 0
             up = previous[index]
-            upper_left = previous[index - channels] if index >= channels else 0
+            upper_left = previous[index - filter_bpp] if index >= filter_bpp else 0
             if filter_type == 0:
                 prediction = 0
             elif filter_type == 1:
@@ -239,8 +282,24 @@ def _decode_png_rgba(raw: bytes) -> _DecodedRGBA:
         rows.append(row)
         previous = row
     rgba = bytearray()
+    palette: list[tuple[int, int, int, int]] = []
+    if color_type == 3:
+        palette_data = next(data for kind, data in chunks if kind == b"PLTE")
+        alpha_data = next((data for kind, data in chunks if kind == b"tRNS"), b"")
+        for palette_index in range(len(palette_data) // 3):
+            offset = palette_index * 3
+            alpha = alpha_data[palette_index] if palette_index < len(alpha_data) else 255
+            palette.append((palette_data[offset], palette_data[offset + 1], palette_data[offset + 2], alpha))
     for row in rows:
         for index in range(width):
+            if color_type == 3:
+                bit_offset = index * bit_depth
+                shift = 8 - bit_depth - (bit_offset % 8)
+                palette_index = (row[bit_offset // 8] >> shift) & ((1 << bit_depth) - 1)
+                if palette_index >= len(palette):
+                    raise SemanticDecodeError("indexed PNG pixel references an absent PLTE entry")
+                rgba.extend(palette[palette_index])
+                continue
             pixel = row[index * channels : (index + 1) * channels]
             if color_type == 0:
                 rgba.extend((pixel[0], pixel[0], pixel[0], 255))

@@ -1098,11 +1098,13 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
         alternative.mkdir()
         with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="canonical owner artwork folders"):
             owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
-        oversized = folders["OWNER_SUGGESTIONS"]
-        for index in range(owner_folder_batch.MAX_OWNER_FOLDER_PNGS + 1):
-            (oversized / f"{index:03d}.png").write_bytes(b"")
-        with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="no files were imported"):
-            owner_folder_batch.scan_owner_source_folder(oversized, repository_root=repository)
+        large_folder = folders["OWNER_SUGGESTIONS"]
+        for index in range(151):
+            (large_folder / f"{index:03d}.png").write_bytes(b"")
+        large_scan = owner_folder_batch.scan_owner_source_folder(large_folder, repository_root=repository)
+        assert large_scan["png_count"] == 151
+        assert len(large_scan["entries"]) == 151
+        assert all(item["disposition"] == "REJECTED" for item in large_scan["entries"])
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():

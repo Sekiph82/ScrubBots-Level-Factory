@@ -14,7 +14,6 @@ from .semantic.normalization.core import RAW_ARTIFACT_MAX_BYTES, SUPPORTED_MEDIA
 from .owner_upload import owner_upload_root
 
 
-MAX_OWNER_FOLDER_PNGS = 150
 _PROVIDER_KEYS = {
     "ALPIX": "alpix",
     "PIXELLAB": "pixellab_final",
@@ -156,10 +155,6 @@ def scan_owner_source_folder(
             continue
         png_files.append(entry)
     png_files.sort(key=lambda item: (item.name.casefold(), item.name))
-    if len(png_files) > MAX_OWNER_FOLDER_PNGS:
-        raise OwnerFolderBatchError(
-            f"folder contains {len(png_files)} direct PNG files; limit is {MAX_OWNER_FOLDER_PNGS}; no files were imported"
-        )
     entries: list[dict[str, Any]] = []
     valid_paths: list[str] = []
     rejected: list[dict[str, Any]] = []
@@ -289,6 +284,6 @@ def import_owner_source_folder(
 
 
 __all__ = [
-    "MAX_OWNER_FOLDER_PNGS", "OwnerFolderBatchError", "approved_owner_source_folders",
+    "OwnerFolderBatchError", "approved_owner_source_folders",
     "import_owner_source_folder", "scan_owner_source_folder",
 ]
