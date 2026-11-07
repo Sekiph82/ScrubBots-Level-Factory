@@ -830,6 +830,46 @@ def test_owner_csv_path_is_restricted_to_direct_canonical_input_files(tmp_path: 
         owner_art_storage.validate_owner_input_csv(canonical_input / "prompts.txt", repository_root=repository)
 
 
+def test_level_factory_auto_sync_scans_only_pixellab_final(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "factory"
+    paths = owner_art_storage.owner_art_paths(repository)
+    final_png = paths["pixellab_final"] / "new-sprite.png"
+    final_png.parent.mkdir(parents=True)
+    Image.new("RGBA", (56, 56), (255, 69, 0, 255)).save(final_png, format="PNG")
+    final_bytes = final_png.read_bytes()
+
+    legacy_png = repository / "level_factory" / "output" / "legacy" / "old-sprite.png"
+    legacy_png.parent.mkdir(parents=True)
+    Image.new("RGBA", (56, 56), (0, 204, 120, 255)).save(legacy_png, format="PNG")
+    grid_atlas = paths["pixellab_grid_files"] / "raw-atlas.png"
+    grid_atlas.parent.mkdir(parents=True)
+    Image.new("RGBA", (224, 224), (54, 144, 234, 255)).save(grid_atlas, format="PNG")
+
+    imported_paths: list[str] = []
+
+    def fake_import(path, *, repository_root):
+        imported_paths.append(str(Path(path).resolve()))
+        digest = hashlib.sha256(final_bytes).hexdigest()
+        return {"state": "IMPORTED", "source_id": f"owner-upload-{digest}"}
+
+    monkeypatch.setattr(studio_extensions, "import_owner_upload", fake_import)
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(studio_extensions, "validate_owner_source", lambda *_args, **_kwargs: {
+        "exact_logical_source": True,
+        "structural": {"disposition": "PASS"},
+        "void_capability": {"state": "NOT_REQUIRED"},
+    })
+
+    active, invalid = studio_extensions._sync_current_pixellab_final_sources(repository)
+
+    expected_id = "owner-upload-" + hashlib.sha256(final_bytes).hexdigest()
+    assert active == {expected_id}
+    assert invalid == []
+    assert imported_paths == [str(final_png.resolve())]
+    assert str(legacy_png.resolve()) not in imported_paths
+    assert final_png.read_bytes() == final_bytes
+
+
 def test_owner_art_archivers_reject_invalid_inputs_before_filesystem_access(monkeypatch) -> None:
     def forbidden_layout(*_args, **_kwargs):
         pytest.fail("invalid artifact must be rejected before creating owner folders")
