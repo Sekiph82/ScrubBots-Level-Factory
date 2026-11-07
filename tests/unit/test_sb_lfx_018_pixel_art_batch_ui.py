@@ -2,6 +2,7 @@ from pathlib import Path
 import hashlib
 
 import factory_core_launcher
+import pytest
 
 
 def _function(source: str, name: str) -> str:
@@ -97,12 +98,59 @@ def test_owner_folder_preview_and_import_stream_per_file_progress_to_pipeline_ac
     importer = (root / "src/scrubbots_pixel_factory/studio_extensions.py").read_text(encoding="utf-8")
 
     assert "_begin_owner_folder_activity(folder" in _function(ui, "_on_owner_folder_selected")
-    assert '"activity_run_id": _activity_run_id' in _function(ui, "_on_owner_folder_selected")
+    assert "request.merge(_owner_folder_activity_request(), true)" in _function(ui, "_on_owner_folder_selected")
+    assert '"activity_run_id": _activity_run_id' in _function(ui, "_owner_folder_activity_request")
+    assert '"activity_log_path": _activity_file_path' in _function(ui, "_owner_folder_activity_request")
+    assert "request.merge(_owner_folder_activity_request(), true)" in _function(ui, "_on_owner_folder_selected")
+    assert "request.merge(_owner_folder_activity_request(), true)" in _function(ui, "_confirm_owner_folder_import")
+    assert "request.merge(_owner_folder_activity_request(), true)" in _function(ui, "_poll_studio_read_extension")
     assert "owner-folder-preview-" in _function(ui, "_begin_owner_folder_activity")
     assert "activity_source_id" in launcher and '"stage": "FILE CHECK"' in scanner
     assert '"stage": "FILE IMPORT"' in importer
     assert "writer.emit(\"PIPELINE\", \"COMPLETE\"" in launcher
     assert "studio-pipeline-activity" in ui
+
+
+def test_folder_activity_writer_is_bound_to_the_active_studio_project_output(monkeypatch) -> None:
+    import scrubbots_pixel_factory.pipeline_activity as pipeline_activity
+
+    captured: dict[str, object] = {}
+
+    class FakeWriter:
+        terminal_emitted = False
+
+        def __init__(self, repository_root, run_id, source_id, source_sha256, *, output_directory):
+            captured["output_directory"] = output_directory
+            captured["identity"] = (run_id, source_id, source_sha256)
+
+        def emit(self, stage, state, message):
+            captured.setdefault("events", []).append((stage, state, message))
+
+    monkeypatch.setattr(pipeline_activity, "PipelineActivityWriter", FakeWriter)
+    folder = r"C:\approved\PixelLab\Final"
+    folder_identity = Path(folder).resolve(strict=False).as_posix().lower()
+    source_sha = hashlib.sha256(folder_identity.encode("utf-8")).hexdigest()
+    run_id = "pipeline-ui-20261108T021000Z-0123456789ab"
+    project_output = Path(factory_core_launcher.__file__).resolve().parents[1] / "output" / "studio-pipeline-activity"
+    request = {
+        "folder": folder,
+        "activity_run_id": run_id,
+        "activity_source_id": "owner-folder-preview-" + source_sha,
+        "activity_source_sha256": source_sha,
+        "activity_log_path": str(project_output / (run_id + ".jsonl")),
+    }
+
+    writer, emit, errors = factory_core_launcher._folder_activity_context(request)
+    assert isinstance(writer, FakeWriter)
+    assert captured["output_directory"] == project_output
+    assert captured["identity"] == (run_id, request["activity_source_id"], source_sha)
+    assert not errors
+    emit({"stage": "DISCOVERY", "state": "RUNNING", "message": "Found 304 PNG files"})
+    assert captured["events"][-1] == ("DISCOVERY", "RUNNING", "Found 304 PNG files")
+
+    request["activity_log_path"] = str(project_output.parent / "outside.jsonl")
+    with pytest.raises(ValueError, match="does not match this Studio project's output directory"):
+        factory_core_launcher._folder_activity_context(request)
 
 
 def test_pixel_art_left_controls_are_compact_and_prompt_refresh_is_removed() -> None:

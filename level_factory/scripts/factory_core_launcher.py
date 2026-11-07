@@ -58,7 +58,17 @@ def _folder_activity_context(request: Mapping[str, object]):
         raise ValueError("folder activity identity does not match the selected canonical path")
     from scrubbots_pixel_factory.pipeline_activity import PipelineActivityWriter
 
-    writer = PipelineActivityWriter(_repository_root(), run_id, source_id, source_sha)
+    project_output = Path(__file__).resolve().parents[1] / "output" / "studio-pipeline-activity"
+    expected_log_path = project_output / (run_id + ".jsonl")
+    requested_log_path = str(request.get("activity_log_path", ""))
+    if requested_log_path:
+        resolved_requested_log = Path(requested_log_path).resolve(strict=False)
+        if resolved_requested_log != expected_log_path.resolve(strict=False):
+            raise ValueError("folder activity log path does not match this Studio project's output directory")
+    writer = PipelineActivityWriter(
+        _repository_root(), run_id, source_id, source_sha,
+        output_directory=project_output,
+    )
     errors: list[str] = []
 
     def emit(event: Mapping[str, object]) -> None:

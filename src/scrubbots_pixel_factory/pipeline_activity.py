@@ -21,10 +21,21 @@ _MAX_BYTES = 64 * 1024 * 1024
 class PipelineActivityWriter:
     """Write hash-chained events to one unique file under LF's output directory."""
 
-    def __init__(self, repository_root: Path, run_id: str, source_id: str, source_sha256: str) -> None:
+    def __init__(
+        self,
+        repository_root: Path,
+        run_id: str,
+        source_id: str,
+        source_sha256: str,
+        *,
+        output_directory: Path | None = None,
+    ) -> None:
         if not _RUN_ID.fullmatch(run_id) or not _SOURCE_ID.fullmatch(source_id) or not _SHA256.fullmatch(source_sha256):
             raise ValueError("pipeline activity identity is invalid")
-        output_root = (repository_root.resolve() / "level_factory" / "output" / "studio-pipeline-activity").resolve()
+        output_root = (
+            output_directory.resolve() if output_directory is not None else
+            (repository_root.resolve() / "level_factory" / "output" / "studio-pipeline-activity").resolve()
+        )
         output_root.mkdir(parents=True, exist_ok=True)
         self.path = output_root / f"{run_id}.jsonl"
         if self.path.resolve().parent != output_root or self.path.exists():

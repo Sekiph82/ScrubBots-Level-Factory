@@ -2535,11 +2535,9 @@ func _on_owner_folder_selected(folder: String) -> void:
 	_begin_owner_folder_activity(folder, "Folder selected; discovering direct PNGs and starting per-file checks. No solver or provider call is running.")
 	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
-	if not _queue_studio_read_extension("owner-folder-preview", {
-		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
-		"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
-		"activity_source_sha256": _activity_source_sha256,
-	}, {"kind": "owner-folder-preview"}):
+	var request := {"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}
+	request.merge(_owner_folder_activity_request(), true)
+	if not _queue_studio_read_extension("owner-folder-preview", request, {"kind": "owner-folder-preview"}):
 		_operation_running = false
 		_report("Folder preview worker could not start.")
 		_complete_owner_folder_activity_error("Folder preview worker could not start.")
@@ -2590,6 +2588,7 @@ func _owner_folder_activity_request() -> Dictionary:
 		"activity_run_id": _activity_run_id,
 		"activity_source_id": _activity_source_id,
 		"activity_source_sha256": _activity_source_sha256,
+		"activity_log_path": _activity_file_path,
 	}
 
 
@@ -2646,11 +2645,9 @@ func _confirm_owner_folder_import() -> void:
 	_begin_owner_folder_activity(folder, "Confirm accepted; rechecking %d PNG files against the preview before import." % all_paths.size())
 	_sync_pipeline_activity_visibility()
 	_refresh_activity_header()
-	if not _queue_studio_read_extension("owner-folder-preview", {
-		"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative,
-		"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
-		"activity_source_sha256": _activity_source_sha256,
-	}, {"kind": "owner-folder-recheck", "paths": all_paths, "entries": old_entries, "folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}):
+	var request := {"folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}
+	request.merge(_owner_folder_activity_request(), true)
+	if not _queue_studio_read_extension("owner-folder-preview", request, {"kind": "owner-folder-recheck", "paths": all_paths, "entries": old_entries, "folder": folder, "explicit_alternative": _owner_folder_explicit_alternative}):
 		_operation_running = false
 		_report("Folder confirmation recheck could not start; no source was imported.")
 		_complete_owner_folder_activity_error("Folder confirmation recheck could not start; no source was imported.")
@@ -4686,11 +4683,9 @@ func _poll_studio_read_extension() -> void:
 		var folder := str(context.get("folder", ""))
 		var paths: Array = context.get("paths", [])
 		_begin_owner_folder_activity(folder, "Preview recheck passed; importing %d selected PNG files one by one. Solver has not started." % paths.size())
-		if not _queue_studio_read_extension("owner-folder-import", {
-			"folder": folder, "explicit_alternative": bool(context.get("explicit_alternative", false)),
-			"activity_run_id": _activity_run_id, "activity_source_id": _activity_source_id,
-			"activity_source_sha256": _activity_source_sha256,
-		}, {"kind": "owner-folder-import", "paths": paths}):
+		var request := {"folder": folder, "explicit_alternative": bool(context.get("explicit_alternative", false))}
+		request.merge(_owner_folder_activity_request(), true)
+		if not _queue_studio_read_extension("owner-folder-import", request, {"kind": "owner-folder-import", "paths": paths}):
 			_operation_running = false
 			_report("Owner folder import worker could not start; no source was imported.")
 			_complete_owner_folder_activity_error("Owner folder import worker could not start; no source was imported.")
