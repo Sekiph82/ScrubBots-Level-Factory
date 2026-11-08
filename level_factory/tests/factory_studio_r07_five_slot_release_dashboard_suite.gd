@@ -233,8 +233,12 @@ func _run_suite() -> void:
 
 	ui.call("_show_screen", "LEVEL FACTORY")
 	var source_id := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-	var release_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path().path_join("Release/ScrubBots Factory Studio")
-	var source_path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % source_id)
+	var repository_root := str(ui.call("_factory_repository_root"))
+	var source_relative_path := "level_factory/output/owner-uploads/%s/source.png" % source_id
+	var source_path := str(ui.call("_factory_repository_path", source_relative_path))
+	_check(not repository_root.is_empty() and FileAccess.file_exists(repository_root.path_join("TASKS.md")), "canonical repository root was not found from the installed project path")
+	_check(source_path == repository_root.path_join(source_relative_path), "installed project did not resolve owner art beneath the canonical repository")
+	_check(str(ui.call("_factory_repository_path", "../TASKS.md")).is_empty(), "repository-relative path helper accepted traversal")
 	var source_sha := source_id.trim_prefix("owner-upload-")
 	var record_sha := str(ui.call("_source_record_sha256_for_id", source_id))
 	_check(FileAccess.file_exists(source_path), "read-only R07 source-bound batch fixture is unavailable")
@@ -277,7 +281,7 @@ func _run_suite() -> void:
 	_check(str(ui.get("_batch_follow_item").get("status", "")) == "FAILED", "terminal authenticated status transition was not followed")
 	_check(str(ui.get("_activity_stage")) == "FAILED", "Pipeline Activity did not follow the terminal batch item state")
 
-	var real_job_path := release_root.path_join("level_factory/output/studio-extensions/png-batches/jobs/png-batch-c898cfef80663a61e8246ea1e4da8e13.json")
+	var real_job_path := repository_root.path_join("level_factory/output/studio-extensions/png-batches/jobs/png-batch-c898cfef80663a61e8246ea1e4da8e13.json")
 	var real_job_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(real_job_path)) if FileAccess.file_exists(real_job_path) else null
 	_check(real_job_variant is Dictionary and (real_job_variant as Dictionary).get("items", []).size() == 9, "read-only nine-source batch fixture is unavailable")
 	if real_job_variant is Dictionary and (real_job_variant as Dictionary).get("items", []).size() == 9:
@@ -289,7 +293,7 @@ func _run_suite() -> void:
 			var identity := str(saved.get("source_id", ""))
 			var sha := str(saved.get("source_sha256", ""))
 			var record_hash := str(saved.get("source_record_sha256", ""))
-			var path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % identity)
+			var path := str(ui.call("_factory_repository_path", "level_factory/output/owner-uploads/%s/source.png" % identity))
 			_check(FileAccess.file_exists(path) and sha == identity.trim_prefix("owner-upload-"), "saved nine-source item %d has no matching read-only owner PNG" % index)
 			_check(str(ui.call("_source_record_sha256_for_id", identity)) == record_hash, "saved nine-source item %d source-record hash is not current" % index)
 			ui.call("_upsert_imported_source", {"path": path, "source_id": identity, "source_sha256": sha, "source_record_sha256": record_hash, "display_filename": str(saved.get("original_filename", "PNG")), "width": 32, "height": 32})

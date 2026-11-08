@@ -129,6 +129,11 @@ def test_provider_control_caption_tracks_the_selected_provider_after_confirmatio
 def test_installed_studio_resolves_csv_output_and_palette_from_canonical_repository_data() -> None:
     assert 'func _factory_repository_root() -> String:' in UI
     assert 'FileAccess.file_exists(current.path_join("TASKS.md")) and DirAccess.dir_exists_absolute(current.path_join(".git"))' in UI
+    assert 'func _factory_repository_path(relative_path: String) -> String:' in UI
+    assert 'var png_path := _factory_repository_path(relative_path)' in UI
+    source_record_lookup = UI.split("func _source_record_sha256_for_id(source_id: String) -> String:", 1)[1].split("\n\nfunc ", 1)[0]
+    assert '_factory_repository_path("level_factory/output/owner-uploads/%s/source.json" % source_id)' in source_record_lookup
+    assert 'var app_root := ProjectSettings.globalize_path("res://").path_join("..")' not in source_record_lookup
     assert 'func _factory_data_path(relative_path: String) -> String:' in UI
     assert '_factory_data_path("input")' in UI
     assert '_factory_data_path("output")' in UI

@@ -1639,6 +1639,15 @@ func _factory_data_path(relative_path: String) -> String:
 	return root.path_join("data").path_join(relative_path).simplify_path()
 
 
+func _factory_repository_path(relative_path: String) -> String:
+	if relative_path.is_empty() or relative_path.is_absolute_path() or ".." in relative_path.replace("\\", "/").split("/"):
+		return ""
+	var root := _factory_repository_root()
+	if root.is_empty():
+		return ""
+	return root.path_join(relative_path).simplify_path()
+
+
 func _ensure_canonical_palette_loaded() -> void:
 	if not _canonical_palette_hex_by_id.is_empty():
 		return
@@ -1753,7 +1762,6 @@ func _restore_imported_sources() -> void:
 func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 	if str(catalog.get("schema", "")) != "scrubbots-source-library-view":
 		return
-	var release_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
 	var sources: Array = catalog.get("sources", [])
 	var source_by_id: Dictionary = {}
 	for source_variant in sources:
@@ -1765,7 +1773,9 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 		var relative_path := str(source.get("immutable_source_path", ""))
 		if not catalog_source_id.begins_with("owner-upload-") or catalog_source_id.trim_prefix("owner-upload-") != expected_sha or expected_sha.length() != 64 or relative_path.is_empty():
 			continue
-		var png_path := release_root.path_join(relative_path).simplify_path()
+		var png_path := _factory_repository_path(relative_path)
+		if png_path.is_empty():
+			continue
 		if not FileAccess.file_exists(png_path):
 			continue
 		var bytes := FileAccess.get_file_as_bytes(png_path)
@@ -2934,29 +2944,22 @@ func _source_record_sha256_for_id(source_id: String) -> String:
 	var source_sha := source_id.trim_prefix("owner-upload-")
 	if source_sha.length() != 64:
 		return ""
-	var app_root := ProjectSettings.globalize_path("res://").path_join("..").simplify_path()
-	var relative_record := "level_factory/output/owner-uploads/%s/source.json" % source_id
-	var record_paths := [
-		app_root.path_join(relative_record),
-		app_root.path_join("Release/ScrubBots Factory Studio").path_join(relative_record),
-	]
-	for record_path in record_paths:
-		if not FileAccess.file_exists(record_path):
-			continue
-		var record_bytes := FileAccess.get_file_as_bytes(record_path)
-		var parsed: Variant = JSON.parse_string(record_bytes.get_string_from_utf8())
-		if not parsed is Dictionary:
-			continue
-		if (str(parsed.get("source_id", "")) != source_id
-				or str(parsed.get("source_sha256", "")) != source_sha
-				or str(parsed.get("immutable_relative_path", "")) != "owner-uploads/%s/source.png" % source_id):
-			continue
-		var hashing := HashingContext.new()
-		if hashing.start(HashingContext.HASH_SHA256) != OK:
-			return ""
-		hashing.update(record_bytes)
-		return hashing.finish().hex_encode()
-	return ""
+	var record_path := _factory_repository_path("level_factory/output/owner-uploads/%s/source.json" % source_id)
+	if record_path.is_empty() or not FileAccess.file_exists(record_path):
+		return ""
+	var record_bytes := FileAccess.get_file_as_bytes(record_path)
+	var parsed: Variant = JSON.parse_string(record_bytes.get_string_from_utf8())
+	if not parsed is Dictionary:
+		return ""
+	if (str(parsed.get("source_id", "")) != source_id
+			or str(parsed.get("source_sha256", "")) != source_sha
+			or str(parsed.get("immutable_relative_path", "")) != "owner-uploads/%s/source.png" % source_id):
+		return ""
+	var hashing := HashingContext.new()
+	if hashing.start(HashingContext.HASH_SHA256) != OK:
+		return ""
+	hashing.update(record_bytes)
+	return hashing.finish().hex_encode()
 
 
 func _refresh_gameplay_sources() -> void:
