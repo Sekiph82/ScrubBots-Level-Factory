@@ -47,6 +47,7 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
     'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
+    'src/scrubbots_pixel_factory/supply_pipeline/r09_campaign.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
