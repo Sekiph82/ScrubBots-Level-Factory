@@ -3644,6 +3644,10 @@ func _run_png_batch() -> void:
 	if _gameplay_sources.size() < 2:
 		_report("Run Entire Loaded Batch requires at least two verified loaded PNGs.")
 		return
+	var pinned_project := _pinned_game_project_path()
+	if not FileAccess.file_exists(pinned_project.path_join("project.godot")):
+		_report("Pinned ScrubBots project is unavailable; no batch was created. Restore the pinned Runtime project and retry.")
+		return
 	var source_ids: Array[String] = []
 	for source in _gameplay_sources:
 		var source_id := str(source.get("source_id", ""))
@@ -3658,12 +3662,43 @@ func _run_png_batch() -> void:
 		_report("Loaded PNG snapshot could not be verified: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
 		return
 	_batch_composite_snapshot = composite
-	var settings := {"game_project": _pinned_game_project_path(), "background_intent": _background_intent}
+	var settings := {
+		"game_project": pinned_project,
+		"background_intent": _background_intent,
+		"solver_timeout_seconds": 900,
+	}
 	var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
 	var job: Dictionary = created.get("job", {})
+	if str(created.get("disposition", "")) == "ALL_SOURCES_ALREADY_READY":
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+		_activity_stage = "READY"
+		_activity_message = "All loaded PNGs already have verified READY evidence; no solver was run."
+		_refresh_activity_header()
+		_report(_activity_message)
+		return
 	if job.is_empty():
 		_report("PNG batch plan could not be verified: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
 		return
+	var job_batch_id := str(job.get("import_batch_id", ""))
+	if job_batch_id.is_empty():
+		_report("PNG batch plan has no persisted source snapshot; no solver was started.")
+		return
+	if job_batch_id != _batch_import_id:
+		var job_source_ids: Array[String] = []
+		for item_variant in job.get("items", []):
+			if item_variant is Dictionary:
+				var job_source_id := str(item_variant.get("source_id", ""))
+				if job_source_id.is_empty() or job_source_id in job_source_ids:
+					_report("READY-excluded batch source list is malformed; no solver was started.")
+					return
+				job_source_ids.append(job_source_id)
+		var job_composite := _extension("loaded-png-batch-create", {"source_ids": job_source_ids})
+		if str(job_composite.get("batch_id", "")) != job_batch_id:
+			_report("READY-excluded source snapshot did not match the persisted job; no solver was started.")
+			return
+		_batch_composite_snapshot = job_composite
+		_batch_import_id = job_batch_id
 	_batch_job_id = str(job.get("job_id", ""))
 	_batch_snapshot = job
 	if _batch_job_id.is_empty():
@@ -5294,7 +5329,7 @@ func _batch_job_matches_loaded_sources() -> bool:
 	var composite_items: Array = _batch_composite_snapshot.get("items", [])
 	if items.is_empty() or composite_items.is_empty() or str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
 		return false
-	if composite_items.size() != _gameplay_sources.size():
+	if composite_items.size() > _gameplay_sources.size():
 		return false
 	var loaded_by_id: Dictionary = {}
 	for loaded_source_variant in _gameplay_sources:

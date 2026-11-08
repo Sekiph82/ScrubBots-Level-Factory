@@ -59,6 +59,63 @@ def test_batch_planner_accepts_304_sources_without_touching_disk(monkeypatch: py
     assert captured["planned_quotas"] == {"3": 137, "4": 122, "5": 45}
 
 
+def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(monkeypatch: pytest.MonkeyPatch) -> None:
+    source_ids = [f"owner-upload-{index:064x}" for index in range(304)]
+    full = {"batch_id": "batch-loaded-304", "items": [
+        {"index": index, "source_id": source_id, "source_sha256": source_id.removeprefix("owner-upload-"), "disposition": "ALREADY_IMPORTED"}
+        for index, source_id in enumerate(source_ids)
+    ]}
+    remaining_ids = source_ids[44:]
+    subset = {"batch_id": "batch-loaded-260", "items": [
+        {"index": index, "source_id": source_id, "source_sha256": source_id.removeprefix("owner-upload-"), "disposition": "ALREADY_IMPORTED"}
+        for index, source_id in enumerate(remaining_ids)
+    ]}
+    ready = {
+        source_id.removeprefix("owner-upload-"): {
+            "source_id": source_id, "candidate_id": f"candidate-{index}",
+            "pipeline_run_id": f"pipeline-{index}", "ready_job_id": "prior-ready-job",
+        }
+        for index, source_id in enumerate(source_ids[:44])
+    }
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda batch_id: {"batch": full if batch_id == full["batch_id"] else subset})
+    monkeypatch.setattr(studio_extensions, "create_loaded_png_batch", lambda ids: subset if list(ids) == remaining_ids else {})
+    monkeypatch.setattr(png_batch, "_verified_ready_sources", lambda _items: ready)
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "pinned-runtime")
+    monkeypatch.setattr(png_batch, "_verify_sources", lambda items, _settings: [
+        {"index": index, "source_id": item["source_id"], "source_sha256": item["source_sha256"],
+         "source_record_sha256": "a" * 64, "status": "QUEUED"}
+        for index, item in enumerate(items)
+    ])
+    monkeypatch.setattr(png_batch, "_root", lambda: type("NoJobsRoot", (), {"__truediv__": lambda self, _name: self})())
+    monkeypatch.setattr(png_batch, "_job_path", lambda _job_id: type("NoDiskPath", (), {"exists": lambda _self: False})())
+    monkeypatch.setattr(png_batch, "_write_job", lambda job: captured.update(job) or job)
+
+    result = png_batch.create_png_batch(full["batch_id"], {"game_project": "pinned-runtime"})
+
+    assert result["disposition"] == "CREATED"
+    assert len(captured["items"]) == 260
+    assert captured["inventory_source_count"] == 304
+    assert captured["snapshot_source_count"] == 260
+    assert captured["import_batch_id"] == subset["batch_id"]
+    assert len(captured["excluded_ready_sources"]) == 44
+    assert {item["source_id"] for item in captured["items"]}.isdisjoint(source_ids[:44])
+    assert captured["planned_quotas"] == {"3": 117, "4": 104, "5": 39}
+
+
+def test_missing_pinned_project_blocks_without_persisting_a_rejected_job(monkeypatch: pytest.MonkeyPatch) -> None:
+    imported = {"batch_id": "batch-missing-runtime", "items": [{"source_id": "owner-upload-" + "1" * 64}]}
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": imported})
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: None)
+    monkeypatch.setattr(png_batch, "_write_job", lambda _job: pytest.fail("must not persist a missing-runtime job"))
+
+    result = png_batch.create_png_batch(imported["batch_id"], {"game_project": "missing-runtime"})
+
+    assert result["state"] == "BLOCKED"
+    assert result["disposition"] == "PINNED_GAME_PROJECT_MISSING"
+    assert result["job"] == {}
+
+
 def test_new_png_batch_jobs_use_release_pool_pending_and_legacy_job_ids_resume_in_place(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()

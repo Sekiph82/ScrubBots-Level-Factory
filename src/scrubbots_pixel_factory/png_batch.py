@@ -418,24 +418,217 @@ def _verify_sources(items: Sequence[Mapping[str, Any]], settings: Mapping[str, A
     return result
 
 
+def _verified_ready_sources(imported_items: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
+    """Find current source SHAs with prior READY status and intact canonical proof.
+
+    A historical job status alone is not enough to suppress work. The source PNG
+    and source record must still match, as must the exact canonical pipeline,
+    solver artifacts, candidate lineage, and Release Pool row.
+    """
+    from . import studio_extensions as studio
+
+    current_by_sha: dict[str, str] = {}
+    for item in imported_items:
+        if not isinstance(item, Mapping):
+            continue
+        source_id = str(item.get("source_id", ""))
+        source_sha = str(item.get("source_sha256", ""))
+        if source_id == f"owner-upload-{source_sha}" and len(source_sha) == 64:
+            current_by_sha[source_sha] = source_id
+    if not current_by_sha:
+        return {}
+
+    jobs_root = _root() / "jobs"
+    if not jobs_root.is_dir():
+        return {}
+    ready_history: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    for path in sorted(jobs_root.glob("png-batch-*.json")):
+        try:
+            job = _read_job(path.stem)
+        except (OSError, ValueError, UnicodeError, json.JSONDecodeError):
+            continue
+        for item in job.get("items", []):
+            if (isinstance(item, dict) and item.get("status") == "READY"
+                    and str(item.get("source_sha256", "")) in current_by_sha
+                    and item.get("source_id") == current_by_sha.get(str(item.get("source_sha256", "")))):
+                ready_history.append((job, item))
+    if not ready_history:
+        return {}
+
+    try:
+        candidates_by_id = {str(row.get("candidate_id", "")): row for row in studio.list_candidates()}
+        from .supply_pipeline import release_pool as release_pool_store
+        from .supply_pipeline.release_pool import release_entries
+
+        entries_by_pair = {
+            (str(row.get("candidate_id", "")), str(row.get("pipeline_run_id", ""))): row
+            for row in release_entries()
+        }
+        pool_paths_by_pair: dict[tuple[str, str], Path] = {}
+        for pool_path in release_pool_store.entry_paths():
+            try:
+                saved_entry = studio._read_json(pool_path)
+            except Exception:
+                continue
+            pair = (str(saved_entry.get("candidate_id", "")), str(saved_entry.get("pipeline_run_id", "")))
+            if all(pair):
+                pool_paths_by_pair[pair] = pool_path
+        latest_ready_by_candidate: dict[str, dict[str, Any]] = {}
+        for pipeline_path in studio._pipeline_paths():
+            try:
+                pipeline_value = studio._read_json(pipeline_path)
+            except Exception:
+                continue
+            candidate_key = str(pipeline_value.get("candidate_id", ""))
+            if (candidate_key and pipeline_value.get("disposition") == "READY"
+                    and pipeline_value.get("primary", {}).get("state") == "READY"):
+                current = latest_ready_by_candidate.get(candidate_key)
+                if current is None or str(pipeline_value.get("created_at", "")) > str(current.get("created_at", "")):
+                    latest_ready_by_candidate[candidate_key] = pipeline_value
+    except Exception:
+        return {}
+    verified: dict[str, dict[str, str]] = {}
+    for job, item in ready_history:
+        source_id = str(item.get("source_id", ""))
+        source_sha = str(item.get("source_sha256", ""))
+        record_sha = str(item.get("source_record_sha256", ""))
+        run_id = str(item.get("run_id", ""))
+        candidate_id = str(item.get("candidate_id", ""))
+        columns = item.get("column_count")
+        if (source_sha in verified or len(record_sha) != 64 or len(run_id) == 0
+                or not run_id.startswith("pipeline-") or len(candidate_id) == 0
+                or columns not in (3, 4, 5)):
+            continue
+        try:
+            source = studio.verify_owner_source(
+                source_id, source_directory=job.get("settings", {}).get("source_directory")
+            )
+            record_path, source_path = studio._source_record_paths(
+                source_id, job.get("settings", {}).get("source_directory")
+            )
+            if (source.get("source_sha256") != source_sha
+                    or hashlib.sha256(source_path.read_bytes()).hexdigest() != source_sha
+                    or hashlib.sha256(record_path.read_bytes()).hexdigest() != record_sha):
+                continue
+            pipeline = studio._read_json(studio._pipeline_path(run_id))
+            latest = latest_ready_by_candidate.get(candidate_id)
+            candidate = candidates_by_id.get(candidate_id)
+            pair = (candidate_id, run_id)
+            pool_entry = entries_by_pair.get(pair)
+            pool_path = pool_paths_by_pair.get(pair)
+            pool_row_ok = False
+            if candidate is not None and pool_entry is not None and pool_path is not None:
+                saved = studio._read_json(pool_path)
+                request = pipeline.get("request", {})
+                binding = pipeline.get("owner_source_binding", {})
+                files = pipeline.get("primary", {}).get("files", {})
+                plan = json.loads(Path(str(files.get("supply_plan", ""))).read_text(encoding="utf-8"))
+                pipeline_path = studio._pipeline_path(run_id)
+                pool_row_ok = (
+                    pool_entry.get("source_id", source_id) == source_id
+                    and pool_entry.get("column_count", int(columns)) == int(columns)
+                    and (not binding or binding.get("source_id") == source_id)
+                    and plan.get("columnCount") == int(columns)
+                    and saved.get("entry_digest") == pool_entry.get("entry_digest")
+                    and saved.get("candidate_id") == candidate_id
+                    and saved.get("pipeline_run_id") == run_id
+                    and saved.get("source_id", source_id) == source_id
+                    and saved.get("column_count", int(columns)) == int(columns)
+                    and saved.get("pipeline_sha256") == hashlib.sha256(pipeline_path.read_bytes()).hexdigest()
+                    and all(
+                        saved.get("files", {}).get(key, {}).get("sha256")
+                        == hashlib.sha256(Path(str(files.get(key, ""))).read_bytes()).hexdigest()
+                        for key in ("level", "supply_plan")
+                    )
+                )
+            if (candidate is None or not isinstance(latest, Mapping)
+                    or latest.get("run_id") != run_id
+                    or not _has_ready_pipeline_proof(
+                        pipeline, source_id, expected_columns=int(columns),
+                        source_record_sha256=record_sha, job=job, item=item,
+                    )
+                    or not _verify_column_artifacts(pipeline, int(columns))
+                    or not _candidate_has_source_lineage(candidate, source_id, source_sha)
+                    or not pool_row_ok):
+                continue
+        except Exception:
+            continue
+        verified[source_sha] = {
+            "source_id": source_id,
+            "candidate_id": candidate_id,
+            "pipeline_run_id": run_id,
+            "ready_job_id": str(job.get("job_id", "")),
+        }
+    return verified
+
+
+def _configured_game_project(settings: Mapping[str, Any]) -> str | None:
+    """Resolve the pinned game root and reject a missing project before job writes."""
+    from .supply_pipeline.pinned_game_source import expected_runtime_root
+
+    configured = settings.get("game_project")
+    project_root = Path(str(configured)).expanduser() if configured else expected_runtime_root()
+    try:
+        project_root = project_root.resolve(strict=True)
+    except OSError:
+        return None
+    if not project_root.is_dir() or not (project_root / "project.godot").is_file():
+        return None
+    return str(project_root)
+
+
 def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    from .studio_extensions import _digest, batch_load
+    from .studio_extensions import _digest, batch_load, create_loaded_png_batch
 
     imported = batch_load(batch_id)["batch"]
     if not isinstance(imported.get("items"), list):
         raise ValueError("an imported PNG batch must contain an items list")
+    inventory_batch_id = batch_id
+    inventory_source_count = len(imported["items"])
     snapshot = dict(settings or {})
     # The UI may configure only canonical bounded pipeline request fields.
     allowed = {"game_project", "source_directory", "background_intent", "seed", "candidates", "verify_top", "screen_budget", "metric_top", "viability_budget", "real_max_visited", "solver_timeout_seconds"}
     if set(snapshot) - allowed:
         raise ValueError("PNG batch settings include unsupported fields")
+    configured_game_project = _configured_game_project(snapshot)
+    if configured_game_project is None:
+        return {
+            "state": "BLOCKED", "disposition": "PINNED_GAME_PROJECT_MISSING",
+            "reason": "Configured ScrubBots project is missing project.godot; no PNG batch was created.",
+            "job": {},
+        }
+    snapshot["game_project"] = configured_game_project
+    previously_ready = _verified_ready_sources(imported["items"])
+    excluded_ready = [
+        {"source_sha256": sha, **previously_ready[sha]}
+        for sha in sorted(previously_ready)
+    ]
+    if previously_ready:
+        remaining_source_ids = [
+            str(item.get("source_id", "")) for item in imported["items"]
+            if isinstance(item, Mapping)
+            and str(item.get("source_sha256", "")) not in previously_ready
+        ]
+        if not remaining_source_ids:
+            return {
+                "state": "SUCCESS", "disposition": "ALL_SOURCES_ALREADY_READY",
+                "job": {}, "excluded_ready_sources": excluded_ready,
+            }
+        imported = create_loaded_png_batch(remaining_source_ids)
+        batch_id = str(imported.get("batch_id", ""))
+        if not batch_id:
+            raise ValueError("READY-excluded source snapshot could not be persisted")
     source_items = _verify_sources(imported["items"], snapshot)
     eligible = [item for item in source_items if item["status"] == "QUEUED"]
     assignments = assign_columns([str(item["source_id"]) for item in eligible])
     assignment_by_id = {str(item["source_id"]): columns for item, columns in zip(eligible, assignments, strict=True)}
     for item in source_items:
         item["column_count"] = assignment_by_id.get(str(item["source_id"]))
-    immutable_plan = {"batch_id": batch_id, "batch_digest": _digest(imported), "settings": snapshot, "items": source_items}
+    immutable_plan = {
+        "batch_id": batch_id, "inventory_batch_id": inventory_batch_id,
+        "batch_digest": _digest(imported), "settings": snapshot,
+        "excluded_ready_sources": excluded_ready, "items": source_items,
+    }
     plan_digest = _digest(immutable_plan)
     job_id = f"png-batch-{plan_digest[:32]}"
     path = _job_path(job_id)
@@ -447,7 +640,10 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     job = {
         "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": job_id,
         "import_batch_id": batch_id, "batch_digest": immutable_plan["batch_digest"],
+        "inventory_batch_id": inventory_batch_id,
+        "inventory_source_count": inventory_source_count,
         "snapshot_source_count": len(imported["items"]),
+        "excluded_ready_sources": excluded_ready,
         "plan_digest": plan_digest, "settings": snapshot, "state": "QUEUED",
         "created_at": _now(), "updated_at": _now(), "current_index": None,
         "items": source_items, "counts": _counts(source_items),
