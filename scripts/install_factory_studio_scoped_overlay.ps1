@@ -104,6 +104,7 @@ $authorizedOverlayAdditions = @(
 	'src/scrubbots_pixel_factory/owner_art_storage.py',
 	'src/scrubbots_pixel_factory/owner_folder_batch.py',
 	'src/scrubbots_pixel_factory/owner_release_library.py',
+	'src/scrubbots_pixel_factory/png_batch.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',
@@ -281,6 +282,45 @@ foreach ($relative in $relativePaths) {
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { throw "Installed manifest is missing: $manifestPath" }
 Assert-NoReparsePath $manifestPath
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
+$manifestSha256 = Get-Sha256 $manifestPath
+$legacyManifestSha256 = 'e5c00fbeede5be0c6b4da3bfbaca6e40c0a5b09ba74b52129d2aebde16be45c7'
+$legacySourceRevision = '2ce5c6ca97f5ffa4563014091fb845b7cd18edab'
+$legacyManagedCount = 2516
+$legacySelectedHashes = @{
+    'level_factory/scripts/factory_studio_exact_ui.gd' = 'fa457def9796b4b874ba836eee809bba7a07c25db1ec5c3706710f0608812d1b'
+    'src/scrubbots_pixel_factory/png_batch.py' = '9c498385323ba89ac6707229286b8c59c34198e2048f25d4761a3fb49862d249'
+}
+$legacyManifestMigration = $false
+$hasInstallationMode = $manifest.PSObject.Properties.Name -contains 'installationMode'
+if ($manifest.formatVersion -eq 1 -and (-not $hasInstallationMode -or $manifest.installationMode -cne 'OWNER_APPROVED_SCOPED_OVERLAY')) {
+    $legacyProperties = @($manifest.PSObject.Properties.Name | Sort-Object)
+    $expectedLegacyProperties = @('formatVersion','managedFiles','sourceRevision') | Sort-Object
+    if ($manifestSha256 -cne $legacyManifestSha256 -or
+        ($legacyProperties -join '|') -cne ($expectedLegacyProperties -join '|') -or
+        [string]$manifest.sourceRevision -cne $legacySourceRevision -or
+        @($manifest.managedFiles).Count -ne $legacyManagedCount) {
+        throw 'Legacy Release manifest does not match the exact owner-approved migration baseline.'
+    }
+    foreach ($selectedPath in $legacySelectedHashes.Keys) {
+        $entries = @($manifest.managedFiles | Where-Object path -ceq $selectedPath)
+        if ($entries.Count -ne 1 -or [string]$entries[0].sha256 -cne $legacySelectedHashes[$selectedPath]) {
+            throw "Legacy Release manifest selected-file baseline differs: $selectedPath"
+        }
+        $installedPath = Join-Path $runtimeRoot ($selectedPath.Replace('/', [IO.Path]::DirectorySeparatorChar))
+        Assert-NoReparsePath $installedPath
+        if (-not (Test-Path -LiteralPath $installedPath -PathType Leaf) -or (Get-Sha256 $installedPath) -cne $legacySelectedHashes[$selectedPath]) {
+            throw "Legacy Release selected file differs from its exact manifest baseline: $selectedPath"
+        }
+    }
+    # Migrate only the exact, measured three-field installer manifest. The
+    # normal scoped transaction will atomically persist these fields together
+    # with the selected overlay and receipt under its writer-exclusion lease.
+    $manifest | Add-Member -NotePropertyName installationMode -NotePropertyValue 'OWNER_APPROVED_SCOPED_OVERLAY'
+    $manifest | Add-Member -NotePropertyName baseRevision -NotePropertyValue $legacySourceRevision
+    $manifest | Add-Member -NotePropertyName overlayPaths -NotePropertyValue @()
+    $manifest | Add-Member -NotePropertyName overlayReceipts -NotePropertyValue @()
+    $legacyManifestMigration = $true
+}
 if ($manifest.formatVersion -ne 1 -or $manifest.installationMode -cne 'OWNER_APPROVED_SCOPED_OVERLAY') { throw 'Installed manifest is not the expected scoped-overlay format.' }
 
 $managed = @{}
@@ -291,7 +331,6 @@ foreach ($entry in @($manifest.managedFiles)) {
 $verifyPath = 'src/scrubbots_pixel_factory/supply_pipeline/verify.py'
 $verifyEntries = @($manifest.managedFiles | Where-Object path -ceq $verifyPath)
 if ($verifyEntries.Count -ne 1) { throw 'Historical verify.py repair requires exactly one managed manifest entry.' }
-$manifestSha256 = Get-Sha256 $manifestPath
 $knownPreFixUiPath = 'level_factory/scripts/factory_studio_exact_ui.gd'
 $knownPreFixUiManifestSha256 = '2919a2ed0818c49cd9ca994701b881d1436708e274cb87dba131ac220adb1517'
 $knownPreFixUiInstalledSha256 = '0a2643a19d63d402d8138e51f32ba5f298863d768a7d699cd1236f77bf972947'

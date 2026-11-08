@@ -67,6 +67,29 @@ def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_byt
     assert "$manifestDrift.Count -gt 0" in source
 
 
+def test_scoped_installer_migrates_only_the_exact_measured_legacy_release_manifest() -> None:
+    source = _installer()
+    migration = source.split("$legacyManifestSha256 =", 1)[1].split("$managed = @{}", 1)[0]
+    for value in (
+        "e5c00fbeede5be0c6b4da3bfbaca6e40c0a5b09ba74b52129d2aebde16be45c7",
+        "2ce5c6ca97f5ffa4563014091fb845b7cd18edab",
+        "$legacyManagedCount = 2516",
+        "level_factory/scripts/factory_studio_exact_ui.gd",
+        "fa457def9796b4b874ba836eee809bba7a07c25db1ec5c3706710f0608812d1b",
+        "src/scrubbots_pixel_factory/png_batch.py",
+        "9c498385323ba89ac6707229286b8c59c34198e2048f25d4761a3fb49862d249",
+        "Legacy Release manifest does not match the exact owner-approved migration baseline.",
+        "Legacy Release selected file differs from its exact manifest baseline",
+        "normal scoped transaction will atomically persist these fields",
+        "OWNER_APPROVED_SCOPED_OVERLAY",
+        "$manifest | Add-Member -NotePropertyName overlayReceipts",
+    ):
+        assert value in migration
+    assert "Get-Sha256 $manifestPath" in source.split("$legacyManifestSha256 =", 1)[0]
+    assert "@($manifest.managedFiles).Count -ne $legacyManagedCount" in migration
+    assert "Invoke-ScopedOverlayTransaction -Plan" in source
+
+
 def test_only_the_receipted_exact_pre_fix_ui_bytes_are_authorized_for_repair() -> None:
     source = _installer()
     repair = source.split("$knownPreFixUiPath =", 1)[1].split("$historicVerifyHash =", 1)[0]
