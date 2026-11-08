@@ -215,12 +215,14 @@ def test_solver_activity_uses_running_studio_project_and_emits_active_png_row(mo
     render_row = _function(ui, "_append_batch_item_activity_row")
 
     assert studio_extensions._studio_activity_output_directory() == expected
-    release_launcher = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "scripts" / "factory_core_launcher.py"
-    release_project = release_launcher.parents[1]
+    ui_startup = _function(ui, "_ready")
+    assert '"SCRUBBOTS_STUDIO_PROJECT_ROOT"' in ui_startup
+    assert 'active_project_root if FileAccess.file_exists(project_marker)' in ui_startup
+    shutdown = _function(ui, "_finish_worker_cancel_marker")
+    assert 'OS.set_environment("SCRUBBOTS_STUDIO_PROJECT_ROOT", _studio_project_root_previous_environment)' in shutdown
+    release_project = root / "Release" / "ScrubBots Factory Studio" / "level_factory"
     if (release_project / "project.godot").is_file():
-        monkeypatch.delenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", raising=False)
-        monkeypatch.setattr(factory_core_launcher, "__file__", str(release_launcher))
-        assert factory_core_launcher._set_studio_project_root() == release_project
+        monkeypatch.setenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", str(release_project))
         release_expected = release_project / "output" / "studio-pipeline-activity"
         assert studio_extensions._studio_activity_output_directory() == release_expected
     assert 'state not in ["RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]' in record_progress

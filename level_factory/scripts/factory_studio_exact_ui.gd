@@ -179,6 +179,8 @@ var _batch_worker_active := false
 var _studio_cancel_marker_path := ""
 var _studio_cancel_previous_environment := ""
 var _studio_pid_previous_environment := ""
+var _studio_project_root_previous_environment := ""
+var _studio_project_root_environment_set := false
 var _shutdown_requested := false
 var _activity_file_path := ""
 var _activity_stream_reader_override: Object
@@ -218,6 +220,14 @@ var _pinned_source_preflight_message := "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
 
 
 func _ready() -> void:
+	_studio_project_root_previous_environment = OS.get_environment("SCRUBBOTS_STUDIO_PROJECT_ROOT")
+	_studio_project_root_environment_set = true
+	var active_project_root := ProjectSettings.globalize_path("res://").simplify_path()
+	var project_marker := active_project_root.path_join("project.godot")
+	OS.set_environment(
+		"SCRUBBOTS_STUDIO_PROJECT_ROOT",
+		active_project_root if FileAccess.file_exists(project_marker) else ""
+	)
 	# Retire a legacy selection on startup without changing saved asset provenance.
 	if _provider_model == "MAGNIFIC":
 		_provider_model = "ALPIX (Claude)"
@@ -346,6 +356,9 @@ func _finish_worker_cancel_marker() -> void:
 	if not _studio_cancel_marker_path.is_empty():
 		OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_previous_environment)
 		OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_PID", _studio_pid_previous_environment)
+	if _studio_project_root_environment_set:
+		OS.set_environment("SCRUBBOTS_STUDIO_PROJECT_ROOT", _studio_project_root_previous_environment)
+		_studio_project_root_environment_set = false
 	if not _studio_cancel_marker_path.is_empty() and FileAccess.file_exists(_studio_cancel_marker_path):
 		DirAccess.remove_absolute(_studio_cancel_marker_path)
 	_studio_cancel_marker_path = ""

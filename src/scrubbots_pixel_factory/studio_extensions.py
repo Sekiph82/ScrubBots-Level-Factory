@@ -64,7 +64,7 @@ def _studio_activity_output_directory() -> Path:
     """Resolve Activity logs beside the Studio project actually running this module.
 
     Studio workers import code from the canonical checkout even when the GUI runs
-    from Release. The launcher passes the active project root explicitly; module
+    from Release. The GUI exports its active project root to child workers; module
     __file__ alone is insufficient because it points into the canonical checkout.
     """
     from .owner_art_storage import OwnerArtStorageError, _verify_path_under_root
