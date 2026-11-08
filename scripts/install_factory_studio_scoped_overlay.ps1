@@ -86,6 +86,10 @@ $authorizedOverlayAdditions = @(
 # cancel-marker/process-tree handling. Permit repairing only those measured
 # bytes; any other manifest mismatch remains a hard stop.
 $authorizedRepairHashes = @{
+    # This exact installed Studio module is a CRLF checkout of the published
+    # 6f089a8 PNG-batch solver fix. The manifest is stale, but the bytes have
+    # now been matched against the immutable Git source before allowing repair.
+    'src/scrubbots_pixel_factory/studio_extensions.py' = '4f8535f94c7bc1e273ce6637c67bd9997d5f84da841ed7123c309a505f135c5c'
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py' = '57b6cf7ae679bf3b8c16b4d9ff8d0c3eb23ff3f4039c8d630c89fe19e3df0169'
     # This exact installed variant differs from the published optimizer only
     # in retaining the old 90-second defaults; restore the approved 240 cap.
