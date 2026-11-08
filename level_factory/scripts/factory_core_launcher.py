@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import sys
 import uuid
 from collections.abc import Mapping, Sequence
@@ -151,7 +152,11 @@ def _canonical_final_source_gate(source_ids: Sequence[object]) -> dict[str, obje
 
     requested = [str(source_id) for source_id in source_ids if str(source_id)]
     try:
-        active_ids, inventory_errors = studio_extensions._sync_current_pixellab_final_sources(_repository_root())
+        from scrubbots_pixel_factory.supply_pipeline.pinned_game_source import expected_runtime_root
+
+        active_ids, inventory_errors = studio_extensions._sync_current_pixellab_final_sources(
+            _repository_root(), game_project=expected_runtime_root()
+        )
     except Exception as exc:
         return {"state": "BLOCKED", "disposition": "CANONICAL_FINAL_INVENTORY_UNAVAILABLE",
                 "error": str(exc)[:512], "invalid_final_sources": []}
@@ -160,6 +165,40 @@ def _canonical_final_source_gate(source_ids: Sequence[object]) -> dict[str, obje
         return {"state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY",
                 "error": "New solving accepts only currently validated PNGs in data/output/Pixellab/Final.",
                 "excluded_source_ids": excluded, "invalid_final_sources": inventory_errors}
+    return None
+
+
+def _canonical_final_membership_gate(source_ids: Sequence[object]) -> dict[str, object] | None:
+    """Require source identities to belong to valid direct PNGs in current Final.
+
+    Logical LevelData/palette validation is deliberately left to the batch plan,
+    which records invalid artwork as REJECTED per item instead of blocking every
+    otherwise eligible source in a large folder.
+    """
+    from scrubbots_pixel_factory import owner_art_storage
+    from scrubbots_pixel_factory.owner_folder_batch import scan_owner_source_folder
+
+    requested = [str(source_id) for source_id in source_ids if str(source_id)]
+    try:
+        final_directory = owner_art_storage.owner_art_paths(_repository_root())["pixellab_final"]
+        scan = scan_owner_source_folder(final_directory, repository_root=_repository_root())
+        if scan.get("provider") != "PIXELLAB":
+            raise ValueError("canonical PixelLab Final source authority could not be established")
+        members = {
+            "owner-upload-" + str(entry.get("source_sha256", ""))
+            for entry in scan.get("entries", [])
+            if isinstance(entry, Mapping)
+            and entry.get("disposition") in {"ELIGIBLE", "ALREADY_IMPORTED"}
+            and re.fullmatch(r"[0-9a-f]{64}", str(entry.get("source_sha256", "")))
+        }
+    except Exception as exc:
+        return {"state": "BLOCKED", "disposition": "CANONICAL_FINAL_INVENTORY_UNAVAILABLE",
+                "error": str(exc)[:512]}
+    excluded = sorted(set(requested) - members)
+    if excluded:
+        return {"state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY",
+                "error": "New solving accepts only direct PNG identities currently present in PixelLab Final.",
+                "excluded_source_ids": excluded}
     return None
 
 
@@ -461,7 +500,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = extensions.batch_load(str(request["batch_id"]))
         elif operation == "loaded-png-batch-create":
             source_ids = request.get("source_ids", [])
-            gate = _canonical_final_source_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
+            gate = _canonical_final_membership_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
                 "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical Final identities."}
             payload = gate if gate is not None else extensions.loaded_png_batch_create(source_ids)
         elif operation == "loaded-png-batch-find":
@@ -470,7 +509,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             loaded = extensions.batch_load(str(request["batch_id"]))
             batch = loaded.get("batch", {})
             source_ids = [str(item.get("source_id", "")) for item in batch.get("items", []) if isinstance(item, Mapping)]
-            gate = _canonical_final_source_gate(source_ids)
+            gate = _canonical_final_membership_gate(source_ids)
             payload = gate if gate is not None else extensions.png_batch_create(str(request["batch_id"]), request.get("settings", {}))
         elif operation == "png-batch-retry-failed":
             status = extensions.png_batch_status(str(request["job_id"]))
@@ -487,7 +526,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "png-batch-run":
             before = extensions.png_batch_status(str(request["job_id"]))
             job = before.get("job", {}) if isinstance(before, Mapping) else {}
-            sources = [str(item.get("source_id", "")) for item in job.get("items", []) if isinstance(item, Mapping)]
+            sources = [
+                str(item.get("source_id", "")) for item in job.get("items", [])
+                if isinstance(item, Mapping) and str(item.get("status", "")) in {"QUEUED", "RUNNING"}
+            ]
             gate = _canonical_final_source_gate(sources)
             if gate is not None:
                 payload = gate

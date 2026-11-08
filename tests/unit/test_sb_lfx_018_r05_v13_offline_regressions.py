@@ -1122,6 +1122,39 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
             shutil.rmtree(root)
 
 
+def test_owner_folder_import_keeps_original_indices_for_already_imported_files(monkeypatch) -> None:
+    paths = [r"C:\owner\Final\first.png", r"C:\owner\Final\second.png"]
+    entries = [
+        {"index": 0, "path": paths[0], "display_path": "first.png", "disposition": "ALREADY_IMPORTED"},
+        {"index": 1, "path": paths[1], "display_path": "second.png", "disposition": "ALREADY_IMPORTED"},
+    ]
+    monkeypatch.setattr(
+        owner_folder_batch,
+        "scan_owner_source_folder",
+        lambda *_args, **_kwargs: {
+            "paths": paths, "entries": entries, "pre_rejected": [],
+            "provider": "PIXELLAB", "selected_folder": r"C:\owner\Final", "png_count": 2,
+        },
+    )
+    received: dict[str, object] = {}
+
+    def batch_import(selected_paths, **kwargs):
+        received["paths"] = list(selected_paths)
+        received.update(kwargs)
+        return {"items": [
+            {"index": index, "source_id": f"owner-upload-{index}", "disposition": "ALREADY_IMPORTED"}
+            for index, _path in zip(kwargs["path_indices"], selected_paths)
+        ]}
+
+    monkeypatch.setattr(studio_extensions, "batch_import", batch_import)
+    result = owner_folder_batch.import_owner_source_folder(r"C:\owner\Final")
+
+    assert received["paths"] == paths
+    assert received["path_indices"] == [0, 1]
+    assert [item["index"] for item in result["items"]] == [0, 1]
+    assert result["png_count"] == 2
+
+
 def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) -> None:
     root = Path(__file__).resolve().parent / ".r10-owner-folder-dedupe-test-output"
     if root.exists():
@@ -1238,6 +1271,12 @@ def test_owner_release_library_keeps_status_history_separate_and_ready_gated(mon
                   "repository_root": root, "batch_id": "batch-import-test"}
 
         pending = owner_release_library.transition(source_id, "PENDING", **kwargs)
+        atlas_manifest = root / "data/Release Pool/Pending" / ("pixellab-atlas-" + "c" * 64 + ".json")
+        atlas_manifest.write_text(json.dumps({
+            "schema": "scrubbots-pixellab-atlas-transaction/v1", "state": "FINALIZED",
+            "source_atlas_sha256": "c" * 64,
+        }), encoding="utf-8")
+        assert owner_release_library.list_records(repository_root=root)["counts"]["PENDING"] == 1
         repeated = owner_release_library.transition(source_id, "PENDING", **kwargs)
         assert repeated["idempotent"] is True
         failed = owner_release_library.transition(source_id, "FAILED", **{**kwargs, "reason": "synthetic solver timeout",

@@ -15,6 +15,7 @@ from typing import Any, Iterator, Mapping
 from . import owner_art_storage
 
 SCHEMA = "scrubbots-owner-release-library-event/v1"
+_ATLAS_TRANSACTION_SCHEMA = "scrubbots-pixellab-atlas-transaction/v1"
 STATUSES = {"PENDING", "READY", "FAILED", "REJECTED"}
 _ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -318,7 +319,14 @@ def list_records(status: str | None = None, *, repository_root: str | Path | Non
         for path in sorted(folder.glob("*.json"), key=lambda p: p.name.casefold()) if folder.exists() else []:
             if _reparse(path): raise OwnerReleaseLibraryError("status projection is unsafe")
             value = json.loads(path.read_text(encoding="utf-8"))
-            if not isinstance(value, dict) or value.get("status") != state or path.stem != value.get("source_id"):
+            # PixelLab's durable atlas transaction manifests also live directly
+            # in Release Pool/Pending. They are not source-status projections.
+            # Ignore only that explicitly recognized artifact schema; malformed
+            # owner-library projections remain fail-closed below.
+            if isinstance(value, dict) and value.get("schema") == _ATLAS_TRANSACTION_SCHEMA:
+                continue
+            if (not isinstance(value, dict) or value.get("schema") != SCHEMA
+                    or value.get("status") != state or path.stem != value.get("source_id")):
                 raise OwnerReleaseLibraryError("status projection identity is invalid")
             event_digest = str(value.pop("event_sha256", ""))
             if _hash(_json_bytes(value)) != event_digest:

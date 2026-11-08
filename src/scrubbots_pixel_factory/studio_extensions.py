@@ -259,11 +259,19 @@ def save_library_metadata(source_id: str, label: str = "", tags: Sequence[str] =
     return {**source, "catalog": metadata}
 
 
-def _sync_current_pixellab_final_sources(repository_root: str | Path | None = None) -> tuple[set[str], list[dict[str, str]]]:
+def _sync_current_pixellab_final_sources(
+    repository_root: str | Path | None = None,
+    *,
+    game_project: str | Path | None = None,
+) -> tuple[set[str], list[dict[str, str]]]:
     """Idempotently register only validated direct PNGs currently in PixelLab Final."""
 
     from . import owner_art_storage
     from .owner_folder_batch import scan_owner_source_folder
+    if game_project is None:
+        from .supply_pipeline.pinned_game_source import expected_runtime_root
+
+        game_project = expected_runtime_root()
 
     paths = owner_art_storage.owner_art_paths(repository_root)
     scan = scan_owner_source_folder(paths["pixellab_final"], repository_root=repository_root)
@@ -292,7 +300,10 @@ def _sync_current_pixellab_final_sources(repository_root: str | Path | None = No
                 continue
         try:
             verify_owner_source(source_id, source_directory=source_directory)
-            validation = validate_owner_source(source_id, persist=False, source_directory=source_directory)
+            validation = validate_owner_source(
+                source_id, persist=False, game_project=game_project,
+                source_directory=source_directory,
+            )
             void_state = str(validation.get("void_capability", {}).get("state", "NOT_REQUIRED"))
             if (validation.get("exact_logical_source") is not True
                     or validation.get("structural", {}).get("disposition") != "PASS"
@@ -2051,8 +2062,6 @@ def _loaded_png_batch_payload(source_ids: Sequence[str]) -> dict[str, Any]:
     """Build the deterministic source snapshot; import-event history is provenance only."""
     if not isinstance(source_ids, Sequence) or isinstance(source_ids, (str, bytes)):
         raise ValueError("loaded PNG source IDs must be a sequence")
-    if len(source_ids) > 150:
-        raise ValueError("loaded PNG snapshot exceeds the 150-source bound")
     history: dict[str, list[dict[str, Any]]] = {}
     batch_root = extensions_root() / "batches"
     for path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:

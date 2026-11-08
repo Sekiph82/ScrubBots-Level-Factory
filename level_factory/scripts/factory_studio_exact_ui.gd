@@ -3606,9 +3606,6 @@ func _run_png_batch() -> void:
 	if _gameplay_sources.size() < 2:
 		_report("Run Entire Loaded Batch requires at least two verified loaded PNGs.")
 		return
-	if _gameplay_sources.size() > 150:
-		_report("Loaded PNG batch exceeds the 150-source sequential limit; no source was run.")
-		return
 	var source_ids: Array[String] = []
 	for source in _gameplay_sources:
 		var source_id := str(source.get("source_id", ""))
@@ -5344,7 +5341,10 @@ func _batch_ordered_gameplay_sources() -> Array:
 
 
 func _pinned_game_project_path() -> String:
-	return ProjectSettings.globalize_path("res://output/current-game-runtime/%s" % _PINNED_GAME_COMMIT).simplify_path()
+	# The installed launcher resolves Factory Core modules from the canonical
+	# Desktop checkout. Keep the UI's game-runtime argument on that same root;
+	# the duplicate Release runtime is not the validator's attested path.
+	return ProjectSettings.globalize_path("res://../../../level_factory/output/current-game-runtime/%s" % _PINNED_GAME_COMMIT).simplify_path()
 
 
 func _build_selected_source_pipeline_request() -> Dictionary:

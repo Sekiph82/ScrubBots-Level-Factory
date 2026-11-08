@@ -23,7 +23,6 @@ from typing import Any
 
 JOB_SCHEMA = "scrubbots-studio-png-sequential-batch"
 JOB_VERSION = 1
-MAX_BATCH_ITEMS = 150
 MAX_JOB_BYTES = 1024 * 1024
 _PROCESS_LOCKS: dict[str, threading.Lock] = {}
 _PROCESS_LOCKS_GUARD = threading.Lock()
@@ -39,13 +38,15 @@ def _canonical(value: object) -> bytes:
 
 def largest_remainder_quotas(count: int) -> dict[int, int]:
     """Return exact integer quotas for 45/40/15, with stable 3/4/5 ties."""
-    if type(count) is not int or count < 0 or count > MAX_BATCH_ITEMS:
-        raise ValueError(f"batch size must be an integer between 0 and {MAX_BATCH_ITEMS}")
+    if type(count) is not int or count < 0:
+        raise ValueError("batch size must be a non-negative integer")
     weights = ((3, 45), (4, 40), (5, 15))
-    exact = {columns: count * weight / 100.0 for columns, weight in weights}
-    quotas = {columns: int(exact[columns]) for columns, _weight in weights}
+    # Keep mathematically equal remainders equal; float rounding otherwise
+    # makes the tie break platform-dependent for large batches.
+    remainders = {columns: count * weight % 100 for columns, weight in weights}
+    quotas = {columns: count * weight // 100 for columns, weight in weights}
     remaining = count - sum(quotas.values())
-    order = sorted(weights, key=lambda pair: (-(exact[pair[0]] - quotas[pair[0]]), pair[0]))
+    order = sorted(weights, key=lambda pair: (-remainders[pair[0]], pair[0]))
     for columns, _weight in order[:remaining]:
         quotas[columns] += 1
     return quotas
@@ -438,8 +439,8 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     from .studio_extensions import _digest, batch_load
 
     imported = batch_load(batch_id)["batch"]
-    if not isinstance(imported.get("items"), list) or len(imported["items"]) > MAX_BATCH_ITEMS:
-        raise ValueError(f"an imported PNG batch must contain at most {MAX_BATCH_ITEMS} entries")
+    if not isinstance(imported.get("items"), list):
+        raise ValueError("an imported PNG batch must contain an items list")
     snapshot = dict(settings or {})
     # The UI may configure only canonical bounded pipeline request fields.
     allowed = {"game_project", "source_directory", "background_intent", "seed", "candidates", "verify_top", "screen_budget", "metric_top", "viability_budget", "real_max_visited", "solver_timeout_seconds"}

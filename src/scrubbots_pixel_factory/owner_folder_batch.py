@@ -328,7 +328,15 @@ def import_owner_source_folder(
         source_provider=scanned["provider"],
         source_folder=scanned["selected_folder"],
         pre_rejected=scanned["pre_rejected"],
-        path_indices=[int(item["index"]) for item in scanned["entries"] if item.get("disposition") == "ELIGIBLE"],
+        # `paths` also includes hash-identical sources that already have an
+        # immutable OWNER_UPLOAD record. Keep indices aligned with every path
+        # that is passed to batch_import, or an all-ALREADY_IMPORTED folder
+        # fails before the UI can load/select its existing sources.
+        path_indices=[
+            int(item["index"])
+            for item in scanned["entries"]
+            if item.get("disposition") in {"ELIGIBLE", "ALREADY_IMPORTED"}
+        ],
         progress_callback=progress_callback,
     )
     return {**payload, "source_provider": scanned["provider"],

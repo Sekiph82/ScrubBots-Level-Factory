@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scrubbots_pixel_factory import png_batch
+from scrubbots_pixel_factory import studio_extensions
 
 
 @pytest.mark.parametrize(
@@ -16,6 +17,7 @@ from scrubbots_pixel_factory import png_batch
         (40, {3: 18, 4: 16, 5: 6}),
         (100, {3: 45, 4: 40, 5: 15}),
         (150, {3: 68, 4: 60, 5: 22}),
+        (304, {3: 137, 4: 122, 5: 45}),
     ],
 )
 def test_largest_remainder_quotas_match_locked_mix(count: int, expected: dict[int, int]) -> None:
@@ -23,11 +25,38 @@ def test_largest_remainder_quotas_match_locked_mix(count: int, expected: dict[in
 
 
 def test_assignments_are_deterministic_interleaved_and_exact() -> None:
-    ids = [f"owner-upload-{index:064x}" for index in range(150)]
+    ids = [f"owner-upload-{index:064x}" for index in range(304)]
     assignment = png_batch.assign_columns(ids)
     assert assignment == png_batch.assign_columns(ids)
-    assert {column: assignment.count(column) for column in (3, 4, 5)} == {3: 68, 4: 60, 5: 22}
+    assert {column: assignment.count(column) for column in (3, 4, 5)} == {3: 137, 4: 122, 5: 45}
     assert max((len(list(group)) for _key, group in __import__("itertools").groupby(assignment))) <= 3
+
+
+def test_batch_planner_accepts_304_sources_without_touching_disk(monkeypatch: pytest.MonkeyPatch) -> None:
+    source_ids = [f"owner-upload-{index:064x}" for index in range(304)]
+    imported = {"batch_id": "batch-304-in-memory", "items": [
+        {"index": index, "source_id": source_id, "disposition": "IMPORTED"}
+        for index, source_id in enumerate(source_ids)
+    ]}
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": imported})
+    monkeypatch.setattr(
+        png_batch, "_verify_sources",
+        lambda items, _settings: [
+            {"index": item["index"], "source_id": item["source_id"], "status": "QUEUED"}
+            for item in items
+        ],
+    )
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
+    monkeypatch.setattr(png_batch, "_job_path", lambda _job_id: type("NoDiskPath", (), {"exists": lambda _self: False})())
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(png_batch, "_write_job", lambda job: captured.update(job) or job)
+
+    result = png_batch.create_png_batch("batch-304-in-memory")
+
+    assert result["state"] == "SUCCESS"
+    assert result["disposition"] == "CREATED"
+    assert len(captured["items"]) == 304
+    assert captured["planned_quotas"] == {"3": 137, "4": 122, "5": 45}
 
 
 def test_new_png_batch_jobs_use_release_pool_pending_and_legacy_job_ids_resume_in_place(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -540,8 +569,8 @@ def test_candidate_filtered_release_pool_read_scans_only_that_candidate(monkeypa
     assert observed == [f"{candidate_id}-*.json"]
 
 
-def test_150_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    batch_id, _items = _make_batch(tmp_path, monkeypatch, 150)
+def test_304_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    batch_id, _items = _make_batch(tmp_path, monkeypatch, 304)
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]
     active = 0
@@ -560,9 +589,9 @@ def test_150_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
     result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=fake_runner)
     assert result["disposition"] == "COMPLETE"
-    assert calls == 150 and peak == 1
-    assert result["job"]["counts"] == {"total": 150, "ready": 150, "failed": 0, "rejected": 0, "skipped": 0, "remaining": 0}
-    assert result["job"]["ready_mix"] == {"3": 68, "4": 60, "5": 22}
+    assert calls == 304 and peak == 1
+    assert result["job"]["counts"] == {"total": 304, "ready": 304, "failed": 0, "rejected": 0, "skipped": 0, "remaining": 0}
+    assert result["job"]["ready_mix"] == {"3": 137, "4": 122, "5": 45}
     saved = json.loads(png_batch._job_path(str(job["job_id"])).read_text(encoding="utf-8"))
     assert saved["state_digest"] == result["job"]["state_digest"]
     assert png_batch.MAX_JOB_BYTES == 1024 * 1024
