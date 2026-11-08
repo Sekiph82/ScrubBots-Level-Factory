@@ -93,6 +93,7 @@ $authorizedOverlayAdditions = @(
 	'level_factory/scripts/factory_studio_exact_ui.gd',
 	'src/scrubbots_pixel_factory/generators/router/art_first.py',
 	'src/scrubbots_pixel_factory/supply_pipeline/r09_campaign.py',
+	'src/scrubbots_pixel_factory/owner_upload.py',
     'level_factory/scripts/factory_studio_pipeline.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',
