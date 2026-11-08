@@ -254,6 +254,46 @@ $verifyPath = 'src/scrubbots_pixel_factory/supply_pipeline/verify.py'
 $verifyEntries = @($manifest.managedFiles | Where-Object path -ceq $verifyPath)
 if ($verifyEntries.Count -ne 1) { throw 'Historical verify.py repair requires exactly one managed manifest entry.' }
 $manifestSha256 = Get-Sha256 $manifestPath
+$knownPreFixUiPath = 'level_factory/scripts/factory_studio_exact_ui.gd'
+$knownPreFixUiManifestSha256 = '2919a2ed0818c49cd9ca994701b881d1436708e274cb87dba131ac220adb1517'
+$knownPreFixUiInstalledSha256 = '0a2643a19d63d402d8138e51f32ba5f298863d768a7d699cd1236f77bf972947'
+$knownPreFixUiSourceCommit = '65dfa26a6977a0c42a4a290e881f9f242546d5b7'
+$knownPreFixUiSourceBlobSha256 = '138b4d8b8ea86d891e513d9e8946b694cb0f2b4117e6b3fb2c3f8452db9a268c'
+$knownPreFixUiReceiptCommit = 'e6c53f19b285e448b5126a6e3428d102268003ce'
+$knownPreFixUiExpectedReceiptSha256 = '2919a2ed0818c49cd9ca994701b881d1436708e274cb87dba131ac220adb1517'
+$knownPreFixUiExpectedReceiptBytes = 303719
+$knownPreFixUiEntry = @($manifest.managedFiles | Where-Object path -ceq $knownPreFixUiPath)
+$latestUiReceipt = $null
+$latestUiReceiptOwner = $null
+foreach ($receipt in @($manifest.overlayReceipts)) {
+    if ($receipt.PSObject.Properties.Name -notcontains 'files') { continue }
+    $receiptFiles = @($receipt.files | Where-Object path -ceq $knownPreFixUiPath)
+    if ($receiptFiles.Count -eq 1) {
+        $latestUiReceipt = $receiptFiles[0]
+        $latestUiReceiptOwner = $receipt
+    }
+}
+if ($knownPreFixUiEntry.Count -eq 1 -and
+    [string]$knownPreFixUiEntry[0].sha256 -ceq $knownPreFixUiManifestSha256 -and
+    $null -ne $latestUiReceipt -and
+    [string]$latestUiReceiptOwner.sourceCommit -ceq $knownPreFixUiReceiptCommit -and
+    [string]$latestUiReceiptOwner.sourceHead -ceq $knownPreFixUiReceiptCommit -and
+    [string]$latestUiReceiptOwner.writerExclusionMethod -clike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*' -and
+    [string]$latestUiReceipt.sha256 -ceq $knownPreFixUiExpectedReceiptSha256 -and
+    [int64]$latestUiReceipt.bytes -eq $knownPreFixUiExpectedReceiptBytes) {
+    # The current Release bytes were verified as the exact CRLF conversion of
+    # this published pre-fix UI blob. Permit only that one stale UI hash to be
+    # replaced by the current published source; process and writer exclusion
+    # gates still apply to the actual transaction.
+    $preFixLfBytes = [byte[]](Get-HistoricBlobBytes -Commit $knownPreFixUiSourceCommit -RelativePath $knownPreFixUiPath -ExpectedRawSha256 $knownPreFixUiSourceBlobSha256)
+    $preFixText = [Text.UTF8Encoding]::new($false, $true).GetString($preFixLfBytes)
+    $preFixCanonicalLf = $preFixText.Replace("`r`n", "`n")
+    $preFixCanonicalCrlf = [Text.UTF8Encoding]::new($false).GetBytes($preFixCanonicalLf.Replace("`n", "`r`n"))
+    if ((Get-Sha256Bytes $preFixCanonicalCrlf) -cne $knownPreFixUiInstalledSha256) {
+        throw 'Known pre-fix Level Factory UI provenance did not reproduce the exact installed hash.'
+    }
+    $authorizedRepairHashes[$knownPreFixUiPath] = $knownPreFixUiInstalledSha256
+}
 $historicVerifyHash = $knownProvenanceHashes[$verifyPath].sha256
 $verifyRepairAuthorized = $false
 if (([string]$verifyEntries[0].sha256).ToLowerInvariant() -ceq '0f4b7f0319d68278934863fd448db63acdeb418776cddcbca4685815d3317ca2') {

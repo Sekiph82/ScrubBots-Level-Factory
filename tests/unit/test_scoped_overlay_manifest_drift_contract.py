@@ -67,6 +67,29 @@ def test_preflight_reports_hash_triples_and_reproduces_exact_historic_verify_byt
     assert "$manifestDrift.Count -gt 0" in source
 
 
+def test_only_the_receipted_exact_pre_fix_ui_bytes_are_authorized_for_repair() -> None:
+    source = _installer()
+    repair = source.split("$knownPreFixUiPath =", 1)[1].split("$historicVerifyHash =", 1)[0]
+    for value in (
+        "level_factory/scripts/factory_studio_exact_ui.gd",
+        "2919a2ed0818c49cd9ca994701b881d1436708e274cb87dba131ac220adb1517",
+        "0a2643a19d63d402d8138e51f32ba5f298863d768a7d699cd1236f77bf972947",
+        "65dfa26a6977a0c42a4a290e881f9f242546d5b7",
+        "138b4d8b8ea86d891e513d9e8946b694cb0f2b4117e6b3fb2c3f8452db9a268c",
+        "e6c53f19b285e448b5126a6e3428d102268003ce",
+        "303719",
+        "Get-HistoricBlobBytes",
+        "preFixCanonicalCrlf",
+        "$authorizedRepairHashes[$knownPreFixUiPath] = $knownPreFixUiInstalledSha256",
+        "process and writer exclusion",
+    ):
+        assert value in repair
+    assert repair.index("$knownPreFixUiEntry[0].sha256 -ceq $knownPreFixUiManifestSha256") < repair.index("$authorizedRepairHashes[$knownPreFixUiPath]")
+    assert repair.index("$latestUiReceiptOwner.sourceCommit -ceq $knownPreFixUiReceiptCommit") < repair.index("$authorizedRepairHashes[$knownPreFixUiPath]")
+    assert "writerExclusionMethod -clike 'Windows FileStream deny-write handles on every existing replacement target and install manifest;*'" in repair
+    assert repair.index("Get-Sha256Bytes $preFixCanonicalCrlf") < repair.index("$authorizedRepairHashes[$knownPreFixUiPath]")
+
+
 def test_apply_is_blocked_by_manifest_drift_or_active_runtime() -> None:
     source = _installer()
     transaction = _transaction()
