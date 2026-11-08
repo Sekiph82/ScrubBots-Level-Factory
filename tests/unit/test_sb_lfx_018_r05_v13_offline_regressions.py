@@ -1294,6 +1294,16 @@ def test_owner_release_library_keeps_status_history_separate_and_ready_gated(mon
         monkeypatch.setattr(owner_release_library, "_verified_ready_entry", lambda _source, _run: ready_entry)
         ready = owner_release_library.transition(source_id, "READY", **{**kwargs, "pipeline_run_id": "run-retry",
             "evidence": {"solver": "synthetic canonical release-entry test"}})
+        # The canonical Release Pool candidate entry shares Ready with owner
+        # status projections; it must be recognized by identity and digest.
+        candidate_entry = {"schema": "scrubbots-release-pool-entry/v1",
+            "candidate_id": "candidate-owner-import-test", "pipeline_run_id": "pipeline-import-test",
+            "review_id": None, "entry_digest": ""}
+        candidate_entry["entry_digest"] = hashlib.sha256(json.dumps(
+            {key: value for key, value in candidate_entry.items() if key != "entry_digest"}, ensure_ascii=False,
+            sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        candidate_entry_path = root / "data/Release Pool/Ready/candidate-owner-import-test-pipeline-import-test-ready.json"
+        candidate_entry_path.write_text(json.dumps(candidate_entry), encoding="utf-8")
         repeat_import = owner_release_library.record_import_items({"batch_id": "batch-import-repeat",
             "source_provider": "ALPIX", "items": [{"source_id": source_id, "source_sha256": digest,
             "original_source_path": str(source), "disposition": "ALREADY_IMPORTED"}]}, repository_root=root)
@@ -1301,6 +1311,14 @@ def test_owner_release_library_keeps_status_history_separate_and_ready_gated(mon
         view = owner_release_library.list_records(repository_root=root)
         assert view["counts"] == {"FAILED": 0, "PENDING": 0, "READY": 1, "REJECTED": 0}
         assert view["records"][0]["artifact"]["sha256"] == digest
+        candidate_entry["entry_digest"] = "0" * 64
+        candidate_entry_path.write_text(json.dumps(candidate_entry), encoding="utf-8")
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="Release Pool entry digest is invalid"):
+            owner_release_library.list_records(repository_root=root)
+        candidate_entry["entry_digest"] = hashlib.sha256(json.dumps(
+            {key: value for key, value in candidate_entry.items() if key != "entry_digest"},
+            ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+        candidate_entry_path.write_text(json.dumps(candidate_entry), encoding="utf-8")
         assert (root / "data/Release Pool/Ready" / f"{source_id}.json").is_file()
         assert hashlib.sha256((root / "data/Release Pool/Ready" / f"{source_id}.png").read_bytes()).hexdigest() == digest
         assert not (root / "data/Release Pool/Pending" / f"{source_id}.json").exists()

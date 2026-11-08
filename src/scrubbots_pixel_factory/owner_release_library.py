@@ -16,6 +16,7 @@ from . import owner_art_storage
 
 SCHEMA = "scrubbots-owner-release-library-event/v1"
 _ATLAS_TRANSACTION_SCHEMA = "scrubbots-pixellab-atlas-transaction/v1"
+_RELEASE_POOL_ENTRY_SCHEMA = "scrubbots-release-pool-entry/v1"
 STATUSES = {"PENDING", "READY", "FAILED", "REJECTED"}
 _ID = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _SHA = re.compile(r"^[0-9a-f]{64}$")
@@ -40,6 +41,39 @@ def _reparse(path: Path) -> bool:
     except OSError:
         return True
     return stat.S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400)
+
+def _is_release_pool_entry_projection(path: Path, state: str, value: object) -> bool:
+    """Recognize an intact canonical candidate entry sharing the Ready folder.
+
+    Release Pool candidate entries and owner status projections share the
+    canonical status directories, but have separate schemas and identity
+    contracts. Only a READY candidate entry with a matching filename and
+    content digest is excluded from the owner-status view.
+    """
+    if not isinstance(value, dict) or value.get("schema") != _RELEASE_POOL_ENTRY_SCHEMA:
+        return False
+    candidate_id = value.get("candidate_id")
+    pipeline_run_id = value.get("pipeline_run_id")
+    review_id = value.get("review_id")
+    suffix = review_id if isinstance(review_id, str) and review_id else "ready"
+    expected_name = f"{candidate_id}-{pipeline_run_id}-{suffix}.json"
+    if (state != "READY"
+            or not isinstance(candidate_id, str) or not _ID.fullmatch(candidate_id)
+            or not isinstance(pipeline_run_id, str) or not _ID.fullmatch(pipeline_run_id)
+            or (suffix != "ready" and not _ID.fullmatch(suffix))
+            or path.name != expected_name):
+        raise OwnerReleaseLibraryError("Release Pool entry identity is invalid")
+    entry_digest = value.get("entry_digest")
+    if not isinstance(entry_digest, str) or not _SHA.fullmatch(entry_digest):
+        raise OwnerReleaseLibraryError("Release Pool entry digest is invalid")
+    payload = dict(value)
+    payload.pop("entry_digest", None)
+    actual_digest = hashlib.sha256(json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")).hexdigest()
+    if actual_digest != entry_digest:
+        raise OwnerReleaseLibraryError("Release Pool entry digest is invalid")
+    return True
 
 def _safe_directory(root: Path, target: Path) -> None:
     if not root.exists() or _reparse(root): raise OwnerReleaseLibraryError("owner release root is missing or unsafe")
@@ -324,6 +358,8 @@ def list_records(status: str | None = None, *, repository_root: str | Path | Non
             # Ignore only that explicitly recognized artifact schema; malformed
             # owner-library projections remain fail-closed below.
             if isinstance(value, dict) and value.get("schema") == _ATLAS_TRANSACTION_SCHEMA:
+                continue
+            if _is_release_pool_entry_projection(path, state, value):
                 continue
             if (not isinstance(value, dict) or value.get("schema") != SCHEMA
                     or value.get("status") != state or path.stem != value.get("source_id")):
