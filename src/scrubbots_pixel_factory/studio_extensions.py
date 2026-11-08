@@ -61,43 +61,28 @@ def _repository_root() -> Path:
 
 
 def _studio_activity_output_directory() -> Path:
-    """Resolve Activity logs beside the Studio project actually running this module.
-
-    Studio workers import code from the canonical checkout even when the GUI runs
-    from Release. The GUI exports its active project root to child workers; module
-    __file__ alone is insufficient because it points into the canonical checkout.
-    """
-    from .owner_art_storage import OwnerArtStorageError, _verify_path_under_root
+    """Return the one shared Activity directory used by GUI and Python workers."""
+    from .owner_art_storage import OwnerArtStorageError, _verify_path_under_root, owner_art_paths
 
     repository_root = Path(_repository_root()).resolve()
-    configured_root = os.environ.get("SCRUBBOTS_STUDIO_PROJECT_ROOT", "").strip()
-    studio_root: Path | None = None
-    if configured_root:
-        candidate = Path(configured_root).expanduser().resolve(strict=False)
-        try:
-            _verify_path_under_root(repository_root, candidate)
-        except OwnerArtStorageError as exc:
-            raise StudioExtensionError("Factory Studio project root is outside the canonical checkout") from exc
-        if not (candidate / "project.godot").is_file():
-            raise StudioExtensionError("configured Factory Studio project root is invalid")
-        studio_root = candidate
-    else:
-        module_path = Path(__file__).resolve()
-        studio_root = next((parent for parent in module_path.parents if (parent / "project.godot").is_file()), None)
-    if studio_root is None:
-        studio_root = repository_root / "level_factory"
-        if not studio_root.is_dir():
-            raise StudioExtensionError("Factory Studio project root is unavailable for Pipeline Activity output")
-    output_directory = studio_root / "output" / "studio-pipeline-activity"
+    output_directory = owner_art_paths(repository_root)["activity"]
     try:
-        _verify_path_under_root(studio_root, output_directory)
+        _verify_path_under_root(repository_root, output_directory)
     except OwnerArtStorageError as exc:
-        raise StudioExtensionError("Factory Studio Pipeline Activity path is unsafe") from exc
+        raise StudioExtensionError("canonical Level Factory Activity path is unsafe") from exc
     return output_directory
 
 
 def extensions_root() -> Path:
-    return (_repository_root() / "level_factory" / "output" / "studio-extensions").resolve()
+    from .owner_art_storage import owner_art_paths
+
+    return (owner_art_paths(_repository_root())["workspace"] / "Studio Extensions").resolve()
+
+
+def _batch_import_root() -> Path:
+    from .owner_art_storage import owner_art_paths
+
+    return owner_art_paths(_repository_root())["batches"] / "Imports"
 
 
 _PIPELINE_STATUS_DIRS = {
@@ -119,19 +104,17 @@ def _pipeline_status_dir(disposition: object) -> str:
 
 
 def _pipeline_paths() -> list[Path]:
-    """Read new status-scoped pipeline runs and immutable legacy runs."""
+    """Read pipeline runs only from the canonical data/Release Pool status folders."""
 
     repository_root = Path(_repository_root()).resolve()
     paths = owner_art_storage.owner_art_paths(repository_root)
     roots = [paths[key] / "Pipelines" for key in ("pending", "ready", "failed", "rejected")]
-    roots.append(extensions_root() / "pipelines")
     found: dict[str, Path] = {}
     for root in roots:
-        if root != extensions_root() / "pipelines":
-            try:
-                owner_art_storage._verify_path_under_root(repository_root, root)
-            except OwnerArtStorageError as exc:
-                raise StudioExtensionError("canonical pipeline status path contains a reparse point or escapes the repository") from exc
+        try:
+            owner_art_storage._verify_path_under_root(repository_root, root)
+        except OwnerArtStorageError as exc:
+            raise StudioExtensionError("canonical pipeline status path contains a reparse point or escapes the repository") from exc
         if owner_art_storage._is_reparse_point(root) or not root.is_dir():
             continue
         for path in root.glob("*.json"):
@@ -225,7 +208,13 @@ def _source_record_paths(source_id: str, source_directory: str | Path | None = N
         raise StudioExtensionError("source directory does not match the OWNER_UPLOAD identity")
     if source_directory is None and owner_upload_root().resolve() not in root.parents:
         raise StudioExtensionError("source path escaped the canonical OWNER_UPLOAD area")
-    return root / "source.json", root / "source.png"
+    record_path = root / "source.json"
+    record = _read_json(record_path)
+    filename = record.get("original_filename")
+    if (not isinstance(filename, str) or Path(filename).name != filename
+            or filename in {".", ".."} or not filename.lower().endswith(".png")):
+        raise StudioExtensionError("OWNER_UPLOAD source filename is not a safe direct PNG basename")
+    return record_path, root / filename
 
 
 def verify_owner_source(source_id: str, *, source_directory: str | Path | None = None) -> dict[str, Any]:
@@ -246,8 +235,8 @@ def verify_owner_source(source_id: str, *, source_directory: str | Path | None =
     digest = hashlib.sha256(raw).hexdigest()
     if digest != record.get("source_sha256") or len(raw) != record.get("byte_length"):
         raise StudioExtensionError("source bytes do not match source.json identity")
-    expected_source = f"owner-uploads/{source_id}/source.png"
-    expected_record = f"owner-uploads/{source_id}/source.json"
+    expected_source = f"data/Level Factory/Imported/{source_id}/{record['original_filename']}"
+    expected_record = f"data/Level Factory/Imported/{source_id}/source.json"
     if record.get("immutable_relative_path") != expected_source or record.get("source_record_relative_path") != expected_record:
         raise StudioExtensionError("OWNER_UPLOAD relative paths are not canonical")
     try:
@@ -519,10 +508,12 @@ def validate_owner_source(
 
 
 def _candidate_roots() -> Iterable[Path]:
-    output = (_repository_root() / "level_factory" / "output").resolve()
+    from .owner_art_storage import owner_art_paths
+
+    output = (owner_art_paths(_repository_root())["workspace"] / "Candidates").resolve()
     if not output.exists():
         return ()
-    return (path.parent for path in output.rglob("metadata.json") if "studio-reproductions" not in path.parent.parts and path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
+    return (path.parent for path in output.rglob("metadata.json") if "Reproductions" not in path.parent.parts and path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
 
 
 def list_candidates() -> list[dict[str, Any]]:
@@ -933,8 +924,7 @@ def _pipeline_path(run_id: str, *, status: str | None = None) -> Path:
     filename = f"{run_id}.json"
     paths = owner_art_storage.owner_art_paths(_repository_root())
     canonical = [paths[key] / "Pipelines" / filename for key in ("pending", "ready", "failed", "rejected")]
-    legacy = extensions_root() / "pipelines" / filename
-    candidates = canonical + [legacy]
+    candidates = canonical
     existing = []
     for path in candidates:
         if path in canonical:
@@ -952,7 +942,7 @@ def _pipeline_path(run_id: str, *, status: str | None = None) -> Path:
         except OSError as exc:
             raise StudioExtensionError("duplicate pipeline record is unreadable") from exc
         if not same_bytes:
-            raise StudioExtensionError("pipeline run identity exists with conflicting canonical or legacy evidence")
+            raise StudioExtensionError("pipeline run identity exists with conflicting status projections")
         return next((path for path in canonical if path in existing), existing[0])
     if existing:
         return existing[0]
@@ -1040,7 +1030,7 @@ def _derive_owner_candidate(source_id: str, validation: Mapping[str, Any], sourc
     )
     quality = evaluate_grid(width, height, cells, policy=QualityPolicy())
     lineage = {"source_id": source_id, "source_sha256": validation["source_sha256"], "source_record": _owner_source_record_reference(source_png), "source_bytes_unchanged": True, "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE"}
-    destination = _repository_root() / "level_factory" / "output" / "studio-derived-candidates"
+    destination = owner_art_storage.owner_art_paths(_repository_root())["workspace"] / "Candidates"
     existing_path = destination / candidate_id
     if existing_path.exists():
         # Older immutable owner-upload bundles can predate the persisted
@@ -1187,7 +1177,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
                     requested_visits, requested_timeout, auto_extend=True
                 )
             elif requested_visits is None and requested_timeout is None:
-                solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 240)
+                solver_max_visited, solver_timeout = normalize_solver_budget(25_000, 900)
             else:
                 solver_max_visited, solver_timeout = normalize_solver_budget(
                     requested_visits, requested_timeout
@@ -1583,7 +1573,7 @@ def apply_preset(preset_id: str, overrides: Mapping[str, Any] | None = None) -> 
         if not hasattr(candidate, "result") and not hasattr(candidate, "canonical_dict"):
             raise StudioExtensionError("canonical Generate did not return a candidate")
         candidate_id = f"preset-{preset_id}-{_digest(settings)[:16]}"
-        destination = (_repository_root() / "level_factory" / "output" / "studio-preset-runs").resolve()
+        destination = (owner_art_storage.owner_art_paths(_repository_root())["workspace"] / "Preset Runs").resolve()
         bundle_path = export_candidate(candidate, candidate_id, destination)
     except Exception as exc:
         raise StudioExtensionError(f"canonical preset Generate failed: {exc}") from exc
@@ -1689,7 +1679,7 @@ def reproduce_exact(candidate_id: str) -> dict[str, Any]:
     if capability.get("disposition") != "EXACT_REPRODUCIBLE":
         raise StudioExtensionError(f"exact reproduction is not available: {capability.get('reason', 'capability rejected')}")
     metadata_path, original = _reproduction_contract(candidate)
-    run_root = (_repository_root() / "level_factory" / "output" / "studio-reproductions" / f"{candidate_id}-{candidate['artwork_sha256'][:16]}").resolve()
+    run_root = (owner_art_storage.owner_art_paths(_repository_root())["workspace"] / "Reproductions" / f"{candidate_id}-{candidate['artwork_sha256'][:16]}").resolve()
     destination = run_root / candidate_id
     launcher = _repository_root() / "level_factory" / "scripts" / "factory_core_launcher.py"
     from .studio_lifecycle import StudioShutdownRequested, run_studio_child_interruptibly, studio_shutdown_requested
@@ -1952,7 +1942,7 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
                     break
         except (StudioExtensionError, OSError):
             continue
-    batch_root = extensions_root() / "batches"
+    batch_root = _batch_import_root()
     for path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
         try:
             value = _read_json(path)
@@ -1967,7 +1957,7 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
 def _prior_import_filename_sources() -> dict[str, list[tuple[str, str]]]:
     """Read import-ledger metadata only; never open prior source PNGs."""
     known: dict[str, list[tuple[str, str]]] = {}
-    batch_root = extensions_root() / "batches"
+    batch_root = _batch_import_root()
     if not batch_root.is_dir():
         return known
     for path in sorted(batch_root.glob("batch-import-*.json"), key=lambda item: item.name.casefold()):
@@ -2008,7 +1998,7 @@ def batch_import(
     prior_filename_sources = _prior_import_filename_sources()
     for index, path in enumerate(paths):
         source_path = Path(path)
-        result = import_owner_upload(path)
+        result = import_owner_upload(path, repository_root=_repository_root())
         state = str(result.get("state", "ERROR"))
         source_sha = str(result.get("source_sha256", ""))
         duplicate = state in {"IMPORTED", "ALREADY_IMPORTED"} and bool(source_sha) and source_sha in seen_sha
@@ -2093,7 +2083,7 @@ def batch_import(
         },
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _write_json(extensions_root() / "batches" / f"{batch_id}.json", payload, immutable=True)
+    _write_json(_batch_import_root() / f"{batch_id}.json", payload, immutable=True)
     return payload
 
 
@@ -2102,7 +2092,7 @@ def _loaded_png_batch_payload(source_ids: Sequence[str]) -> dict[str, Any]:
     if not isinstance(source_ids, Sequence) or isinstance(source_ids, (str, bytes)):
         raise ValueError("loaded PNG source IDs must be a sequence")
     history: dict[str, list[dict[str, Any]]] = {}
-    batch_root = extensions_root() / "batches"
+    batch_root = _batch_import_root()
     for path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
         try:
             prior = batch_load(path.stem)["batch"]
@@ -2193,7 +2183,7 @@ def _loaded_png_provenance_digest(value: Mapping[str, Any]) -> str:
 def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
     """Create or reuse a stable SHA-bound snapshot of the loaded PNG gallery."""
     payload = _loaded_png_batch_payload(source_ids)
-    path = extensions_root() / "batches" / f"{payload['batch_id']}.json"
+    path = _batch_import_root() / f"{payload['batch_id']}.json"
     if path.exists():
         existing = batch_load(str(payload["batch_id"]))["batch"]
         if _loaded_png_batch_digest(existing) != payload["snapshot_digest"]:
@@ -2206,14 +2196,14 @@ def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
 def find_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
     """Read-only lookup for the exact stable composite represented by loaded sources."""
     payload = _loaded_png_batch_payload(source_ids)
-    path = extensions_root() / "batches" / f"{payload['batch_id']}.json"
+    path = _batch_import_root() / f"{payload['batch_id']}.json"
     if not path.exists():
         source_signature = [
             (str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")))
             for item in payload.get("items", []) if isinstance(item, Mapping)
         ]
         legacy_matches: list[dict[str, Any]] = []
-        batch_root = extensions_root() / "batches"
+        batch_root = _batch_import_root()
         for legacy_path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
             try:
                 legacy = batch_load(legacy_path.stem)["batch"]
@@ -2241,7 +2231,7 @@ def find_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
 
 def batch_load(batch_id: str) -> dict[str, Any]:
     if not _ID.fullmatch(batch_id): raise StudioExtensionError("batch ID is invalid")
-    value = _read_json(extensions_root() / "batches" / f"{batch_id}.json")
+    value = _read_json(_batch_import_root() / f"{batch_id}.json")
     if value.get("schema") != BATCH_SCHEMA or value.get("version") not in {1, 2} or value.get("batch_id") != batch_id or not isinstance(value.get("items"), list) or not isinstance(value.get("counts"), Mapping):
         raise StudioExtensionError("batch evidence schema or identity is invalid")
     if value.get("version") == 2:

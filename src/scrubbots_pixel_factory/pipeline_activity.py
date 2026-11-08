@@ -34,7 +34,7 @@ class PipelineActivityWriter:
             raise ValueError("pipeline activity identity is invalid")
         output_root = (
             output_directory.resolve() if output_directory is not None else
-            (repository_root.resolve() / "level_factory" / "output" / "studio-pipeline-activity").resolve()
+            (repository_root.resolve() / "data" / "Level Factory" / "Activity").resolve()
         )
         output_root.mkdir(parents=True, exist_ok=True)
         self.path = output_root / f"{run_id}.jsonl"

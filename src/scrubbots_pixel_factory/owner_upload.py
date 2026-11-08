@@ -27,7 +27,7 @@ OWNER_UPLOAD_SCHEMA_VERSION = 1
 OWNER_UPLOAD_ORIGIN = "OWNER_UPLOAD"
 OWNER_UPLOAD_STATUS = "SOURCE_ONLY"
 OWNER_UPLOAD_VALIDATION_STATE = "UNVALIDATED"
-OWNER_UPLOAD_FILENAME = "source.png"
+OWNER_UPLOAD_FILENAME = "source.png"  # Legacy constant retained for historical contracts.
 _SOURCE_ID = re.compile(r"owner-upload-[0-9a-f]{64}\Z")
 _RECORD_KEYS = frozenset(
     {
@@ -58,7 +58,12 @@ def _canonical_json_bytes(value: Mapping[str, object]) -> bytes:
 
 
 def _repository_root() -> Path:
-    return Path(__file__).resolve().parents[2]
+    # The packaged Factory Studio lives under ``Release``. Its module path is
+    # an executable install location, never the mutable-art repository root.
+    # Resolve the same canonical Desktop checkout used by the rest of the app.
+    from .owner_art_storage import factory_repository_root
+
+    return factory_repository_root(__file__)
 
 
 def _path_is_reparse_point(path: Path) -> bool:
@@ -83,8 +88,8 @@ def _path_is_reparse_point(path: Path) -> bool:
 
 def owner_upload_root(repository_root: str | Path | None = None) -> Path:
     repository = Path(repository_root).resolve() if repository_root is not None else _repository_root().resolve()
-    root = repository / "level_factory" / "output" / "owner-uploads"
-    for component in (repository / "level_factory", repository / "level_factory" / "output", root):
+    root = repository / "data" / "Level Factory" / "Imported"
+    for component in (repository / "data", repository / "data" / "Level Factory", root):
         if _path_is_reparse_point(component):
             raise OwnerUploadError("canonical OWNER_UPLOAD path contains a symlink or reparse point")
     try:
@@ -135,7 +140,9 @@ def _record(
     width: int,
     height: int,
 ) -> dict[str, object]:
-    immutable_relative_path = f"owner-uploads/{source_id}/{OWNER_UPLOAD_FILENAME}"
+    if Path(original_filename).name != original_filename or original_filename in {".", ".."} or not original_filename.lower().endswith(".png"):
+        raise OwnerUploadError("selected canonical source filename is unsafe")
+    immutable_relative_path = f"data/Level Factory/Imported/{source_id}/{original_filename}"
     return {
         "schema": OWNER_UPLOAD_SCHEMA,
         "version": OWNER_UPLOAD_SCHEMA_VERSION,
@@ -148,7 +155,7 @@ def _record(
         "original_width": width,
         "original_height": height,
         "immutable_relative_path": immutable_relative_path,
-        "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+        "source_record_relative_path": f"data/Level Factory/Imported/{source_id}/source.json",
         "status": OWNER_UPLOAD_STATUS,
         "validation_state": OWNER_UPLOAD_VALIDATION_STATE,
     }
@@ -161,21 +168,32 @@ def _exact_text(value: object, label: str) -> str:
 
 
 def _verify_existing(destination: Path, expected: Mapping[str, object], raw: bytes) -> dict[str, object]:
-    source_path = destination / OWNER_UPLOAD_FILENAME
     record_path = destination / "source.json"
-    if any(_path_is_reparse_point(path) for path in (destination, source_path, record_path)):
+    if any(_path_is_reparse_point(path) for path in (destination, record_path)):
         raise OwnerUploadError("content-addressed source destination contains a symlink or reparse point")
-    if not source_path.is_file() or not record_path.is_file():
+    if not record_path.is_file():
         raise OwnerUploadError("content-addressed source destination is incomplete")
     try:
-        stored = source_path.read_bytes()
         parsed = json.loads(record_path.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise OwnerUploadError(f"existing content-addressed source is unreadable: {exc}") from exc
     if not isinstance(parsed, Mapping) or set(parsed) != _RECORD_KEYS:
         raise OwnerUploadError("existing content-addressed source record is malformed")
     record = dict(parsed)
-    if record != dict(expected) and any(record.get(key) != expected.get(key) for key in ("schema", "version", "source_id", "origin", "source_sha256", "byte_length", "media_type", "original_width", "original_height", "immutable_relative_path", "source_record_relative_path", "status", "validation_state")):
+    filename = str(record.get("original_filename", ""))
+    if Path(filename).name != filename or filename in {".", ".."} or not filename.lower().endswith(".png"):
+        raise OwnerUploadError("existing canonical imported source filename is unsafe")
+    source_path = destination / filename
+    if _path_is_reparse_point(source_path) or not source_path.is_file():
+        raise OwnerUploadError("content-addressed source destination is incomplete")
+    try:
+        stored = source_path.read_bytes()
+    except OSError as exc:
+        raise OwnerUploadError("existing content-addressed source is unreadable") from exc
+    expected_immutable = f"data/Level Factory/Imported/{expected['source_id']}/{filename}"
+    if (record.get("immutable_relative_path") != expected_immutable
+            or record.get("source_record_relative_path") != f"data/Level Factory/Imported/{expected['source_id']}/source.json"
+            or any(record.get(key) != expected.get(key) for key in ("schema", "version", "source_id", "origin", "source_sha256", "byte_length", "media_type", "original_width", "original_height", "source_record_relative_path", "status", "validation_state"))):
         raise OwnerUploadError("existing content-addressed source record identity is inconsistent")
     if not _SOURCE_ID.fullmatch(str(record.get("source_id", ""))):
         raise OwnerUploadError("existing source ID is malformed")
@@ -243,7 +261,10 @@ def import_owner_upload(source_path: str | Path, *, repository_root: str | Path 
         except FileExistsError:
             record = _verify_concurrent_existing(destination, expected, raw)
             return _result(record, "ALREADY_IMPORTED")
-        (destination / OWNER_UPLOAD_FILENAME).write_bytes(raw)
+        source_path = destination / str(expected["original_filename"])
+        if _path_is_reparse_point(source_path):
+            raise OwnerUploadError("canonical imported source target is a reparse point")
+        source_path.write_bytes(raw)
         (destination / "source.json").write_bytes(_canonical_json_bytes(expected))
         record = _verify_concurrent_existing(destination, expected, raw)
         return _result(record, "IMPORTED")

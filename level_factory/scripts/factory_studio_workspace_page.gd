@@ -6,6 +6,7 @@ extends PanelContainer
 @onready var content: VBoxContainer = $Padding/Content
 
 const DASHBOARD_SCRIPT_PATH := "res://scripts/factory_studio_dashboard.gd"
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 const IMPORT_SCRIPT_PATH := "res://scripts/factory_studio_import.gd"
 const LIBRARY_SCRIPT_PATH := "res://scripts/factory_studio_library.gd"
 const VALIDATION_SCRIPT_PATH := "res://scripts/factory_studio_import_validation.gd"
@@ -679,7 +680,7 @@ func _refresh_owner_preview() -> void:
 		var candidate := _owner_candidate(selected_owner_candidate_id)
 		var relative_artwork := str(candidate.get("artwork_path", ""))
 		if not relative_artwork.is_empty():
-			var repository_root := ProjectSettings.globalize_path("res://").get_base_dir()
+			var repository_root := DATA_PATHS.repository_root()
 			var candidate_image := Image.new()
 			if candidate_image.call("load", repository_root.path_join(relative_artwork)) == OK:
 				image = candidate_image
@@ -1048,7 +1049,7 @@ func _show_legacy_surface(surface_name: String) -> void:
 	title.text = "Factory Studio — " + surface_name
 	if surface_name == "Dashboard":
 		state.text = "READ-ONLY DERIVED VIEW — canonical batch evidence (NOT AVAILABLE until a canonical manifest is selected)"
-		detail.text = "No generated data is loaded until Dashboard refresh reads a validated batch-manifest.json under res://output/. It does not mutate canonical records or imply owner acceptance, solver evidence, measured difficulty, timing, or provider cost."
+		detail.text = "No generated data is loaded until Dashboard refresh reads a validated batch-manifest.json under data/output/. It does not mutate canonical records or imply owner acceptance, solver evidence, measured difficulty, timing, or provider cost."
 		if dashboard != null and dashboard.has_method("show_dashboard"):
 			dashboard.call("show_dashboard")
 	elif surface_name == "Import":

@@ -5,6 +5,8 @@ extends Control
 @export var level_factory_master: Texture2D
 @export var release_pool_master: Texture2D
 
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
+
 var _gateway: RefCounted
 var _canvas: TextureRect
 var _status: Label
@@ -336,7 +338,7 @@ func _notification(what: int) -> void:
 func _prepare_worker_cancel_marker() -> void:
 	if not _studio_cancel_marker_path.is_empty():
 		return
-	_studio_cancel_marker_path = ProjectSettings.globalize_path("res://output/.studio-cancel-%d.flag" % Time.get_ticks_usec())
+	_studio_cancel_marker_path = _factory_data_path("Level Factory/Activity/.studio-cancel-%d.flag" % Time.get_ticks_usec())
 	_studio_cancel_previous_environment = OS.get_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE")
 	_studio_pid_previous_environment = OS.get_environment("SCRUBBOTS_FACTORY_STUDIO_PID")
 	OS.set_environment("SCRUBBOTS_FACTORY_STUDIO_CANCEL_FILE", _studio_cancel_marker_path)
@@ -1077,8 +1079,10 @@ func _refresh_owner_release_library_panel() -> void:
 			if item is Dictionary and str(item.get("source_id", "")) == _selected_import_source_id:
 				selected_status = str(item.get("status", ""))
 				break
-		solve_again.text = "Retry Failed" if selected_status == "FAILED" else "Solve Again"
-		solve_again.disabled = _operation_running or selected_status == "REJECTED"
+		var verified_retry_issue := _verified_batch_issue_for_source(_selected_import_source_id)
+		var batch_retry_available := not verified_retry_issue.is_empty() and str(_batch_snapshot.get("state", "")) == "COMPLETE"
+		solve_again.text = "Retry Failed / Rejected" if batch_retry_available and selected_status in ["FAILED", "REJECTED"] else "Solve Again"
+		solve_again.disabled = _operation_running or (selected_status == "REJECTED" and not batch_retry_available)
 
 
 func _select_owner_archive_record(item: Dictionary) -> void:
@@ -1632,24 +1636,11 @@ func _refresh_live_data() -> void:
 
 
 func _factory_repository_root() -> String:
-	var current := ProjectSettings.globalize_path("res://").simplify_path()
-	while not current.is_empty():
-		if FileAccess.file_exists(current.path_join("TASKS.md")) and DirAccess.dir_exists_absolute(current.path_join(".git")):
-			return current
-		var parent := current.get_base_dir()
-		if parent == current:
-			break
-		current = parent
-	return ""
+	return DATA_PATHS.repository_root()
 
 
 func _factory_data_path(relative_path: String) -> String:
-	if relative_path.is_absolute_path() or ".." in relative_path.replace("\\", "/").split("/"):
-		return ""
-	var root := _factory_repository_root()
-	if root.is_empty():
-		return ""
-	return root.path_join("data").path_join(relative_path).simplify_path()
+	return DATA_PATHS.data_path(relative_path)
 
 
 func _factory_repository_path(relative_path: String) -> String:
@@ -1741,7 +1732,9 @@ func _set_runtime_button(button_name: String, caption: String, image_path: Strin
 func _runtime_png_texture(path: String) -> Texture2D:
 	var resolved := path
 	if not resolved.is_absolute_path():
-		resolved = ProjectSettings.globalize_path("res://").path_join("..").simplify_path().path_join(path)
+		var canonical_root := DATA_PATHS.repository_root()
+		if canonical_root.is_empty(): return null
+		resolved = canonical_root.path_join(path)
 	if not FileAccess.file_exists(resolved): return null
 	var image := Image.load_from_file(resolved)
 	if image == null or image.is_empty(): return null
@@ -2580,7 +2573,7 @@ func _begin_owner_folder_activity(folder: String, message: String) -> void:
 	suffix_hash.update((str(Time.get_ticks_usec()) + _activity_source_id).to_utf8_buffer())
 	_activity_run_id = "pipeline-ui-%s-%s" % [timestamp, suffix_hash.finish().hex_encode().left(12)]
 	_activity_source_filename = "Folder · " + folder.get_file()
-	_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(_activity_run_id + ".jsonl")
+	_activity_file_path = _factory_data_path("Level Factory/Activity").path_join(_activity_run_id + ".jsonl")
 	_activity_started_msec = Time.get_ticks_msec()
 	_activity_finished_msec = 0
 	_activity_seen_sequence = 0
@@ -2957,16 +2950,18 @@ func _source_record_sha256_for_id(source_id: String) -> String:
 	var source_sha := source_id.trim_prefix("owner-upload-")
 	if source_sha.length() != 64:
 		return ""
-	var record_path := _factory_repository_path("level_factory/output/owner-uploads/%s/source.json" % source_id)
+	var record_path := _factory_data_path("Level Factory/Imported/%s/source.json" % source_id)
 	if record_path.is_empty() or not FileAccess.file_exists(record_path):
 		return ""
 	var record_bytes := FileAccess.get_file_as_bytes(record_path)
 	var parsed: Variant = JSON.parse_string(record_bytes.get_string_from_utf8())
 	if not parsed is Dictionary:
 		return ""
-	if (str(parsed.get("source_id", "")) != source_id
+	var source_filename := str(parsed.get("original_filename", ""))
+	if (source_filename.is_empty() or source_filename.get_file() != source_filename or not source_filename.to_lower().ends_with(".png")
+			or str(parsed.get("source_id", "")) != source_id
 			or str(parsed.get("source_sha256", "")) != source_sha
-			or str(parsed.get("immutable_relative_path", "")) != "owner-uploads/%s/source.png" % source_id):
+			or str(parsed.get("immutable_relative_path", "")) != "data/Level Factory/Imported/%s/%s" % [source_id, source_filename]):
 		return ""
 	var hashing := HashingContext.new()
 	if hashing.start(HashingContext.HASH_SHA256) != OK:
@@ -3508,7 +3503,7 @@ func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
 	if _gameplay_sources.size() > 1:
-		if str(_batch_snapshot.get("state", "")) == "COMPLETE" and int(_batch_snapshot.get("counts", {}).get("failed", 0)) > 0 and _batch_job_matches_loaded_sources():
+		if str(_batch_snapshot.get("state", "")) == "COMPLETE" and (int(_batch_snapshot.get("counts", {}).get("failed", 0)) + int(_batch_snapshot.get("counts", {}).get("rejected", 0))) > 0 and _batch_job_matches_loaded_sources():
 			_retry_failed_png_batch()
 			return
 		_run_png_batch()
@@ -3559,7 +3554,7 @@ func _run_single_level_pipeline() -> void:
 		_operation_running = false
 		_report("Live activity requires the approved Release installation.")
 		return
-	_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(_activity_run_id + ".jsonl")
+	_activity_file_path = _factory_data_path("Level Factory/Activity").path_join(_activity_run_id + ".jsonl")
 	_activity_started_msec = Time.get_ticks_msec()
 	_activity_finished_msec = 0
 	_activity_seen_sequence = 0
@@ -3925,7 +3920,7 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	var item_activity_id := str(item.get("activity_run_id", ""))
 	if _activity_source_id != source_id or _activity_run_id != item_activity_id:
 		_activity_run_id = item_activity_id
-		_activity_file_path = ProjectSettings.globalize_path("res://output/studio-pipeline-activity").path_join(item_activity_id + ".jsonl") if not item_activity_id.is_empty() else ""
+		_activity_file_path = _factory_data_path("Level Factory/Activity").path_join(item_activity_id + ".jsonl") if not item_activity_id.is_empty() else ""
 		_activity_source_sha256 = source_sha
 		_activity_stream_reader_override = null
 		_activity_started_msec = Time.get_ticks_msec() if not item_activity_id.is_empty() else 0
@@ -5363,10 +5358,7 @@ func _batch_ordered_gameplay_sources() -> Array:
 
 
 func _pinned_game_project_path() -> String:
-	# The installed launcher resolves Factory Core modules from the canonical
-	# Desktop checkout. Keep the UI's game-runtime argument on that same root;
-	# the duplicate Release runtime is not the validator's attested path.
-	return ProjectSettings.globalize_path("res://../../../level_factory/output/current-game-runtime/%s" % _PINNED_GAME_COMMIT).simplify_path()
+	return _factory_data_path("Level Factory/Runtime/%s" % _PINNED_GAME_COMMIT)
 
 
 func _build_selected_source_pipeline_request() -> Dictionary:
@@ -5379,7 +5371,7 @@ func _build_selected_source_pipeline_request() -> Dictionary:
 		"request": {
 			"column_count": _column_count,
 			"real_max_visited": 25000,
-			"solver_timeout_seconds": 240,
+			"solver_timeout_seconds": 900,
 			"level_number": _level_number if _manual_level_override else 1,
 			"game_project": _pinned_game_project_path(),
 			"background_intent": _background_intent,
@@ -5544,6 +5536,11 @@ func _toggle_background() -> void:
 
 
 func _solve_again() -> void:
+	if (str(_batch_snapshot.get("state", "")) == "COMPLETE"
+			and (int(_batch_snapshot.get("counts", {}).get("failed", 0)) + int(_batch_snapshot.get("counts", {}).get("rejected", 0))) > 0
+			and _batch_job_matches_loaded_sources()):
+		_retry_failed_png_batch()
+		return
 	_run_single_level_pipeline()
 
 

@@ -88,30 +88,18 @@ def _safe_file(path: Path, root: Path, limit: int, label: str) -> bytes:
 
 def _validated_review_root() -> Path:
     """Return only the canonical, non-reparse ART_FIRST owner-review root."""
-    output_root = owner_upload_root().parent
-    expected_extensions_root = output_root / "studio-extensions"
+    from ...owner_art_storage import _verify_path_under_root, factory_repository_root
+    expected_extensions_root = extensions_root()
     if _path_is_reparse_point(expected_extensions_root) or not expected_extensions_root.is_dir():
         raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: canonical Studio extensions root is missing or unsafe")
     try:
-        resolved_output_root = output_root.resolve(strict=True)
         resolved_extensions_root = expected_extensions_root.resolve(strict=True)
     except (OSError, RuntimeError) as exc:
         raise ArtFirstUnavailable("UNAVAILABLE: canonical Studio extensions root cannot be resolved") from exc
-    expected_resolved_extensions_root = resolved_output_root / "studio-extensions"
-    if (
-        resolved_extensions_root.parent != resolved_output_root
-        or resolved_extensions_root != expected_resolved_extensions_root
-    ):
-        raise ArtFirstUnavailable("UNAVAILABLE: canonical Studio extensions root escaped its output directory")
-
-    # Keep the existing import injectable for source-backed tests, but never let
-    # it select a different review authority than the raw canonical path above.
     try:
-        configured_extensions_root = extensions_root().resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        raise ArtFirstUnavailable("UNAVAILABLE: configured Studio extensions root cannot be resolved") from exc
-    if configured_extensions_root != resolved_extensions_root:
-        raise ArtFirstUnavailable("UNAVAILABLE: configured Studio extensions root is not canonical")
+        _verify_path_under_root(factory_repository_root().resolve(), resolved_extensions_root)
+    except Exception as exc:
+        raise ArtFirstUnavailable("UNAVAILABLE: Studio extensions root escaped canonical data workspace") from exc
 
     raw_review_root = expected_extensions_root / "owner-review"
     if _path_is_reparse_point(raw_review_root) or not raw_review_root.is_dir():
@@ -151,9 +139,7 @@ def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) ->
         raise ArtFirstUnavailable("UNAVAILABLE: source directory cannot be resolved") from exc
 
     record_path = source_dir / "source.json"
-    png_path = source_dir / "source.png"
     record_bytes = _safe_file(record_path, source_dir, 64 * 1024, "source record")
-    png_bytes = _safe_file(png_path, source_dir, RAW_ARTIFACT_MAX_BYTES, "source PNG")
     if _sha256(record_bytes) != expected_record_sha:
         raise ArtFirstUnavailable("UNAVAILABLE: immutable source record hash changed")
     try:
@@ -162,6 +148,10 @@ def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) ->
         raise ArtFirstUnavailable("UNAVAILABLE: source record is malformed") from exc
     if not isinstance(record, Mapping) or set(record) != _SOURCE_RECORD_FIELDS:
         raise ArtFirstUnavailable("UNAVAILABLE: source record schema is unsupported")
+    original_filename = record.get("original_filename")
+    if not isinstance(original_filename, str) or Path(original_filename).name != original_filename or not original_filename.lower().endswith(".png"):
+        raise ArtFirstUnavailable("UNAVAILABLE: source record filename is unsafe")
+    png_bytes = _safe_file(source_dir / original_filename, source_dir, RAW_ARTIFACT_MAX_BYTES, "source PNG")
     if _canonical_source_record_bytes(record) != record_bytes:
         raise ArtFirstUnavailable("UNAVAILABLE: source record is not canonical JSON")
     if record.get("schema") != "scrubbots-owner-upload-source" or record.get("version") != 1:
@@ -174,8 +164,8 @@ def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) ->
         or record.get("source_sha256") != expected_sha
         or record.get("byte_length") != len(png_bytes)
         or record.get("media_type") != SUPPORTED_MEDIA_TYPE
-        or record.get("immutable_relative_path") != f"owner-uploads/{source_id}/source.png"
-        or record.get("source_record_relative_path") != f"owner-uploads/{source_id}/source.json"
+        or record.get("immutable_relative_path") != f"data/Level Factory/Imported/{source_id}/{original_filename}"
+        or record.get("source_record_relative_path") != f"data/Level Factory/Imported/{source_id}/source.json"
         or _sha256(png_bytes) != expected_sha
     ):
         raise ArtFirstUnavailable("UNAVAILABLE: source record does not bind the exact imported PNG bytes")
@@ -218,13 +208,13 @@ def _candidate_and_review(
     if candidate_id != expected_candidate_id or not review_id.startswith(f"review-{expected_candidate_id}-"):
         raise ArtFirstUnavailable("UNAVAILABLE: candidate or review identity does not match this exact source")
     output_root = owner_upload_root().parent
-    candidate_store = output_root / "studio-derived-candidates"
+    candidate_store = output_root / "Workspace" / "Candidates"
     if _path_is_reparse_point(candidate_store) or not candidate_store.is_dir():
         raise ArtFirstUnavailable("UNAVAILABLE/NEEDS_OWNER_ACCEPT: candidate store is missing or is a reparse point")
     try:
         resolved_output_root = output_root.resolve(strict=True)
         resolved_candidate_store = candidate_store.resolve(strict=True)
-        if resolved_candidate_store.parent != resolved_output_root:
+        if resolved_candidate_store.parent != resolved_output_root / "Workspace":
             raise ArtFirstUnavailable("UNAVAILABLE: candidate store escaped the canonical output directory")
         candidate_store = resolved_candidate_store
     except (OSError, RuntimeError) as exc:

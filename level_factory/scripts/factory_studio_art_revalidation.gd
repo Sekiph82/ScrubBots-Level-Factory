@@ -19,7 +19,8 @@ const OWNER_LIMITATION := "QA PASS != OWNER ACCEPT; structural ACCEPT does not p
 const REQUEST_SCHEMA := "scrubbots-studio-manual-art-revalidation"
 const REQUEST_VERSION := 1
 const OPERATION := "manual-art-structural-revalidation"
-const TRANSPORT_REQUEST_PATH := "res://output/.lf06-008-revalidation/request.json"
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
+const TRANSPORT_REQUEST_RELATIVE := "Level Factory/Workspace/Requests/manual-art-revalidation/request.json"
 
 var _editor: Node
 var _gateway: RefCounted
@@ -180,7 +181,7 @@ func _on_revalidate_pressed() -> void:
 		_error_message = "ERROR — manual artwork structural revalidation transport request could not be created."
 		_refresh_presentation()
 		return
-	var result_variant: Variant = _gateway.call("run_manual_art_revalidation", TRANSPORT_REQUEST_PATH)
+	var result_variant: Variant = _gateway.call("run_manual_art_revalidation", DATA_PATHS.data_path(TRANSPORT_REQUEST_RELATIVE))
 	_cleanup_transport_request()
 	var result: Dictionary = result_variant if result_variant is Dictionary else {
 		"state": "ERROR",
@@ -281,9 +282,10 @@ func _source_file_hashes(bundle_path: String) -> Dictionary:
 
 
 func _write_transport_request(request: Dictionary) -> bool:
-	var transport_root := ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")
+	var request_path := DATA_PATHS.data_path(TRANSPORT_REQUEST_RELATIVE)
+	var transport_root := request_path.get_base_dir()
 	DirAccess.make_dir_recursive_absolute(transport_root)
-	var request_file := FileAccess.open(ProjectSettings.globalize_path(TRANSPORT_REQUEST_PATH), FileAccess.WRITE)
+	var request_file := FileAccess.open(request_path, FileAccess.WRITE)
 	if request_file == null:
 		_cleanup_transport_request()
 		return false
@@ -293,9 +295,9 @@ func _write_transport_request(request: Dictionary) -> bool:
 
 
 func _cleanup_transport_request() -> void:
-	var request_path := ProjectSettings.globalize_path(TRANSPORT_REQUEST_PATH)
+	var request_path := DATA_PATHS.data_path(TRANSPORT_REQUEST_RELATIVE)
 	DirAccess.remove_absolute(request_path)
-	DirAccess.remove_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation"))
+	DirAccess.remove_absolute(request_path.get_base_dir())
 
 
 func _sha256(bytes: PackedByteArray) -> String:

@@ -14,6 +14,7 @@ const QUALITY_BINDING_SCHEMA := "scrubbots-output-quality-binding"
 const QUALITY_BINDING_VERSION := 1
 const QUALITY_SCHEMA := "scrubbots-quality"
 const QUALITY_VERSION := 1
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 const GENERATION_REQUEST_SCHEMA := "scrubbots-generation-request"
 const SUPPORTED_GENERATION_REQUEST_SCHEMA_VERSIONS: Array[int] = [1, 2, 3]
 
@@ -276,7 +277,7 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 func _safe_output_path(path: String) -> bool:
 	if path.is_empty():
 		return false
-	var project_output := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
+	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
 	var candidate := path
 	if candidate.begins_with("res://") or not candidate.is_absolute_path():
 		candidate = ProjectSettings.globalize_path(candidate)

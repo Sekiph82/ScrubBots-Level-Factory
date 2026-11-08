@@ -59,7 +59,9 @@ def _folder_activity_context(request: Mapping[str, object]):
         raise ValueError("folder activity identity does not match the selected canonical path")
     from scrubbots_pixel_factory.pipeline_activity import PipelineActivityWriter
 
-    project_output = Path(__file__).resolve().parents[1] / "output" / "studio-pipeline-activity"
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
+
+    project_output = owner_art_paths(_repository_root())["activity"]
     expected_log_path = project_output / (run_id + ".jsonl")
     requested_log_path = str(request.get("activity_log_path", ""))
     if requested_log_path:
@@ -272,7 +274,7 @@ def _dashboard_manifest_path(raw_path: object) -> Path:
     if type(raw_path) is not str or not raw_path.strip():
         raise ValueError("manifest path must be a non-empty local path")
     manifest_path = Path(raw_path).resolve()
-    output_root = (_repository_root() / "level_factory" / "output").resolve()
+    output_root = (_repository_root() / "data" / "output").resolve()
     if manifest_path.name != "batch-manifest.json" or not _inside_output(manifest_path, output_root):
         raise ValueError("manifest path must be batch-manifest.json inside the approved Factory output area")
     if not manifest_path.is_file():
@@ -835,8 +837,8 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
     candidate = provider.generate_checked(semantic_request)
     if candidate.status.value != "SUCCESS":
         raise ValueError(candidate.reason or "selected provider did not return an image")
-    factory_output = (_repository_root() / "level_factory" / "output").resolve()
-    output_root = (factory_output / "semantic-generated").resolve()
+    factory_output = (_repository_root() / "data" / "output").resolve()
+    output_root = (factory_output / "Pixellab" / "Generation Staging" / "semantic-generated").resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     destination = (output_root / f"{candidate.candidate_id}.png").resolve()
     if not _inside_output(destination, factory_output):
@@ -1073,8 +1075,8 @@ def _semantic_generate_pixellab_pro_4x4(
         )
         job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
         persist_job()
-        factory_output = (_repository_root() / "level_factory" / "output").resolve()
-        source_root = (factory_output / "semantic-generated" /
+        factory_output = (_repository_root() / "data" / "output" / "Pixellab").resolve()
+        source_root = (factory_output / "Generation Staging" /
                        f"pixellab-pro-4x4-{generated.job_id[:20]}-{resolved_operation_id[:12]}").resolve()
         if not _inside_output(source_root, factory_output):
             raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
@@ -1211,9 +1213,10 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
     if source_path.stat().st_size > size_limit:
         raise ValueError("PIXELLAB_PRO_4X4_SOURCE_TOO_LARGE")
     raw = source_path.read_bytes()
-    output_root = (_repository_root() / "level_factory" / "output" / "semantic-generated").resolve()
+    factory_output = (_repository_root() / "data" / "output").resolve()
+    output_root = (factory_output / "Pixellab" / "Generation Staging").resolve()
     output_directory = (output_root / f"pixellab-pro-4x4-import-{uuid.uuid4().hex}").resolve()
-    if not _inside_output(output_directory, (_repository_root() / "level_factory" / "output").resolve()):
+    if not _inside_output(output_directory, factory_output):
         raise ValueError("PixelLab Pro 4x4 import output escaped Factory output")
     manifest = (
         export_photopea_zip(raw, output_directory, max_colors=max_colors)
@@ -1452,10 +1455,10 @@ def _run_studio_revalidation(raw_request: object) -> dict[str, object]:
     request = _validate_studio_request(raw_request)
     from scrubbots_pixel_factory import QualityPolicy, evaluate_grid, logical_grid_hash, read_bundle
 
-    output_root = (_repository_root() / "level_factory" / "output").resolve()
+    output_root = (_repository_root() / "data" / "Level Factory" / "Workspace" / "Candidates").resolve()
     source_bundle = Path(str(request["source_bundle_path"])).resolve()
     if not _inside_output(source_bundle, output_root):
-        raise ValueError("source bundle is outside the approved Factory output area")
+        raise ValueError("source bundle is outside the canonical Level Factory candidate workspace")
     bundle = read_bundle(source_bundle)
     source_width = int(request["source_width"])
     source_height = int(request["source_height"])

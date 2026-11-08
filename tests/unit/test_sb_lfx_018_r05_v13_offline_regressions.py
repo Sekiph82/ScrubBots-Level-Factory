@@ -814,6 +814,32 @@ def test_owner_art_folder_contract_uses_exact_owner_spelling() -> None:
     assert paths["rejected"] == root / "data/Release Pool/Rejected"
 
 
+def test_packaged_owner_upload_resolves_data_root_outside_release_directory(tmp_path: Path, monkeypatch) -> None:
+    from scrubbots_pixel_factory import owner_upload
+
+    canonical = tmp_path / "Desktop" / "Scrubbots - Pixel Art Generator"
+    canonical.mkdir(parents=True)
+    (canonical / ".git").mkdir()
+    (canonical / "TASKS.md").write_text("test authority\n", encoding="utf-8")
+    installed_module = canonical / "Release" / "ScrubBots Factory Studio" / "scripts" / "owner_upload.py"
+    installed_module.parent.mkdir(parents=True)
+    monkeypatch.setattr(owner_upload, "__file__", str(installed_module))
+
+    assert owner_upload._repository_root() == canonical
+    assert owner_upload.owner_upload_root() == canonical / "data" / "Level Factory" / "Imported"
+
+
+def test_packaged_data_root_fails_closed_when_canonical_checkout_is_unavailable(monkeypatch) -> None:
+    from scrubbots_pixel_factory import owner_art_storage
+
+    release_module = Path("C:/Users/sekip/Desktop/Factory-Release-Fixture/scripts/owner_upload.py")
+    monkeypatch.setattr(owner_art_storage, "__file__", str(release_module))
+    monkeypatch.setenv("USERPROFILE", "C:/Users/sekip/Factory-profile-without-checkout")
+
+    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="canonical Factory data checkout"):
+        owner_art_storage.factory_repository_root(release_module)
+
+
 def test_owner_csv_path_is_restricted_to_direct_canonical_input_files(tmp_path: Path) -> None:
     repository = tmp_path / "factory"
     canonical_input = repository / "data" / "input"

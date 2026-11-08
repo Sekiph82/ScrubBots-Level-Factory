@@ -4,7 +4,6 @@ import json
 import hashlib
 import os
 import subprocess
-import tempfile
 import threading
 import time
 import uuid
@@ -53,12 +52,10 @@ class ScrubBotsSolver:
             hard_timeout = float(timeout if timeout is not None else 0)
             if auto_extend_timeout:
                 raise ValueError("staged solver extension is available only for an attested pinned runtime")
-        if attested_runtime:
-            work_root = Path(self.rules.project).resolve() / ".lf_solver_jobs"
-            work = work_root / f"job-{uuid.uuid4().hex}"
-            work.mkdir(parents=True, exist_ok=False)
-        else:
-            work = Path(tempfile.mkdtemp(prefix="sb_bridge_"))
+        from ..owner_art_storage import factory_repository_root, owner_art_paths
+        work_root = owner_art_paths(factory_repository_root())["solver_jobs"]
+        work = work_root / f"job-{uuid.uuid4().hex}"
+        work.mkdir(parents=True, exist_ok=False)
         # Exercise the game's owner-facing loaders for every candidate, including
         # generated candidates. SupplyPlanLoader resolves canonical global C IDs
         # through the live game's palette authority before building runtime state.
@@ -182,7 +179,7 @@ class ScrubBotsSolver:
         if attested_runtime and os.name == "nt":
             flags |= getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
         start = time.monotonic()
-        initial_timeout = float(timeout if timeout is not None else (240 if attested_runtime else 0))
+        initial_timeout = float(timeout if timeout is not None else 900 if attested_runtime else 0)
         timeout_limit = staged_solver_timeout_limit(initial_timeout, hard_timeout, attested=attested_runtime)
         if hard_timeout < 0 or hard_timeout > timeout_limit or (attested_runtime and hard_timeout == 0):
             raise ValueError(f"native solver timeout must be from 0 to {timeout_limit} seconds")
@@ -211,7 +208,7 @@ class ScrubBotsSolver:
                     extended = True
                     extension_trigger_elapsed_seconds = round(elapsed, 3)
                     extension_note = (
-                        "BRIDGE_SOLVER_BUDGET_EXTENDED initial_budget_s=240 hard_budget_s=480 "
+                        f"BRIDGE_SOLVER_BUDGET_EXTENDED initial_budget_s={initial_timeout:g} hard_budget_s={hard_timeout:g} "
                         f"extension_trigger_elapsed_s={extension_trigger_elapsed_seconds} "
                         f"extension_reason=STILL_RUNNING pid={p.pid} job_id={work.name} "
                         f"request_sha256={request_sha256} source_sha256={source_sha256 or 'BOUND_BY_REQUEST_SHA'} "
@@ -248,7 +245,7 @@ class ScrubBotsSolver:
                 if reader_error:
                     output_overflow = True
                 if progress and not progress_disabled and elapsed >= next_progress_at:
-                    phase_label = "EXTENDED 240-480s" if extended else "Solving 0-240s"
+                    phase_label = f"Solving up to {hard_timeout:g}s"
                     deadline = hard_timeout if extended else initial_timeout
                     remaining = max(0.0, deadline - elapsed)
                     try:
@@ -288,7 +285,7 @@ class ScrubBotsSolver:
             "process_invocation_count": 1 if p is not None else 0,
             "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME" if attested_runtime else "CONFIGURED_GAME_PROJECT",
             "timeout_seconds": hard_timeout or None, "initial_budget_s": initial_timeout or None,
-            "hard_budget_s": hard_timeout or None, "phase": "TIMEOUT_480" if timed_out and extended else ("TIMEOUT_240" if timed_out else "COMPLETE"),
+            "hard_budget_s": hard_timeout or None, "phase": "TIMEOUT_900" if timed_out else "COMPLETE",
             "extended": extended, "extension_trigger_elapsed_s": extension_trigger_elapsed_seconds,
             "extension_reason": "STILL_RUNNING" if extended else None,
             "elapsed_seconds": elapsed_seconds,
@@ -307,7 +304,7 @@ class ScrubBotsSolver:
         if timed_out:
             raise SolverBridgeError(
                 f"bounded Godot solver timed out after {hard_timeout:.1f}s "
-                f"({'TIMEOUT_480' if extended else 'TIMEOUT_240'}); job retained at {work}", telemetry
+                f"(TIMEOUT_900); job retained at {work}", telemetry
             )
         if reader_error:
             raise SolverBridgeError("bounded Godot output capture failed: " + "; ".join(reader_error), telemetry)

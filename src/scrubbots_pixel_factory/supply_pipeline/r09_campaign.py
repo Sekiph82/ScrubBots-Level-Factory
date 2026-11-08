@@ -54,7 +54,10 @@ def _historical_r09_predecessor_proof(root: Path) -> dict[str, Any]:
     """Read-only proof that the fixed R09 dispatch spent zero native solve calls."""
     from .r09_solver_attempts import MAX_PRIMARY_ATTEMPTS, R09Blocked
 
-    predecessor = root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
+    from ..owner_art_storage import owner_art_paths
+
+    pending_pipeline = owner_art_paths(root)["pending"] / "Pipelines"
+    predecessor = pending_pipeline / "Campaigns" / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
     summary_path = predecessor / "summary.json"
     attempt_path = predecessor / "attempt-01.json"
     try:
@@ -64,7 +67,7 @@ def _historical_r09_predecessor_proof(root: Path) -> dict[str, Any]:
         attempt = json.loads(attempt_bytes.decode("utf-8"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
         raise R09Blocked(f"R09_QUEUE_IDENTITY_UNVERIFIED: historical predecessor is unreadable: {exc}") from exc
-    job = root / "level_factory" / "output" / "current-game-runtime" / PINNED_MAIN_SHA / ".lf_solver_jobs" / R09_PRENATIVE_JOB_NAME
+    job = owner_art_paths(root)["solver_jobs"] / R09_PRENATIVE_JOB_NAME
     try:
         job_entries = list(job.iterdir())
     except OSError as exc:
@@ -141,6 +144,7 @@ def _build_r09_r01_campaign_context(root: Path | None = None) -> dict[str, Any]:
     from .. import studio_extensions as studio
     from ..contracts.palette import CANONICAL_PALETTE, VOID_CELL_ID
     from .r09_solver_attempts import R09Blocked
+    from ..owner_art_storage import owner_art_paths
 
     root = (root or studio._repository_root()).resolve()
     runtime = expected_runtime_root().resolve()
@@ -148,13 +152,11 @@ def _build_r09_r01_campaign_context(root: Path | None = None) -> dict[str, Any]:
     if manifest.get("source_commit") != PINNED_MAIN_SHA or manifest.get("full_game_checkout_verified") is not False:
         raise R09Blocked("pinned mini-runtime identity is not the accepted R08 source authority")
 
-    source_dir = (root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output"
-                  / "owner-uploads" / SOURCE_ID)
-    output_dir = root / "level_factory" / "output" / f"r09-r01-continuation-{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
+    record_path, png_path = studio._source_record_paths(SOURCE_ID)
+    source_dir = record_path.parent
+    output_dir = owner_art_paths(root)["pending"] / "Pipelines" / "Campaigns" / f"r09-r01-continuation-{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
     _assert_continuation_output_available(output_dir)
     predecessor_proof = _historical_r09_predecessor_proof(root)
-    png_path = source_dir / "source.png"
-    record_path = source_dir / "source.json"
     if _sha256(png_path) != SOURCE_SHA256 or _sha256(record_path) != SOURCE_RECORD_SHA256:
         raise R09Blocked("original installed 002 source identity changed")
     source = studio.verify_owner_source(SOURCE_ID, source_directory=source_dir)
@@ -182,7 +184,7 @@ def _build_r09_r01_campaign_context(root: Path | None = None) -> dict[str, Any]:
     rules = GameRules(runtime, column_count=3)
     grid, used = studio._canonical_cells_to_grid(cells, width, height, rules)
     optimizer = SupplyOptimizer(rules)
-    r08_job = runtime / ".lf_solver_jobs" / R08_JOB_NAME
+    r08_job = owner_art_paths(root)["solver_jobs"] / R08_JOB_NAME
     r08_refs = load_r08_ranked_plan_refs(
         r08_job, rules=rules, expected_game_sha=PINNED_MAIN_SHA, expected_level_id="r08_002_first_real"
     )
@@ -278,12 +280,13 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
         manifest = verify_attested_runtime(runtime)
         if manifest.get("source_commit") != PINNED_MAIN_SHA or manifest.get("full_game_checkout_verified") is not False:
             raise R09Blocked("pinned mini-runtime identity is not the accepted R08 source authority")
-        source_dir = (root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "owner-uploads" / SOURCE_ID)
-        output_dir = root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
+        record_path, png_path = studio._source_record_paths(SOURCE_ID)
+        source_dir = record_path.parent
+        from ..owner_art_storage import owner_art_paths
+        output_dir = owner_art_paths(root)["pending"] / "Pipelines" / "Campaigns" / "r09-capped-solver" / f"{SOURCE_SHA256}-{PINNED_MAIN_SHA}"
         if output_dir.exists():
             raise R09Blocked("fixed R09 campaign output already exists; refusing to repeat the source budget")
         predecessor_proof = None
-        png_path, record_path = source_dir / "source.png", source_dir / "source.json"
         if _sha256(png_path) != SOURCE_SHA256 or _sha256(record_path) != SOURCE_RECORD_SHA256:
             raise R09Blocked("original installed 002 source identity changed")
         source = studio.verify_owner_source(SOURCE_ID, source_directory=source_dir)
@@ -302,7 +305,7 @@ def _run_original_002_r09_campaign(*, continuation: bool) -> dict[str, Any]:
         rules = GameRules(runtime, column_count=3)
         grid, used = studio._canonical_cells_to_grid(cells, width, height, rules)
         optimizer = SupplyOptimizer(rules)
-        r08_refs = load_r08_ranked_plan_refs(runtime / ".lf_solver_jobs" / R08_JOB_NAME, rules=rules, expected_game_sha=PINNED_MAIN_SHA, expected_level_id="r08_002_first_real")
+        r08_refs = load_r08_ranked_plan_refs(owner_art_paths(root)["solver_jobs"] / R08_JOB_NAME, rules=rules, expected_game_sha=PINNED_MAIN_SHA, expected_level_id="r08_002_first_real")
         ranked = build_ranked_candidate_queue(optimizer, grid, used, r08_refs, seed=17018, source_sha256=SOURCE_SHA256, game_sha=PINNED_MAIN_SHA, target_count=6, screen_budget=1200, viability_budget=600, max_generated_plans=12)
         print("R09_RANKED_QUEUE " + json.dumps([{"rank": index, "candidate_id": item["id"], "score": item["score"], "plan_sha256": item["plan_sha256"]} for index, item in enumerate(ranked, 1)], sort_keys=True), flush=True)
         metadata = optimizer.analyzer.analyze(grid, used)

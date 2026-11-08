@@ -10,6 +10,7 @@ const READY := "READY"
 const ERROR := "ERROR"
 const MAX_PREVIEW_EDGE := 512
 const MAX_PRESENTATION_SCALE := 16
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 
 var _state := EMPTY
 var _source_action := ""
@@ -151,7 +152,7 @@ func _load_successful_artwork(result: Dictionary) -> void:
 func _load_canonical_image(output_path: String) -> Image:
 	if output_path.is_empty():
 		return null
-	var project_output := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
+	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
 	var candidate_output := output_path
 	if candidate_output.begins_with("res://") or not candidate_output.is_absolute_path():
 		candidate_output = ProjectSettings.globalize_path(candidate_output)

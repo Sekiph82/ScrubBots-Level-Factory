@@ -12,6 +12,7 @@ const ERROR := "ERROR"
 const UNVALIDATED_DISPOSITION := "UNVALIDATED — canonical structural revalidation has not been run."
 const MAX_PREVIEW_EDGE := 512
 const MAX_PRESENTATION_SCALE := 16
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 const LOGICAL_PALETTE_IDS: Array[String] = [
 	"C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08",
 	"C09", "C10", "C11", "C12", "C13", "C14", "C15", "C16",
@@ -450,7 +451,7 @@ func _globalize_path(path: String) -> String:
 
 
 func _safe_output_path(path: String) -> bool:
-	var project_output := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
+	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
 	var candidate := _globalize_path(path).simplify_path().replace(char(92), "/").to_lower()
 	return candidate == project_output or candidate.begins_with(project_output + "/")
 

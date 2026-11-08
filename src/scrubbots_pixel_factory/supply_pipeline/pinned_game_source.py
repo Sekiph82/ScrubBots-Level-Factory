@@ -35,7 +35,9 @@ def repository_root() -> Path:
 
 
 def expected_runtime_root() -> Path:
-    return repository_root() / "level_factory" / "output" / "current-game-runtime" / PINNED_MAIN_SHA
+    from ..owner_art_storage import owner_art_paths
+
+    return owner_art_paths(repository_root())["runtime"] / PINNED_MAIN_SHA
 
 
 def is_pinned_runtime(project: str | Path) -> bool:
@@ -50,7 +52,7 @@ def verify_attested_runtime(project: str | Path) -> dict[str, Any]:
 
     root = Path(project).expanduser().resolve()
     if root != expected_runtime_root().resolve():
-        raise PinnedGameSourceError("pinned runtime path is not the task-owned LF output directory")
+        raise PinnedGameSourceError("pinned runtime path is not the canonical data/Level Factory/Runtime directory")
     if root.is_symlink() or not (root / "project.godot").is_file():
         raise PinnedGameSourceError("pinned runtime project is missing or redirected")
     manifest_path = root / "source-attestation.json"

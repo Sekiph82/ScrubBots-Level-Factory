@@ -17,16 +17,29 @@ from PIL import Image
 
 _FOLDER_RELATIVE_PATHS = {
     "input": "data/input",
+    "level_factory": "data/Level Factory",
+    "imported": "data/Level Factory/Imported",
+    "batches": "data/Level Factory/Batches",
+    "batch_imports": "data/Level Factory/Batches/Imports",
+    "batch_jobs": "data/Level Factory/Batches/Jobs",
+    "batch_control": "data/Level Factory/Batches/Control",
+    "batch_locks": "data/Level Factory/Batches/Locks",
+    "activity": "data/Level Factory/Activity",
+    "workspace": "data/Level Factory/Workspace",
+    "runtime": "data/Level Factory/Runtime",
     "alpix": "data/output/Alpix",
     "pixellab": "data/output/Pixellab",
     "pixellab_grid_files": "data/output/Pixellab/Grid Files",
     "pixellab_final": "data/output/Pixellab/Final",
+    "pixellab_transactions": "data/output/Pixellab/Transactions",
     "owner_suggestions": "data/output/Owner Suggestions",
     "release_pool": "data/Release Pool",
     "pending": "data/Release Pool/Pending",
     "ready": "data/Release Pool/Ready",
     "failed": "data/Release Pool/Failed",
     "rejected": "data/Release Pool/Rejected",
+    "solver_jobs": "data/Release Pool/Pending/Pipelines/SolverJobs",
+    "pipeline_work": "data/Release Pool/Pending/Pipelines/Work",
 }
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 
@@ -36,7 +49,7 @@ class OwnerArtStorageError(ValueError):
 
 
 def factory_repository_root(anchor: str | Path | None = None) -> Path:
-    """Resolve the canonical checkout root for both source and installed Release code."""
+    """Resolve the one canonical mutable-data root from source and installed Release."""
 
     location = Path(anchor if anchor is not None else __file__).resolve()
     start = location if location.is_dir() else location.parent
@@ -44,12 +57,76 @@ def factory_repository_root(anchor: str | Path | None = None) -> Path:
         git_metadata = candidate / ".git"
         if ((git_metadata.is_dir() or git_metadata.is_file()) and (candidate / "TASKS.md").is_file()):
             return candidate
-    return Path(__file__).resolve().parents[2]
+    profile = os.environ.get("USERPROFILE")
+    if profile:
+        canonical = Path(profile) / "Desktop" / "Scrubbots - Pixel Art Generator"
+        git_metadata = canonical / ".git"
+        if ((git_metadata.is_dir() or git_metadata.is_file()) and (canonical / "TASKS.md").is_file()):
+            return canonical.resolve()
+    # Never treat the installed Release directory as a mutable-data root. If
+    # the canonical Desktop checkout cannot be identified, fail closed rather
+    # than quietly writing solver/import data beside the executable.
+    raise OwnerArtStorageError("canonical Factory data checkout could not be resolved")
 
 
 def owner_art_paths(repository_root: str | Path | None = None) -> dict[str, Path]:
     root = Path(repository_root).resolve() if repository_root is not None else factory_repository_root()
     return {key: root / relative for key, relative in _FOLDER_RELATIVE_PATHS.items()}
+
+
+def pixellab_asset_name_manifest(repository_root: str | Path | None = None) -> Path:
+    root = Path(repository_root).resolve() if repository_root is not None else factory_repository_root()
+    return root / "data" / "output" / "Pixellab" / "asset-name-manifest.json"
+
+
+def pixellab_transaction_path(atlas_sha256: str, repository_root: str | Path | None = None) -> Path:
+    """Return the transaction record beside PixelLab assets, outside solver state."""
+    if not _SHA256.fullmatch(str(atlas_sha256)):
+        raise OwnerArtStorageError("PixelLab atlas digest is invalid")
+    paths = owner_art_paths(repository_root)
+    return paths["pixellab_transactions"] / f"pixellab-atlas-{atlas_sha256}.json"
+
+
+def _load_pixellab_name_map(repository_root: Path) -> dict[str, Any]:
+    path = pixellab_asset_name_manifest(repository_root)
+    if not path.exists():
+        return {"schema": "scrubbots-pixellab-asset-names/v1", "version": 1, "atlases": {}, "sprites": {}}
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise OwnerArtStorageError("PixelLab stable-name manifest is unreadable") from exc
+    if (not isinstance(value, dict) or value.get("schema") != "scrubbots-pixellab-asset-names/v1"
+            or value.get("version") != 1 or not isinstance(value.get("atlases"), dict)
+            or not isinstance(value.get("sprites"), dict)):
+        raise OwnerArtStorageError("PixelLab stable-name manifest has an invalid schema")
+    return value
+
+
+def _next_asset_name(records: Mapping[str, Any], prefix: str) -> str:
+    highest = 0
+    for item in records.values():
+        filename = item.get("filename") if isinstance(item, Mapping) else None
+        match = re.fullmatch(rf"{re.escape(prefix)}([0-9]{{6,}})\.png", str(filename or ""))
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return f"{prefix}{highest + 1:06d}.png"
+
+
+def _save_pixellab_name_map(repository_root: Path, value: Mapping[str, Any]) -> None:
+    path = pixellab_asset_name_manifest(repository_root)
+    if _is_reparse_point(path):
+        raise OwnerArtStorageError("PixelLab stable-name manifest is a reparse point")
+    raw = (json.dumps(dict(value), ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.{os.urandom(6).hex()}.partial")
+    try:
+        with temporary.open("xb") as stream:
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _is_reparse_point(path: Path) -> bool:
@@ -253,6 +330,15 @@ def archive_pixellab_export(
         raise OwnerArtStorageError("PixelLab source kind is invalid")
 
     paths = ensure_owner_art_layout(repository_root)
+    canonical_root = Path(repository_root).resolve() if repository_root is not None else factory_repository_root()
+    name_map = _load_pixellab_name_map(canonical_root)
+    atlas_entry = name_map["atlases"].get(atlas_sha)
+    if atlas_entry is None:
+        atlas_name = _next_asset_name(name_map["atlases"], "PX-ATLAS-")
+        atlas_entry = {"filename": atlas_name, "sha256": atlas_sha, "original_filename": "", "dimensions": None}
+        name_map["atlases"][atlas_sha] = atlas_entry
+    elif not isinstance(atlas_entry, Mapping) or atlas_entry.get("sha256") != atlas_sha:
+        raise OwnerArtStorageError("PixelLab atlas stable-name identity conflicts with its SHA-256")
     source_root = Path(output_directory).resolve()
     original = source_root / "original-atlas.png"
     if _is_reparse_point(original) or not original.is_file():
@@ -298,7 +384,19 @@ def archive_pixellab_export(
         y = ((index - 1) // 4) * height
         if slice_rgba.tobytes() != atlas_rgba.crop((x, y, x + width, y + height)).tobytes():
             raise OwnerArtStorageError("PixelLab slice pixels or alpha do not match the row-major source atlas cell")
-        target_name = f"atlas-{atlas_sha}-sprite-{index:02d}-{frame_sha}.png"
+        sprite_key = f"{atlas_sha}:{index:02d}"
+        sprite_entry = name_map["sprites"].get(sprite_key)
+        if sprite_entry is None:
+            target_name = _next_asset_name(name_map["sprites"], "LF-")
+            sprite_entry = {"filename": target_name, "sha256": frame_sha, "atlas_sha256": atlas_sha, "index": index, "original_filename": filename, "dimensions": [width, height]}
+            name_map["sprites"][sprite_key] = sprite_entry
+        else:
+            if (not isinstance(sprite_entry, Mapping) or sprite_entry.get("sha256") != frame_sha
+                    or sprite_entry.get("atlas_sha256") != atlas_sha or sprite_entry.get("index") != index):
+                raise OwnerArtStorageError("PixelLab sprite stable-name identity conflicts with its parent atlas")
+            target_name = str(sprite_entry.get("filename", ""))
+        if Path(target_name).name != target_name or not re.fullmatch(r"LF-[0-9]{6,}\.png", target_name):
+            raise OwnerArtStorageError("PixelLab sprite stable filename is malformed")
         target = paths["pixellab_final"] / target_name
         if _is_reparse_point(target):
             raise OwnerArtStorageError("PixelLab Final slice target is a symlink or reparse point")
@@ -310,7 +408,10 @@ def archive_pixellab_export(
         raise OwnerArtStorageError("PixelLab export is missing a row-major slice")
     prepared.sort(key=lambda item: int(item["index"]))
 
-    atlas_target = paths["pixellab_grid_files"] / f"atlas-{atlas_sha}.png"
+    atlas_target_name = str(atlas_entry.get("filename", ""))
+    if Path(atlas_target_name).name != atlas_target_name or not re.fullmatch(r"PX-ATLAS-[0-9]{6,}\.png", atlas_target_name):
+        raise OwnerArtStorageError("PixelLab atlas stable filename is malformed")
+    atlas_target = paths["pixellab_grid_files"] / atlas_target_name
     if atlas_target.exists() and (not atlas_target.is_file() or _hash(atlas_target.read_bytes()) != atlas_sha):
         raise OwnerArtStorageError("content-addressed PixelLab atlas target has conflicting bytes")
     transaction = {
@@ -322,7 +423,7 @@ def archive_pixellab_export(
         "atlas_filename": atlas_target.name,
         "slices": [{key: item[key] for key in ("index", "sha256", "filename")} for item in prepared],
     }
-    transaction_path = paths["pending"] / f"pixellab-atlas-{atlas_sha}.json"
+    transaction_path = pixellab_transaction_path(atlas_sha, canonical_root)
     _write_atlas_transaction(transaction_path, transaction, finalized=False)
 
     created_targets: list[Path] = []
@@ -338,6 +439,9 @@ def archive_pixellab_export(
                 _write_content_addressed(paths["pixellab_final"], item["filename"], item["bytes"], item["sha256"])
                 created_targets.append(target)
             slices.append({"index": item["index"], "sha256": item["sha256"], "path": str(target)})
+        atlas_entry["dimensions"] = list(atlas_dimensions)
+        atlas_entry["original_filename"] = original.name
+        _save_pixellab_name_map(canonical_root, name_map)
         record = {
             "schema": "scrubbots-owner-pixellab-atlas-catalog/v1",
             "source_atlas_sha256": atlas_sha,

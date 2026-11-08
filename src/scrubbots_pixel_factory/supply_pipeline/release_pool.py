@@ -232,7 +232,7 @@ def _verify_candidate_source_grid_binding(candidate: Mapping[str, Any], classifi
 
     lineage = _candidate_source_lineage(candidate)
     source_id = lineage.get("source_id")
-    expected_record = f"level_factory/output/owner-uploads/{source_id}/source.json"
+    expected_record = f"data/Level Factory/Imported/{source_id}/source.json"
     if lineage.get("source_record") != expected_record:
         raise ReleaseError("candidate source record path is not the canonical OWNER_UPLOAD path")
     try:
@@ -350,7 +350,7 @@ def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[st
     pipeline_sha = _hash(pipeline_path.read_bytes()) if pipeline_path.is_file() else None
     source_id = pipeline.get("request", {}).get("source_id") if isinstance(pipeline.get("request"), Mapping) else None
     lineage = _candidate_source_lineage(candidate)
-    source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
+    source_record, _source_png = studio._source_record_paths(str(source_id))
     source_record_sha = _hash(source_record.read_bytes()) if source_record.is_file() else None
     vector = _official_challenge_vector(official)
     vector_sha = _hash(_canonical_bytes(vector))
@@ -362,7 +362,7 @@ def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[st
         raise ReleaseError("pinned game runtime authority is unavailable for historical profile proof") from exc
     analyzer_sha = next((item.get("sha256") for item in attestation["source_files"] if item.get("path") == "scripts/difficulty/level_difficulty_analyzer_v1.gd"), None)
     if (not source_id or lineage.get("source_id") != source_id or source_record_sha is None
-            or lineage.get("source_record") != f"level_factory/output/owner-uploads/{source_id}/source.json"
+            or lineage.get("source_record") != f"data/Level Factory/Imported/{source_id}/source.json"
             or lineage.get("source_sha256") != str(source_id).removeprefix("owner-upload-")
             or not isinstance(authority, Mapping)
             or authority.get("git_head") != attestation.get("source_commit")
@@ -419,10 +419,10 @@ def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: 
     analyzer_sha = next(item["sha256"] for item in attestation["source_files"] if item["path"] == "scripts/difficulty/level_difficulty_analyzer_v1.gd")
     source_id = pipeline.get("request", {}).get("source_id")
     lineage = _candidate_source_lineage(candidate)
-    source_record = studio._repository_root() / "level_factory" / "output" / "owner-uploads" / str(source_id) / "source.json"
+    source_record, _source_png = studio._source_record_paths(str(source_id))
     authority = pipeline.get("primary", {}).get("authority", {})
     if (not source_id or lineage.get("source_id") != source_id or not source_record.is_file()
-            or lineage.get("source_record") != f"level_factory/output/owner-uploads/{source_id}/source.json"
+            or lineage.get("source_record") != f"data/Level Factory/Imported/{source_id}/source.json"
             or lineage.get("source_sha256") != str(source_id).removeprefix("owner-upload-")
             or not isinstance(authority, Mapping)
             or authority.get("git_head") != attestation.get("source_commit")
@@ -660,12 +660,11 @@ def _pool_root() -> Path:
 
 
 def _pool_roots() -> tuple[Path, Path]:
-    from .. import studio_extensions as studio
-    return _pool_root(), studio.extensions_root() / "release-pool"
+    return (_pool_root(),)
 
 
 def entry_paths(candidate_id_filter: str | None = None) -> list[Path]:
-    """Return canonical Ready entries plus read-only legacy receipt paths."""
+    """Return only canonical data/Release Pool Ready entries."""
 
     from .. import studio_extensions as studio
     from ..owner_art_storage import OwnerArtStorageError, _is_reparse_point, _verify_path_under_root

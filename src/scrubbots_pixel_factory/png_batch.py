@@ -69,43 +69,26 @@ def assign_columns(source_ids: Sequence[str]) -> list[int]:
 
 
 def _root() -> Path:
-    from . import studio_extensions
     from .owner_art_storage import owner_art_paths
-
-    return owner_art_paths(studio_extensions._repository_root())["pending"] / "Pipelines" / "BatchJobs"
-
-
-def _legacy_root() -> Path:
-    from .studio_extensions import extensions_root
-
-    return extensions_root() / "png-batches"
+    from . import studio_extensions
+    return owner_art_paths(studio_extensions._repository_root())["batches"] / "Jobs"
 
 
 def _job_path(job_id: str) -> Path:
     if not isinstance(job_id, str) or not job_id.startswith("png-batch-") or len(job_id) > 80 or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in job_id):
         raise ValueError("PNG batch job identity is malformed")
     from . import studio_extensions
-    from .owner_art_storage import OwnerArtStorageError, _is_reparse_point, _verify_path_under_root, owner_art_paths
+    from .owner_art_storage import OwnerArtStorageError, _is_reparse_point, _verify_path_under_root
 
     filename = f"{job_id}.json"
     canonical_root = _root()
     canonical = canonical_root / "jobs" / filename
-    legacy = _legacy_root() / "jobs" / filename
-    expected_root = owner_art_paths(studio_extensions._repository_root())["pending"] / "Pipelines" / "BatchJobs"
-    if canonical_root == expected_root:
-        try:
-            _verify_path_under_root(Path(studio_extensions._repository_root()).resolve(), canonical.parent)
-        except OwnerArtStorageError as exc:
-            raise ValueError("canonical PNG batch path contains a reparse point or escapes the repository") from exc
-    if ((isinstance(canonical, Path) and _is_reparse_point(canonical))
-            or (isinstance(legacy, Path) and _is_reparse_point(legacy))):
+    try:
+        _verify_path_under_root(Path(studio_extensions._repository_root()).resolve(), canonical.parent)
+    except OwnerArtStorageError as exc:
+        raise ValueError("canonical PNG batch path contains a reparse point or escapes the repository") from exc
+    if _is_reparse_point(canonical):
         raise ValueError("PNG batch job path is a symlink or reparse point")
-    if canonical.exists() and legacy.exists():
-        if canonical.read_bytes() != legacy.read_bytes():
-            raise ValueError("PNG batch job identity has conflicting canonical and legacy state")
-        return canonical
-    if legacy.exists():
-        return legacy
     return canonical
 
 
@@ -476,15 +459,15 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
 
 
 def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
-    """Create a separate deterministic retry job for FAILED items only."""
+    """Create a deterministic explicit retry for FAILED and REJECTED items."""
     from .studio_extensions import _digest, _source_record_paths, batch_load, verify_owner_source
 
     original = _read_job(job_id)
     if original.get("state") != "COMPLETE":
         return {"state": "BLOCKED", "disposition": "BATCH_NOT_FINISHED", "job": original}
-    failed = [item for item in original.get("items", []) if item.get("status") == "FAILED"]
-    if not failed:
-        return {"state": "BLOCKED", "disposition": "NO_RETRYABLE_FAILURES", "job": original}
+    retryable_items = [item for item in original.get("items", []) if item.get("status") in {"FAILED", "REJECTED"}]
+    if not retryable_items:
+        return {"state": "BLOCKED", "disposition": "NO_RETRYABLE_FAILED_OR_REJECTED_ITEMS", "job": original}
     batch_id = str(original.get("import_batch_id", ""))
     batch = batch_load(batch_id)["batch"]
     if _digest(batch) != original.get("batch_digest"):
@@ -500,7 +483,7 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
                 or parent.get("import_batch_id") != batch_id
                 or parent.get("batch_digest") != original.get("batch_digest")):
             return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
-                    "reason": "Retry parent state or source authority changed; failed subset was not retried."}
+                    "reason": "Retry parent state or source authority changed; failed/rejected subset was not retried."}
         parent_by_index = {str(item.get("index")): item for item in parent.get("items", []) if isinstance(item, Mapping)}
         for item in original.get("items", []):
             if not isinstance(item, Mapping):
@@ -514,7 +497,7 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
                 return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
                         "reason": "Retry item no longer matches its SHA-bound parent assignment."}
     batch_items = {str(item.get("source_id", "")): item for item in batch.get("items", []) if isinstance(item, Mapping)}
-    for item in failed:
+    for item in retryable_items:
         source_id = str(item.get("source_id", ""))
         source = batch_items.get(source_id)
         try:
@@ -532,7 +515,7 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
             return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "job": original,
                     "reason": "Current PNG or source-record SHA differs from the original nine-source composite."}
     items: list[dict[str, Any]] = []
-    for index, previous in enumerate(failed):
+    for index, previous in enumerate(retryable_items):
         items.append({
             "index": index, "prior_item_index": previous.get("index"),
             "source_id": previous.get("source_id"), "source_sha256": previous.get("source_sha256"),
@@ -554,14 +537,14 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
     if path.exists():
         existing = _read_job(retry_id)
         if existing.get("plan_digest") != plan_digest:
-            raise ValueError("retry job identity collides with a different failed-item snapshot")
+            raise ValueError("retry job identity collides with a different failed/rejected-item snapshot")
         return {"state": "SUCCESS", "disposition": "EXISTING_RETRY", "job": existing}
     quotas = Counter(int(item["column_count"]) for item in items if item.get("column_count") in (3, 4, 5))
     job = {
         "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": retry_id,
         "import_batch_id": original.get("import_batch_id"), "batch_digest": original.get("batch_digest"),
         "parent_job_id": job_id, "parent_job_state_digest": original.get("state_digest"),
-        "retry_of_failed_only": True, "plan_digest": plan_digest,
+        "retry_of_failed_or_rejected_only": True, "plan_digest": plan_digest,
         "settings": dict(original.get("settings", {})), "state": "QUEUED",
         "created_at": _now(), "updated_at": _now(), "current_index": None,
         "items": items, "counts": _counts(items),
@@ -622,7 +605,7 @@ def _job_lineage_matches_snapshot(job: Mapping[str, Any], batch: Mapping[str, An
             return False
         parent_items = {str(item.get("index")): item for item in parent.get("items", []) if isinstance(item, Mapping)}
         expected_failed = [str(item.get("index")) for item in parent.get("items", [])
-                           if isinstance(item, Mapping) and item.get("status") == "FAILED"]
+                           if isinstance(item, Mapping) and item.get("status") in {"FAILED", "REJECTED"}]
         actual_parent_indexes = [str(item.get("prior_item_index", "")) for item in current.get("items", [])
                                  if isinstance(item, Mapping)]
         if actual_parent_indexes != expected_failed:
@@ -1079,7 +1062,7 @@ def run_png_batch(
                 # settings remain honored up to the existing canonical maximum.
                 "candidates": min(int(request.get("candidates", 48)), 300),
                 "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
-                "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 240)), 240),
+                "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 900)), 900),
             })
             try:
                 control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"

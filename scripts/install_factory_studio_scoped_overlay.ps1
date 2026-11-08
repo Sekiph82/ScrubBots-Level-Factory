@@ -14,6 +14,7 @@ $runtimeRoot = 'C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\S
 $manifestPath = Join-Path $runtimeRoot '.factory-studio-install-manifest.json'
 Import-Module (Join-Path $PSScriptRoot 'scoped_overlay_transaction.psm1') -Force
 $authorizedNewManagedPaths = @(
+    'level_factory/scripts/factory_data_paths.gd',
     'src/scrubbots_pixel_factory/owner_art_storage.py',
     'src/scrubbots_pixel_factory/owner_folder_batch.py',
     'src/scrubbots_pixel_factory/owner_release_library.py',
@@ -29,6 +30,12 @@ $relativePaths = @(
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_studio_workspace_page.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
+	'level_factory/scripts/factory_data_paths.gd',
+	'level_factory/scripts/factory_studio_art_editor.gd',
+	'level_factory/scripts/factory_studio_art_preview.gd',
+	'level_factory/scripts/factory_studio_art_revalidation.gd',
+	'level_factory/scripts/factory_studio_dashboard.gd',
+	'level_factory/scripts/factory_studio_evidence_panel.gd',
 	'level_factory/project.godot',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',
@@ -42,6 +49,7 @@ $relativePaths = @(
     'src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py',
     'src/scrubbots_pixel_factory/supply_pipeline/verify.py',
     'src/scrubbots_pixel_factory/alpix_batch.py',
+	'src/scrubbots_pixel_factory/owner_upload.py',
 	'src/scrubbots_pixel_factory/owner_art_storage.py',
 	'src/scrubbots_pixel_factory/owner_folder_batch.py',
 	'src/scrubbots_pixel_factory/owner_release_library.py',
@@ -64,6 +72,7 @@ $authorizedOverlayAdditions = @(
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_studio_workspace_page.gd',
 	'level_factory/scripts/factory_core_gateway.gd',
+	'level_factory/scripts/factory_data_paths.gd',
     'level_factory/scripts/factory_studio_pipeline.gd',
     'src/scrubbots_pixel_factory/output/bundle.py',
     'src/scrubbots_pixel_factory/semantic/providers/registry.py',

@@ -6,7 +6,7 @@ extends VBoxContainer
 ## Python Factory Core owns validation and replay; this node only presents its result.
 
 const DASHBOARD_OPERATION := "factory-operations-dashboard-inspection"
-const OUTPUT_PREFIX := "res://output/"
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 
 var _core_gateway: RefCounted
 var _action_source: Node
@@ -48,12 +48,12 @@ func refresh_manifest() -> void:
 		_set_empty()
 		return
 	if not _valid_relative_path(relative_path):
-		_set_error("ERROR — choose a batch-manifest.json below res://output/.")
+		_set_error("ERROR — choose a batch-manifest.json below data/output/.")
 		return
 	if _core_gateway == null or not _core_gateway.has_method("run_dashboard_inspection"):
 		_set_error("UNAVAILABLE — canonical dashboard inspection is not connected.")
 		return
-	var result: Variant = _core_gateway.call("run_dashboard_inspection", OUTPUT_PREFIX + relative_path)
+	var result: Variant = _core_gateway.call("run_dashboard_inspection", DATA_PATHS.output_path(relative_path))
 	if result is Dictionary:
 		_projection = result.duplicate(true)
 	else:
@@ -78,7 +78,7 @@ func _build_controls() -> void:
 	add_child(heading)
 
 	var explanation := Label.new()
-	explanation.text = "Refresh a canonical batch-manifest.json from res://output/. This view derives evidence only; it does not edit manifests, schedule work, accept ownership, solve puzzles, or measure difficulty."
+	explanation.text = "Refresh a canonical batch-manifest.json from data/output/. This view derives evidence only; it does not edit manifests, schedule work, accept ownership, solve puzzles, or measure difficulty."
 	explanation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(explanation)
 

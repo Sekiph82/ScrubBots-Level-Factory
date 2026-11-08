@@ -12,11 +12,12 @@ enum ConnectionStatus {
 	ERROR,
 }
 
+const DATA_PATHS := preload("res://scripts/factory_data_paths.gd")
 const PYTHON_ENVIRONMENT_NAME := "SCRUBBOTS_FACTORY_PYTHON"
 const LAUNCHER_PATH := "res://scripts/factory_core_launcher.py"
-const GENERATE_OUTPUT_PATH := "res://output/studio-runs"
-const REPRODUCE_OUTPUT_PATH := "res://output/studio-reproductions"
-const STUDIO_REVALIDATION_TRANSPORT_PATH := "res://output/.lf06-008-revalidation/request.json"
+const GENERATE_OUTPUT_RELATIVE := "Factory Studio/Generated"
+const REPRODUCE_OUTPUT_RELATIVE := "Factory Studio/Reproductions"
+const STUDIO_REVALIDATION_TRANSPORT_RELATIVE := "Level Factory/Workspace/Requests/manual-art-revalidation/request.json"
 const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
 const OWNER_UPLOAD_OPERATION := "owner-upload-import"
@@ -135,7 +136,7 @@ func run_manual_art_revalidation(request_path: String) -> Dictionary:
 			"exit_code": -1,
 			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
 		}
-	if request_path.strip_edges() != STUDIO_REVALIDATION_TRANSPORT_PATH:
+	if request_path.strip_edges() != DATA_PATHS.data_path(STUDIO_REVALIDATION_TRANSPORT_RELATIVE):
 		return {
 			"operation": STUDIO_REVALIDATION_OPERATION,
 			"scope": "STRUCTURAL_ART_QA_ONLY",
@@ -148,7 +149,7 @@ func run_manual_art_revalidation(request_path: String) -> Dictionary:
 	var exit_code := _execute_process(python_executable, PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"studio-revalidate-art",
-		"--request-file", ProjectSettings.globalize_path(request_path),
+		"--request-file", request_path,
 	]), captured)
 	var process_output := "\n".join(captured)
 	var payload := _find_studio_result(captured)
@@ -176,21 +177,21 @@ func run_dashboard_inspection(manifest_path: String) -> Dictionary:
 			"error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace.",
 		}
 	var raw_path := manifest_path.strip_edges()
-	var normalized := raw_path.replace(char(92), "/")
-	var path_parts := normalized.split("/", false)
-	var relative_suffix := normalized.trim_prefix("res://output/")
-	if normalized.is_empty() or raw_path.contains(char(92)) or not normalized.begins_with("res://output/") or relative_suffix.contains(":") or normalized.contains("..") or not normalized.ends_with("/batch-manifest.json") or path_parts.has("."):
+	var normalized := raw_path.replace(char(92), "/").simplify_path()
+	var canonical_output := DATA_PATHS.output_path().replace(char(92), "/").to_lower()
+	var normalized_lower := normalized.to_lower()
+	if normalized.is_empty() or not normalized.is_absolute_path() or normalized.contains("..") or not normalized_lower.begins_with(canonical_output + "/") or not normalized_lower.ends_with("/batch-manifest.json"):
 		return {
 			"operation": DASHBOARD_INSPECTION_OPERATION,
 			"state": "ERROR",
 			"disposition": "ERROR",
-			"error": "ERROR — Dashboard manifest path is outside the approved res://output boundary.",
+			"error": "ERROR — Dashboard manifest path is outside the canonical data/output directory.",
 		}
 	var captured: Array[String] = []
 	var exit_code := _execute_process(python_executable, PackedStringArray([
 		ProjectSettings.globalize_path(LAUNCHER_PATH),
 		"dashboard-inspect",
-		"--manifest", ProjectSettings.globalize_path(normalized),
+		"--manifest", normalized,
 	]), captured)
 	var process_output := "\n".join(captured)
 	var payload := _find_dashboard_result(captured)
@@ -401,11 +402,11 @@ func _safe_output_root(requested: String, action: String) -> String:
 	if chosen.is_empty() and not _default_output_root.is_empty():
 		chosen = _default_output_root
 	if chosen.is_empty():
-		chosen = GENERATE_OUTPUT_PATH if action == "Generate" else REPRODUCE_OUTPUT_PATH
+		chosen = DATA_PATHS.output_path(GENERATE_OUTPUT_RELATIVE) if action == "Generate" else DATA_PATHS.output_path(REPRODUCE_OUTPUT_RELATIVE)
 	if action == "Reproduce" and (not requested.strip_edges().is_empty() or not _default_output_root.is_empty()):
 		chosen = chosen.path_join("reproduction")
-	var project_output := ProjectSettings.globalize_path("res://output").simplify_path()
-	var candidate := ProjectSettings.globalize_path(chosen) if chosen.begins_with("res://") or not chosen.is_absolute_path() else chosen
+	var project_output := DATA_PATHS.output_path().simplify_path()
+	var candidate := ProjectSettings.globalize_path(chosen) if chosen.begins_with("res://") else chosen
 	candidate = candidate.simplify_path()
 	var normalized_project_output := project_output.replace(char(92), "/").to_lower()
 	var normalized_candidate := candidate.replace(char(92), "/").to_lower()

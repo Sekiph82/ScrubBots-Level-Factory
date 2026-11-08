@@ -8,6 +8,7 @@ import json
 import re
 import stat
 from typing import Any, Callable
+from PIL import Image
 
 from .owner_art_storage import OwnerArtStorageError, _is_reparse_point, owner_art_paths
 from .semantic.normalization.core import RAW_ARTIFACT_MAX_BYTES, SUPPORTED_MEDIA_TYPE, SemanticRawArtifact
@@ -30,13 +31,11 @@ class OwnerFolderProgressError(RuntimeError):
 
 
 def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, str]]:
-    """Index atlas commit markers so interrupted 4x4 outputs cannot enter intake."""
+    """Index finalized atlas commits and SHA/pixel-verified migrated source links."""
 
     index: dict[str, dict[str, str]] = {}
-    pending = paths["pending"]
-    if not pending.exists():
-        return index
-    for manifest_path in sorted(pending.glob("pixellab-atlas-*.json"), key=lambda item: item.name):
+    transactions = paths["pixellab_transactions"]
+    for manifest_path in sorted(transactions.glob("pixellab-atlas-*.json"), key=lambda item: item.name) if transactions.exists() else []:
         if _is_reparse_point(manifest_path) or not manifest_path.is_file():
             raise OwnerFolderBatchError("PixelLab atlas transaction manifest is unsafe")
         try:
@@ -48,12 +47,14 @@ def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, s
         frames = value.get("frame_dimensions") if isinstance(value, dict) else None
         atlas_dimensions = value.get("atlas_dimensions") if isinstance(value, dict) else None
         slices = value.get("slices") if isinstance(value, dict) else None
-        if (not isinstance(value, dict) or value.get("schema") != "scrubbots-pixellab-atlas-transaction/v1"
-                or type(atlas_sha) is not str or len(atlas_sha) != 64
+        if (not isinstance(value, dict) or value.get("schema") not in {"scrubbots-pixellab-atlas-transaction/v1", "scrubbots-pixellab-atlas-transaction/v2"}
+                or type(atlas_sha) is not str or not re.fullmatch(r"[0-9a-f]{64}", atlas_sha)
                 or state not in {"IN_PROGRESS", "FINALIZED"}
                 or not isinstance(frames, list) or len(frames) != 2 or any(type(part) is not int or not 51 <= part <= 59 for part in frames)
                 or atlas_dimensions != [frames[0] * 4, frames[1] * 4]
-                or value.get("atlas_filename") != f"atlas-{atlas_sha}.png"
+                or type(value.get("atlas_filename")) is not str
+                or Path(value["atlas_filename"]).name != value["atlas_filename"]
+                or not value["atlas_filename"].lower().endswith(".png")
                 or not isinstance(slices, list) or len(slices) != 16
                 or manifest_path.name != f"pixellab-atlas-{atlas_sha}.json"):
             raise OwnerFolderBatchError("PixelLab atlas transaction manifest contract is invalid")
@@ -63,15 +64,13 @@ def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, s
                 raise OwnerFolderBatchError("PixelLab atlas transaction slice record is invalid")
             frame_index, frame_sha, filename = frame.get("index"), frame.get("sha256"), frame.get("filename")
             if (type(frame_index) is not int or not 1 <= frame_index <= 16
-                    or type(frame_sha) is not str or len(frame_sha) != 64
-                    or filename != f"atlas-{atlas_sha}-sprite-{frame_index:02d}-{frame_sha}.png"
+                    or type(frame_sha) is not str or not re.fullmatch(r"[0-9a-f]{64}", frame_sha)
+                    or type(filename) is not str or Path(filename).name != filename
+                    or not filename.lower().endswith(".png")
                     or filename in expected):
                 raise OwnerFolderBatchError("PixelLab atlas transaction slice identity is invalid")
             expected[filename] = frame_sha
-        if set(expected) != {
-                f"atlas-{atlas_sha}-sprite-{frame_index:02d}-{frame['sha256']}.png"
-                for frame_index, frame in enumerate(sorted(slices, key=lambda row: int(row["index"])), 1)
-        }:
+        if set(expected) != {str(frame.get("filename", "")) for frame in slices} or {frame.get("index") for frame in slices} != set(range(1, 17)):
             raise OwnerFolderBatchError("PixelLab atlas transaction must cover all sixteen row-major identities")
         group_valid = state == "FINALIZED"
         if group_valid:
@@ -94,9 +93,61 @@ def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, s
                     group_valid = False
                     break
         for filename, digest in expected.items():
-            if filename in index:
-                raise OwnerFolderBatchError("PixelLab transaction manifests reuse a Final filename")
+            if filename in index and index[filename]["sha256"] != digest:
+                raise OwnerFolderBatchError("PixelLab transaction manifests reuse a Final filename with conflicting bytes")
             index[filename] = {"state": str(state), "sha256": digest, "group_valid": "true" if group_valid else "false"}
+
+    # The reset migration records links reconstructed from exact decoded pixel
+    # matches. This is separate from provider-generation receipts and does not
+    # claim an API job identity that was not retained by the old data.
+    name_map_path = paths["pixellab"].parent / "asset-name-manifest.json"
+    if name_map_path.exists():
+        if _is_reparse_point(name_map_path) or not name_map_path.is_file():
+            raise OwnerFolderBatchError("PixelLab stable-name manifest is unsafe")
+        try:
+            name_map = json.loads(name_map_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise OwnerFolderBatchError("PixelLab stable-name manifest is unreadable") from exc
+        if (not isinstance(name_map, dict) or name_map.get("schema") != "scrubbots-pixellab-asset-names/v1"
+                or name_map.get("version") != 1 or name_map.get("migration_state") not in {None, "COMPLETE"}
+                or not isinstance(name_map.get("atlases"), dict) or not isinstance(name_map.get("sprites"), dict)):
+            raise OwnerFolderBatchError("PixelLab stable-name manifest is incomplete or invalid")
+        for sprite_key, sprite in name_map["sprites"].items():
+            if not isinstance(sprite, dict) or sprite.get("migration_basis") != "EXACT_DECODED_RGBA_PIXEL_MATCH":
+                continue
+            filename = sprite.get("filename")
+            digest = sprite.get("sha256")
+            atlas_sha = sprite.get("atlas_sha256")
+            frame_index = sprite.get("index")
+            atlas_record = name_map["atlases"].get(atlas_sha)
+            valid = (type(filename) is str and Path(filename).name == filename
+                     and type(digest) is str and re.fullmatch(r"[0-9a-f]{64}", digest)
+                     and type(atlas_sha) is str and re.fullmatch(r"[0-9a-f]{64}", atlas_sha)
+                     and type(frame_index) is int and 1 <= frame_index <= 16
+                     and isinstance(atlas_record, dict))
+            if valid:
+                sprite_path = paths["pixellab_final"] / filename
+                atlas_path = paths["pixellab_grid_files"] / str(atlas_record.get("filename", ""))
+                valid = (not _is_reparse_point(sprite_path) and sprite_path.is_file()
+                         and hashlib.sha256(sprite_path.read_bytes()).hexdigest() == digest
+                         and not _is_reparse_point(atlas_path) and atlas_path.is_file()
+                         and hashlib.sha256(atlas_path.read_bytes()).hexdigest() == atlas_sha)
+                if valid:
+                    try:
+                        with Image.open(sprite_path) as sprite_image, Image.open(atlas_path) as atlas_image:
+                            sprite_pixels = sprite_image.convert("RGBA")
+                            atlas_pixels = atlas_image.convert("RGBA")
+                            frame_w, frame_h = sprite_pixels.size
+                            x = ((frame_index - 1) % 4) * frame_w
+                            y = ((frame_index - 1) // 4) * frame_h
+                            valid = (atlas_pixels.size == (frame_w * 4, frame_h * 4)
+                                     and sprite_pixels.tobytes() == atlas_pixels.crop((x, y, x + frame_w, y + frame_h)).tobytes())
+                    except (OSError, ValueError):
+                        valid = False
+            if filename in index and index[filename]["sha256"] != digest:
+                raise OwnerFolderBatchError("Migrated PixelLab sprite conflicts with its transaction record")
+            index[str(filename)] = {"state": "FINALIZED", "sha256": str(digest),
+                                    "group_valid": "true" if valid else "false"}
     return index
 
 
