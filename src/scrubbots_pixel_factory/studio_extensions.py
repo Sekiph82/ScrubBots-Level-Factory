@@ -60,6 +60,29 @@ def _repository_root() -> Path:
     return factory_repository_root(__file__)
 
 
+def _studio_activity_output_directory() -> Path:
+    """Resolve Activity logs beside the Studio project actually running this module.
+
+    Installed Studio workers import code from Release while owner data remains in
+    the canonical checkout. Pipeline logs are UI runtime state, so their directory
+    must follow the loaded Studio project rather than the owner-data repository.
+    """
+    from .owner_art_storage import OwnerArtStorageError, _verify_path_under_root
+
+    module_path = Path(__file__).resolve()
+    studio_root = next((parent for parent in module_path.parents if (parent / "project.godot").is_file()), None)
+    if studio_root is None:
+        studio_root = _repository_root() / "level_factory"
+        if not studio_root.is_dir():
+            raise StudioExtensionError("Factory Studio project root is unavailable for Pipeline Activity output")
+    output_directory = studio_root / "output" / "studio-pipeline-activity"
+    try:
+        _verify_path_under_root(studio_root, output_directory)
+    except OwnerArtStorageError as exc:
+        raise StudioExtensionError("Factory Studio Pipeline Activity path is unsafe") from exc
+    return output_directory
+
+
 def extensions_root() -> Path:
     return (_repository_root() / "level_factory" / "output" / "studio-extensions").resolve()
 
@@ -1319,7 +1342,10 @@ def run_pipeline(*, source_id: str | None = None, candidate_id: str | None = Non
         actual_sha256 = str(identity_record.get("source_sha256", ""))
         if actual_sha256 != activity_source_sha256:
             raise StudioExtensionError("selected PNG identity changed before live pipeline activity started")
-        activity_writer = PipelineActivityWriter(_repository_root(), activity_run_id, source_id, actual_sha256)
+        activity_writer = PipelineActivityWriter(
+            _repository_root(), activity_run_id, source_id, actual_sha256,
+            output_directory=_studio_activity_output_directory(),
+        )
         activity_writer.emit("SOURCE", "RUNNING", "Validating the selected immutable PNG source.")
         payload = _run_pipeline_impl(source_id=source_id, candidate_id=candidate_id, request=request_data, activity_writer=activity_writer)
         disposition = str(payload.get("disposition", payload.get("state", "ERROR")))

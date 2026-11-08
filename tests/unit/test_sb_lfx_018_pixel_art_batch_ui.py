@@ -204,6 +204,26 @@ def test_pixellab_resume_inspection_is_read_only_and_reports_new_rows() -> None:
     assert not ledger_root.exists()
 
 
+def test_solver_activity_uses_running_studio_project_and_emits_active_png_row(monkeypatch) -> None:
+    from scrubbots_pixel_factory import studio_extensions
+
+    root = Path(__file__).resolve().parents[2]
+    expected = root / "level_factory" / "output" / "studio-pipeline-activity"
+    ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    record_progress = _function(ui, "_record_verified_batch_item_progress")
+    render_row = _function(ui, "_append_batch_item_activity_row")
+
+    assert studio_extensions._studio_activity_output_directory() == expected
+    release_module = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "src" / "scrubbots_pixel_factory" / "studio_extensions.py"
+    if release_module.is_file():
+        monkeypatch.setattr(studio_extensions, "__file__", str(release_module))
+        release_expected = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "studio-pipeline-activity"
+        assert studio_extensions._studio_activity_output_directory() == release_expected
+    assert 'state not in ["RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]' in record_progress
+    assert 'var run_reference := activity_id if state == "RUNNING" else run_id' in render_row
+    assert "activity_run_id=%s" in render_row
+
+
 def test_pixellab_resume_inspection_fails_closed_if_csv_changes_after_selection() -> None:
     csv_path = Path(__file__).resolve().parents[2] / "data" / "input" / "scrubbots_2000_prompts.csv"
     result = factory_core_launcher._inspect_pixellab_batch({

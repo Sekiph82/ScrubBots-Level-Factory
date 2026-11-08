@@ -161,9 +161,16 @@ func _test_active_source_follow(ui: Control, gateway: ReadOnlyGateway, source_co
 	ui.set("_operation_running", true)
 	var active_source_005 := str(sources[3].get("source_id", ""))
 	var active_source_006 := str(sources[4].get("source_id", ""))
+	var items: Array = job.get("items", [])
+	var active_item: Dictionary = items[3]
+	active_item["activity_run_id"] = "pipeline-ui-20261108T080000Z-000000000005"
+	items[3] = active_item
+	job["items"] = items
 	ui.call("_sync_verified_batch_follow", job)
 	_check(str(ui.get("_activity_source_id")) == active_source_005 and _detail_text(ui).contains("005_32x32px.png"), "%d-item active job did not align Activity and Details to 005" % source_count)
-	var items: Array = job.get("items", [])
+	ui.call("_record_verified_batch_item_progress", job)
+	var running_rows := _activity_row_texts(ui)
+	_check(running_rows.size() == 1 and running_rows[0].contains("005_32x32px.png") and running_rows[0].contains("RUNNING") and running_rows[0].contains("pipeline-ui-20261108T080000Z-000000000005"), "%d-item active PNG did not appear immediately in Activity with its run identity" % source_count)
 	var finished_item: Dictionary = items[3]
 	finished_item["status"] = "READY"
 	var finished_run_id := "run-%d-005" % source_count
@@ -183,7 +190,8 @@ func _test_active_source_follow(ui: Control, gateway: ReadOnlyGateway, source_co
 	ui.set("_batch_snapshot", job.duplicate(true))
 	ui.call("_sync_verified_batch_follow", job)
 	ui.call("_record_verified_batch_item_progress", job)
-	_check(_activity_row_texts(ui).size() == 1 and _activity_row_texts(ui)[0].contains("005_32x32px.png"), "%d-item completed current item 005 did not produce one source-specific row" % source_count)
+	var completed_rows := _activity_row_texts(ui)
+	_check(completed_rows.size() == 2 and completed_rows[0].contains("READY") and completed_rows[1].contains("RUNNING"), "%d-item completed current item 005 did not retain newest-first RUNNING and READY Activity rows" % source_count)
 	job["current_index"] = 4
 	var next_item: Dictionary = items[4]
 	next_item["status"] = "RUNNING"

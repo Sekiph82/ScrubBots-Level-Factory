@@ -3835,7 +3835,7 @@ func _record_verified_batch_item_progress(job: Dictionary) -> void:
 			continue
 		var attempt_id := str(item.get("attempt_id", ""))
 		var state := str(item.get("status", ""))
-		if attempt_id.is_empty() or state not in ["READY", "FAILED", "REJECTED", "SKIPPED"]:
+		if attempt_id.is_empty() or state not in ["RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]:
 			continue
 		if state == "READY" and (str(item.get("run_id", "")).is_empty() or str(_last_pipeline.get("run_id", "")) != str(item.get("run_id", "")) or str(_last_pipeline.get("source_id", "")) != source_id):
 			continue
@@ -4067,13 +4067,15 @@ func _append_batch_item_activity_row(item: Dictionary, job: Dictionary, force: b
 	var reason := str(item.get("reason", ""))
 	var filename := str(item.get("original_filename", item.get("display_name", "PNG")))
 	var run_id := str(item.get("run_id", "no run ID"))
-	var line := "%s · columns %d · %s · %s%s" % [filename, int(item.get("column_count", 0)), state, run_id, " · " + reason if not reason.is_empty() else ""]
+	var activity_id := str(item.get("activity_run_id", "no activity ID"))
+	var run_reference := activity_id if state == "RUNNING" else run_id
+	var line := "%s · columns %d · %s · %s%s" % [filename, int(item.get("column_count", 0)), state, run_reference, " · " + reason if not reason.is_empty() else ""]
 	var row := Label.new()
 	row.name = "BatchResult_%03d" % int(item.get("index", 0))
 	row.text = line
 	row.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.custom_minimum_size.y = 34
-	row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), int(item.get("index", 0)), attempt_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
+	row.tooltip_text = "job_id=%s\nitem_index=%d\nattempt_id=%s\nactivity_run_id=%s\nsource_id=%s\nsource_sha256=%s\nsource_record_sha256=%s\nstatus=%s\nreason=%s" % [str(job.get("job_id", "")), int(item.get("index", 0)), attempt_id, activity_id, str(item.get("source_id", "")), str(item.get("source_sha256", "")), str(item.get("source_record_sha256", "")), state, reason]
 	row.add_theme_font_size_override("font_size", 10)
 	row.add_theme_color_override("font_color", Color("#dce8f8"))
 	var scrollbar := _activity_scroll.get_v_scroll_bar()
@@ -4350,16 +4352,20 @@ func _refresh_activity_header() -> void:
 		var job_state := str(_batch_snapshot.get("state", ""))
 		var activity_state := job_state if job_state in ["PAUSED", "INTERRUPTED", "STOPPED"] else "RUNNING"
 		var current_caption := "Starting next verified PNG"
+		var phase_caption := "Canonical pipeline"
 		if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
 			var current: Dictionary = items[current_index]
-			current_caption = "%s · %d columns" % [str(current.get("original_filename", current.get("display_name", "Selected PNG"))).left(24), int(current.get("column_count", 0))]
+			var current_name := str(current.get("original_filename", current.get("display_name", "Selected PNG")))
+			var current_status := str(current.get("status", "QUEUED"))
+			current_caption = "%s · %s · %d columns" % [current_name.left(20), current_status, int(current.get("column_count", 0))]
+			phase_caption = "%s · %s · %d columns" % [current_name.left(20), current_status, int(current.get("column_count", 0))]
 		_activity_state_label.text = activity_state
 		var activity_color := Color("#245478") if activity_state == "RUNNING" else Color("#7a5824") if activity_state in ["PAUSED", "STOPPED"] else Color("#743d3c")
 		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(activity_color, activity_color.lightened(0.22)))
 		_activity_source_label.text = "%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + (1 if current_index is int else 0), int(counts.get("total", 0))]
 		_activity_source_label.tooltip_text = "Sequential batch %s" % _batch_job_id
-		_activity_phase_label.text = "Canonical pipeline · %d READY · %d failed" % [int(counts.get("ready", 0)), int(counts.get("failed", 0))]
-		_activity_phase_label.tooltip_text = _activity_message
+		_activity_phase_label.text = "%s · %d READY · %d failed" % [phase_caption, int(counts.get("ready", 0)), int(counts.get("failed", 0))]
+		_activity_phase_label.tooltip_text = "%s · batch=%s · item=%s · activity=%s" % [_activity_message, _batch_job_id, str(current_index), str(_batch_follow_item.get("activity_run_id", ""))]
 		return
 	var activity_matches_selection := folder_activity_active or _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
 	if not activity_matches_selection:
