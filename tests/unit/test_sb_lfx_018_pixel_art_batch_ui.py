@@ -208,20 +208,32 @@ def test_solver_activity_uses_running_studio_project_and_emits_active_png_row(mo
     from scrubbots_pixel_factory import studio_extensions
 
     root = Path(__file__).resolve().parents[2]
+    monkeypatch.delenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", raising=False)
     expected = root / "level_factory" / "output" / "studio-pipeline-activity"
     ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
     record_progress = _function(ui, "_record_verified_batch_item_progress")
     render_row = _function(ui, "_append_batch_item_activity_row")
 
     assert studio_extensions._studio_activity_output_directory() == expected
-    release_module = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "src" / "scrubbots_pixel_factory" / "studio_extensions.py"
-    if release_module.is_file():
-        monkeypatch.setattr(studio_extensions, "__file__", str(release_module))
-        release_expected = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "studio-pipeline-activity"
+    release_launcher = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "scripts" / "factory_core_launcher.py"
+    release_project = release_launcher.parents[1]
+    if (release_project / "project.godot").is_file():
+        monkeypatch.delenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", raising=False)
+        monkeypatch.setattr(factory_core_launcher, "__file__", str(release_launcher))
+        assert factory_core_launcher._set_studio_project_root() == release_project
+        release_expected = release_project / "output" / "studio-pipeline-activity"
         assert studio_extensions._studio_activity_output_directory() == release_expected
     assert 'state not in ["RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]' in record_progress
     assert 'var run_reference := activity_id if state == "RUNNING" else run_id' in render_row
     assert "activity_run_id=%s" in render_row
+
+
+def test_solver_activity_rejects_external_studio_project_root(monkeypatch) -> None:
+    from scrubbots_pixel_factory import studio_extensions
+
+    monkeypatch.setenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", r"C:\outside\factory")
+    with pytest.raises(studio_extensions.StudioExtensionError, match="outside the canonical checkout"):
+        studio_extensions._studio_activity_output_directory()
 
 
 def test_pixellab_resume_inspection_fails_closed_if_csv_changes_after_selection() -> None:

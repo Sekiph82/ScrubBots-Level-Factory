@@ -63,16 +63,29 @@ def _repository_root() -> Path:
 def _studio_activity_output_directory() -> Path:
     """Resolve Activity logs beside the Studio project actually running this module.
 
-    Installed Studio workers import code from Release while owner data remains in
-    the canonical checkout. Pipeline logs are UI runtime state, so their directory
-    must follow the loaded Studio project rather than the owner-data repository.
+    Studio workers import code from the canonical checkout even when the GUI runs
+    from Release. The launcher passes the active project root explicitly; module
+    __file__ alone is insufficient because it points into the canonical checkout.
     """
     from .owner_art_storage import OwnerArtStorageError, _verify_path_under_root
 
-    module_path = Path(__file__).resolve()
-    studio_root = next((parent for parent in module_path.parents if (parent / "project.godot").is_file()), None)
+    repository_root = Path(_repository_root()).resolve()
+    configured_root = os.environ.get("SCRUBBOTS_STUDIO_PROJECT_ROOT", "").strip()
+    studio_root: Path | None = None
+    if configured_root:
+        candidate = Path(configured_root).expanduser().resolve(strict=False)
+        try:
+            _verify_path_under_root(repository_root, candidate)
+        except OwnerArtStorageError as exc:
+            raise StudioExtensionError("Factory Studio project root is outside the canonical checkout") from exc
+        if not (candidate / "project.godot").is_file():
+            raise StudioExtensionError("configured Factory Studio project root is invalid")
+        studio_root = candidate
+    else:
+        module_path = Path(__file__).resolve()
+        studio_root = next((parent for parent in module_path.parents if (parent / "project.godot").is_file()), None)
     if studio_root is None:
-        studio_root = _repository_root() / "level_factory"
+        studio_root = repository_root / "level_factory"
         if not studio_root.is_dir():
             raise StudioExtensionError("Factory Studio project root is unavailable for Pipeline Activity output")
     output_directory = studio_root / "output" / "studio-pipeline-activity"

@@ -47,6 +47,16 @@ def _repository_root() -> Path:
     return factory_repository_root(__file__)
 
 
+def _set_studio_project_root() -> Path | None:
+    """Tell imported canonical modules which installed/source Studio launched this worker."""
+    project_root = Path(__file__).resolve().parents[1]
+    if not (project_root / "project.godot").is_file():
+        os.environ.pop("SCRUBBOTS_STUDIO_PROJECT_ROOT", None)
+        return None
+    os.environ["SCRUBBOTS_STUDIO_PROJECT_ROOT"] = str(project_root)
+    return project_root
+
+
 def _folder_activity_context(request: Mapping[str, object]):
     run_id = str(request.get("activity_run_id", ""))
     source_id = str(request.get("activity_source_id", ""))
@@ -1577,6 +1587,9 @@ def _primary_supply_verify_main(arguments: Sequence[str]) -> int:
 
 
 def _main() -> int:
+    # The launcher can live under Release while its Python modules are imported
+    # from the canonical checkout. Preserve the active GUI's output location.
+    _set_studio_project_root()
     repository_root = _repository_root()
     sys.path.insert(0, str(repository_root / "src"))
     sys.path.insert(0, str(repository_root / "scripts"))
