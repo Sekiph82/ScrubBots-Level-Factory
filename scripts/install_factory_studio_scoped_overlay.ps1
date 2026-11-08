@@ -117,6 +117,9 @@ $authorizedOverlayAdditions = @(
 # cancel-marker/process-tree handling. Permit repairing only those measured
 # bytes; any other manifest mismatch remains a hard stop.
 $authorizedRepairHashes = @{
+    # The installed launcher has this exact raw SHA-256 and normalizes byte-
+    # for-byte to the published canonical source at d2886c874888efd412497f229f376f36d6eae8d0.
+    'level_factory/scripts/factory_core_launcher.py' = '660c4558b69ff5cd5e669a8614e134146c47ac9a2d5c5af2dec0cc25789b10b1'
     # This exact installed Studio module is a CRLF checkout of the published
     # 6f089a8 PNG-batch solver fix. The manifest is stale, but the bytes have
     # now been matched against the immutable Git source before allowing repair.
