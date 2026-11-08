@@ -2977,6 +2977,33 @@ func _refresh_gameplay_sources() -> void:
 		var height := int(source.get("height", 0))
 		if width >= 20 and width <= 59 and height >= 20 and height <= 59:
 			_gameplay_sources.append(source)
+	_gameplay_sources.sort_custom(_gameplay_source_precedes)
+
+
+func _gameplay_source_precedes(left: Dictionary, right: Dictionary) -> bool:
+	var left_name := str(left.get("display_filename", left.get("original_filename", ""))).get_file()
+	var right_name := str(right.get("display_filename", right.get("original_filename", ""))).get_file()
+	var left_number := _level_factory_sequence_number(left_name)
+	var right_number := _level_factory_sequence_number(right_name)
+	if left_number >= 0 and right_number >= 0 and left_number != right_number:
+		return left_number < right_number
+	if (left_number >= 0) != (right_number >= 0):
+		return left_number >= 0
+	var left_key := left_name.to_lower()
+	var right_key := right_name.to_lower()
+	if left_key != right_key:
+		return left_key < right_key
+	return str(left.get("source_id", "")) < str(right.get("source_id", ""))
+
+
+func _level_factory_sequence_number(filename: String) -> int:
+	var regex := RegEx.new()
+	if regex.compile("^LF-(\\d+)\\.png$") != OK:
+		return -1
+	var result := regex.search(filename)
+	if result == null:
+		return -1
+	return int(result.get_string(1))
 
 
 func _gameplay_source_index(source_id: String) -> int:
