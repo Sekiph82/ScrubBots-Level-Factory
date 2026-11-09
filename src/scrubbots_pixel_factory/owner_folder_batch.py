@@ -16,9 +16,7 @@ from .owner_upload import owner_upload_root
 
 
 _PROVIDER_KEYS = {
-    "ALPIX": "alpix",
     "PIXELLAB": "pixellab_final",
-    "OWNER_SUGGESTIONS": "owner_suggestions",
 }
 
 

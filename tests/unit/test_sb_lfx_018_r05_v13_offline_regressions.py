@@ -804,10 +804,9 @@ def test_owner_art_folder_contract_uses_exact_owner_spelling() -> None:
     paths = owner_art_storage.owner_art_paths(root)
 
     assert paths["input"] == root / "data/input"
-    assert paths["alpix"] == root / "data/output/Alpix"
     assert paths["pixellab_grid_files"] == root / "data/output/Pixellab/Grid Files"
     assert paths["pixellab_final"] == root / "data/output/Pixellab/Final"
-    assert paths["owner_suggestions"] == root / "data/output/Owner Suggestions"
+    assert "alpix" not in paths and "owner_suggestions" not in paths
     assert paths["pending"] == root / "data/Release Pool/Pending"
     assert paths["ready"] == root / "data/Release Pool/Ready"
     assert paths["failed"] == root / "data/Release Pool/Failed"
@@ -910,8 +909,6 @@ def test_owner_art_archivers_reject_invalid_inputs_before_filesystem_access(monk
             "source_kind": "IMPORTED_ATLAS",
             "frames": [],
         })
-    with pytest.raises(owner_art_storage.OwnerArtStorageError, match="PNG byte stream"):
-        owner_art_storage.archive_alpix_png(b"not a png")
 
 
 def test_owner_art_outputs_route_only_through_explicit_catalog_functions() -> None:
@@ -922,26 +919,24 @@ def test_owner_art_outputs_route_only_through_explicit_catalog_functions() -> No
 
     assert "archive_pixellab_export(source_root, manifest)" in launcher
     assert "archive_pixellab_export(output_directory, manifest)" in launcher
-    assert 'ensure_owner_art_layout(_repository_root())["alpix"]' in launcher
-    assert 'archive_alpix_png(raw_png, repository_root=_repository_root())' in launcher
+    assert "alpix" not in launcher.casefold()
+    assert "owner_suggestions" not in launcher.casefold()
     csv_picker = ui.split("func _open_batch_csv() -> void:", 1)[1].split("func _process_level_csv", 1)[0]
-    assert 'globalize_path("res://../data/input")' in csv_picker
+    assert '_factory_data_path("input")' in csv_picker
     assert 'func _is_canonical_input_csv(path: String)' in ui
     assert 'validate_owner_input_csv(csv_path_value, repository_root=_repository_root())' in launcher
-    assert 'validate_owner_input_csv(_text(request.get("csv_path"), "csv_path"), repository_root=_repository_root())' in launcher
-    owner_source_menu = ui.split("func _open_owner_folder_sources() -> void:", 1)[1].split("func _on_owner_folder_provider_selected", 1)[0]
-    assert 'menu.add_item("ALPIX · Finished PNGs", 0)' in owner_source_menu
-    assert 'menu.add_item("PixelLab · Final slices only", 1)' in owner_source_menu
-    assert 'menu.add_item("Owner Suggestions", 2)' in owner_source_menu
-    assert "Browse another folder" not in owner_source_menu
-    assert "data/output/Alpix/**" in ignore
+    owner_source_menu = ui.split("func _open_owner_folder_sources() -> void:", 1)[1].split("func _on_owner_folder_selected", 1)[0]
+    assert "Compatibility binding only" in owner_source_menu
+    assert "_restore_imported_sources()" in owner_source_menu
+    assert "menu.add_item" not in owner_source_menu
+    assert "data/output/Alpix/**" not in ignore
     assert "data/output/Pixellab/Grid Files/**" in ignore
     assert "data/output/Pixellab/Final/**" in ignore
-    assert "data/output/Owner Suggestions/**" in ignore
+    assert "data/output/Owner Suggestions/**" not in ignore
     assert "data/Release Pool/**" in ignore
 
 
-def test_owner_art_layout_and_alpix_archive_are_idempotent_and_repo_local() -> None:
+def test_owner_art_layout_is_pixellab_only_and_repo_local() -> None:
     root = Path(__file__).resolve().parent / ".r10-owner-art-storage-test-output"
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
@@ -950,15 +945,9 @@ def test_owner_art_layout_and_alpix_archive_are_idempotent_and_repo_local() -> N
         repository.mkdir(parents=True)
         paths = owner_art_storage.ensure_owner_art_layout(repository)
         assert all(path.is_dir() for path in paths.values())
-        raw_png = b"\x89PNG\r\n\x1a\nowner-art-storage-offline-test"
-
-        first = owner_art_storage.archive_alpix_png(raw_png, repository_root=repository)
-        second = owner_art_storage.archive_alpix_png(raw_png, repository_root=repository)
-
-        assert first == second
-        assert first.read_bytes() == raw_png
-        assert first.parent == paths["alpix"]
-        assert first.name == f"alpix-{hashlib.sha256(raw_png).hexdigest()}.png"
+        assert "alpix" not in paths and "owner_suggestions" not in paths
+        assert not (repository / "data/output/Alpix").exists()
+        assert not (repository / "data/output/Owner Suggestions").exists()
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():
@@ -1018,7 +1007,7 @@ def test_pixellab_catalog_archives_exact_slices_and_finalizes_atomically() -> No
         transaction = json.loads(Path(first["transaction_path"]).read_text(encoding="utf-8"))
         assert transaction["state"] == "FINALIZED"
         assert len(transaction["slices"]) == 16
-        assert not list(final_paths["pixellab"].glob("*.json"))
+        assert owner_art_storage.pixellab_asset_name_manifest(repository).is_file()
         assert json.loads(Path(first["catalog_path"]).read_text(encoding="utf-8")) == {
             key: value for key, value in first.items() if key not in {"catalog_path", "transaction_path", "transaction_state"}
         }
@@ -1088,7 +1077,7 @@ def test_pixellab_interrupted_archive_rolls_back_new_pngs_and_keeps_in_progress_
     assert scanned["entries"][0]["reason"] == "PIXELLAB_ATLAS_TRANSACTION_INCOMPLETE_OR_INVALID"
 
 
-def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_files() -> None:
+def test_owner_folder_scan_is_non_recursive_pixellab_only_and_uncapped(monkeypatch) -> None:
     root = Path(__file__).resolve().parent / ".r10-owner-folder-test-output"
     if root.exists():
         raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
@@ -1100,22 +1089,31 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
         grid = owner_art_storage.owner_art_paths(repository)["pixellab_grid_files"]
         grid.mkdir(parents=True, exist_ok=True)
         png_bytes = BytesIO()
-        Image.new("RGBA", (32, 32), (10, 20, 30, 255)).save(png_bytes, format="PNG")
+        Image.new("RGBA", (56, 56), (10, 20, 30, 255)).save(png_bytes, format="PNG")
         for name in ("b.png", "A.PNG"):
-            (folders["ALPIX"] / name).write_bytes(png_bytes.getvalue())
-        nested = folders["ALPIX"] / "nested"
+            (folders["PIXELLAB"] / name).write_bytes(png_bytes.getvalue())
+        nested = folders["PIXELLAB"] / "nested"
         nested.mkdir()
         (nested / "ignored.png").write_bytes(png_bytes.getvalue())
         (grid / "raw-atlas.png").write_bytes(png_bytes.getvalue())
 
-        scanned = owner_folder_batch.scan_owner_source_folder(folders["ALPIX"], repository_root=repository)
+        def transaction_index(paths):
+            return {
+                item.name: {"state": "FINALIZED", "sha256": hashlib.sha256(item.read_bytes()).hexdigest(),
+                            "group_valid": "true"}
+                for item in paths["pixellab_final"].glob("*.png")
+            }
 
-        assert scanned["provider"] == "ALPIX"
+        monkeypatch.setattr(owner_folder_batch, "_pixellab_transaction_index", transaction_index)
+
+        scanned = owner_folder_batch.scan_owner_source_folder(folders["PIXELLAB"], repository_root=repository)
+
+        assert scanned["provider"] == "PIXELLAB"
         assert [Path(path).name for path in scanned["paths"]] == ["A.PNG", "b.png"]
         assert scanned["png_count"] == 2
-        invalid = folders["ALPIX"] / "invalid.png"
+        invalid = folders["PIXELLAB"] / "invalid.png"
         invalid.write_bytes(b"not a PNG")
-        rescanned = owner_folder_batch.scan_owner_source_folder(folders["ALPIX"], repository_root=repository)
+        rescanned = owner_folder_batch.scan_owner_source_folder(folders["PIXELLAB"], repository_root=repository)
         assert rescanned["png_count"] == 3
         assert any(item.get("disposition") == "REJECTED" and item.get("display_path") == "invalid.png" for item in rescanned["entries"])
         with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="raw atlases"):
@@ -1124,19 +1122,20 @@ def test_owner_folder_scan_is_non_recursive_provider_bounded_and_excludes_grid_f
         alternative.mkdir()
         with pytest.raises(owner_folder_batch.OwnerFolderBatchError, match="canonical owner artwork folders"):
             owner_folder_batch.scan_owner_source_folder(alternative, repository_root=repository, explicit_alternative=True)
-        large_folder = folders["OWNER_SUGGESTIONS"]
+        large_folder = root / "large-repo" / "data" / "output" / "Pixellab" / "Final"
+        large_folder.mkdir(parents=True)
         for index in range(151):
             (large_folder / f"{index:03d}.png").write_bytes(b"")
         progress_events = []
         large_scan = owner_folder_batch.scan_owner_source_folder(
-            large_folder, repository_root=repository, progress_callback=progress_events.append,
+            large_folder, repository_root=root / "large-repo", progress_callback=progress_events.append,
         )
         assert large_scan["png_count"] == 151
         assert len(large_scan["entries"]) == 151
         assert all(item["disposition"] == "REJECTED" for item in large_scan["entries"])
         assert progress_events[0]["stage"] == "FOLDER"
-        assert progress_events[1]["stage"] == "DISCOVERY"
-        assert progress_events[1]["total"] == 151
+        discovery_event = next(event for event in progress_events if event["stage"] == "DISCOVERY")
+        assert discovery_event["total"] == 151
         file_events = [event for event in progress_events if event["stage"] == "FILE CHECK"]
         assert len(file_events) == 151
         assert file_events[-1]["completed"] == 151
@@ -1189,7 +1188,7 @@ def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) 
     ledger = root / "ledger"
     calls = {}
 
-    def fake_import(path):
+    def fake_import(path, **_kwargs):
         raw = Path(path).read_bytes()
         digest = hashlib.sha256(raw).hexdigest()
         seen_before = digest in calls
@@ -1208,8 +1207,8 @@ def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) 
         monkeypatch.setattr(studio_extensions, "extensions_root", lambda: ledger)
         monkeypatch.setattr(studio_extensions, "import_owner_upload", fake_import)
 
-        first = studio_extensions.batch_import(files, source_provider="ALPIX", source_folder="approved")
-        second = studio_extensions.batch_import(files, source_provider="ALPIX", source_folder="approved")
+        first = studio_extensions.batch_import(files, source_provider="PIXELLAB", source_folder="approved")
+        second = studio_extensions.batch_import(files, source_provider="PIXELLAB", source_folder="approved")
 
         assert first["items"][0]["disposition"] == "IMPORTED"
         assert first["items"][1]["disposition"] == "SKIPPED_DUPLICATE"
@@ -1220,7 +1219,7 @@ def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) 
         another_folder_file = root / "four" / "same.png"
         another_folder_file.parent.mkdir()
         another_folder_file.write_bytes(b"different provider folder identity")
-        cross_folder = studio_extensions.batch_import([another_folder_file], source_provider="OWNER_SUGGESTIONS", source_folder="other-approved-folder")
+        cross_folder = studio_extensions.batch_import([another_folder_file], source_provider="PIXELLAB", source_folder="other-approved-folder")
         assert cross_folder["items"][0]["filename_collision"] is True
         assert cross_folder["items"][0]["collision_with_source_id"] in {
             first["items"][0]["source_id"], first["items"][2]["source_id"],
@@ -1257,7 +1256,7 @@ def test_concurrent_and_interrupted_owner_uploads_fail_or_reuse_without_overwrit
         assert states.count("IMPORTED") == 1
         assert states.count("ALREADY_IMPORTED") == 7
         source_id = "owner-upload-" + hashlib.sha256(raw).hexdigest()
-        assert len(list(upload_root.glob(f"{source_id}/source.png"))) == 1
+        assert len(list(upload_root.glob(f"{source_id}/same.png"))) == 1
 
         interrupted_bytes = BytesIO()
         Image.new("RGBA", (32, 32), (77, 88, 99, 255)).save(interrupted_bytes, format="PNG")
@@ -1307,8 +1306,10 @@ def test_owner_release_library_keeps_status_history_separate_and_ready_gated(mon
         assert repeated["idempotent"] is True
         failed = owner_release_library.transition(source_id, "FAILED", **{**kwargs, "reason": "synthetic solver timeout",
             "pipeline_run_id": "run-first", "evidence": {"solution": {"state": "NOT_AVAILABLE"}}})
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="explicit retry bound to the prior event"):
+            owner_release_library.transition(source_id, "PENDING", **{**kwargs, "retry_of": failed["event_sha256"]})
         retried = owner_release_library.transition(source_id, "PENDING", **{**kwargs, "reason": "explicit retry",
-            "pipeline_run_id": "run-retry", "retry_of": failed["event_sha256"]})
+            "pipeline_run_id": "run-retry", "retry_of": failed["event_sha256"], "evidence": {"explicit_retry": True}})
 
         real_ready_check = owner_release_library._verified_ready_entry
         monkeypatch.setattr(owner_release_library, "_verified_ready_entry", lambda _source, _run: (_ for _ in ()).throw(owner_release_library.OwnerReleaseLibraryError("canonical evidence absent")))
@@ -1346,28 +1347,218 @@ def test_owner_release_library_keeps_status_history_separate_and_ready_gated(mon
             ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
         candidate_entry_path.write_text(json.dumps(candidate_entry), encoding="utf-8")
         assert (root / "data/Release Pool/Ready" / f"{source_id}.json").is_file()
-        assert hashlib.sha256((root / "data/Release Pool/Ready" / f"{source_id}.png").read_bytes()).hexdigest() == digest
+        assert hashlib.sha256((root / "data/Release Pool/Ready" / source.name).read_bytes()).hexdigest() == digest
         assert not (root / "data/Release Pool/Pending" / f"{source_id}.json").exists()
         assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 4
 
         rejected = owner_release_library.transition(source_id, "REJECTED", **{**kwargs, "reason": "owner rejected"})
         assert rejected["status"] == "REJECTED"
         assert not (root / "data/Release Pool/Ready" / f"{source_id}.json").exists()
-        assert not (root / "data/Release Pool/Ready" / f"{source_id}.png").exists()
+        assert not (root / "data/Release Pool/Ready" / source.name).exists()
         assert (root / "data/Release Pool/Rejected" / f"{source_id}.json").is_file()
-        assert hashlib.sha256((root / "data/Release Pool/Rejected" / f"{source_id}.png").read_bytes()).hexdigest() == digest
-        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="REJECTED -> PENDING"):
-            owner_release_library.transition(source_id, "PENDING", **kwargs)
-        final = owner_release_library.list_records(repository_root=root)
-        assert final["counts"]["REJECTED"] == 1 and final["counts"]["READY"] == 0
-        assert final["records"][0]["retry_of"] is None
-        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 5
+        assert hashlib.sha256((root / "data/Release Pool/Rejected" / source.name).read_bytes()).hexdigest() == digest
         with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="excluded from solver retry"):
             owner_release_library.assert_solver_allowed([source_id], repository_root=root)
+        with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="explicit retry bound to the prior event"):
+            owner_release_library.transition(source_id, "PENDING", **kwargs)
+        retried_rejection = owner_release_library.transition(source_id, "PENDING", **{**kwargs,
+            "reason": "explicit retry after reviewing rejection", "retry_of": rejected["event_sha256"],
+            "evidence": {"explicit_retry": True}})
+        assert retried_rejection["status"] == "PENDING"
+        assert not (root / "data/Release Pool/Rejected" / f"{source_id}.json").exists()
+        final = owner_release_library.list_records(repository_root=root)
+        assert final["counts"] == {"FAILED": 0, "PENDING": 1, "READY": 0, "REJECTED": 0}
+        assert final["records"][0]["retry_of"] == rejected["event_sha256"]
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 6
+
+        from scrubbots_pixel_factory import studio_extensions
+        monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
+            "source_id": source_id, "source_sha256": digest, "source_path": str(source), "original_filename": "frog.png"
+        })
+        job = {"batch_id": "batch-live-projection", "items": []}
+        item = {"source_id": source_id, "source_sha256": digest, "original_source_path": str(source),
+                "source_provider": "PIXELLAB", "status": "RUNNING", "run_id": "run-live-projection"}
+        started = owner_release_library.begin_batch_item_attempt(job, item, repository_root=root)
+        assert started["status"] == "PENDING"
+        item["status"] = "FAILED"
+        item["reason"] = "synthetic canonical solver failure"
+        failed_projection = owner_release_library.record_batch_item_outcome(job, item, repository_root=root)
+        assert failed_projection["status"] == "FAILED"
+        assert owner_release_library.list_records(repository_root=root)["counts"]["FAILED"] == 1
+        item["status"] = "REJECTED"
+        item["reason"] = "synthetic source identity rejection"
+        rejected_projection = owner_release_library.record_batch_item_outcome(job, item, repository_root=root)
+        assert rejected_projection["status"] == "REJECTED"
+        assert owner_release_library.list_records(repository_root=root)["counts"] == {
+            "FAILED": 0, "PENDING": 0, "READY": 0, "REJECTED": 1
+        }
+        assert not (root / "data/Release Pool/Failed" / f"{source_id}.json").exists()
+        assert (root / "data/Release Pool/Rejected" / f"{source_id}.json").is_file()
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 9
     finally:
         if root.exists():
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("Owner release library test output escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_release_startup_reconciles_interrupted_status_projection_from_history() -> None:
+    root = Path(__file__).resolve().parent / ".codex-owner-release-projection-recovery-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+        image = BytesIO()
+        Image.new("RGBA", (32, 32), (30, 60, 90, 255)).save(image, format="PNG")
+        raw = image.getvalue()
+        source = source_dir / "recovery.png"
+        source.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        source_id = "owner-upload-" + digest
+        kwargs = {"source_sha256": digest, "provider": "PIXELLAB",
+                  "original_source_path": str(source), "repository_root": root}
+        pending = owner_release_library.transition(source_id, "PENDING", **kwargs)
+        failed = owner_release_library.transition(source_id, "FAILED", **{**kwargs, "reason": "synthetic interrupted projection"})
+
+        release_root = root / "data/Release Pool"
+        failed_json = release_root / "Failed" / f"{source_id}.json"
+        failed_png = release_root / "Failed" / source.name
+        failed_json.unlink()
+        failed_png.unlink()
+
+        # Simulate a crash after immutable FAILED history was committed but
+        # before the status-folder projection move replaced the prior PENDING row.
+        pending_projection = {**pending}
+        pending_digest = pending_projection.pop("event_sha256")
+        pending_path = release_root / "Pending" / f"{source_id}.json"
+        pending_path.write_bytes(owner_release_library._json_bytes({**pending_projection, "event_sha256": pending_digest}))
+        object_path = release_root / ".objects" / f"{digest}.png"
+        legacy_pending_png = release_root / "Pending" / f"{source_id}.png"
+        legacy_pending_png.hardlink_to(object_path)
+
+        recovered = owner_release_library.reconcile_status_projections(repository_root=root)
+        assert recovered["state"] == "RECONCILED"
+        assert recovered["checked"] == 1
+        assert recovered["repaired"] == 1
+        view = owner_release_library.list_records(repository_root=root)
+        assert view["counts"] == {"FAILED": 1, "PENDING": 0, "READY": 0, "REJECTED": 0}
+        assert view["records"][0]["event_sha256"] == failed["event_sha256"]
+        assert hashlib.sha256(failed_png.read_bytes()).hexdigest() == digest
+        assert not pending_path.exists()
+        assert not legacy_pending_png.exists()
+        assert (release_root / "Failed" / source.name).is_file()
+        assert not (release_root / "Failed" / f"{source_id}.png").exists()
+        history_before = sorted(path.read_bytes() for path in (release_root / ".history" / source_id).glob("*.json"))
+
+        repeated = owner_release_library.reconcile_status_projections(repository_root=root)
+        assert repeated["state"] == "RECONCILED"
+        assert repeated["checked"] == 1
+        assert repeated["repaired"] == 0
+        assert sorted(path.read_bytes() for path in (release_root / ".history" / source_id).glob("*.json")) == history_before
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Release projection recovery fixture escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_owner_release_startup_restores_terminal_batch_outcome_without_overwriting_newer_status(monkeypatch) -> None:
+    root = Path(__file__).resolve().parent / ".codex-owner-release-terminal-batch-reconcile-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        from scrubbots_pixel_factory import png_batch
+
+        source_dir = root / "source"
+        source_dir.mkdir(parents=True)
+
+        def make_png(name: str, color: tuple[int, int, int, int]):
+            image = BytesIO()
+            Image.new("RGBA", (32, 32), color).save(image, format="PNG")
+            raw = image.getvalue()
+            source = source_dir / name
+            source.write_bytes(raw)
+            digest = hashlib.sha256(raw).hexdigest()
+            return source, raw, digest, "owner-upload-" + digest
+
+        source, _raw, digest, source_id = make_png("recovered.png", (30, 60, 90, 255))
+        protected_source, _protected_raw, protected_digest, protected_id = make_png("newer.png", (90, 60, 30, 255))
+        queued_source, _queued_raw, queued_digest, queued_id = make_png("still-queued.png", (15, 120, 30, 255))
+        pending_kwargs = {"source_sha256": digest, "provider": "PIXELLAB",
+                          "original_source_path": str(source), "repository_root": root}
+        protected_kwargs = {"source_sha256": protected_digest, "provider": "PIXELLAB",
+                            "original_source_path": str(protected_source), "repository_root": root}
+        owner_release_library.transition(source_id, "PENDING", **pending_kwargs)
+        protected_failure = owner_release_library.transition(
+            protected_id, "FAILED", **{**protected_kwargs, "reason": "newer explicit solver result"},
+        )
+        queued_kwargs = {"source_sha256": queued_digest, "provider": "PIXELLAB",
+                         "original_source_path": str(queued_source), "repository_root": root}
+        owner_release_library.transition(queued_id, "PENDING", **queued_kwargs)
+        records = {}
+        for sid in (source_id, protected_id, queued_id):
+            record = source_dir / f"{sid}.json"
+            record.write_text("{}", encoding="utf-8")
+            records[sid] = record
+
+        job_id = "png-batch-reconcile-test"
+        item = {"index": 7, "source_id": source_id, "source_sha256": digest,
+                "source_record_sha256": hashlib.sha256(records[source_id].read_bytes()).hexdigest(), "original_filename": "recovered.png",
+                "status": "FAILED", "reason": "canonical run timed out", "run_id": "pipeline-reconcile-test",
+                "finished_at": "2026-11-09T11:00:00+00:00"}
+        protected_item = {**item, "index": 8, "source_id": protected_id,
+                          "source_sha256": protected_digest, "original_filename": "newer.png",
+                          "reason": "stale older job must not replace status"}
+        queued_failure = {**item, "index": 9, "source_id": queued_id,
+                          "source_sha256": queued_digest, "source_record_sha256": hashlib.sha256(records[queued_id].read_bytes()).hexdigest(),
+                          "original_filename": "still-queued.png", "reason": "older failure",
+                          "finished_at": "2026-11-09T10:05:00+00:00"}
+        old_job = {"job_id": "png-batch-older", "import_batch_id": "batch-older", "batch_digest": "a" * 64,
+                   "state_digest": "b" * 64, "created_at": "2026-11-09T10:00:00+00:00",
+                   "updated_at": "2026-11-09T10:10:00+00:00", "settings": {},
+                   "items": [queued_failure]}
+        queued_item = {**queued_failure, "status": "QUEUED", "reason": "awaiting solver", "finished_at": None}
+        job = {"job_id": job_id, "import_batch_id": "batch-reconcile-test", "batch_digest": "a" * 64,
+               "state_digest": "b" * 64, "updated_at": "2026-11-09T11:01:00+00:00",
+               "created_at": "2026-11-09T11:00:00+00:00", "settings": {},
+               "items": [item, protected_item, queued_item]}
+        jobs_root = root / "data/Level Factory/Batches/Jobs/jobs"
+        jobs_root.mkdir(parents=True)
+        (jobs_root / f"{job_id}.json").write_text("{}", encoding="utf-8")
+        (jobs_root / f"{old_job['job_id']}.json").write_text("{}", encoding="utf-8")
+
+        monkeypatch.setattr(png_batch, "_root", lambda: root / "data/Level Factory/Batches/Jobs")
+        jobs_by_id = {job_id: job, old_job["job_id"]: old_job}
+        monkeypatch.setattr(png_batch, "_read_job", lambda current_job_id: jobs_by_id[current_job_id])
+        monkeypatch.setattr(png_batch, "_job_lineage_matches_snapshot", lambda _job, _batch: True)
+        monkeypatch.setattr(studio_extensions, "batch_load", lambda batch_id: {"batch": {"batch_id": batch_id}})
+        monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda sid, **_kwargs: {
+            "source_id": sid,
+            "source_sha256": {source_id: digest, protected_id: protected_digest, queued_id: queued_digest}[sid],
+        })
+        monkeypatch.setattr(studio_extensions, "_source_record_paths", lambda sid, *_args: (
+            records[sid], {source_id: source, protected_id: protected_source, queued_id: queued_source}[sid],
+        ))
+
+        recovered = owner_release_library.reconcile_terminal_batch_projections(repository_root=root)
+        assert recovered["state"] == "RECONCILED"
+        assert recovered["terminal_sources"] == 1
+        assert recovered["repaired"] == 1
+        assert recovered["repaired_source_ids"] == [source_id]
+        view = owner_release_library.list_records(repository_root=root)
+        assert view["counts"] == {"FAILED": 2, "PENDING": 1, "READY": 0, "REJECTED": 0}
+        rows = {row["source_id"]: row for row in view["records"]}
+        assert rows[source_id]["reason"] == "canonical run timed out"
+        assert rows[source_id]["evidence"]["reconciled_job_id"] == job_id
+        assert rows[protected_id]["event_sha256"] == protected_failure["event_sha256"]
+        assert rows[queued_id]["status"] == "PENDING"
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 2
+        assert len(list((root / "data/Release Pool/.history" / protected_id).glob("*.json"))) == 1
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("Batch outcome reconciliation fixture escaped its owned directory")
             shutil.rmtree(root)
 
 
@@ -1393,6 +1584,179 @@ def test_owner_release_library_concurrent_same_import_creates_one_event() -> Non
             if root.resolve().parent != root.parent.resolve():
                 raise AssertionError("Owner release concurrency fixture escaped its owned directory")
             shutil.rmtree(root)
+
+
+def test_pixellab_final_inventory_is_sha_reconciled_into_pending() -> None:
+    from scrubbots_pixel_factory import studio_extensions
+
+    root = Path(__file__).resolve().parent / ".r10-pixellab-final-pending-reconcile-test-output"
+    if root.exists():
+        raise AssertionError(f"Refusing pre-existing test-owned output: {root}")
+    try:
+        final = root / "data/output/Pixellab/Final"
+        final.mkdir(parents=True)
+        release_pool = root / "data/Release Pool"
+        release_pool.mkdir(parents=True)
+        source_path = final / "robot.png"
+        image = BytesIO()
+        Image.new("RGBA", (32, 32), (20, 40, 60, 255)).save(image, format="PNG")
+        raw = image.getvalue()
+        source_path.write_bytes(raw)
+        digest = hashlib.sha256(raw).hexdigest()
+        source_id = "owner-upload-" + digest
+        imported_root = root / "data/Level Factory/Imported"
+        imported_source = imported_root / source_id / source_path.name
+
+        from scrubbots_pixel_factory import owner_art_storage, owner_folder_batch
+
+        real_paths = owner_art_storage.owner_art_paths
+        # The normal resolver already targets this fixture root when passed explicitly.
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr(owner_folder_batch, "scan_owner_source_folder", lambda _folder, **_kwargs: {
+            "provider": "PIXELLAB", "entries": [{"disposition": "ELIGIBLE", "source_sha256": digest,
+                "path": str(source_path), "display_path": source_path.name}]
+        })
+
+        def import_source(_path: str, *, repository_root: str | Path | None = None) -> dict[str, str]:
+            imported_source.parent.mkdir(parents=True, exist_ok=True)
+            imported_source.write_bytes(raw)
+            return {"state": "IMPORTED", "source_id": source_id}
+
+        monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda _root=None: imported_root)
+        monkeypatch.setattr(studio_extensions, "import_owner_upload", import_source)
+        monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id, **_kwargs: {
+            "source_id": source_id, "source_sha256": digest, "source_path": str(imported_source),
+            "original_filename": source_path.name,
+        })
+        monkeypatch.setattr(studio_extensions, "validate_owner_source", lambda *_args, **_kwargs: {
+            "exact_logical_source": True, "structural": {"disposition": "PASS"},
+            "void_capability": {"state": "NOT_REQUIRED"},
+        })
+        active, invalid = studio_extensions._sync_current_pixellab_final_sources(root)
+        assert active == {source_id}
+        assert invalid == []
+        first = owner_release_library.list_records(repository_root=root)
+        assert first["counts"]["PENDING"] == 1
+        pending_png = root / "data/Release Pool/Pending" / source_path.name
+        assert pending_png.read_bytes() == raw
+
+        active_again, invalid_again = studio_extensions._sync_current_pixellab_final_sources(root)
+        assert active_again == {source_id}
+        assert invalid_again == []
+        assert owner_release_library.list_records(repository_root=root)["counts"]["PENDING"] == 1
+        assert len(list((root / "data/Release Pool/.history" / source_id).glob("*.json"))) == 1
+        assert source_path.read_bytes() == raw
+        assert real_paths(root)["pixellab_final"] == final
+        monkeypatch.undo()
+    finally:
+        if root.exists():
+            if root.resolve().parent != root.parent.resolve():
+                raise AssertionError("PixelLab Pending reconciliation fixture escaped its owned directory")
+            shutil.rmtree(root)
+
+
+def test_new_lf_batch_snapshot_requires_current_pending_sha_bound_pixellab_sources(monkeypatch) -> None:
+    digest_a = "a" * 64
+    digest_b = "b" * 64
+    source_a = "owner-upload-" + digest_a
+    source_b = "owner-upload-" + digest_b
+    rows = {
+        "records": [
+            {"source_id": source_a, "source_sha256": digest_a, "provider": "PIXELLAB",
+             "status": "PENDING", "original_source_path": r"C:\Factory\Imported\a.png"},
+            {"source_id": source_b, "source_sha256": digest_b, "provider": "PIXELLAB",
+             "status": "READY", "original_source_path": r"C:\Factory\Imported\b.png"},
+        ]
+    }
+    monkeypatch.setattr(owner_release_library, "list_records", lambda status=None: {
+        "records": [row for row in rows["records"] if row["status"] == status]
+    })
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id: {
+        "source_sha256": source_id.removeprefix("owner-upload-"),
+        "original_filename": "a.png" if source_id == source_a else "b.png",
+    })
+    monkeypatch.setattr(studio_extensions, "create_loaded_png_batch", lambda source_ids: {
+        "batch_id": "batch-loaded-pending-only", "items": [{"source_id": item} for item in source_ids]
+    })
+    created = studio_extensions.create_pending_png_batch([source_a])
+    assert created["queue_authority"] == "CURRENT_RELEASE_POOL_PENDING"
+    assert created["pending_verified_count"] == 1
+    assert [item["source_id"] for item in created["items"]] == [source_a]
+    with pytest.raises(studio_extensions.StudioExtensionError, match="Pending queue changed"):
+        studio_extensions.create_pending_png_batch([source_b])
+    with pytest.raises(studio_extensions.StudioExtensionError, match="duplicate source IDs"):
+        studio_extensions.create_pending_png_batch([source_a, source_a])
+
+
+def test_solve_again_can_queue_release_pool_failures_without_the_last_ui_batch(monkeypatch) -> None:
+    from scrubbots_pixel_factory import png_batch
+
+    sha_failed = "a" * 64
+    sha_rejected = "b" * 64
+    failed_id = "owner-upload-" + sha_failed
+    rejected_id = "owner-upload-" + sha_rejected
+    records = [
+        {"source_id": failed_id, "source_sha256": sha_failed, "provider": "PIXELLAB", "status": "FAILED",
+         "original_source_path": r"C:\Factory\data\Level Factory\Imported\failed.png", "event_sha256": "c" * 64,
+         "reason": "canonical game-host timeout"},
+        {"source_id": rejected_id, "source_sha256": sha_rejected, "provider": "PIXELLAB", "status": "REJECTED",
+         "original_source_path": r"C:\Factory\data\Level Factory\Imported\rejected.png", "event_sha256": "d" * 64,
+         "reason": "palette validation failed"},
+    ]
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: r"C:\Factory\game")
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: Path(r"C:\Factory"))
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id: {
+        "source_sha256": source_id.removeprefix("owner-upload-"),
+        "original_filename": "failed.png" if source_id == failed_id else "rejected.png",
+    })
+    monkeypatch.setattr(owner_release_library, "list_records", lambda **_kwargs: {"records": records})
+    snapshots: list[list[str]] = []
+    monkeypatch.setattr(studio_extensions, "create_loaded_png_batch", lambda source_ids: (
+        snapshots.append(list(source_ids)) or {"batch_id": "batch-retry-snapshot", "items": []}
+    ))
+    transitions: list[dict[str, object]] = []
+
+    def record_transition(source_id, status, **kwargs):
+        transitions.append({"source_id": source_id, "status": status, **kwargs})
+        return {"source_id": source_id, "status": status, "event_sha256": "e" * 64}
+
+    monkeypatch.setattr(owner_release_library, "transition", record_transition)
+    monkeypatch.setattr(png_batch, "create_png_batch", lambda batch_id, settings: {
+        "state": "SUCCESS", "disposition": "CREATED",
+        "job": {"job_id": "png-batch-retry-from-release", "import_batch_id": batch_id,
+                "settings": settings, "items": []},
+    })
+
+    result = png_batch.retry_release_pool_sources([failed_id, rejected_id], {
+        "game_project": r"C:\Factory\game", "solver_timeout_seconds": 900,
+    })
+
+    assert result["disposition"] == "RETRY_CREATED_FROM_RELEASE_POOL"
+    assert snapshots == [[failed_id, rejected_id]]
+    assert [event["status"] for event in transitions] == ["PENDING", "PENDING"]
+    assert [event["retry_of"] for event in transitions] == ["c" * 64, "d" * 64]
+    assert [event["evidence"]["prior_reason"] for event in transitions] == [
+        "canonical game-host timeout", "palette validation failed",
+    ]
+    assert result["job"]["job_id"] == "png-batch-retry-from-release"
+
+
+def test_solve_again_rejects_non_pixel_lab_or_non_failed_archive_records_without_mutation(monkeypatch) -> None:
+    from scrubbots_pixel_factory import png_batch
+
+    source_id = "owner-upload-" + "a" * 64
+    row = {"source_id": source_id, "source_sha256": "a" * 64, "provider": "OWNER_UPLOAD",
+           "status": "FAILED", "original_source_path": r"C:\Factory\failed.png", "event_sha256": "b" * 64}
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: r"C:\Factory\game")
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: Path(r"C:\Factory"))
+    monkeypatch.setattr(owner_release_library, "list_records", lambda **_kwargs: {"records": [row]})
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
+        "source_sha256": "a" * 64, "original_filename": "failed.png",
+    })
+    monkeypatch.setattr(studio_extensions, "create_loaded_png_batch", lambda _source_ids: pytest.fail("must not snapshot"))
+
+    result = png_batch.retry_release_pool_sources([source_id], {"game_project": r"C:\Factory\game"})
+    assert result["disposition"] == "RETRY_SOURCE_NOT_FAILED_OR_REJECTED"
 
 
 def test_owner_release_library_refuses_to_replace_unverified_owner_projection() -> None:
@@ -1434,11 +1798,16 @@ def test_owner_release_library_is_wired_without_weakening_canonical_pool() -> No
     assert "record_import_items(payload)" in launcher
     assert "record_batch_outcomes(completed_job)" in launcher
     assert "assert_solver_allowed(sources)" in launcher
-    assert 'state == "REJECTED"' in ui and "cannot be sent to the solver" in ui
-    assert 'solve_again.text = "Retry Failed"' in ui
+    assert 'state in ["FAILED", "REJECTED"]' in ui
+    assert '"Retry Failed / Rejected (%d)"' in ui
+    assert '"Retry This PNG"' in ui
+    assert 'func _pending_gameplay_sources()' in ui
+    assert '"Run Pending Batch (%d)"' in ui
+    assert '_startup_source_inventory_loaded' in ui
+    assert 'STARTUP_INVENTORY_COMPLETE' in ui
     assert "_refresh_owner_release_library_panel()" in ui
     assert "Keep prior loaded-batch failures visible" in ui
-    assert 'status not in ["FAILED", "REJECTED"]' in ui
+    assert 'str(record.get("status", "")) in ["FAILED", "REJECTED"]' in ui
     assert 'pipeline.get("disposition") != "READY"' in canonical_pool
     assert "canonical solver/replay/difficulty/QA and owner-eligibility evidence" in Path("src/scrubbots_pixel_factory/owner_release_library.py").read_text(encoding="utf-8")
 
@@ -1470,7 +1839,8 @@ def test_new_solve_gate_accepts_only_current_canonical_final_sources(monkeypatch
 
     current = "owner-upload-" + "1" * 64
     legacy = "owner-upload-" + "2" * 64
-    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources", lambda _root: ({current}, []))
+    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources",
+                        lambda _root, *, game_project=None: ({current}, []))
     assert launcher._canonical_final_source_gate([current]) is None
     blocked = launcher._canonical_final_source_gate([legacy])
     assert blocked is not None
@@ -1488,14 +1858,15 @@ def test_new_solve_gate_fails_closed_when_final_inventory_cannot_be_verified(mon
     launcher = __import__("factory_core_launcher")
     from scrubbots_pixel_factory import studio_extensions
 
-    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources", lambda _root: (_ for _ in ()).throw(OSError("synthetic inventory failure")))
+    monkeypatch.setattr(studio_extensions, "_sync_current_pixellab_final_sources",
+                        lambda _root, *, game_project=None: (_ for _ in ()).throw(OSError("synthetic inventory failure")))
     blocked = launcher._canonical_final_source_gate(["owner-upload-" + "3" * 64])
     assert blocked is not None
     assert blocked["state"] == "BLOCKED"
     assert blocked["disposition"] == "CANONICAL_FINAL_INVENTORY_UNAVAILABLE"
 
 
-def test_new_pipeline_records_use_release_pool_status_folders_and_legacy_reads_remain(tmp_path: Path, monkeypatch) -> None:
+def test_new_pipeline_records_use_release_pool_status_folders_and_ignore_legacy_paths(tmp_path: Path, monkeypatch) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
     extension_root = repository / "level_factory" / "output" / "studio-extensions"
@@ -1513,29 +1884,25 @@ def test_new_pipeline_records_use_release_pool_status_folders_and_legacy_reads_r
     legacy = extension_root / "pipelines" / "pipeline-legacy-fixture.json"
     legacy.parent.mkdir(parents=True)
     legacy.write_text('{"run_id":"pipeline-legacy-fixture"}', encoding="utf-8")
-    assert studio_extensions._pipeline_path("pipeline-legacy-fixture") == legacy
-    assert legacy in studio_extensions._pipeline_paths()
+    assert studio_extensions._pipeline_path("pipeline-legacy-fixture") == repository / "data/Release Pool/Pending/Pipelines/pipeline-legacy-fixture.json"
+    assert legacy not in studio_extensions._pipeline_paths()
     conflicting_legacy = extension_root / "pipelines" / ready.name
     conflicting_legacy.write_text('{"run_id":"pipeline-ready-fixture","disposition":"FAILED"}', encoding="utf-8")
-    with pytest.raises(studio_extensions.StudioExtensionError, match="conflicting"):
-        studio_extensions._pipeline_paths()
-    with pytest.raises(studio_extensions.StudioExtensionError, match="conflicting"):
-        studio_extensions._pipeline_path("pipeline-ready-fixture")
+    assert studio_extensions._pipeline_path("pipeline-ready-fixture") == ready
+    assert conflicting_legacy.is_file()  # Legacy history is preserved but cannot override canonical status.
     with pytest.raises(studio_extensions.StudioExtensionError, match="unsafe"):
         studio_extensions._pipeline_path("../escape")
 
 
-def test_pixellab_provider_dialog_uses_non_overlapping_scrollable_vertical_layout() -> None:
+def test_pixellab_status_dialog_is_fixed_provider_without_selection_controls() -> None:
     ui = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
     dialog = ui.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
-    assert "dialog.min_size = Vector2i(680, 420)" in dialog
-    assert 'content.name = "ProviderDialogContent"' in dialog
-    assert 'reason_scroll.name = "ProviderStatusScroll"' in dialog
-    assert "reason_scroll.add_child(status_label)" in dialog
-    assert "content.add_child(choice)" in dialog and "content.add_child(reason_scroll)" in dialog
-    assert "dialog.add_child(content)" in dialog
-    assert "dialog.add_child(status_label)" not in dialog
-    assert "dialog.popup_centered(Vector2i(680, 420))" in dialog
+    assert '_provider_model = "PIXELLAB"' in dialog
+    assert 'dialog.title = "PixelLab Pro · 4×4"' in dialog
+    assert 'dialog.add_button("Refresh status"' in dialog
+    assert 'dialog.add_button("Open Credential Manager"' in dialog
+    assert "choice" not in dialog
+    assert "ALPIX" not in dialog
 
 
 def test_pixellab_details_gallery_spacing_is_fixed_and_alpix_is_unmodified_by_helper() -> None:

@@ -188,8 +188,63 @@ def _counts(items: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     states = Counter(str(item.get("status", "UNKNOWN")) for item in items)
     return {
         "total": len(items), "ready": states["READY"], "failed": states["FAILED"],
-        "rejected": states["REJECTED"], "skipped": states["SKIPPED_DUPLICATE"],
-        "remaining": sum(states[name] for name in ("QUEUED", "RUNNING", "VERIFYING_EXISTING")),
+        "rejected": states["REJECTED"],
+        "skipped": states["SKIPPED_DUPLICATE"] + states["SKIPPED"],
+        "remaining": sum(states[name] for name in ("QUEUED", "RUNNING", "VERIFYING_EXISTING", "RETRYABLE", "INCONCLUSIVE")),
+    }
+
+
+class OwnerReleaseProjectionError(RuntimeError):
+    """A terminal solver outcome could not be mirrored to Release Pool."""
+
+
+def _persist_owner_release_item(job: Mapping[str, Any], item: dict[str, Any]) -> None:
+    """Immediately project a terminal item into its current Release Pool status."""
+    if item.get("status") not in {"READY", "FAILED", "REJECTED"}:
+        return
+    try:
+        from .owner_release_library import record_batch_item_outcome
+
+        event = record_batch_item_outcome(job, item)
+        item["owner_release_projection"] = {
+            "state": "RECORDED" if event else "NOT_APPLICABLE",
+            "status": event.get("status") if event else None,
+            "event_sha256": event.get("event_sha256") if event else None,
+        }
+    except Exception as exc:
+        detail = f"{type(exc).__name__}: {str(exc)[:400]}"
+        item["owner_release_projection"] = {"state": "ERROR", "reason": detail}
+        raise OwnerReleaseProjectionError(detail) from exc
+
+
+def _persist_projection_or_pause(job: dict[str, Any], item: dict[str, Any]) -> dict[str, Any] | None:
+    """Persist a terminal source status before allowing the batch to advance."""
+    try:
+        _persist_owner_release_item(job, item)
+    except OwnerReleaseProjectionError as exc:
+        job["state"] = "PROJECTION_ERROR"
+        job["current_index"] = item.get("index")
+        job["projection_error"] = {
+            "source_id": item.get("source_id"), "status": item.get("status"),
+            "reason": str(exc)[:512], "retryable": True,
+        }
+        job["updated_at"] = _now()
+        saved = _write_job(job)
+        return {"state": "ERROR", "disposition": "OWNER_RELEASE_PROJECTION_ERROR",
+                "job": saved, "reason": str(exc)[:512]}
+    job.pop("projection_error", None)
+    return None
+
+
+def _persist_owner_release_attempt(job: Mapping[str, Any], item: dict[str, Any]) -> None:
+    """Durably keep an item in Pending before invoking its solver attempt."""
+    from .owner_release_library import begin_batch_item_attempt
+
+    event = begin_batch_item_attempt(job, item)
+    item["owner_release_projection"] = {
+        "state": "RECORDED" if event else "NOT_APPLICABLE",
+        "status": event.get("status") if event else None,
+        "event_sha256": event.get("event_sha256") if event else None,
     }
 
 
@@ -579,10 +634,34 @@ def _configured_game_project(settings: Mapping[str, Any]) -> str | None:
 
 def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
     from .studio_extensions import _digest, batch_load, create_loaded_png_batch
+    from .owner_release_library import list_records as list_release_records
 
     imported = batch_load(batch_id)["batch"]
     if not isinstance(imported.get("items"), list):
         raise ValueError("an imported PNG batch must contain an items list")
+    pending_by_id = {
+        str(row.get("source_id", "")): row
+        for row in list_release_records("PENDING").get("records", [])
+        if isinstance(row, Mapping)
+    }
+    pending_status_snapshot: list[dict[str, str]] = []
+    for source_item in imported["items"]:
+        if not isinstance(source_item, Mapping):
+            return {"state": "BLOCKED", "disposition": "PENDING_QUEUE_ITEM_INVALID", "job": {}}
+        source_id = str(source_item.get("source_id", ""))
+        source_sha = str(source_item.get("source_sha256", ""))
+        status_row = pending_by_id.get(source_id)
+        if (not status_row or status_row.get("source_sha256") != source_sha
+                or str(status_row.get("provider", "")).upper() not in {"PIXELLAB", "OWNER_UPLOAD"}):
+            return {
+                "state": "BLOCKED", "disposition": "SOURCE_NOT_CURRENTLY_PENDING",
+                "reason": "Every new PNG solver job must be built from the exact current PixelLab Pending status and SHA.",
+                "source_id": source_id, "job": {},
+            }
+        pending_status_snapshot.append({
+            "source_id": source_id, "source_sha256": source_sha,
+            "pending_event_sha256": str(status_row.get("event_sha256", "")),
+        })
     inventory_batch_id = batch_id
     inventory_source_count = len(imported["items"])
     snapshot = dict(settings or {})
@@ -627,6 +706,8 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     immutable_plan = {
         "batch_id": batch_id, "inventory_batch_id": inventory_batch_id,
         "batch_digest": _digest(imported), "settings": snapshot,
+        "queue_authority": "CURRENT_RELEASE_POOL_PENDING",
+        "pending_status_snapshot": pending_status_snapshot,
         "excluded_ready_sources": excluded_ready, "items": source_items,
     }
     plan_digest = _digest(immutable_plan)
@@ -654,14 +735,24 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
     return {"state": "SUCCESS", "disposition": "CREATED", "job": saved}
 
 
-def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
-    """Create a deterministic explicit retry for FAILED and REJECTED items."""
+def retry_failed_png_batch(job_id: str, source_ids: Sequence[str] | None = None) -> dict[str, Any]:
+    """Create an explicit retry for all failed/rejected items or a selected subset."""
     from .studio_extensions import _digest, _source_record_paths, batch_load, verify_owner_source
 
     original = _read_job(job_id)
     if original.get("state") != "COMPLETE":
         return {"state": "BLOCKED", "disposition": "BATCH_NOT_FINISHED", "job": original}
-    retryable_items = [item for item in original.get("items", []) if item.get("status") in {"FAILED", "REJECTED"}]
+    all_retryable = [item for item in original.get("items", []) if item.get("status") in {"FAILED", "REJECTED"}]
+    if source_ids is None:
+        retryable_items = all_retryable
+    else:
+        requested = [str(source_id) for source_id in source_ids]
+        if not requested or len(set(requested)) != len(requested):
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_SELECTION_INVALID", "job": original}
+        retryable_by_source = {str(item.get("source_id", "")): item for item in all_retryable}
+        if any(source_id not in retryable_by_source for source_id in requested):
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_NOT_FAILED_OR_REJECTED", "job": original}
+        retryable_items = [retryable_by_source[source_id] for source_id in requested]
     if not retryable_items:
         return {"state": "BLOCKED", "disposition": "NO_RETRYABLE_FAILED_OR_REJECTED_ITEMS", "job": original}
     batch_id = str(original.get("import_batch_id", ""))
@@ -693,12 +784,13 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
                 return {"state": "BLOCKED", "disposition": "RETRY_PARENT_MISMATCH", "job": original,
                         "reason": "Retry item no longer matches its SHA-bound parent assignment."}
     batch_items = {str(item.get("source_id", "")): item for item in batch.get("items", []) if isinstance(item, Mapping)}
+    source_paths: dict[str, str] = {}
     for item in retryable_items:
         source_id = str(item.get("source_id", ""))
         source = batch_items.get(source_id)
         try:
             current = verify_owner_source(source_id, source_directory=original.get("settings", {}).get("source_directory"))
-            record_path, _png_path = _source_record_paths(source_id, original.get("settings", {}).get("source_directory"))
+            record_path, png_path = _source_record_paths(source_id, original.get("settings", {}).get("source_directory"))
             record_sha = hashlib.sha256(record_path.read_bytes()).hexdigest()
         except Exception as exc:
             return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "job": original,
@@ -710,12 +802,14 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
                 or record_sha != item.get("source_record_sha256")):
             return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "job": original,
                     "reason": "Current PNG or source-record SHA differs from the original nine-source composite."}
+        source_paths[source_id] = str(png_path.resolve())
     items: list[dict[str, Any]] = []
     for index, previous in enumerate(retryable_items):
         items.append({
             "index": index, "prior_item_index": previous.get("index"),
             "source_id": previous.get("source_id"), "source_sha256": previous.get("source_sha256"),
             "source_record_sha256": previous.get("source_record_sha256"),
+            "original_source_path": source_paths[str(previous.get("source_id", ""))],
             "display_name": previous.get("display_name", previous.get("original_filename", "")),
             "original_filename": previous.get("original_filename", previous.get("display_name", "")),
             "status": "QUEUED", "reason": "", "column_count": previous.get("column_count"),
@@ -735,6 +829,16 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
         if existing.get("plan_digest") != plan_digest:
             raise ValueError("retry job identity collides with a different failed/rejected-item snapshot")
         return {"state": "SUCCESS", "disposition": "EXISTING_RETRY", "job": existing}
+    from .owner_release_library import list_records, transition
+
+    status_rows = {str(row.get("source_id", "")): row for row in list_records()["records"]}
+    for item in items:
+        source_id = str(item["source_id"])
+        prior = status_rows.get(source_id)
+        if (prior is None or prior.get("status") not in {"FAILED", "REJECTED"}
+                or prior.get("source_sha256") != item.get("source_sha256")):
+            return {"state": "BLOCKED", "disposition": "RETRY_RELEASE_STATUS_MISMATCH", "job": original,
+                    "reason": "Current Release Pool status must be the exact FAILED/REJECTED source SHA before retry."}
     quotas = Counter(int(item["column_count"]) for item in items if item.get("column_count") in (3, 4, 5))
     job = {
         "schema": JOB_SCHEMA, "version": JOB_VERSION, "job_id": retry_id,
@@ -747,7 +851,104 @@ def retry_failed_png_batch(job_id: str) -> dict[str, Any]:
         "planned_quotas": {str(columns): quotas[columns] for columns in (3, 4, 5)},
         "ready_mix": {"3": 0, "4": 0, "5": 0},
     }
-    return {"state": "SUCCESS", "disposition": "RETRY_CREATED", "job": _write_job(job)}
+    saved = _write_job(job)
+    for item in items:
+        source_id = str(item["source_id"])
+        prior = status_rows.get(source_id)
+        try:
+            transition(
+                source_id, "PENDING", source_sha256=str(item["source_sha256"]),
+                provider=str(prior.get("provider", "PIXELLAB")) if prior else "PIXELLAB",
+                original_source_path=source_paths[source_id], reason="Explicit retry queued; previous outcome remains in immutable history.",
+                batch_id=str(saved.get("import_batch_id", "")) or None,
+                retry_of=str(prior.get("event_sha256", "")) if prior else None,
+                evidence={"explicit_retry": True, "retry_job_id": retry_id,
+                          "retry_parent_job_id": job_id, "retry_item_index": int(item["index"])},
+            )
+        except Exception as exc:
+            return {"state": "BLOCKED", "disposition": "RETRY_RELEASE_STATUS_WRITE_FAILED", "job": saved,
+                    "reason": str(exc)[:400]}
+    return {"state": "SUCCESS", "disposition": "RETRY_CREATED", "job": saved}
+
+
+def retry_release_pool_sources(source_ids: Sequence[str], settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Queue explicit current FAILED/REJECTED Release Pool sources for a new verified run.
+
+    This entry point deliberately does not depend on the Studio's last in-memory
+    batch. Current status event hashes, immutable source bytes and a fresh
+    Pending-only PNG batch establish the retry authority.
+    """
+    from . import studio_extensions as extensions
+    from .owner_release_library import OwnerReleaseLibraryError, list_records, transition
+
+    requested = [str(source_id) for source_id in source_ids]
+    if not requested or len(requested) != len(set(requested)):
+        return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_SELECTION_INVALID", "reason": "Select one or more unique failed/rejected PixelLab sources."}
+    snapshot = dict(settings or {})
+    configured_game_project = _configured_game_project(snapshot)
+    if configured_game_project is None:
+        return {"state": "BLOCKED", "disposition": "PINNED_GAME_PROJECT_MISSING", "reason": "Configured ScrubBots project is missing project.godot; no retry was queued."}
+    snapshot["game_project"] = configured_game_project
+
+    current = {
+        str(row.get("source_id", "")): row
+        for row in list_records(repository_root=extensions._repository_root()).get("records", [])
+        if isinstance(row, Mapping)
+    }
+    selected: list[dict[str, Any]] = []
+    for source_id in requested:
+        row = current.get(source_id)
+        if (row is None or row.get("status") not in {"FAILED", "REJECTED"}
+                or str(row.get("provider", "")).upper() != "PIXELLAB"):
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_NOT_FAILED_OR_REJECTED",
+                    "source_id": source_id,
+                    "reason": "Retry is limited to a current SHA-matched PIXELLAB Final source whose latest status is FAILED or REJECTED."}
+        source_sha = str(row.get("source_sha256", ""))
+        try:
+            source = extensions.verify_owner_source(source_id)
+        except Exception as exc:
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "source_id": source_id,
+                    "reason": f"Current source could not be verified: {str(exc)[:240]}"}
+        if (source_id != "owner-upload-" + source_sha
+                or source.get("source_sha256") != source_sha
+                or not str(source.get("original_filename", "")).lower().endswith(".png")):
+            return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_CHANGED", "source_id": source_id,
+                    "reason": "Current source bytes or filename no longer match the saved Release Pool identity."}
+        selected.append(dict(row))
+
+    # Persist the immutable source snapshot before changing any current status.
+    composite = extensions.create_loaded_png_batch(requested)
+    batch_id = str(composite.get("batch_id", ""))
+    if not batch_id:
+        return {"state": "BLOCKED", "disposition": "RETRY_SNAPSHOT_FAILED", "reason": "An immutable retry source snapshot could not be created."}
+
+    retry_events: list[dict[str, Any]] = []
+    for row in selected:
+        source_id = str(row["source_id"])
+        try:
+            retry_events.append(transition(
+                source_id, "PENDING", source_sha256=str(row["source_sha256"]),
+                provider="PIXELLAB", original_source_path=str(row["original_source_path"]),
+                reason="Explicit Solve Again retry queued; prior %s result and reason remain in immutable history." % row["status"],
+                batch_id=batch_id, retry_of=str(row["event_sha256"]),
+                evidence={"explicit_retry": True, "retry_source": "CURRENT_RELEASE_POOL_STATUS",
+                          "prior_status": str(row["status"]), "prior_reason": str(row.get("reason", ""))[:512],
+                          "retry_source_event_sha256": str(row["event_sha256"]), "retry_snapshot_batch_id": batch_id},
+                repository_root=extensions._repository_root(),
+            ))
+        except (OwnerReleaseLibraryError, OSError, ValueError) as exc:
+            return {"state": "ERROR", "disposition": "RETRY_PENDING_PROJECTION_FAILED",
+                    "queued_source_ids": [str(event.get("source_id", "")) for event in retry_events],
+                    "source_id": source_id, "reason": str(exc)[:512]}
+
+    created = create_png_batch(batch_id, snapshot)
+    if str(created.get("state", "")) != "SUCCESS" or not isinstance(created.get("job"), Mapping):
+        return {"state": "ERROR", "disposition": "RETRY_QUEUED_JOB_CREATION_FAILED",
+                "queued_source_ids": [str(event.get("source_id", "")) for event in retry_events],
+                "reason": str(created.get("reason", created.get("disposition", "Retry remains safely Pending; no solver ran."))),
+                "job": created.get("job", {})}
+    return {"state": "SUCCESS", "disposition": "RETRY_CREATED_FROM_RELEASE_POOL",
+            "retry_events": retry_events, "composite": composite, "job": created["job"]}
 
 
 def batch_terminal_message(job: Mapping[str, Any], loaded_count: int | None = None) -> str:
@@ -761,6 +962,130 @@ def batch_terminal_message(job: Mapping[str, Any], loaded_count: int | None = No
     loaded = int(job.get("snapshot_source_count", total) if loaded_count is None else loaded_count)
     prefix = "FINISHED WITH FAILURES · " if job.get("state") == "COMPLETE" and (failed or rejected) else ""
     return f"{prefix}Loaded {loaded} · Job {total} · {ready} READY · {failed} FAILED · {rejected} REJECTED · {skipped} SKIPPED · {remaining} remaining"
+
+
+def find_resumable_pending_batch(
+    pending_snapshot: Mapping[str, Any],
+    active_source_ids: Sequence[str],
+) -> dict[str, Any]:
+    """Find a durable in-flight job whose unfinished rows still match current Pending.
+
+    The immutable batch snapshot remains the original job's full source set. As
+    rows finish, Pending shrinks, so an exact snapshot lookup cannot recover the
+    job after restart. This read-only matcher binds every persisted row to its
+    original snapshot, the current Final source set, and its latest Release Pool
+    status before offering that job for resume.
+    """
+    from . import studio_extensions as extensions
+    from .owner_release_library import list_records
+
+    pending_rows = [row for row in pending_snapshot.get("items", []) if isinstance(row, Mapping)]
+    pending_by_id = {
+        str(row.get("source_id", "")): (str(row.get("source_sha256", "")), str(row.get("source_record_sha256", "")))
+        for row in pending_rows
+    }
+    if not pending_by_id or len(pending_by_id) != len(pending_rows):
+        return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None, "mutated": False}
+    active_ids = {str(source_id) for source_id in active_source_ids if str(source_id)}
+    if not pending_by_id.keys() <= active_ids:
+        return {"state": "BLOCKED", "disposition": "ACTIVE_FINAL_SET_MISMATCH", "batch": None, "mutated": False}
+
+    status_by_id = {
+        str(row.get("source_id", "")): row
+        for row in list_records().get("records", [])
+        if isinstance(row, Mapping)
+    }
+    pending_candidate_ids = set(pending_by_id)
+    job_root = _root() / "jobs"
+    if not job_root.exists():
+        return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None, "mutated": False}
+
+    resumable: list[tuple[dict[str, Any], dict[str, Any], set[str]]] = []
+    conflicting_overlap: list[str] = []
+    resumable_states = {"QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"}
+    unfinished_states = {"QUEUED", "RUNNING", "VERIFYING_EXISTING"}
+    terminal_states = {"READY", "FAILED", "REJECTED"}
+    for path in sorted(job_root.glob("png-batch-*.json")):
+        try:
+            job = _read_job(path.stem)
+            if str(job.get("state", "")) not in resumable_states:
+                continue
+            batch_id = str(job.get("import_batch_id", ""))
+            batch = extensions.batch_load(batch_id)["batch"]
+            if (batch.get("version") != 2 or batch.get("kind") != "COMPOSITE_LOADED_SOURCE_SNAPSHOT"
+                    or extensions._digest(batch) != job.get("batch_digest")
+                    or not _job_lineage_matches_snapshot(job, batch)):
+                continue
+            batch_rows = [row for row in batch.get("items", []) if isinstance(row, Mapping)]
+            job_rows = [row for row in job.get("items", []) if isinstance(row, Mapping)]
+            if len(batch_rows) != len(job_rows) or not job_rows:
+                continue
+            needs_resume: set[str] = set()
+            valid = True
+            overlap: set[str] = set()
+            for index, (item, source) in enumerate(zip(job_rows, batch_rows, strict=True)):
+                source_id = str(item.get("source_id", ""))
+                source_sha = str(item.get("source_sha256", ""))
+                record_sha = str(item.get("source_record_sha256", ""))
+                status = status_by_id.get(source_id)
+                if (int(item.get("index", -1)) != index
+                        or source_id != str(source.get("source_id", ""))
+                        or source_sha != str(source.get("source_sha256", ""))
+                        or record_sha != str(source.get("source_record_sha256", ""))
+                        or source_id not in active_ids
+                        or not isinstance(status, Mapping)
+                        or str(status.get("source_sha256", "")) != source_sha):
+                    valid = False
+                    break
+                item_state = str(item.get("status", ""))
+                current_state = str(status.get("status", ""))
+                if item_state in unfinished_states:
+                    if current_state != "PENDING":
+                        valid = False
+                        break
+                    needs_resume.add(source_id)
+                elif item_state in terminal_states:
+                    projection = item.get("owner_release_projection", {})
+                    if current_state == "PENDING" and isinstance(projection, Mapping) and projection.get("state") != "RECORDED":
+                        # A durable solver result exists but its current status
+                        # projection still needs repair before the next item.
+                        needs_resume.add(source_id)
+                    elif current_state != item_state:
+                        valid = False
+                        break
+                else:
+                    valid = False
+                    break
+                if source_id in pending_candidate_ids:
+                    if pending_by_id[source_id] != (source_sha, record_sha):
+                        valid = False
+                        break
+                    overlap.add(source_id)
+                elif item_state in unfinished_states or source_id in needs_resume:
+                    valid = False
+                    break
+            if not valid or not overlap:
+                if overlap:
+                    conflicting_overlap.extend([str(job.get("job_id", path.stem))])
+                continue
+            if not needs_resume <= pending_candidate_ids:
+                conflicting_overlap.append(str(job.get("job_id", path.stem)))
+                continue
+            resumable.append((job, batch, needs_resume))
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+
+    if len(resumable) == 1:
+        job, batch, needs_resume = resumable[0]
+        return {"state": "SUCCESS", "disposition": "RESUMABLE_PENDING_SUBSET", "batch": batch,
+                "resume_job_id": str(job.get("job_id", "")),
+                "resume_count": len(needs_resume), "pending_count": len(pending_candidate_ids),
+                "ignored_stale_job_ids": sorted(set(conflicting_overlap)), "mutated": False}
+    if len(resumable) > 1 or conflicting_overlap:
+        ids = sorted({str(job.get("job_id", "")) for job, _batch, _rows in resumable} | set(conflicting_overlap))
+        return {"state": "BLOCKED", "disposition": "PENDING_BATCH_RESUME_AMBIGUOUS",
+                "candidate_job_ids": ids, "batch": None, "mutated": False}
+    return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None, "mutated": False}
 
 
 def png_batch_status(job_id: str) -> dict[str, Any]:
@@ -804,18 +1129,19 @@ def _job_lineage_matches_snapshot(job: Mapping[str, Any], batch: Mapping[str, An
                            if isinstance(item, Mapping) and item.get("status") in {"FAILED", "REJECTED"}]
         actual_parent_indexes = [str(item.get("prior_item_index", "")) for item in current.get("items", [])
                                  if isinstance(item, Mapping)]
-        if actual_parent_indexes != expected_failed:
+        if (not actual_parent_indexes or len(set(actual_parent_indexes)) != len(actual_parent_indexes)
+                or any(index not in expected_failed for index in actual_parent_indexes)):
             return False
         for item in current.get("items", []):
             if not isinstance(item, Mapping):
                 return False
             previous = parent_items.get(str(item.get("prior_item_index")))
-            if (previous is None or previous.get("status") != "FAILED"
+            if (previous is None or previous.get("status") not in {"FAILED", "REJECTED"}
                     or previous.get("source_id") != item.get("source_id")
                     or previous.get("source_sha256") != item.get("source_sha256")
                     or previous.get("source_record_sha256") != item.get("source_record_sha256")
                     or previous.get("column_count") != item.get("column_count")
-                    or item.get("prior_attempt", {}).get("status") != "FAILED"):
+                    or item.get("prior_attempt", {}).get("status") not in {"FAILED", "REJECTED"}):
                 return False
         current = parent
     rows = [item for item in exact_batch.get("items", []) if isinstance(item, Mapping)]
@@ -1108,35 +1434,26 @@ def run_png_batch(
         if batch.get("version") == 2 and batch.get("kind") == "COMPOSITE_LOADED_SOURCE_SNAPSHOT" and not _job_lineage_matches_snapshot(job, batch):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": job,
                     "reason": "Persisted plan or retry parent does not match the exact SHA-bound source snapshot."}
-        if job.get("state") == "STOPPED":
-            # An explicit owner Resume after STOPPED retries terminal non-READY
-            # items in their original immutable source order. READY proof stays
-            # untouched; failed/rejected attempt evidence is retained per item.
-            for item in job.get("items", []):
-                if item.get("status") not in {"FAILED", "REJECTED"}:
-                    continue
-                prior_attempt = {
-                    key: item.get(key) for key in (
-                        "attempt_id", "activity_run_id", "run_id", "candidate_id",
-                        "status", "reason", "started_at", "finished_at",
-                    ) if item.get(key) is not None
-                }
-                if prior_attempt:
-                    history = item.setdefault("attempt_history", [])
-                    if not isinstance(history, list):
-                        history = []
-                        item["attempt_history"] = history
-                    history.append(prior_attempt)
-                item["status"] = "QUEUED"
-                item["reason"] = ""
-                item.pop("finished_at", None)
-                item["requeued_at"] = _now()
-            job["counts"] = _counts(job["items"])
+        # Resume continues only unfinished queue items. FAILED and REJECTED are
+        # terminal current outcomes; only the explicit Solve Again action may
+        # move them back to Pending and create a retry snapshot.
         _record_legacy_resume_choice(job, batch)
         _clear_control(job_id)
         job["state"] = "RUNNING"
         job["updated_at"] = _now()
         job = _write_job(job)
+        # Recover a previous crash or Release Pool write error before solving
+        # another PNG. Terminal solver evidence is immutable; only its current
+        # status projection is repaired here.
+        for terminal_item in job.get("items", []):
+            if (not isinstance(terminal_item, dict)
+                    or terminal_item.get("status") not in {"READY", "FAILED", "REJECTED"}
+                    or terminal_item.get("owner_release_projection", {}).get("state") == "RECORDED"):
+                continue
+            projection_error = _persist_projection_or_pause(job, terminal_item)
+            if projection_error is not None:
+                return projection_error
+            job = _write_job(job)
         for item_index, item in enumerate(job["items"]):
             from .studio_lifecycle import studio_shutdown_requested
             if studio_shutdown_requested():
@@ -1146,7 +1463,7 @@ def run_png_batch(
                 _clear_control(job_id)
                 job = _write_job(job)
                 return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
-            if item.get("status") in {"READY", "FAILED", "REJECTED", "SKIPPED_DUPLICATE"}:
+            if item.get("status") in {"READY", "FAILED", "REJECTED", "SKIPPED_DUPLICATE", "SKIPPED"}:
                 continue
             action = _control_action(job_id)
             if action:
@@ -1176,6 +1493,10 @@ def run_png_batch(
                 job["current_index"] = None
                 job["updated_at"] = _now()
                 job = _write_job(job)
+                projection_error = _persist_projection_or_pause(job, item)
+                if projection_error is not None:
+                    return projection_error
+                job = _write_job(job)
                 continue
             if item.get("status") == "RUNNING":
                 recovered = _recover_attempt(job, item)
@@ -1186,6 +1507,10 @@ def run_png_batch(
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                     job["current_index"] = None
                     job["updated_at"] = _now()
+                    job = _write_job(job)
+                    projection_error = _persist_projection_or_pause(job, item)
+                    if projection_error is not None:
+                        return projection_error
                     job = _write_job(job)
                     continue
                 item["status"] = "QUEUED"
@@ -1215,12 +1540,20 @@ def run_png_batch(
                 job["current_index"] = None
                 job["updated_at"] = _now()
                 job = _write_job(job)
+                projection_error = _persist_projection_or_pause(job, item)
+                if projection_error is not None:
+                    return projection_error
+                job = _write_job(job)
                 continue
             if reused is not None and reused.get("rejected"):
                 item.update({"status": "REJECTED", "reason": str(reused.get("reason", "SOURCE_CANDIDATE_IS_OWNER_REJECTED")), "finished_at": _now()})
                 job["counts"] = _counts(job["items"])
                 job["current_index"] = None
                 job["updated_at"] = _now()
+                job = _write_job(job)
+                projection_error = _persist_projection_or_pause(job, item)
+                if projection_error is not None:
+                    return projection_error
                 job = _write_job(job)
                 continue
             if reused is not None:
@@ -1230,6 +1563,10 @@ def run_png_batch(
                 job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                 job["current_index"] = None
                 job["updated_at"] = _now()
+                job = _write_job(job)
+                projection_error = _persist_projection_or_pause(job, item)
+                if projection_error is not None:
+                    return projection_error
                 job = _write_job(job)
                 continue
             item["status"] = "QUEUED"
@@ -1261,6 +1598,9 @@ def run_png_batch(
                 "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 900)), 900),
             })
             try:
+                _persist_owner_release_attempt(job, item)
+                job["updated_at"] = _now()
+                job = _write_job(job)
                 control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"
                 previous_control_file = os.environ.get(control_env)
                 os.environ[control_env] = str(_control_path(job_id))
@@ -1308,6 +1648,10 @@ def run_png_batch(
             job["current_index"] = None
             job["counts"] = _counts(job["items"])
             job["updated_at"] = _now()
+            job = _write_job(job)
+            projection_error = _persist_projection_or_pause(job, item)
+            if projection_error is not None:
+                return projection_error
             job = _write_job(job)
         job["state"] = "COMPLETE"
         job["current_index"] = None

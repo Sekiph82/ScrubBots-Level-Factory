@@ -15,9 +15,50 @@ def _sha(raw: bytes) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
+def test_release_pool_index_distinguishes_owner_status_events_from_candidate_entries():
+    status_event = {
+        "schema": "scrubbots-owner-release-library-event/v1",
+        "event_sha256": "a" * 64,
+        "status": "READY",
+    }
+    candidate_entry = {
+        "schema": "scrubbots-release-pool-entry/v1",
+        "entry_digest": "b" * 64,
+    }
+    assert release_pool._is_owner_release_library_event(status_event)
+    assert not release_pool._is_owner_release_library_event(candidate_entry)
+    assert not release_pool._is_owner_release_library_event({"schema": "unknown"})
+
+
+def test_release_pool_ready_index_ignores_owner_status_projection_without_digest():
+    """An owner READY status projection must not poison candidate receipt discovery."""
+    from scrubbots_pixel_factory import owner_art_storage
+
+    ready = Path("repo/data/Release Pool/Ready")
+    owner_event_path = ready / ("owner-upload-" + "a" * 64 + ".json")
+    candidate_path = ready / "candidate-fixture-pipeline-fixture-ready.json"
+    owner_event = {"schema": "scrubbots-owner-release-library-event/v1", "source_id": owner_event_path.stem,
+                   "status": "READY", "event_sha256": "b" * 64}
+    candidate_entry = {"schema": "scrubbots-release-pool-entry/v1", "candidate_id": "candidate-fixture",
+                       "pipeline_run_id": "pipeline-fixture", "entry_digest": "c" * 64}
+    entries = {owner_event_path.name: owner_event, candidate_path.name: candidate_entry}
+
+    with patch.object(release_pool, "_pool_root", return_value=ready), \
+         patch.object(release_pool, "_pool_roots", return_value=(ready,)), \
+         patch.object(studio_extensions, "_repository_root", return_value=Path("repo")), \
+         patch.object(owner_art_storage, "_verify_path_under_root"), \
+         patch.object(owner_art_storage, "_is_reparse_point", return_value=False), \
+         patch.object(Path, "resolve", lambda self: self), \
+         patch.object(Path, "is_dir", lambda self: self == ready), \
+         patch.object(Path, "is_file", lambda self: True), \
+         patch.object(Path, "glob", lambda self, _pattern: [owner_event_path, candidate_path] if self == ready else []), \
+         patch.object(release_pool, "_json", side_effect=lambda path: entries[path.name]):
+        assert release_pool.entry_paths() == [candidate_path]
+
+
 def _ready_fixture(root: Path):
     output = root / "studio-extensions"
-    pipelines = output / "pipelines"
+    pipelines = root / "data" / "Release Pool" / "Ready" / "Pipelines"
     pipelines.mkdir(parents=True)
     candidate_id = "candidate-fixture"
     bundle = root / candidate_id
@@ -30,11 +71,13 @@ def _ready_fixture(root: Path):
             "source_id": "owner-upload-fixture",
         }}}},
     }), encoding="utf-8")
-    level = root / "level.json"
-    plan = root / "plan.json"
+    work = root / "data" / "Release Pool" / "Pending" / "Pipelines" / "Work" / "fixture-run"
+    work.mkdir(parents=True)
+    level = work / "level.json"
+    plan = work / "plan.json"
     level.write_text(json.dumps({"id": "level-fixture"}), encoding="utf-8")
     plan.write_text(json.dumps({"levelId": "level-fixture", "intendedColumnClicks": [1]}), encoding="utf-8")
-    real_play_path = root / "real_play_result_v2.json"
+    real_play_path = work / "real_play_result_v2.json"
     real_play = {
         "schema": "scrubbots.real_play_file_result.v2", "model": "real_play_v1",
         "mode": "canonical_60hz", "canonicalDt": "1/60", "verdict": "WON_CANONICAL", "exitCode": 0,
@@ -74,7 +117,7 @@ def _ready_fixture(root: Path):
     def candidate_list(): return [candidate]
     def latest_run(_candidate_id): return run
     def latest_review(_candidate_id): return None
-    def pipeline_file(_run_id): return pipeline_path
+    def pipeline_file(_run_id, *, status=None): return pipeline_path
     return output, run, candidate, pipeline_path, candidate_list, latest_run, latest_review, pipeline_file
 
 
@@ -118,7 +161,7 @@ def test_ready_auto_release_pool_entry_reads_back_exactly_once(tmp_path):
         assert len(release_pool.release_entries()) == 1
 
 
-def test_release_pool_lists_canonical_ready_and_legacy_receipt_paths_read_only(tmp_path, monkeypatch):
+def test_release_pool_lists_only_canonical_ready_receipt_paths(tmp_path, monkeypatch):
     repository = tmp_path / "repository"
     extension_root = repository / "level_factory" / "output" / "studio-extensions"
     legacy = extension_root / "release-pool"
@@ -129,7 +172,8 @@ def test_release_pool_lists_canonical_ready_and_legacy_receipt_paths_read_only(t
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
 
     assert release_pool._pool_root() == repository / "data" / "Release Pool" / "Ready"
-    assert release_pool.entry_paths("candidate-legacy") == [legacy_receipt]
+    assert release_pool.entry_paths("candidate-legacy") == []
+    assert legacy_receipt.is_file()  # Historical bytes are untouched but are no longer active.
     assert not (repository / "data" / "Release Pool" / "Ready").exists()
 
 

@@ -100,6 +100,16 @@ def _finish_folder_activity(writer, emit, errors: list[str], payload: dict[str, 
                 len(dispositions), int(payload.get("png_count", len(dispositions))), eligible, existing, failed, rejected,
             )
             writer.emit("PIPELINE", "COMPLETE", message, backend_disposition="FOLDER_PREVIEW_COMPLETE")
+        elif phase == "INVENTORY":
+            sources = payload.get("sources", [])
+            sources = sources if isinstance(sources, list) else []
+            invalid = payload.get("invalid_sources", [])
+            invalid = invalid if isinstance(invalid, list) else []
+            reconciliation = payload.get("release_pool_reconciliation", {})
+            reconciliation = reconciliation if isinstance(reconciliation, Mapping) else {}
+            writer.emit("PIPELINE", "COMPLETE", "Startup inventory complete: %d active PixelLab PNGs · %d invalid · %d READY receipts reconciled." % (
+                len(sources), len(invalid), int(reconciliation.get("owner_rows_promoted", 0)),
+            ), backend_disposition="STARTUP_INVENTORY_COMPLETE")
         else:
             counts = payload.get("counts", {})
             counts = counts if isinstance(counts, Mapping) else {}
@@ -406,7 +416,17 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         if operation == "owner-pages":
             payload = extensions.owner_pages_snapshot()
         elif operation == "library-refresh":
-            payload = extensions.library_refresh()
+            activity_writer, progress_callback, activity_errors = _folder_activity_context(request)
+            try:
+                payload = extensions.library_refresh(progress_callback=progress_callback)
+            except Exception as exc:
+                if activity_writer is not None and not activity_writer.terminal_emitted:
+                    try:
+                        activity_writer.emit("PIPELINE", "ERROR", "Startup inventory failed: " + str(exc)[:180], backend_disposition="STARTUP_INVENTORY_ERROR")
+                    except Exception:
+                        pass
+                raise
+            payload = _finish_folder_activity(activity_writer, progress_callback, activity_errors, payload, phase="INVENTORY")
         elif operation == "library-save":
             payload = extensions.save_library_metadata(str(request["source_id"]), str(request.get("label", "")), request.get("tags", []))
         elif operation == "validate-source":
@@ -505,8 +525,14 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             gate = _canonical_final_membership_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
                 "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical Final identities."}
             payload = gate if gate is not None else extensions.loaded_png_batch_create(source_ids)
+        elif operation == "pending-png-batch-create":
+            source_ids = request.get("source_ids", [])
+            gate = _canonical_final_membership_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
+                "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical Final identities."}
+            payload = gate if gate is not None else extensions.pending_png_batch_create(source_ids)
         elif operation == "loaded-png-batch-find":
-            payload = extensions.loaded_png_batch_find(request.get("source_ids", []))
+            payload = extensions.loaded_png_batch_find(
+                request.get("source_ids", []), request.get("active_source_ids", []))
         elif operation == "png-batch-create":
             loaded = extensions.batch_load(str(request["batch_id"]))
             batch = loaded.get("batch", {})
@@ -516,9 +542,24 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "png-batch-retry-failed":
             status = extensions.png_batch_status(str(request["job_id"]))
             job = status.get("job", {})
-            source_ids = [str(item.get("source_id", "")) for item in job.get("items", []) if isinstance(item, Mapping)]
+            requested_ids = request.get("source_ids")
+            source_ids = (
+                [str(source_id) for source_id in requested_ids]
+                if isinstance(requested_ids, Sequence) and not isinstance(requested_ids, (str, bytes))
+                else [str(item.get("source_id", "")) for item in job.get("items", [])
+                      if isinstance(item, Mapping) and str(item.get("status", "")) in {"FAILED", "REJECTED"}]
+            )
             gate = _canonical_final_source_gate(source_ids)
-            payload = gate if gate is not None else extensions.png_batch_retry_failed(str(request["job_id"]))
+            payload = gate if gate is not None else extensions.png_batch_retry_failed(
+                str(request["job_id"]), source_ids if requested_ids is not None else None
+            )
+        elif operation == "png-batch-retry-release-sources":
+            source_ids = request.get("source_ids", [])
+            gate = _canonical_final_source_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
+                "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical PixelLab Final identities."}
+            payload = gate if gate is not None else extensions.png_batch_retry_release_sources(
+                source_ids, request.get("settings", {})
+            )
         elif operation == "png-batch-status":
             payload = extensions.png_batch_status(str(request["job_id"]))
         elif operation == "png-batch-latest":
@@ -594,10 +635,6 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = {"state": "READY", "palette_id": "V3", "colors": [
                 {"id": color.id, "hex": color.hex} for color in CANONICAL_PALETTE.colors
             ]}
-        elif operation == "alpix-generate":
-            payload = _alpix_generate(request)
-        elif operation == "alpix-csv-job":
-            payload = _alpix_csv_job(request)
         elif operation == "campaign-build":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
             payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
@@ -1259,127 +1296,14 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
 
 
 def _provider_options() -> dict[str, object]:
-    """Expose only adapters that are actually executable in this process."""
-    from scrubbots_pixel_factory.alpix_batch import discover_alpix
+    """Expose the sole active Factory Studio image provider."""
     from scrubbots_pixel_factory.studio_extensions import pixellab_secret_status
-    from scrubbots_pixel_factory.semantic.providers.registry import active_factory_studio_provider_ids
-
-    alpix = discover_alpix(project_root=Path(_repository_root()))
-    options: list[dict[str, object]] = []
-    for provider_id in active_factory_studio_provider_ids():
-        if provider_id == "ALPIX (Claude)":
-            options.append({"id": provider_id, "available": alpix.get("available") is True,
-                "prompt_capable": True, "status": alpix.get("status", "ALPIX_INVALID_CONFIG"),
-                "reason": alpix.get("reason", "ALPIX_INVALID_CONFIG: Claude Alpix configuration could not be verified."),
-                "plugin_id": alpix.get("plugin_id"), "mcp_servers": alpix.get("mcp_servers")})
-        elif provider_id == "PIXELLAB":
-            credential = pixellab_secret_status()
-            options.append({"id": provider_id, "available": credential.get("configured") is True, "prompt_capable": True,
-                "execution_mode": "PRO_4X4", "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
-                "reason": credential.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")})
-    return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": options}
-
-
-def _alpix_generate(request: Mapping[str, object]) -> dict[str, object]:
-    """Generate exactly one image through the installed Claude Code Alpix tool."""
-    from scrubbots_pixel_factory.alpix_batch import generate_alpix_png
-    from scrubbots_pixel_factory import studio_extensions as extensions
-
-    if set(request) - {"prompt", "width", "height", "output_path"}:
-        raise ValueError("ALPIX request contains unsupported fields")
-    output = _alpix_output_path(request.get("output_path"))
-    generated = generate_alpix_png(prompt=_text(request.get("prompt"), "prompt"),
-        width=_exact_int(request.get("width"), "width"), height=_exact_int(request.get("height"), "height"),
-        destination=output, project_root=Path(_repository_root()))
-    from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
-    if studio_shutdown_requested():
-        return {"operation": "alpix-generate", "state": "CANCELLED",
-                "reason": "Factory Studio closed after the provider completed; the generated PNG was preserved."}
-    imported = extensions.batch_import([str(output)])
-    items = imported.get("items", [])
-    item = items[0] if isinstance(items, list) and items else {}
-    source_id = item.get("source_id") if isinstance(item, Mapping) else None
-    if not isinstance(source_id, str) or not source_id:
-        raise ValueError("ALPIX PNG was not accepted by canonical artwork import")
-    return {"operation": "alpix-generate", "state": "IMPORTED", "provider_id": "ALPIX_CLAUDE",
-            "source_id": source_id, "source_path": str(output), "content_sha256": generated["sha256"],
-            "width": generated["width"], "height": generated["height"]}
-
-
-def _alpix_csv_job(request: Mapping[str, object]) -> dict[str, object]:
-    """Open or resume the CSV-SHA job and pass each row through canonical import."""
-    from scrubbots_pixel_factory.alpix_batch import generate_alpix_png, run_csv_job
-    from scrubbots_pixel_factory import studio_extensions as extensions
-    from scrubbots_pixel_factory.owner_art_storage import OwnerArtStorageError, validate_owner_input_csv
-
-    if set(request) - {"csv_path", "default_width", "default_height"}:
-        raise ValueError("ALPIX batch request contains unsupported fields")
-    try:
-        csv_path = validate_owner_input_csv(_text(request.get("csv_path"), "csv_path"), repository_root=_repository_root())
-    except (OwnerArtStorageError, OSError, ValueError) as exc:
-        raise ValueError("ALPIX_BATCH_CSV_OUTSIDE_CANONICAL_INPUT: select a .csv directly from data/input") from exc
-    root = extensions.extensions_root() / "alpix-jobs"
-    default_width = _exact_int(request.get("default_width", 32), "default_width")
-    default_height = _exact_int(request.get("default_height", 32), "default_height")
-
-    def render(prompt: str, width: int, height: int, destination: Path) -> Mapping[str, object]:
-        return generate_alpix_png(prompt=prompt, width=width, height=height, destination=destination,
-                                  project_root=Path(_repository_root()))
-
-    def import_png(path: Path) -> Mapping[str, object]:
-        result = extensions.batch_import([str(path)])
-        items = result.get("items", [])
-        item = items[0] if isinstance(items, list) and items else {}
-        return item if isinstance(item, Mapping) else {}
-
-    job_result = run_csv_job(csv_path, root, renderer=render,
-        importer=import_png, default_size=(default_width, default_height))
-    if job_result.state == "INTERRUPTED":
-        return {"operation": "alpix-csv-job", **job_result.to_dict()}
-    from scrubbots_pixel_factory.owner_art_storage import archive_alpix_png
-    rows: list[dict[str, object]] = []
-    job_artifact_root = (root / job_result.job_id).resolve()
-    for index, row_value in enumerate(job_result.rows):
-        from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
-        if studio_shutdown_requested():
-            return {"operation": "alpix-csv-job", **job_result.to_dict(), "state": "INTERRUPTED",
-                    "rows": rows + [dict(value) for value in job_result.rows[index:]]}
-        row = dict(row_value)
-        artifact = job_artifact_root / f"row-{index + 1:05d}.png"
-        row["artifact_path"] = str(artifact)
-        expected_sha = row.get("artifact_sha256")
-        if row.get("state") in {"DRAWN", "VALIDATED", "IMPORTED"}:
-            if (artifact.is_symlink() or not artifact.is_file()
-                    or artifact.resolve().parent != job_artifact_root):
-                row["owner_catalog_status"] = "ARTIFACT_MISSING_OR_UNSAFE"
-                rows.append(row)
-                continue
-            raw_png = artifact.read_bytes()
-            if not isinstance(expected_sha, str) or hashlib.sha256(raw_png).hexdigest() != expected_sha:
-                row["owner_catalog_status"] = "ARTIFACT_SHA_MISMATCH"
-            else:
-                if row.get("state") == "IMPORTED":
-                    source_id = row.get("source_id")
-                    expected_source_id = f"owner-upload-{expected_sha}"
-                    if source_id != expected_source_id:
-                        row["owner_catalog_status"] = "SOURCE_IDENTITY_MISMATCH"
-                        rows.append(row)
-                        continue
-                    try:
-                        source = extensions.verify_owner_source(expected_source_id)
-                    except Exception:
-                        row["owner_catalog_status"] = "SOURCE_IDENTITY_UNVERIFIED"
-                        rows.append(row)
-                        continue
-                    if (source.get("source_sha256") != expected_sha
-                            or source.get("source_bytes_sha256") != expected_sha):
-                        row["owner_catalog_status"] = "SOURCE_IDENTITY_MISMATCH"
-                        rows.append(row)
-                        continue
-                row["owner_catalog_path"] = str(archive_alpix_png(raw_png, repository_root=_repository_root()))
-                row["owner_catalog_status"] = "ARCHIVED"
-        rows.append(row)
-    return {"operation": "alpix-csv-job", **job_result.to_dict(), "rows": rows}
+    credential = pixellab_secret_status()
+    provider = {"id": "PIXELLAB", "available": credential.get("configured") is True,
+        "prompt_capable": True, "execution_mode": "PRO_4X4",
+        "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
+        "reason": credential.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")}
+    return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": [provider]}
 def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
     """Delegate to the existing Magnific adapter's truthful prepare/import contract."""
     from scrubbots_pixel_factory.semantic.contracts import OutputClass, SemanticGenerationRequest
@@ -1400,19 +1324,6 @@ def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
     return {"operation": "magnific-prepare", "state": "PREPARED_FOR_EXTERNAL_EXECUTION",
             "provider_id": "MAGNIFIC", "request": canonical,
             "message": "Magnific job prepared. Import the returned image and result manifest to continue."}
-
-
-def _alpix_output_path(raw: object) -> Path:
-    from scrubbots_pixel_factory.owner_art_storage import ensure_owner_art_layout
-    root = ensure_owner_art_layout(_repository_root())["alpix"].resolve()
-    if raw is None or not str(raw).strip():
-        import uuid
-        target = root / f"alpix-{uuid.uuid4().hex}.png"
-    else:
-        target = Path(_text(raw, "output_path")).resolve()
-    if not _inside_output(target, root) or target.suffix.lower() != ".png":
-        raise ValueError("ALPIX output must be a PNG inside data/output/Alpix")
-    return target
 
 
 def _validate_studio_request(raw: object) -> dict[str, object]:

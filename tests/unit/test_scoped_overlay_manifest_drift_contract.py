@@ -22,7 +22,6 @@ def test_solver_dependencies_are_scoped_and_manifest_owned() -> None:
     for path in (
         "src/scrubbots_pixel_factory/supply_pipeline/supply_exporter.py",
         "src/scrubbots_pixel_factory/supply_pipeline/verify.py",
-        "src/scrubbots_pixel_factory/alpix_batch.py",
         "src/scrubbots_pixel_factory/owner_art_storage.py",
         "src/scrubbots_pixel_factory/owner_folder_batch.py",
         "src/scrubbots_pixel_factory/owner_release_library.py",

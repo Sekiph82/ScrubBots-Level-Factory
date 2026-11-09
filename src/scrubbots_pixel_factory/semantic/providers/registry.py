@@ -37,7 +37,7 @@ _REGISTRY = {
     "PIXELLAB": ProviderDescriptor("PIXELLAB", "pixellab-adapter-v1", "1", _pixellab_factory),
 }
 
-_ACTIVE_FACTORY_STUDIO_PROVIDER_IDS = ("ALPIX (Claude)", "PIXELLAB")
+_ACTIVE_FACTORY_STUDIO_PROVIDER_IDS = ("PIXELLAB",)
 
 
 def provider_registry() -> tuple[ProviderDescriptor, ...]:

@@ -288,22 +288,25 @@ def _sync_current_pixellab_final_sources(
     repository_root: str | Path | None = None,
     *,
     game_project: str | Path | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[set[str], list[dict[str, str]]]:
     """Idempotently register only validated direct PNGs currently in PixelLab Final."""
 
     from . import owner_art_storage
     from .owner_folder_batch import scan_owner_source_folder
-    if game_project is None:
-        from .supply_pipeline.pinned_game_source import expected_runtime_root
-
-        game_project = expected_runtime_root()
-
     paths = owner_art_storage.owner_art_paths(repository_root)
-    scan = scan_owner_source_folder(paths["pixellab_final"], repository_root=repository_root)
+    scan = scan_owner_source_folder(
+        paths["pixellab_final"], repository_root=repository_root,
+        progress_callback=progress_callback,
+    )
     if scan.get("provider") != "PIXELLAB":
         raise StudioExtensionError("canonical PixelLab Final source authority could not be established")
     active: set[str] = set()
     invalid: list[dict[str, str]] = []
+    from .owner_release_library import list_records as list_owner_release_records, transition as transition_owner_release
+
+    release_view = list_owner_release_records(repository_root=repository_root)
+    release_by_source = {str(row.get("source_id", "")): row for row in release_view.get("records", []) if isinstance(row, Mapping)}
     for entry in scan.get("entries", []):
         if not isinstance(entry, Mapping):
             continue
@@ -319,41 +322,130 @@ def _sync_current_pixellab_final_sources(
         source_id = f"owner-upload-{digest}"
         source_directory = owner_upload_root(repository_root) / source_id
         if disposition == "ELIGIBLE":
+            if progress_callback is not None:
+                progress_callback({"stage": "FILE IMPORT", "state": "RUNNING",
+                                   "filename": str(entry.get("display_path", "")),
+                                   "message": f"Registering new SHA-verified Final PNG {entry.get('display_path', '')}."})
             imported = import_owner_upload(str(entry.get("path", "")), repository_root=repository_root)
             if imported.get("state") not in {"IMPORTED", "ALREADY_IMPORTED"} or imported.get("source_id") != source_id:
                 invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IMPORT_FAILED", "reason": str(imported.get("error", "Canonical Final source could not be registered."))[:512]})
                 continue
         try:
-            verify_owner_source(source_id, source_directory=source_directory)
-            validation = validate_owner_source(
-                source_id, persist=False, game_project=game_project,
-                source_directory=source_directory,
-            )
-            void_state = str(validation.get("void_capability", {}).get("state", "NOT_REQUIRED"))
-            if (validation.get("exact_logical_source") is not True
-                    or validation.get("structural", {}).get("disposition") != "PASS"
-                    or void_state not in {"OPEN", "NOT_REQUIRED"}):
-                invalid.append({
-                    "source_id": source_id, "disposition": "NOT_ACTIVE / SOURCE_VALIDATION_FAILED",
-                    "reason": str(validation.get("reason", "PixelLab Final source did not pass canonical source validation."))[:512],
-                })
-                continue
+            # Inventory refresh is an identity/index operation, not a game
+            # validation run. The source folder scan above verifies actual PNG
+            # bytes, dimensions, atlas provenance and SHA; verify_owner_source
+            # binds those bytes to the immutable Imported record. Full palette,
+            # geometry, solver and game-host checks run once when a Pending
+            # source enters its pipeline. Re-running them for every image at
+            # every Studio refresh made large folders appear hung for minutes.
+            source = verify_owner_source(source_id, source_directory=source_directory)
         except (StudioExtensionError, OSError, ValueError) as exc:
             invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IDENTITY_INVALID", "reason": str(exc)[:512]})
             continue
         active.add(source_id)
+        current_status = release_by_source.get(source_id)
+        if current_status is None:
+            # import_owner_upload may already have emitted the initial Pending
+            # projection; refresh this one row before creating another event.
+            latest = list_owner_release_records(repository_root=repository_root)
+            current_status = next((row for row in latest.get("records", [])
+                                   if isinstance(row, Mapping) and row.get("source_id") == source_id), None)
+            if current_status is not None:
+                release_by_source[source_id] = current_status
+        if current_status is None:
+            source_path = owner_upload_root(repository_root) / source_id / str(source.get("original_filename", ""))
+            try:
+                release_event = transition_owner_release(
+                    source_id, "PENDING", source_sha256=digest, provider="PIXELLAB",
+                    original_source_path=str(source_path.resolve()),
+                    reason="New SHA-verified PixelLab Final source discovered during inventory reconciliation.",
+                    evidence={"inventory_source": "data/output/Pixellab/Final", "source_sha256_verified": True},
+                    repository_root=repository_root,
+                )
+                release_by_source[source_id] = release_event
+            except (OSError, ValueError) as exc:
+                invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / RELEASE_POOL_PENDING_WRITE_FAILED", "reason": str(exc)[:512]})
+                active.discard(source_id)
     return active, invalid
 
 
-def library_refresh(*, repository_root: str | Path | None = None) -> dict[str, Any]:
+def library_refresh(
+    *, repository_root: str | Path | None = None,
+    progress_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> dict[str, Any]:
     """Expose only current PixelLab Final art as active sources; retain old provenance separately."""
 
     sources: list[dict[str, Any]] = []
     historical: list[dict[str, Any]] = []
     invalid: list[dict[str, str]] = []
+    reconciliation: dict[str, Any] = {"state": "NOT_RUN", "reason": "PixelLab Final inventory was unavailable."}
     try:
-        active_ids, final_invalid = _sync_current_pixellab_final_sources(repository_root)
+        if progress_callback is not None:
+            progress_callback({"stage": "INVENTORY", "state": "RUNNING",
+                               "message": "Opening PixelLab Final inventory and comparing SHA identities with Release Pool statuses."})
+        from .owner_release_library import reconcile_status_projections
+
+        status_reconciliation = reconcile_status_projections(repository_root=repository_root)
+        if progress_callback is not None:
+            progress_callback({
+                "stage": "RELEASE POOL STATUS RECOVERY",
+                "state": "COMPLETE" if status_reconciliation.get("state") == "RECONCILED" else "ERROR",
+                "completed": int(status_reconciliation.get("repaired", 0)),
+                "total": int(status_reconciliation.get("checked", 0)),
+                "message": "Release Pool status recovery checked %d source histories and repaired %d interrupted projections; %d integrity conflicts." % (
+                    int(status_reconciliation.get("checked", 0)),
+                    int(status_reconciliation.get("repaired", 0)),
+                    len(status_reconciliation.get("errors", [])),
+                ),
+            })
+        active_ids, final_invalid = _sync_current_pixellab_final_sources(
+            repository_root, progress_callback=progress_callback,
+        )
         invalid.extend(final_invalid)
+        from .owner_release_library import reconcile_ready_projections
+
+        try:
+            reconciliation = reconcile_ready_projections(repository_root=repository_root)
+            reconciliation.setdefault("state", "RECONCILED")
+            if progress_callback is not None:
+                progress_callback({"stage": "READY RECONCILE", "state": "COMPLETE",
+                                   "completed": int(reconciliation.get("owner_rows_promoted", 0)),
+                                   "total": int(reconciliation.get("canonical_ready_receipts", 0)),
+                                   "message": "Release Pool receipt reconciliation complete: %d READY projections repaired; %d receipts checked." % (
+                                       int(reconciliation.get("owner_rows_promoted", 0)),
+                                       int(reconciliation.get("canonical_ready_receipts", 0)),
+                                   )})
+        except (StudioExtensionError, OSError, OwnerArtStorageError, ValueError) as exc:
+            # A damaged or stale READY receipt must be visible as a reconciliation
+            # issue, but must not make the verified PixelLab source gallery vanish.
+            reconciliation = {"state": "ERROR", "reason": str(exc)[:512],
+                              "canonical_ready_receipts": 0, "owner_rows_promoted": 0}
+            if progress_callback is not None:
+                progress_callback({"stage": "READY RECONCILE", "state": "ERROR",
+                                   "message": "Release Pool READY reconciliation failed; source inventory remains visible: %s" % str(exc)[:160]})
+        try:
+            from .owner_release_library import reconcile_terminal_batch_projections
+
+            terminal_reconciliation = reconcile_terminal_batch_projections(repository_root=repository_root)
+            if progress_callback is not None:
+                progress_callback({
+                    "stage": "BATCH OUTCOME RECONCILE",
+                    "state": "COMPLETE" if terminal_reconciliation.get("state") == "RECONCILED" else "ERROR",
+                    "completed": int(terminal_reconciliation.get("repaired", 0)),
+                    "total": int(terminal_reconciliation.get("terminal_sources", 0)),
+                    "message": "Durable FAILED/REJECTED batch outcomes checked: %d; restored: %d; skipped: %d; integrity errors: %d." % (
+                        int(terminal_reconciliation.get("terminal_sources", 0)),
+                        int(terminal_reconciliation.get("repaired", 0)),
+                        int(terminal_reconciliation.get("skipped", 0)),
+                        len(terminal_reconciliation.get("errors", [])),
+                    ),
+                })
+        except (StudioExtensionError, OSError, OwnerArtStorageError, ValueError) as exc:
+            terminal_reconciliation = {"state": "ERROR", "reason": str(exc)[:512],
+                                       "terminal_sources": 0, "repaired": 0}
+            if progress_callback is not None:
+                progress_callback({"stage": "BATCH OUTCOME RECONCILE", "state": "ERROR",
+                                   "message": "Durable FAILED/REJECTED outcome reconciliation failed: %s" % str(exc)[:160]})
     except (StudioExtensionError, OSError, OwnerArtStorageError, ValueError) as exc:
         active_ids = set()
         invalid.append({"source_id": "PIXELLAB_FINAL", "disposition": "ACTIVE_INVENTORY_UNAVAILABLE", "reason": str(exc)[:512]})
@@ -377,11 +469,19 @@ def library_refresh(*, repository_root: str | Path | None = None) -> dict[str, A
                 (sources if directory.name in active_ids else historical).append(row)
             except (StudioExtensionError, OSError) as exc:
                 invalid.append({"source_id": directory.name, "disposition": "INVALID / QUARANTINED", "reason": str(exc)[:512]})
+    # Both startup thumbnails and new solver queue snapshots use stable PNG
+    # filename order. SHA-derived owner IDs are implementation identities and
+    # must not dictate the visible or execution order.
+    sources.sort(key=lambda item: (str(item.get("original_filename", "")).casefold(), str(item.get("original_filename", ""))))
+    historical.sort(key=lambda item: (str(item.get("original_filename", "")).casefold(), str(item.get("original_filename", ""))))
     return {
         "schema": "scrubbots-source-library-view", "version": 2, "state": "READY", "disposition": "DERIVED_CATALOG",
         "sources": sources, "historical_sources": historical, "invalid_sources": invalid,
+        "release_pool_status_reconciliation": status_reconciliation if "status_reconciliation" in locals() else {"state": "NOT_RUN"},
+        "release_pool_reconciliation": reconciliation,
+        "release_pool_terminal_batch_reconciliation": terminal_reconciliation if "terminal_reconciliation" in locals() else {"state": "NOT_RUN"},
         "source_policy": "ACTIVE_SOLVER_INPUTS_FROM_CURRENT_DATA_OUTPUT_PIXELLAB_FINAL_ONLY",
-        "notice": "ACTIVE SOURCES ARE THE VERIFIED CURRENT PIXELLAB FINAL INVENTORY. Historical source records remain available separately and do not enter new solver queues.",
+        "notice": "ACTIVE SOURCES ARE THE SHA-VERIFIED CURRENT PIXELLAB FINAL INVENTORY. New files enter Pending once; only Pending sources enter new solver queues. Historical source records remain separate.",
     }
 
 
@@ -1987,7 +2087,7 @@ def batch_import(
     path_indices: Sequence[int] | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
-    allowed_providers = {"OWNER_UPLOAD", "ALPIX", "PIXELLAB", "OWNER_SUGGESTIONS"}
+    allowed_providers = {"OWNER_UPLOAD", "PIXELLAB"}
     if source_provider not in allowed_providers:
         raise StudioExtensionError("batch source provider is not an approved owner-art source")
     if path_indices is not None and len(path_indices) != len(paths):
@@ -2193,7 +2293,41 @@ def create_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
     return payload
 
 
-def find_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
+def create_pending_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
+    """Create an immutable solver snapshot from current PixelLab Pending rows only."""
+    from .owner_release_library import list_records
+
+    requested = [str(source_id) for source_id in source_ids]
+    if not requested or any(not source_id.startswith("owner-upload-") for source_id in requested):
+        raise StudioExtensionError("Pending solver snapshot needs one or more canonical PixelLab source IDs")
+    if len(requested) != len(set(requested)):
+        raise StudioExtensionError("Pending solver snapshot contains duplicate source IDs")
+    rows = {
+        str(row.get("source_id", "")): row
+        for row in list_records("PENDING").get("records", [])
+        if isinstance(row, Mapping)
+    }
+    missing = [source_id for source_id in requested if source_id not in rows]
+    if missing:
+        raise StudioExtensionError("Pending queue changed before batch creation; refresh source status and try again")
+    verified: list[str] = []
+    for source_id in requested:
+        row = rows[source_id]
+        if str(row.get("provider", "")).upper() not in {"PIXELLAB", "OWNER_UPLOAD"}:
+            raise StudioExtensionError("new LF solver batches accept PixelLab Final sources only")
+        source = verify_owner_source(source_id)
+        if (str(source.get("source_sha256", "")) != str(row.get("source_sha256", ""))
+                or str(source.get("original_filename", "")) != Path(str(row.get("original_source_path", ""))).name):
+            raise StudioExtensionError("Pending source identity changed before batch creation")
+        verified.append(source_id)
+    payload = create_loaded_png_batch(verified)
+    return {**payload, "queue_authority": "CURRENT_RELEASE_POOL_PENDING", "pending_verified_count": len(verified)}
+
+
+def find_loaded_png_batch(
+    source_ids: Sequence[str],
+    active_source_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
     """Read-only lookup for the exact stable composite represented by loaded sources."""
     payload = _loaded_png_batch_payload(source_ids)
     path = _batch_import_root() / f"{payload['batch_id']}.json"
@@ -2222,6 +2356,11 @@ def find_loaded_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
         if len(legacy_matches) > 1:
             return {"state": "BLOCKED", "disposition": "LEGACY_COMPOSITE_AMBIGUOUS", "batch": None,
                     "candidate_batch_ids": [str(item.get("batch_id", "")) for item in legacy_matches], "mutated": False}
+        from .png_batch import find_resumable_pending_batch
+
+        resumable = find_resumable_pending_batch(payload, active_source_ids or source_ids)
+        if str(resumable.get("disposition", "")) != "NO_MATCHING_COMPOSITE":
+            return resumable
         return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None, "mutated": False}
     existing = batch_load(str(payload["batch_id"]))["batch"]
     if _loaded_png_batch_digest(existing) != payload["snapshot_digest"]:
@@ -2248,8 +2387,15 @@ def loaded_png_batch_create(source_ids: Sequence[str]) -> dict[str, Any]:
     return create_loaded_png_batch(source_ids)
 
 
-def loaded_png_batch_find(source_ids: Sequence[str]) -> dict[str, Any]:
-    return find_loaded_png_batch(source_ids)
+def pending_png_batch_create(source_ids: Sequence[str]) -> dict[str, Any]:
+    return create_pending_png_batch(source_ids)
+
+
+def loaded_png_batch_find(
+    source_ids: Sequence[str],
+    active_source_ids: Sequence[str] | None = None,
+) -> dict[str, Any]:
+    return find_loaded_png_batch(source_ids, active_source_ids)
 
 
 def png_batch_create(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -2282,10 +2428,16 @@ def png_batch_run(job_id: str, expected_batch_id: str | None = None) -> dict[str
     return run_png_batch(job_id, expected_batch_id=expected_batch_id)
 
 
-def png_batch_retry_failed(job_id: str) -> dict[str, Any]:
+def png_batch_retry_failed(job_id: str, source_ids: Sequence[str] | None = None) -> dict[str, Any]:
     from .png_batch import retry_failed_png_batch
 
-    return retry_failed_png_batch(job_id)
+    return retry_failed_png_batch(job_id, source_ids)
+
+
+def png_batch_retry_release_sources(source_ids: Sequence[str], settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    from .png_batch import retry_release_pool_sources
+
+    return retry_release_pool_sources(source_ids, settings)
 
 
 def owner_pages_snapshot() -> dict[str, Any]:

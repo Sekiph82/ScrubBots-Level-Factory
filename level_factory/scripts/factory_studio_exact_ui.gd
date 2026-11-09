@@ -34,8 +34,6 @@ var _prompt := "pixel art owl"
 var _width := 32
 var _height := 32
 var _max_used_colors := 12
-var _alpix_width := 32
-var _alpix_height := 32
 var _provider_model := "PIXELLAB"
 var _generation_mode := "SINGLE"
 var _batch_csv_path := ""
@@ -81,6 +79,7 @@ var _batch_job_id := ""
 var _batch_import_id := ""
 var _batch_snapshot: Dictionary = {}
 var _owner_release_archive: Dictionary = {}
+var _owner_release_archive_loaded := false
 var _batch_composite_snapshot: Dictionary = {}
 var _batch_legacy_reconciliation := false
 var _batch_job_source_mismatch := false
@@ -113,6 +112,8 @@ var _active_preview_path := ""
 var _preview_paths_by_screen := {"PIXEL ART": "", "LEVEL FACTORY": "", "RELEASE POOL": ""}
 var _imported_sources: Array[Dictionary] = []
 var _gameplay_sources: Array[Dictionary] = []
+var _startup_source_inventory_loaded := false
+var _startup_pending_batch_restore_started := false
 var _source_batch_by_id: Dictionary = {}
 var _rejected_imports: Array[Dictionary] = []
 var _imported_window_start := 0
@@ -230,9 +231,8 @@ func _ready() -> void:
 		"SCRUBBOTS_STUDIO_PROJECT_ROOT",
 		active_project_root if FileAccess.file_exists(project_marker) else ""
 	)
-	# Retire a legacy selection on startup without changing saved asset provenance.
-	if _provider_model == "MAGNIFIC":
-		_provider_model = "ALPIX (Claude)"
+	# Factory Studio generation is fixed to the approved PixelLab Pro 4×4 provider.
+	_provider_model = "PIXELLAB"
 	_canvas = get_node_or_null("MasterCanvas") as TextureRect
 	_status = get_node_or_null("Status") as Label
 	_file_dialog = get_node_or_null("FileDialog") as FileDialog
@@ -240,7 +240,6 @@ func _ready() -> void:
 		return
 	_file_dialog.file_selected.connect(_on_file_selected)
 	_file_dialog.files_selected.connect(_on_files_selected)
-	_file_dialog.dir_selected.connect(_on_owner_folder_selected)
 	_build_live_chrome()
 	_preview_host = Control.new()
 	_preview_host.name = "VisualReviewClip"
@@ -806,12 +805,12 @@ func _control_caption(control_name: String) -> String:
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
 		"GenerationPrompt": "Prompt", "GenerationSize": "Size",
-		"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)",
+		"GenerationProvider": "Provider: PixelLab Pro · 4×4",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
 		"ArtworkCarouselLeft": "‹", "ArtworkCarouselRight": "›", "ZoomOut": "−", "ZoomIn": "+",
-		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "Select Folder",
+		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "PixelLab Final · Auto",
 		"LevelNumber": _level_number_caption(), "SupplyColumns3": "3", "SupplyColumns4": "4", "SupplyColumns5": "5",
 		"MaxRobotsAuto": "Max Robots: Auto", "BackgroundIntent": "Background: %s" % _background_intent,
 		"RunLevelPipeline": "Run Pipeline", "SolveAgain": "Solve Again", "PreviewReplay": "Preview Replay",
@@ -991,7 +990,59 @@ func _refresh_batch_issue_panel() -> void:
 
 
 func _refresh_owner_release_archive() -> void:
+	_owner_release_archive_loaded = false
 	_queue_studio_read_extension("owner-release-library", {}, {"kind": "owner-release-library", "token": str(Time.get_ticks_usec())})
+
+
+func _pending_gameplay_sources() -> Array[Dictionary]:
+	var pending_by_id: Dictionary = {}
+	for record_variant in _owner_release_archive.get("records", []):
+		if not record_variant is Dictionary:
+			continue
+		var record: Dictionary = record_variant
+		if str(record.get("status", "")) == "PENDING":
+			pending_by_id[str(record.get("source_id", ""))] = str(record.get("source_sha256", ""))
+	var pending: Array[Dictionary] = []
+	for source in _gameplay_sources:
+		var source_id := str(source.get("source_id", ""))
+		var source_sha := str(source.get("source_sha256", ""))
+		if pending_by_id.has(source_id) and str(pending_by_id[source_id]) == source_sha:
+			pending.append(source)
+	return pending
+
+
+func _current_release_status_counts() -> Dictionary:
+	# Count only SHA-matched status rows for the current PixelLab Final inventory.
+	# Historical or non-Final archive rows must not inflate the LF screen totals.
+	var counts := {"PENDING": 0, "READY": 0, "FAILED": 0, "REJECTED": 0}
+	var records_by_id: Dictionary = {}
+	for record_variant in _owner_release_archive.get("records", []):
+		if not record_variant is Dictionary:
+			continue
+		var record: Dictionary = record_variant
+		var source_id := str(record.get("source_id", ""))
+		if not source_id.is_empty():
+			records_by_id[source_id] = record
+	var known := 0
+	for source_variant in _gameplay_sources:
+		if not source_variant is Dictionary:
+			continue
+		var source: Dictionary = source_variant
+		var source_id := str(source.get("source_id", ""))
+		var record_value: Variant = records_by_id.get(source_id, {})
+		if not record_value is Dictionary:
+			continue
+		var record: Dictionary = record_value
+		if str(record.get("source_sha256", "")) != str(source.get("source_sha256", "")):
+			continue
+		var status := str(record.get("status", ""))
+		if counts.has(status):
+			counts[status] = int(counts[status]) + 1
+			known += 1
+	counts["total"] = _gameplay_sources.size()
+	counts["untracked"] = maxi(0, _gameplay_sources.size() - known)
+	counts["loaded"] = _owner_release_archive_loaded
+	return counts
 
 
 func _refresh_owner_release_library_panel() -> void:
@@ -1074,31 +1125,33 @@ func _refresh_owner_release_library_panel() -> void:
 		_batch_issue_rows.add_child(none)
 	var solve_again := get_node_or_null("SolveAgain") as Button
 	if solve_again != null:
-		var selected_status := ""
-		for item in records:
-			if item is Dictionary and str(item.get("source_id", "")) == _selected_import_source_id:
-				selected_status = str(item.get("status", ""))
-				break
-		var verified_retry_issue := _verified_batch_issue_for_source(_selected_import_source_id)
-		var batch_retry_available := not verified_retry_issue.is_empty() and str(_batch_snapshot.get("state", "")) == "COMPLETE"
-		solve_again.text = "Retry Failed / Rejected" if batch_retry_available and selected_status in ["FAILED", "REJECTED"] else "Solve Again"
-		solve_again.disabled = _operation_running or (selected_status == "REJECTED" and not batch_retry_available)
+		var retryable_ids: Array[String] = []
+		for record_variant in _owner_release_archive.get("records", []):
+			if not record_variant is Dictionary:
+				continue
+			var record: Dictionary = record_variant
+			if str(record.get("status", "")) not in ["FAILED", "REJECTED"]:
+				continue
+			var retry_source_id := str(record.get("source_id", ""))
+			if retry_source_id.begins_with("owner-upload-") and retry_source_id not in retryable_ids:
+				retryable_ids.append(retry_source_id)
+		var selected_retry := _selected_import_source_id in retryable_ids
+		solve_again.text = "Retry This PNG" if selected_retry else "Retry Failed / Rejected (%d)" % retryable_ids.size() if not retryable_ids.is_empty() else "Solve Again"
+		solve_again.disabled = _operation_running or not _owner_release_archive_loaded
 
 
 func _select_owner_archive_record(item: Dictionary) -> void:
 	var state := str(item.get("status", ""))
-	if state == "REJECTED":
-		_report("REJECTED · this source is preserved in the owner archive and cannot be sent to the solver.")
-		return
 	var source_id := str(item.get("source_id", ""))
 	if not source_id.begins_with("owner-upload-"):
 		_report("Archived source has no valid OWNER_UPLOAD identity; source selection was not changed.")
 		return
 	_select_imported_source_by_id(source_id)
-	if state == "FAILED":
-		_report("FAILED · use Retry Failed to start a new explicit run; prior outcome remains archived.")
+	if state in ["FAILED", "REJECTED"]:
+		_report("%s · original reason and attempts remain in history. Solve Again retries this PNG; with no failed/rejected PNG selected it retries all current failed/rejected PixelLab PNGs." % state)
 	else:
 		_report("%s · archived source selected; no solver was started." % state)
+	_refresh_batch_issue_panel()
 
 
 func _set_batch_issue_filter(value: String) -> void:
@@ -1588,11 +1641,13 @@ func _refresh_live_data() -> void:
 		var difficulty_text := str(primary.get("difficulty", {}).get("class", "—")) if not active_run and selected_run and not primary.is_empty() and not monitor_failed else "—"
 		var columns := int(primary.get("column_count", _column_count)) if selected_run and not primary.is_empty() else _selected_batch_column()
 		var pool_status := _owner_review_status if not _owner_review_status.is_empty() else "—"
-		var batch_caption := ""
+		var release_counts := _current_release_status_counts()
+		var batch_caption := "%d Pending · %d READY · %d FAILED · %d REJECTED / %d" % [int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0)), int(release_counts.get("total", 0))]
+		if not bool(release_counts.get("loaded", false)):
+			batch_caption = "Release Pool statuses loading · %d Final PNGs" % int(release_counts.get("total", 0))
 		if not _batch_snapshot.is_empty():
 			var counts_value: Variant = _batch_snapshot.get("counts", {})
 			var counts: Dictionary = counts_value if counts_value is Dictionary else {}
-			batch_caption = "%d loaded / %d job · %d READY · %d failed" % [_gameplay_sources.size(), int(counts.get("total", 0)), int(counts.get("ready", 0)), int(counts.get("failed", 0))]
 		if batch_following:
 			var item_release: Dictionary = _batch_follow_item.get("release_pool", {})
 			var follow_primary: Dictionary = _batch_follow_pipeline.get("primary", {})
@@ -1603,7 +1658,7 @@ func _refresh_live_data() -> void:
 			difficulty_text = str(follow_primary.get("difficulty", {}).get("class", "—"))
 			columns = int(_batch_follow_item.get("column_count", 0))
 			pool_status = str(item_release.get("disposition", "NOT ENTERED" if batch_item_state == "READY" else "—"))
-			batch_caption = "%d/%d · %s · %s" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING", str(_batch_follow_item.get("run_id", "no run ID"))]
+			batch_caption = "%d/%d · %s · %d P / %d R / %d F / %d X" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING", int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0))]
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
@@ -1615,6 +1670,10 @@ func _refresh_live_data() -> void:
 			var row := _details_rows[row_index]
 			row.text = facts[row_index]
 			row.tooltip_text = facts[row_index] + ("\n" + pipeline_reason if row_index == 1 and not pipeline_reason.is_empty() else "")
+			if row_index == 4:
+				var full_sha := str(_batch_follow_item.get("source_sha256", "")) if batch_following else str(_selected_import_source_id.trim_prefix("owner-upload-"))
+				row.tooltip_text += "\nCurrent Final inventory: %d · Pending: %d · READY: %d · FAILED: %d · REJECTED: %d · untracked: %d" % [int(release_counts.get("total", 0)), int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0)), int(release_counts.get("untracked", 0))]
+				row.tooltip_text += "\nSource SHA-256: %s · Job: %s · Batch: %s · Run: %s" % [full_sha, _batch_job_id if not _batch_job_id.is_empty() else "none", _batch_import_id if not _batch_import_id.is_empty() else "none", str(_batch_follow_item.get("run_id", "none")) if batch_following else "none"]
 		if _results_panel != null:
 			_results_panel.visible = not _results_mode.is_empty()
 	else:
@@ -1678,8 +1737,8 @@ func _refresh_run_button_caption() -> void:
 	var button := get_node_or_null("RunLevelPipeline") as Button
 	if button == null or _screen != "LEVEL FACTORY":
 		return
-	var imported_count := _gameplay_sources.size()
-	var batch_mode := imported_count > 1
+	var pending_count := _pending_gameplay_sources().size()
+	var batch_mode := pending_count > 0
 	if _batch_restore_pending:
 		button.text = "Checking saved batch…"
 		button.disabled = true
@@ -1687,7 +1746,7 @@ func _refresh_run_button_caption() -> void:
 		var counts_value: Variant = _batch_snapshot.get("counts", {})
 		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
-		button.text = "Running %d/%d" % [completed + (1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", imported_count))]
+		button.text = "Running %d/%d" % [completed + (1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", pending_count))]
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
@@ -1700,18 +1759,18 @@ func _refresh_run_button_caption() -> void:
 			button.text = "Review & Resume Legacy Batch" if _batch_legacy_reconciliation else "Resume Batch · %d remaining" % int(counts.get("remaining", 0))
 			button.disabled = false
 		elif state == "COMPLETE":
-			if _batch_job_matches_loaded_sources():
+			if pending_count == 0 and _batch_job_matches_loaded_sources():
 				button.text = "Batch Complete · %d READY · %d FAILED · %d REJECTED\n%d remaining" % [int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)), int(counts.get("remaining", 0))]
 				button.disabled = true
 			else:
-				button.text = "Run Entire Loaded Batch (%d)" % imported_count
+				button.text = "Run Pending Batch (%d)" % pending_count
 				button.disabled = false
 		else:
-			button.text = "Run Entire Loaded Batch (%d)" % imported_count
+			button.text = "Run Pending Batch (%d)" % pending_count
 			button.disabled = false
 	else:
-		button.text = "Run Pipeline"
-		button.disabled = false
+		button.text = "No Pending PNGs"
+		button.disabled = true
 	if _batch_pause_button != null:
 		_batch_pause_button.visible = _operation_running and not _batch_job_id.is_empty()
 	if _batch_stop_button != null:
@@ -1762,12 +1821,34 @@ func _pipeline_stop_reason(result: Dictionary) -> String:
 func _restore_imported_sources() -> void:
 	if _gateway == null:
 		return
-	_queue_studio_read_extension("library-refresh", {}, {"kind": "restore-imported-sources"})
+	_startup_source_inventory_loaded = false
+	_startup_pending_batch_restore_started = false
+	var final_directory := _factory_data_path("output/Pixellab/Final")
+	if final_directory.is_empty():
+		_complete_owner_folder_activity_error("Canonical PixelLab Final path could not be resolved during startup.")
+		return
+	_operation_running = true
+	_begin_owner_folder_activity(final_directory, "Startup inventory: comparing PixelLab Final PNG hashes with Release Pool statuses.")
+	var request := {"folder": final_directory}
+	request.merge(_owner_folder_activity_request(), true)
+	if not _queue_studio_read_extension("library-refresh", request, {"kind": "restore-imported-sources"}):
+		_operation_running = false
+		_complete_owner_folder_activity_error("Startup PixelLab inventory worker could not start.")
 
 
 func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 	if str(catalog.get("schema", "")) != "scrubbots-source-library-view":
+		_operation_running = false
+		_complete_owner_folder_activity_error(str(catalog.get("error", "Startup PixelLab inventory returned an invalid source catalog.")))
 		return
+	_operation_running = false
+	_startup_source_inventory_loaded = true
+	_activity_finished_msec = Time.get_ticks_msec()
+	_activity_terminal_state = "COMPLETE"
+	_activity_backend_disposition = "STARTUP_INVENTORY_COMPLETE"
+	_activity_stage = "INVENTORY"
+	_activity_message = "PixelLab Final and Release Pool status comparison completed."
+	_refresh_activity_header()
 	var sources: Array = catalog.get("sources", [])
 	var source_by_id: Dictionary = {}
 	for source_variant in sources:
@@ -1815,20 +1896,39 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 		_upsert_imported_source(source_by_id[ordered_source_id])
 	_refresh_gameplay_sources()
 	if _gameplay_sources.is_empty():
+		_refresh_live_data()
 		return
 	var selected_is_gameplay := _gameplay_source_index(_selected_import_source_id) >= 0
 	if not selected_is_gameplay:
 		_selected_import_source_id = _PINNED_002_SOURCE_ID if _gameplay_source_index(_PINNED_002_SOURCE_ID) >= 0 else str(_gameplay_sources[0].get("source_id", ""))
 	_select_imported_source_by_id(_selected_import_source_id)
-	_restore_loaded_png_batch_readonly()
 	_refresh_runtime_cards()
 
 
 func _restore_loaded_png_batch_readonly() -> void:
-	if _gateway == null or _gameplay_sources.is_empty():
+	if (_gateway == null or not _owner_release_archive_loaded
+			or not _startup_source_inventory_loaded or _startup_pending_batch_restore_started):
+		return
+	_startup_pending_batch_restore_started = true
+	var pending_sources := _pending_gameplay_sources()
+	if pending_sources.is_empty():
+		_batch_restore_pending = false
+		_batch_composite_snapshot.clear()
+		_batch_import_id = ""
+		_batch_job_id = ""
+		_batch_snapshot.clear()
+		_batch_job_source_mismatch = false
+		_refresh_run_button_caption()
+		_refresh_runtime_cards()
 		return
 	var source_ids: Array[String] = []
+	var active_source_ids: Array[String] = []
 	for source in _gameplay_sources:
+		var active_source_id := str(source.get("source_id", ""))
+		if active_source_id.is_empty() or active_source_id in active_source_ids:
+			return
+		active_source_ids.append(active_source_id)
+	for source in pending_sources:
 		var source_id := str(source.get("source_id", ""))
 		if source_id.is_empty() or source_id in source_ids:
 			return
@@ -1836,7 +1936,9 @@ func _restore_loaded_png_batch_readonly() -> void:
 	_batch_restore_pending = true
 	_batch_restore_token = "%d-%d" % [Time.get_ticks_msec(), Time.get_ticks_usec()]
 	_refresh_run_button_caption()
-	if not _queue_studio_read_extension("loaded-png-batch-find", {"source_ids": source_ids}, {"kind": "batch-find", "token": _batch_restore_token}):
+	if not _queue_studio_read_extension("loaded-png-batch-find", {
+		"source_ids": source_ids, "active_source_ids": active_source_ids
+	}, {"kind": "batch-find", "token": _batch_restore_token}):
 		_batch_restore_pending = false
 		_report("Saved batch lookup could not be prepared; no batch was resumed or modified.")
 		_refresh_run_button_caption()
@@ -1848,7 +1950,7 @@ func _apply_loaded_png_batch_find(resolved: Dictionary, token: String) -> void:
 	var composite_value: Variant = resolved.get("batch", {})
 	var composite: Dictionary = composite_value if composite_value is Dictionary else {}
 	var resolution := str(resolved.get("disposition", ""))
-	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH"] or composite.is_empty():
+	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH", "RESUMABLE_PENDING_SUBSET"] or composite.is_empty():
 		_batch_restore_pending = false
 		_batch_composite_snapshot.clear()
 		_batch_import_id = ""
@@ -2115,7 +2217,7 @@ func _build_master_controls() -> void:
 	_place_control("ToggleGrid", Rect2(1010, 124, 45, 32), _toggle_grid)
 	# LEVEL FACTORY: select artwork, set 3/4/5 columns, run real pipeline,
 	# then record append-only owner acceptance or rejection for its candidate.
-	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _open_owner_folder_sources)
+	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _restore_imported_sources)
 	_place_control("LevelNumber", Rect2(172, 165, 190, 38), _edit_level_number)
 	_place_control("SupplyColumns3", Rect2(172, 209, 56, 38), _set_columns.bind(3))
 	_place_control("SupplyColumns4", Rect2(238, 209, 56, 38), _set_columns.bind(4))
@@ -2495,49 +2597,8 @@ func _open_files(multiple: bool) -> void:
 
 
 func _open_owner_folder_sources() -> void:
-	var menu := PopupMenu.new()
-	menu.name = "OwnerFolderProviderMenu"
-	menu.add_item("ALPIX · Finished PNGs", 0)
-	menu.add_item("PixelLab · Final slices only", 1)
-	menu.add_item("Owner Suggestions", 2)
-	menu.id_pressed.connect(_on_owner_folder_provider_selected)
-	add_child(menu)
-	menu.popup(Rect2(get_global_mouse_position(), Vector2.ZERO))
-
-
-func _on_owner_folder_provider_selected(id: int) -> void:
-	var menu := get_node_or_null("OwnerFolderProviderMenu") as PopupMenu
-	if menu != null:
-		menu.queue_free()
-	if _file_dialog == null:
-		return
-	_owner_folder_explicit_alternative = id == 3
-	_file_selection_action = "OWNER_FOLDER_IMPORT"
-	var data_root := _factory_data_path("output")
-	if data_root.is_empty():
-		_report("Could not locate the canonical Factory data directory from this installation.")
-		return
-	match id:
-		0:
-			_owner_folder_provider = "ALPIX"
-			_file_dialog.current_dir = data_root.path_join("Alpix")
-			_file_dialog.title = "Select ALPIX output folder"
-		1:
-			_owner_folder_provider = "PIXELLAB"
-			_file_dialog.current_dir = data_root.path_join("Pixellab").path_join("Final")
-			_file_dialog.title = "Select PixelLab Final slices folder · Grid Files is excluded"
-		2:
-			_owner_folder_provider = "OWNER_SUGGESTIONS"
-			_file_dialog.current_dir = data_root.path_join("Owner Suggestions")
-			_file_dialog.title = "Select Owner Suggestions folder"
-		_:
-			_owner_folder_explicit_alternative = false
-			_report("Select one of the canonical ALPIX, PixelLab Final, or Owner Suggestions folders.")
-			return
-	_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_DIR
-	_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
-	_file_dialog.clear_filters()
-	_file_dialog.popup_centered_ratio(0.72)
+	# Compatibility binding only: intake always uses the canonical PixelLab Final folder.
+	_restore_imported_sources()
 
 
 func _on_owner_folder_selected(folder: String) -> void:
@@ -3030,6 +3091,7 @@ func _wrap_identity(value: String, chunk_size: int = 24) -> String:
 func _generate_art() -> void:
 	if _operation_running:
 		return
+	_provider_model = "PIXELLAB"
 	var provider_status := _provider_status_for(_provider_model)
 	if not bool(provider_status.get("available", false)):
 		_report(str(provider_status.get("reason", "Selected provider is unavailable.")))
@@ -3048,14 +3110,7 @@ func _generate_art() -> void:
 		_record_pixel_art_activity("SINGLE", "CONFIRMATION_REQUIRED", "One paid PixelLab Pro 4×4 request awaits explicit confirmation.")
 		_confirm_pro_4x4_generation()
 		return
-	if _provider_model == "ALPIX (Claude)":
-		if _start_alpix_generate_worker({"prompt": _prompt, "width": _width, "height": _height}):
-			_record_pixel_art_activity("SINGLE", "SUBMITTED", "Submitting one ALPIX/Claude request through the tracked Studio worker.")
-		else:
-			_report("ALPIX/Claude worker could not start; no request was sent.")
-		return
-	var result := _generate_request({"prompt": _prompt, "width": _width, "height": _height, "provider": _provider_model, "seed": _seed, "background_intent": _background_intent})
-	_finish_generation(result)
+	_report("PixelLab Pro 4×4 generation must use the explicit confirmation flow.")
 
 
 func _confirm_pro_4x4_generation() -> void:
@@ -3075,10 +3130,6 @@ func _confirm_pro_4x4_generation() -> void:
 func _start_pixel_art_worker(request: Dictionary) -> bool:
 	var payload := {"prompt": request.get("prompt", ""), "provider_id": "PIXELLAB", "provider_model": "PRO_4X4", "width": request.get("width", 56), "height": request.get("height", 56), "max_colors": request.get("max_colors", 12), "seed": request.get("seed", ""), "background_intent": "TRANSPARENT", "operation_id": "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]}
 	return _start_pixel_art_extension("semantic-generate", payload, "PIXELLAB")
-
-
-func _start_alpix_generate_worker(request: Dictionary) -> bool:
-	return _start_pixel_art_extension("alpix-generate", request, "ALPIX_SINGLE")
 
 
 func _start_pixel_art_extension(operation: String, payload: Dictionary, worker_kind: String) -> bool:
@@ -3148,18 +3199,6 @@ func _poll_pixel_art_worker() -> void:
 		return
 	if not completed:
 		result = {"state": "ERROR", "error": "Pixel Art worker exited without returning a result."}
-	if worker_kind == "ALPIX_SINGLE":
-		if str(result.get("state", "")) == "IMPORTED":
-			_semantic_progress = {"completed": 1, "failed": 0, "remaining": 0, "state": "IMPORTED"}
-			_finish_generation(result)
-		else:
-			_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
-			_report("ALPIX/Claude · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
-		_record_pixel_art_activity("ALPIX RESULT", str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
-		return
-	if worker_kind == "ALPIX_CSV":
-		_handle_alpix_csv_job(result)
-		return
 	if str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"]:
 		var source_ids: Array = result.get("source_ids", [])
 		_semantic_progress = {"completed": source_ids.size(), "failed": 16 - source_ids.size(), "remaining": 0, "state": str(result.get("state", "SOURCE_ONLY")), "frame_statuses": result.get("frame_statuses", [])}
@@ -3225,83 +3264,8 @@ func _generate_batch_csv(path: String) -> void:
 		_refresh_batch_csv_button()
 		return
 	_batch_csv_path = path
-	if _provider_model == "PIXELLAB":
-		_prepare_pixellab_csv_batch(path)
-		return
-	if _gateway == null:
-		_report("Factory Core is unavailable.")
-		return
-	if _provider_model == "ALPIX (Claude)":
-		if not _start_pixel_art_extension("alpix-csv-job", {"csv_path": path, "default_width": _width, "default_height": _height}, "ALPIX_CSV"):
-			_report("ALPIX CSV worker could not start; no generation request was sent.")
-			_record_pixel_art_activity("ALPIX CSV", "NOT_STARTED", "Tracked provider worker could not start.")
-		return
-	var file := FileAccess.open(path, FileAccess.READ)
-	if file == null:
-		_report("Could not read the selected CSV file.")
-		return
-	var expected := PackedStringArray(["prompt", "style", "width", "height", "provider", "seed", "background_intent"])
-	var header := file.get_csv_line()
-	if header != expected and header != PackedStringArray(["prompt", "style", "size", "provider", "seed", "background_intent"]):
-		_report("CSV must use prompt,style,width,height,provider,seed,background_intent.")
-		return
-	var succeeded := 0
-	var failed := 0
-	var row_number := 0
-	while not file.eof_reached():
-		var row := file.get_csv_line()
-		if row.size() == 1 and row[0].strip_edges().is_empty():
-			continue
-		row_number += 1
-		if row_number > 100:
-			_report("CSV batch stopped at the 100-row owner limit.")
-			break
-		if row.size() != header.size():
-			_report("CSV row %d has the wrong number of fields." % row_number)
-			failed += 1
-			continue
-		var row_values := {}
-		for index in range(header.size()): row_values[str(header[index]).strip_edges()] = row[index].strip_edges()
-		var dims := _csv_dimensions(row_values)
-		# Historical CSV style cells are retained for compatibility but ignored.
-		var result := _generate_request({"prompt": str(row_values.get("prompt", "")), "width": dims.x, "height": dims.y, "provider": str(row_values.get("provider", _provider_model)), "seed": str(row_values.get("seed", "")), "background_intent": str(row_values.get("background_intent", _background_intent))})
-		if str(result.get("state", "")) in ["SUCCESS", "IMPORTED"]:
-			_last_candidate_id = str(result.get("candidate_id", _last_candidate_id))
-			_last_source_id = str(result.get("source_id", _last_source_id))
-			succeeded += 1
-		else:
-			failed += 1
-	_operation_running = false
-	_semantic_progress = {"completed": succeeded, "failed": failed, "remaining": 0}
-	_report("Batch: %d succeeded · %d failed" % [succeeded, failed])
-	file.close()
-	_record_pixel_art_activity("ALPIX CSV BATCH", "COMPLETE", "Batch finished: %d succeeded, %d failed." % [succeeded, failed])
-	_batch_csv_path = ""
-	var csv_button := get_node_or_null("BatchCsvPath") as Button
-	if csv_button != null: csv_button.text = "CSV file…"
-
-
-func _handle_alpix_csv_job(job: Dictionary) -> void:
-	_semantic_progress = {"job_id": job.get("job_id", ""), "completed": job.get("completed", 0), "failed": job.get("failed", 0), "retired": job.get("retired", 0), "remaining": job.get("remaining", 0), "state": job.get("state", "ERROR")}
-	_set_batch_action_label(str(job.get("state", "ERROR")) in ["LIMIT", "UNAVAILABLE", "NEEDS_RETRY", "INTERRUPTED"])
-	var rows: Array = job.get("rows", [])
-	var provider_error := ""
-	for row in rows:
-		if str(row.get("state", "")) == "IMPORTED":
-			_last_source_id = str(row.get("source_id", _last_source_id))
-			_selected_art_path = str(row.get("artifact_path", _selected_art_path))
-		elif not str(row.get("error", "")).strip_edges().is_empty():
-			provider_error = str(row.get("error", "")).strip_edges().left(180)
-	if not _selected_art_path.is_empty():
-		_load_selected_art_preview(_selected_art_path)
-	var summary := "ALPIX %s · %d imported · %d failed · %d retired · %d left" % [str(job.get("state", "ERROR")), int(job.get("completed", 0)), int(job.get("failed", 0)), int(job.get("retired", 0)), int(job.get("remaining", 0))]
-	if not provider_error.is_empty():
-		summary += " · " + provider_error
-	_report(summary)
-	_record_pixel_art_activity("ALPIX CSV BATCH", str(job.get("state", "ERROR")), summary)
-	_batch_csv_path = ""
-	var csv_button := get_node_or_null("BatchCsvPath") as Button
-	if csv_button != null: csv_button.text = "CSV file…"
+	_provider_model = "PIXELLAB"
+	_prepare_pixellab_csv_batch(path)
 
 
 func _prepare_pixellab_csv_batch(path: String) -> void:
@@ -3529,13 +3493,9 @@ func _send_to_level_factory() -> void:
 func _run_level_pipeline() -> void:
 	if _gateway == null or _operation_running:
 		return
-	if _gameplay_sources.size() > 1:
-		if str(_batch_snapshot.get("state", "")) == "COMPLETE" and (int(_batch_snapshot.get("counts", {}).get("failed", 0)) + int(_batch_snapshot.get("counts", {}).get("rejected", 0))) > 0 and _batch_job_matches_loaded_sources():
-			_retry_failed_png_batch()
-			return
-		_run_png_batch()
-		return
-	_run_single_level_pipeline()
+	# Run Pipeline has one authority: the SHA-verified current Pending projection.
+	# Failed/Rejected retries are explicit through Solve Again.
+	_run_png_batch()
 
 
 func _run_single_level_pipeline() -> void:
@@ -3632,6 +3592,10 @@ func _run_single_level_pipeline() -> void:
 func _run_png_batch() -> void:
 	if _gateway == null or _operation_running:
 		return
+	if not _owner_release_archive_loaded:
+		_refresh_owner_release_archive()
+		_report("Release Pool Pending list is still loading; no solver batch was created. Try Run Pipeline after the status refresh completes.")
+		return
 	if _batch_job_source_mismatch:
 		_report("Loaded PNG batch provenance does not match the current sources; no batch was created or resumed.")
 		_refresh_run_button_caption()
@@ -3641,22 +3605,23 @@ func _run_png_batch() -> void:
 			_activity_message = "Explicit owner resume requested for the SHA-matched legacy composite."
 		_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
 		return
-	if _gameplay_sources.size() < 2:
-		_report("Run Entire Loaded Batch requires at least two verified loaded PNGs.")
+	var pending_sources := _pending_gameplay_sources()
+	if pending_sources.is_empty():
+		_report("No SHA-verified PixelLab Final PNG is currently Pending; no solver batch was created.")
 		return
 	var pinned_project := _pinned_game_project_path()
 	if not FileAccess.file_exists(pinned_project.path_join("project.godot")):
 		_report("Pinned ScrubBots project is unavailable; no batch was created. Restore the pinned Runtime project and retry.")
 		return
 	var source_ids: Array[String] = []
-	for source in _gameplay_sources:
+	for source in pending_sources:
 		var source_id := str(source.get("source_id", ""))
 		if source_id.begins_with("owner-upload-") and source_id not in source_ids:
 			source_ids.append(source_id)
-	if source_ids.size() != _gameplay_sources.size():
-		_report("Loaded gallery changed during snapshot; no batch was created.")
+	if source_ids.size() != pending_sources.size():
+		_report("Pending PNG inventory changed during snapshot; no batch was created.")
 		return
-	var composite := _extension("loaded-png-batch-create", {"source_ids": source_ids})
+	var composite := _extension("pending-png-batch-create", {"source_ids": source_ids})
 	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
 		_report("Loaded PNG snapshot could not be verified: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
@@ -3725,17 +3690,43 @@ func _run_png_batch() -> void:
 	_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
 
 
-func _retry_failed_png_batch() -> void:
-	if _gateway == null or _operation_running or _batch_job_id.is_empty():
+func _retry_failed_png_batch(source_ids: Array[String] = []) -> void:
+	if _gateway == null or _operation_running or not _owner_release_archive_loaded:
 		return
-	var result := _extension("png-batch-retry-failed", {"job_id": _batch_job_id})
+	var retryable_ids: Array[String] = []
+	if source_ids.is_empty():
+		if _selected_import_source_id.begins_with("owner-upload-"):
+			for record_variant in _owner_release_archive.get("records", []):
+				if record_variant is Dictionary and str(record_variant.get("source_id", "")) == _selected_import_source_id and str(record_variant.get("status", "")) in ["FAILED", "REJECTED"]:
+					retryable_ids.append(_selected_import_source_id)
+		if retryable_ids.is_empty():
+			for record_variant in _owner_release_archive.get("records", []):
+				if not record_variant is Dictionary:
+					continue
+				var record: Dictionary = record_variant
+				var retry_source_id := str(record.get("source_id", ""))
+				if str(record.get("status", "")) in ["FAILED", "REJECTED"] and retry_source_id.begins_with("owner-upload-"):
+					retryable_ids.append(retry_source_id)
+	else:
+		retryable_ids = source_ids.duplicate()
+	if retryable_ids.is_empty():
+		_report("Release Pool has no current FAILED/REJECTED PixelLab PNGs to retry.")
+		return
+	var pinned_project := _pinned_game_project_path()
+	if not FileAccess.file_exists(pinned_project.path_join("project.godot")):
+		_report("Pinned ScrubBots project is unavailable; retry was not queued.")
+		return
+	var result := _extension("png-batch-retry-release-sources", {"source_ids": retryable_ids,
+		"settings": {"game_project": pinned_project, "background_intent": _background_intent, "solver_timeout_seconds": 900}})
 	var job: Dictionary = result.get("job", {})
 	if job.is_empty() or str(job.get("job_id", "")).is_empty():
-		_report("Explicit Retry Failed was not created: %s" % str(result.get("reason", result.get("disposition", "UNAVAILABLE"))))
+		_report("Solve Again did not start: %s" % str(result.get("reason", result.get("disposition", "UNAVAILABLE"))))
 		return
 	_batch_job_id = str(job.get("job_id", ""))
+	_batch_import_id = str(job.get("import_batch_id", ""))
+	_batch_composite_snapshot = _extension("batch-load", {"batch_id": _batch_import_id}).get("batch", {})
 	_batch_snapshot = job
-	_dispatch_png_batch_job(_batch_job_id, str(job.get("import_batch_id", "")))
+	_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
 
 
 func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
@@ -4433,9 +4424,10 @@ func _refresh_activity_header() -> void:
 		var activity_color := Color("#245478") if activity_state == "RUNNING" else Color("#7a5824") if activity_state in ["PAUSED", "STOPPED"] else Color("#743d3c")
 		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(activity_color, activity_color.lightened(0.22)))
 		_activity_source_label.text = "%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + (1 if current_index is int else 0), int(counts.get("total", 0))]
-		_activity_source_label.tooltip_text = "Sequential batch %s" % _batch_job_id
-		_activity_phase_label.text = "%s · %d READY · %d failed" % [phase_caption, int(counts.get("ready", 0)), int(counts.get("failed", 0))]
-		_activity_phase_label.tooltip_text = "%s · batch=%s · item=%s · activity=%s" % [_activity_message, _batch_job_id, str(current_index), str(_batch_follow_item.get("activity_run_id", ""))]
+		var release_counts := _current_release_status_counts()
+		_activity_source_label.tooltip_text = "Sequential batch %s · current PNG: %s · source SHA-256: %s · run: %s" % [_batch_job_id, str(_batch_follow_item.get("original_filename", _batch_follow_item.get("display_name", ""))), str(_batch_follow_item.get("source_sha256", "")), str(_batch_follow_item.get("run_id", "none"))]
+		_activity_phase_label.text = "%s · P%d R%d F%d X%d" % [phase_caption, int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0))]
+		_activity_phase_label.tooltip_text = "%s · job=%s · item=%s/%s · job counts READY=%d FAILED=%d REJECTED=%d remaining=%d · activity=%s" % [_activity_message, _batch_job_id, str(current_index if current_index is int else "—"), str(items.size()), int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)), int(counts.get("remaining", 0)), str(_batch_follow_item.get("activity_run_id", ""))]
 		return
 	var activity_matches_selection := folder_activity_active or _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id
 	if not activity_matches_selection:
@@ -4782,13 +4774,20 @@ func _poll_studio_read_extension() -> void:
 	elif kind == "owner-release-library":
 		if str(result.get("schema", "")) == "scrubbots-owner-release-library-view/v1" and result.get("records", []) is Array:
 			_owner_release_archive = result
+			_owner_release_archive_loaded = true
 			_batch_issue_render_key = ""
 			_refresh_batch_issue_panel()
+			_refresh_run_button_caption()
 			_refresh_live_data()
+			_restore_loaded_png_batch_readonly()
+		else:
+			_owner_release_archive_loaded = false
+			_report("Release Pool source statuses could not be verified; Run Pipeline remains disabled.")
 	elif kind == "batch-latest":
 		_apply_batch_progress_result(result, str(context.get("job_id", "")))
 	elif kind == "restore-imported-sources":
 		_apply_restored_imported_sources(result)
+		_refresh_owner_release_archive()
 	elif kind == "batch-find":
 		_apply_loaded_png_batch_find(result, str(context.get("token", "")))
 	elif kind == "batch-restore-latest":
@@ -4925,25 +4924,6 @@ func _publish_staging() -> void:
 	_report("STAGING: %s" % str(result.get("state", result.get("disposition", "UNAVAILABLE"))))
 
 
-func _generate_request(request: Dictionary) -> Dictionary:
-	if _gateway == null or _operation_running:
-		return {"state": "UNAVAILABLE", "reason": "Factory Core is unavailable."}
-	_operation_running = true
-	var result: Dictionary
-	var selected_provider := str(request.get("provider", _provider_model))
-	if selected_provider == "ALPIX (Claude)":
-		result = {"state": "ASYNC_REQUIRED", "reason": "ALPIX generation must use the tracked Studio worker."}
-	elif selected_provider == "PIXELLAB":
-		# Paid requests only pass through explicit confirmation and the async worker.
-		result = {"state": "PAID_CONFIRMATION_REQUIRED", "reason": "Start one explicit Generate/Regenerate request to confirm PixelLab Pro 4×4 cost."}
-	elif selected_provider == "MAGNIFIC":
-		result = {"state": "PROVIDER_RETIRED", "reason": "PROVIDER_RETIRED_MAGNIFIC · choose ALPIX (Claude) or PIXELLAB explicitly."}
-	else:
-		result = {"state": "UNAVAILABLE", "reason": "Selected provider is not configured."}
-	_operation_running = false
-	return result
-
-
 func _finish_generation(result: Dictionary) -> void:
 	_last_candidate_id = str(result.get("candidate_id", _last_candidate_id))
 	_last_source_id = str(result.get("source_id", _last_source_id))
@@ -5016,15 +4996,9 @@ func _choose_size() -> void:
 		dialog.title = "PixelLab Pro 4×4 controls"
 	dialog.add_child(controls)
 	dialog.confirmed.connect(func():
-		if _provider_model == "PIXELLAB":
-			_width = clampi(int(width_input.value), 51, 59)
-			_height = clampi(int(height_input.value), 51, 59)
-			_max_used_colors = clampi(int(max_colors_input.value), 3, 12)
-		else:
-			_width = int(width_input.value)
-			_height = int(height_input.value)
-			_alpix_width = _width
-			_alpix_height = _height
+		_width = clampi(int(width_input.value), 51, 59)
+		_height = clampi(int(height_input.value), 51, 59)
+		_max_used_colors = clampi(int(max_colors_input.value), 3, 12)
 		_refresh_selected_size_value()
 		_refresh_live_data()
 		dialog.queue_free()
@@ -5034,107 +5008,27 @@ func _choose_size() -> void:
 
 
 func _choose_provider() -> void:
-	var dialog := ConfirmationDialog.new()
-	dialog.title = "Provider"
-	dialog.min_size = Vector2i(680, 420)
-	var choice := OptionButton.new()
-	choice.custom_minimum_size = Vector2(0, 42)
-	choice.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	var result := _extension("provider-options", {})
-	var options: Array = result.get("providers", [])
-	var names: Array[String] = []
-	var provider_ids: Array[String] = []
-	var reasons_by_id: Dictionary = {}
-	for item in options:
-		if item is Dictionary:
-			var provider_id := str(item.get("id", ""))
-			if provider_id in ["ALPIX (Claude)", "PIXELLAB"]:
-				var available := bool(item.get("available", false))
-				var status := str(item.get("status", "UNAVAILABLE"))
-				var display_name := "PixelLab Pro · 4×4" if provider_id == "PIXELLAB" else provider_id
-				if not available: display_name += " · %s" % status
-				choice.add_item(display_name)
-				choice.set_item_metadata(choice.item_count - 1, provider_id)
-				choice.set_item_tooltip(choice.item_count - 1, str(item.get("reason", "")))
-				names.append(display_name)
-				provider_ids.append(provider_id)
-				reasons_by_id[provider_id] = str(item.get("reason", "Provider status is unavailable."))
-	if _provider_model == "MAGNIFIC": _provider_model = "ALPIX (Claude)"
-	var selected := provider_ids.find(_provider_model)
-	if selected < 0: selected = provider_ids.find("ALPIX (Claude)")
-	if selected < 0: selected = 0
-	if not names.is_empty(): choice.select(selected)
-	var content := VBoxContainer.new()
-	content.name = "ProviderDialogContent"
-	content.custom_minimum_size = Vector2(560, 220)
-	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	content.add_theme_constant_override("separation", 12)
-	content.add_child(choice)
-	var reason_scroll := ScrollContainer.new()
-	reason_scroll.name = "ProviderStatusScroll"
-	reason_scroll.custom_minimum_size = Vector2(0, 150)
-	reason_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	reason_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	reason_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	reason_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
-	var status_label := Label.new()
-	status_label.name = "ProviderStatusReason"
-	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	status_label.add_theme_font_size_override("font_size", 12)
-	status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No active provider status was returned."))
-	reason_scroll.add_child(status_label)
-	content.add_child(reason_scroll)
-	dialog.add_child(content)
-	choice.item_selected.connect(func(index: int):
-		var selected_id := str(choice.get_item_metadata(index))
-		status_label.text = str(reasons_by_id.get(selected_id, "No provider status was returned."))
-	)
+	_provider_model = "PIXELLAB"
+	var provider := _provider_status_for(_provider_model)
+	var dialog := AcceptDialog.new()
+	dialog.title = "PixelLab Pro · 4×4"
+	dialog.dialog_text = str(provider.get("status", "UNAVAILABLE")) + "\n" + str(provider.get("reason", "Provider status could not be verified."))
 	dialog.add_button("Refresh status", false, "refresh_provider_status")
 	dialog.add_button("Open Credential Manager", false, "open_credential_manager")
 	dialog.custom_action.connect(func(action: String):
 		if action == "open_credential_manager":
 			OS.create_process("control.exe", PackedStringArray(["/name", "Microsoft.CredentialManager"]), false)
 		elif action == "refresh_provider_status":
-			var refreshed := _extension("provider-options", {})
-			var refreshed_options: Array = refreshed.get("providers", [])
-			for refreshed_item in refreshed_options:
-				if refreshed_item is Dictionary:
-					var provider_id := str(refreshed_item.get("id", ""))
-					if reasons_by_id.has(provider_id):
-						var available := bool(refreshed_item.get("available", false))
-						var status := str(refreshed_item.get("status", "UNAVAILABLE"))
-						reasons_by_id[provider_id] = str(refreshed_item.get("reason", "Provider status is unavailable."))
-						var option_index := provider_ids.find(provider_id)
-						if option_index >= 0:
-							var base_name := "PixelLab Pro · 4×4" if provider_id == "PIXELLAB" else provider_id
-							choice.set_item_text(option_index, base_name if available else "%s · %s" % [base_name, status])
-			status_label.text = str(reasons_by_id.get(str(choice.get_item_metadata(choice.selected)) if choice.item_count > 0 else "", "No provider status was returned."))
+			var refreshed := _provider_status_for("PIXELLAB")
+			dialog.dialog_text = str(refreshed.get("status", "UNAVAILABLE")) + "\n" + str(refreshed.get("reason", "Provider status could not be verified."))
 	)
-	dialog.confirmed.connect(func():
-		var previous_provider := _provider_model
-		if choice.item_count > 0: _provider_model = str(choice.get_item_metadata(choice.selected))
-		if previous_provider == "ALPIX (Claude)":
-			_alpix_width = _width
-			_alpix_height = _height
-		if _provider_model == "PIXELLAB":
-			if _width < 51 or _width > 59: _width = 56
-			if _height < 51 or _height > 59: _height = 56
-			_refresh_selected_size_value()
-			_refresh_live_data()
-		elif _provider_model == "ALPIX (Claude)" and previous_provider == "PIXELLAB":
-			_width = _alpix_width
-			_height = _alpix_height
-			_refresh_selected_size_value()
-			_refresh_live_data()
-		_refresh_provider_control_caption()
-		dialog.queue_free()
-	)
-	dialog.canceled.connect(func(): dialog.queue_free())
-	add_child(dialog); dialog.popup_centered(Vector2i(680, 420))
+	add_child(dialog)
+	dialog.popup_centered()
 
 
 func _provider_status_for(provider_id: String) -> Dictionary:
+	if provider_id != "PIXELLAB":
+		return {"available": false, "status": "PROVIDER_RETIRED", "reason": "Only PixelLab Pro 4×4 is active in Factory Studio."}
 	var result := _extension("provider-options", {})
 	var options: Array = result.get("providers", [])
 	for item in options:
@@ -5598,12 +5492,29 @@ func _toggle_background() -> void:
 
 
 func _solve_again() -> void:
-	if (str(_batch_snapshot.get("state", "")) == "COMPLETE"
-			and (int(_batch_snapshot.get("counts", {}).get("failed", 0)) + int(_batch_snapshot.get("counts", {}).get("rejected", 0))) > 0
-			and _batch_job_matches_loaded_sources()):
-		_retry_failed_png_batch()
+	if not _owner_release_archive_loaded:
+		_report("Release Pool status history is still loading; no solver was started.")
 		return
-	_run_single_level_pipeline()
+	if _selected_import_source_id.begins_with("owner-upload-"):
+		for record_variant in _owner_release_archive.get("records", []):
+			if not record_variant is Dictionary:
+				continue
+			var record: Dictionary = record_variant
+			if str(record.get("source_id", "")) == _selected_import_source_id and str(record.get("status", "")) in ["FAILED", "REJECTED"]:
+				_retry_failed_png_batch([_selected_import_source_id])
+				return
+	var retryable_ids: Array[String] = []
+	for record_variant in _owner_release_archive.get("records", []):
+		if not record_variant is Dictionary:
+			continue
+		var record: Dictionary = record_variant
+		var source_id := str(record.get("source_id", ""))
+		if source_id.begins_with("owner-upload-") and str(record.get("status", "")) in ["FAILED", "REJECTED"]:
+			retryable_ids.append(source_id)
+	if retryable_ids.is_empty():
+		_report("Release Pool has no current FAILED/REJECTED PixelLab PNGs to retry. Use Run Pipeline for Pending PNGs.")
+		return
+	_retry_failed_png_batch(retryable_ids)
 
 
 func _preview_replay() -> void:

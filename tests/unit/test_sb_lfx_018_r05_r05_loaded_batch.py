@@ -35,6 +35,9 @@ class MemoryPath:
             return self.name in self.files
         return bool(self.entries) or self.name.rsplit("/", 1)[-1] in self.files
 
+    def resolve(self):
+        return self
+
     def mkdir(self, **_kwargs):
         return None
 
@@ -104,6 +107,7 @@ def test_loaded_snapshot_unions_import_events_and_binds_both_hashes(monkeypatch)
     new_event = MemoryPath("batches/new-event.json")
     root = MemoryPath("extensions", entries=[old_event, new_event])
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: root)
+    monkeypatch.setattr(studio_extensions, "_batch_import_root", lambda: root)
     monkeypatch.setattr(studio_extensions, "batch_load", lambda batch_id: {"batch": {
         "schema": studio_extensions.BATCH_SCHEMA,
         "version": 1,
@@ -132,6 +136,27 @@ def test_loaded_snapshot_unions_import_events_and_binds_both_hashes(monkeypatch)
 def test_one_explicit_fake_run_visits_all_nine_sequentially_and_retry_is_separate(monkeypatch):
     ids = _source_ids(9)
     records = {source_id: _record(source_id) for source_id in ids}
+    pending_records = [
+        {"source_id": source_id, "source_sha256": records[source_id]["source_sha256"],
+         "provider": "PIXELLAB", "event_sha256": hashlib.sha256((source_id + ":pending").encode()).hexdigest()}
+        for source_id in ids
+    ]
+    failed_records = [
+        {**row, "status": "FAILED"} for row in pending_records
+    ]
+    monkeypatch.setattr(
+        "scrubbots_pixel_factory.owner_release_library.list_records",
+        lambda status=None, **_kwargs: {
+            "records": pending_records if status == "PENDING" else failed_records if status in {None, "FAILED"} else []
+        },
+    )
+    monkeypatch.setattr(
+        "scrubbots_pixel_factory.owner_release_library.transition",
+        lambda source_id, status, **kwargs: {
+            "source_id": source_id, "status": status, "event_sha256": hashlib.sha256(source_id.encode()).hexdigest(),
+            **kwargs,
+        },
+    )
     manifest = {"batch_id": "batch-loaded-test", "items": _validated_items(ids)}
     manifest["snapshot_source_count"] = 9
     jobs: dict[str, dict] = {}
@@ -151,10 +176,14 @@ def test_one_explicit_fake_run_visits_all_nine_sequentially_and_retry_is_separat
     monkeypatch.setattr(png_batch, "_control_action", lambda _job_id: "")
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda *_args: None)
     monkeypatch.setattr(png_batch, "_reuse_existing_ready", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_persist_owner_release_attempt", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_persist_owner_release_item", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_verified_ready_sources", lambda _items: {})
     monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": manifest})
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id, **_kwargs: records[source_id])
     monkeypatch.setattr(studio_extensions, "validate_owner_source", lambda *_args, **_kwargs: {"source_sha256": ""})
-    monkeypatch.setattr(studio_extensions, "_source_record_paths", lambda source_id, *_args: (MemoryRecord((source_id + ":record").encode()), None))
+    monkeypatch.setattr(studio_extensions, "_source_record_paths", lambda source_id, *_args: (
+        MemoryRecord((source_id + ":record").encode()), MemoryPath(f"sources/{source_id}.png")))
     monkeypatch.setattr(png_batch, "_source_record_paths", lambda source_id, *_args: (MemoryRecord((source_id + ":record").encode()), None), raising=False)
 
     # Install the exact fake validation API on the module imported by _verify_sources.
@@ -178,7 +207,10 @@ def test_one_explicit_fake_run_visits_all_nine_sequentially_and_retry_is_separat
 
     result = png_batch.run_png_batch(job["job_id"], expected_batch_id="batch-loaded-test", pipeline_runner=fake_pipeline_runner)
     failed_job = result["job"]
-    assert [row[0] for row in calls] == ids
+    assert [row[0] for row in calls] == ids, (
+        result.get("job", {}).get("counts"),
+        [(item.get("status"), item.get("reason")) for item in result.get("job", {}).get("items", [])],
+    )
     assert [row[2] for row in calls] == list(range(9))
     assert result["disposition"] == "FINISHED_WITH_FAILURES", (result["disposition"], result["job"].get("state"), result["job"].get("counts"), [(item["status"], item.get("reason")) for item in result["job"].get("items", [])])
     assert failed_job["counts"] == {"total": 9, "ready": 0, "failed": 9, "rejected": 0, "skipped": 0, "remaining": 0}
@@ -195,7 +227,7 @@ def test_one_explicit_fake_run_visits_all_nine_sequentially_and_retry_is_separat
     assert jobs[job["job_id"]]["state"] == "COMPLETE"
 
 
-def test_explicit_resume_of_stopped_batch_requeues_only_nonready_items(monkeypatch):
+def test_resume_of_stopped_batch_does_not_retry_failed_or_rejected_items(monkeypatch):
     ids = _source_ids(9)
     records = {source_id: _record(source_id) for source_id in ids}
     manifest = {"batch_id": "batch-stopped-test", "items": _validated_items(ids)}
@@ -217,6 +249,17 @@ def test_explicit_resume_of_stopped_batch_requeues_only_nonready_items(monkeypat
     monkeypatch.setattr(png_batch, "_control_action", lambda _job_id: "")
     monkeypatch.setattr(png_batch, "_recover_attempt", lambda *_args: None)
     monkeypatch.setattr(png_batch, "_reuse_existing_ready", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_persist_owner_release_item", lambda *_args: None)
+    monkeypatch.setattr(png_batch, "_verified_ready_sources", lambda _items: {})
+    pending_records = [
+        {"source_id": source_id, "source_sha256": records[source_id]["source_sha256"],
+         "provider": "PIXELLAB", "event_sha256": hashlib.sha256((source_id + ":pending").encode()).hexdigest()}
+        for source_id in ids
+    ]
+    monkeypatch.setattr("scrubbots_pixel_factory.owner_release_library.list_records",
+                        lambda status=None, **_kwargs: {"records": [row for row in pending_records
+                                                                       if status is None or status == "PENDING"]})
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "C:/game")
     monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": manifest})
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id, **_kwargs: records[source_id])
 
@@ -238,23 +281,18 @@ def test_explicit_resume_of_stopped_batch_requeues_only_nonready_items(monkeypat
     stopped["counts"] = png_batch._counts(stopped["items"])
     write_job(stopped)
 
-    calls = []
-
-    def fake_pipeline_runner(*, source_id, request):
-        calls.append((source_id, request["png_batch_item_index"], request["solver_timeout_seconds"]))
-        return {"disposition": "ERROR", "error": "fixture failure after explicit resume"}
-
-    result = png_batch.run_png_batch(imported["job_id"], expected_batch_id="batch-stopped-test", pipeline_runner=fake_pipeline_runner)
+    result = png_batch.run_png_batch(
+        imported["job_id"], expected_batch_id="batch-stopped-test",
+        pipeline_runner=lambda **_kwargs: pytest.fail("terminal FAILED/REJECTED items require explicit Solve Again"),
+    )
     assert result["state"] == "SUCCESS", result
     resumed = result["job"]
-    assert [row[0] for row in calls] == ids[1:], [
-        (item["index"], item["status"], item.get("reason")) for item in resumed["items"]
-    ]
-    assert all(row[2] == 240 for row in calls)
-    assert resumed["counts"] == {"total": 9, "ready": 1, "failed": 8, "rejected": 0, "skipped": 0, "remaining": 0}
+    assert resumed["state"] == "COMPLETE"
+    assert resumed["counts"] == {"total": 9, "ready": 1, "failed": 1, "rejected": 7, "skipped": 0, "remaining": 0}
     assert resumed["items"][0]["run_id"] == "pipeline-kept-ready"
-    assert resumed["items"][1]["attempt_history"][-1]["status"] == "FAILED"
-    assert all(item["attempt_history"][-1]["status"] == "REJECTED" for item in resumed["items"][2:])
+    assert resumed["items"][1]["status"] == "FAILED"
+    assert resumed["items"][1]["reason"] == "old failure"
+    assert all(item["status"] == "REJECTED" and item["reason"] == "old source rejection" for item in resumed["items"][2:])
 
 
 @contextmanager
@@ -281,3 +319,90 @@ def test_immutable_writer_still_fails_closed_without_changing_existing_bytes():
     with pytest.raises(studio_extensions.StudioExtensionError, match="immutable evidence already exists"):
         studio_extensions._write_json(path, {"schema": "new", "source_sha256": "a" * 64}, immutable=True)
     assert path.read_bytes() == raw
+
+
+def test_startup_resume_finds_original_batch_after_pending_shrinks(monkeypatch):
+    """A restart resumes the original full job after terminal rows leave Pending."""
+    source_ids = _source_ids(3)
+    records = [_record(source_id) for source_id in source_ids]
+    batch = {
+        "version": 2,
+        "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT",
+        "batch_id": "batch-original",
+        "items": [{key: row[key] for key in ("source_id", "source_sha256", "source_record_sha256")}
+                  for row in records],
+    }
+    digest = "b" * 64
+    job_id = "png-batch-original"
+    states = ["READY", "FAILED", "QUEUED"]
+    job = {
+        "job_id": job_id,
+        "import_batch_id": batch["batch_id"],
+        "batch_digest": digest,
+        "state": "INTERRUPTED",
+        "items": [
+            {"index": index, "source_id": row["source_id"], "source_sha256": row["source_sha256"],
+             "source_record_sha256": row["source_record_sha256"], "status": state,
+             "owner_release_projection": {"state": "RECORDED"} if state in {"READY", "FAILED"} else {}}
+            for index, (row, state) in enumerate(zip(records, states, strict=True))
+        ],
+    }
+    current_records = [
+        {"source_id": row["source_id"], "source_sha256": row["source_sha256"],
+         "status": "PENDING" if state == "QUEUED" else state}
+        for row, state in zip(records, states, strict=True)
+    ]
+    job_path = MemoryPath(f"root/jobs/{job_id}.json")
+    monkeypatch.setattr(png_batch, "_root", lambda: MemoryPath("root", entries=[job_path]))
+    monkeypatch.setattr(png_batch, "_read_job", lambda _job_id: job)
+    monkeypatch.setattr(png_batch, "_job_lineage_matches_snapshot", lambda _job, _batch: True)
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": batch})
+    monkeypatch.setattr(studio_extensions, "_digest", lambda _value: digest)
+    monkeypatch.setattr(
+        "scrubbots_pixel_factory.owner_release_library.list_records",
+        lambda *_args, **_kwargs: {"records": current_records},
+    )
+
+    pending = {"items": [{key: records[2][key] for key in
+                           ("source_id", "source_sha256", "source_record_sha256")} ]}
+    result = png_batch.find_resumable_pending_batch(pending, source_ids)
+
+    assert result["state"] == "SUCCESS"
+    assert result["disposition"] == "RESUMABLE_PENDING_SUBSET"
+    assert result["resume_job_id"] == job_id
+    assert result["resume_count"] == result["pending_count"] == 1
+    assert result["batch"]["batch_id"] == batch["batch_id"]
+    assert result["mutated"] is False
+
+
+def test_startup_resume_refuses_two_jobs_that_match_the_same_pending_sha(monkeypatch):
+    source_id = _source_ids(1)[0]
+    record = _record(source_id)
+    batch = {"version": 2, "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT", "batch_id": "batch-one",
+             "items": [{key: record[key] for key in
+                        ("source_id", "source_sha256", "source_record_sha256")} ]}
+    paths = [MemoryPath("root/jobs/png-batch-a.json"), MemoryPath("root/jobs/png-batch-b.json")]
+    jobs = {
+        path.stem: {"job_id": path.stem, "import_batch_id": batch["batch_id"], "batch_digest": "c" * 64,
+                    "state": "INTERRUPTED", "items": [{"index": 0, "source_id": source_id,
+                    "source_sha256": record["source_sha256"], "source_record_sha256": record["source_record_sha256"],
+                    "status": "QUEUED"}]}
+        for path in paths
+    }
+    monkeypatch.setattr(png_batch, "_root", lambda: MemoryPath("root", entries=paths))
+    monkeypatch.setattr(png_batch, "_read_job", lambda job_id: jobs[job_id])
+    monkeypatch.setattr(png_batch, "_job_lineage_matches_snapshot", lambda _job, _batch: True)
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": batch})
+    monkeypatch.setattr(studio_extensions, "_digest", lambda _value: "c" * 64)
+    monkeypatch.setattr(
+        "scrubbots_pixel_factory.owner_release_library.list_records",
+        lambda *_args, **_kwargs: {"records": [{"source_id": source_id,
+            "source_sha256": record["source_sha256"], "status": "PENDING"}]},
+    )
+
+    result = png_batch.find_resumable_pending_batch({"items": [record]}, [source_id])
+
+    assert result["state"] == "BLOCKED"
+    assert result["disposition"] == "PENDING_BATCH_RESUME_AMBIGUOUS"
+    assert result["batch"] is None
+    assert result["mutated"] is False

@@ -81,11 +81,13 @@ def test_exact_three_master_ui_uses_owner_binary_and_canonical_actions() -> None
     assert (runtime_assets / "FACTORY_STUDIO_PIXEL_ART_MASTER_V04.png.import").is_file()
     assert "owner-review" in source and '"pipeline"' in source
     assert '"release-pool"' in source and '"scrubbots-publish"' in source
-    assert '"prompt", "style", "width", "height", "provider", "seed", "background_intent"' in source
+    assert '"provider_id": "PIXELLAB", "provider_model": "PRO_4X4"' in source
+    assert '"max_colors": request.get("max_colors", 12)' in source
     assert '"semantic-generate"' in source
     assert '"ZoomOut"' in source and '"ToggleGrid"' in source
-    assert '"alpix-generate"' in source and '"magnific-prepare"' not in source
-    assert '"ALPIX (Claude)"' in source and '"PIXELLAB"' in source
+    assert '"alpix-generate"' not in source
+    assert '"ALPIX (Claude)"' not in source
+    assert '"PIXELLAB"' in source
     assert '"column_count": _column_count' in source and 'columns in [3, 4, 5]' in source
     assert 'str(_last_pipeline.get("disposition", "")) != "READY"' in source
     legacy_shell = scene.split('[node name="Frame"', 1)[1].split('[node name="Layout"', 1)[0]

@@ -80,6 +80,7 @@ if ($OnlyPaths.Count -gt 0) {
     if ($relativePaths.Count -ne $requestedPaths.Count) { throw 'OnlyPaths could not be resolved to the scoped overlay allowlist.' }
 }
 $authorizedOverlayAdditions = @(
+	'level_factory/scripts/factory_core_launcher.py',
 	'level_factory/project.godot',
 	'level_factory/scripts/factory_studio_shell.gd',
 	'level_factory/scripts/factory_studio_workspace_page.gd',
@@ -104,7 +105,9 @@ $authorizedOverlayAdditions = @(
 	'src/scrubbots_pixel_factory/owner_art_storage.py',
 	'src/scrubbots_pixel_factory/owner_folder_batch.py',
 	'src/scrubbots_pixel_factory/owner_release_library.py',
+	'src/scrubbots_pixel_factory/studio_extensions.py',
 	'src/scrubbots_pixel_factory/png_batch.py',
+	'src/scrubbots_pixel_factory/supply_pipeline/release_pool.py',
     'src/scrubbots_pixel_factory/supply_pipeline/scrubbots_solver.py',
     'src/scrubbots_pixel_factory/supply_pipeline/solver_budget.py',
     'src/scrubbots_pixel_factory/supply_pipeline/supply_optimizer.py',

@@ -166,7 +166,17 @@ def _replace_projection(path: Path, raw: bytes, root: Path, *, expected_event_sh
     finally:
         temp.unlink(missing_ok=True)
 
-def _ensure_status_artwork(root: Path, status: str, source_id: str, artifact: Mapping[str, Any]) -> None:
+def _status_artwork_name(source_id: str, original_source_path: str) -> str:
+    """Keep the owner's readable PNG basename across status-folder moves."""
+    name = Path(original_source_path).name
+    if (not name or name in {".", ".."} or Path(name).name != name
+            or Path(name).suffix.lower() != ".png"):
+        raise OwnerReleaseLibraryError("status artwork source filename is unsafe")
+    return name
+
+
+def _ensure_status_artwork(root: Path, status: str, source_id: str, artifact: Mapping[str, Any],
+                           original_source_path: str) -> Path | None:
     if artifact.get("state") != "VERIFIED": return
     relative = Path(str(artifact.get("relative_path", "")))
     source = root / relative
@@ -175,12 +185,13 @@ def _ensure_status_artwork(root: Path, status: str, source_id: str, artifact: Ma
     digest = str(artifact.get("sha256", ""))
     if _hash(source.read_bytes()) != digest: raise OwnerReleaseLibraryError("status artwork object SHA mismatch")
     folder = root / status.title(); _safe_directory(root, folder)
-    target = folder / f"{source_id}.png"
+    target = folder / _status_artwork_name(source_id, original_source_path)
     if _reparse(target): raise OwnerReleaseLibraryError("status artwork link is a reparse point")
     try: os.link(source, target)
     except FileExistsError:
         if not target.is_file() or _hash(target.read_bytes()) != digest:
-            raise OwnerReleaseLibraryError("active status artwork link conflicts with immutable source bytes")
+            raise OwnerReleaseLibraryError("readable status artwork name conflicts with different source bytes")
+    return target
 
 def _history(root: Path, source_id: str) -> list[dict[str, Any]]:
     folder = root / ".history" / source_id
@@ -199,18 +210,177 @@ def _history(root: Path, source_id: str) -> list[dict[str, Any]]:
         previous_hash = _hash(raw); events.append(event)
     return events
 
-def _verified_ready_entry(source_id: str, run_id: str | None) -> dict[str, Any]:
+
+def _status_artwork_candidates(root: Path, status: str, source_id: str,
+                               original_source_path: str) -> tuple[Path, ...]:
+    folder = root / status.title()
+    legacy = folder / f"{source_id}.png"
+    try:
+        readable = folder / _status_artwork_name(source_id, original_source_path)
+    except OwnerReleaseLibraryError:
+        # Older history can lack a safe original basename. Such records may
+        # still be recovered by their source-ID projection, but new verified
+        # artwork writes remain strict in _ensure_status_artwork().
+        return (legacy,)
+    return (readable,) if readable == legacy else (readable, legacy)
+
+
+def _recover_latest_status_projection(root: Path, source_id: str, events: list[dict[str, Any]]) -> bool:
+    """Finish an interrupted status projection using its immutable event chain.
+
+    The history append is the commit authority. This repairs only projections
+    that are byte-for-byte represented in that chain and refuses unknown files.
+    """
+    if not events:
+        return False
+    latest = events[-1]
+    latest_digest = _hash(_json_bytes(latest))
+    known_events = {_hash(_json_bytes(event)): event for event in events}
+    projection_digests: dict[str, str] = {}
+    artwork_digests: dict[str, str] = {}
+    changed = False
+
+    for state in STATUSES:
+        projection_path = root / state.title() / f"{source_id}.json"
+        if projection_path.exists():
+            if _reparse(projection_path):
+                raise OwnerReleaseLibraryError("owner release status projection is a reparse point")
+            try:
+                value = json.loads(projection_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                raise OwnerReleaseLibraryError("owner release status projection is unreadable during recovery") from exc
+            if not isinstance(value, dict) or value.get("schema") != SCHEMA or value.get("source_id") != source_id:
+                raise OwnerReleaseLibraryError("owner release projection collides with an unverified status record")
+            digest = str(value.pop("event_sha256", ""))
+            if (digest not in known_events or value.get("status") != state
+                    or _hash(_json_bytes(value)) != digest
+                    or _json_bytes(value) != _json_bytes(known_events[digest])):
+                raise OwnerReleaseLibraryError("owner release status projection is not represented in immutable history")
+            projection_digests[state] = digest
+
+        event_for_state = next((event for event in reversed(events) if event.get("status") == state), None)
+        if event_for_state is not None:
+            for artwork_path in _status_artwork_candidates(
+                    root, state, source_id, str(event_for_state.get("original_source_path", ""))):
+                if not artwork_path.exists():
+                    continue
+                if _reparse(artwork_path) or not artwork_path.is_file():
+                    raise OwnerReleaseLibraryError("owner release artwork projection is unsafe during recovery")
+                actual = _hash(artwork_path.read_bytes())
+                matching_history = any(
+                    event.get("status") == state
+                    and isinstance(event.get("artifact"), Mapping)
+                    and event["artifact"].get("state") == "VERIFIED"
+                    and event["artifact"].get("sha256") == actual
+                    for event in events
+                )
+                if not matching_history:
+                    raise OwnerReleaseLibraryError("owner release artwork projection is not represented in immutable history")
+                artwork_digests[state] = actual
+
+    desired_state = str(latest.get("status", ""))
+    if desired_state not in STATUSES:
+        raise OwnerReleaseLibraryError("latest owner release history status is unsupported")
+    artifact = latest.get("artifact", {})
+    if isinstance(artifact, Mapping) and artifact.get("state") == "VERIFIED":
+        expected_artwork_path = root / desired_state.title() / _status_artwork_name(
+            source_id, str(latest.get("original_source_path", "")))
+        legacy_artwork_path = root / desired_state.title() / f"{source_id}.png"
+        changed = changed or not expected_artwork_path.exists() or legacy_artwork_path.exists()
+        _ensure_status_artwork(root, desired_state, source_id, artifact,
+                               str(latest.get("original_source_path", "")))
+        if legacy_artwork_path.exists() and legacy_artwork_path != expected_artwork_path:
+            if _reparse(legacy_artwork_path) or _hash(legacy_artwork_path.read_bytes()) != str(artifact.get("sha256", "")):
+                raise OwnerReleaseLibraryError("legacy status artwork name is not bound to the latest immutable source")
+            legacy_artwork_path.unlink()
+    elif desired_state in artwork_digests:
+        raise OwnerReleaseLibraryError("latest owner release status has artwork without a verified immutable object")
+
+    desired_projection = root / desired_state.title() / f"{source_id}.json"
+    current_digest = projection_digests.get(desired_state)
+    if current_digest != latest_digest:
+        changed = True
+        _replace_projection(
+            desired_projection, _json_bytes({**latest, "event_sha256": latest_digest}), root,
+            expected_event_sha256=current_digest,
+        )
+
+    for state in STATUSES - {desired_state}:
+        for suffix in (".json", ".png"):
+            stale_paths = [root / state.title() / f"{source_id}{suffix}"]
+            if suffix == ".png":
+                event_for_state = next((event for event in reversed(events) if event.get("status") == state), None)
+                if event_for_state is not None:
+                    stale_paths.extend(_status_artwork_candidates(
+                        root, state, source_id, str(event_for_state.get("original_source_path", ""))))
+            for stale in set(stale_paths):
+                if stale.exists():
+                    if _reparse(stale):
+                        raise OwnerReleaseLibraryError("stale owner status projection is unsafe during recovery")
+                    stale.unlink()
+                    changed = True
+    return changed
+
+
+def reconcile_status_projections(*, repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Repair interrupted current-status files from their verified immutable histories."""
+    root = _root(repository_root)
+    if not root.exists():
+        return {"state": "RECONCILED", "repaired": 0, "errors": []}
+    history_root = root / ".history"
+    _verify_existing_path(root, history_root)
+    repaired: list[str] = []
+    checked = 0
+    errors: list[dict[str, str]] = []
+    for directory in sorted((path for path in history_root.iterdir() if path.is_dir()), key=lambda path: path.name):
+        source_id = directory.name
+        try:
+            with _lock(root / ".locks" / f"{source_id}.lock", root):
+                events = _history(root, source_id)
+                checked += 1
+                if _recover_latest_status_projection(root, source_id, events):
+                    repaired.append(source_id)
+        except (OSError, ValueError) as exc:
+            errors.append({"source_id": source_id, "reason": str(exc)[:512]})
+    return {"state": "RECONCILED" if not errors else "PARTIAL", "checked": checked, "repaired": len(repaired),
+            "repaired_source_ids": repaired, "errors": errors}
+
+def _verified_ready_entry(source_id: str, run_id: str | None, candidate_id: str | None = None) -> dict[str, Any]:
     if not run_id: raise OwnerReleaseLibraryError("READY needs a canonical pipeline run and pool receipt")
     from .supply_pipeline.release_pool import release_entries
-    for entry in release_entries():
+    # Restrict the read to the candidate bound by this solver result. A single
+    # unrelated/corrupt Ready receipt must not hide every other verified level.
+    entries = release_entries(candidate_id_filter=candidate_id) if candidate_id else release_entries()
+    for entry in entries:
         candidate = entry.get("candidate", {})
         lineage = candidate.get("source_lineage", candidate.get("provenance", {})) if isinstance(candidate, Mapping) else {}
         if (isinstance(lineage, Mapping) and str(lineage.get("source_id", "")) == source_id
+                and (not candidate_id or str(entry.get("candidate_id", "")) == candidate_id)
                 and str(entry.get("pipeline_run_id", "")) == run_id
                 and entry.get("pipeline", {}).get("disposition") == "READY"
                 and entry.get("pipeline", {}).get("primary", {}).get("state") == "READY"):
             return dict(entry)
     raise OwnerReleaseLibraryError("READY needs exact canonical solver/replay/difficulty/QA and owner-eligibility evidence")
+
+
+def _assert_ready_entry_binding(entry: Mapping[str, Any], source_id: str, run_id: str | None) -> dict[str, Any]:
+    """Recheck a receipt returned by the full canonical Release Pool reader."""
+    candidate = entry.get("candidate", {})
+    lineage = candidate.get("source_lineage", candidate.get("provenance", {})) if isinstance(candidate, Mapping) else {}
+    if (entry.get("schema") != _RELEASE_POOL_ENTRY_SCHEMA
+            or not run_id or str(entry.get("pipeline_run_id", "")) != run_id
+            or str(entry.get("candidate_id", "")) == ""
+            or entry.get("pipeline", {}).get("disposition") != "READY"
+            or entry.get("pipeline", {}).get("primary", {}).get("state") != "READY"
+            or not isinstance(lineage, Mapping) or str(lineage.get("source_id", "")) != source_id):
+        raise OwnerReleaseLibraryError("prevalidated Release Pool receipt does not match the exact READY source/run")
+    expected = entry.get("entry_digest")
+    payload = dict(entry)
+    payload.pop("entry_digest", None)
+    actual = hashlib.sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    if not isinstance(expected, str) or not _SHA.fullmatch(expected) or expected != actual:
+        raise OwnerReleaseLibraryError("prevalidated Release Pool receipt digest changed")
+    return dict(entry)
 
 def _object_for_source(root: Path, path_text: str, source_sha: str | None) -> dict[str, Any]:
     if not path_text: return {"state": "NOT_AVAILABLE", "reason": "Original source path is unavailable."}
@@ -227,6 +397,7 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                original_source_path: str, reason: str = "", batch_id: str | None = None,
                pipeline_run_id: str | None = None, retry_of: str | None = None,
                evidence: Mapping[str, Any] | None = None,
+               _verified_entry: Mapping[str, Any] | None = None,
                repository_root: str | Path | None = None) -> dict[str, Any]:
     if not isinstance(source_id, str) or not _ID.fullmatch(source_id): raise OwnerReleaseLibraryError("source identity is malformed")
     if status not in STATUSES: raise OwnerReleaseLibraryError("status is unsupported")
@@ -235,9 +406,19 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
     root = owner_art_storage.ensure_owner_art_layout(repository_root)["release_pool"]
     evidence_value = dict(evidence or {})
     if status == "READY":
-        entry = _verified_ready_entry(source_id, pipeline_run_id)
+        candidate_id = str(evidence_value.get("candidate_id", "")) or None
+        if _verified_entry is not None:
+            entry = _assert_ready_entry_binding(_verified_entry, source_id, pipeline_run_id)
+        elif candidate_id:
+            entry = _verified_ready_entry(source_id, pipeline_run_id, candidate_id)
+        else:
+            # Keep the historical two-argument call shape for integrations and
+            # test adapters that wrap the canonical verifier.
+            entry = _verified_ready_entry(source_id, pipeline_run_id)
         evidence_value.update({"canonical_release_entry_digest": entry.get("entry_digest"), "canonical_pipeline_sha256": entry.get("pipeline_sha256")})
     with _lock(root / ".locks" / f"{source_id}.lock", root):
+        events = _history(root, source_id)
+        _recover_latest_status_projection(root, source_id, events)
         events = _history(root, source_id); previous = events[-1] if events else None
         artifact = _object_for_source(root, original_source_path, source_sha256)
         if (artifact.get("state") == "NOT_AVAILABLE" and previous
@@ -250,8 +431,12 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
         prior_status = str(previous.get("status", "")) if previous else ""
         allowed = {"": {"PENDING", "FAILED", "REJECTED"}, "PENDING": STATUSES,
                    "FAILED": {"PENDING", "FAILED", "REJECTED"}, "READY": {"READY", "REJECTED"},
-                   "REJECTED": {"REJECTED"}}
+                   "REJECTED": {"PENDING", "REJECTED"}}
         if status not in allowed.get(prior_status, set()): raise OwnerReleaseLibraryError(f"invalid status transition {prior_status or 'NEW'} -> {status}")
+        if prior_status in {"FAILED", "REJECTED"} and status == "PENDING":
+            prior_digest = _hash(_json_bytes(previous)) if previous else None
+            if (retry_of != prior_digest or evidence_value.get("explicit_retry") is not True):
+                raise OwnerReleaseLibraryError("FAILED/REJECTED -> PENDING requires an explicit retry bound to the prior event SHA-256")
         fields = {"source_sha256": verified_sha, "provider": provider, "original_source_path": original_source_path,
                   "reason": reason[:512], "batch_id": batch_id, "pipeline_run_id": pipeline_run_id,
                   "retry_of": retry_of, "evidence": evidence_value, "artifact": artifact}
@@ -271,30 +456,49 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                     or projection_value.get("event_sha256") != expected_previous_sha
                     or _json_bytes({key: value for key, value in projection_value.items() if key != "event_sha256"}) != _json_bytes(previous)):
                 raise OwnerReleaseLibraryError("prior owner release status projection does not match immutable history")
+        prior_path = str(previous.get("original_source_path", "")) if previous else original_source_path
         for prior_status_name in STATUSES:
-            prior_artwork = root / prior_status_name.title() / f"{source_id}.png"
-            if not prior_artwork.exists():
-                continue
-            if prior_status_name != prior_status or _reparse(prior_artwork) or not prior_artwork.is_file():
-                raise OwnerReleaseLibraryError("owner release artwork projection collides with an unverified status record")
-            prior_artifact = previous.get("artifact", {}) if previous else {}
-            prior_digest = str(prior_artifact.get("sha256", "")) if isinstance(prior_artifact, Mapping) else ""
-            if not prior_digest or _hash(prior_artwork.read_bytes()) != prior_digest:
-                raise OwnerReleaseLibraryError("prior owner release artwork projection does not match immutable source bytes")
+            for prior_artwork in _status_artwork_candidates(root, prior_status_name, source_id, prior_path):
+                if not prior_artwork.exists():
+                    continue
+                if prior_status_name != prior_status or _reparse(prior_artwork) or not prior_artwork.is_file():
+                    raise OwnerReleaseLibraryError("owner release artwork projection collides with an unverified status record")
+                prior_artifact = previous.get("artifact", {}) if previous else {}
+                prior_digest = str(prior_artifact.get("sha256", "")) if isinstance(prior_artifact, Mapping) else ""
+                if not prior_digest or _hash(prior_artwork.read_bytes()) != prior_digest:
+                    raise OwnerReleaseLibraryError("prior owner release artwork projection does not match immutable source bytes")
+        if artifact.get("state") == "VERIFIED":
+            target = root / status.title() / _status_artwork_name(source_id, original_source_path)
+            if _reparse(target):
+                raise OwnerReleaseLibraryError("status artwork target is a reparse point")
+            if target.exists() and (not target.is_file() or _hash(target.read_bytes()) != str(artifact.get("sha256", ""))):
+                raise OwnerReleaseLibraryError("readable status artwork name conflicts with different source bytes")
         event = {"schema": SCHEMA, "version": 1, "source_id": source_id, **fields, "status": status,
                  "sequence": len(events) + 1, "created_at": datetime.now(timezone.utc).isoformat(),
                  "previous_event_sha256": expected_previous_sha}
         raw = _json_bytes(event); digest = _hash(raw)
         _create_immutable(root / ".history" / source_id / f"{event['sequence']:06d}-{digest}.json", raw, root)
         projection = {**event, "event_sha256": digest}
-        _ensure_status_artwork(root, status, source_id, artifact)
+        current_artwork = _ensure_status_artwork(root, status, source_id, artifact, original_source_path)
         _replace_projection(root / status.title() / f"{source_id}.json", _json_bytes(projection), root,
                             expected_event_sha256=expected_previous_sha if status == prior_status else None)
         for old in STATUSES - {status}:
-            for suffix in (".json", ".png"):
-                stale = root / old.title() / f"{source_id}{suffix}"
+            stale_paths = [root / old.title() / f"{source_id}.json"]
+            if previous is not None:
+                stale_paths.extend(_status_artwork_candidates(
+                    root, old, source_id, str(previous.get("original_source_path", original_source_path))))
+            for stale in set(stale_paths):
                 if stale.exists():
                     if _reparse(stale): raise OwnerReleaseLibraryError("old status projection is unsafe; immutable history retained")
+                    stale.unlink()
+        if current_artwork is not None and previous is not None:
+            previous_paths = _status_artwork_candidates(
+                root, prior_status, source_id,
+                str(previous.get("original_source_path", original_source_path)))
+            for stale in previous_paths:
+                if stale != current_artwork and stale.exists():
+                    if _reparse(stale) or _hash(stale.read_bytes()) != str(artifact.get("sha256", "")):
+                        raise OwnerReleaseLibraryError("legacy current-status artwork does not match immutable source bytes")
                     stale.unlink()
         return projection
 
@@ -376,12 +580,206 @@ def list_records(status: str | None = None, *, repository_root: str | Path | Non
     counts = {key: sum(row.get("status") == key for row in rows) for key in sorted(STATUSES)}
     return {"schema": "scrubbots-owner-release-library-view/v1", "state": "READY", "read_only": True, "counts": counts, "records": rows}
 
-def transition_pipeline(source_id: str, pipeline: Mapping[str, Any]) -> dict[str, Any]:
+
+def reconcile_ready_projections(*, repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Repair intake-only Pending rows from one canonical Ready receipt snapshot.
+
+    This is deliberately conservative: it promotes only the first, import-time
+    PENDING event. Explicit retries, active attempts, and later failures or
+    rejections remain the latest owner action and are never overwritten.
+    """
+    from . import studio_extensions
+    from .supply_pipeline.release_pool import release_entries
+
+    entries = release_entries()
+    entry_by_source: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        candidate = entry.get("candidate", {})
+        lineage = candidate.get("source_lineage", candidate.get("provenance", {})) if isinstance(candidate, Mapping) else {}
+        source_id = str(lineage.get("source_id", "")) if isinstance(lineage, Mapping) else ""
+        if source_id:
+            existing = entry_by_source.get(source_id)
+            if existing is None or str(entry.get("pipeline_run_id", "")) > str(existing.get("pipeline_run_id", "")):
+                entry_by_source[source_id] = entry
+
+    current = {str(row.get("source_id", "")): row
+               for row in list_records(repository_root=repository_root).get("records", [])
+               if isinstance(row, Mapping)}
+    promoted: list[str] = []
+    skipped = 0
+    for source_id, entry in entry_by_source.items():
+        row = current.get(source_id)
+        row_evidence = row.get("evidence", {}) if isinstance(row, Mapping) else {}
+        row_evidence = row_evidence if isinstance(row_evidence, Mapping) else {}
+        if (row is None or row.get("status") != "PENDING" or row.get("sequence") != 1
+                or row.get("pipeline_run_id") or row_evidence.get("batch_attempt_started")):
+            skipped += 1
+            continue
+        candidate = entry.get("candidate", {})
+        lineage = candidate.get("source_lineage", candidate.get("provenance", {})) if isinstance(candidate, Mapping) else {}
+        source_sha = str(lineage.get("source_sha256", lineage.get("source_sha", ""))) if isinstance(lineage, Mapping) else ""
+        if source_sha != str(row.get("source_sha256", "")):
+            skipped += 1
+            continue
+        try:
+            source = studio_extensions.verify_owner_source(source_id)
+            if str(source.get("source_sha256", "")) != source_sha:
+                skipped += 1
+                continue
+            event = transition(
+                source_id, "READY", source_sha256=source_sha,
+                provider=str(row.get("provider", "PIXELLAB")),
+                original_source_path=str(row.get("original_source_path", source.get("source_path", ""))),
+                pipeline_run_id=str(entry.get("pipeline_run_id", "")),
+                evidence={"candidate_id": str(entry.get("candidate_id", "")),
+                          "startup_ready_receipt_reconciliation": True},
+                _verified_entry=entry, repository_root=repository_root,
+            )
+            if event.get("status") == "READY":
+                promoted.append(source_id)
+            else:
+                skipped += 1
+        except (OSError, ValueError, OwnerReleaseLibraryError):
+            skipped += 1
+    return {"state": "RECONCILED", "canonical_ready_receipts": len(entries),
+            "owner_rows_promoted": len(promoted), "promoted_source_ids": promoted,
+            "skipped_newer_or_unmatched_rows": skipped}
+
+
+def reconcile_terminal_batch_projections(*, repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Restore missing FAILED/REJECTED projections from sealed batch outcomes.
+
+    Older Studio builds could persist a terminal PNG batch item without also
+    recording its Release Pool status event. On startup, use only a digest-
+    verified batch job whose immutable import snapshot, source PNG SHA, and
+    source-record SHA still match. READY is intentionally handled by
+    ``reconcile_ready_projections`` because it additionally requires a
+    canonical Release Pool receipt.
+
+    Existing retries, attempts, and terminal owner decisions are never
+    overwritten. Only intake-time PENDING events (sequence 1, with no solver
+    attempt) can be restored by this compatibility path.
+    """
+    from . import studio_extensions
+    from .png_batch import _job_lineage_matches_snapshot, _read_job, _root as batch_root
+
+    root = _root(repository_root)
+    jobs_root = batch_root() / "jobs"
+    if not jobs_root.is_dir():
+        return {"state": "RECONCILED", "checked_jobs": 0, "repaired": 0,
+                "skipped": 0, "errors": []}
+
+    current = {str(row.get("source_id", "")): row
+               for row in list_records(repository_root=repository_root).get("records", [])
+               if isinstance(row, Mapping)}
+    latest_by_source: dict[str, tuple[str, str, str, dict[str, Any], dict[str, Any]]] = {}
+    checked_jobs = 0
+    errors: list[dict[str, str]] = []
+    for path in sorted(jobs_root.glob("png-batch-*.json"), key=lambda item: item.name):
+        try:
+            job = _read_job(path.stem)
+            checked_jobs += 1
+            batch_id = str(job.get("import_batch_id", ""))
+            if not batch_id:
+                continue
+            batch = studio_extensions.batch_load(batch_id)["batch"]
+            if not _job_lineage_matches_snapshot(job, batch):
+                continue
+            # Job creation establishes which batch/retry supersedes older work;
+            # updated_at alone would let an old batch that resumed later hide a
+            # newer explicitly created job.
+            job_stamp = str(job.get("created_at", ""))
+            for item in job.get("items", []):
+                if (not isinstance(item, Mapping)
+                        or item.get("status") not in {"QUEUED", "RUNNING", "VERIFYING_EXISTING", "READY", "FAILED", "REJECTED"}):
+                    continue
+                source_id = str(item.get("source_id", ""))
+                source_sha = str(item.get("source_sha256", ""))
+                record_sha = str(item.get("source_record_sha256", ""))
+                if (not _ID.fullmatch(source_id) or not _SHA.fullmatch(source_sha)
+                        or not _SHA.fullmatch(record_sha) or source_id != "owner-upload-" + source_sha):
+                    continue
+                row = current.get(source_id)
+                evidence = row.get("evidence", {}) if isinstance(row, Mapping) else {}
+                evidence = evidence if isinstance(evidence, Mapping) else {}
+                if (row is None or row.get("status") != "PENDING" or row.get("sequence") != 1
+                        or row.get("pipeline_run_id") or evidence.get("batch_attempt_started")):
+                    continue
+                source = studio_extensions.verify_owner_source(
+                    source_id, source_directory=job.get("settings", {}).get("source_directory"),
+                )
+                record_path, source_path = studio_extensions._source_record_paths(
+                    source_id, job.get("settings", {}).get("source_directory"),
+                )
+                if (str(source.get("source_sha256", "")) != source_sha
+                        or _hash(source_path.read_bytes()) != source_sha
+                        or _hash(record_path.read_bytes()) != record_sha
+                        or str(row.get("source_sha256", "")) != source_sha):
+                    continue
+                stamp = str(item.get("finished_at", "")) or job_stamp
+                previous = latest_by_source.get(source_id)
+                if (previous is None or
+                        (job_stamp, stamp, str(job.get("job_id", ""))) > (previous[1], previous[0], previous[2])):
+                    latest_by_source[source_id] = (
+                        stamp, job_stamp, str(job.get("job_id", "")),
+                        dict(job), dict(item),
+                    )
+        except (OSError, ValueError, TypeError, KeyError, UnicodeError) as exc:
+            errors.append({"job_id": path.stem, "reason": str(exc)[:320]})
+
+    repaired: list[str] = []
+    skipped = 0
+    for source_id, (_stamp, _job_stamp, _job_id, job, item) in latest_by_source.items():
+        if item.get("status") not in {"FAILED", "REJECTED"}:
+            continue
+        row = current.get(source_id)
+        if row is None or row.get("status") != "PENDING" or row.get("sequence") != 1:
+            skipped += 1
+            continue
+        try:
+            status = str(item.get("status"))
+            event = transition(
+                source_id, status, source_sha256=str(item.get("source_sha256", "")),
+                provider=str(row.get("provider", "PIXELLAB")),
+                original_source_path=str(row.get("original_source_path", "")),
+                reason=str(item.get("reason", "")) or "Recovered from a SHA-verified durable PNG batch outcome.",
+                batch_id=str(job.get("import_batch_id", "")) or None,
+                pipeline_run_id=str(item.get("run_id", "")) or None,
+                evidence={
+                    "startup_terminal_batch_reconciliation": True,
+                    "reconciled_job_id": str(job.get("job_id", "")),
+                    "reconciled_job_state_digest": str(job.get("state_digest", "")),
+                    "reconciled_item_index": int(item.get("index", -1)),
+                    "source_record_sha256": str(item.get("source_record_sha256", "")),
+                },
+                repository_root=repository_root,
+            )
+            if event.get("status") == status:
+                repaired.append(source_id)
+            else:
+                skipped += 1
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            errors.append({"source_id": source_id, "reason": str(exc)[:320]})
+    terminal_sources = sum(item.get("status") in {"FAILED", "REJECTED"}
+                           for _stamp, _job_stamp, _job_id, _job, item in latest_by_source.values())
+    pending_preserved = sum(item.get("status") not in {"FAILED", "REJECTED", "READY"}
+                            for _stamp, _job_stamp, _job_id, _job, item in latest_by_source.values())
+    return {"state": "RECONCILED" if not errors else "PARTIAL", "checked_jobs": checked_jobs,
+            "terminal_sources": terminal_sources, "pending_preserved": pending_preserved, "repaired": len(repaired),
+            "repaired_source_ids": repaired, "skipped": skipped, "errors": errors}
+
+def transition_pipeline(source_id: str, pipeline: Mapping[str, Any], *, repository_root: str | Path | None = None) -> dict[str, Any]:
     from . import studio_extensions
     source = studio_extensions.verify_owner_source(source_id)
     run_id = str(pipeline.get("run_id", "")) or None
     outcome = str(pipeline.get("disposition", pipeline.get("state", "PENDING"))).upper()
-    status = "READY" if outcome == "READY" else "FAILED" if outcome in {"ERROR", "FAILED", "BLOCKED", "INTERRUPTED"} or outcome.startswith("PARTIAL") else "PENDING"
+    status = (
+        "READY" if outcome == "READY" else
+        "REJECTED" if outcome == "REJECTED" else
+        "PENDING" if outcome in {"PENDING", "QUEUED", "INTERRUPTED", "INCONCLUSIVE"} else
+        "FAILED" if outcome in {"ERROR", "FAILED", "BLOCKED"} or outcome.startswith("PARTIAL") else
+        "PENDING"
+    )
     reason = "" if status == "READY" else str(pipeline.get("reason", pipeline.get("stop_reason", outcome)))
     evidence: dict[str, Any] = {"pipeline_run_id": run_id, "solution": {"state": "NOT_AVAILABLE"}, "plan": {"state": "NOT_AVAILABLE"}}
     primary = pipeline.get("primary", {}); files = primary.get("files", {}) if isinstance(primary, Mapping) else {}
@@ -389,21 +787,24 @@ def transition_pipeline(source_id: str, pipeline: Mapping[str, Any]) -> dict[str
         for key, label in (("level", "solution"), ("supply_plan", "plan")):
             text = str(files.get(key, "")); path = Path(text) if text else None
             if path and path.is_file() and not _reparse(path): evidence[label] = {"state": "VERIFIED", "path": text, "sha256": _hash(path.read_bytes())}
-    current = next((row for row in list_records()["records"] if row.get("source_id") == source_id), None)
+    current = next((row for row in list_records(repository_root=repository_root)["records"] if row.get("source_id") == source_id), None)
     args = {"source_sha256": str(source.get("source_sha256", "")), "provider": str(current.get("provider", "OWNER_UPLOAD")) if current else "OWNER_UPLOAD",
             "original_source_path": str(current.get("original_source_path", source.get("source_path", ""))) if current else str(source.get("source_path", "")), "pipeline_run_id": run_id,
             "reason": reason, "evidence": evidence}
-    if current and current.get("status") == "REJECTED":
-        raise OwnerReleaseLibraryError("explicitly rejected artwork cannot be sent to the solver")
-    if current and current.get("status") == "FAILED":
+    if current and current.get("status") in {"FAILED", "REJECTED"} and status == "PENDING":
         retry_id = str(current.get("event_sha256", ""))
-        transition(source_id, "PENDING", **{**args, "reason": "Explicit Retry Failed attempt started.",
-                    "retry_of": retry_id or None, "evidence": {**evidence, "explicit_retry": True}})
+        transition(source_id, "PENDING", **{**args, "reason": "Explicit Retry %s attempt started." % current.get("status"),
+                    "retry_of": retry_id or None, "evidence": {**evidence, "explicit_retry": True},
+                    "repository_root": repository_root})
     if status == "READY":
-        try: return transition(source_id, "READY", **args)
+        evidence["candidate_id"] = str(pipeline.get("candidate_id", ""))
+        try: return transition(source_id, "READY", **{**args, "evidence": evidence, "repository_root": repository_root})
         except OwnerReleaseLibraryError as exc:
-            return transition(source_id, "PENDING", **{**args, "reason": f"READY deferred until canonical Release Pool eligibility verifies: {str(exc)[:380]}"})
-    return transition(source_id, status, **args)
+            # A run that solved but did not receive an exact current canonical
+            # Release Pool receipt is a failed processing outcome. Keeping it
+            # in Pending made the same PNG appear runnable forever.
+            return transition(source_id, "FAILED", **{**args, "reason": f"RELEASE_POOL_VERIFICATION_FAILED: {str(exc)[:360]}", "evidence": evidence, "repository_root": repository_root})
+    return transition(source_id, status, **{**args, "repository_root": repository_root})
 
 def assert_solver_allowed(source_ids: list[str] | tuple[str, ...], *, repository_root: str | Path | None = None) -> None:
     """Reject explicit owner-rejected source identities before solver dispatch."""
@@ -411,19 +812,68 @@ def assert_solver_allowed(source_ids: list[str] | tuple[str, ...], *, repository
     if any(str(source_id) in rejected for source_id in source_ids):
         raise OwnerReleaseLibraryError("owner-rejected artwork is excluded from solver retry")
 
-def record_batch_outcomes(job: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Record terminal solver outcomes already verified by the canonical PNG batch engine."""
+def record_batch_outcomes(job: Mapping[str, Any], *, repository_root: str | Path | None = None) -> list[dict[str, Any]]:
+    """Record terminal solver outcomes already verified by the canonical PNG batch engine.
+
+    Safe to call after each item or at batch completion. Each status projection is
+    updated atomically while the complete immutable event chain is preserved.
+    """
     results = []
     for item in job.get("items", []):
-        if not isinstance(item, Mapping) or item.get("status") not in {"READY", "FAILED"}:
+        if not isinstance(item, Mapping) or item.get("status") not in {"READY", "FAILED", "REJECTED"}:
             continue
         source_id = str(item.get("source_id", ""))
         run_id = str(item.get("run_id", "")) or None
-        pipeline = {"run_id": run_id, "disposition": "READY" if item.get("status") == "READY" else "FAILED",
-                    "primary": {"state": "READY" if item.get("status") == "READY" else "FAILED",
+        outcome = str(item.get("status"))
+        pipeline = {"run_id": run_id, "disposition": outcome,
+                    "primary": {"state": outcome,
                                 "files": item.get("artifact_refs", {})},
-                    "reason": str(item.get("reason", "")), "candidate_id": item.get("candidate_id")}
-        results.append(transition_pipeline(source_id, pipeline))
+                    "reason": str(item.get("reason", "")), "candidate_id": item.get("candidate_id"),
+                    "batch_id": str(job.get("batch_id", ""))}
+        results.append(transition_pipeline(source_id, pipeline, repository_root=repository_root))
     return results
 
-__all__ = ["OwnerReleaseLibraryError", "assert_solver_allowed", "list_records", "record_batch_outcomes", "record_import_items", "transition", "transition_pipeline"]
+
+def begin_batch_item_attempt(job: Mapping[str, Any], item: Mapping[str, Any], *, repository_root: str | Path | None = None) -> dict[str, Any] | None:
+    """Move an explicit retry back to Pending before its solver attempt starts."""
+    source_id = str(item.get("source_id", ""))
+    source_sha = str(item.get("source_sha256", ""))
+    original_path = str(item.get("original_source_path", ""))
+    if not source_id or not _SHA.fullmatch(source_sha):
+        raise OwnerReleaseLibraryError("batch item lacks a verified source identity for Pending projection")
+    if not original_path:
+        from .studio_extensions import verify_owner_source
+
+        source = verify_owner_source(source_id)
+        original_path = str(source.get("source_path", ""))
+        path_value = Path(original_path)
+        if original_path and not path_value.is_absolute():
+            base = Path(repository_root).resolve() if repository_root is not None else owner_art_storage.factory_repository_root()
+            original_path = str((base / path_value).resolve())
+    if not original_path:
+        raise OwnerReleaseLibraryError("batch item source path could not be resolved for Pending projection")
+    view = list_records(repository_root=repository_root)
+    current = next((row for row in view["records"] if row.get("source_id") == source_id), None)
+    if current and current.get("source_sha256") != source_sha:
+        raise OwnerReleaseLibraryError("batch item source SHA differs from the current Release Pool status")
+    prior_status = str(current.get("status", "")) if current else ""
+    retry_of = str(current.get("event_sha256", "")) if prior_status in {"FAILED", "REJECTED"} else None
+    evidence = {"batch_attempt_started": True, "batch_id": str(job.get("batch_id", "")),
+                "explicit_retry": prior_status in {"FAILED", "REJECTED"}}
+    return transition(
+        source_id, "PENDING", source_sha256=source_sha, provider=str(current.get("provider", item.get("source_provider", "PIXELLAB"))) if current else str(item.get("source_provider", "PIXELLAB")),
+        original_source_path=original_path, reason="Solver attempt started; source remains Pending until a terminal verified outcome.",
+        batch_id=str(job.get("batch_id", "")) or None, pipeline_run_id=str(item.get("run_id", "")) or None,
+        retry_of=retry_of, evidence=evidence, repository_root=repository_root,
+    )
+
+
+def record_batch_item_outcome(job: Mapping[str, Any], item: Mapping[str, Any], *, repository_root: str | Path | None = None) -> dict[str, Any] | None:
+    """Immediately project one terminal PNG outcome into its Release Pool folder."""
+    if item.get("status") not in {"READY", "FAILED", "REJECTED"}:
+        return None
+    one_item_job = {"batch_id": job.get("batch_id"), "items": [item]}
+    result = record_batch_outcomes(one_item_job, repository_root=repository_root)
+    return result[0] if result else None
+
+__all__ = ["OwnerReleaseLibraryError", "assert_solver_allowed", "begin_batch_item_attempt", "list_records", "record_batch_item_outcome", "record_batch_outcomes", "record_import_items", "transition", "transition_pipeline"]

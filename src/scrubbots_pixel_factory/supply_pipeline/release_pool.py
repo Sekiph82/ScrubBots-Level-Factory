@@ -33,6 +33,18 @@ class ReleaseError(ValueError):
 
 _DIFFICULTY_PROFILES = {"FLOW", "COLOR", "FORTRESS", "ROUTE", "MARATHON", "BALANCED"}
 CANONICAL_WORK_STORAGE_POLICY = "CANONICAL_RELEASE_POOL_WORK_V1"
+_OWNER_RELEASE_LIBRARY_EVENT_SCHEMA = "scrubbots-owner-release-library-event/v1"
+
+
+def _is_owner_release_library_event(value: object) -> bool:
+    """Keep status projections out of the canonical READY-entry index.
+
+    The owner status archive intentionally stores one READY projection beside
+    canonical candidate receipts. They have different schemas and digest
+    contracts (`event_sha256` versus `entry_digest`) and must be read by their
+    respective validators.
+    """
+    return isinstance(value, Mapping) and value.get("schema") == _OWNER_RELEASE_LIBRARY_EVENT_SCHEMA
 
 
 def validate_pool_candidate_provenance(
@@ -681,6 +693,15 @@ def entry_paths(candidate_id_filter: str | None = None) -> list[Path]:
         for path in sorted(root.glob(pattern)):
             if _is_reparse_point(path) or not path.is_file():
                 continue
+            # READY also contains owner-release status projections. They are
+            # validated by owner_release_library.list_records(); including one
+            # here makes the RP reader incorrectly require an entry_digest and
+            # can disable both Release Pool refresh and READY exclusion in LF.
+            try:
+                if _is_owner_release_library_event(_json(path)):
+                    continue
+            except ReleaseError:
+                raise
             previous = found.get(path.name)
             if previous is not None:
                 try:

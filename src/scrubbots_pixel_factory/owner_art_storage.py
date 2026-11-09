@@ -27,12 +27,10 @@ _FOLDER_RELATIVE_PATHS = {
     "activity": "data/Level Factory/Activity",
     "workspace": "data/Level Factory/Workspace",
     "runtime": "data/Level Factory/Runtime",
-    "alpix": "data/output/Alpix",
     "pixellab": "data/output/Pixellab",
     "pixellab_grid_files": "data/output/Pixellab/Grid Files",
     "pixellab_final": "data/output/Pixellab/Final",
     "pixellab_transactions": "data/output/Pixellab/Transactions",
-    "owner_suggestions": "data/output/Owner Suggestions",
     "release_pool": "data/Release Pool",
     "pending": "data/Release Pool/Pending",
     "ready": "data/Release Pool/Ready",
@@ -302,14 +300,6 @@ def _write_content_addressed(directory: Path, filename: str, raw: bytes, expecte
         temporary.unlink(missing_ok=True)
 
 
-def archive_alpix_png(raw_png: bytes, *, repository_root: str | Path | None = None) -> Path:
-    if type(raw_png) is not bytes or not raw_png.startswith(b"\x89PNG\r\n\x1a\n"):
-        raise OwnerArtStorageError("ALPIX output is not a PNG byte stream")
-    digest = _hash(raw_png)
-    paths = ensure_owner_art_layout(repository_root)
-    return _write_content_addressed(paths["alpix"], f"alpix-{digest}.png", raw_png, digest)
-
-
 def archive_pixellab_export(
     output_directory: str | Path,
     manifest: Mapping[str, Any],
@@ -486,4 +476,4 @@ def archive_pixellab_export(
         raise
 
 
-__all__ = ["OwnerArtStorageError", "archive_alpix_png", "archive_pixellab_export", "ensure_owner_art_layout", "factory_repository_root", "owner_art_paths", "validate_owner_input_csv"]
+__all__ = ["OwnerArtStorageError", "archive_pixellab_export", "ensure_owner_art_layout", "factory_repository_root", "owner_art_paths", "validate_owner_input_csv"]
