@@ -1817,14 +1817,21 @@ def test_solve_again_retries_only_current_pixel_lab_rows_with_verified_imported_
     retry = ui.split("func _retry_failed_png_batch(", 1)[1].split("func _dispatch_png_batch_job(", 1)[0]
     verifier = retry.split("func _verified_retryable_release_sources(", 1)[1]
     solve_again = ui.split("func _solve_again()", 1)[1].split("func _preview_replay()", 1)[0]
+    panel = ui.split("func _refresh_owner_release_library_panel()", 1)[1].split("func _select_owner_archive_record(", 1)[0]
 
     assert 'str(record.get("provider", "")).to_upper() != "PIXELLAB"' in verifier
     assert 'str(record.get("status", "")) not in ["FAILED", "REJECTED"]' in verifier
     assert 'source_id != "owner-upload-" + source_sha' in verifier
+    assert 'active_source_id == "owner-upload-" + active_source_sha' in verifier
+    assert 'not active_final_shas.has(source_id)' in verifier
+    assert 'str(active_final_shas.get(source_id, "")) != source_sha' in verifier
     assert '"Level Factory/Imported/%s/source.json" % source_id' in verifier
     assert '"Level Factory/Imported/%s/%s" % [source_id, filename]' in verifier
     assert "hash_context.finish().hex_encode() != source_sha" in verifier
     assert '"skipped": skipped' in verifier
+    assert 'not active_final_shas.has(source_id)' in panel
+    assert 'str(item.get("source_sha256", "")) != str(active_final_shas.get(source_id, ""))' in panel
+    assert 'for record in records:' in panel
     assert '_retry_failed_png_batch()' in solve_again
 
 

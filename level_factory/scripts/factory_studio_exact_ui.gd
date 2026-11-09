@@ -1046,23 +1046,43 @@ func _current_release_status_counts() -> Dictionary:
 
 
 func _refresh_owner_release_library_panel() -> void:
-	var records: Array = (_owner_release_archive.get("records", []) as Array).duplicate(true)
+	var active_final_shas: Dictionary = {}
+	for source_variant in _gameplay_sources:
+		if not source_variant is Dictionary:
+			continue
+		var source: Dictionary = source_variant
+		var source_id := str(source.get("source_id", ""))
+		var source_sha := str(source.get("source_sha256", ""))
+		if source_id == "owner-upload-" + source_sha and source_sha.length() == 64:
+			active_final_shas[source_id] = source_sha
+	var records: Array = []
 	var known_sources := {}
 	var counts := {"PENDING": 0, "READY": 0, "FAILED": 0, "REJECTED": 0}
-	for item in records:
-		if not item is Dictionary: continue
-		known_sources[str(item.get("source_id", ""))] = true
+	for item_variant in _owner_release_archive.get("records", []):
+		if not item_variant is Dictionary:
+			continue
+		var item: Dictionary = item_variant
+		var source_id := str(item.get("source_id", ""))
+		if (not active_final_shas.has(source_id)
+				or str(item.get("source_sha256", "")) != str(active_final_shas.get(source_id, ""))):
+			continue
+		records.append(item.duplicate(true))
+		known_sources[source_id] = true
 		var status := str(item.get("status", ""))
 		if counts.has(status): counts[status] += 1
 	# Keep prior loaded-batch failures visible until those sources are represented
-	# in the new owner archive; this does not rewrite their historic batch ledger.
+	# in the new owner archive, but only while their exact SHA is in current Final.
+	# This does not rewrite their historic batch ledger.
 	if _batch_job_matches_loaded_sources():
 		for item_variant in _batch_snapshot.get("items", []):
 			if not item_variant is Dictionary: continue
 			var prior: Dictionary = item_variant
 			var source_id := str(prior.get("source_id", ""))
 			var status := str(prior.get("status", ""))
-			if status not in ["FAILED", "REJECTED"] or source_id in known_sources: continue
+			if (status not in ["FAILED", "REJECTED"] or source_id in known_sources
+					or not active_final_shas.has(source_id)
+					or str(prior.get("source_sha256", "")) != str(active_final_shas.get(source_id, ""))):
+				continue
 			var legacy := {"source_id": source_id, "source_sha256": prior.get("source_sha256", ""),
 				"original_source_path": prior.get("original_source_path", ""), "status": status,
 				"reason": prior.get("reason", ""), "pipeline_run_id": prior.get("run_id", ""),
@@ -1073,7 +1093,7 @@ func _refresh_owner_release_library_panel() -> void:
 	var total := records.size()
 	var title := _batch_issue_panel.get_node_or_null("VBoxContainer/BatchIssuesHeading") as Label
 	if title != null:
-		title.text = "OWNER ARCHIVE · %d" % total
+		title.text = "PIXELLAB FINAL · %d" % total if _startup_source_inventory_loaded else "PIXELLAB FINAL · checking…"
 	if _batch_issue_tabs != null and _batch_issue_tabs.get_child_count() == 0:
 		for spec in [["ALL", "All (%d)" % total], ["FAILED", "FAILED (%d)" % int(counts.get("FAILED", 0))], ["REJECTED", "REJECTED (%d)" % int(counts.get("REJECTED", 0))]]:
 			var tab := Button.new()
@@ -1126,10 +1146,9 @@ func _refresh_owner_release_library_panel() -> void:
 	var solve_again := get_node_or_null("SolveAgain") as Button
 	if solve_again != null:
 		var retryable_ids: Array[String] = []
-		for record_variant in _owner_release_archive.get("records", []):
-			if not record_variant is Dictionary:
+		for record in records:
+			if not record is Dictionary:
 				continue
-			var record: Dictionary = record_variant
 			if str(record.get("status", "")) not in ["FAILED", "REJECTED"]:
 				continue
 			var retry_source_id := str(record.get("source_id", ""))
@@ -3744,6 +3763,15 @@ func _verified_retryable_release_sources(requested_ids: Array[String]) -> Dictio
 	for source_id in requested_ids:
 		if not source_id.is_empty():
 			requested[source_id] = true
+	var active_final_shas: Dictionary = {}
+	for source_variant in _gameplay_sources:
+		if not source_variant is Dictionary:
+			continue
+		var source: Dictionary = source_variant
+		var active_source_id := str(source.get("source_id", ""))
+		var active_source_sha := str(source.get("source_sha256", ""))
+		if active_source_sha.length() == 64 and active_source_id == "owner-upload-" + active_source_sha:
+			active_final_shas[active_source_id] = active_source_sha
 	var verified: Array[String] = []
 	var skipped := 0
 	var seen: Dictionary = {}
@@ -3758,7 +3786,9 @@ func _verified_retryable_release_sources(requested_ids: Array[String]) -> Dictio
 		var source_sha := str(record.get("source_sha256", ""))
 		if (str(record.get("status", "")) not in ["FAILED", "REJECTED"]
 				or str(record.get("provider", "")).to_upper() != "PIXELLAB"
-				or source_sha.length() != 64 or source_id != "owner-upload-" + source_sha):
+				or source_sha.length() != 64 or source_id != "owner-upload-" + source_sha
+				or not active_final_shas.has(source_id)
+				or str(active_final_shas.get(source_id, "")) != source_sha):
 			skipped += 1
 			continue
 		var source_record_path := _factory_data_path("Level Factory/Imported/%s/source.json" % source_id)
