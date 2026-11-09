@@ -3693,24 +3693,34 @@ func _run_png_batch() -> void:
 func _retry_failed_png_batch(source_ids: Array[String] = []) -> void:
 	if _gateway == null or _operation_running or not _owner_release_archive_loaded:
 		return
-	var retryable_ids: Array[String] = []
-	if source_ids.is_empty():
+	var requested_ids: Array[String] = source_ids.duplicate()
+	if requested_ids.is_empty():
+		var selected_is_retryable := false
 		if _selected_import_source_id.begins_with("owner-upload-"):
 			for record_variant in _owner_release_archive.get("records", []):
-				if record_variant is Dictionary and str(record_variant.get("source_id", "")) == _selected_import_source_id and str(record_variant.get("status", "")) in ["FAILED", "REJECTED"]:
-					retryable_ids.append(_selected_import_source_id)
-		if retryable_ids.is_empty():
+				if (record_variant is Dictionary
+						and str(record_variant.get("source_id", "")) == _selected_import_source_id
+						and str(record_variant.get("status", "")) in ["FAILED", "REJECTED"]):
+					requested_ids.append(_selected_import_source_id)
+					selected_is_retryable = true
+					break
+		if not selected_is_retryable:
 			for record_variant in _owner_release_archive.get("records", []):
 				if not record_variant is Dictionary:
 					continue
 				var record: Dictionary = record_variant
 				var retry_source_id := str(record.get("source_id", ""))
 				if str(record.get("status", "")) in ["FAILED", "REJECTED"] and retry_source_id.begins_with("owner-upload-"):
-					retryable_ids.append(retry_source_id)
-	else:
-		retryable_ids = source_ids.duplicate()
+					requested_ids.append(retry_source_id)
+	var verification := _verified_retryable_release_sources(requested_ids)
+	var retryable_ids: Array[String] = []
+	for verified_id in verification.get("source_ids", []):
+		retryable_ids.append(str(verified_id))
+	var skipped_count := int(verification.get("skipped", 0))
+	if skipped_count > 0:
+		_report("Solve Again: %d FAILED/REJECTED kaydı atlandı; PixelLab kimliği ve değişmemiş Imported PNG SHA doğrulanamadı." % skipped_count)
 	if retryable_ids.is_empty():
-		_report("Release Pool has no current FAILED/REJECTED PixelLab PNGs to retry.")
+		_report("Release Pool has no current FAILED/REJECTED PixelLab PNG with a verified immutable source to retry.")
 		return
 	var pinned_project := _pinned_game_project_path()
 	if not FileAccess.file_exists(pinned_project.path_join("project.godot")):
@@ -3727,6 +3737,66 @@ func _retry_failed_png_batch(source_ids: Array[String] = []) -> void:
 	_batch_composite_snapshot = _extension("batch-load", {"batch_id": _batch_import_id}).get("batch", {})
 	_batch_snapshot = job
 	_dispatch_png_batch_job(_batch_job_id, _batch_import_id)
+
+
+func _verified_retryable_release_sources(requested_ids: Array[String]) -> Dictionary:
+	var requested: Dictionary = {}
+	for source_id in requested_ids:
+		if not source_id.is_empty():
+			requested[source_id] = true
+	var verified: Array[String] = []
+	var skipped := 0
+	var seen: Dictionary = {}
+	for record_variant in _owner_release_archive.get("records", []):
+		if not record_variant is Dictionary:
+			continue
+		var record: Dictionary = record_variant
+		var source_id := str(record.get("source_id", ""))
+		if not requested.has(source_id) or seen.has(source_id):
+			continue
+		seen[source_id] = true
+		var source_sha := str(record.get("source_sha256", ""))
+		if (str(record.get("status", "")) not in ["FAILED", "REJECTED"]
+				or str(record.get("provider", "")).to_upper() != "PIXELLAB"
+				or source_sha.length() != 64 or source_id != "owner-upload-" + source_sha):
+			skipped += 1
+			continue
+		var source_record_path := _factory_data_path("Level Factory/Imported/%s/source.json" % source_id)
+		if source_record_path.is_empty() or not FileAccess.file_exists(source_record_path):
+			skipped += 1
+			continue
+		var source_record_bytes := FileAccess.get_file_as_bytes(source_record_path)
+		var source_record: Variant = JSON.parse_string(source_record_bytes.get_string_from_utf8())
+		if (not source_record is Dictionary
+				or str(source_record.get("schema", "")) != "scrubbots-owner-upload-source"
+				or int(source_record.get("version", 0)) != 1
+				or str(source_record.get("source_id", "")) != source_id
+				or str(source_record.get("source_sha256", "")) != source_sha
+				or str(source_record.get("origin", "")) != "OWNER_UPLOAD"):
+			skipped += 1
+			continue
+		var filename := str(source_record.get("original_filename", ""))
+		var expected_relative_path := "data/Level Factory/Imported/%s/%s" % [source_id, filename]
+		if (filename.is_empty() or filename.get_file() != filename or not filename.to_lower().ends_with(".png")
+				or str(source_record.get("immutable_relative_path", "")) != expected_relative_path
+				or int(source_record.get("byte_length", -1)) <= 0):
+			skipped += 1
+			continue
+		var source_path := _factory_data_path("Level Factory/Imported/%s/%s" % [source_id, filename])
+		if source_path.is_empty() or not FileAccess.file_exists(source_path):
+			skipped += 1
+			continue
+		var source_bytes := FileAccess.get_file_as_bytes(source_path)
+		var hash_context := HashingContext.new()
+		if hash_context.start(HashingContext.HASH_SHA256) != OK:
+			skipped += 1
+			continue
+		hash_context.update(source_bytes)
+		if hash_context.finish().hex_encode() != source_sha or source_bytes.size() != int(source_record.get("byte_length", -1)):
+			skipped += 1
+			continue
+		verified.append(source_id)
+	return {"source_ids": verified, "skipped": skipped}
 
 
 func _dispatch_png_batch_job(job_id: String, batch_id: String) -> void:
@@ -5495,26 +5565,7 @@ func _solve_again() -> void:
 	if not _owner_release_archive_loaded:
 		_report("Release Pool status history is still loading; no solver was started.")
 		return
-	if _selected_import_source_id.begins_with("owner-upload-"):
-		for record_variant in _owner_release_archive.get("records", []):
-			if not record_variant is Dictionary:
-				continue
-			var record: Dictionary = record_variant
-			if str(record.get("source_id", "")) == _selected_import_source_id and str(record.get("status", "")) in ["FAILED", "REJECTED"]:
-				_retry_failed_png_batch([_selected_import_source_id])
-				return
-	var retryable_ids: Array[String] = []
-	for record_variant in _owner_release_archive.get("records", []):
-		if not record_variant is Dictionary:
-			continue
-		var record: Dictionary = record_variant
-		var source_id := str(record.get("source_id", ""))
-		if source_id.begins_with("owner-upload-") and str(record.get("status", "")) in ["FAILED", "REJECTED"]:
-			retryable_ids.append(source_id)
-	if retryable_ids.is_empty():
-		_report("Release Pool has no current FAILED/REJECTED PixelLab PNGs to retry. Use Run Pipeline for Pending PNGs.")
-		return
-	_retry_failed_png_batch(retryable_ids)
+	_retry_failed_png_batch()
 
 
 func _preview_replay() -> void:

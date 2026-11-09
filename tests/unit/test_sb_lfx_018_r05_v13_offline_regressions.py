@@ -1812,6 +1812,22 @@ def test_owner_release_library_is_wired_without_weakening_canonical_pool() -> No
     assert "canonical solver/replay/difficulty/QA and owner-eligibility evidence" in Path("src/scrubbots_pixel_factory/owner_release_library.py").read_text(encoding="utf-8")
 
 
+def test_solve_again_retries_only_current_pixel_lab_rows_with_verified_imported_png_bytes() -> None:
+    ui = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
+    retry = ui.split("func _retry_failed_png_batch(", 1)[1].split("func _dispatch_png_batch_job(", 1)[0]
+    verifier = retry.split("func _verified_retryable_release_sources(", 1)[1]
+    solve_again = ui.split("func _solve_again()", 1)[1].split("func _preview_replay()", 1)[0]
+
+    assert 'str(record.get("provider", "")).to_upper() != "PIXELLAB"' in verifier
+    assert 'str(record.get("status", "")) not in ["FAILED", "REJECTED"]' in verifier
+    assert 'source_id != "owner-upload-" + source_sha' in verifier
+    assert '"Level Factory/Imported/%s/source.json" % source_id' in verifier
+    assert '"Level Factory/Imported/%s/%s" % [source_id, filename]' in verifier
+    assert "hash_context.finish().hex_encode() != source_sha" in verifier
+    assert '"skipped": skipped' in verifier
+    assert '_retry_failed_png_batch()' in solve_again
+
+
 def test_owner_release_ready_verification_requires_exact_source_run_entry(monkeypatch) -> None:
     from scrubbots_pixel_factory.supply_pipeline import release_pool
 
