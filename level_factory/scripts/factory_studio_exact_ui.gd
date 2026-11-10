@@ -42,6 +42,7 @@ var _pixel_batch_index := 0
 var _pixel_batch_succeeded := 0
 var _pixel_batch_failed := 0
 var _pixel_batch_active := false
+var _pixel_batch_start_after_startup := false
 var _pixel_batch_skipped := 0
 var _pixel_batch_source_count := 0
 var _pixel_batch_monthly_used := 0
@@ -1856,6 +1857,9 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 		return
 	_operation_running = false
 	_startup_source_inventory_loaded = true
+	if _pixel_batch_start_after_startup:
+		_pixel_batch_start_after_startup = false
+		call_deferred("_run_batch")
 	_activity_finished_msec = Time.get_ticks_msec()
 	_activity_terminal_state = "COMPLETE"
 	_activity_backend_disposition = "STARTUP_INVENTORY_COMPLETE"
@@ -3293,8 +3297,14 @@ static func _pixellab_result_detail(result: Dictionary) -> String:
 
 
 func _run_batch() -> void:
+	if not _pixel_batch_active and _operation_running and not _startup_source_inventory_loaded:
+		# The Level Factory startup Final scan holds the shared flag for a minute
+		# or so; remember the press instead of silently rejecting it.
+		_pixel_batch_start_after_startup = true
+		_record_pixel_art_activity("BATCH", "WAITING_FOR_STARTUP_SCAN", "Level Factory is still scanning PixelLab Final at startup; the batch review opens automatically when the scan finishes.")
+		return
 	if _pixel_batch_active or _operation_running:
-		_record_pixel_art_activity("BATCH", "ALREADY_RUNNING", "Wait for the current Pixel Art operation to reach a terminal state.")
+		_record_pixel_art_activity("BATCH", "ALREADY_RUNNING", "Another Factory Studio operation is still running; press Run Batch again when it finishes.")
 		return
 	if not _batch_csv_path.is_empty():
 		_generate_batch_csv(_batch_csv_path)
