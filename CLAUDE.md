@@ -5,6 +5,8 @@
 **Active execution contract:**
 https://github.com/Sekiph82/ScrubBots-Level-Factory/blob/main/.hiveai/prompts/SB_LFX_OWNER_CLAUDE_AUTONOMOUS_RECOVERY_PIXEL_ART_BATCH_MISMATCH_20261110.md
 
+**Initial screenshot observation transcript:** `docs/evidence/OWNER_WINDOWS_FACTORY_STUDIO_SCREENSHOTS_20261110_OBSERVATIONS.md` (the owner-supplied actual PNG captures were not committed; reproduce and capture real new screenshots locally).
+
 **Canonical task tracker:** root `TASKS.md`. There is no second task-management file.
 
 **Factory repo:** `Sekiph82/ScrubBots-Level-Factory`, branch `main`, Windows root `C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator`.
