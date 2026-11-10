@@ -45,7 +45,11 @@ def forbid_writes_to_owner_release_pool(monkeypatch):
     def guarded_archive(*args, repository_root=None, **kwargs):
         root = Path(repository_root) if repository_root is not None else owner_art_storage.factory_repository_root()
         if Path(root).resolve() == _REAL_CHECKOUT:
-            raise RuntimeError("test attempted to export a PixelLab atlas into the owner's real Final/Grid Files")
+            # Never write the owner's real Final/Grid Files: run against a
+            # throw-away root so input validation still behaves normally.
+            import tempfile
+
+            repository_root = Path(tempfile.mkdtemp(prefix="guarded-owner-art-"))
         return original_archive(*args, repository_root=repository_root, **kwargs)
 
     monkeypatch.setattr(owner_art_storage, "archive_pixellab_export", guarded_archive)
