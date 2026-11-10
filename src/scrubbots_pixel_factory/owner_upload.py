@@ -242,6 +242,44 @@ def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
     return payload
 
 
+def align_owner_upload_filename(source_id: str, canonical_filename: str, *,
+                                repository_root: str | Path | None = None) -> dict[str, object]:
+    """Give one Imported record the canonical PixelLab Final filename; bytes never change.
+
+    Generation used to import slices under their per-atlas staging name
+    (sprite-NN.png). The readable name everywhere downstream must be the Final
+    file name (LF-xxxxxx.png), so the immutable copy and source.json are renamed.
+    """
+    if not _SOURCE_ID.fullmatch(source_id):
+        raise OwnerUploadError("source ID is malformed")
+    destination = owner_upload_root(repository_root) / source_id
+    record_path = destination / "source.json"
+    current = json.loads(record_path.read_text(encoding="utf-8"))
+    old_name = str(current.get("original_filename", ""))
+    if old_name == canonical_filename:
+        return current
+    old_file = destination / old_name
+    raw = old_file.read_bytes()
+    _verify_existing(destination, current, raw)
+    if source_id != f"owner-upload-{hashlib.sha256(raw).hexdigest()}":
+        raise OwnerUploadError("imported bytes do not match the source identity")
+    expected = _record(source_id, str(current["source_sha256"]), len(raw), canonical_filename,
+                       int(current["original_width"]), int(current["original_height"]))
+    new_file = destination / canonical_filename
+    if _path_is_reparse_point(new_file):
+        raise OwnerUploadError("canonical imported source target is a reparse point")
+    if new_file.exists():
+        if new_file.read_bytes() != raw:
+            raise OwnerUploadError("canonical imported filename already holds different bytes")
+    else:
+        new_file.write_bytes(raw)
+    temporary = record_path.with_name(".source.json.align.partial")
+    temporary.write_bytes(_canonical_json_bytes(expected))
+    temporary.replace(record_path)
+    old_file.unlink()
+    return _verify_existing(destination, expected, raw)
+
+
 def import_owner_upload(source_path: str | Path, *, repository_root: str | Path | None = None) -> dict[str, object]:
     """Import one explicitly selected strict PNG without transforming it."""
 

@@ -344,9 +344,39 @@ def _sync_current_pixellab_final_sources(
         except (StudioExtensionError, OSError, ValueError) as exc:
             invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IDENTITY_INVALID", "reason": str(exc)[:512]})
             continue
+        # One readable name end to end: the canonical PixelLab Final filename.
+        final_path = Path(str(entry.get("path", "")))
+        final_name = final_path.name
+        if final_name.lower().endswith(".png") and str(source.get("original_filename", "")) != final_name:
+            try:
+                from .owner_upload import OwnerUploadError, align_owner_upload_filename
+
+                align_owner_upload_filename(source_id, final_name, repository_root=repository_root)
+                source = verify_owner_source(source_id, source_directory=source_directory)
+            except (OwnerUploadError, StudioExtensionError, OSError, ValueError, KeyError) as exc:
+                invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / NAME_ALIGNMENT_FAILED", "reason": str(exc)[:512]})
+                continue
         active.add(source_id)
         verified_sources[source_id] = dict(source)
         current_status = release_by_source.get(source_id)
+        if (current_status is not None and str(current_status.get("status", "")) == "PENDING"
+                and final_path.is_file()
+                and Path(str(current_status.get("original_source_path", ""))).name != final_name):
+            try:
+                previous_name = Path(str(current_status.get("original_source_path", ""))).name
+                release_by_source[source_id] = transition_owner_release(
+                    source_id, "PENDING", source_sha256=digest,
+                    provider=str(current_status.get("provider", "PIXELLAB")),
+                    original_source_path=str(final_path.resolve()),
+                    reason="Release Pool name aligned with the canonical PixelLab Final filename.",
+                    batch_id=current_status.get("batch_id") or None,
+                    evidence={"name_alignment": {"from": previous_name, "to": final_name}},
+                    repository_root=repository_root,
+                )
+            except (OSError, ValueError) as exc:
+                invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / RELEASE_POOL_NAME_ALIGNMENT_FAILED", "reason": str(exc)[:512]})
+                active.discard(source_id)
+                continue
         if current_status is None:
             # import_owner_upload may already have emitted the initial Pending
             # projection; refresh this one row before creating another event.
