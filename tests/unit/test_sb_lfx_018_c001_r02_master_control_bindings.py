@@ -100,22 +100,14 @@ def test_canvas_presentation_is_separate_from_source_art_and_selection() -> None
     assert "line.visible = _grid_enabled" in UI
 
 
-def test_provider_picker_exposes_owner_provider_choices_with_truthful_availability(monkeypatch) -> None:
+def test_provider_options_expose_only_pixellab(monkeypatch) -> None:
+    # Owner 2026-11-09/10: Pixel Art is PixelLab-only; ALPIX code was removed.
     import factory_core_launcher
-    from scrubbots_pixel_factory import alpix_batch
 
-    monkeypatch.delenv("PIXELLAB_SECRET", raising=False)
-    monkeypatch.delenv("PIXELLAB_API_TOKEN", raising=False)
-    monkeypatch.setattr(alpix_batch, "discover_alpix", lambda **_kwargs: {"available": False, "reason": "not installed"})
     options = factory_core_launcher._provider_options()
     assert options["state"] == "READY"
-    assert [item["id"] for item in options["providers"]] == ["ALPIX (Claude)", "PIXELLAB"]
-    assert options["providers"][0]["available"] is False
-    assert options["providers"][1]["execution_mode"] == "PRO_4X4"
-    monkeypatch.setenv("PIXELLAB_API_TOKEN", "redacted-test-secret")
-    configured = factory_core_launcher._provider_options()
-    assert configured["providers"][1]["available"] is True
-    assert "redacted-test-secret" not in str(configured)
+    assert [item["id"] for item in options["providers"]] == ["PIXELLAB"]
+    assert options["providers"][0]["execution_mode"] == "PRO_4X4"
 
 
 def test_provider_control_caption_tracks_the_selected_provider_after_confirmation() -> None:
