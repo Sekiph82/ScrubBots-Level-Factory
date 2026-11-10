@@ -37,3 +37,20 @@ P0-A classifier, inbox O(n²) fix, Release Pool write guard + quarantine, gatewa
 ## Test runs
 - Focused new tests: all pass (p0a ×2 incl. Godot headless, candidate inbox, write guard, gateway large request (Godot headless), launcher bundled src).
 - Related suites (studio/candidate/release_pool/review/inbox/batch selection, 388 tests): 297 passed, 90 failed, 1 skipped; failing files re-run with the write guard: 0 guard hits → failures are pre-existing stale tests (removed `_legacy_root`, ALPIX retirement, Pending/Release-Pool architecture changes). `factory_studio_runtime_suite.gd` (no timeout) hung >30 min against real data and was stopped — NOT_RUN_WITH_REASON.
+
+## Further fixes found by running the real installed app (all pushed)
+- 2043fb51: with bundled src active, `pinned_game_source.repository_root()`, the palette path (palette SHA binds PixelLab request digests), Imported record refs and Route A commit lookup derived data paths from their own file location (→ `Release\…\data`). First resume ended `PROJECTION_ERROR: pinned Difficulty V1 class authority is unavailable` ("ScrubBots project not found: …\Release\…\Runtime\…"). All four now use `factory_repository_root()`; test `test_installed_src_copy_reads_owner_data_from_canonical_checkout`.
+- 18b98803: retryable `PROJECTION_ERROR` jobs were not discoverable after restart (resume caption/state lists and `find_resumable_pending_batch` omitted it) → orphaned job. Added; parametrized test fails on prior code.
+- b41e66bb: removed dead `alpix_batch.py` + retired ALPIX tests (owner plan F1).
+- 161ab0c0: `test_sb_lfx_018_r09_r02_r04_r01_run_output.py` wrote fake-solver output into real `data/Release Pool/Pending/Pipelines/Work/candidate-same-source` (2026-11-10 10:10, during the orphaned runtime-suite run) → quarantined to `data/Level Factory/Quarantine/claude-20261110-test-leak-pipeline-work-candidate-same-source/` with MANIFEST; test isolated; conftest now reports any owner-data change during a test session.
+- db5e72b7: "Retry Failed / Rejected (N)" overflowed the 94 px button and overlapped Accept → "Retry (N)" / "Retry PNG" + tooltip.
+- 9ae2dfd4: `release_entries()` verified the attested runtime once per entry (116×); now once per listing per column count. Listing ~70 s → ~11 s.
+- Operational note: a `TaskStop` of a backgrounded pytest left its python + Godot runtime-suite children alive (10:12–10:22) running against real data; they were killed. The startup at 10:09 that reported "0 active PixelLab PNGs / BATCH OUTCOME RECONCILE ERROR" overlapped with that run; a clean restart reported 320 active, 0 errors. Owner Final/Grid files verified unchanged (no mtime after 08:40), Release Pool changes limited to the 16 legitimate new Pending entries.
+
+## Installed GUI evidence (docs/evidence/claude-gui-20261110/)
+- 01 Pixel Art after restart (activity is in-memory only; the owner's STOPPED_AFTER_FAILURE window had already been closed by the owner — the "before" failure state exists only in the owner's own screenshots).
+- 03/04/05 old build: LF startup inventory still running after 1:30, 3:05, 8:04 (No Pending PNGs / 0 Final PNGs).
+- 10/11 fixed build: Final 320/320 scanned in ~2 s; 320 PNG gallery, `Batch 196 Pending · 116 READY …`, issues All 320 / FAILED 6 / REJECTED 2 (phantom 9 gone).
+- 12 `Batch mismatch` reproduced before the CLI-limit fix; 13 new Workspace layout (no PixelLab Final · Auto button); 15 after fix: `Resume Batch · 180 remaining`.
+- 18 restored READY evidence of LF-000001 (Solver READY, Replay WON_CANONICAL, Difficulty MEDIUM, Pool IN_RELEASE_POOL — prior run, no re-solve).
+- 19/20 real batch resumed: `Running 81/260`, live canonical pipeline on LF-000097 (SOURCE/PALETTE/CANDIDATE PASS, ANALYZE/PLAN 48/48 screening-solvable, SOLVE running).
