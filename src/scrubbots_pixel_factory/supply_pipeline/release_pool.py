@@ -471,6 +471,12 @@ def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: 
     return {"path": str(path), "sha256": _hash(raw), "supplement_digest": payload["supplement_digest"]}
 
 
+# Within one release_entries() listing the attested runtime is verified once per
+# column count instead of once per entry (116 full manifest re-hashes took ~20 s).
+# Outside a listing every call still re-verifies the runtime.
+_PINNED_RULES_SCOPE: dict[int, Any] | None = None
+
+
 def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str, Any], provenance: Mapping[str, Any]) -> None:
     score = official.get("challengeScore")
     difficulty = primary.get("difficulty", {})
@@ -484,8 +490,13 @@ def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str,
         raise ReleaseError("direct official Difficulty V1 challengeScore must exactly equal primary difficulty score")
     from . import pinned_game_source
     from .game_rules import GameRules
+    column_count = int(primary.get("column_count", 3))
     try:
-        rules = GameRules(pinned_game_source.expected_runtime_root(), column_count=int(primary.get("column_count", 3)))
+        rules = _PINNED_RULES_SCOPE.get(column_count) if _PINNED_RULES_SCOPE is not None else None
+        if rules is None:
+            rules = GameRules(pinned_game_source.expected_runtime_root(), column_count=column_count)
+            if _PINNED_RULES_SCOPE is not None:
+                _PINNED_RULES_SCOPE[column_count] = rules
     except (OSError, RuntimeError, ValueError) as exc:
         raise ReleaseError("pinned Difficulty V1 class authority is unavailable") from exc
     if not isinstance(difficulty, Mapping) or difficulty.get("class") != rules.classify(float(score)):
@@ -967,6 +978,16 @@ def _cached_latest_review(
 
 
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
+    global _PINNED_RULES_SCOPE
+    outer_scope = _PINNED_RULES_SCOPE
+    _PINNED_RULES_SCOPE = {} if outer_scope is None else outer_scope
+    try:
+        return _release_entries(candidate_id_filter)
+    finally:
+        _PINNED_RULES_SCOPE = outer_scope
+
+
+def _release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
     entries = []
     from .. import studio_extensions as studio
     # Entry filenames begin with the canonical candidate id. A filtered read
