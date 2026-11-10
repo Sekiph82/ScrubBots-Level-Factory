@@ -13,6 +13,89 @@ def unload_m03_modules_after_each_test():
 
 _REAL_CHECKOUT = __import__("pathlib").Path(__file__).resolve().parents[1]
 
+# Content-pipeline tests import scrubbots_content_pipeline directly; make that
+# independent of which other test happened to extend sys.path first.
+if str(_REAL_CHECKOUT / "content_pipeline" / "src") not in sys.path:
+    sys.path.append(str(_REAL_CHECKOUT / "content_pipeline" / "src"))
+
+# 2026-11-10: a test cleanup deleted every folder in the owner's real
+# data/Level Factory/Imported. While a test runs, any delete, rename or write
+# under the real checkout's data/ folder now fails that test instead.
+_REAL_DATA_PREFIX = __import__("os").path.normcase(str(_REAL_CHECKOUT / "data")) + __import__("os").sep
+_guard_owner_data = False
+_WRITE_FLAGS = 0
+for _flag in ("O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND", "O_TRUNC"):
+    _WRITE_FLAGS |= getattr(__import__("os"), _flag, 0)
+
+
+def _is_real_data_path(value) -> bool:
+    import os
+
+    if isinstance(value, bytes):
+        value = os.fsdecode(value)
+    if not isinstance(value, (str, os.PathLike)):
+        return False
+    try:
+        return os.path.normcase(os.path.abspath(os.fspath(value))).startswith(_REAL_DATA_PREFIX)
+    except (TypeError, ValueError):
+        return False
+
+
+def _owner_data_audit(event: str, args: tuple) -> None:
+    if not _guard_owner_data:
+        return
+    if event in {"os.remove", "os.rmdir", "shutil.rmtree", "os.truncate"}:
+        targets = args[:1]
+    elif event in {"os.rename", "os.replace"}:
+        targets = args[:2]
+    elif event == "open" and len(args) >= 3:
+        mode, flags = args[1], args[2]
+        writes = (isinstance(mode, str) and any(ch in mode for ch in "wax+")) or (
+            isinstance(flags, int) and bool(flags & _WRITE_FLAGS))
+        targets = args[:1] if writes else ()
+    else:
+        return
+    for target in targets:
+        if _is_real_data_path(target):
+            raise PermissionError(f"test attempted {event} on the owner's real data: {target}")
+
+
+sys.addaudithook(_owner_data_audit)
+
+
+_GODOT_SUBPROCESS_TIMEOUT_SECONDS = 900
+
+
+@pytest.fixture(autouse=True)
+def bound_godot_subprocesses(monkeypatch):
+    """2026-11-10: a headless Godot suite without a timeout hung the run for 3 h.
+
+    Any Godot child started through subprocess.run without its own timeout now
+    fails that one test with TimeoutExpired instead of blocking the session.
+    """
+    import subprocess
+
+    original_run = subprocess.run
+
+    def bounded_run(args, *positional, **keywords):
+        text = " ".join(str(part) for part in args) if isinstance(args, (list, tuple)) else str(args)
+        if "timeout" not in keywords and ("godot" in text.lower() or "--headless" in text):
+            keywords["timeout"] = _GODOT_SUBPROCESS_TIMEOUT_SECONDS
+        return original_run(args, *positional, **keywords)
+
+    monkeypatch.setattr(subprocess, "run", bounded_run)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def forbid_owner_data_mutation():
+    global _guard_owner_data
+    _guard_owner_data = True
+    try:
+        yield
+    finally:
+        _guard_owner_data = False
+
 
 @pytest.fixture(autouse=True)
 def forbid_writes_to_owner_release_pool(monkeypatch):
@@ -109,3 +192,21 @@ def forbid_real_pixellab_network(monkeypatch):
 
     monkeypatch.setattr(studio_extensions, "urlopen", blocked, raising=False)
     yield
+
+
+@pytest.fixture
+def isolated_studio_repository(tmp_path, monkeypatch):
+    """A throw-away repository in the canonical data layout for Studio tests.
+
+    Every repository-root resolver points at it, so candidates, Imported
+    sources, reviews and evidence never touch the owner's real data.
+    """
+    from scrubbots_pixel_factory import owner_art_storage, owner_upload, studio_extensions
+
+    repository = tmp_path / "repository"
+    (repository / "data" / "Level Factory" / "Imported").mkdir(parents=True)
+    (repository / "data" / "Level Factory" / "Workspace" / "Candidates").mkdir(parents=True)
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
+    return repository

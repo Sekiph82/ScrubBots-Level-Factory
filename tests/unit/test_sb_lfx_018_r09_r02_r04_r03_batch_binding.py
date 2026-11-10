@@ -73,7 +73,7 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
     )
     output_root = tmp_path / "factory-output"
     monkeypatch.setattr(extensions, "extensions_root", lambda: output_root)
-    monkeypatch.setattr(extensions, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
     monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args, **_kwargs: (record_path, source_path))
     monkeypatch.setattr(extensions, "validate_owner_source", lambda *_args, **_kwargs: {
         "source_sha256": source_sha, "record_path": str(record_path), "evidence_path": str(record_path),
@@ -124,9 +124,14 @@ def test_real_producer_shape_persists_owner_binding_before_immutable_write(tmp_p
     monkeypatch.setattr(solver_budget, "normalize_solver_budget", lambda *_args: (25_000, 90.0))
     monkeypatch.setattr(verify, "verify_exported_supply", lambda *_args, **_kwargs: {"state": "READY"})
     def fake_real_play(level_path: str, plan_path: str, result_path: Path, *, source_sha256: str):
+        # Complete exact-1/60 WON_CANONICAL evidence, as a new READY requires.
         result = {
-            "schema": "scrubbots-real-play-result/v2", "mode": "canonical-60hz",
+            "schema": real_play_gate.CANONICAL_RESULT_SCHEMA, "mode": real_play_gate.CANONICAL_MODE,
+            "canonicalDt": real_play_gate.CANONICAL_DT,
             "verdict": "WON_CANONICAL", "searched": False, "sourceSha256": source_sha256,
+            "perDt": {real_play_gate.CANONICAL_DT: {"won": True, "final": {
+                "supplyExhausted": True, "targetsCleared": True, "slotsEmpty": True,
+                "activeRobots": 0, "boardResidue": 0}}},
         }
         result_path.write_text(json.dumps(result), encoding="utf-8")
         return {"result": result, "result_path": str(result_path)}
@@ -215,16 +220,26 @@ def test_crash_recovery_orchestration_only_uses_isolated_evidence_gate_stubs(tmp
     record.write_text("immutable record", encoding="utf-8")
     item["source_record_sha256"] = hashlib.sha256(record.read_bytes()).hexdigest()
     png_batch_root = tmp_path / "png-batches"
-    pipeline_root = tmp_path / "pipelines"
-    pipeline_root.mkdir()
+    from scrubbots_pixel_factory import owner_art_storage
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
+
+    # Whole fixture lives in an isolated repository (Release Pool projections included).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: tmp_path)
+    # Pipeline runs are read from the canonical data/Release Pool status folders.
+    pipeline_root = owner_art_paths(tmp_path)["ready"] / "Pipelines"
+    pipeline_root.mkdir(parents=True)
     (pipeline_root / "pipeline-exact.json").write_text(json.dumps(pipeline), encoding="utf-8")
     candidate = {"candidate_id": pipeline["candidate_id"]}
     monkeypatch.setattr(png_batch, "_root", lambda: png_batch_root)
+    monkeypatch.setattr(extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)  # job path containment
     monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: nullcontext())
     monkeypatch.setattr(extensions, "extensions_root", lambda: tmp_path)
     monkeypatch.setattr(extensions, "batch_load", lambda _batch_id: {"batch": imported_batch})
     monkeypatch.setattr(extensions, "validate_owner_source", lambda *_args, **_kwargs: {
         "source_sha256": source_sha, "exact_logical_source": True, "structural": {"disposition": "PASS"},
+    })
+    monkeypatch.setattr(extensions, "verify_owner_source", lambda *_args, **_kwargs: {
+        "source_id": source_id, "source_sha256": source_sha, "source_bytes_sha256": source_sha,
     })
     monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args, **_kwargs: (record, tmp_path / "source.png"))
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
@@ -246,7 +261,7 @@ def test_crash_recovery_orchestration_only_uses_isolated_evidence_gate_stubs(tmp
 
     result = png_batch.run_png_batch(job_id, expected_batch_id="batch-exact", pipeline_runner=lambda **_: pytest.fail("crash recovery reran the canonical solver"))
 
-    assert result["job"]["items"][0]["status"] == "READY"
+    assert result["job"]["items"][0]["status"] == "READY", {k: v for k, v in result["job"]["items"][0].items() if k in ("reason", "error", "failure_reason", "recovered_after_interruption", "run_id")}
     assert result["job"]["items"][0]["recovered_after_interruption"] is True
     assert result["job"]["ready_mix"] == {"3": 1, "4": 0, "5": 0}
     completed = png_batch.run_png_batch(job_id, expected_batch_id="batch-exact", pipeline_runner=lambda **_: pytest.fail("completed recovery reran"))
@@ -350,6 +365,7 @@ def test_run_rejects_job_for_different_displayed_batch_without_mutation(monkeypa
 
 def test_restart_lookup_selects_only_job_bound_to_displayed_batch_digest(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(png_batch, "_root", lambda: tmp_path / "png-batches")
+    monkeypatch.setattr(extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)  # job path containment
     batches = {
         batch_id: {
             "schema": "scrubbots-owner-upload-batch",
@@ -424,6 +440,10 @@ def test_pool_readback_is_bound_to_pipeline_hash_and_requested_column(tmp_path: 
     from scrubbots_pixel_factory.supply_pipeline import release_pool
 
     monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [pool_row])
+    # Canonical locations moved to data/Release Pool; point their resolvers
+    # at this fixture so the hash/column binding itself stays under test.
+    monkeypatch.setattr(extensions, "_pipeline_path", lambda run, **_kwargs: root / "pipelines" / f"{run}.json")
+    monkeypatch.setattr(release_pool, "entry_paths", lambda *_args: [pool_entry_path])
     candidate = {"candidate_id": "candidate-exact"}
 
     assert png_batch._pool_row_matches(pipeline, candidate, source_id, 3)
@@ -511,7 +531,7 @@ def test_candidate_source_lineage_gate_fails_closed_on_bad_bundle_and_identity_c
     source_id = "owner-upload-" + source_sha
     root = tmp_path / "repo"
     (root / "bundle").mkdir(parents=True)
-    monkeypatch.setattr(extensions, "_repository_root", lambda: root)
+    monkeypatch.setattr(extensions, "_repository_root", lambda *_args, **_kwargs: root)
     candidate = {
         "candidate_id": "candidate-lineage",
         "source_path": "bundle",
@@ -570,7 +590,7 @@ def test_batch_ui_follows_active_item_and_its_pipeline_activity_stream() -> None
     source = Path("level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
     follow = source.split("func _sync_verified_batch_follow(job: Dictionary) -> void:", 1)[1].split("func _complete_png_batch", 1)[0]
     assert 'str(item.get("activity_run_id", ""))' in follow
-    assert "studio-pipeline-activity" in follow
+    assert '_factory_data_path("Level Factory/Activity")' in follow  # activity stream moved to data/Level Factory/Activity
     assert 'status", "")) in ["VERIFYING_EXISTING", "RUNNING"]' in source
     assert "if _batch_worker_active:" in source
 

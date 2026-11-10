@@ -7,6 +7,14 @@ import pytest
 from scrubbots_pixel_factory.studio_extensions import StudioExtensionError, delete_preset, expand_preset, load_preset, save_preset
 
 
+@pytest.fixture(autouse=True)
+def _isolated_extensions_root(tmp_path, monkeypatch):
+    # Never write sessions/presets into the owner's real Studio Extensions.
+    from scrubbots_pixel_factory import studio_extensions
+
+    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: tmp_path / "Studio Extensions")
+
+
 def test_presets_expand_full_request_and_history_survives_update_delete() -> None:
     preset_id = "lfx008-test"
     try:

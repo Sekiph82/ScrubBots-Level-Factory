@@ -22,9 +22,9 @@ def test_source_library_exposes_only_current_final_and_preserves_historical_reco
     evidence_root = repository / "level_factory/output/studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(owner_upload, "owner_upload_root", lambda _root=None: source_root)
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda _root=None: source_root)
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: evidence_root)
 
@@ -37,7 +37,7 @@ def test_source_library_exposes_only_current_final_and_preserves_historical_reco
     second = owner_upload.import_owner_upload(second_path)
     assert first["state"] == second["state"] == "IMPORTED"
     first_id, second_id = str(first["source_id"]), str(second["source_id"])
-    first_source = source_root / first_id / "source.png"
+    first_source = source_root / first_id / first_path.name
     first_record = source_root / first_id / "source.json"
     before_source, before_record = first_source.read_bytes(), first_record.read_bytes()
     try:

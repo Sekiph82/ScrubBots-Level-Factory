@@ -40,13 +40,24 @@ def _png_size(path: Path) -> tuple[int, int]:
     return int.from_bytes(raw[16:20], "big"), int.from_bytes(raw[20:24], "big")
 
 
+def _require_saved_owner_uploads() -> None:
+    # The installed Release's level_factory/output/owner-uploads (the 002
+    # producer fixture) was emptied by the 2026-11-07 cleanup; skip with that
+    # reason instead of fabricating owner sources.
+    root = RELEASE_ROOT / "level_factory" / "output" / "owner-uploads"
+    if not (root / PINNED_SOURCE_ID).is_dir():
+        pytest.skip("owner's saved 002 source was removed by the 2026-11-07 cleanup: " + str(root / PINNED_SOURCE_ID))
+
+
 def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
     root = pinned_game_source.expected_runtime_root()
-    assert root == pinned_game_source.repository_root() / "level_factory" / "output" / "current-game-runtime" / pinned_game_source.PINNED_MAIN_SHA
+    # Pinned runtime moved to the canonical data root (data/Level Factory/Runtime).
+    assert root == pinned_game_source.repository_root() / "data" / "Level Factory" / "Runtime" / pinned_game_source.PINNED_MAIN_SHA
     manifest = pinned_game_source.verify_attested_runtime(root)
     assert len(manifest["source_files"]) == 232
     assert sum(entry["bytes"] for entry in manifest["source_files"]) == 1_977_597
     assert manifest["source_commit"] == "aef60a616d4ac401e9dfac15df6fe56e671c0053"
+    _require_saved_owner_uploads()
 
     source_png = _source_dir(PINNED_SOURCE_ID) / "source.png"
     source_record = _source_dir(PINNED_SOURCE_ID) / "source.json"
@@ -79,6 +90,7 @@ def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
 def test_pinned_runtime_cannot_authorize_a_different_owner_upload() -> None:
     root = pinned_game_source.expected_runtime_root()
     pinned_game_source.verify_attested_runtime(root)
+    _require_saved_owner_uploads()
     owner_root = RELEASE_ROOT / "level_factory" / "output" / "owner-uploads"
     other_id = next(
         directory.name
@@ -99,6 +111,7 @@ def test_pinned_runtime_cannot_authorize_a_different_owner_upload() -> None:
 
 
 def test_installed_gameplay_catalog_filters_by_content_dimensions_without_mutation() -> None:
+    _require_saved_owner_uploads()
     root = RELEASE_ROOT / "level_factory" / "output" / "owner-uploads"
     sources = sorted(path for path in root.iterdir() if path.is_dir() and path.name.startswith("owner-upload-"))
     before = {path.name: (_sha(path / "source.png"), _sha(path / "source.json")) for path in sources}

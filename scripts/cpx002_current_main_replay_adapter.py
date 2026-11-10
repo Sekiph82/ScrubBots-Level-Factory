@@ -8,10 +8,17 @@ import os
 import re
 import subprocess
 import tempfile
+import sys
 from pathlib import Path
 from typing import Mapping, Sequence
 
-from scrubbots_content_pipeline.current_main_replay import (
+# This integration-layer module is the one place allowed to reach the content
+# pipeline package; Factory Core (src/) loads it without naming that package.
+_CONTENT_PIPELINE_SRC = Path(__file__).resolve().parents[1] / "content_pipeline" / "src"
+if str(_CONTENT_PIPELINE_SRC) not in sys.path:
+    sys.path.insert(0, str(_CONTENT_PIPELINE_SRC))
+
+from scrubbots_content_pipeline.current_main_replay import (  # noqa: E402
     AUTHORITY_SOURCE_PATHS,
     GAME_REMOTE,
     CurrentMainReplayError,

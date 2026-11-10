@@ -5,6 +5,14 @@ import pytest
 from scrubbots_pixel_factory.studio_extensions import StudioExtensionError, extensions_root, restore_session, save_session
 
 
+@pytest.fixture(autouse=True)
+def _isolated_extensions_root(tmp_path, monkeypatch):
+    # Never write sessions/presets into the owner's real Studio Extensions.
+    from scrubbots_pixel_factory import studio_extensions
+
+    monkeypatch.setattr(studio_extensions, "extensions_root", lambda: tmp_path / "Studio Extensions")
+
+
 def test_session_allowlist_rejects_unknown_nested_secret_and_preserves_typed_state() -> None:
     with pytest.raises(StudioExtensionError):
         save_session("lfx015-test", {"surface": "Batch Import", "nested": {"safe": "secret"}})

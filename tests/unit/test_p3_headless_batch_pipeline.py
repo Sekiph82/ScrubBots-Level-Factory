@@ -51,7 +51,7 @@ def test_unknown_pipeline_disposition_fails_closed() -> None:
 def test_new_pipeline_records_are_written_to_canonical_status_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, disposition: str, expected_directory: str,
 ) -> None:
-    monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: tmp_path)
     run_id = f"pipeline-status-{disposition.lower()}"
 
     path = studio._write_pipeline_record({"run_id": run_id, "disposition": disposition})
@@ -64,7 +64,7 @@ def test_headless_job_events_use_release_pool_and_keep_legacy_resume_path(tmp_pa
     repository = tmp_path / "repository"
     repository.mkdir()
     extension_root = repository / "level_factory" / "output" / "studio-extensions"
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio, "extensions_root", lambda: extension_root)
     job_key = "a" * 64
 
@@ -84,9 +84,9 @@ def _install_fake_canonical_route(monkeypatch, tmp_path: Path) -> dict[str, obje
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
     monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args: source_root)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
 
     source_png = tmp_path / "source.png"

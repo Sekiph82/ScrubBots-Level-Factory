@@ -1,0 +1,23 @@
+{
+ "count": 3,
+ "ledgers": [
+  {
+   "name": "batch-import-2581a51ac3a19024b2243b30-6bee55d8dc8e.json",
+   "bytes": 2506,
+   "sha256": "33787a73bd4c1453db7066512130eda4a5f74298b7e31b8fd80cf7672ba9b0d2",
+   "pattern": "test_sb_lfx_014 same.png x3 + bad.png"
+  },
+  {
+   "name": "batch-import-3c33964e5a1574c529b453af-7aba5268a9d7.json",
+   "bytes": 2506,
+   "sha256": "a94e94693e676f47f441b41ebc19ba5b3ed63ca580d38ba1bc311d73a2ed1741",
+   "pattern": "test_sb_lfx_014 same.png x3 + bad.png"
+  },
+  {
+   "name": "batch-import-c1e2386f30f860e2c0f7b2a1-2a8b35321eb1.json",
+   "bytes": 2510,
+   "sha256": "593f091ce0498ba7f4b25d92af8f4d7e310eb9d258c4237425aab37d9a958c30",
+   "pattern": "test_sb_lfx_014 same.png x3 + bad.png"
+  }
+ ]
+}

@@ -13,10 +13,10 @@ def test_legacy_verified_owner_bundle_gets_read_only_classification_projection(
 ) -> None:
     repository = tmp_path / "repository"
     source_root = repository / "level_factory" / "output" / "owner-uploads"
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
     monkeypatch.setattr(studio, "extensions_root", lambda: repository / "level_factory" / "output" / "studio-extensions")
 
     source = tmp_path / "owner.png"

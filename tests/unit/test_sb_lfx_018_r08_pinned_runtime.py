@@ -69,6 +69,10 @@ def test_attestation_rejects_modified_git_blob(tmp_path: Path, monkeypatch: pyte
 
 def test_release_owner_source_root_is_read_only_and_preserves_same_identity() -> None:
     source_dir = _owner_release_source()
+    if not source_dir.is_dir():
+        # The installed Release owner-uploads (002 fixture) was emptied by the
+        # 2026-11-07 cleanup; never fabricate the owner's source.
+        pytest.skip("owner's saved 002 source was removed by the 2026-11-07 cleanup: " + str(source_dir))
     png = source_dir / "source.png"
     record = source_dir / "source.json"
     before = (hashlib.sha256(png.read_bytes()).hexdigest(), hashlib.sha256(record.read_bytes()).hexdigest())
@@ -143,11 +147,22 @@ def test_attested_solver_timeout_terminates_and_keeps_jobs_in_project_output(
         column_count=3,
         authority={},
     )
+    # Solver jobs live under the canonical data root (owner_art_paths
+    # "solver_jobs"); isolate that root so the test never writes owner data.
+    from scrubbots_pixel_factory import owner_art_storage
+
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: tmp_path)
+    # The fake PID must never reach the real `taskkill /PID ... /T /F` path.
+    from scrubbots_pixel_factory import studio_lifecycle
+
+    monkeypatch.setattr(studio_lifecycle, "terminate_studio_child_tree", lambda process: process.terminate())
     solver = ScrubBotsSolver(rules, godot="fake-godot")
     level = {"id": "bounded", "width": 1, "height": 1, "palette": ["#000000FF"], "cells": [0]}
     with pytest.raises(RuntimeError, match="timed out"):
-        solver.run(level, [{"id": "bounded-timeout-candidate"}], stop_after=1, max_visited=25_000, timeout=0.1)
+        # Short single-stage deadline; auto-extension requires the full 900 s budget.
+        solver.run(level, [{"id": "bounded-timeout-candidate"}], stop_after=1, max_visited=25_000, timeout=0.1,
+                   auto_extend_timeout=False)
     assert captured["process"].terminated is True
     temp_env = captured["process"].kwargs["env"]
     assert temp_env["TEMP"].startswith(str(tmp_path))
-    assert (tmp_path / ".lf_solver_jobs").is_dir()
+    assert owner_art_storage.owner_art_paths(tmp_path)["solver_jobs"].is_dir()

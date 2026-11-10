@@ -11,12 +11,47 @@ import pytest
 from scrubbots_pixel_factory import png_batch, studio_extensions as ext
 
 
+_SOURCE_NAMES: dict[str, str] = {}
+
+
+def _source_png(source_root: Path, source_id: str) -> Path:
+    return source_root / source_id / _SOURCE_NAMES[source_id]
+
+
+def _patch_repository(monkeypatch, repository: Path, source_root: Path) -> None:
+    from scrubbots_pixel_factory import owner_art_storage, owner_release_library
+
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(ext, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(ext, "_source_record_paths", lambda source_id, *_args: (
+        source_root / source_id / "source.json", _source_png(source_root, source_id)))
+    monkeypatch.setattr(ext, "validate_owner_source", lambda source_id, **_kwargs: {
+        "source_sha256": source_id.removeprefix("owner-upload-"),
+        "exact_logical_source": True, "structural": {"disposition": "PASS"},
+        "void_capability": {"state": "OPEN"},
+    })
+    # New solver jobs start only from current PixelLab Pending rows, bound to a
+    # pinned game. Real Release Pool events, written to the isolated repository.
+    current = owner_release_library.list_records(repository_root=repository)["records"]
+    if not current:
+        for source_id in _SOURCE_NAMES:
+            owner_release_library.transition(
+                source_id, "PENDING", source_sha256=source_id.removeprefix("owner-upload-"), provider="PIXELLAB",
+                original_source_path=str(_source_png(source_root, source_id)), reason="fixture Pending source",
+                repository_root=repository)
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "pinned-runtime")
+
+
 def _install_disk_sources(monkeypatch, tmp_path: Path, count: int = 9):
-    root = tmp_path / "extensions"
-    batches = root / "batches"
-    source_root = tmp_path / "owner-uploads"
+    """Isolated repository in the canonical data layout (data/Level Factory/...)."""
+    repository = tmp_path / "repository"
+    root = repository / "data" / "Level Factory" / "Workspace" / "Studio Extensions"
+    batches = repository / "data" / "Level Factory" / "Batches" / "Imports"
+    source_root = repository / "data" / "Level Factory" / "Imported"
+    root.mkdir(parents=True)
     batches.mkdir(parents=True)
-    source_root.mkdir()
+    source_root.mkdir(parents=True)
+    _SOURCE_NAMES.clear()
     ids: list[str] = []
     for index in range(count):
         raw = b"PNG-fixture-" + index.to_bytes(4, "big")
@@ -25,29 +60,23 @@ def _install_disk_sources(monkeypatch, tmp_path: Path, count: int = 9):
         ids.append(source_id)
         folder = source_root / source_id
         folder.mkdir()
+        filename = f"{index + 1:03d}_32x32px.png"
+        _SOURCE_NAMES[source_id] = filename
         record = {
             "schema": "scrubbots-owner-upload", "version": 1, "source_id": source_id,
             "origin": ext.OWNER_UPLOAD_ORIGIN, "source_sha256": source_sha,
             "byte_length": len(raw), "media_type": "image/png",
-            "original_filename": f"{index + 1:03d}_32x32px.png",
+            "original_filename": filename,
             "original_width": 32, "original_height": 32,
-            "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
-            "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+            "immutable_relative_path": f"data/Level Factory/Imported/{source_id}/{filename}",
+            "source_record_relative_path": f"data/Level Factory/Imported/{source_id}/source.json",
             "status": ext.OWNER_UPLOAD_STATUS,
             "validation_state": ext.OWNER_UPLOAD_VALIDATION_STATE,
         }
-        (folder / "source.png").write_bytes(raw)
+        (folder / filename).write_bytes(raw)
         (folder / "source.json").write_bytes(ext._canonical_bytes(record))
 
-    monkeypatch.setattr(ext, "extensions_root", lambda: root)
-    monkeypatch.setattr(ext, "_source_record_paths", lambda source_id, *_args: (
-        source_root / source_id / "source.json", source_root / source_id / "source.png"))
-    monkeypatch.setattr(png_batch, "_root", lambda: root / "png-batches")
-    monkeypatch.setattr(ext, "validate_owner_source", lambda source_id, **_kwargs: {
-        "source_sha256": source_id.removeprefix("owner-upload-"),
-        "exact_logical_source": True, "structural": {"disposition": "PASS"},
-        "void_capability": {"state": "OPEN"},
-    })
+    _patch_repository(monkeypatch, repository, source_root)
     return root, batches, source_root, ids
 
 
@@ -63,7 +92,7 @@ def _write_v1_event(batch_root: Path, batch_id: str, ids: list[str]) -> None:
 def _legacy_composite(ids: list[str]) -> dict:
     """Faithful pre-R06 identity rule used to demonstrate the original red case."""
     history: dict[str, list[dict]] = {}
-    batch_root = ext.extensions_root() / "batches"
+    batch_root = ext._batch_import_root()
     for path in sorted(batch_root.glob("*.json")):
         try:
             prior = ext.batch_load(path.stem)["batch"]
@@ -99,8 +128,8 @@ def _legacy_composite(ids: list[str]) -> dict:
 
 
 def test_real_disk_legacy_snapshot_red_then_stable_composite_and_job_reuse(monkeypatch, tmp_path):
-    root, batch_root, _source_root, ids = _install_disk_sources(monkeypatch, tmp_path)
-    original_pngs = {source_id: (root.parent / "owner-uploads" / source_id / "source.png").read_bytes() for source_id in ids}
+    root, batch_root, source_root, ids = _install_disk_sources(monkeypatch, tmp_path)
+    original_pngs = {source_id: _source_png(source_root, source_id).read_bytes() for source_id in ids}
     _write_v1_event(batch_root, "batch-import-original-002-005", ids[:4])
     _write_v1_event(batch_root, "batch-import-original-003-010", ids[3:])
 
@@ -148,25 +177,19 @@ def test_real_disk_legacy_snapshot_red_then_stable_composite_and_job_reuse(monke
 
     # Simulated process restart: reload the backend module and recover only from disk.
     importlib.reload(ext)
-    monkeypatch.setattr(ext, "extensions_root", lambda: root)
-    monkeypatch.setattr(ext, "_source_record_paths", lambda source_id, *_args: (
-        root.parent / "owner-uploads" / source_id / "source.json",
-        root.parent / "owner-uploads" / source_id / "source.png"))
-    monkeypatch.setattr(ext, "validate_owner_source", lambda source_id, **_kwargs: {
-        "source_sha256": source_id.removeprefix("owner-upload-"),
-        "exact_logical_source": True, "structural": {"disposition": "PASS"},
-        "void_capability": {"state": "OPEN"},
-    })
+    _patch_repository(monkeypatch, root.parents[3], source_root)
     resolved = ext.find_loaded_png_batch(ids)
     assert resolved["disposition"] == "MATCHED"
     assert resolved["batch"] == first
+    # The explicit resume above already settled all nine sources out of Pending,
+    # so after restart no new solver job may start for them (stable fail-closed);
+    # stable job reuse for Pending sources is covered by the 150-source test.
     created = png_batch.create_png_batch(first["batch_id"], {"background_intent": "TRANSPARENT"})
     reused = png_batch.create_png_batch(first["batch_id"], {"background_intent": "TRANSPARENT"})
-    assert created["job"]["job_id"] == reused["job"]["job_id"]
-    assert created["job"]["plan_digest"] == reused["job"]["plan_digest"]
-    assert Counter(item["column_count"] for item in created["job"]["items"]) == Counter({3: 4, 4: 4, 5: 1})
+    assert created["disposition"] == reused["disposition"] == "SOURCE_NOT_CURRENTLY_PENDING"
+    assert created["job"] == reused["job"] == {}
     for source_id, raw in original_pngs.items():
-        assert (root.parent / "owner-uploads" / source_id / "source.png").read_bytes() == raw
+        assert _source_png(source_root, source_id).read_bytes() == raw
 
 
 def test_three_level_failed_subset_retry_chain_and_fail_closed_authority(monkeypatch, tmp_path):

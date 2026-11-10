@@ -3,12 +3,13 @@ name sprite-01.png; Release Pool names status artwork by the source basename, so
 the second atlas could never enter Pending ("readable status artwork name conflicts
 with different source bytes"). The Final→Pending sync now names it from Final."""
 import hashlib
+import json
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
 
-from scrubbots_pixel_factory import owner_folder_batch, owner_release_library, studio_extensions
+from scrubbots_pixel_factory import owner_folder_batch, owner_release_library, owner_upload, studio_extensions
 
 
 def _png(color) -> bytes:
@@ -32,6 +33,9 @@ def test_two_atlases_with_same_staging_name_both_enter_pending(tmp_path: Path, m
         staged = imported_root / source_id / "sprite-01.png"   # per-atlas staging name
         staged.parent.mkdir(parents=True)
         staged.write_bytes(raw)
+        # Real Imported records carry source.json; name alignment rewrites it.
+        (staged.parent / "source.json").write_bytes(owner_upload._canonical_json_bytes(
+            owner_upload._record(source_id, digest, len(raw), "sprite-01.png", 32, 32)))
         sources[source_id] = {"digest": digest, "final": final / name, "imported": staged}
 
     monkeypatch.setattr(owner_folder_batch, "scan_owner_source_folder", lambda _folder, **_kwargs: {
@@ -39,9 +43,15 @@ def test_two_atlases_with_same_staging_name_both_enter_pending(tmp_path: Path, m
             {"disposition": "ALREADY_IMPORTED", "source_sha256": s["digest"], "path": str(s["final"]),
              "display_path": s["final"].name} for s in sources.values()]})
     monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda _root=None: imported_root)
-    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id, **_kwargs: {
-        "source_id": source_id, "source_sha256": sources[source_id]["digest"],
-        "source_path": str(sources[source_id]["imported"]), "original_filename": "sprite-01.png"})
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda _root=None: imported_root)
+
+    def verify(source_id, **_kwargs):
+        record = json.loads((imported_root / source_id / "source.json").read_text(encoding="utf-8"))
+        return {"source_id": source_id, "source_sha256": sources[source_id]["digest"],
+                "source_path": str(imported_root / source_id / record["original_filename"]),
+                "original_filename": record["original_filename"]}
+
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", verify)
 
     active, invalid, _verified = studio_extensions._sync_current_pixellab_final_sources(root)
 

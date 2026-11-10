@@ -57,5 +57,5 @@ def test_sync_renames_imported_and_pending_to_final_name(tmp_path: Path, monkeyp
     from scrubbots_pixel_factory import owner_art_storage
 
     monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_a, **_k: root)
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: root)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: root)
     assert studio_extensions.create_pending_png_batch([source_id])["pending_verified_count"] == 1

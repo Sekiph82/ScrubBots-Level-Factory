@@ -329,6 +329,7 @@ func _apply_startup_gate() -> void:
 			button.tooltip_text = ""
 	if core_ready and release_ready:
 		_startup_gate_released = true
+		print("STARTUP_READY ms=%d" % Time.get_ticks_msec())
 		if not is_inside_tree():
 			return
 		_refresh_run_button_caption()
@@ -1941,14 +1942,20 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 		hash_ctx.update(bytes)
 		if hash_ctx.finish().hex_encode() != expected_sha:
 			continue
-		var image := Image.new()
-		if image.load(png_path) != OK:
-			continue
+		# The Python catalog already decoded and size-checked this exact SHA;
+		# decode here only when it did not report dimensions.
+		var width := int(source.get("original_width", 0))
+		var height := int(source.get("original_height", 0))
+		if width <= 0 or height <= 0:
+			var image := Image.new()
+			if image.load(png_path) != OK:
+				continue
+			width = image.get_width()
+			height = image.get_height()
 		source_by_id[catalog_source_id] = {
 			"path": png_path, "source_id": catalog_source_id, "source_sha256": expected_sha,
-			"source_record_sha256": _source_record_sha256_for_id(catalog_source_id),
 			"disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png")),
-			"width": image.get_width(), "height": image.get_height()
+			"width": width, "height": height
 		}
 	# Startup restore needs only the source catalog. owner-pages also validates
 	# every pipeline, candidate, failure, and Release Pool entry; running it here
@@ -1963,7 +1970,7 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 			if source_by_id.has(remaining_source_id) and remaining_source_id not in order_ids:
 				order_ids.append(remaining_source_id)
 	for ordered_source_id in order_ids:
-		_upsert_imported_source(source_by_id[ordered_source_id])
+		_upsert_imported_source(source_by_id[ordered_source_id], false)
 	_refresh_gameplay_sources()
 	if _gameplay_sources.is_empty():
 		_refresh_live_data()
@@ -2424,13 +2431,19 @@ func _build_secondary_surfaces() -> void:
 	_settings_game.text = OS.get_environment("SCRUBBOTS_REPO")
 	if _settings_game.text.is_empty():
 		_settings_game.text = OS.get_environment("SCRUBBOTS_PROJECT")
-	if _settings_game.text.is_empty():
-		_settings_game.text = "C:/Users/sekip/Desktop/ScrubBots"
+	if _settings_game.text.is_empty() and not _factory_repository_root().is_empty():
+		# The ScrubBots game checkout sits beside this Factory checkout; no
+		# machine-specific absolute path is compiled into the Studio.
+		_settings_game.text = _factory_repository_root().get_base_dir().path_join("Scrubbots")
 	_settings_godot = LineEdit.new()
 	_settings_godot.placeholder_text = "Godot 4.7.2 console executable (godotExe)"
 	_settings_godot.text = OS.get_environment("GODOT")
 	if _settings_godot.text.is_empty():
-		_settings_godot.text = "C:/Users/sekip/AppData/Local/Microsoft/WinGet/Packages/GodotEngine.GodotEngine_Microsoft.Winget.Source_8wekyb3d8bbwe/Godot_v4.7.2-stable_win64_console.exe"
+		# Default to the Godot that runs this Studio (its _console twin when present);
+		# no machine-specific install path is compiled in.
+		var running_godot := OS.get_executable_path()
+		var console_godot := running_godot.get_basename() + "_console." + running_godot.get_extension()
+		_settings_godot.text = console_godot if FileAccess.file_exists(console_godot) else running_godot
 	_settings_real_play_timeout = LineEdit.new()
 	_settings_real_play_timeout.placeholder_text = "Real-play timeout seconds (realPlayTimeoutSeconds)"
 	_settings_real_play_timeout.text = OS.get_environment("SCRUBBOTS_REAL_PLAY_TIMEOUT_SECONDS")
@@ -3060,7 +3073,7 @@ func _show_import_results(selected_count: int, lines: Array[String]) -> void:
 	dialog.popup_centered()
 
 
-func _upsert_imported_source(record: Dictionary) -> void:
+func _upsert_imported_source(record: Dictionary, refresh_gameplay := true) -> void:
 	var source_id := str(record.get("source_id", ""))
 	if source_id.is_empty():
 		return
@@ -3083,10 +3096,14 @@ func _upsert_imported_source(record: Dictionary) -> void:
 				if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
 			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
 			_imported_sources[index] = existing
-			_refresh_gameplay_sources()
+			if refresh_gameplay:
+				_refresh_gameplay_sources()
 			return
 	_imported_sources.append(record.duplicate(true))
-	_refresh_gameplay_sources()
+	# Bulk startup restore refreshes (and sorts) once after the loop instead of
+	# once per source; 1,376 sorted rebuilds blocked the UI for ~40 s.
+	if refresh_gameplay:
+		_refresh_gameplay_sources()
 
 
 func _source_record_sha256_for_id(source_id: String) -> String:
@@ -4809,6 +4826,9 @@ func _release_pool_cache_is_fresh() -> bool:
 	return _release_pool_loaded and _release_pool_last_success_msec >= 0 and Time.get_ticks_msec() - _release_pool_last_success_msec < RELEASE_POOL_CACHE_TTL_MSEC
 
 
+var _studio_read_started_msec := 0
+
+
 func _queue_studio_read_extension(operation: String, request: Dictionary, context: Dictionary) -> bool:
 	if _gateway == null or not _gateway.has_method("prepare_studio_extension_call"):
 		return false
@@ -4867,6 +4887,7 @@ func _start_next_studio_read_extension() -> void:
 	_studio_read_result.clear()
 	_studio_read_context = queued.get("context", {}).duplicate(true)
 	_studio_read_mutex.unlock()
+	_studio_read_started_msec = Time.get_ticks_msec()
 	_studio_read_thread = Thread.new()
 	var error := _studio_read_thread.start(Callable(self, "_studio_read_extension_worker").bind(queued.get("prepared", {})))
 	if error != OK:
@@ -4926,6 +4947,7 @@ func _poll_studio_read_extension() -> void:
 		_report("Studio read worker exited without returning a result.")
 		return
 	var kind := str(context.get("kind", ""))
+	print("STUDIO_READ kind=%s ms=%d at=%d" % [kind, Time.get_ticks_msec() - _studio_read_started_msec, Time.get_ticks_msec()])
 	if kind == "pixellab-batch-inspect":
 		_operation_running = false
 		_confirm_pixellab_batch_after_inspection(result, context.get("rows", []))

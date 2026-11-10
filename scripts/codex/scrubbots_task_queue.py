@@ -191,7 +191,9 @@ def validate_checkout(root: Path, *, allow_existing_work: bool = False) -> list[
     ancestry = _run_git(root, "merge-base", "--is-ancestor", "origin/main", "HEAD", check=False)
     if ancestry.returncode != 0:
         raise ValueError("HEAD is behind or diverged from origin/main; safe fast-forward sync is required")
-    tracked_status = git("status", "--porcelain=v1", "--untracked-files=no")
+    # Keep porcelain columns intact: strip() would drop the first line's leading
+    # space and turn " M" (unstaged) into "M" (staged).
+    tracked_status = _run_git(root, "status", "--porcelain=v1", "--untracked-files=no").stdout.rstrip("\r\n")
     dirty_entries = tracked_status.splitlines() if tracked_status else []
     if dirty_entries and not allow_existing_work:
         raise ValueError(

@@ -26,6 +26,8 @@ def test_owner_pages_projection_reads_validated_records_without_writing(tmp_path
     before = {path.relative_to(tmp_path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
 
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
+    # Import ledgers live in data/Level Factory/Batches/Imports since 2026-11-08.
+    monkeypatch.setattr(studio_extensions, "_batch_import_root", lambda: batches)
     monkeypatch.setattr(studio_extensions, "candidate_inbox", lambda: {"candidates": [{"candidate_id": "candidate-r01"}]})
     monkeypatch.setattr(studio_extensions, "library_refresh", lambda: {"sources": [{"source_id": "owner-upload-r01"}]})
     monkeypatch.setattr(studio_extensions, "list_failures", lambda: {"failures": []})

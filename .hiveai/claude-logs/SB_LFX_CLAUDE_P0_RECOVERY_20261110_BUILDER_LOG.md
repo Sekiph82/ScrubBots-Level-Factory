@@ -104,3 +104,27 @@ Evidence (job ledger `data/Level Factory/Workspace/Studio Extensions/pixellab-jo
 - Tests: new 3 + 2 pass (the 3 retry tests fail on 2bd5cffb source); MCP transport 12 pass; Godot UI 10 pass; `test_pixellab_pro_4x4_v02.py` 16 failed both on clean HEAD worktree and after the change (pre-existing P0-G item).
 - Install: Release files `factory_core_launcher.py`, `factory_studio_exact_ui.gd` (also carries startup gate 2bd5cffb), `studio_extensions.py` replaced (content == HEAD 51a371dc ignoring CRLF); backups in CLAUDE scratchpad `release-backup-51a371dc`; `.claude-deployed-commit` = 51a371dc. LNK unchanged.
 - Release Pool sync (`_sync_current_pixellab_final_sources`, app closed): 1376 active Final sources, 0 invalid, 15 min 54 s wall time (F7 slowness confirmed). Pending PNG 499 → 1251 (= 499 + 752). Name check re-run: 47 jobs, 752 new Final PNG, rows_with_issues 0, duplicates 0, sprite names 0. Installed GUI not relaunched by CLAUDE (owner to open the LNK); startup gate and `PIXELLAB RECOVERY` log line are verified by Godot headless tests only.
+
+## 2026-11-10 ~18:40 → 11-11 ~02:30 — P0-I unit-suite triage, owner-data incident, test isolation (CLAUDE)
+
+Full unit run (`tests/unit`, 18:43→22:05) stalled 3 h 12 min on `factory_studio_import_integration_suite.gd` (headless Godot, no timeout; also hangs on clean HEAD). Result after kill: 148 failed / 1903 passed. Baseline with HEAD `src` against the real data root: 141 of the 143 failing ids also fail → pre-existing; the 2 regressions were mine (`os` shadowed by a local `import os` in `_studio_extension_main` → every studio-extension op errored; fixed) and one that passed again after re-run.
+
+Owner-data incident (found during triage):
+- `data/Level Factory/Imported` was empty (dir mtime 22:39, during the baseline run). Cause: `tests/unit/test_sb_lfx_014_batch_import.py` imported into the real store and its `finally` unlinked **every** `owner-upload-*` folder under the real `owner_upload_root()` — the long-unexplained "deleter of ~300 Imported records".
+- Restored additively with the app's own `import_owner_upload()` from PixelLab Final (`docs/evidence/claude-imported-restore-20261110/`): 0 → 1376 records, 0 byte mismatches, every Release Pool record (1251 PENDING / 117 READY / 6 FAILED / 2 REJECTED, unchanged) has its Imported record. Name check: 0 issues.
+- 84 synthetic `same.png` batch-import ledgers written by unisolated tests into `data/Level Factory/Batches/Imports` were deleted on the owner's explicit instruction ("arşivlemene gerek yok … sil"), manifest first (`docs/evidence/claude-test-ledger-cleanup-20261110/`); 1007 real ledgers remain.
+- `Studio Extensions/failures` is empty and `retries` absent: `test_sb_lfx_013_failures.py` deleted every JSON there on each run; not recoverable.
+- Guard: `tests/conftest.py` audit hook fails any test that deletes, renames or writes under the real checkout's `data/`; regression `tests/unit/test_claude_owner_data_guard.py`. A guarded sweep reported 0 owner-data changes. Godot children of tests are not covered by this hook (separate process).
+- Godot subprocesses started by tests without a timeout are now bounded to 900 s (conftest wrapper).
+
+Product fixes found by the triage (each with a test that failed before):
+- `operations.verify_content_health`: observed object keys (`../outside`, non-string) were validated only after a successful manifest parse; an invalid manifest skipped the check. Now validated first. Old code verified to return FAIL without raising.
+- `scripts/codex/scrubbots_task_queue.py`: `git status --porcelain` output was `.strip()`ped, turning the first line's " M" into "M".
+- `current_game_contract.py` (Factory Core) imported the content pipeline through a `sys.path` hack (boundary violation since 4368559e); the integration-layer adapter `scripts/cpx002_current_main_replay_adapter.py` now owns that path, core only loads the adapter.
+- `factory_studio_exact_ui.gd`: compiled-in `C:/Users/sekip/...` defaults for the game checkout and Godot executable replaced by paths derived from the repository root / running Godot.
+- `factory_studio_target_controls.gd`: generator modes lacked `ART_FIRST` (added to core 6364d1a5).
+- `owner_upload_root()` cache (startup speed-up) re-checks reparse points every call; only path resolution is cached.
+
+Stale tests updated to current, deliberate product contracts (each change commented in the test): canonical data layout (`data/Level Factory/...` since c0d940f5), original-filename storage, 900 s solver budget (c0d940f5), PixelLab-only Pixel Art (e48443c2), MCP transport (`generate_pixellab_pro_4x4_atlas_mcp`), Release-Pool-Pending-only job creation, semantic request schema v2 digests (45b19569), approved `factory_data_paths.gd` preload and staged-request `FileAccess` write (f95a9cab). Tests depending on the owner's 002/003/R09 evidence removed by the 2026-11-07 cleanup now skip with that reason (11 skips) instead of fabricating evidence. A fake-PID test could reach real `taskkill /PID 12345 /T /F`; termination is now stubbed there.
+
+Results: non-Godot unit suite 1752 passed, 11 skipped, 7 failed → the 7 then fixed (solver budget contract) except `cp00_010`/secret-literal checks that only fail while TASKS.md/launcher are uncommitted. PixelLab v02: 47/47. NOT DONE: 22 GDScript integration suites still target legacy `res://output` and the real data root; they need an isolated project copy + path migration (next task). Startup re-measurement, arctic background import and Release deploy are still pending.

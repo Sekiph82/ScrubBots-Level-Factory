@@ -96,6 +96,10 @@ def test_nested_project_has_no_network_provider_or_credential_path() -> None:
         for path in _runtime_project_files()
         if path.suffix.lower() in {".godot", ".tscn", ".gd", ".tres", ".res", ".cfg", ".json"}
     )
+    # The PixelLab status dialog may open the Windows Credential Manager (owner
+    # 2026-11-10); that button names it but never reads or stores a secret.
+    for approved in ('"open credential manager"', '"open_credential_manager"', '"microsoft.credentialmanager"'):
+        text = text.replace(approved, '"approved-os-vault-button"')
     forbidden_patterns = (
         "http://",
         "https://",

@@ -23,22 +23,19 @@ def test_every_declared_master_control_has_one_unique_explicit_action() -> None:
 
 
 def test_generation_values_and_csv_use_the_same_real_generation_entrypoint() -> None:
+    # Owner 2026-11-09 (e48443c2): Pixel Art is PixelLab Pro 4x4 only; the
+    # ALPIX/Magnific branches and the separate paid-confirmation state were removed.
     assert '"semantic-generate"' in UI
     assert '"provider_model": "PRO_4X4"' in UI
     assert '"width": request.get("width", 56)' in UI
     assert '"height": request.get("height", 56)' in UI
     assert "_confirm_pro_4x4_generation()" in UI
     assert "_start_pixel_art_worker" in UI
-    assert '"state": "PAID_CONFIRMATION_REQUIRED"' in UI
-    assert 'selected_provider == "ALPIX (Claude)"' in UI
-    assert 'selected_provider == "MAGNIFIC"' in UI
-    assert 'var result := _generate_request({' in UI
-    assert 'var result := _generate_request({"prompt": str(row_values.get("prompt", ""))' in UI
-    assert 'PackedStringArray(["prompt", "style", "width", "height", "provider", "seed", "background_intent"])' in UI
-    assert '"size"' in UI and "_csv_dimensions" in UI
+    assert '"provider": "PIXELLAB"' in UI
+    for removed in ('selected_provider == "ALPIX (Claude)"', 'selected_provider == "MAGNIFIC"', '"alpix-generate"', '"alpix-csv-job"'):
+        assert removed not in UI
     assert 'OS.get_environment("PIXELLAB_SECRET")' not in UI
     assert '"provider-options"' in UI
-
 
 def test_pipeline_review_and_replay_bind_to_canonical_studio_operations() -> None:
     assert '"column_count": _column_count' in UI
@@ -112,28 +109,29 @@ def test_provider_options_expose_only_pixellab(monkeypatch) -> None:
 
 def test_provider_control_caption_tracks_the_selected_provider_after_confirmation() -> None:
     assert 'var _provider_model := "PIXELLAB"' in UI
-    assert '"GenerationProvider": "Provider: PixelLab Pro · 4×4" if _provider_model == "PIXELLAB" else "Provider: ALPIX (Claude)"' in UI
+    assert '"GenerationProvider": "Provider: PixelLab Pro · 4×4",' in UI
     assert "func _refresh_provider_control_caption() -> void:" in UI
     provider_dialog = UI.split("func _choose_provider() -> void:", 1)[1].split("func _provider_status_for", 1)[0]
-    assert provider_dialog.index("_provider_model = str(choice.get_item_metadata(choice.selected))") < provider_dialog.index("_refresh_provider_control_caption()")
-
+    assert '_provider_model = "PIXELLAB"' in provider_dialog
 
 def test_installed_studio_resolves_csv_output_and_palette_from_canonical_repository_data() -> None:
-    assert 'func _factory_repository_root() -> String:' in UI
-    assert 'FileAccess.file_exists(current.path_join("TASKS.md")) and DirAccess.dir_exists_absolute(current.path_join(".git"))' in UI
+    # Since 2026-11-08 every data path goes through factory_data_paths.gd,
+    # which finds the checkout by TASKS.md + .git and never uses res://../data.
+    paths = (ROOT / "level_factory/scripts/factory_data_paths.gd").read_text(encoding="utf-8")
+    assert 'FileAccess.file_exists(current.path_join("TASKS.md")) and (' in paths
+    assert 'DirAccess.dir_exists_absolute(current.path_join(".git"))' in paths
+    assert 'func _factory_repository_root() -> String:\n\treturn DATA_PATHS.repository_root()' in UI
+    assert 'func _factory_data_path(relative_path: String) -> String:\n\treturn DATA_PATHS.data_path(relative_path)' in UI
     assert 'func _factory_repository_path(relative_path: String) -> String:' in UI
-    assert 'var png_path := _factory_repository_path(relative_path)' in UI
     source_record_lookup = UI.split("func _source_record_sha256_for_id(source_id: String) -> String:", 1)[1].split("\n\nfunc ", 1)[0]
-    assert '_factory_repository_path("level_factory/output/owner-uploads/%s/source.json" % source_id)' in source_record_lookup
-    assert 'var app_root := ProjectSettings.globalize_path("res://").path_join("..")' not in source_record_lookup
-    assert 'func _factory_data_path(relative_path: String) -> String:' in UI
+    assert '_factory_data_path("Level Factory/Imported/%s/source.json" % source_id)' in source_record_lookup
+    assert 'ProjectSettings.globalize_path("res://").path_join("..")' not in source_record_lookup
     assert '_factory_data_path("input")' in UI
-    assert '_factory_data_path("output")' in UI
+    assert '_factory_data_path("output/Pixellab/Final")' in UI
     assert '_factory_data_path("palette/scrubbots_palette_v3.json")' in UI
     assert 'ProjectSettings.globalize_path("res://../data/input")' not in UI
     assert 'ProjectSettings.globalize_path("res://../data/output")' not in UI
     assert 'ProjectSettings.globalize_path("res://../data/palette' not in UI
-
 
 def test_production_screens_are_native_controls_and_master_textures_are_not_live_underlays() -> None:
     assert "_canvas.texture = null" in UI
@@ -164,21 +162,19 @@ def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_so
 
 
 def test_level_factory_folder_picker_is_source_bounded_and_pixellab_atlas_picker_stays_single() -> None:
-    picker = UI.split("func _open_files(multiple: bool) -> void:", 1)[1].split("func _open_batch_csv", 1)[0]
+    picker = UI.split("func _open_files(multiple: bool) -> void:", 1)[1].split("func _open_owner_folder_sources", 1)[0]
     multi_callback = UI.split("func _on_files_selected(paths: PackedStringArray) -> void:", 1)[1].split("func _import_pro_4x4_source", 1)[0]
+    owner_folder = UI.split("func _open_owner_folder_sources() -> void:", 1)[1].split("\n\nfunc ", 1)[0]
     # Owner 2026-11-10: LF sources are always the automatic PixelLab Final scan;
-    # the redundant "PixelLab Final · Auto" selector button was removed.
+    # the folder menu (ALPIX / Owner Suggestions / Browse) was removed.
     assert '"SelectArtwork"' not in UI
-    assert 'menu.add_item("ALPIX · Finished PNGs", 0)' in UI
-    assert 'menu.add_item("PixelLab · Final slices only", 1)' in UI
-    assert 'menu.add_item("Owner Suggestions", 2)' in UI
-    assert 'menu.add_item("Browse another folder…", 3)' in UI
+    for removed in ('menu.add_item("ALPIX · Finished PNGs", 0)', 'menu.add_item("Owner Suggestions", 2)', 'menu.add_item("Browse another folder…", 3)'):
+        assert removed not in UI
+    assert "_restore_imported_sources()" in owner_folder
     assert '"owner-folder-preview"' in UI and '"owner-folder-import"' in UI
     assert 'JSON.stringify(old_entries) != JSON.stringify(result.get("entries", []))' in UI
     assert '_queue_studio_read_extension("owner-folder-preview"' in UI
     assert '_queue_studio_read_extension("owner-folder-import"' in UI
     assert "FileDialog.FILE_MODE_OPEN_FILES if multiple else FileDialog.FILE_MODE_OPEN_FILE" in picker
-    assert "FILE_MODE_OPEN_FILE if pro_atlas or not multiple" not in picker
-    assert 'paths.size() == 1' in multi_callback and "_import_pro_4x4_source(str(paths[0]))" in multi_callback
-    assert "_import_pngs(Array(paths))" in multi_callback
-    assert "paths.size() != 1" not in multi_callback
+    assert '_provider_model == "PIXELLAB" and paths.size() == 1' in multi_callback
+    assert "_import_pro_4x4_source(str(paths[0]))" in multi_callback

@@ -14,7 +14,8 @@ INTEGRATION = FACTORY / "tests" / "factory_studio_action_integration_suite.gd"
 def test_preview_is_a_local_canonical_artwork_presentation_component() -> None:
     assert PREVIEW.exists()
     assert PREVIEW.is_relative_to(FACTORY)
-    source = PREVIEW.read_text(encoding="utf-8").lower()
+    # The canonical data-path helper (2026-11-08) is the one approved preload.
+    source = PREVIEW.read_text(encoding="utf-8").replace('preload("res://scripts/factory_data_paths.gd")', "DATA_PATHS_HELPER").lower()
     assert 'class_name factorystudioartpreview' in source
     assert 'image.load_from_file' in source
     assert 'path_join("artwork.png")' in source

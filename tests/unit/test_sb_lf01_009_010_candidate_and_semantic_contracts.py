@@ -56,9 +56,9 @@ def _candidate(
         from scrubbots_pixel_factory import studio_extensions as studio
 
         repository = source_root.resolve()
-        owner_root = repository / "level_factory" / "output" / "owner-uploads"
-        monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-        monkeypatch.setattr(studio, "owner_upload_root", lambda: owner_root)
+        owner_root = repository / "data" / "Level Factory" / "Imported"
+        monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+        monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
         source_directory = owner_root / f"owner-upload-{source_sha}"
         source_directory.mkdir(parents=True, exist_ok=True)
         (source_directory / "source.png").write_bytes(source_png)
@@ -68,8 +68,8 @@ def _candidate(
             "source_sha256": source_sha, "byte_length": len(source_png),
             "media_type": "image/png", "original_filename": "source.png",
             "original_width": 20, "original_height": 20,
-            "immutable_relative_path": f"owner-uploads/owner-upload-{source_sha}/source.png",
-            "source_record_relative_path": f"owner-uploads/owner-upload-{source_sha}/source.json",
+            "immutable_relative_path": f"data/Level Factory/Imported/owner-upload-{source_sha}/source.png",
+            "source_record_relative_path": f"data/Level Factory/Imported/owner-upload-{source_sha}/source.json",
             "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
         }, sort_keys=True), encoding="utf-8")
         metadata = {
@@ -78,7 +78,7 @@ def _candidate(
                 "source_lineage": {
                     "source_id": f"owner-upload-{source_sha}",
                     "source_sha256": source_sha,
-                    "source_record": f"level_factory/output/owner-uploads/owner-upload-{source_sha}/source.json",
+                    "source_record": f"data/Level Factory/Imported/owner-upload-{source_sha}/source.json",
                     "source_bytes_unchanged": True,
                     "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
                 }
@@ -166,9 +166,9 @@ def _install_fake_owner_source(candidate: dict[str, object], source_png: bytes, 
     from scrubbots_pixel_factory import studio_extensions as studio
 
     repository = tmp_path.resolve()
-    owner_root = repository / "level_factory" / "output" / "owner-uploads"
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: owner_root)
+    owner_root = repository / "data" / "Level Factory" / "Imported"
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
     metadata = candidate["metadata"]
     lineage = metadata["generator_metadata"]["payload"]["data"]["source_lineage"]
     source_id = lineage["source_id"]
@@ -187,8 +187,8 @@ def _install_fake_owner_source(candidate: dict[str, object], source_png: bytes, 
             "source_sha256": hashlib.sha256(source_png).hexdigest(), "byte_length": len(source_png),
             "media_type": "image/png", "original_filename": "source.png",
             "original_width": width, "original_height": height,
-            "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
-            "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+            "immutable_relative_path": f"data/Level Factory/Imported/{source_id}/source.png",
+            "source_record_relative_path": f"data/Level Factory/Imported/{source_id}/source.json",
             "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
         }, sort_keys=True), encoding="utf-8")
     candidate_root = repository / str(candidate["source_path"])
@@ -299,7 +299,7 @@ def test_owner_upload_metadata_without_source_bytes_cannot_create_production_exp
         "data": {"source_lineage": {
             "source_id": f"owner-upload-{source_sha}",
             "source_sha256": source_sha,
-            "source_record": f"level_factory/output/owner-uploads/owner-upload-{source_sha}/source.json",
+            "source_record": f"data/Level Factory/Imported/owner-upload-{source_sha}/source.json",
             "source_bytes_unchanged": True,
             "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
         }},
@@ -367,15 +367,15 @@ def test_owner_source_filter_and_ancillary_png_reaches_real_pool_provenance_gate
     assert classification["source_sha256"]
     assert studio._owner_source_grid(source_png)[2] == cells
 
-    # Positive control reaches the next Pool stage with a synthetic canonical
-    # READY record; stop before official game/runtime proof is evaluated.
+    # Positive control reaches the next Pool stage (the on-disk READY pipeline
+    # record gate, added 2026-11-07 before official proof); stop there.
     class ProvenancePassed(Exception):
         pass
 
     monkeypatch.setattr(
         release_pool,
-        "_canonical_official_difficulty",
-        lambda _primary: (_ for _ in ()).throw(ProvenancePassed()),
+        "_verified_ready_pipeline_record",
+        lambda _pipeline, _studio: (_ for _ in ()).throw(ProvenancePassed()),
     )
     with pytest.raises(ProvenancePassed):
         enter_release_pool(
@@ -445,7 +445,7 @@ def test_owner_source_candidate_path_escape_fails_closed(tmp_path: Path, monkeyp
 
     candidate = _candidate(owner_source=True, source_root=tmp_path, monkeypatch=monkeypatch)
     candidate["source_path"] = "../outside-candidate"
-    monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path.resolve())
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: tmp_path.resolve())
     with pytest.raises(ReleaseError, match="candidate source lineage path is invalid"):
         release_pool._verify_candidate_source_grid_binding(
             candidate, candidate["metadata"]["generator_metadata"]["classification"]

@@ -17,8 +17,8 @@ def isolate_owner_upload_evidence(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     from scrubbots_pixel_factory import owner_upload, studio_extensions
 
     repository = tmp_path / "isolated-repository"
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
 
 
 def _cleanup(source_id: str) -> None:
@@ -43,7 +43,7 @@ def test_validation_reports_exact_logical_facts_without_mutating_owner_source(tm
     path.write_bytes(encode_logical_png(20, 20, ["C01", "C02", "C03", "C04"] * 100))
     result = import_owner_upload(path)
     source_id = str(result["source_id"])
-    source_path = owner_upload_root() / source_id / "source.png"
+    source_path = owner_upload_root() / source_id / path.name
     before = source_path.read_bytes()
     try:
         report = validate_owner_source(source_id)
@@ -81,7 +81,7 @@ def test_validation_alpha_failure_and_tampered_source_or_evidence_fail_closed(tm
     result = import_owner_upload(path)
     source_id = str(result["source_id"])
     source_root = owner_upload_root() / source_id
-    source_path = source_root / "source.png"
+    source_path = source_root / path.name
     record_path = source_root / "source.json"
     before_source = source_path.read_bytes()
     before_record = record_path.read_bytes()

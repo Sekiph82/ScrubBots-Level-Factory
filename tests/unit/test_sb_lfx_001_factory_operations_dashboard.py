@@ -28,17 +28,22 @@ def test_dashboard_projection_reuses_canonical_manifest_validation_and_is_read_o
 
 
 def test_dashboard_gateway_and_ui_have_bounded_read_only_contracts() -> None:
-    gateway = GATEWAY.read_text(encoding="utf-8").lower()
+    # The one approved gateway write stages an over-long Studio request under
+    # data/Level Factory/Runtime (f95a9cab); any other FileAccess.WRITE still fails.
+    gateway = GATEWAY.read_text(encoding="utf-8").replace(
+        "var handle := FileAccess.open(request_file, FileAccess.WRITE)", "var handle := STAGED_REQUEST_WRITER").lower()
     dashboard = DASHBOARD.read_text(encoding="utf-8").lower()
     workspace = WORKSPACE.read_text(encoding="utf-8").lower()
     assert "run_dashboard_inspection" in gateway
     assert "dashboard-inspect" in gateway
-    assert 'res://output/' in gateway
+    # Since 2026-11-08 the manifest must sit under the canonical data/output
+    # directory (factory_data_paths), not the project-local res://output.
+    assert "data_paths.output_path()" in gateway and 'begins_with(canonical_output + "/")' in gateway
     assert "_find_dashboard_result" in gateway
     assert "refresh_manifest" in dashboard
     assert "snapshot" in dashboard
     assert "read-only" in dashboard
-    assert "res://output/" in dashboard
+    assert "data_paths.output_path(relative_path)" in dashboard
     assert "operationsdashboard" in workspace
     for source in (gateway, dashboard):
         for forbidden in ("http://", "https://", "httprequest", "fileaccess.write", "sqlite", "database", "task.md"):

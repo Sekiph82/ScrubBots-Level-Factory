@@ -471,6 +471,10 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             raise ValueError("request-json must be an object")
         from scrubbots_pixel_factory import studio_extensions as extensions
         operation = args.operation
+        # Studio workers share strict-decoder verdicts for unchanged PNG bytes
+        # (SHA-keyed); without this every startup re-decoded ~1,400 Final PNGs.
+        os.environ.setdefault("SCRUBBOTS_PNG_VERDICT_CACHE",
+                              str(_repository_root() / "data" / "Level Factory" / "Runtime" / "png-decode-verdicts.json"))
         if operation != "png-batch-control":
             from scrubbots_pixel_factory.studio_lifecycle import studio_shutdown_requested
             if studio_shutdown_requested():
@@ -706,7 +710,6 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
         elif operation == "campaign-approve":
             from scrubbots_pixel_factory.supply_pipeline.release_route_a import release_approved_campaign
             from scrubbots_pixel_factory import studio_extensions as extensions
-            import os
             game_project = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
             if not game_project:
                 raise ValueError("SCRUBBOTS_PROJECT must identify the configured Sekiph82/Scrubbots checkout")
@@ -1465,11 +1468,11 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
 def _provider_options() -> dict[str, object]:
     """Expose the sole active Factory Studio image provider."""
     from scrubbots_pixel_factory.studio_extensions import pixellab_secret_status
-    credential = pixellab_secret_status()
-    provider = {"id": "PIXELLAB", "available": credential.get("configured") is True,
+    secret_status = pixellab_secret_status()
+    provider = {"id": "PIXELLAB", "available": secret_status.get("configured") is True,
         "prompt_capable": True, "execution_mode": "PRO_4X4",
-        "status": credential.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
-        "reason": credential.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")}
+        "status": secret_status.get("status", "PIXELLAB_CREDENTIALS_CONFLICT"),
+        "reason": secret_status.get("reason", "PIXELLAB_CREDENTIALS_CONFLICT: credential state could not be verified.")}
     return {"operation": STUDIO_EXTENSION_OPERATION, "state": "READY", "providers": [provider]}
 def _magnific_prepare(request: Mapping[str, object]) -> dict[str, object]:
     """Delegate to the existing Magnific adapter's truthful prepare/import contract."""

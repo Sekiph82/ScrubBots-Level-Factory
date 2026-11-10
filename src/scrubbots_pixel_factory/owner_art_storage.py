@@ -46,9 +46,24 @@ class OwnerArtStorageError(ValueError):
     """Raised when an owner-art path or immutable artifact is unsafe."""
 
 
+_REPOSITORY_ROOT_CACHE: dict[tuple[str, str], Path] = {}
+
+
 def factory_repository_root(anchor: str | Path | None = None) -> Path:
     """Resolve the one canonical mutable-data root from source and installed Release."""
 
+    # The checkout layout does not change while a worker runs; a startup refresh
+    # used to re-walk the disk ~9,600 times. Only successful lookups are cached.
+    key = (str(anchor if anchor is not None else __file__), os.environ.get("USERPROFILE", ""))
+    cached = _REPOSITORY_ROOT_CACHE.get(key)
+    if cached is not None:
+        return cached
+    root = _resolve_factory_repository_root(anchor)
+    _REPOSITORY_ROOT_CACHE[key] = root
+    return root
+
+
+def _resolve_factory_repository_root(anchor: str | Path | None = None) -> Path:
     location = Path(anchor if anchor is not None else __file__).resolve()
     start = location if location.is_dir() else location.parent
     for candidate in (start, *start.parents):

@@ -64,18 +64,19 @@ def _drive_fake_process(*, terminal_at: float | None = None, terminal_result: st
     return process_launch_count, process, extension_events, phase
 
 
-def test_staged_budget_keeps_240_initial_and_caps_absolute_total_at_480() -> None:
-    assert normalize_staged_solver_budget(25_000, 240, auto_extend=True) == (25_000, 240.0, 480.0)
+def test_native_budget_is_one_bounded_900_second_policy() -> None:
+    # 2026-11-08 (c0d940f5) replaced the staged 240 s + 480 s policy with one
+    # bounded 900-second native solver budget; extension cannot exceed it.
+    assert normalize_staged_solver_budget(25_000, 900, auto_extend=True) == (25_000, 900.0, 900.0)
     assert normalize_staged_solver_budget(25_000, 240, auto_extend=False) == (25_000, 240.0, 240.0)
-    assert MAX_SOLVER_TIMEOUT_SECONDS == 240.0
-    assert MAX_SOLVER_HARD_TIMEOUT_SECONDS == 480.0
-    assert staged_solver_timeout_limit(240.0, 480.0, attested=True) == 480.0
-    assert staged_solver_timeout_limit(240.0, 240.0, attested=True) == 240.0
-    assert staged_solver_timeout_limit(240.0, 300.0, attested=False) == 300.0
-    with pytest.raises(ValueError, match="240-second initial"):
-        normalize_staged_solver_budget(25_000, 90, auto_extend=True)
-    with pytest.raises(ValueError, match=r"240\]"):
-        normalize_staged_solver_budget(25_000, 480, auto_extend=False)
+    assert MAX_SOLVER_TIMEOUT_SECONDS == 900.0
+    assert MAX_SOLVER_HARD_TIMEOUT_SECONDS == 900.0
+    assert staged_solver_timeout_limit(900.0, 900.0, attested=True) == 900.0
+    assert staged_solver_timeout_limit(240.0, 240.0, attested=False) == 900.0
+    with pytest.raises(ValueError, match="900-second canonical budget"):
+        normalize_staged_solver_budget(25_000, 240, auto_extend=True)
+    with pytest.raises(ValueError, match=r"900\]"):
+        normalize_staged_solver_budget(25_000, 901, auto_extend=False)
 
 
 def test_one_fake_process_transitions_once_at_240_and_times_out_at_480() -> None:

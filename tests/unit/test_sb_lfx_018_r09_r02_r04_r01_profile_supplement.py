@@ -25,17 +25,20 @@ def test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tam
     candidate_id = "candidate-test-source"
     run_id = "pipeline-test-profile-run"
     repository = tmp_path / "repo"
-    runtime = Path(r"C:\Users\sekip\Desktop\Scrubbots - Pixel Art Generator\Release\ScrubBots Factory Studio\level_factory\output\current-game-runtime\aef60a616d4ac401e9dfac15df6fe56e671c0053")
-    source_record = repository / "level_factory" / "output" / "owner-uploads" / source_id / "source.json"
+    # The attested pinned runtime lives at data/Level Factory/Runtime/<sha> (read-only here).
+    runtime = pinned_game_source.expected_runtime_root()
+    if not (runtime / "project.godot").is_file():
+        pytest.skip(f"attested pinned runtime is not installed: {runtime}")
+    source_record = repository / "data" / "Level Factory" / "Imported" / source_id / "source.json"
     source_record.parent.mkdir(parents=True)
-    source_record.write_text('{"source_id":"owner-upload-test-source"}', encoding="utf-8")
+    source_record.write_text('{"source_id":"owner-upload-test-source","original_filename":"fixture.png"}', encoding="utf-8")
     candidate_bundle = repository / "level_factory" / "output" / "studio-derived-candidates" / candidate_id
     candidate_bundle.mkdir(parents=True)
     metadata = {"generator_metadata": {"payload": {"data": {"source_lineage": {
         "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
         "source_id": source_id,
         "source_sha256": source_id.removeprefix("owner-upload-"),
-        "source_record": f"level_factory/output/owner-uploads/{source_id}/source.json",
+        "source_record": f"data/Level Factory/Imported/{source_id}/source.json",
     }}}}}
     (candidate_bundle / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
     extensions = repository / "level_factory" / "output" / "studio-extensions"
@@ -59,6 +62,7 @@ def test_historical_profile_supplement_binds_real_source_run_analyzer_and_is_tam
     candidate = {"candidate_id": candidate_id, "source_path": f"level_factory/output/studio-derived-candidates/{candidate_id}"}
     with patch.object(studio_extensions, "_repository_root", return_value=repository), \
          patch.object(studio_extensions, "extensions_root", return_value=extensions), \
+         patch.object(studio_extensions, "owner_upload_root", return_value=source_record.parent.parent), \
          patch.object(studio_extensions, "_pipeline_path", return_value=pipeline_path), \
          patch.object(pinned_game_source, "expected_runtime_root", return_value=runtime):
         written = release_pool.write_historical_profile_supplement(candidate, pipeline)

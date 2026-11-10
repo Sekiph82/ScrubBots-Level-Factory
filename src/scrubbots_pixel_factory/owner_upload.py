@@ -86,14 +86,28 @@ def _path_is_reparse_point(path: Path) -> bool:
     return False
 
 
+_RESOLVED_PATHS: dict[str, Path] = {}
+
+
+def _cached_resolve(path: Path) -> Path:
+    # Windows realpath walks dominated startup (~5,000 per refresh). Only the
+    # resolution is memoised; the reparse-point checks below run on every call.
+    key = str(path)
+    resolved = _RESOLVED_PATHS.get(key)
+    if resolved is None:
+        resolved = path.resolve()
+        _RESOLVED_PATHS[key] = resolved
+    return resolved
+
+
 def owner_upload_root(repository_root: str | Path | None = None) -> Path:
-    repository = Path(repository_root).resolve() if repository_root is not None else _repository_root().resolve()
+    repository = _cached_resolve(Path(repository_root) if repository_root is not None else _repository_root())
     root = repository / "data" / "Level Factory" / "Imported"
     for component in (repository / "data", repository / "data" / "Level Factory", root):
         if _path_is_reparse_point(component):
             raise OwnerUploadError("canonical OWNER_UPLOAD path contains a symlink or reparse point")
     try:
-        resolved_root = root.resolve()
+        resolved_root = _cached_resolve(root)
     except (OSError, RuntimeError) as exc:
         raise OwnerUploadError("canonical OWNER_UPLOAD path cannot be resolved safely") from exc
     if resolved_root != root or not resolved_root.is_relative_to(repository):

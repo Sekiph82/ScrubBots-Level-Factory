@@ -12,16 +12,16 @@ def test_pipeline_records_truthful_owner_upload_stop_and_preserves_source(tmp_pa
     evidence_root = repository / "level_factory/output/studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
     source_path = tmp_path / "pipeline.png"
     source_path.write_bytes(encode_logical_png(20, 20, ["C01", "C02", "C03", "C04"] * 100))
     imported = owner_upload.import_owner_upload(source_path)
     source_id = str(imported["source_id"])
-    source_bytes = (owner_upload.owner_upload_root() / source_id / "source.png").read_bytes()
+    source_bytes = (owner_upload.owner_upload_root() / source_id / source_path.name).read_bytes()
     try:
         run = studio.run_pipeline(source_id=source_id)
         assert run["schema"] == "scrubbots-studio-pipeline-run"
@@ -34,7 +34,7 @@ def test_pipeline_records_truthful_owner_upload_stop_and_preserves_source(tmp_pa
         assert dispositions["SOLVE"] == "UNAVAILABLE"
         assert dispositions["DIFFICULTY"] == "NOT_AVAILABLE"
         assert dispositions["QA"] == "NOT_AVAILABLE"
-        assert (owner_upload.owner_upload_root() / source_id / "source.png").read_bytes() == source_bytes
+        assert (owner_upload.owner_upload_root() / source_id / source_path.name).read_bytes() == source_bytes
     finally:
         root = owner_upload.owner_upload_root() / source_id
         for child in root.iterdir(): child.unlink()

@@ -137,15 +137,20 @@ def test_publication_plan_maps_to_secret_free_preflight_record_in_memory() -> No
 
 
 def test_health_verifier_rejects_malformed_observed_keys_before_sorting_in_memory() -> None:
-    manifest = b"canonical manifest"
-    manifest_sha = hashlib.sha256(manifest).hexdigest()
+    from scrubbots_content_pipeline.manifest_v1 import ContentManifestV1, ManifestPackV1
+
     expected_bytes = b"pack"
     expected_sha = hashlib.sha256(expected_bytes).hexdigest()
-    expected = {"packs/level-01.scrubpack": expected_sha}
+    expected = {"packs/campaign/level-01.scrubpack": expected_sha}
+    # The verifier strict-parses manifest V1 before comparing object sets.
+    manifest = ContentManifestV1(
+        packs=(ManifestPackV1("campaign", 1, "packs/campaign/level-01.scrubpack", expected_sha, len(expected_bytes)),),
+    ).to_json_bytes()
+    manifest_sha = hashlib.sha256(manifest).hexdigest()
 
     for observed in (
-        {"packs/level-01.scrubpack": expected_bytes, 7: b"unexpected"},
-        {"packs/level-01.scrubpack": expected_bytes, "../outside": b"unexpected"},
+        {"packs/campaign/level-01.scrubpack": expected_bytes, 7: b"unexpected"},
+        {"packs/campaign/level-01.scrubpack": expected_bytes, "../outside": b"unexpected"},
     ):
         try:
             verify_content_health(
@@ -164,9 +169,26 @@ def test_health_verifier_rejects_malformed_observed_keys_before_sorting_in_memor
         expected_manifest_sha256=manifest_sha,
         expected_objects=expected,
         observed_objects={
-            "packs/level-01.scrubpack": expected_bytes,
-            "packs/level-02.scrubpack": b"unexpected",
+            "packs/campaign/level-01.scrubpack": expected_bytes,
+            "packs/campaign/level-02.scrubpack": b"unexpected",
         },
     )
     assert extra["status"] == "FAIL"
-    assert extra["unexpected_object_keys"] == ["packs/level-02.scrubpack"]
+    assert extra["unexpected_object_keys"] == ["packs/campaign/level-02.scrubpack"]
+
+
+def test_malformed_observed_keys_fail_closed_even_when_manifest_is_invalid() -> None:
+    # 2026-11-10: key validation ran only after a successful manifest parse, so
+    # an invalid manifest returned FAIL without ever rejecting traversal keys.
+    import pytest
+
+    invalid_manifest = b"not a manifest"
+    expected = {"packs/campaign/level-01.scrubpack": hashlib.sha256(b"pack").hexdigest()}
+    for observed in ({"../outside": b"x"}, {7: b"x"}):
+        with pytest.raises(OperationsEvidenceError):
+            verify_content_health(
+                invalid_manifest,
+                expected_manifest_sha256=hashlib.sha256(invalid_manifest).hexdigest(),
+                expected_objects=expected,
+                observed_objects=observed,  # type: ignore[arg-type]
+            )

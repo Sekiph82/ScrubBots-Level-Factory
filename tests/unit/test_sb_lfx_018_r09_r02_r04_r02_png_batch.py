@@ -10,6 +10,25 @@ from scrubbots_pixel_factory import png_batch
 from scrubbots_pixel_factory import studio_extensions
 
 
+def _pending_status(monkeypatch: pytest.MonkeyPatch, items, repository: Path | None = None) -> None:
+    """New solver jobs start only from current Release Pool PENDING rows (2026-11).
+
+    Serve those rows for the synthetic items; with a repository, every Release
+    Pool write of the run also lands in that isolated root, never owner data.
+    """
+    from scrubbots_pixel_factory import owner_art_storage, owner_release_library
+
+    rows = [{"source_id": str(item["source_id"]), "source_sha256": str(item.get("source_sha256", "")),
+             "provider": "PIXELLAB", "status": "PENDING"} for item in items]
+    monkeypatch.setattr(owner_release_library, "list_records", lambda *_args, **_kwargs: {"records": [dict(row) for row in rows]})
+    if repository is not None:
+        repository.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+        from scrubbots_pixel_factory import studio_extensions as extensions
+
+        monkeypatch.setattr(extensions, "_repository_root", lambda *_args, **_kwargs: repository)
+
+
 @pytest.mark.parametrize(
     ("count", "expected"),
     [
@@ -32,13 +51,14 @@ def test_assignments_are_deterministic_interleaved_and_exact() -> None:
     assert max((len(list(group)) for _key, group in __import__("itertools").groupby(assignment))) <= 3
 
 
-def test_batch_planner_accepts_304_sources_without_touching_disk(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_batch_planner_accepts_304_sources_without_touching_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_ids = [f"owner-upload-{index:064x}" for index in range(304)]
     imported = {"batch_id": "batch-304-in-memory", "items": [
         {"index": index, "source_id": source_id, "disposition": "IMPORTED"}
         for index, source_id in enumerate(source_ids)
     ]}
     monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": imported})
+    _pending_status(monkeypatch, imported["items"])
     monkeypatch.setattr(
         png_batch, "_verify_sources",
         lambda items, _settings: [
@@ -47,11 +67,15 @@ def test_batch_planner_accepts_304_sources_without_touching_disk(monkeypatch: py
         ],
     )
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
-    monkeypatch.setattr(png_batch, "_job_path", lambda _job_id: type("NoDiskPath", (), {"exists": lambda _self: False})())
+    # Paths that are never created: _write_job is captured and the job lock is a no-op.
+    monkeypatch.setattr(png_batch, "_job_path", lambda job_id: tmp_path / "never-written" / "jobs" / f"{job_id}.json")
+    monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: __import__("contextlib").nullcontext())
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "pinned-runtime")
     captured: dict[str, object] = {}
     monkeypatch.setattr(png_batch, "_write_job", lambda job: captured.update(job) or job)
 
     result = png_batch.create_png_batch("batch-304-in-memory")
+    assert not (tmp_path / "never-written").exists()
 
     assert result["state"] == "SUCCESS"
     assert result["disposition"] == "CREATED"
@@ -59,7 +83,7 @@ def test_batch_planner_accepts_304_sources_without_touching_disk(monkeypatch: py
     assert captured["planned_quotas"] == {"3": 137, "4": 122, "5": 45}
 
 
-def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     source_ids = [f"owner-upload-{index:064x}" for index in range(304)]
     full = {"batch_id": "batch-loaded-304", "items": [
         {"index": index, "source_id": source_id, "source_sha256": source_id.removeprefix("owner-upload-"), "disposition": "ALREADY_IMPORTED"}
@@ -79,6 +103,7 @@ def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(mo
     }
     captured: dict[str, object] = {}
     monkeypatch.setattr(studio_extensions, "batch_load", lambda batch_id: {"batch": full if batch_id == full["batch_id"] else subset})
+    _pending_status(monkeypatch, full["items"])
     monkeypatch.setattr(studio_extensions, "create_loaded_png_batch", lambda ids: subset if list(ids) == remaining_ids else {})
     monkeypatch.setattr(png_batch, "_verified_ready_sources", lambda _items: ready)
     monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "pinned-runtime")
@@ -87,8 +112,9 @@ def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(mo
          "source_record_sha256": "a" * 64, "status": "QUEUED"}
         for index, item in enumerate(items)
     ])
-    monkeypatch.setattr(png_batch, "_root", lambda: type("NoJobsRoot", (), {"__truediv__": lambda self, _name: self})())
-    monkeypatch.setattr(png_batch, "_job_path", lambda _job_id: type("NoDiskPath", (), {"exists": lambda _self: False})())
+    monkeypatch.setattr(png_batch, "_root", lambda: tmp_path / "never-written")
+    monkeypatch.setattr(png_batch, "_job_path", lambda job_id: tmp_path / "never-written" / "jobs" / f"{job_id}.json")
+    monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: __import__("contextlib").nullcontext())
     monkeypatch.setattr(png_batch, "_write_job", lambda job: captured.update(job) or job)
 
     result = png_batch.create_png_batch(full["batch_id"], {"game_project": "pinned-runtime"})
@@ -106,6 +132,7 @@ def test_batch_planner_excludes_only_44_verified_ready_sources_and_queues_260(mo
 def test_missing_pinned_project_blocks_without_persisting_a_rejected_job(monkeypatch: pytest.MonkeyPatch) -> None:
     imported = {"batch_id": "batch-missing-runtime", "items": [{"source_id": "owner-upload-" + "1" * 64}]}
     monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": imported})
+    _pending_status(monkeypatch, imported["items"])
     monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: None)
     monkeypatch.setattr(png_batch, "_write_job", lambda _job: pytest.fail("must not persist a missing-runtime job"))
 
@@ -116,21 +143,17 @@ def test_missing_pinned_project_blocks_without_persisting_a_rejected_job(monkeyp
     assert result["job"] == {}
 
 
-def test_new_png_batch_jobs_use_release_pool_pending_and_legacy_job_ids_resume_in_place(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_new_png_batch_jobs_use_canonical_batches_jobs_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The legacy studio-extensions/png-batches resume path was removed with the
+    # canonical data rebuild (c0d940f5, 2026-11-08); jobs live only here now.
     repository = tmp_path / "repository"
     repository.mkdir()
-    extensions = repository / "level_factory" / "output" / "studio-extensions"
-    monkeypatch.setattr(png_batch, "_root", lambda: repository / "data/Release Pool/Pending/Pipelines/BatchJobs")
-    monkeypatch.setattr(png_batch, "_legacy_root", lambda: extensions / "png-batches")
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
 
     new_path = png_batch._job_path("png-batch-new-fixture")
-    assert new_path == repository / "data/Release Pool/Pending/Pipelines/BatchJobs/jobs/png-batch-new-fixture.json"
-
-    legacy_id = "png-batch-legacy-fixture"
-    legacy_path = extensions / "png-batches/jobs" / f"{legacy_id}.json"
-    legacy_path.parent.mkdir(parents=True)
-    legacy_path.write_text('{"job_id":"png-batch-legacy-fixture"}', encoding="utf-8")
-    assert png_batch._job_path(legacy_id) == legacy_path
+    assert new_path == repository / "data/Level Factory/Batches/Jobs/jobs/png-batch-new-fixture.json"
+    with pytest.raises(ValueError, match="malformed"):
+        png_batch._job_path("../escape")
 
 
 def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: int = 4) -> tuple[str, list[dict[str, object]]]:
@@ -139,7 +162,7 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
     Source-record validation is stubbed here, so tests using this helper do not
     prove real owner-source eligibility or canonical READY evidence.
     """
-    root = tmp_path / "png-batches"
+    root = tmp_path / "repository" / "data" / "Level Factory" / "Batches" / "Jobs"
     monkeypatch.setattr(png_batch, "_root", lambda: root)
     records = tmp_path / "owner-uploads"
     records.mkdir()
@@ -151,7 +174,8 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
         record = records / f"{index}.json"
         record.write_text(json.dumps({"index": index}), encoding="utf-8")
         by_id[source_id] = {"sha": digest, "record": str(record)}
-        items.append({"index": index, "display_path": f"source-{index}.png", "source_id": source_id, "disposition": "IMPORTED"})
+        items.append({"index": index, "display_path": f"source-{index}.png", "source_id": source_id,
+                      "source_sha256": digest, "disposition": "IMPORTED"})
 
     from scrubbots_pixel_factory import studio_extensions as extensions
 
@@ -161,7 +185,8 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
     monkeypatch.setattr(
         extensions,
         "verify_owner_source",
-        lambda source_id, **_kwargs: {"source_sha256": by_id[source_id]["sha"], "original_filename": f"{source_id[-4:]}.png"},
+        lambda source_id, **_kwargs: {"source_sha256": by_id[source_id]["sha"], "original_filename": f"{source_id[-4:]}.png",
+                                      "source_path": str(Path(by_id[source_id]["record"]).with_suffix(".png"))},
     )
     monkeypatch.setattr(extensions, "validate_owner_source", lambda source_id, **_kwargs: {
         "source_sha256": by_id[source_id]["sha"],
@@ -170,6 +195,9 @@ def _make_batch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_count: i
     })
     monkeypatch.setattr(extensions, "_source_record_paths", lambda source_id, *_args, **_kwargs: (Path(by_id[source_id]["record"]), Path("unused.png")))
     monkeypatch.setattr(extensions, "restore_source_run", lambda *args, **kwargs: {"state": "SOURCE_ONLY"})
+    _pending_status(monkeypatch, items, tmp_path / "repository")
+    # Jobs are bound to a pinned game project; orchestration tests use a fixed pin.
+    monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: "pinned-runtime")
     return "batch-test", items
 
 
@@ -292,7 +320,7 @@ def test_pause_orchestration_only_does_not_start_the_next_source(tmp_path: Path,
     assert paused["job"]["counts"]["remaining"] == 2
 
 
-def test_close_cancellation_marks_current_batch_item_interrupted(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_close_cancellation_marks_current_batch_item_interrupted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     import copy
     import hashlib
 
@@ -320,6 +348,7 @@ def test_close_cancellation_marks_current_batch_item_interrupted(monkeypatch: py
 
     monkeypatch.setattr(png_batch, "_read_job", lambda _job_id: copy.deepcopy(stored["job"]))
     monkeypatch.setattr(png_batch, "_write_job", lambda value: (stored.update(job=copy.deepcopy(value)), dict(value))[1])
+    monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: __import__("contextlib").nullcontext())  # no lock file in owner data
     monkeypatch.setattr(png_batch, "_control_path", lambda _job_id: Path("unused-control.json"))
     monkeypatch.setattr(png_batch, "_control_action", lambda _job_id: control["action"])
     monkeypatch.setattr(png_batch, "_clear_control", lambda _job_id: control.update(action=""))
@@ -332,6 +361,11 @@ def test_close_cancellation_marks_current_batch_item_interrupted(monkeypatch: py
     })
     monkeypatch.setattr(extensions, "_source_record_paths", lambda *_args, **_kwargs: (ReadOnlyRecord(), None))
     monkeypatch.setattr(extensions, "restore_source_run", lambda *_args, **_kwargs: {"state": "SOURCE_ONLY"})
+    source_png = tmp_path / "close-test.png"
+    monkeypatch.setattr(extensions, "verify_owner_source", lambda *_args, **_kwargs: {
+        "source_sha256": source_sha, "source_path": str(source_png)})
+    _pending_status(monkeypatch, [item], tmp_path / "repository")
+    monkeypatch.setattr(png_batch, "_job_lock", lambda _job_id: __import__("contextlib").nullcontext())
 
     def cancelled_runner(**_args: object) -> dict[str, object]:
         control["action"] = "CANCEL_NOW"

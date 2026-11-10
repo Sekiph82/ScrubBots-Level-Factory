@@ -449,11 +449,21 @@ class SemanticRawArtifact:
             raw = source.read_bytes()
         except OSError as exc:
             raise SemanticNormalizationError(f"cannot read local normalization input: {exc}") from exc
-        decoded = _decode_raw(raw, media_type)
         raw_hash = _sha256(raw)
-        request_digest = _digest({"schema": "scrubbots-local-normalization-input", "raw_sha256": raw_hash, "width": decoded.width, "height": decoded.height})
+        verdicts = _load_png_verdicts() if media_type == SUPPORTED_MEDIA_TYPE and _png_verdict_path() is not None else None
+        known = verdicts.get(raw_hash) if verdicts is not None else None
+        if known is not None and len(raw) <= RAW_ARTIFACT_MAX_BYTES:
+            width, height = known
+        else:
+            decoded = _decode_raw(raw, media_type)
+            width, height = decoded.width, decoded.height
+            if verdicts is not None:
+                global _png_verdicts_dirty
+                verdicts[raw_hash] = [width, height]
+                _png_verdicts_dirty = True
+        request_digest = _digest({"schema": "scrubbots-local-normalization-input", "raw_sha256": raw_hash, "width": width, "height": height})
         candidate_digest = _digest({"schema": "scrubbots-local-raw-candidate", "raw_sha256": raw_hash, "request_digest": request_digest})
-        return cls(raw, raw_hash, candidate_digest, "LOCAL_FILE", "local-ingest-v1", "local-normalization-v1", None, request_digest, decoded.width, decoded.height, decoded.width, decoded.height, _text(media_type, "media_type"), CandidateStatus.SUCCESS)
+        return cls(raw, raw_hash, candidate_digest, "LOCAL_FILE", "local-ingest-v1", "local-normalization-v1", None, request_digest, width, height, width, height, _text(media_type, "media_type"), CandidateStatus.SUCCESS)
 
     def identity_dict(self) -> dict[str, object]:
         return {
@@ -488,12 +498,83 @@ class SemanticRawArtifact:
         return _sha256(self.canonical_bytes())
 
 
+_DECODED_BY_SHA: dict[str, _DecodedRGBA] = {}
+_DECODED_BY_SHA_LIMIT = 4096
+
+
 def _decode_raw(raw: bytes, media_type: str) -> _DecodedRGBA:
     if media_type != SUPPORTED_MEDIA_TYPE:
         raise SemanticDecodeError("C001 supports only image/png; JPEG and WebP are not silently decoded")
     if len(raw) > RAW_ARTIFACT_MAX_BYTES:
         raise SemanticDecodeError("raw image exceeds the bounded input size")
-    return _decode_png_rgba(raw)
+    # The strict pure-Python decoder is deterministic for identical bytes; one
+    # startup used to decode every Final PNG twice. Only successes are kept.
+    key = hashlib.sha256(raw).hexdigest()
+    cached = _DECODED_BY_SHA.get(key)
+    if cached is None:
+        cached = _decode_png_rgba(raw)
+        if len(_DECODED_BY_SHA) >= _DECODED_BY_SHA_LIMIT:
+            _DECODED_BY_SHA.clear()
+        _DECODED_BY_SHA[key] = cached
+    return cached
+
+
+# Cross-process verdicts: SHA-256 of exact PNG bytes -> dimensions the strict
+# decoder accepted. Enabled only when the Studio launcher names a cache file
+# (SCRUBBOTS_PNG_VERDICT_CACHE); every caller still reads and hashes the bytes.
+_PNG_VERDICT_SCHEMA = "scrubbots-png-decode-verdicts/v1"
+_png_verdicts: dict[str, list[int]] | None = None
+_png_verdicts_dirty = False
+
+
+def _png_verdict_path() -> Path | None:
+    import os
+
+    value = os.environ.get("SCRUBBOTS_PNG_VERDICT_CACHE", "").strip()
+    return Path(value) if value else None
+
+
+def _load_png_verdicts() -> dict[str, list[int]]:
+    global _png_verdicts
+    if _png_verdicts is None:
+        _png_verdicts = {}
+        path = _png_verdict_path()
+        if path is not None:
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(value, dict) and value.get("schema") == _PNG_VERDICT_SCHEMA and isinstance(value.get("verdicts"), dict):
+                    _png_verdicts = {key: dims for key, dims in value["verdicts"].items()
+                                     if isinstance(key, str) and len(key) == 64 and isinstance(dims, list) and len(dims) == 2
+                                     and all(type(part) is int and part > 0 for part in dims)}
+            except (OSError, UnicodeError, ValueError):
+                _png_verdicts = {}
+            import atexit
+
+            atexit.register(_save_png_verdicts)
+    return _png_verdicts
+
+
+def _save_png_verdicts() -> None:
+    path = _png_verdict_path()
+    if path is None or not _png_verdicts_dirty or _png_verdicts is None:
+        return
+    import os
+
+    try:
+        merged: dict[str, list[int]] = {}
+        try:
+            prior = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(prior, dict) and prior.get("schema") == _PNG_VERDICT_SCHEMA and isinstance(prior.get("verdicts"), dict):
+                merged.update(prior["verdicts"])
+        except (OSError, UnicodeError, ValueError):
+            pass
+        merged.update(_png_verdicts)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps({"schema": _PNG_VERDICT_SCHEMA, "verdicts": merged}, separators=(",", ":")), encoding="utf-8")
+        os.replace(temporary, path)
+    except OSError:
+        pass   # a cache write failure only costs speed on the next start
 
 
 @dataclass(frozen=True, slots=True)

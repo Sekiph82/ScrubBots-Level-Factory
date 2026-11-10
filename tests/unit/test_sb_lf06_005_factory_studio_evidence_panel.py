@@ -21,6 +21,8 @@ def test_evidence_panel_is_project_local_and_reads_canonical_metadata_only() -> 
     assert PANEL.exists()
     assert PANEL.is_relative_to(FACTORY)
     source = PANEL.read_text(encoding="utf-8")
+    # The canonical data-path helper (2026-11-08) is the one approved preload.
+    source = source.replace('preload("res://scripts/factory_data_paths.gd")', 'DATA_PATHS_HELPER')
     lowered = source.lower()
     assert f'const metadata_schema := "{METADATA_SCHEMA}"' in lowered
     assert f"const metadata_schema_version := {METADATA_SCHEMA_VERSION}" in lowered

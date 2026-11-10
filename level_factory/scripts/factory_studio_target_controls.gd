@@ -5,7 +5,7 @@ extends VBoxContainer
 ## Generate target draft and action presentation for Factory Studio.
 ## Python Factory Core remains the authority for request interpretation and artifacts.
 
-const CANONICAL_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
+const CANONICAL_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO", "ART_FIRST"]
 const ACTIONS: Array[String] = ["Generate", "Solve", "Validate", "Analyze", "Reproduce"]
 const MIN_DIMENSION := 20
 const MAX_DIMENSION := 59

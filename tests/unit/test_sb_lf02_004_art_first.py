@@ -21,7 +21,7 @@ from scrubbots_pixel_factory.generators.router.art_first import _check_mask_cons
 from scrubbots_pixel_factory.output.bundle import OutputContractError, export_candidate, read_bundle
 from scrubbots_pixel_factory.output.png import encode_logical_png
 from scrubbots_pixel_factory.quality import logical_grid_hash
-from scrubbots_pixel_factory import owner_upload, studio_extensions
+from scrubbots_pixel_factory import owner_art_storage, owner_upload, studio_extensions
 
 
 def _json_bytes(value: object, *, newline: bool = False) -> bytes:
@@ -60,8 +60,8 @@ def _source_record(source_id: str, source_sha: str, raw: bytes, width: int, heig
         "original_filename": "synthetic-art-first.png",
         "original_width": width,
         "original_height": height,
-        "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
-        "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+        "immutable_relative_path": f"data/Level Factory/Imported/{source_id}/synthetic-art-first.png",
+        "source_record_relative_path": f"data/Level Factory/Imported/{source_id}/source.json",
         "status": "SOURCE_ONLY",
         "validation_state": "UNVALIDATED",
     }
@@ -69,13 +69,17 @@ def _source_record(source_id: str, source_sha: str, raw: bytes, width: int, heig
 
 def _fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, width: int = 20, height: int = 20, color_count: int = 3, review_disposition: str = "ACCEPT"):
     art_first_module = importlib.import_module("scrubbots_pixel_factory.generators.router.art_first")
-    owner_root = tmp_path / "level_factory" / "output" / "owner-uploads"
-    extensions_root = tmp_path / "level_factory" / "output" / "studio-extensions"
-    derived_root = tmp_path / "level_factory" / "output" / "studio-derived-candidates"
-    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda: owner_root)
+    # Canonical owner data layout (data/Level Factory/...) inside an isolated repository.
+    owner_root = tmp_path / "data" / "Level Factory" / "Imported"
+    extensions_root = tmp_path / "data" / "Level Factory" / "Workspace" / "Studio Extensions"
+    derived_root = tmp_path / "data" / "Level Factory" / "Workspace" / "Candidates"
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: tmp_path)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: tmp_path)
+    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
     monkeypatch.setattr(art_first_module, "extensions_root", lambda: extensions_root)
-    monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda: owner_root)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: owner_root)
+    monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
 
     colors = tuple(f"C{index:02d}" for index in range(1, color_count + 1))
     cells = tuple(colors[index % color_count] for index in range(width * height))
@@ -86,16 +90,12 @@ def _fixture(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, width: int = 20, h
     source_dir.mkdir(parents=True)
     source_record = _source_record(source_id, source_sha, raw_png, width, height)
     source_record_bytes = _json_bytes(source_record, newline=True)
-    (source_dir / "source.png").write_bytes(raw_png)
+    (source_dir / "synthetic-art-first.png").write_bytes(raw_png)
     (source_dir / "source.json").write_bytes(source_record_bytes)
     source_record_sha = hashlib.sha256(source_record_bytes).hexdigest()
 
     candidate_id = f"candidate-owner-{source_sha[:48]}"
-    source_record_path = (source_dir / "source.json").resolve()
-    try:
-        source_record_ref = source_record_path.relative_to(Path(__file__).resolve().parents[2]).as_posix()
-    except ValueError:
-        source_record_ref = str(source_record_path)
+    source_record_ref = f"data/Level Factory/Imported/{source_id}/source.json"  # repository-relative
     mask_request = GenerationRequest(seed=source_sha, width=width, height=height, generator_mode="MASK")
     rng = DeterministicRNG(source_sha)
     source_result = GenerationResult.success(
@@ -252,7 +252,7 @@ def test_art_first_fails_closed_for_ai_unregistered_sources_and_source_byte_drif
     assert result.is_success is False
     assert "UNAVAILABLE" in result.failure_reason
 
-    fixture["source_dir"].joinpath("source.png").write_bytes(b"changed immutable source bytes")
+    fixture["source_dir"].joinpath("synthetic-art-first.png").write_bytes(b"changed immutable source bytes")
     drifted = _run(fixture["request"])
     assert drifted.is_success is False
     assert "source" in drifted.failure_reason.lower()
@@ -267,7 +267,7 @@ def test_art_first_fails_closed_for_missing_file_record_hash_drift_and_path_inpu
     assert "record" in changed_record.failure_reason.lower()
 
     fixture = _fixture(monkeypatch, tmp_path / "missing")
-    (fixture["source_dir"] / "source.png").unlink()
+    (fixture["source_dir"] / "synthetic-art-first.png").unlink()
     missing = _run(fixture["request"])
     assert missing.is_success is False
     assert "missing" in missing.failure_reason.lower()
@@ -301,7 +301,7 @@ def test_art_first_rejects_foreign_and_semi_alpha_png_pixels(monkeypatch, tmp_pa
     source_dir = fixture["owner_root"] / source_id
     source_dir.mkdir()
     record_bytes = _json_bytes(_source_record(source_id, source_sha, raw, 20, 20), newline=True)
-    (source_dir / "source.png").write_bytes(raw)
+    (source_dir / "synthetic-art-first.png").write_bytes(raw)
     (source_dir / "source.json").write_bytes(record_bytes)
     request = GenerationRequest(
         seed="art-first-invalid-pixel", width=20, height=20, generator_mode="ART_FIRST",
@@ -320,7 +320,7 @@ def test_art_first_rejects_foreign_and_semi_alpha_png_pixels(monkeypatch, tmp_pa
 
 def test_owner_upload_root_rejects_reparse_component_without_reading_source(monkeypatch):
     repository = owner_upload._repository_root()
-    output_root = repository / "level_factory" / "output"
+    output_root = repository.resolve() / "data" / "Level Factory"
     original_check = owner_upload._path_is_reparse_point
 
     def mark_output_as_reparse(path: Path) -> bool:
@@ -353,7 +353,7 @@ def test_art_first_rejects_junctioned_owner_source_directory_before_file_reads(m
 def test_art_first_rejects_junctioned_candidate_store_before_file_reads(monkeypatch):
     source_sha = "e" * 64
     candidate_id = f"candidate-owner-{source_sha[:48]}"
-    candidate_store = owner_upload.owner_upload_root().parent / "studio-derived-candidates"
+    candidate_store = owner_upload.owner_upload_root().parent / "Workspace" / "Candidates"
     original_reparse_check = art_first._path_is_reparse_point
 
     def mark_candidate_store_as_junction(path: Path) -> bool:
@@ -373,7 +373,7 @@ def test_art_first_rejects_junctioned_candidate_store_before_file_reads(monkeypa
 def test_art_first_rejects_junctioned_candidate_directory_before_file_reads(monkeypatch):
     source_sha = "a" * 64
     candidate_id = f"candidate-owner-{source_sha[:48]}"
-    candidate_store = owner_upload.owner_upload_root().parent / "studio-derived-candidates"
+    candidate_store = owner_upload.owner_upload_root().parent / "Workspace" / "Candidates"
     candidate_dir = candidate_store / candidate_id
     original_reparse_check = art_first._path_is_reparse_point
     original_is_dir = Path.is_dir
@@ -413,24 +413,28 @@ def test_art_first_safe_file_rejects_resolved_escape_before_read(monkeypatch):
 
 def test_art_first_rejects_symlinked_source_and_bad_logical_dimensions(monkeypatch, tmp_path):
     fixture = _fixture(monkeypatch, tmp_path)
-    png_path = fixture["source_dir"] / "source.png"
-    original_is_symlink = Path.is_symlink
+    png_path = fixture["source_dir"] / "synthetic-art-first.png"
+    # conftest unloads generator modules after every test: use the live module.
+    live_art_first = importlib.import_module("scrubbots_pixel_factory.generators.router.art_first")
+    original_reparse_check = live_art_first._path_is_reparse_point
 
-    def is_symlink(path: Path) -> bool:
+    def is_link(path: Path) -> bool:
         # Windows may deny creating a real symlink without elevated privilege;
-        # this synthetic marker exercises the production fail-closed branch.
-        return path == png_path or original_is_symlink(path)
+        # production detects links with lstat (symlink or reparse attribute),
+        # so this synthetic marker drives that same fail-closed check.
+        return path == png_path or original_reparse_check(path)
 
-    monkeypatch.setattr(Path, "is_symlink", is_symlink)
+    monkeypatch.setattr(live_art_first, "_path_is_reparse_point", is_link)
     symlink_result = _run(fixture["request"])
     assert symlink_result.is_success is False
-    assert "symlink" in symlink_result.failure_reason.lower()
+    assert "reparse point" in symlink_result.failure_reason.lower()
+    monkeypatch.setattr(live_art_first, "_path_is_reparse_point", original_reparse_check)
 
-    owner_root = tmp_path / "bad-dimensions" / "level_factory" / "output" / "owner-uploads"
+    owner_root = tmp_path / "bad-dimensions" / "data" / "Level Factory" / "Imported"
     art_first_module = importlib.import_module("scrubbots_pixel_factory.generators.router.art_first")
-    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda: owner_root)
-    monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda: owner_root)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: owner_root)
+    monkeypatch.setattr(art_first_module, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
+    monkeypatch.setattr(studio_extensions, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
     bad_cells = tuple(("C01", "C02", "C03")[index % 3] for index in range(19 * 20))
     bad_png = encode_logical_png(19, 20, bad_cells)
     bad_sha = hashlib.sha256(bad_png).hexdigest()
@@ -438,7 +442,7 @@ def test_art_first_rejects_symlinked_source_and_bad_logical_dimensions(monkeypat
     bad_dir = owner_root / bad_source_id
     bad_dir.mkdir(parents=True)
     bad_record_bytes = _json_bytes(_source_record(bad_source_id, bad_sha, bad_png, 19, 20), newline=True)
-    (bad_dir / "source.png").write_bytes(bad_png)
+    (bad_dir / "synthetic-art-first.png").write_bytes(bad_png)
     (bad_dir / "source.json").write_bytes(bad_record_bytes)
     bad_request = GenerationRequest(
         seed="art-first-fixed-seed", width=20, height=20, generator_mode="ART_FIRST",
@@ -478,7 +482,7 @@ def test_art_first_transparent_source_stays_unavailable_without_current_void_att
     source_dir.mkdir()
     record = _source_record(source_id, source_sha, raw_png, 20, 20)
     record_bytes = _json_bytes(record, newline=True)
-    (source_dir / "source.png").write_bytes(raw_png)
+    (source_dir / "synthetic-art-first.png").write_bytes(raw_png)
     (source_dir / "source.json").write_bytes(record_bytes)
     request = GenerationRequest(
         seed="void-art-first", width=20, height=20, generator_mode="ART_FIRST", background_intent="TRANSPARENT",
@@ -497,13 +501,15 @@ def test_art_first_transparent_source_stays_unavailable_without_current_void_att
 
 def _review_root_memory_setup(reparse_path: Path | None = None, configured_root: Path | None = None):
     patch = pytest.MonkeyPatch()
-    output_root = Path("C:/virtual/art-first-output")
-    extensions_path = output_root / "studio-extensions"
+    repository = Path("C:/virtual/art-first-repo")
+    output_root = repository / "data" / "Level Factory"
+    extensions_path = output_root / "Workspace" / "Studio Extensions"
     review_path = extensions_path / "owner-review"
     enumerated: list[Path] = []
     safe_reads: list[Path] = []
 
-    patch.setattr(art_first, "owner_upload_root", lambda: output_root / "owner-uploads")
+    patch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    patch.setattr(art_first, "owner_upload_root", lambda *_args, **_kwargs: output_root / "Imported")
     patch.setattr(art_first, "extensions_root", lambda: configured_root or extensions_path)
     patch.setattr(art_first, "_path_is_reparse_point", lambda path: path == reparse_path)
     patch.setattr(Path, "is_dir", lambda self: True)
@@ -514,7 +520,7 @@ def _review_root_memory_setup(reparse_path: Path | None = None, configured_root:
 
 
 def test_art_first_rejects_studio_extensions_reparse_before_review_access():
-    marker = Path("C:/virtual/art-first-output/studio-extensions")
+    marker = Path("C:/virtual/art-first-repo/data/Level Factory/Workspace/Studio Extensions")
     patch, _, _, enumerated, safe_reads = _review_root_memory_setup(reparse_path=marker)
     try:
         with pytest.raises(art_first.ArtFirstUnavailable, match="Studio extensions root.*unsafe"):
@@ -526,7 +532,7 @@ def test_art_first_rejects_studio_extensions_reparse_before_review_access():
 
 
 def test_art_first_rejects_owner_review_reparse_before_review_access():
-    marker = Path("C:/virtual/art-first-output/studio-extensions/owner-review")
+    marker = Path("C:/virtual/art-first-repo/data/Level Factory/Workspace/Studio Extensions/owner-review")
     patch, _, _, enumerated, safe_reads = _review_root_memory_setup(reparse_path=marker)
     try:
         with pytest.raises(art_first.ArtFirstUnavailable, match="safe durable owner-review"):
@@ -542,7 +548,7 @@ def test_art_first_rejects_noncanonical_injected_extensions_root():
         configured_root=Path("C:/external/owner-review-authority")
     )
     try:
-        with pytest.raises(art_first.ArtFirstUnavailable, match="configured Studio extensions root is not canonical"):
+        with pytest.raises(art_first.ArtFirstUnavailable, match="Studio extensions root escaped canonical data workspace"):
             art_first._validated_review_root()
         assert enumerated == []
         assert safe_reads == []
@@ -562,9 +568,10 @@ def test_art_first_accepts_canonical_memory_review_root():
 
 def _candidate_flow_reparse_setup(reparse_path: Path):
     patch = pytest.MonkeyPatch()
-    output_root = Path("C:/virtual/art-first-output")
-    owner_root = output_root / "owner-uploads"
-    extensions_path = output_root / "studio-extensions"
+    repository = Path("C:/virtual/art-first-repo")
+    output_root = repository / "data" / "Level Factory"
+    owner_root = output_root / "Imported"
+    extensions_path = output_root / "Workspace" / "Studio Extensions"
     source_sha = "a" * 64
     source_id = f"owner-upload-{source_sha}"
     candidate_id = f"candidate-owner-{source_sha[:48]}"
@@ -574,7 +581,7 @@ def _candidate_flow_reparse_setup(reparse_path: Path):
     lineage = {
         "source_id": source_id,
         "source_sha256": source_sha,
-        "source_record": str(source_record_path),
+        "source_record": f"data/Level Factory/Imported/{source_id}/source.json",
         "source_bytes_unchanged": True,
         "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
     }
@@ -591,7 +598,8 @@ def _candidate_flow_reparse_setup(reparse_path: Path):
     safe_reads: list[tuple[Path, str]] = []
     enumerated: list[Path] = []
 
-    patch.setattr(art_first, "owner_upload_root", lambda: owner_root)
+    patch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    patch.setattr(art_first, "owner_upload_root", lambda *_args, **_kwargs: owner_root)
     patch.setattr(art_first, "extensions_root", lambda: extensions_path)
     patch.setattr(art_first, "_path_is_reparse_point", lambda path: path == reparse_path)
     patch.setattr(art_first, "_safe_file", lambda path, root, limit, label: (safe_reads.append((path, label)), record_bytes)[1])
@@ -606,8 +614,8 @@ def _candidate_flow_reparse_setup(reparse_path: Path):
 
 def test_art_first_candidate_flow_rejects_review_reparse_before_review_access():
     for marker in (
-        Path("C:/virtual/art-first-output/studio-extensions"),
-        Path("C:/virtual/art-first-output/studio-extensions/owner-review"),
+        Path("C:/virtual/art-first-repo/data/Level Factory/Workspace/Studio Extensions"),
+        Path("C:/virtual/art-first-repo/data/Level Factory/Workspace/Studio Extensions/owner-review"),
     ):
         patch, source_sha, record_sha, source_id, candidate_id, safe_reads, enumerated = _candidate_flow_reparse_setup(marker)
         try:

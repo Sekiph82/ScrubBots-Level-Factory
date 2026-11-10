@@ -186,8 +186,19 @@ def _validation_evidence_path(source_id: str, source_sha256: str, report: Mappin
     return extensions_root() / "validation" / f"{source_id}-{source_sha256}{suffix}-v2-{context_digest}.json"
 
 
+_RESOLVED_ROOTS: dict[str, Path] = {}
+
+
+def _resolved_repository_root() -> Path:
+    root = _repository_root()
+    key = str(root)
+    if key not in _RESOLVED_ROOTS:
+        _RESOLVED_ROOTS[key] = Path(root).resolve()
+    return _RESOLVED_ROOTS[key]
+
+
 def _relative(path: Path) -> str:
-    return path.resolve().relative_to(_repository_root().resolve()).as_posix()
+    return path.resolve().relative_to(_resolved_repository_root()).as_posix()
 
 
 def _owner_source_record_reference(source_png: Path) -> str:
@@ -221,6 +232,16 @@ def verify_owner_source(source_id: str, *, source_directory: str | Path | None =
     """Re-verify one canonical OWNER_UPLOAD record and its exact bytes."""
 
     record_path, source_path = _source_record_paths(source_id, source_directory)
+    # One startup refresh verified the same source up to three times; reuse a
+    # verification while both files are byte-for-byte unchanged (size + mtime).
+    try:
+        stamps = tuple((stat.st_mtime_ns, stat.st_size) for stat in (record_path.stat(), source_path.stat()))
+    except OSError:
+        stamps = None
+    cache_key = (source_id, str(record_path))
+    cached = _VERIFIED_SOURCE_CACHE.get(cache_key)
+    if stamps is not None and cached is not None and cached[0] == stamps:
+        return dict(cached[1])
     record = _read_json(record_path)
     expected_keys = {
         "schema", "version", "source_id", "origin", "source_sha256", "byte_length", "media_type",
@@ -245,12 +266,18 @@ def verify_owner_source(source_id: str, *, source_directory: str | Path | None =
     except ValueError:
         source_relative = str(source_path.resolve())
         record_relative = str(record_path.resolve())
-    return {
+    result = {
         **record,
         "source_path": source_relative,
         "record_path": record_relative,
         "source_bytes_sha256": digest,
     }
+    if stamps is not None:
+        _VERIFIED_SOURCE_CACHE[cache_key] = (stamps, dict(result))
+    return result
+
+
+_VERIFIED_SOURCE_CACHE: dict[tuple[str, str], tuple[tuple[tuple[int, int], ...], dict[str, Any]]] = {}
 
 
 def _metadata_path(source_id: str) -> Path:

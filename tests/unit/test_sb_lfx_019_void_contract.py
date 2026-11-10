@@ -66,10 +66,10 @@ def _configure_upload_roots(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     evidence = repository / "level_factory" / "output" / "studio-extensions"
     uploads.mkdir(parents=True)
     evidence.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio, "extensions_root", lambda: evidence)
     return repository, uploads
 
@@ -110,7 +110,7 @@ def test_alpha_and_color_counts_ignore_void_and_keep_source_bytes(tmp_path: Path
     assert report["palette"]["used_color_count"] == 3
     assert report["palette"]["used_color_count"] == count_used_colors([VOID_CELL_ID, "C01", "C02", "C03"])
     assert report["exact_logical_source"] is True
-    assert (uploads / source_id / "source.png").read_bytes() == source_bytes
+    assert (uploads / source_id / source.name).read_bytes() == source_bytes
 
 
 def test_gate_closed_transparent_owner_upload_has_reason_and_no_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

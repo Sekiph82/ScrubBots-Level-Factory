@@ -63,6 +63,31 @@ def _independent_claim_worker(repository_root: str, claim_path: str, barrier, ou
         outcomes.put("BLOCKED")
 
 
+def _patch_frames_provider(monkeypatch: pytest.MonkeyPatch, generate) -> None:
+    """Route a 16-frame fake provider through the current MCP atlas transport.
+
+    The launcher calls generate_pixellab_pro_4x4_atlas_mcp (the retired REST
+    frames function is no longer on the production path). The fake frames are
+    tiled into one real 4x4 atlas PNG, so slicing, Final export and intake
+    still run the canonical code; only the network is replaced.
+    """
+    from types import SimpleNamespace
+
+    def atlas_mcp(**kwargs: object):
+        result = generate(**kwargs)
+        if not isinstance(result, extensions.PixelLabPro4x4Result):
+            return result
+        atlas = Image.new("RGBA", (result.width * 4, result.height * 4), (0, 0, 0, 0))
+        for index, frame in enumerate(result.frames_png):
+            atlas.paste(Image.open(BytesIO(frame)).convert("RGBA"), ((index % 4) * result.width, (index // 4) * result.height))
+        output = BytesIO()
+        atlas.save(output, format="PNG")
+        return SimpleNamespace(job_id=result.job_id, atlas_png=output.getvalue(), mcp_request_count=1,
+                               width=result.width, height=result.height, max_colors=result.max_colors)
+
+    monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_atlas_mcp", atlas_mcp)
+
+
 def _launcher_module():
     repository_root = Path(__file__).resolve().parents[2]
     scripts = str(repository_root / "level_factory" / "scripts")
@@ -346,7 +371,7 @@ def test_factory_imports_only_pass_frames_as_source_only_and_reuses_job_id(monke
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -370,7 +395,7 @@ def test_factory_imports_only_pass_frames_as_source_only_and_reuses_job_id(monke
             imported.append(imported_path)
             return {"items": [{"disposition": "IMPORTED", "source_id": f"source-{len(imported):02d}"}]}
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", generate)
+        _patch_frames_provider(monkeypatch, generate)
         monkeypatch.setattr(extensions, "batch_import", batch_import)
         first = launcher._semantic_generate_pixellab_pro_4x4(
             prompt="offline source test", style="CREATURE", width=56, height=56,
@@ -421,7 +446,7 @@ def test_factory_import_never_submits_rejected_atlas_slices(monkeypatch: pytest.
     imported_paths: list[Path] = []
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: fake_repo)
 
         def batch_import(paths: list[str]) -> dict[str, object]:
             imported_paths.append(Path(paths[0]))
@@ -476,7 +501,7 @@ def test_cross_operation_digest_claim_blocks_every_paid_or_uncertain_state(
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -496,7 +521,7 @@ def test_cross_operation_digest_claim_blocks_every_paid_or_uncertain_state(
                 56, 56, 12, 123,
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", generate)
+        _patch_frames_provider(monkeypatch, generate)
         monkeypatch.setattr(
             extensions, "batch_import",
             lambda paths: {"items": [{"disposition": "IMPORTED", "source_id": f"source-{Path(paths[0]).name}"}]},
@@ -564,7 +589,7 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
 
     monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: sandbox_repo)
     try:
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -584,7 +609,7 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
                 56, 56, 12, 123,
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", generate)
+        _patch_frames_provider(monkeypatch, generate)
         monkeypatch.setattr(extensions, "batch_import", lambda _: {"items": []})
         launcher._semantic_generate_pixellab_pro_4x4(
             prompt="stale claim", style="CREATURE", width=56, height=56,
@@ -615,7 +640,7 @@ def test_legacy_v02_digest_remains_guarded_before_creating_new_claim(
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         description = "Legacy prompt. Pixel art style: CREATURE."
         palette_sha256 = sha256(PALETTE_DATA_PATH.read_bytes()).hexdigest()
@@ -631,7 +656,7 @@ def test_legacy_v02_digest_remains_guarded_before_creating_new_claim(
             "state": "POLLING", "job_id": "old-provider-job",
         }), encoding="utf-8")
         submissions: list[object] = []
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", lambda **kwargs: submissions.append(kwargs))
+        _patch_frames_provider(monkeypatch, lambda **kwargs: submissions.append(kwargs))
 
         outcome = launcher._semantic_generate_pixellab_pro_4x4(
             prompt="Legacy prompt", style="CREATURE", width=56, height=56,
@@ -652,7 +677,7 @@ def test_missing_credential_creates_no_claim_then_same_intent_can_submit_once(
     with _runtime_sandbox() as sandbox:
         fake_repo = sandbox / "repo"
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: fake_repo)
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: fake_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         status = {"configured": False, "status": "PIXELLAB_API_TOKEN_NOT_CONFIGURED",
                   "reason": "PIXELLAB_API_TOKEN_NOT_CONFIGURED: no local credential."}
@@ -672,7 +697,7 @@ def test_missing_credential_creates_no_claim_then_same_intent_can_submit_once(
                 "mock-first-use-job", None, 56, 56, 12, 123,
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", generate)
+        _patch_frames_provider(monkeypatch, generate)
         monkeypatch.setattr(
             extensions, "batch_import",
             lambda paths: {"items": [{"disposition": "IMPORTED", "source_id": "offline-source-1"}]},
@@ -710,14 +735,13 @@ def test_credential_conflict_returns_without_creating_claim_or_job(
     launcher = _launcher_module()
     with _runtime_sandbox() as sandbox:
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox / "repo")
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": False, "status": "PIXELLAB_CREDENTIALS_CONFLICT",
             "reason": "PIXELLAB_CREDENTIALS_CONFLICT: environment entries differ.",
         })
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames",
-                            lambda **kwargs: pytest.fail("provider adapter must not run"))
+        _patch_frames_provider(monkeypatch, lambda **kwargs: pytest.fail("provider adapter must not run"))
         result = launcher._semantic_generate_pixellab_pro_4x4(
             prompt="credential conflict", style="CREATURE", width=56, height=56,
             max_colors=12, seed="conflict-seed", operation_id="conflict-operation",
@@ -734,7 +758,7 @@ def test_existing_known_unpaid_claim_stays_fail_closed_without_auto_release(
 
     with _runtime_sandbox() as sandbox:
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox / "repo")
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "mock only"})
@@ -742,7 +766,7 @@ def test_existing_known_unpaid_claim_stays_fail_closed_without_auto_release(
         def fail_before_post(**kwargs: object):
             raise PixelLabProviderError("CREDENTIALS_NOT_CONFIGURED", "synthetic pre-submit failure")
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", fail_before_post)
+        _patch_frames_provider(monkeypatch, fail_before_post)
         with pytest.raises(ValueError, match="CREDENTIALS_NOT_CONFIGURED"):
             launcher._semantic_generate_pixellab_pro_4x4(
                 prompt="preserve old unpaid intent", style="CREATURE", width=56, height=56,
@@ -771,7 +795,7 @@ def test_provider_request_id_is_persisted_with_safe_paid_failure_record(
     launcher = _launcher_module()
     with _runtime_sandbox() as sandbox:
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox / "repo")
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -786,7 +810,7 @@ def test_provider_request_id_is_persisted_with_safe_paid_failure_record(
                 provider_request_id="req_support_123",
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", rejected_submission)
+        _patch_frames_provider(monkeypatch, rejected_submission)
         with pytest.raises(ValueError, match="Provider request ID: req_support_123"):
             launcher._semantic_generate_pixellab_pro_4x4(
                 prompt="safe test prompt", style="CREATURE", width=56, height=56,
@@ -797,7 +821,7 @@ def test_provider_request_id_is_persisted_with_safe_paid_failure_record(
         record = json.loads(record_path.read_text(encoding="utf-8"))
         assert record["state"] == "HTTP_ERROR"
         assert record["paid_submission_possible"] is True
-        assert record["provider_http_request_count"] == 1
+        assert record["provider_mcp_request_count"] == 1  # MCP transport field name
         assert record["provider_request_id"] == "req_support_123"
         assert "safe test prompt" not in json.dumps(record)
 
@@ -806,7 +830,7 @@ def test_explicit_http_400_failure_can_be_retried_in_a_later_user_intent(monkeyp
     launcher = _launcher_module()
     with _runtime_sandbox() as sandbox:
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox / "repo")
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -825,7 +849,7 @@ def test_explicit_http_400_failure_can_be_retried_in_a_later_user_intent(monkeyp
                 "HTTP_ERROR", "PixelLab returned HTTP 400.", http_request_count=1, http_status=400
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", rejected_submission)
+        _patch_frames_provider(monkeypatch, rejected_submission)
         common = {
             "prompt": "offline test prompt", "style": "", "width": 56, "height": 56,
             "max_colors": 12, "seed": 777,
@@ -848,7 +872,7 @@ def test_ambiguous_matching_record_remains_fail_closed(monkeypatch: pytest.Monke
     launcher = _launcher_module()
     with _runtime_sandbox() as sandbox:
         extensions_root = sandbox / "extensions"
-        monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox / "repo")
+        monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: sandbox / "repo")
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
         monkeypatch.setattr(extensions, "pixellab_secret_status", lambda: {
             "configured": True, "status": "READY_CREDENTIALS_CONFIGURED", "reason": "offline fixture"
@@ -864,7 +888,7 @@ def test_ambiguous_matching_record_remains_fail_closed(monkeypatch: pytest.Monke
                 "SUBMISSION_UNKNOWN", "submission outcome unknown", http_request_count=1
             )
 
-        monkeypatch.setattr(extensions, "generate_pixellab_pro_4x4_frames", unknown_submission)
+        _patch_frames_provider(monkeypatch, unknown_submission)
         params = {"prompt": "ambiguous offline prompt", "style": "", "width": 56,
                   "height": 56, "max_colors": 12, "seed": 778}
         with pytest.raises(ValueError, match="SUBMISSION_UNKNOWN"):
@@ -877,7 +901,12 @@ def test_ambiguous_matching_record_remains_fail_closed(monkeypatch: pytest.Monke
 
 def test_csv_resume_retries_only_explicit_unaccepted_http_400_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     launcher = _launcher_module()
-    csv_path = Path(__file__).resolve().parents[2] / "data" / "input" / "scrubbots_2000_prompts.csv"
+    # Isolated canonical input folder (the owner's real prompt CSV changes over time).
+    input_root = Path(_runtime_root()) / "repo"
+    csv_path = input_root / "data" / "input" / "prompts.csv"
+    csv_path.parent.mkdir(parents=True)
+    csv_path.write_text("id,prompt" + chr(10) + "storm-moth,a storm moth guardian" + chr(10), encoding="utf-8")
+    monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: input_root)
     with csv_path.open("r", encoding="utf-8-sig", newline="") as file:
         rows = [row for row in csv.reader(file) if row and any(cell.strip() for cell in row)]
     header = [cell.strip().lower() for cell in rows[0]]

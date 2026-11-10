@@ -463,6 +463,13 @@ def verify_content_health(
     for key, digest in expected_objects.items():
         _object_key(key, "object key")
         checked_expected[key] = _digest(digest, f"expected_objects[{key}]")
+    # Validate caller-observed keys at the trust boundary before any manifest
+    # outcome, so malformed or traversal keys always fail closed.
+    if observed_objects is not None:
+        if not isinstance(observed_objects, Mapping):
+            raise OperationsEvidenceError("observed_objects must be an explicit key-to-bytes mapping or None")
+        for key in observed_objects:
+            _object_key(key, "observed object key")
     if manifest_bytes is None:
         return {"status": "UNKNOWN", "reason": "MANIFEST_BYTES_NOT_OBSERVED", "objects": []}
     if not isinstance(manifest_bytes, bytes):

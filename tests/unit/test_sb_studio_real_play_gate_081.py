@@ -497,7 +497,7 @@ def test_ready_writer_keeps_solver_replay_and_real_play_as_separate_required_pro
     monkeypatch.setattr(release_pool, "validate_pool_candidate_provenance", lambda *_args: classification)
     monkeypatch.setattr(release_pool, "_candidate_source_lineage", lambda _candidate: {"source_id": "owner-test"})
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda *_args: {"source_sha256": source_sha, "source_bytes_sha256": source_sha})
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: factory)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: factory)
     monkeypatch.setattr(release_pool, "_canonical_official_difficulty", lambda _primary: {"challengeScore": 50.0, "vector": [0.1] * 7, "profile": {"dominant": "FLOW"}})
     monkeypatch.setattr(release_pool, "_official_challenge_vector", lambda _official: [0.1] * 7)
     monkeypatch.setattr(release_pool, "_resolve_official_profile", lambda *_args: ({"dominant": "FLOW"}, {"kind": "DERIVED"}))

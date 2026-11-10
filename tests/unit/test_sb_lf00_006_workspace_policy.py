@@ -110,12 +110,11 @@ def test_secret_locations_are_ignored_without_extension_wide_rules() -> None:
     for path in ignored:
         assert _check_ignored(path), path
 
-    gitignore = (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8")
-    assert "*.json" not in gitignore
-    assert "*.md" not in gitignore
-    assert "*.png" not in gitignore
-    assert "*.key" not in gitignore
-    assert "*.pem" not in gitignore
+    # Extension-wide rules are forbidden; a scoped rule such as
+    # data/output/Pixellab/atlas-*.json only matches inside its folder.
+    rules = {line.strip().lstrip("/") for line in (REPOSITORY_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()}
+    for extension in ("json", "md", "png", "key", "pem"):
+        assert f"*.{extension}" not in rules and f"**/*.{extension}" not in rules
 
 
 def test_durable_source_and_evidence_paths_are_not_ignored() -> None:
@@ -139,6 +138,17 @@ def test_no_secret_literal_or_real_secret_fixture_was_added() -> None:
         r"(?i)(?:-----begin [^-]+ private key-----|(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
         r"(?:api[_-]?key|token|password|secret|credential)\s*=\s*[^\s#]{12,})"
     )
+    # In source code a secret is a quoted literal; `credential = credential_ptr.contents`
+    # is an identifier, not a value, and UPPER_SNAKE status codes are not secrets.
+    # Config-style files keep the unquoted rule.
+    suspicious_code_literal = re.compile(
+        r"(?i)(?:-----begin [^-]+ private key-----|(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
+        # identifier naming a secret (not *_target/_state/_status/... metadata) = quoted value
+        r"(?:api[_-]?key|token|password|secret|credential)"
+        r"(?!\w*_(?:target|state|status|name|path|kind|file|env|label)\b)\w*"
+        # ...whose value is not an UPPER_SNAKE status code nor an obvious test/fake value
+        r"\s*[:=]\s*[rbuf]?[\"'](?!(?-i:[A-Z0-9_]+)[\"'])(?![^\"']*(?:test|fake|dummy|example)[^\"']*[\"'])[^\"'\s]{12,}[\"'])"
+    )
     for path in _changed_files():
         raw = path.read_bytes()
         try:
@@ -147,7 +157,8 @@ def test_no_secret_literal_or_real_secret_fixture_was_added() -> None:
             # Binary fixtures (for example regenerated PNG goldens) cannot
             # contain a textual secret literal; inspect only text artifacts.
             continue
-        assert suspicious_literal.search(text) is None, path
+        pattern = suspicious_code_literal if path.suffix.lower() in {".py", ".gd"} else suspicious_literal
+        assert pattern.search(text) is None, path
 
 
 def test_root_tracker_is_not_ignored_and_no_policy_tracker_is_created() -> None:

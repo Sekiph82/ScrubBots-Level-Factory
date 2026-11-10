@@ -308,15 +308,20 @@ def current_main_replay_bridge(
     replay_evidence: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Use CPX002's pure policy descriptor; never treat caller claims as authority."""
-    adapter_path = __import__("pathlib").Path(__file__).resolve().parents[3] / "content_pipeline" / "src"
-    added_path = str(adapter_path) not in sys.path
+    # The CPX002 descriptor lives in the repository integration layer
+    # (scripts/); Factory Core must not depend on that package directly.
+    import importlib
+
+    scripts_root = __import__("pathlib").Path(__file__).resolve().parents[3] / "scripts"
+    added_path = str(scripts_root) not in sys.path
     if added_path:
-        sys.path.insert(0, str(adapter_path))
+        sys.path.insert(0, str(scripts_root))
     try:
-        from scripts.cpx002_current_main_replay_adapter import describe_current_main_replay_requirements
+        describe_current_main_replay_requirements = importlib.import_module(
+            "cpx002_current_main_replay_adapter").describe_current_main_replay_requirements
     finally:
         if added_path:
-            sys.path.remove(str(adapter_path))
+            sys.path.remove(str(scripts_root))
 
     descriptor = describe_current_main_replay_requirements(
         configured_game_root=(cpx002_authority.get("game_root") if isinstance(cpx002_authority, Mapping) else None),

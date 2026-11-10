@@ -22,13 +22,25 @@ EDITOR = FACTORY / "scripts" / "factory_studio_art_editor.gd"
 REVALIDATION = FACTORY / "scripts" / "factory_studio_art_revalidation.gd"
 TARGET = FACTORY / "scripts" / "factory_studio_target_controls.gd"
 INTEGRATION = FACTORY / "tests" / "factory_studio_art_revalidation_integration_suite.gd"
-TEST_ROOT = FACTORY / "output" / ".lf06-008-python-revalidation-test"
+# The launcher only revalidates bundles inside <repository>/data/Level Factory/
+# Workspace/Candidates. Run a copy of it from a throw-away repository (TASKS.md +
+# .git marker) so the fixture never lands in the owner's real data; the copy
+# imports the same installed src.
+import tempfile
+
+_ISOLATED_REPOSITORY = Path(tempfile.mkdtemp(prefix="lf06-008-repository-"))
+(_ISOLATED_REPOSITORY / "TASKS.md").write_text("isolated test repository\n", encoding="utf-8")
+(_ISOLATED_REPOSITORY / ".git").write_text("gitdir: none\n", encoding="utf-8")
+_ISOLATED_LAUNCHER = _ISOLATED_REPOSITORY / "level_factory" / "scripts" / "factory_core_launcher.py"
+_ISOLATED_LAUNCHER.parent.mkdir(parents=True)
+shutil.copyfile(LAUNCHER, _ISOLATED_LAUNCHER)
+TEST_ROOT = _ISOLATED_REPOSITORY / "data" / "Level Factory" / "Workspace" / "Candidates" / ".lf06-008-python-revalidation-test"
 
 
 def _invoke(request: dict[str, object], request_path: Path) -> subprocess.CompletedProcess[str]:
     request_path.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
     return subprocess.run(
-        [sys.executable, str(LAUNCHER), "studio-revalidate-art", "--request-file", str(request_path)],
+        [sys.executable, str(_ISOLATED_LAUNCHER), "studio-revalidate-art", "--request-file", str(request_path)],
         cwd=ROOT,
         check=False,
         capture_output=True,

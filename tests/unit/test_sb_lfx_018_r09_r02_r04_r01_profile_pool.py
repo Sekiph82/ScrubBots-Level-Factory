@@ -168,7 +168,7 @@ def test_release_pool_lists_only_canonical_ready_receipt_paths(tmp_path, monkeyp
     legacy.mkdir(parents=True)
     legacy_receipt = legacy / "candidate-legacy-pipeline-legacy-ready.json"
     legacy_receipt.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
 
     assert release_pool._pool_root() == repository / "data" / "Release Pool" / "Ready"
@@ -202,7 +202,7 @@ def test_official_vector_and_profile_shape_reject_tampered_values():
 
 
 def test_canonical_output_is_per_activity_run_and_rejects_traversal(tmp_path, monkeypatch):
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
     first = studio_extensions._canonical_run_output_dir("candidate-abc", "activity-one")
     second = studio_extensions._canonical_run_output_dir("candidate-abc", "activity-two")
     assert first.parent == second.parent
@@ -218,7 +218,7 @@ def test_primary_image_path_cannot_bypass_canonical_factory_acceptance(tmp_path,
 
     repository = tmp_path / "repository"
     repository.mkdir()
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: repository / "level_factory" / "output" / "studio-extensions")
     image = tmp_path / "input.png"
     image.write_bytes(b"fixture image path; primary runner is isolated")
@@ -242,7 +242,7 @@ def test_primary_image_path_cannot_bypass_canonical_factory_acceptance(tmp_path,
 def test_explicit_primary_workdir_rejects_external_output_path(tmp_path, monkeypatch):
     repository = tmp_path / "repository"
     repository.mkdir()
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
     outside = tmp_path / "outside-work"
 
     with pytest.raises(studio_extensions.StudioExtensionError, match="must stay under data/Release Pool"):

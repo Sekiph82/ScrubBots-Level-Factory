@@ -13,7 +13,7 @@
   "quality": null,
   "reference_bindings": [],
   "rendered_prompt": "16 by 16 pixel wizard; outline=NONE; shading=FLAT; detail=MEDIUM; view=FRONT; direction=S; isometric=False; transparent_background=False; coverage_percentage=80.0; Return raw provider artwork; logical dimensions are provenance only.",
-  "request_digest": "e897c942c0509cc4b09174a4a6db9678674b5d43bdfaf0afc6806eae9309aa5f",
+  "request_digest": "9c6b393d53ed20e2b55ec1637ef3bca822a5efb0b2cae3b8626c4da46dd38d68",
   "resolution": null,
   "schema": "scrubbots-magnific-job",
   "schema_version": 1

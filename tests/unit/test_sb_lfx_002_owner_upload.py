@@ -31,7 +31,7 @@ def _rgba_png(width: int, height: int, pixels: bytes) -> bytes:
 
 def test_owner_upload_preserves_bytes_and_is_content_addressed(tmp_path: Path, monkeypatch) -> None:
     destination_root = tmp_path / "owner-uploads"
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: destination_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: destination_root)
     source = tmp_path / "owner.png"
     raw = _rgba_png(3, 2, bytes((255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 20, 30, 40, 255, 50, 60, 70, 255, 80, 90, 100, 255)))
     source.write_bytes(raw)
@@ -44,10 +44,10 @@ def test_owner_upload_preserves_bytes_and_is_content_addressed(tmp_path: Path, m
     assert imported["validation_state"] == "UNVALIDATED"
     assert imported["source_sha256"] == hashlib.sha256(raw).hexdigest()
     assert imported["byte_length"] == len(raw)
-    assert (destination_root / imported["source_id"] / "source.png").read_bytes() == raw
+    assert (destination_root / imported["source_id"] / source.name).read_bytes() == raw
     assert source.read_bytes() == before
     record = json.loads((destination_root / imported["source_id"] / "source.json").read_text(encoding="utf-8"))
-    assert record["immutable_relative_path"] == f"owner-uploads/{imported['source_id']}/source.png"
+    assert record["immutable_relative_path"] == f"data/Level Factory/Imported/{imported['source_id']}/{source.name}"
     assert record["source_id"] == imported["source_id"]
 
     renamed = tmp_path / "different-display-name.png"
@@ -60,7 +60,7 @@ def test_owner_upload_preserves_bytes_and_is_content_addressed(tmp_path: Path, m
 
 def test_owner_upload_collision_and_corruption_fail_closed(tmp_path: Path, monkeypatch) -> None:
     destination_root = tmp_path / "owner-uploads"
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: destination_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: destination_root)
     first = tmp_path / "same-name.png"
     second = tmp_path / "same-name-copy.png"
     first_raw = _rgba_png(2, 2, bytes((255, 0, 0, 255)) * 4)
@@ -71,7 +71,7 @@ def test_owner_upload_collision_and_corruption_fail_closed(tmp_path: Path, monke
     second_result = owner_upload.import_owner_upload(second)
     assert first_result["state"] == second_result["state"] == "IMPORTED"
     assert first_result["source_id"] != second_result["source_id"]
-    assert (destination_root / first_result["source_id"] / "source.png").read_bytes() == first_raw
+    assert (destination_root / first_result["source_id"] / first.name).read_bytes() == first_raw
 
     record_path = destination_root / first_result["source_id"] / "source.json"
     original_record = record_path.read_bytes()

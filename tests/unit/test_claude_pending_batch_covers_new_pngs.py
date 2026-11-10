@@ -13,7 +13,7 @@ def _job(job_id: str, state: str, statuses: dict[str, str]) -> dict:
 
 
 def test_new_pending_batch_supersedes_only_fully_covered_unfinished_jobs(tmp_path, monkeypatch) -> None:
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
     covered = png_batch._write_job(_job("png-batch-old-covered", "PAUSED",
                                         {"a": "READY", "b": "QUEUED", "c": "QUEUED"}))
     partly = png_batch._write_job(_job("png-batch-old-partly", "QUEUED", {"b": "QUEUED", "z": "QUEUED"}))

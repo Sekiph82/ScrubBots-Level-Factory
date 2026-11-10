@@ -19,6 +19,7 @@ GAME_SHA = r09_campaign.PINNED_MAIN_SHA
 
 def test_r09_r02_shared_dry_preflight_is_read_only_and_never_invokes_native(monkeypatch):
     """Exercise the real R08/R09 inputs while sentinels reject every process/solver boundary."""
+    _require_saved_r09_evidence()
     root = ROOT
     release_source = root / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "owner-uploads" / r09_campaign.SOURCE_ID
     png = release_source / "source.png"
@@ -59,7 +60,23 @@ def test_r09_r02_shared_dry_preflight_is_read_only_and_never_invokes_native(monk
 PREDECESSOR = ROOT / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
 
 
+def _require_saved_r09_evidence() -> None:
+    # The owner's saved 002/R09 receipts were removed by the 2026-11-07 cleanup
+    # (Release owner-uploads and the r09-capped-solver predecessor are absent);
+    # skip with that reason instead of fabricating evidence.
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
+
+    needed = [
+        ROOT / "Release" / "ScrubBots Factory Studio" / "level_factory" / "output" / "owner-uploads" / r09_campaign.SOURCE_ID,
+        owner_art_paths(ROOT)["pending"] / "Pipelines" / "Campaigns" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}",
+    ]
+    missing = [str(path) for path in needed if not path.exists()]
+    if missing:
+        pytest.skip("owner's saved 002/R09 evidence was removed by the 2026-11-07 cleanup: " + "; ".join(missing))
+
+
 def test_original_blocked_receipts_are_sha_bound_and_leave_all_six_native_calls():
+    _require_saved_r09_evidence()
     proof = r09_campaign._historical_r09_predecessor_proof(ROOT)
     assert proof["predecessor_summary_sha256"] == "211a5abe7b9b95effce6fcdb6f7a6dc914eadade3f07bcc4f9cf0517a5f78b43"
     assert proof["predecessor_attempt_sha256"] == "e0a833dee3beaec3dc5486adde6326b7bdd8fd7f3c9a6f6616597e57cbc025a4"
@@ -77,10 +94,13 @@ def test_missing_or_ambiguous_predecessor_fails_closed(tmp_path: Path):
     with pytest.raises(r09.R09Blocked, match="historical predecessor is unreadable"):
         r09_campaign._historical_r09_predecessor_proof(tmp_path / "missing-r09-predecessor")
 
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
+
     isolated_root = tmp_path / "repository"
-    predecessor = isolated_root / "level_factory" / "output" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
+    paths = owner_art_paths(isolated_root)  # canonical data/Release Pool + Level Factory layout
+    predecessor = paths["pending"] / "Pipelines" / "Campaigns" / "r09-capped-solver" / f"{SOURCE_SHA}-{GAME_SHA}"
     predecessor.mkdir(parents=True)
-    job = isolated_root / "level_factory" / "output" / "current-game-runtime" / GAME_SHA / ".lf_solver_jobs" / r09_campaign.R09_PRENATIVE_JOB_NAME
+    job = paths["solver_jobs"] / r09_campaign.R09_PRENATIVE_JOB_NAME
     job.mkdir(parents=True)
     summary = {
         "status": "BLOCKED", "game_sha": GAME_SHA, "source_sha256": SOURCE_SHA,

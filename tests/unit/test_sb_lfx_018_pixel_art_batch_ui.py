@@ -1,8 +1,12 @@
 from pathlib import Path
 import hashlib
+import sys
 
-import factory_core_launcher
 import pytest
+
+# Do not depend on another test having put the launcher folder on sys.path.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts"))
+import factory_core_launcher  # noqa: E402
 
 
 def _function(source: str, name: str) -> str:
@@ -108,7 +112,8 @@ def test_owner_folder_preview_and_import_stream_per_file_progress_to_pipeline_ac
     assert "activity_source_id" in launcher and '"stage": "FILE CHECK"' in scanner
     assert '"stage": "FILE IMPORT"' in importer
     assert "writer.emit(\"PIPELINE\", \"COMPLETE\"" in launcher
-    assert "studio-pipeline-activity" in ui
+    # Activity logs moved to the canonical data root (2026-11-08).
+    assert '_factory_data_path("Level Factory/Activity")' in ui
 
 
 def test_folder_activity_writer_is_bound_to_the_active_studio_project_output(monkeypatch) -> None:
@@ -131,7 +136,10 @@ def test_folder_activity_writer_is_bound_to_the_active_studio_project_output(mon
     folder_identity = Path(folder).resolve(strict=False).as_posix().lower()
     source_sha = hashlib.sha256(folder_identity.encode("utf-8")).hexdigest()
     run_id = "pipeline-ui-20261108T021000Z-0123456789ab"
-    project_output = Path(factory_core_launcher.__file__).resolve().parents[1] / "output" / "studio-pipeline-activity"
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
+
+    # One shared Activity directory under the canonical data root (2026-11-08).
+    project_output = owner_art_paths(factory_core_launcher._repository_root())["activity"]
     request = {
         "folder": folder,
         "activity_run_id": run_id,
@@ -169,10 +177,14 @@ def test_pixel_art_left_controls_are_compact_and_prompt_refresh_is_removed() -> 
     assert 'Vector2(27, 538)' in table
 
 
-def test_pixellab_resume_inspection_is_read_only_and_reports_new_rows() -> None:
-    project_root = Path(__file__).resolve().parents[2]
-    csv_path = project_root / "data" / "input" / "scrubbots_2000_prompts.csv"
-    ledger_root = project_root / "tests" / "fixtures" / "unused-pixellab-ledger-test-root"
+def test_pixellab_resume_inspection_is_read_only_and_reports_new_rows(tmp_path: Path, monkeypatch) -> None:
+    # Isolated canonical input folder: the owner's real prompt CSV changes over time.
+    repository = tmp_path / "repository"
+    csv_path = repository / "data" / "input" / "prompts.csv"
+    csv_path.parent.mkdir(parents=True)
+    csv_path.write_text("id,prompt\n1,forest spirit\n2,desert golem\n3,sea serpent\n", encoding="utf-8")
+    monkeypatch.setattr(factory_core_launcher, "_repository_root", lambda: repository)
+    ledger_root = tmp_path / "unused-pixellab-ledger-test-root"
 
     class FakeExtensions:
         @staticmethod
@@ -193,53 +205,56 @@ def test_pixellab_resume_inspection_is_read_only_and_reports_new_rows() -> None:
         "max_colors": 12,
     }
 
-    assert not ledger_root.exists()
     result = factory_core_launcher._inspect_pixellab_batch(request, FakeExtensions)
-    assert result["state"] == "READY"
+    assert result["state"] == "READY", result
     assert result["monthly_request_limit"] == 200
-    assert result["source_prompt_count"] == 1997
-    assert len(result["rows"]) == 1997
+    assert result["source_prompt_count"] == 3
     assert result["rows"][0] == {"row_index": 1, "disposition": "NEW"}
-    assert result["rows"][-1] == {"row_index": 1997, "disposition": "NEW"}
+    assert result["rows"][-1] == {"row_index": 3, "disposition": "NEW"}
     assert not ledger_root.exists()
 
 
 def test_solver_activity_uses_running_studio_project_and_emits_active_png_row(monkeypatch) -> None:
     from scrubbots_pixel_factory import studio_extensions
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
 
     root = Path(__file__).resolve().parents[2]
-    monkeypatch.delenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", raising=False)
-    expected = root / "level_factory" / "output" / "studio-pipeline-activity"
+    # Since 2026-11-08 source and installed Studio share one canonical Activity
+    # directory under data/Level Factory; the project-root variable no longer moves it.
+    expected = owner_art_paths(root)["activity"]
     ui = (root / "level_factory/scripts/factory_studio_exact_ui.gd").read_text(encoding="utf-8")
     record_progress = _function(ui, "_record_verified_batch_item_progress")
     render_row = _function(ui, "_append_batch_item_activity_row")
 
+    monkeypatch.delenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", raising=False)
     assert studio_extensions._studio_activity_output_directory() == expected
-    ui_startup = _function(ui, "_ready")
-    assert '"SCRUBBOTS_STUDIO_PROJECT_ROOT"' in ui_startup
-    assert 'active_project_root if FileAccess.file_exists(project_marker)' in ui_startup
+    monkeypatch.setenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", str(root / "Release" / "ScrubBots Factory Studio" / "level_factory"))
+    assert studio_extensions._studio_activity_output_directory() == expected
     shutdown = _function(ui, "_finish_worker_cancel_marker")
     assert 'OS.set_environment("SCRUBBOTS_STUDIO_PROJECT_ROOT", _studio_project_root_previous_environment)' in shutdown
-    release_project = root / "Release" / "ScrubBots Factory Studio" / "level_factory"
-    if (release_project / "project.godot").is_file():
-        monkeypatch.setenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", str(release_project))
-        release_expected = release_project / "output" / "studio-pipeline-activity"
-        assert studio_extensions._studio_activity_output_directory() == release_expected
     assert 'state not in ["RUNNING", "READY", "FAILED", "REJECTED", "SKIPPED"]' in record_progress
     assert 'var run_reference := activity_id if state == "RUNNING" else run_id' in render_row
     assert "activity_run_id=%s" in render_row
 
 
 def test_solver_activity_rejects_external_studio_project_root(monkeypatch) -> None:
+    # An external project root can no longer redirect Activity: the directory
+    # is always the canonical data/Level Factory/Activity of this checkout.
     from scrubbots_pixel_factory import studio_extensions
+    from scrubbots_pixel_factory.owner_art_storage import owner_art_paths
 
     monkeypatch.setenv("SCRUBBOTS_STUDIO_PROJECT_ROOT", r"C:\outside\factory")
-    with pytest.raises(studio_extensions.StudioExtensionError, match="outside the canonical checkout"):
-        studio_extensions._studio_activity_output_directory()
+    directory = studio_extensions._studio_activity_output_directory()
+    assert directory == owner_art_paths(Path(__file__).resolve().parents[2])["activity"]
+    assert "outside" not in str(directory).lower()
 
 
-def test_pixellab_resume_inspection_fails_closed_if_csv_changes_after_selection() -> None:
-    csv_path = Path(__file__).resolve().parents[2] / "data" / "input" / "scrubbots_2000_prompts.csv"
+def test_pixellab_resume_inspection_fails_closed_if_csv_changes_after_selection(tmp_path: Path, monkeypatch) -> None:
+    repository = tmp_path / "repository"
+    csv_path = repository / "data" / "input" / "prompts.csv"
+    csv_path.parent.mkdir(parents=True)
+    csv_path.write_text("id,prompt\n1,forest spirit\n", encoding="utf-8")
+    monkeypatch.setattr(factory_core_launcher, "_repository_root", lambda: repository)
     result = factory_core_launcher._inspect_pixellab_batch({
         "csv_path": str(csv_path),
         "source_sha256": "0" * 64,

@@ -125,7 +125,10 @@ def _parse_rows(text: str) -> list[dict[str, object]]:
             continue
         state = match.group(1)
         body = match.group(2)
-        before, title = body.split(" — ", 1)
+        # Five historical SB-CP06/SB-CP09 rows use " - " after the ID; accept
+        # either separator rather than rewriting archived ledger text.
+        separator = " — " if " — " in body else " - "
+        before, title = body.split(separator, 1)
         identifier = TASK_ID_RE.search(before)
         assert identifier is not None, (line_number, line)
         prefix_tags = TAG_RE.findall(before[: identifier.start()])
@@ -155,7 +158,8 @@ def test_root_tracker_and_legacy_control_plane_boundaries() -> None:
     assert "tasks.md" not in effective
     assert all(path not in effective and not _exact_relative_exists(path) for path in LEGACY_TRACKER_FILES)
     hiveai_entries = {path.name for path in (REPOSITORY_ROOT / ".hiveai").iterdir()}
-    assert hiveai_entries <= {"audit-criteria", "audits", "codex-logs", "prompts"}
+    # claude-logs: append-only Claude builder logs required by the 2026-11-10 owner handoff.
+    assert hiveai_entries <= {"audit-criteria", "audits", "claude-logs", "codex-logs", "prompts"}
 
 
 def test_governance_docs_use_tasks_only_authority_and_evidence_archives() -> None:

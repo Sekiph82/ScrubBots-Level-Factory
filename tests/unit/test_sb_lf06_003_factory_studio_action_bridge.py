@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import subprocess
 import sys
 from pathlib import Path
@@ -46,7 +48,8 @@ def test_launcher_only_delegates_to_the_canonical_python_cli() -> None:
     assert "sys.path.insert" in source
     assert "scrubbots_pixel_factory.cli.main" in source
     assert "canonical_main()" in source
-    assert "requests" not in source.lower()
+    # No third-party HTTP client in the launcher (word matches like "paid_requests" are fine).
+    assert not re.search(r"^\s*(import|from)\s+requests\b", source, re.M)
     result = subprocess.run(
         [sys.executable, str(LAUNCHER), "--help"],
         cwd=ROOT,

@@ -94,6 +94,12 @@ def test_unimplemented_surfaces_are_truthful_placeholders() -> None:
 
 def test_gateway_is_a_truthful_local_canonical_core_bridge() -> None:
     source = GATEWAY.read_text(encoding="utf-8")
+    # The one approved file write: staging an over-long Studio request under
+    # data/Level Factory/Runtime (Windows 32767-char command line, f95a9cab).
+    # Any other FileAccess use in the gateway still fails below.
+    staged = "var handle := FileAccess.open(request_file, FileAccess.WRITE)"
+    assert source.count(staged) == 1 and 'DATA_PATHS.data_path("Level Factory/Runtime/studio-requests/' in source
+    source = source.replace(staged, "var handle := STAGED_REQUEST_WRITER")
     assert "AVAILABLE" in source
     assert "UNAVAILABLE" in source
     assert "ERROR" in source

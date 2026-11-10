@@ -141,7 +141,9 @@ def test_level_factory_auto_sync_scans_only_pixellab_final(tmp_path: Path, monke
         return {"state": "IMPORTED", "source_id": f"owner-upload-{digest}"}
 
     monkeypatch.setattr(studio_extensions, "import_owner_upload", fake_import)
-    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda *_args, **_kwargs: {})
+    # The imported record carries the Final filename (one name end to end), so
+    # no name alignment is attempted for this fake import.
+    monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda *_args, **_kwargs: {"original_filename": final_png.name})
     monkeypatch.setattr(studio_extensions, "validate_owner_source", lambda *_args, **_kwargs: {
         "exact_logical_source": True,
         "structural": {"disposition": "PASS"},
@@ -331,10 +333,11 @@ def test_pixellab_interrupted_archive_rolls_back_new_pngs_and_keeps_in_progress_
     paths = owner_art_storage.owner_art_paths(repository)
     assert not list(paths["pixellab_grid_files"].glob("*.png"))
     assert not list(paths["pixellab_final"].glob("*.png"))
-    transaction_path = paths["pending"] / f"pixellab-atlas-{atlas_sha}.json"
+    transaction_path = owner_art_storage.pixellab_transaction_path(atlas_sha, repository)  # Transactions folder beside PixelLab assets
     transaction = json.loads(transaction_path.read_text(encoding="utf-8"))
     assert transaction["state"] == "IN_PROGRESS"
-    partial_name = f"atlas-{atlas_sha}-sprite-01-{frames[0]['sha256']}.png"
+    # Final names (LF-NNNNNN.png) are reserved in the IN_PROGRESS marker.
+    partial_name = next(item["filename"] for item in transaction["slices"] if item["index"] == 1)
     (paths["pixellab_final"] / partial_name).write_bytes((source / frames[0]["filename"]).read_bytes())
     scanned = owner_folder_batch.scan_owner_source_folder(paths["pixellab_final"], repository_root=repository)
     assert scanned["entries"][0]["disposition"] == "REJECTED"
@@ -482,6 +485,10 @@ def test_batch_import_classifies_repeat_and_same_batch_sha_as_skip(monkeypatch) 
             item.parent.mkdir()
             item.write_bytes(b"different identity" if item.parent.name == "three" else b"same valid test identity")
         monkeypatch.setattr(studio_extensions, "extensions_root", lambda: ledger)
+        # Ledgers live under data/Level Factory/Batches/Imports since 2026-11;
+        # keep them test-owned (84 synthetic same.png ledgers had leaked into
+        # the owner's real Batches folder before this isolation).
+        monkeypatch.setattr(studio_extensions, "_batch_import_root", lambda: ledger / "Imports")
         monkeypatch.setattr(studio_extensions, "import_owner_upload", fake_import)
 
         first = studio_extensions.batch_import(files, source_provider="PIXELLAB", source_folder="approved")
@@ -983,7 +990,7 @@ def test_solve_again_can_queue_release_pool_failures_without_the_last_ui_batch(m
          "reason": "palette validation failed"},
     ]
     monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: r"C:\Factory\game")
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: Path(r"C:\Factory"))
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: Path(r"C:\Factory"))
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda source_id: {
         "source_sha256": source_id.removeprefix("owner-upload-"),
         "original_filename": "failed.png" if source_id == failed_id else "rejected.png",
@@ -1027,7 +1034,7 @@ def test_solve_again_rejects_non_pixel_lab_or_non_failed_archive_records_without
     row = {"source_id": source_id, "source_sha256": "a" * 64, "provider": "OWNER_UPLOAD",
            "status": "FAILED", "original_source_path": r"C:\Factory\failed.png", "event_sha256": "b" * 64}
     monkeypatch.setattr(png_batch, "_configured_game_project", lambda _settings: r"C:\Factory\game")
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: Path(r"C:\Factory"))
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: Path(r"C:\Factory"))
     monkeypatch.setattr(owner_release_library, "list_records", lambda **_kwargs: {"records": [row]})
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
         "source_sha256": "a" * 64, "original_filename": "failed.png",
@@ -1121,7 +1128,7 @@ def test_release_pool_failed_source_retry_does_not_require_source_to_remain_in_f
            "provider": "PIXELLAB", "event_sha256": "5" * 64,
            "original_source_path": "data/Level Factory/Imported/source.png", "reason": "prior run failed"}
     monkeypatch.setattr(owner_release_library, "list_records", lambda **_kwargs: {"records": [row]})
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: tmp_path)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
     monkeypatch.setattr(studio_extensions, "verify_owner_source", lambda _source_id: {
         "source_id": source_id, "source_sha256": source_sha, "original_filename": "source.png",
     })
@@ -1223,7 +1230,7 @@ def test_pending_solver_gate_uses_exact_release_pool_pending_projection(monkeypa
 
     source_sha = "5" * 64
     source_id = "owner-upload-" + source_sha
-    monkeypatch.setattr(launcher, "_repository_root", lambda: Path("C:/canonical/factory"))
+    monkeypatch.setattr(launcher, "_repository_root", lambda *_args, **_kwargs: Path("C:/canonical/factory"))
     monkeypatch.setattr(owner_release_library, "list_records", lambda status=None, **_kwargs: {
         "records": [{"source_id": source_id, "source_sha256": source_sha,
                      "provider": "PIXELLAB", "status": "PENDING"}]
@@ -1261,7 +1268,7 @@ def test_new_pipeline_records_use_release_pool_status_folders_and_ignore_legacy_
     repository = tmp_path / "repository"
     repository.mkdir()
     extension_root = repository / "level_factory" / "output" / "studio-extensions"
-    monkeypatch.setattr(studio_extensions, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: repository)
     monkeypatch.setattr(studio_extensions, "extensions_root", lambda: extension_root)
 
     ready = studio_extensions._write_pipeline_record({"run_id": "pipeline-ready-fixture", "disposition": "READY"})

@@ -18,6 +18,8 @@ def test_editor_is_local_memory_only_and_has_no_scope_creep() -> None:
     assert EDITOR.exists()
     assert EDITOR.is_relative_to(FACTORY)
     source = EDITOR.read_text(encoding="utf-8")
+    # The canonical data-path helper (2026-11-08) is the one approved preload.
+    source = source.replace('preload("res://scripts/factory_data_paths.gd")', 'DATA_PATHS_HELPER')
     lowered = source.lower()
     assert 'class_name factorystudioarteditor' in lowered
     assert 'const empty := "empty"' in lowered

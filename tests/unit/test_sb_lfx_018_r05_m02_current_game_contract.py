@@ -401,22 +401,23 @@ def test_integrated_launcher_reaches_real_selected_source_validator_with_memory_
     candidate_id = f"candidate-owner-{source_sha[:48]}"
     grid_hash = logical_grid_hash(20, 20, colors)
     candidate_art_sha = hashlib.sha256(png).hexdigest()
-    source_dir = Path.cwd() / "level_factory" / "output" / "owner-uploads" / source_id
-    candidate_dir = Path.cwd() / "level_factory" / "output" / "candidates" / candidate_id
+    # Canonical data layout (memory-only bytes; nothing is written).
+    source_dir = Path.cwd() / "data" / "Level Factory" / "Imported" / source_id
+    candidate_dir = Path.cwd() / "data" / "Level Factory" / "Workspace" / "Candidates" / candidate_id
     record = {
         "schema": "scrubbots-owner-upload-source", "version": 1, "source_id": source_id,
         "origin": "OWNER_UPLOAD", "source_sha256": source_sha, "byte_length": len(png),
         "media_type": "image/png", "original_filename": "memory-fixture.png",
         "original_width": 20, "original_height": 20,
-        "immutable_relative_path": f"owner-uploads/{source_id}/source.png",
-        "source_record_relative_path": f"owner-uploads/{source_id}/source.json",
+        "immutable_relative_path": f"data/Level Factory/Imported/{source_id}/memory-fixture.png",
+        "source_record_relative_path": f"data/Level Factory/Imported/{source_id}/source.json",
         "status": "SOURCE_ONLY", "validation_state": "UNVALIDATED",
     }
     record_bytes = json.dumps(record, sort_keys=True, separators=(",", ":")).encode()
     lineage = {
         "source_id": source_id, "source_sha256": source_sha,
         "source_record_sha256": hashlib.sha256(record_bytes).hexdigest(),
-        "source_record": f"level_factory/output/owner-uploads/{source_id}/source.json",
+        "source_record": f"data/Level Factory/Imported/{source_id}/source.json",
         "source_bytes_unchanged": True,
         "derivation": "EXACT_LOGICAL_OWNER_UPLOAD_TO_CANONICAL_CANDIDATE",
     }
@@ -455,7 +456,7 @@ def test_integrated_launcher_reaches_real_selected_source_validator_with_memory_
 
     byte_map = {
         source_dir / "source.json": record_bytes,
-        source_dir / "source.png": png,
+        source_dir / "memory-fixture.png": png,
         candidate_dir / "artwork.png": png,
         candidate_dir / "metadata.json": json.dumps(metadata).encode(),
     }
@@ -476,7 +477,7 @@ def test_integrated_launcher_reaches_real_selected_source_validator_with_memory_
     request_json = json.dumps({"candidate_id": candidate_id, "current_game_preflight": snapshot})
     with (patch.object(Path, "read_bytes", memory_read_bytes), patch.object(Path, "read_text", memory_read_text),
           patch.object(Path, "stat", memory_stat),
-          patch.object(studio_extensions, "_source_record_paths", return_value=(source_dir / "source.json", source_dir / "source.png")),
+          patch.object(studio_extensions, "_source_record_paths", return_value=(source_dir / "source.json", source_dir / "memory-fixture.png")),
           patch.object(studio_extensions, "list_candidates", return_value=[candidate]),
           patch.object(studio_extensions, "_latest_review", return_value=review),
           patch.object(studio_extensions, "_validated_review_chain", return_value=([review], [])),
@@ -486,7 +487,7 @@ def test_integrated_launcher_reaches_real_selected_source_validator_with_memory_
     assert exit_code == 0, stdout.getvalue()
     card = json.loads(stdout.getvalue())
     assert card["current_game_preflight"]["disposition"] == "SOURCE_CONTRACT_COMPATIBLE_NOT_REPLAYED"
-    assert card["current_game_owner_provenance"]["disposition"] == "OWNER_PROVENANCE_VERIFIED_STATIC_ONLY"
+    assert card["current_game_owner_provenance"]["disposition"] == "OWNER_PROVENANCE_VERIFIED_STATIC_ONLY", card["current_game_owner_provenance"]
     assert card["current_game_owner_provenance"]["historical_cohort_status"] == "SAVED_HISTORICAL_UNVERIFIED"
     assert card["current_main_replay_bridge"]["disposition"] == "CPX002_AUTHORITY_REQUIRED"
     assert card["overall"] == "READY"
