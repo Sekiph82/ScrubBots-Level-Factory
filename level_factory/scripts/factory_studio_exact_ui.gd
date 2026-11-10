@@ -43,6 +43,17 @@ var _pixel_batch_succeeded := 0
 var _pixel_batch_failed := 0
 var _pixel_batch_active := false
 var _pixel_batch_start_after_startup := false
+var _startup_inventory_settled := false
+var _startup_release_archive_settled := false
+var _startup_release_archive_failed := false
+var _startup_gate_released := false
+const STARTUP_GATED_CORE := ["GeneratePixelArt", "BatchCsvPath", "RunBatch", "Regenerate", "AddToLevelFactory",
+	"RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel",
+	"LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
+const STARTUP_GATED_RELEASE := ["RefreshReleasePool", "ManageSelection", "SelectAllRelease", "ClearRelease",
+	"SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2",
+	"RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease",
+	"ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest"]
 var _pixel_batch_skipped := 0
 var _pixel_batch_source_count := 0
 var _pixel_batch_monthly_used := 0
@@ -288,7 +299,46 @@ func _ready() -> void:
 	_apply_responsive_layout()
 
 
+# Owner 2026-11-10: buttons that cannot work yet stay disabled until startup
+# (Final scan, Release Pool statuses, saved-batch check) has settled.
+func _startup_core_ready() -> bool:
+	if _startup_inventory_settled and not _startup_source_inventory_loaded:
+		return true  # startup scan failed: unlock so the owner is never stuck; actions report the error
+	if not _startup_inventory_settled or not _startup_release_archive_settled:
+		return false
+	return _startup_release_archive_failed or (_startup_pending_batch_restore_started and not _batch_restore_pending)
+
+
+func _startup_release_ready() -> bool:
+	return _startup_core_ready() and (_release_pool_loaded or not _release_pool_load_error.is_empty())
+
+
+func _apply_startup_gate() -> void:
+	var core_ready := _startup_core_ready()
+	var release_ready := _startup_release_ready()
+	for button in _master_buttons:
+		var gated := (str(button.name) in STARTUP_GATED_CORE and not core_ready) 			or (str(button.name) in STARTUP_GATED_RELEASE and not release_ready)
+		if gated:
+			if not button.disabled or not button.has_meta("startup_gated"):
+				button.set_meta("startup_gated", true)
+				button.disabled = true
+				button.tooltip_text = "Factory Studio is still loading…"
+		elif button.has_meta("startup_gated"):
+			button.remove_meta("startup_gated")
+			button.disabled = false
+			button.tooltip_text = ""
+	if core_ready and release_ready:
+		_startup_gate_released = true
+		if not is_inside_tree():
+			return
+		_refresh_run_button_caption()
+		_refresh_owner_release_library_panel()
+		_refresh_runtime_cards()
+
+
 func _process(_delta: float) -> void:
+	if not _startup_gate_released:
+		_apply_startup_gate()
 	_poll_studio_read_extension()
 	if not _shutdown_requested:
 		_start_next_studio_read_extension()
@@ -1839,6 +1889,7 @@ func _restore_imported_sources() -> void:
 	_startup_pending_batch_restore_started = false
 	var final_directory := _factory_data_path("output/Pixellab/Final")
 	if final_directory.is_empty():
+		_startup_inventory_settled = true
 		_complete_owner_folder_activity_error("Canonical PixelLab Final path could not be resolved during startup.")
 		return
 	_operation_running = true
@@ -1847,10 +1898,12 @@ func _restore_imported_sources() -> void:
 	request.merge(_owner_folder_activity_request(), true)
 	if not _queue_studio_read_extension("library-refresh", request, {"kind": "restore-imported-sources"}):
 		_operation_running = false
+		_startup_inventory_settled = true
 		_complete_owner_folder_activity_error("Startup PixelLab inventory worker could not start.")
 
 
 func _apply_restored_imported_sources(catalog: Dictionary) -> void:
+	_startup_inventory_settled = true
 	if str(catalog.get("schema", "")) != "scrubbots-source-library-view":
 		_operation_running = false
 		_complete_owner_folder_activity_error(str(catalog.get("error", "Startup PixelLab inventory returned an invalid source catalog.")))
@@ -2337,6 +2390,7 @@ func _place_control(node_name: String, rect: Rect2, action: Callable) -> Button:
 	button.add_theme_font_size_override("font_size", 13)
 	button.add_theme_color_override("font_color", Color("#dce8f8"))
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
+	button.add_theme_color_override("font_disabled_color", Color("#5f6f86"))
 	button.add_theme_stylebox_override("normal", _control_style(Color("#17243a"), Color("#30415e")))
 	button.add_theme_stylebox_override("hover", _control_style(Color("#233651"), Color("#6b8bb9")))
 	button.add_theme_stylebox_override("pressed", _control_style(Color("#2d4668"), Color("#8eb7ec")))
@@ -4912,6 +4966,7 @@ func _poll_studio_read_extension() -> void:
 		if str(result.get("schema", "")) == "scrubbots-owner-release-library-view/v1" and result.get("records", []) is Array:
 			_owner_release_archive = result
 			_owner_release_archive_loaded = true
+			_startup_release_archive_settled = true
 			_batch_issue_render_key = ""
 			_refresh_batch_issue_panel()
 			_refresh_run_button_caption()
@@ -4919,6 +4974,8 @@ func _poll_studio_read_extension() -> void:
 			_restore_loaded_png_batch_readonly()
 		else:
 			_owner_release_archive_loaded = false
+			_startup_release_archive_settled = true
+			_startup_release_archive_failed = true
 			_report("Release Pool source statuses could not be verified; Run Pipeline remains disabled.")
 	elif kind == "batch-latest":
 		_apply_batch_progress_result(result, str(context.get("job_id", "")))
