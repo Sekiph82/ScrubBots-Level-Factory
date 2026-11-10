@@ -2358,8 +2358,12 @@ def create_pending_png_batch(source_ids: Sequence[str]) -> dict[str, Any]:
         if str(row.get("provider", "")).upper() not in {"PIXELLAB", "OWNER_UPLOAD"}:
             raise StudioExtensionError("new LF solver batches accept PixelLab Final sources only")
         source = verify_owner_source(source_id)
+        # Identity is content: the source ID is owner-upload-<sha256> and the
+        # immutable Imported bytes are re-hashed above. Display filenames may
+        # legitimately differ (staging sprite-NN.png vs canonical Final
+        # LF-xxxxxx.png); comparing them rejected whole batches.
         if (str(source.get("source_sha256", "")) != str(row.get("source_sha256", ""))
-                or str(source.get("original_filename", "")) != Path(str(row.get("original_source_path", ""))).name):
+                or source_id != f"owner-upload-{row.get('source_sha256', '')}"):
             raise StudioExtensionError("Pending source identity changed before batch creation")
         verified.append(source_id)
     payload = create_loaded_png_batch(verified)

@@ -2126,7 +2126,14 @@ func _refresh_runtime_cards() -> void:
 func _runtime_source_status_caption(source_id: String, disposition: String) -> String:
 	var item := _verified_batch_item_for_source(source_id)
 	if item.is_empty():
-		return "UNVERIFIED" if _batch_snapshot.has("items") and _batch_job_contains_source(source_id) else "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
+		if _batch_snapshot.has("items") and _batch_job_contains_source(source_id):
+			return "UNVERIFIED"
+		# Not in the restored batch: show the source's current Release Pool status
+		# (READY/PENDING/FAILED/REJECTED) rather than its import disposition.
+		var release_status := _release_pool_status_for_source(source_id)
+		if not release_status.is_empty():
+			return release_status
+		return "REUSED" if disposition == "ALREADY_IMPORTED" else disposition
 	var status := str(item.get("status", ""))
 	if str(_batch_snapshot.get("state", "")) == "INTERRUPTED" and status == "RUNNING" and not _operation_running:
 		status = "INTERRUPTED"
@@ -2135,6 +2142,13 @@ func _runtime_source_status_caption(source_id: String, disposition: String) -> S
 	if status == "READY" and bool(item.get("reused_existing_ready", false)):
 		return "READY · REUSED PROOF · %d COL" % int(item.get("column_count", 0))
 	return "%s · %d COL" % [status, int(item.get("column_count", 0))]
+
+
+func _release_pool_status_for_source(source_id: String) -> String:
+	for record_variant in _owner_release_archive.get("records", []):
+		if record_variant is Dictionary and str(record_variant.get("source_id", "")) == source_id:
+			return str(record_variant.get("status", ""))
+	return ""
 
 
 func _runtime_source_status_tooltip(imported: Dictionary, filename: String, source_id: String, disposition: String) -> String:
@@ -3622,6 +3636,16 @@ func _run_single_level_pipeline() -> void:
 	_refresh_run_button_caption()
 
 
+# A rejected Run must stay visible: _report() alone disappears after 4 seconds.
+func _report_batch_start_failure(message: String) -> void:
+	_activity_stage = "BATCH NOT STARTED"
+	_activity_terminal_state = "BATCH NOT STARTED"
+	_activity_message = message
+	_append_activity_row({"seq": 1, "elapsed_ms": 0, "stage": "BATCH", "state": "NOT STARTED", "message": message})
+	_refresh_activity_header()
+	_report(message)
+
+
 func _run_png_batch() -> void:
 	if _gateway == null or _operation_running:
 		return
@@ -3657,7 +3681,7 @@ func _run_png_batch() -> void:
 	var composite := _extension("pending-png-batch-create", {"source_ids": source_ids})
 	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
-		_report("Loaded PNG snapshot could not be verified: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
+		_report_batch_start_failure("Pending snapshot could not be created: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
 		return
 	_batch_composite_snapshot = composite
 	var settings := {
@@ -3676,7 +3700,7 @@ func _run_png_batch() -> void:
 		_report(_activity_message)
 		return
 	if job.is_empty():
-		_report("PNG batch plan could not be verified: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
+		_report_batch_start_failure("PNG batch plan could not be created: %s" % str(created.get("error", created.get("reason", "UNAVAILABLE"))))
 		return
 	var job_batch_id := str(job.get("import_batch_id", ""))
 	if job_batch_id.is_empty():
