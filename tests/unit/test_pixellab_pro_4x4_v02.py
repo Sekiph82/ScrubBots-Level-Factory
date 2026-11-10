@@ -73,20 +73,29 @@ def _launcher_module():
     return factory_core_launcher
 
 
+def _runtime_root() -> Path:
+    # A fresh temp directory per test: the old fixed tests/unit/.r10-... path made
+    # every later run fail after one interrupted run left it behind.
+    import tempfile
+
+    return Path(tempfile.mkdtemp(prefix="r10-pixellab-runtime-"))
+
+
 @contextmanager
 def _runtime_sandbox():
-    root = Path(__file__).resolve().parent / ".r10-pixellab-runtime-test-output"
-    if root.exists():
-        raise AssertionError(f"Refusing pre-existing test output: {root}")
-    root.mkdir()
+    from scrubbots_pixel_factory import owner_art_storage
+
+    root = _runtime_root()
     (root / "repo").mkdir()
+    # archive_pixellab_export resolves the owner-art root itself; without this
+    # the fixtures exported synthetic atlases into the owner's real PixelLab Final.
+    original_root = owner_art_storage.factory_repository_root
+    owner_art_storage.factory_repository_root = lambda *_args, **_kwargs: root / "repo"
     try:
         yield root
     finally:
-        if root.exists():
-            if root.resolve().parent != Path(__file__).resolve().parent:
-                raise AssertionError("Runtime fixture escaped its exact test-owned directory")
-            shutil.rmtree(root)
+        owner_art_storage.factory_repository_root = original_root
+        shutil.rmtree(root, ignore_errors=True)
 
 
 @pytest.mark.parametrize("width,height", [(51, 51), (52, 56), (56, 59), (59, 51), (59, 59)])
@@ -376,7 +385,9 @@ def test_factory_imports_only_pass_frames_as_source_only_and_reuses_job_id(monke
         assert len(first["frame_statuses"]) == 16
         assert all(frame["import_status"] == "IMPORTED" for frame in first["frame_statuses"])
         assert len(first["source_ids"]) == len(imported) == 16
-        assert all(path.name.startswith("sprite-") for path in imported)
+        # Sources are imported from their unique Final names, never staging sprite-NN.
+        assert all(path.parent.name == "Final" and path.name.startswith("LF-") for path in imported)
+        assert len({path.name for path in imported}) == 16
         assert second["state"] == "NEEDS_OWNER_REVIEW_IDENTICAL_REQUEST"
         assert len(submissions) == 1
         record = __import__("json").loads(
@@ -438,8 +449,8 @@ def test_factory_import_never_submits_rejected_atlas_slices(monkeypatch: pytest.
         assert "FOREIGN_COLORS" in rejected["reasons"]
         assert rejected["import_status"] == "NOT_IMPORTED"
         assert len(imported_paths) == 15
-        assert all("sprite-07" not in path.name for path in imported_paths)
-        assert all(path.name.startswith("sprite-") for path in imported_paths)
+        assert all(path.parent.name == "Final" and path.name.startswith("LF-") for path in imported_paths)
+        assert len({path.name for path in imported_paths}) == 15
 
 
 @pytest.mark.parametrize(
@@ -545,13 +556,13 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
     launcher = _launcher_module()
     from scrubbots_pixel_factory.studio_extensions import PixelLabPro4x4Result
 
-    sandbox_repo = Path(__file__).resolve().parent / ".r10-pixellab-runtime-test-output" / "repo"
-    extensions_root = Path(__file__).resolve().parent / ".r10-pixellab-runtime-test-output" / "extensions"
-    root = Path(__file__).resolve().parent / ".r10-pixellab-runtime-test-output"
-    if root.exists():
-        raise AssertionError(f"Refusing pre-existing test output: {root}")
-    root.mkdir()
+    root = _runtime_root()
+    sandbox_repo = root / "repo"
+    extensions_root = root / "extensions"
     sandbox_repo.mkdir()
+    from scrubbots_pixel_factory import owner_art_storage
+
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: sandbox_repo)
     try:
         monkeypatch.setattr(launcher, "_repository_root", lambda: sandbox_repo)
         monkeypatch.setattr(extensions, "extensions_root", lambda: extensions_root)
@@ -592,10 +603,7 @@ def test_corrupt_or_stale_claim_is_not_reclaimed_or_overwritten(monkeypatch: pyt
         assert len(submissions) == 1
         assert claim_path.read_bytes() == original_claim
     finally:
-        if root.exists():
-            if root.resolve().parent != Path(__file__).resolve().parent:
-                raise AssertionError("Refusing to remove a path outside the exact test-owned directory")
-            shutil.rmtree(root)
+        shutil.rmtree(root, ignore_errors=True)
 
 
 def test_legacy_v02_digest_remains_guarded_before_creating_new_claim(

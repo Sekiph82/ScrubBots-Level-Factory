@@ -39,6 +39,16 @@ def forbid_writes_to_owner_release_pool(monkeypatch):
         return original(*args, repository_root=repository_root, **kwargs)
 
     monkeypatch.setattr(owner_release_library, "transition", guarded)
+
+    original_archive = owner_art_storage.archive_pixellab_export
+
+    def guarded_archive(*args, repository_root=None, **kwargs):
+        root = Path(repository_root) if repository_root is not None else owner_art_storage.factory_repository_root()
+        if Path(root).resolve() == _REAL_CHECKOUT:
+            raise RuntimeError("test attempted to export a PixelLab atlas into the owner's real Final/Grid Files")
+        return original_archive(*args, repository_root=repository_root, **kwargs)
+
+    monkeypatch.setattr(owner_art_storage, "archive_pixellab_export", guarded_archive)
     yield
 
 
@@ -74,3 +84,24 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
         terminalreporter.write_sep("!", "OWNER DATA CHANGED DURING TESTS (a test may lack an isolated root, or Factory Studio was running)")
         for name in changed[:40]:
             terminalreporter.write_line(name)
+
+
+@pytest.fixture(autouse=True)
+def forbid_real_pixellab_network(monkeypatch):
+    """No test may reach the paid PixelLab API with the owner's stored token.
+
+    2026-11-10: tests patched the retired generate_pixellab_pro_4x4_frames while
+    the launcher calls generate_pixellab_pro_4x4_atlas_mcp, and faked
+    "credentials configured", so they could reach the real MCP endpoint.
+    """
+    try:
+        from scrubbots_pixel_factory import studio_extensions
+    except ImportError:
+        yield
+        return
+
+    def blocked(*_args, **_kwargs):
+        raise RuntimeError("test attempted a real PixelLab network request; patch the provider transport")
+
+    monkeypatch.setattr(studio_extensions, "urlopen", blocked, raising=False)
+    yield

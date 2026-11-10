@@ -970,6 +970,20 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
 
 
 
+def _pixellab_final_slice_path(owner_catalog: Mapping[str, object], frame: Mapping[str, object]) -> Path:
+    """Return the canonical Final copy (unique LF-xxxxxx.png) of one sliced frame.
+
+    Every atlas stages sprite-01..16.png and Release Pool names status artwork by
+    the source basename, so importing staging slices made a second atlas collide
+    with the first in Release Pool/Pending. The Final copy has identical bytes.
+    """
+    slices = owner_catalog.get("slices", [])
+    final_slice = slices[int(frame["index"]) - 1] if isinstance(slices, list) else {}
+    if not isinstance(final_slice, Mapping) or final_slice.get("sha256") != frame.get("sha256"):
+        raise ValueError("PixelLab Final slice does not match its staged frame")
+    return Path(str(final_slice["path"]))
+
+
 def _semantic_generate_pixellab_pro_4x4(
     *, prompt: str, style: str, width: int, height: int, max_colors: int,
     seed: str | int, operation_id: object,
@@ -1188,8 +1202,7 @@ def _semantic_generate_pixellab_pro_4x4(
         for frame in manifest["frames"]:
             if frame["intake_status"] != "PASS":
                 continue
-            frame_path = source_root / frame["filename"]
-            imported = extensions.batch_import([str(frame_path)])
+            imported = extensions.batch_import([str(_pixellab_final_slice_path(owner_catalog, frame))])
             items = imported.get("items", [])
             item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
             imported_sources.append({
@@ -1330,7 +1343,7 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
     for frame in manifest["frames"]:
         if frame["intake_status"] != "PASS":
             continue
-        imported = extensions.batch_import([str(output_directory / frame["filename"])])
+        imported = extensions.batch_import([str(_pixellab_final_slice_path(owner_catalog, frame))])
         items = imported.get("items", [])
         item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
         imported_sources.append({

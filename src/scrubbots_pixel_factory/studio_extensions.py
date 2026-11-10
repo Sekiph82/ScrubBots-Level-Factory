@@ -356,7 +356,13 @@ def _sync_current_pixellab_final_sources(
             if current_status is not None:
                 release_by_source[source_id] = current_status
         if current_status is None:
-            source_path = owner_upload_root(repository_root) / source_id / str(source.get("original_filename", ""))
+            # Name the Release Pool status artwork after the canonical Final file
+            # (unique LF-xxxxxx.png), as earlier batch records do. Imported copies
+            # of generation-time slices can carry the per-atlas staging name
+            # sprite-NN.png, which collides across atlases in Release Pool/Pending.
+            final_path = Path(str(entry.get("path", "")))
+            source_path = (final_path if final_path.name.lower().endswith(".png") and final_path.is_file()
+                           else owner_upload_root(repository_root) / source_id / str(source.get("original_filename", "")))
             try:
                 release_event = transition_owner_release(
                     source_id, "PENDING", source_sha256=digest, provider="PIXELLAB",
