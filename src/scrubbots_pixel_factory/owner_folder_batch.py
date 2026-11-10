@@ -159,6 +159,7 @@ def scan_owner_source_folder(
     *,
     repository_root: str | Path | None = None,
     explicit_alternative: bool = False,
+    verify_existing_imports: bool = True,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """List direct-child PNG candidates; the canonical importer validates bytes.
@@ -322,19 +323,26 @@ def scan_owner_source_folder(
                     result["disposition"] = "SKIPPED_DUPLICATE"
                     result["reason"] = "DUPLICATE_IDENTICAL_SHA256_IN_SELECTED_FOLDER"
                 elif (existing_sources / source_id).exists():
-                    from . import studio_extensions
-                    try:
-                        studio_extensions.verify_owner_source(source_id)
+                    if verify_existing_imports:
+                        from . import studio_extensions
+                        try:
+                            studio_extensions.verify_owner_source(source_id)
+                            result["disposition"] = "ALREADY_IMPORTED"
+                            result["reason"] = "IDENTICAL_SHA256_ALREADY_IMPORTED"
+                        except (studio_extensions.StudioExtensionError, OSError, ValueError) as exc:
+                            result["disposition"] = "FAILED"
+                            result["reason"] = f"EXISTING_SOURCE_IDENTITY_CONFLICT: {str(exc)[:300]}"
+                            rejected.append({
+                                "index": index, "display_path": item.name, "original_source_path": str(item),
+                                "source_sha256": digest, "original_width": width, "original_height": height,
+                                "error": result["reason"], "disposition": "FAILED",
+                            })
+                    else:
+                        # Startup reconciliation verifies this Imported record once
+                        # in its own stage. Avoid hashing the same immutable copy
+                        # here and again while building the active source catalog.
                         result["disposition"] = "ALREADY_IMPORTED"
-                        result["reason"] = "IDENTICAL_SHA256_ALREADY_IMPORTED"
-                    except (studio_extensions.StudioExtensionError, OSError, ValueError) as exc:
-                        result["disposition"] = "FAILED"
-                        result["reason"] = f"EXISTING_SOURCE_IDENTITY_CONFLICT: {str(exc)[:300]}"
-                        rejected.append({
-                            "index": index, "display_path": item.name, "original_source_path": str(item),
-                            "source_sha256": digest, "original_width": width, "original_height": height,
-                            "error": result["reason"], "disposition": "FAILED",
-                        })
+                        result["reason"] = "IDENTICAL_SHA256_IMPORTED_RECORD_WILL_BE_VERIFIED_DURING_RECONCILIATION"
                 seen_digests.add(digest)
                 if result["disposition"] != "FAILED":
                     valid_paths.append(str(item))

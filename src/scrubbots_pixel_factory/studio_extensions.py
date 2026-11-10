@@ -289,7 +289,7 @@ def _sync_current_pixellab_final_sources(
     *,
     game_project: str | Path | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
-) -> tuple[set[str], list[dict[str, str]]]:
+) -> tuple[set[str], list[dict[str, str]], dict[str, dict[str, Any]]]:
     """Idempotently register only validated direct PNGs currently in PixelLab Final."""
 
     from . import owner_art_storage
@@ -297,12 +297,14 @@ def _sync_current_pixellab_final_sources(
     paths = owner_art_storage.owner_art_paths(repository_root)
     scan = scan_owner_source_folder(
         paths["pixellab_final"], repository_root=repository_root,
+        verify_existing_imports=False,
         progress_callback=progress_callback,
     )
     if scan.get("provider") != "PIXELLAB":
         raise StudioExtensionError("canonical PixelLab Final source authority could not be established")
     active: set[str] = set()
     invalid: list[dict[str, str]] = []
+    verified_sources: dict[str, dict[str, Any]] = {}
     from .owner_release_library import list_records as list_owner_release_records, transition as transition_owner_release
 
     release_view = list_owner_release_records(repository_root=repository_root)
@@ -343,6 +345,7 @@ def _sync_current_pixellab_final_sources(
             invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / IDENTITY_INVALID", "reason": str(exc)[:512]})
             continue
         active.add(source_id)
+        verified_sources[source_id] = dict(source)
         current_status = release_by_source.get(source_id)
         if current_status is None:
             # import_owner_upload may already have emitted the initial Pending
@@ -366,7 +369,7 @@ def _sync_current_pixellab_final_sources(
             except (OSError, ValueError) as exc:
                 invalid.append({"source_id": source_id, "disposition": "NOT_ACTIVE / RELEASE_POOL_PENDING_WRITE_FAILED", "reason": str(exc)[:512]})
                 active.discard(source_id)
-    return active, invalid
+    return active, invalid, verified_sources
 
 
 def library_refresh(
@@ -379,6 +382,7 @@ def library_refresh(
     historical: list[dict[str, Any]] = []
     invalid: list[dict[str, str]] = []
     reconciliation: dict[str, Any] = {"state": "NOT_RUN", "reason": "PixelLab Final inventory was unavailable."}
+    verified_active_sources: dict[str, dict[str, Any]] = {}
     try:
         if progress_callback is not None:
             progress_callback({"stage": "INVENTORY", "state": "RUNNING",
@@ -398,7 +402,7 @@ def library_refresh(
                     len(status_reconciliation.get("errors", [])),
                 ),
             })
-        active_ids, final_invalid = _sync_current_pixellab_final_sources(
+        active_ids, final_invalid, verified_active_sources = _sync_current_pixellab_final_sources(
             repository_root, progress_callback=progress_callback,
         )
         invalid.extend(final_invalid)
@@ -454,7 +458,13 @@ def library_refresh(
         for directory in sorted((item for item in root.iterdir() if item.is_dir()), key=lambda item: item.name):
             try:
                 source_directory = root / directory.name
-                source = verify_owner_source(directory.name, source_directory=source_directory)
+                # `_sync_current_pixellab_final_sources` has just checked the
+                # exact imported bytes and source.json for each active Final
+                # source. Reuse that verified result instead of reading and
+                # hashing the same PNG a second time during catalog assembly.
+                source = verified_active_sources.get(directory.name)
+                if source is None:
+                    source = verify_owner_source(directory.name, source_directory=source_directory)
                 metadata = _read_catalog_metadata(directory.name)
                 row = {
                     "source_id": source["source_id"], "origin": source["origin"], "source_sha256": source["source_sha256"],

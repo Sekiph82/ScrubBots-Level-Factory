@@ -902,7 +902,7 @@ def retry_release_pool_sources(source_ids: Sequence[str], settings: Mapping[str,
                 or str(row.get("provider", "")).upper() != "PIXELLAB"):
             return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_NOT_FAILED_OR_REJECTED",
                     "source_id": source_id,
-                    "reason": "Retry is limited to a current SHA-matched PIXELLAB Final source whose latest status is FAILED or REJECTED."}
+                    "reason": "Retry requires a current SHA-matched PIXELLAB Release Pool record whose latest status is FAILED or REJECTED."}
         source_sha = str(row.get("source_sha256", ""))
         try:
             source = extensions.verify_owner_source(source_id)

@@ -15,6 +15,14 @@ import sys
 import uuid
 from collections.abc import Mapping, Sequence
 
+# Run the Factory Core shipped beside this launcher (source checkout: the
+# checkout's src; installed Release: the deployed, committed src copy). The
+# editable pip install otherwise makes an installed Studio execute whatever
+# uncommitted code is in the Desktop working tree.
+_BUNDLED_SRC = Path(__file__).resolve().parents[2] / "src"
+if (_BUNDLED_SRC / "scrubbots_pixel_factory").is_dir():
+    sys.path.insert(0, str(_BUNDLED_SRC))
+
 
 STUDIO_OPERATION = "manual-art-structural-revalidation"
 STUDIO_REQUEST_SCHEMA = "scrubbots-studio-manual-art-revalidation"
@@ -39,6 +47,7 @@ DASHBOARD_OPERATION = "factory-operations-dashboard-inspection"
 OWNER_UPLOAD_OPERATION = "owner-upload-import"
 STUDIO_EXTENSION_OPERATION = "studio-extension"
 _MAX_STUDIO_REQUEST_BYTES = 384 * 1024
+_PIXELLAB_SOURCE_ID = re.compile(r"owner-upload-([0-9a-f]{64})\Z")
 
 
 def _repository_root() -> Path:
@@ -166,7 +175,7 @@ def _canonical_final_source_gate(source_ids: Sequence[object]) -> dict[str, obje
     try:
         from scrubbots_pixel_factory.supply_pipeline.pinned_game_source import expected_runtime_root
 
-        active_ids, inventory_errors = studio_extensions._sync_current_pixellab_final_sources(
+        active_ids, inventory_errors, _verified = studio_extensions._sync_current_pixellab_final_sources(
             _repository_root(), game_project=expected_runtime_root()
         )
     except Exception as exc:
@@ -211,6 +220,62 @@ def _canonical_final_membership_gate(source_ids: Sequence[object]) -> dict[str, 
         return {"state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY",
                 "error": "New solving accepts only direct PNG identities currently present in PixelLab Final.",
                 "excluded_source_ids": excluded}
+    return None
+
+
+def _release_pool_retry_selection_gate(source_ids: object) -> dict[str, object] | None:
+    """Validate retry selection shape without requiring the PNG to remain in Final.
+
+    The retry adapter is the authority for current FAILED/REJECTED status and
+    imported-byte SHA verification. Final membership applies to new intake,
+    not to an explicit retry of an already imported Release Pool record.
+    """
+    if not isinstance(source_ids, Sequence) or isinstance(source_ids, (str, bytes)):
+        return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_SELECTION_INVALID",
+                "error": "source_ids must be a list of Release Pool source identities."}
+    requested = [str(source_id) for source_id in source_ids]
+    if not requested or any(not _PIXELLAB_SOURCE_ID.fullmatch(source_id) for source_id in requested):
+        return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_SELECTION_INVALID",
+                "error": "Select one or more valid SHA-bound PixelLab Release Pool identities."}
+    if len(requested) != len(set(requested)):
+        return {"state": "BLOCKED", "disposition": "RETRY_SOURCE_SELECTION_INVALID",
+                "error": "A PixelLab source may appear only once in a retry selection."}
+    return None
+
+
+def _pending_batch_source_gate(job: Mapping[str, object]) -> dict[str, object] | None:
+    """Require every unfinished solver item to remain in the exact Pending projection.
+
+    Queued work and explicit Failed/Rejected retries are already admitted through
+    Final or Release Pool respectively. Requiring current Final membership here
+    would make a valid durable Pending job disappear when its upstream PNG moves.
+    """
+    from scrubbots_pixel_factory.owner_release_library import list_records
+
+    items = job.get("items", [])
+    if not isinstance(items, list):
+        return {"state": "BLOCKED", "disposition": "PENDING_BATCH_INVALID", "error": "Solver job has no item list."}
+    queued = [item for item in items if isinstance(item, Mapping)
+              and str(item.get("status", "")) in {"QUEUED", "RUNNING"}]
+    if not queued:
+        return None
+    pending = {
+        str(row.get("source_id", "")): row
+        for row in list_records("PENDING", repository_root=_repository_root()).get("records", [])
+        if isinstance(row, Mapping)
+    }
+    for item in queued:
+        source_id = str(item.get("source_id", ""))
+        source_sha = str(item.get("source_sha256", ""))
+        row = pending.get(source_id)
+        if (not _PIXELLAB_SOURCE_ID.fullmatch(source_id)
+                or source_id != "owner-upload-" + source_sha
+                or row is None
+                or str(row.get("source_sha256", "")) != source_sha
+                or str(row.get("provider", "")).upper() != "PIXELLAB"):
+            return {"state": "BLOCKED", "disposition": "PENDING_QUEUE_STATUS_MISMATCH",
+                    "source_id": source_id,
+                    "error": "Solver dispatch requires the exact SHA-matched PixelLab Pending status; Final is not re-scanned."}
     return None
 
 
@@ -555,8 +620,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             )
         elif operation == "png-batch-retry-release-sources":
             source_ids = request.get("source_ids", [])
-            gate = _canonical_final_source_gate(source_ids) if isinstance(source_ids, Sequence) and not isinstance(source_ids, (str, bytes)) else {
-                "state": "BLOCKED", "disposition": "PIXELLAB_FINAL_ONLY", "error": "source_ids must be a list of canonical PixelLab Final identities."}
+            gate = _release_pool_retry_selection_gate(source_ids)
             payload = gate if gate is not None else extensions.png_batch_retry_release_sources(
                 source_ids, request.get("settings", {})
             )
@@ -573,7 +637,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
                 str(item.get("source_id", "")) for item in job.get("items", [])
                 if isinstance(item, Mapping) and str(item.get("status", "")) in {"QUEUED", "RUNNING"}
             ]
-            gate = _canonical_final_source_gate(sources)
+            gate = _pending_batch_source_gate(job) if isinstance(job, Mapping) else {
+                "state": "BLOCKED", "disposition": "PENDING_BATCH_INVALID", "error": "Solver job is unavailable."}
             if gate is not None:
                 payload = gate
             else:
@@ -1492,7 +1557,7 @@ def _primary_supply_verify_main(arguments: Sequence[str]) -> int:
 
 def _main() -> int:
     repository_root = _repository_root()
-    sys.path.insert(0, str(repository_root / "src"))
+    # Mutable data lives under repository_root/data; code stays the bundled src.
     sys.path.insert(0, str(repository_root / "scripts"))
     if len(sys.argv) > 1 and sys.argv[1] == "dashboard-inspect":
         return _dashboard_inspect_main(sys.argv[2:])
