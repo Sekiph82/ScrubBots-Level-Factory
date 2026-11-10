@@ -40,3 +40,37 @@ def forbid_writes_to_owner_release_pool(monkeypatch):
 
     monkeypatch.setattr(owner_release_library, "transition", guarded)
     yield
+
+
+_OWNER_DATA_WATCH = ("data/Release Pool", "data/Level Factory/Batches", "data/Level Factory/Imported",
+                     "data/output/Pixellab/Final", "data/output/Pixellab/Grid Files")
+
+
+def _owner_data_snapshot():
+    from pathlib import Path
+
+    snapshot = {}
+    for relative in _OWNER_DATA_WATCH:
+        root = _REAL_CHECKOUT / relative
+        if root.exists():
+            for path in root.rglob("*"):
+                if path.is_file() and ".locks" not in path.parts:
+                    stat = path.stat()
+                    snapshot[str(path.relative_to(_REAL_CHECKOUT))] = (stat.st_mtime_ns, stat.st_size)
+    return snapshot
+
+
+def pytest_sessionstart(session):
+    session.config._owner_data_before = _owner_data_snapshot()
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    before = getattr(config, "_owner_data_before", None)
+    if before is None:
+        return
+    after = _owner_data_snapshot()
+    changed = sorted(set(after) ^ set(before) | {k for k in after if k in before and after[k] != before[k]})
+    if changed:
+        terminalreporter.write_sep("!", "OWNER DATA CHANGED DURING TESTS (a test may lack an isolated root, or Factory Studio was running)")
+        for name in changed[:40]:
+            terminalreporter.write_line(name)

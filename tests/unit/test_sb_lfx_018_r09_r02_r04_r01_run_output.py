@@ -16,6 +16,8 @@ def _sha(path: Path) -> str:
 def test_two_fake_successful_same_source_runs_keep_three_and_four_column_artifacts(tmp_path, monkeypatch):
     extensions = tmp_path / "studio-extensions"
     monkeypatch.setattr(studio, "extensions_root", lambda: extensions)
+    # Keep pipeline Work output out of the owner's real data/Release Pool.
+    monkeypatch.setattr(studio, "_repository_root", lambda: tmp_path)
     monkeypatch.setattr(studio, "_canonical_cells_to_grid", lambda cells, width, height, rules: ({"grid": cells}, ["C01"]))
 
     class FakeRules:
