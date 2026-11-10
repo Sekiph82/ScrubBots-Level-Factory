@@ -732,7 +732,47 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
         "ready_mix": {"3": 0, "4": 0, "5": 0},
     }
     saved = _write_job(job)
-    return {"state": "SUCCESS", "disposition": "CREATED", "job": saved}
+    superseded = _supersede_covered_jobs(saved)
+    return {"state": "SUCCESS", "disposition": "CREATED", "job": saved, "superseded_job_ids": superseded}
+
+
+_SUPERSEDABLE_STATES = {"QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "PROJECTION_ERROR"}
+_UNFINISHED_ITEM_STATES = {"QUEUED", "RUNNING", "VERIFYING_EXISTING"}
+
+
+def _supersede_covered_jobs(new_job: Mapping[str, Any]) -> list[str]:
+    """Retire older unfinished jobs whose remaining sources the new Pending job covers.
+
+    A new batch is built from every current Pending PNG. An older paused or
+    interrupted job whose unfinished rows are all in that batch would otherwise
+    stay "resumable" and make startup discovery ambiguous. Its finished rows and
+    history are kept; only its state becomes SUPERSEDED (never run again).
+    """
+    covered = {str(item.get("source_id", "")) for item in new_job.get("items", [])
+               if isinstance(item, Mapping) and item.get("status") == "QUEUED"}
+    superseded: list[str] = []
+    job_root = _root() / "jobs"
+    for path in sorted(job_root.glob("png-batch-*.json")) if job_root.exists() else []:
+        job_id = path.stem
+        if job_id == new_job.get("job_id"):
+            continue
+        try:
+            with _job_lock(job_id):
+                old = _read_job(job_id)
+                if old.get("state") not in _SUPERSEDABLE_STATES:
+                    continue
+                unfinished = {str(item.get("source_id", "")) for item in old.get("items", [])
+                              if isinstance(item, Mapping) and item.get("status") in _UNFINISHED_ITEM_STATES}
+                if not unfinished or not unfinished <= covered:
+                    continue
+                old["state"] = "SUPERSEDED"
+                old["superseded_by"] = str(new_job.get("job_id", ""))
+                old["updated_at"] = _now()
+                _write_job(old)
+                superseded.append(job_id)
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+    return superseded
 
 
 def retry_failed_png_batch(job_id: str, source_ids: Sequence[str] | None = None) -> dict[str, Any]:
@@ -1077,6 +1117,14 @@ def find_resumable_pending_batch(
         except (OSError, ValueError, KeyError, TypeError):
             continue
 
+    if len(resumable) == 1 and pending_candidate_ids - resumable[0][2]:
+        # Newer Pending PNGs exist that this saved job does not contain. Offer a
+        # fresh Pending batch over all of them; creating it supersedes this job.
+        job = resumable[0][0]
+        return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None,
+                "superseded_candidate_job_id": str(job.get("job_id", "")),
+                "pending_count": len(pending_candidate_ids),
+                "uncovered_pending_count": len(pending_candidate_ids - resumable[0][2]), "mutated": False}
     if len(resumable) == 1:
         job, batch, needs_resume = resumable[0]
         return {"state": "SUCCESS", "disposition": "RESUMABLE_PENDING_SUBSET", "batch": batch,
@@ -1202,7 +1250,7 @@ def png_batch_latest(batch_id: str | None = None) -> dict[str, Any]:
                 jobs.append(_read_job(path.stem))
             except (OSError, ValueError, json.JSONDecodeError):
                 continue
-    resumable = next((job for job in jobs if job.get("state") not in {"COMPLETE", "STOPPED"}), None)
+    resumable = next((job for job in jobs if job.get("state") not in {"COMPLETE", "STOPPED", "SUPERSEDED"}), None)
     if batch_id is None:
         return {"state": "SUCCESS", "disposition": "LATEST", "job": resumable, "jobs": jobs, "mutated": False}
     from .studio_extensions import _digest, batch_load
@@ -1427,6 +1475,9 @@ def run_png_batch(
         job = _read_job(job_id)
         if expected_batch_id is not None and expected_batch_id != job.get("import_batch_id"):
             return {"state": "BLOCKED", "disposition": "BATCH_JOB_SOURCE_MISMATCH", "reason": "Displayed import batch does not match this resumable job."}
+        if job.get("state") == "SUPERSEDED":
+            return {"state": "BLOCKED", "disposition": "BATCH_JOB_SUPERSEDED", "job": job,
+                    "reason": f"This job was replaced by {job.get('superseded_by', 'a newer Pending batch')}."}
         if job.get("state") == "COMPLETE":
             disposition = "FINISHED_WITH_FAILURES" if int(job.get("counts", {}).get("failed", 0)) or int(job.get("counts", {}).get("rejected", 0)) else "COMPLETE"
             return {"state": "SUCCESS", "disposition": disposition, "job": job, "mutated": False}
