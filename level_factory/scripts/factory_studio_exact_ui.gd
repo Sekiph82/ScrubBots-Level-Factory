@@ -1766,7 +1766,7 @@ func _refresh_run_button_caption() -> void:
 		if _batch_job_source_mismatch:
 			button.text = "Batch mismatch"
 			button.disabled = true
-		elif state in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"] and _batch_job_matches_loaded_sources():
+		elif state in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING", "PROJECTION_ERROR"] and _batch_job_matches_loaded_sources():
 			button.text = "Review & Resume Legacy Batch" if _batch_legacy_reconciliation else "Resume Batch · %d remaining" % int(counts.get("remaining", 0))
 			button.disabled = false
 		elif state == "COMPLETE":
@@ -2023,7 +2023,7 @@ func _apply_restored_latest_batch(latest: Dictionary, token: String, batch_id: S
 		_activity_backend_disposition = "INTERRUPTED"
 		_activity_terminal_state = "INTERRUPTED"
 		_activity_message = "Previous batch worker stopped with the application. Resume is available; no solver was started."
-	elif str(job.get("state", "")) in ["PAUSED", "STOPPED", "QUEUED"]:
+	elif str(job.get("state", "")) in ["PAUSED", "STOPPED", "QUEUED", "PROJECTION_ERROR"]:
 		_activity_stage = str(job.get("state", ""))
 		_activity_backend_disposition = _activity_stage
 		_activity_terminal_state = _activity_stage
@@ -3631,7 +3631,7 @@ func _run_png_batch() -> void:
 		_report("Loaded PNG batch provenance does not match the current sources; no batch was created or resumed.")
 		_refresh_run_button_caption()
 		return
-	if not _batch_job_id.is_empty() and _batch_job_matches_loaded_sources() and str(_batch_snapshot.get("state", "")) in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"]:
+	if not _batch_job_id.is_empty() and _batch_job_matches_loaded_sources() and str(_batch_snapshot.get("state", "")) in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING", "PROJECTION_ERROR"]:
 		if _batch_legacy_reconciliation:
 			_activity_message = "Explicit owner resume requested for the SHA-matched legacy composite."
 		_dispatch_png_batch_job(_batch_job_id, _batch_import_id)

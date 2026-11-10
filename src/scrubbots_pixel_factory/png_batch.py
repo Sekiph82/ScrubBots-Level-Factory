@@ -1002,7 +1002,9 @@ def find_resumable_pending_batch(
 
     resumable: list[tuple[dict[str, Any], dict[str, Any], set[str]]] = []
     conflicting_overlap: list[str] = []
-    resumable_states = {"QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING"}
+    # PROJECTION_ERROR is retryable: a durable solver result exists and only its
+    # Release Pool status projection still needs repair (run_png_batch resumes it).
+    resumable_states = {"QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "RUNNING", "PROJECTION_ERROR"}
     unfinished_states = {"QUEUED", "RUNNING", "VERIFYING_EXISTING"}
     terminal_states = {"READY", "FAILED", "REJECTED"}
     for path in sorted(job_root.glob("png-batch-*.json")):

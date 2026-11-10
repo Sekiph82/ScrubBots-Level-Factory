@@ -321,7 +321,10 @@ def test_immutable_writer_still_fails_closed_without_changing_existing_bytes():
     assert path.read_bytes() == raw
 
 
-def test_startup_resume_finds_original_batch_after_pending_shrinks(monkeypatch):
+# PROJECTION_ERROR (retryable status-projection repair) must stay discoverable
+# after restart; it was orphaned before 2026-11-10.
+@pytest.mark.parametrize("job_state", ["INTERRUPTED", "PROJECTION_ERROR"])
+def test_startup_resume_finds_original_batch_after_pending_shrinks(monkeypatch, job_state):
     """A restart resumes the original full job after terminal rows leave Pending."""
     source_ids = _source_ids(3)
     records = [_record(source_id) for source_id in source_ids]
@@ -339,7 +342,7 @@ def test_startup_resume_finds_original_batch_after_pending_shrinks(monkeypatch):
         "job_id": job_id,
         "import_batch_id": batch["batch_id"],
         "batch_digest": digest,
-        "state": "INTERRUPTED",
+        "state": job_state,
         "items": [
             {"index": index, "source_id": row["source_id"], "source_sha256": row["source_sha256"],
              "source_record_sha256": row["source_record_sha256"], "status": state,
