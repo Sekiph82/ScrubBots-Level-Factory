@@ -2,6 +2,8 @@
 
 This adapter is deliberately read-only. It never claims, edits, or publishes
 TASKS.md and never scans checkbox rows to guess which task should run.
+Owner delegation as of 2026-11-10 authorizes CLAUDE as primary actor; old
+CODEX task receipts remain parseable for historical compatibility.
 """
 
 from __future__ import annotations
@@ -125,11 +127,11 @@ def select_current_task(source: str) -> CurrentTask:
     ]
     if (
         not actor_chain
-        or actor_chain[0] != "CODEX"
-        or any(actor not in {"CODEX", "CHATGPT", "OWNER"} for actor in actor_chain)
+        or actor_chain[0] not in {"CLAUDE", "CODEX"}
+        or any(actor not in {"CLAUDE", "CODEX", "CHATGPT", "OWNER"} for actor in actor_chain)
         or len(set(actor_chain)) != len(actor_chain)
     ):
-        raise ValueError("Required Actor must authorize CODEX")
+        raise ValueError("Required Actor must authorize CLAUDE or legacy CODEX")
 
     current = fields["Current Task"]
     actions = fields["Next Task/Action"]
