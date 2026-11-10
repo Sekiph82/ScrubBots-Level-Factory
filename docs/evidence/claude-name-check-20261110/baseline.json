@@ -1,0 +1,13 @@
+{
+ "taken_at": "2026-11-10T13:00:03",
+ "final_count": 624,
+ "final_last": "LF-000640.png",
+ "grid_count": 39,
+ "grid_last": "PX-ATLAS-000040.png",
+ "job_records": [
+  "1794288845-1335910230.json",
+  "1794297005-1434274805.json",
+  "1794297112-1540919289.json"
+ ],
+ "pending_count": 499
+}
