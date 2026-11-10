@@ -22,6 +22,7 @@ const STUDIO_REVALIDATION_OPERATION := "manual-art-structural-revalidation"
 const DASHBOARD_INSPECTION_OPERATION := "factory-operations-dashboard-inspection"
 const OWNER_UPLOAD_OPERATION := "owner-upload-import"
 const STUDIO_EXTENSION_OPERATION := "studio-extension"
+const STUDIO_REQUEST_ARGUMENT_LIMIT := 24000
 const SCRUBBOTS_PROJECT_ENVIRONMENT_NAME := "SCRUBBOTS_PROJECT"
 const READ_STDERR := true
 const OPEN_CONSOLE := false
@@ -257,12 +258,30 @@ func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
 	if prepared.is_empty():
 		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."}
 	var captured: Array[String] = []
-	var exit_code := _execute_process(str(prepared.get("executable", "")), PackedStringArray([
+	var request_base64 := str(prepared.get("request_base64", ""))
+	var request_arguments := PackedStringArray(["--request-base64", request_base64])
+	var request_file := ""
+	# Windows limits a command line to 32767 characters. Large requests (e.g. a
+	# 196-Pending + 320-active source-ID batch lookup) previously failed to launch,
+	# came back as ERROR and were shown to the owner as "Batch mismatch".
+	if request_base64.length() > STUDIO_REQUEST_ARGUMENT_LIMIT:
+		request_file = DATA_PATHS.data_path("Level Factory/Runtime/studio-requests/%s-%d-%d.json" % [str(prepared.get("operation", "request")), Time.get_ticks_usec(), randi()])
+		DirAccess.make_dir_recursive_absolute(request_file.get_base_dir())
+		var handle := FileAccess.open(request_file, FileAccess.WRITE)
+		if handle == null:
+			return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": "ERROR — large Studio request could not be staged in data/Level Factory/Runtime."}
+		handle.store_buffer(Marshalls.base64_to_raw(request_base64))
+		handle.close()
+		request_arguments = PackedStringArray(["--request-file", request_file])
+	var arguments := PackedStringArray([
 		str(prepared.get("launcher", "")),
 		"studio-extension",
 		"--operation", str(prepared.get("operation", "")),
-		"--request-base64", str(prepared.get("request_base64", "")),
-	]), captured)
+	])
+	arguments.append_array(request_arguments)
+	var exit_code := _execute_process(str(prepared.get("executable", "")), arguments, captured)
+	if not request_file.is_empty():
+		DirAccess.remove_absolute(request_file)
 	var process_output := "\n".join(captured)
 	var payload := _find_extension_result(captured)
 	if payload.is_empty():

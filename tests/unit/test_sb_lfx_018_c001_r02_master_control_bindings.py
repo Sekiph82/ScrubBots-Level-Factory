@@ -174,8 +174,9 @@ def test_external_png_single_multi_and_csv_use_the_same_canonical_pipeline_in_so
 def test_level_factory_folder_picker_is_source_bounded_and_pixellab_atlas_picker_stays_single() -> None:
     picker = UI.split("func _open_files(multiple: bool) -> void:", 1)[1].split("func _open_batch_csv", 1)[0]
     multi_callback = UI.split("func _on_files_selected(paths: PackedStringArray) -> void:", 1)[1].split("func _import_pro_4x4_source", 1)[0]
-    assert '"SelectArtwork": "Select Folder"' in UI
-    assert '_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _open_owner_folder_sources)' in UI
+    # Owner 2026-11-10: LF sources are always the automatic PixelLab Final scan;
+    # the redundant "PixelLab Final · Auto" selector button was removed.
+    assert '"SelectArtwork"' not in UI
     assert 'menu.add_item("ALPIX · Finished PNGs", 0)' in UI
     assert 'menu.add_item("PixelLab · Final slices only", 1)' in UI
     assert 'menu.add_item("Owner Suggestions", 2)' in UI

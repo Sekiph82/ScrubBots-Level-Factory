@@ -616,10 +616,30 @@ def _candidate_roots() -> Iterable[Path]:
     return (path.parent for path in output.rglob("metadata.json") if "Reproductions" not in path.parent.parts and path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
 
 
+# Parsed candidate rows keyed by bundle root and the (mtime_ns, size) of its three
+# files. Callers such as _latest_review() call list_candidates() once per item,
+# which re-validated every bundle (O(n^2); ~20 min for 125 candidates).
+_CANDIDATE_ROW_CACHE: dict[Path, tuple[tuple[tuple[int, int], ...], dict[str, Any] | None]] = {}
+
+
 def list_candidates() -> list[dict[str, Any]]:
+    import copy
+
     candidates: list[dict[str, Any]] = []
     seen: set[str] = set()
     for root in sorted(_candidate_roots(), key=lambda path: path.as_posix()):
+        try:
+            stamps = tuple((stat.st_mtime_ns, stat.st_size) for stat in (
+                (root / name).stat() for name in ("metadata.json", "artwork.json", "artwork.png")))
+        except OSError:
+            continue
+        cached = _CANDIDATE_ROW_CACHE.get(root)
+        if cached is not None and cached[0] == stamps:
+            row = cached[1]
+            if row is not None and row["candidate_id"] not in seen:
+                seen.add(row["candidate_id"])
+                candidates.append(copy.deepcopy(row))
+            continue
         try:
             bundle = read_bundle(root)
             if bundle.artwork.candidate_id in seen:
@@ -632,7 +652,7 @@ def list_candidates() -> list[dict[str, Any]]:
             generator_payload = generator_metadata.get("payload", {}) if isinstance(generator_metadata.get("payload", {}), Mapping) else {}
             generator_data = generator_payload.get("data", {}) if isinstance(generator_payload.get("data", {}), Mapping) else {}
             request_payload = generation.get("request", {}) if isinstance(generation.get("request", {}), Mapping) else {}
-            candidates.append({
+            row = {
                 "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
                 "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
                 "used_colors": list(CANONICAL_PALETTE.used_ids(bundle.artwork.cells)), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
@@ -641,8 +661,11 @@ def list_candidates() -> list[dict[str, Any]]:
                 "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
                 "candidate_classification": dict(generator_metadata.get("classification", {})) if isinstance(generator_metadata.get("classification", {}), Mapping) else None,
                 "background_intent": request_payload.get("background_intent", "BACKGROUND"),
-            })
+            }
+            _CANDIDATE_ROW_CACHE[root] = (stamps, row)
+            candidates.append(copy.deepcopy(row))
         except Exception:
+            _CANDIDATE_ROW_CACHE[root] = (stamps, None)
             continue
     return candidates
 
@@ -957,8 +980,11 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
 def candidate_inbox() -> dict[str, Any]:
     items = []
     for candidate in list_candidates():
-        review = _latest_review(candidate["candidate_id"], candidate["artwork_sha256"])
+        # Same result as _latest_review(candidate_id, artwork_sha256) without
+        # re-reading every candidate bundle per item (was O(n^2): ~20 min for
+        # 125 candidates, blocking Level Factory startup inventory).
         chain, invalid = _validated_review_chain(candidate)
+        review = chain[-1] if chain else None
         items.append({**candidate, "owner_review": review or {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}, "owner_review_history": chain, "owner_review_invalid": invalid, "provenance": {"origin": candidate["origin"], "source_path": candidate["source_path"]}, "structural": candidate["quality"], "evidence_references": [candidate["source_path"], candidate["artwork_path"]], "similarity_advisory": {"disposition": "NOT AVAILABLE", "reason": "Select a canonical comparison pair; similarity is never inferred in the inbox."}, "solver": {"disposition": "NOT_AVAILABLE", "reason": "Canonical ZIP pipeline not executed."}, "difficulty": {"disposition": "NOT_AVAILABLE", "reason": "Official Difficulty V1 evidence not available."}})
     return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "candidates": items}
 

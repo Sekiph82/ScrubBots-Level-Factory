@@ -810,7 +810,7 @@ func _control_caption(control_name: String) -> String:
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
 		"ArtworkCarouselLeft": "‹", "ArtworkCarouselRight": "›", "ZoomOut": "−", "ZoomIn": "+",
-		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid", "SelectArtwork": "PixelLab Final · Auto",
+		"ZoomOneToOne": "1:1", "ZoomFit": "Fit", "ToggleGrid": "Grid",
 		"LevelNumber": _level_number_caption(), "SupplyColumns3": "3", "SupplyColumns4": "4", "SupplyColumns5": "5",
 		"MaxRobotsAuto": "Max Robots: Auto", "BackgroundIntent": "Background: %s" % _background_intent,
 		"RunLevelPipeline": "Run Pipeline", "SolveAgain": "Solve Again", "PreviewReplay": "Preview Replay",
@@ -2236,13 +2236,12 @@ func _build_master_controls() -> void:
 	_place_control("ToggleGrid", Rect2(1010, 124, 45, 32), _toggle_grid)
 	# LEVEL FACTORY: select artwork, set 3/4/5 columns, run real pipeline,
 	# then record append-only owner acceptance or rejection for its candidate.
-	_place_control("SelectArtwork", Rect2(42, 165, 95, 100), _restore_imported_sources)
-	_place_control("LevelNumber", Rect2(172, 165, 190, 38), _edit_level_number)
-	_place_control("SupplyColumns3", Rect2(172, 209, 56, 38), _set_columns.bind(3))
-	_place_control("SupplyColumns4", Rect2(238, 209, 56, 38), _set_columns.bind(4))
-	_place_control("SupplyColumns5", Rect2(304, 209, 56, 38), _set_columns.bind(5))
-	_place_control("MaxRobotsAuto", Rect2(172, 253, 190, 38), _keep_auto_robot_cap)
-	_place_control("BackgroundIntent", Rect2(172, 297, 190, 38), _toggle_background)
+	_place_control("LevelNumber", Rect2(26, 165, 335, 38), _edit_level_number)
+	_place_control("SupplyColumns3", Rect2(26, 209, 105, 38), _set_columns.bind(3))
+	_place_control("SupplyColumns4", Rect2(141, 209, 105, 38), _set_columns.bind(4))
+	_place_control("SupplyColumns5", Rect2(256, 209, 105, 38), _set_columns.bind(5))
+	_place_control("MaxRobotsAuto", Rect2(26, 253, 335, 38), _keep_auto_robot_cap)
+	_place_control("BackgroundIntent", Rect2(26, 297, 335, 38), _toggle_background)
 	_place_control("RunLevelPipeline", Rect2(26, 347, 335, 52), _run_level_pipeline)
 	_place_control("PreviewReplay", Rect2(1207, 316, 142, 38), _preview_replay)
 	_place_control("ExpandSupplyPlan", Rect2(1356, 316, 142, 38), _toggle_supply_plan)
@@ -2450,7 +2449,7 @@ func _update_master_control_visibility() -> void:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
 	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
-	var level := ["SelectArtwork", "LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
+	var level := ["LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
@@ -3240,9 +3239,13 @@ func _poll_pixel_art_worker() -> void:
 	else:
 		_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
 		_report("PIXELLAB PRO · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
-	_record_pixel_art_activity("PIXELLAB RESULT", str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
+	var atlas_generated := _pixellab_atlas_generated(result)
+	_record_pixel_art_activity("PIXELLAB RESULT", str(result.get("state", "ERROR")), _pixellab_result_detail(result) if atlas_generated else str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
 	if _pixel_batch_active:
-		var row_succeeded := str(result.get("state", "")) == "IMPORTED" or (str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"] and int(result.get("pass_count", 0)) == 16)
+		# A paid row is complete once its atlas was generated and all 16 slices were
+		# persisted. Per-frame Level Factory intake rejections (e.g. MINIMUM_ARTWORK)
+		# are source-quality facts, not a failed generation, and must not stop the batch.
+		var row_succeeded := str(result.get("state", "")) == "IMPORTED" or atlas_generated
 		if not row_succeeded:
 			_pixel_batch_failed += 1
 			_pixel_batch_active = false
@@ -3262,6 +3265,23 @@ func _poll_pixel_art_worker() -> void:
 		return
 	if _shutdown_requested:
 		get_tree().quit()
+
+
+static func _pixellab_atlas_generated(result: Dictionary) -> bool:
+	return (str(result.get("state", "")) in ["SOURCES_IMPORTED_NOT_READY", "SOURCE_IMPORT_FAILED", "FRAMES_REJECTED"]
+		and not str(result.get("atlas_path", "")).is_empty()
+		and (result.get("frame_statuses", []) as Array).size() == 16)
+
+
+static func _pixellab_result_detail(result: Dictionary) -> String:
+	var rejected: Array[String] = []
+	for frame_variant in result.get("frame_statuses", []):
+		if frame_variant is Dictionary and str(frame_variant.get("intake_status", "")) != "PASS":
+			rejected.append("%02d %s" % [int(frame_variant.get("index", 0)), ",".join(frame_variant.get("reasons", []))])
+	var detail := "Atlas generated; 16/16 frames saved; %d/16 passed Level Factory intake" % int(result.get("pass_count", 0))
+	if not rejected.is_empty():
+		detail += "; intake-rejected: " + "; ".join(rejected)
+	return detail + "."
 
 
 func _run_batch() -> void:
