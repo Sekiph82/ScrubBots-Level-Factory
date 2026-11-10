@@ -2906,6 +2906,11 @@ PRO_4X4_MCP_ENDPOINT = "https://api.pixellab.ai/mcp"
 PRO_4X4_MCP_PROTOCOL_VERSION = "2025-11-25"
 PRO_4X4_MCP_MAX_WAIT_SECONDS = 600
 PRO_4X4_MCP_POLL_SECONDS = 5
+# Read-only poll/download faults after acceptance; retried, never resubmitted.
+PRO_4X4_MCP_TRANSIENT_ERRORS = frozenset({
+    "MCP_NETWORK_ERROR", "MCP_GALLERY_DOWNLOAD_FAILED", "MCP_INVALID_RESPONSE", "RATE_LIMITED",
+})
+PRO_4X4_MCP_MAX_TRANSIENT_RETRIES = 8
 PRO_4X4_MCP_MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -3335,8 +3340,13 @@ def generate_pixellab_pro_4x4_atlas_mcp(
     on_submission_started: Callable[[], None] | None = None,
     on_job_accepted: Callable[[str], None] | None = None,
     on_mcp_request_started: Callable[[int], None] | None = None,
+    resume_job_id: str | None = None,
 ) -> PixelLabPro4x4McpResult:
-    """Generate and fetch one transparent 4x4 Pro atlas through PixelLab MCP."""
+    """Generate and fetch one transparent 4x4 Pro atlas through PixelLab MCP.
+
+    With ``resume_job_id`` no create_image_pro is sent: the already accepted
+    (and already charged) provider job is only polled and downloaded.
+    """
     if type(width) is not int or type(height) is not int or not 51 <= width <= 59 or not 51 <= height <= 59:
         raise PixelLabProviderError("GAME_DIMENSIONS_OUT_OF_RANGE", "ScrubBots Pro 4x4 axes must each be 51..59 pixels.")
     if type(max_colors) is not int or not 3 <= max_colors <= 12:
@@ -3416,31 +3426,49 @@ def generate_pixellab_pro_4x4_atlas_mcp(
                 job_id=job_id, http_request_count=request_count,
             ) from shutdown_error
 
-    _raise_if_studio_shutdown()
-    initialize = rpc("initialize", {
-        "protocolVersion": protocol_version,
-        "capabilities": {},
-        "clientInfo": {"name": "scrubbots-factory-studio", "version": "1"},
-    })
-    negotiated = initialize.get("protocolVersion")
-    if isinstance(negotiated, str) and negotiated:
-        protocol_version = negotiated
-    _raise_if_studio_shutdown(request_count=request_count)
-    request_count += 1
-    if on_mcp_request_started is not None:
-        on_mcp_request_started(request_count)
-    notification = {
-        "jsonrpc": "2.0", "method": "notifications/initialized",
-    }
-    _, notification_headers = request_message(
-        secret=secret, message=notification, session_id=session_id,
-        protocol_version=protocol_version, timeout=30,
-    )
-    returned_session = next((str(value) for key, value in notification_headers.items()
-                             if str(key).lower() == "mcp-session-id" and value), None)
-    if returned_session:
-        session_id = returned_session
+    def open_session() -> None:
+        nonlocal protocol_version, session_id, request_count
+        session_id = None
+        initialize = rpc("initialize", {
+            "protocolVersion": protocol_version,
+            "capabilities": {},
+            "clientInfo": {"name": "scrubbots-factory-studio", "version": "1"},
+        })
+        negotiated = initialize.get("protocolVersion")
+        if isinstance(negotiated, str) and negotiated:
+            protocol_version = negotiated
+        _raise_if_studio_shutdown(request_count=request_count)
+        request_count += 1
+        if on_mcp_request_started is not None:
+            on_mcp_request_started(request_count)
+        notification = {
+            "jsonrpc": "2.0", "method": "notifications/initialized",
+        }
+        _, notification_headers = request_message(
+            secret=secret, message=notification, session_id=session_id,
+            protocol_version=protocol_version, timeout=30,
+        )
+        returned_session = next((str(value) for key, value in notification_headers.items()
+                                 if str(key).lower() == "mcp-session-id" and value), None)
+        if returned_session:
+            session_id = returned_session
 
+    def poll_accepted_job(job_id: str) -> PixelLabPro4x4McpResult:
+        return _pixellab_mcp_poll_accepted_job(
+            job_id, rpc=rpc, cancel_accepted_job_for_shutdown=cancel_accepted_job_for_shutdown,
+            reopen_session=open_session,
+            request_count=lambda: request_count, width=width, height=height, max_colors=max_colors,
+            actual_seed=actual_seed, sleep=sleep, monotonic=monotonic,
+            max_wait_seconds=max_wait_seconds, poll_seconds=poll_seconds,
+        )
+
+    _raise_if_studio_shutdown()
+    open_session()
+
+    if resume_job_id is not None:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", resume_job_id):
+            raise PixelLabProviderError("INVALID_JOB_ID", "PixelLab MCP recovery requires a valid persisted job ID.")
+        return poll_accepted_job(resume_job_id)
     if on_submission_started is not None:
         _raise_if_studio_shutdown(request_count=request_count)
         on_submission_started()
@@ -3465,80 +3493,115 @@ def generate_pixellab_pro_4x4_atlas_mcp(
     job_id = job_id_value.strip()
     if on_job_accepted is not None:
         on_job_accepted(job_id)
+    return poll_accepted_job(job_id)
 
+
+def _pixellab_mcp_poll_accepted_job(
+    job_id: str, *, rpc: Callable[..., dict[str, object]], cancel_accepted_job_for_shutdown: Callable[[str], None],
+    reopen_session: Callable[[], None],
+    request_count: Callable[[], int], width: int, height: int, max_colors: int, actual_seed: int,
+    sleep: Callable[[float], None], monotonic: Callable[[], float], max_wait_seconds: int, poll_seconds: int,
+) -> PixelLabPro4x4McpResult:
+    """Poll one accepted job with free get_image calls; transient network faults are retried."""
     deadline = monotonic() + max_wait_seconds
+    transient_failures = 0
     while monotonic() < deadline:
         cancel_accepted_job_for_shutdown(job_id)
         try:
-            result = rpc("tools/call", {"name": "get_image", "arguments": {"job_id": job_id}}, tool_name="get_image")
-        except PixelLabProviderError:
+            if transient_failures:
+                reopen_session()   # the provider may have dropped the MCP session with the connection
+            return _pixellab_mcp_poll_once(job_id, rpc=rpc, request_count=request_count, width=width,
+                                           height=height, max_colors=max_colors, actual_seed=actual_seed)
+        except _PixelLabStillProcessing:
+            transient_failures = 0
+        except PixelLabProviderError as error:
             cancel_accepted_job_for_shutdown(job_id)
-            raise
-        cancel_accepted_job_for_shutdown(job_id)
-        atlas_png = _mcp_inline_png(result)
-        if atlas_png is not None:
-            try:
-                with Image.open(BytesIO(atlas_png)) as image:
-                    image.load()
-                    if image.format != "PNG":
-                        raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP inline image is not a PNG sheet.")
-                    inline_size = image.size
-            except PixelLabProviderError:
+            # The job is already accepted and charged; a dropped status/download
+            # request must not lose it. Read-only calls are retried, nothing is resubmitted.
+            transient = error.code in PRO_4X4_MCP_TRANSIENT_ERRORS or (
+                error.code == "MCP_HTTP_ERROR" and isinstance(error.http_status, int) and error.http_status >= 500)
+            transient_failures += 1
+            if not transient or transient_failures > PRO_4X4_MCP_MAX_TRANSIENT_RETRIES:
+                error.job_id = error.job_id or job_id
+                error.http_request_count = request_count()
                 raise
-            except Exception:
-                raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned an unreadable PNG atlas.") from None
-            if inline_size == (4 * width, 4 * height):
-                return PixelLabPro4x4McpResult(
-                    atlas_png=atlas_png, job_id=job_id, width=width, height=height,
-                    max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
-                )
-        else:
-            inline_size = None
-        text = _mcp_result_text(result).lower()
-        state = _mcp_find_value(result, {"status", "state"})
-        state_text = str(state or "").lower()
-        if any(word in state_text for word in ("failed", "cancelled", "canceled", "error")):
-            # PixelLab can report an error/cancel state after the paid generation
-            # finished and was saved. Recover only an explicitly saved-and-charged
-            # gallery asset; never create or retry another request.
-            asset_id_value = _mcp_asset_id(result)
-            if asset_id_value and "saved" in text and "charged" in text:
-                gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
-                    "job_id": f"gallery:{asset_id_value}",
-                }}, tool_name="get_image")
-                sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value)
-                atlas_png = _download_mcp_gallery_sheet(
-                    sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
-                    asset_id=asset_id_value, request_count=request_count,
-                )
-                return PixelLabPro4x4McpResult(
-                    atlas_png=atlas_png, job_id=job_id, width=width, height=height,
-                    max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
-                )
-            raise PixelLabProviderError("JOB_FAILED", "PixelLab MCP image job did not complete.", job_id=job_id,
-                                       http_request_count=request_count)
-        if "completed" in state_text or "complete" in text and "process" not in text:
-            asset_id_value = _mcp_asset_id(result)
-            if not asset_id_value:
-                code = "PRO_4X4_ATLAS_SIZE_MISMATCH" if inline_size is not None else "MCP_GALLERY_SHEET_MISSING"
-                message = ("PixelLab MCP returned a candidate frame instead of the exact 4x4 gallery sheet."
-                           if inline_size is not None else "PixelLab MCP reported completion without a saved gallery asset.")
-                raise PixelLabProviderError(code, message, job_id=job_id, http_request_count=request_count)
+        sleep(poll_seconds)
+    raise PixelLabProviderError("POLL_TIMEOUT", "PixelLab MCP job remains unresolved; its job ID is saved and no new generation was sent.",
+                               job_id=job_id, http_request_count=request_count())
+
+
+class _PixelLabStillProcessing(Exception):
+    pass
+
+
+def _pixellab_mcp_poll_once(
+    job_id: str, *, rpc: Callable[..., dict[str, object]], request_count: Callable[[], int],
+    width: int, height: int, max_colors: int, actual_seed: int,
+) -> PixelLabPro4x4McpResult:
+    """One get_image status read; returns the atlas or raises _PixelLabStillProcessing."""
+    result = rpc("tools/call", {"name": "get_image", "arguments": {"job_id": job_id}}, tool_name="get_image")
+    atlas_png = _mcp_inline_png(result)
+    if atlas_png is not None:
+        try:
+            with Image.open(BytesIO(atlas_png)) as image:
+                image.load()
+                if image.format != "PNG":
+                    raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP inline image is not a PNG sheet.")
+                inline_size = image.size
+        except PixelLabProviderError:
+            raise
+        except Exception:
+            raise PixelLabProviderError("INVALID_ATLAS_RESPONSE", "PixelLab MCP returned an unreadable PNG atlas.") from None
+        if inline_size == (4 * width, 4 * height):
+            return PixelLabPro4x4McpResult(
+                atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count(),
+            )
+    else:
+        inline_size = None
+    text = _mcp_result_text(result).lower()
+    state = _mcp_find_value(result, {"status", "state"})
+    state_text = str(state or "").lower()
+    if any(word in state_text for word in ("failed", "cancelled", "canceled", "error")):
+        # PixelLab can report an error/cancel state after the paid generation
+        # finished and was saved. Recover only an explicitly saved-and-charged
+        # gallery asset; never create or retry another request.
+        asset_id_value = _mcp_asset_id(result)
+        if asset_id_value and "saved" in text and "charged" in text:
             gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
                 "job_id": f"gallery:{asset_id_value}",
             }}, tool_name="get_image")
             sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value)
             atlas_png = _download_mcp_gallery_sheet(
                 sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
-                asset_id=asset_id_value, request_count=request_count,
+                asset_id=asset_id_value, request_count=request_count(),
             )
             return PixelLabPro4x4McpResult(
                 atlas_png=atlas_png, job_id=job_id, width=width, height=height,
-                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count,
+                max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count(),
             )
-        sleep(poll_seconds)
-    raise PixelLabProviderError("POLL_TIMEOUT", "PixelLab MCP job remains unresolved; its job ID is saved and no new generation was sent.",
-                               job_id=job_id, http_request_count=request_count)
+        raise PixelLabProviderError("JOB_FAILED", "PixelLab MCP image job did not complete.", job_id=job_id,
+                                   http_request_count=request_count())
+    if "completed" in state_text or "complete" in text and "process" not in text:
+        asset_id_value = _mcp_asset_id(result)
+        if not asset_id_value:
+            code = "PRO_4X4_ATLAS_SIZE_MISMATCH" if inline_size is not None else "MCP_GALLERY_SHEET_MISSING"
+            message = ("PixelLab MCP returned a candidate frame instead of the exact 4x4 gallery sheet."
+                       if inline_size is not None else "PixelLab MCP reported completion without a saved gallery asset.")
+            raise PixelLabProviderError(code, message, job_id=job_id, http_request_count=request_count())
+        gallery_result = rpc("tools/call", {"name": "get_image", "arguments": {
+            "job_id": f"gallery:{asset_id_value}",
+        }}, tool_name="get_image")
+        sheet_url = _mcp_gallery_sheet_url(gallery_result, asset_id_value)
+        atlas_png = _download_mcp_gallery_sheet(
+            sheet_url, expected_size=(4 * width, 4 * height), job_id=job_id,
+            asset_id=asset_id_value, request_count=request_count(),
+        )
+        return PixelLabPro4x4McpResult(
+            atlas_png=atlas_png, job_id=job_id, width=width, height=height,
+            max_colors=max_colors, request_seed=actual_seed, mcp_request_count=request_count(),
+        )
+    raise _PixelLabStillProcessing()
 
 
 def reconcile_pixellab_pro_4x4_job_mcp(

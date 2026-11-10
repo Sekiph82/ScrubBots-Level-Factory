@@ -13,7 +13,7 @@ from pathlib import Path
 import re
 import sys
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 
 # Run the Factory Core shipped beside this launcher (source checkout: the
 # checkout's src; installed Release: the deployed, committed src copy). The
@@ -805,6 +805,80 @@ def _resolved_pixellab_batch_seed(seed: str | int, extensions: object) -> int:
     return extensions._resolved_seed(extensions._resolved_seed(seed))
 
 
+# Accepted (already charged) jobs whose atlas never reached Grid Files/Final
+# because a free status/download read failed. They are fetched again with
+# read-only calls only; create_image_pro is never sent for them.
+PIXELLAB_RECOVERABLE_JOB_STATES = frozenset({
+    "POLLING", "POLL_TIMEOUT", "POLL_NETWORK_ERROR", "MCP_NETWORK_ERROR", "MCP_GALLERY_DOWNLOAD_FAILED",
+    "MCP_INVALID_RESPONSE", "MCP_HTTP_ERROR", "RATE_LIMITED",
+})
+PIXELLAB_RECOVERY_MIN_AGE_SECONDS = 15 * 60   # a POLLING record younger than this may still be live
+
+
+def _recover_accepted_pixellab_jobs(extensions: object, *, now: Callable[[], float] | None = None) -> list[dict[str, object]]:
+    import time as _time
+
+    job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
+    if not job_root.is_dir():
+        return []
+    current = (now or _time.time)()
+    recovered: list[dict[str, object]] = []
+    for job_path in sorted(job_root.glob("*.json")):
+        if job_path.name.endswith(".claim.json"):
+            continue
+        try:
+            record = json.loads(job_path.read_text(encoding="utf-8"))
+            age = current - job_path.stat().st_mtime
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            continue
+        job_id = record.get("job_id") if isinstance(record, dict) else None
+        if (not isinstance(record, dict) or record.get("schema") != "scrubbots-pixellab-pro-4x4-job-v1"
+                or record.get("transport") != "PIXELLAB_REMOTE_MCP_HTTP"
+                or record.get("paid_submission_possible") is not True or record.get("atlas_sha256")
+                or record.get("state") not in PIXELLAB_RECOVERABLE_JOB_STATES
+                or not isinstance(job_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,160}", job_id)
+                or record.get("state") == "POLLING" and age < PIXELLAB_RECOVERY_MIN_AGE_SECONDS):
+            continue
+        operation_id = str(record.get("operation_id", job_path.stem))
+        claim_path = (job_root / f"{record.get('request_sha256')}.claim.json").resolve()
+        claim_paired = False
+        try:
+            claim_paired = claim_path.is_file() and json.loads(claim_path.read_text(encoding="utf-8")).get("operation_id") == operation_id
+        except (OSError, UnicodeError, json.JSONDecodeError, AttributeError):
+            pass
+        previous_state = str(record["state"])
+
+        def persist_job(record: dict[str, object] = record, job_path: Path = job_path,
+                        claim_path: Path = claim_path, claim_paired: bool = claim_paired) -> None:
+            _write_durable_json(job_path, record)
+            if claim_paired:
+                _write_durable_json(claim_path, record)
+
+        try:
+            generated = extensions.generate_pixellab_pro_4x4_atlas_mcp(
+                description="recovery of an accepted job", width=int(record["width"]), height=int(record["height"]),
+                max_colors=int(record["max_colors"]), seed=record["seed"], resume_job_id=job_id, max_wait_seconds=60,
+            )
+            record.update({"recovered_from_state": previous_state,
+                           "recovered_at_utc": datetime.now(timezone.utc).isoformat()})
+            result = _finish_pixellab_atlas_job(
+                record, persist_job, generated, resolved_operation_id=operation_id,
+                width=int(record["width"]), height=int(record["height"]), max_colors=int(record["max_colors"]),
+            )
+            recovered.append({"operation_id": operation_id, "job_id": job_id, "state": result["state"],
+                              "previous_state": previous_state, "pass_count": result["pass_count"],
+                              "atlas_path": result["atlas_path"]})
+        except Exception as exc:   # stays recoverable; the next Run Batch tries again
+            code = getattr(exc, "code", type(exc).__name__)
+            # PixelLab definitively reports the job failed without a saved asset: stop retrying it.
+            record.update({"state": "PROVIDER_JOB_FAILED" if code == "JOB_FAILED" else previous_state, "last_recovery_error": f"{code}: {exc}"[:512],
+                           "last_recovery_at_utc": datetime.now(timezone.utc).isoformat()})
+            persist_job()
+            recovered.append({"operation_id": operation_id, "job_id": job_id, "state": "RECOVERY_DEFERRED",
+                              "previous_state": previous_state, "error": f"{code}: {exc}"[:240]})
+    return recovered
+
+
 def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -> dict[str, object]:
     """Read prior Pro 4x4 request claims and this month's local request count."""
     import re
@@ -867,6 +941,7 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
     except Exception:
         return {"state": "ERROR", "error": "PIXELLAB_BATCH_INSPECT_ROW_INVALID"}
 
+    recovered_jobs = _recover_accepted_pixellab_jobs(extensions)
     job_root = (extensions.extensions_root() / "pixellab-jobs").resolve()
     request_records: list[dict[str, object]] = []
     month = datetime.now(timezone.utc).strftime("%Y-%m")
@@ -934,6 +1009,7 @@ def _inspect_pixellab_batch(request: Mapping[str, object], extensions: object) -
         "monthly_paid_requests": monthly_paid_requests,
         "monthly_request_limit": 200, "source_sha256": source_sha256,
         "source_prompt_count": len(normalized_rows), "rows": result_rows,
+        "recovered_jobs": recovered_jobs,
     }
     provider = create_provider("PIXELLAB", engine=model)
     candidate = provider.generate_checked(semantic_request)
@@ -984,6 +1060,73 @@ def _pixellab_final_slice_path(owner_catalog: Mapping[str, object], frame: Mappi
     return Path(str(final_slice["path"]))
 
 
+def _finish_pixellab_atlas_job(
+    job_record: dict[str, object], persist_job: Callable[[], None], generated: object, *,
+    resolved_operation_id: str, width: int, height: int, max_colors: int,
+) -> dict[str, object]:
+    """Normalize a fetched Pro 4x4 atlas into Grid Files/Final and import the passing slices."""
+    from scrubbots_pixel_factory import studio_extensions as extensions
+    from scrubbots_pixel_factory.owner_art_storage import archive_pixellab_export
+    from scrubbots_pixel_factory.pixellab_pro_atlas import export_atlas
+
+    job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
+    persist_job()
+    factory_output = (_repository_root() / "data" / "output" / "Pixellab").resolve()
+    source_root = (factory_output / "Generation Staging" /
+                   f"pixellab-pro-4x4-{generated.job_id[:20]}-{resolved_operation_id[:12]}").resolve()
+    if not _inside_output(source_root, factory_output):
+        raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
+    manifest = export_atlas(generated.atlas_png, source_root, max_colors=max_colors)
+    owner_catalog = archive_pixellab_export(source_root, manifest)
+    imported_sources: list[dict[str, object]] = []
+    for frame in manifest["frames"]:
+        if frame["intake_status"] != "PASS":
+            continue
+        imported = extensions.batch_import([str(_pixellab_final_slice_path(owner_catalog, frame))])
+        items = imported.get("items", [])
+        item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
+        imported_sources.append({
+            "index": frame["index"], "status": str(item.get("disposition", item.get("state", "IMPORT_REJECTED"))),
+            "source_id": item.get("source_id"), "reason": item.get("error", item.get("reason")),
+            "sha256": frame["sha256"],
+        })
+    pass_count = sum(item.get("intake_status") == "PASS" for item in manifest["frames"])
+    rejected_count = 16 - pass_count
+    imported_source_ids = [item["source_id"] for item in imported_sources if item.get("source_id")]
+    final_state = "SOURCES_IMPORTED_NOT_READY" if imported_source_ids else "SOURCE_IMPORT_FAILED" if pass_count else "FRAMES_REJECTED"
+    job_record.update({
+        "state": final_state,
+        "output_directory": str(source_root), "atlas_sha256": manifest["source_atlas_sha256"],
+        "frames": manifest["frames"], "imported_sources": imported_sources,
+        "owner_catalog_path": owner_catalog["catalog_path"],
+        "pass_count": pass_count, "rejected_count": rejected_count,
+        "provider_mcp_request_count": generated.mcp_request_count,
+        "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
+    })
+    persist_job()
+    statuses = [
+        {"index": frame["index"], "intake_status": frame["intake_status"],
+         "reasons": frame["reasons"], "width": frame["width"], "height": frame["height"],
+         "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
+         "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
+         "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
+         "path": str(owner_catalog["slices"][int(frame["index"]) - 1]["path"])}
+        for frame in manifest["frames"]
+    ]
+    return {
+        "operation": STUDIO_EXTENSION_OPERATION,
+        "state": str(job_record["state"]), "operation_id": resolved_operation_id,
+        "job_id": generated.job_id, "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
+        "width": width, "height": height, "atlas_width": width * 4, "atlas_height": height * 4,
+        "max_colors": max_colors, "pass_count": pass_count, "rejected_count": rejected_count,
+        "frame_statuses": statuses, "source_ids": imported_source_ids,
+        "atlas_path": str(owner_catalog["atlas_path"]),
+        "manifest_path": str(owner_catalog["catalog_path"]),
+        "provider_transport": "PIXELLAB_REMOTE_MCP_HTTP",
+        "provider_mcp_request_count": generated.mcp_request_count,
+    }
+
+
 def _semantic_generate_pixellab_pro_4x4(
     *, prompt: str, style: str, width: int, height: int, max_colors: int,
     seed: str | int, operation_id: object,
@@ -993,8 +1136,6 @@ def _semantic_generate_pixellab_pro_4x4(
     import uuid
     from scrubbots_pixel_factory import studio_extensions as extensions
     from scrubbots_pixel_factory.contracts.palette import PALETTE_DATA_PATH
-    from scrubbots_pixel_factory.owner_art_storage import archive_pixellab_export
-    from scrubbots_pixel_factory.pixellab_pro_atlas import export_atlas
 
     resolved_operation_id = str(operation_id or uuid.uuid4().hex)
     if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", resolved_operation_id):
@@ -1189,62 +1330,10 @@ def _semantic_generate_pixellab_pro_4x4(
             max_colors=max_colors, seed=normalized_seed, on_submission_started=submission_started,
             on_job_accepted=accepted, on_mcp_request_started=mcp_request_started,
         )
-        job_record.update({"state": "NORMALIZING", "job_id": generated.job_id})
-        persist_job()
-        factory_output = (_repository_root() / "data" / "output" / "Pixellab").resolve()
-        source_root = (factory_output / "Generation Staging" /
-                       f"pixellab-pro-4x4-{generated.job_id[:20]}-{resolved_operation_id[:12]}").resolve()
-        if not _inside_output(source_root, factory_output):
-            raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
-        manifest = export_atlas(generated.atlas_png, source_root, max_colors=max_colors)
-        owner_catalog = archive_pixellab_export(source_root, manifest)
-        imported_sources: list[dict[str, object]] = []
-        for frame in manifest["frames"]:
-            if frame["intake_status"] != "PASS":
-                continue
-            imported = extensions.batch_import([str(_pixellab_final_slice_path(owner_catalog, frame))])
-            items = imported.get("items", [])
-            item = items[0] if isinstance(items, list) and items and isinstance(items[0], Mapping) else {}
-            imported_sources.append({
-                "index": frame["index"], "status": str(item.get("disposition", item.get("state", "IMPORT_REJECTED"))),
-                "source_id": item.get("source_id"), "reason": item.get("error", item.get("reason")),
-                "sha256": frame["sha256"],
-            })
-        pass_count = sum(item.get("intake_status") == "PASS" for item in manifest["frames"])
-        rejected_count = 16 - pass_count
-        imported_source_ids = [item["source_id"] for item in imported_sources if item.get("source_id")]
-        final_state = "SOURCES_IMPORTED_NOT_READY" if imported_source_ids else "SOURCE_IMPORT_FAILED" if pass_count else "FRAMES_REJECTED"
-        job_record.update({
-            "state": final_state,
-            "output_directory": str(source_root), "atlas_sha256": manifest["source_atlas_sha256"],
-            "frames": manifest["frames"], "imported_sources": imported_sources,
-            "owner_catalog_path": owner_catalog["catalog_path"],
-            "pass_count": pass_count, "rejected_count": rejected_count,
-            "provider_mcp_request_count": generated.mcp_request_count,
-            "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
-        })
-        persist_job()
-        statuses = [
-            {"index": frame["index"], "intake_status": frame["intake_status"],
-             "reasons": frame["reasons"], "width": frame["width"], "height": frame["height"],
-             "import_status": next((item.get("status") for item in imported_sources if item["index"] == frame["index"]), "NOT_IMPORTED"),
-             "import_reason": next((item.get("reason") for item in imported_sources if item["index"] == frame["index"]), None),
-             "source_id": next((item.get("source_id") for item in imported_sources if item["index"] == frame["index"]), None),
-             "path": str(owner_catalog["slices"][int(frame["index"]) - 1]["path"])}
-            for frame in manifest["frames"]
-        ]
-        return {
-            "operation": STUDIO_EXTENSION_OPERATION,
-            "state": str(job_record["state"]), "operation_id": resolved_operation_id,
-            "job_id": generated.job_id, "provider_id": "PIXELLAB", "provider_model": "PRO_4X4",
-            "width": width, "height": height, "atlas_width": width * 4, "atlas_height": height * 4,
-            "max_colors": max_colors, "pass_count": pass_count, "rejected_count": rejected_count,
-            "frame_statuses": statuses, "source_ids": imported_source_ids,
-            "atlas_path": str(owner_catalog["atlas_path"]),
-            "manifest_path": str(owner_catalog["catalog_path"]),
-            "provider_transport": "PIXELLAB_REMOTE_MCP_HTTP",
-            "provider_mcp_request_count": generated.mcp_request_count,
-        }
+        return _finish_pixellab_atlas_job(
+            job_record, persist_job, generated, resolved_operation_id=resolved_operation_id,
+            width=width, height=height, max_colors=max_colors,
+        )
     except extensions.PixelLabProviderError as exc:
         state = exc.code if job_record.get("paid_submission_possible") is True else "PRE_SUBMISSION_ERROR"
         job_record.update({"state": state, "job_id": exc.job_id or job_record.get("job_id"),

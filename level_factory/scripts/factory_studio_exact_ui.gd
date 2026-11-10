@@ -3473,6 +3473,15 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 		_record_pixel_art_activity("CSV RESUME CHECK", "ERROR", str(inspection.get("error", "The local PixelLab request ledger could not be verified.")))
 		_report("PixelLab resume check failed closed: %s" % str(inspection.get("error", "request ledger unavailable")))
 		return
+	var recovered_jobs: Variant = inspection.get("recovered_jobs", [])
+	if recovered_jobs is Array:
+		for job in recovered_jobs:
+			if not job is Dictionary:
+				continue
+			if str(job.get("state", "")) == "RECOVERY_DEFERRED":
+				_record_pixel_art_activity("PIXELLAB RECOVERY", "DEFERRED", "Accepted job %s (%s) could not be fetched yet; it will be retried on the next Run Batch. No new paid request was sent. %s" % [str(job.get("job_id", "")), str(job.get("previous_state", "")), str(job.get("error", ""))])
+			else:
+				_record_pixel_art_activity("PIXELLAB RECOVERY", str(job.get("state", "")), "Recovered accepted job %s after %s with read-only calls; %d/16 frames passed intake; %s. No new paid request was sent." % [str(job.get("job_id", "")), str(job.get("previous_state", "")), int(job.get("pass_count", 0)), str(job.get("atlas_path", "")).get_file()])
 	var attempted_by_index := {}
 	for item in inspected_rows:
 		if item is Dictionary and int(item.get("row_index", 0)) > 0:
