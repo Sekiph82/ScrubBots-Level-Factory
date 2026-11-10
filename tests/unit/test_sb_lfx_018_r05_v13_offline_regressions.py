@@ -1078,8 +1078,8 @@ def test_owner_release_library_is_wired_without_weakening_canonical_pool() -> No
     assert "record_batch_outcomes(completed_job)" in launcher
     assert "assert_solver_allowed(sources)" in launcher
     assert 'state in ["FAILED", "REJECTED"]' in ui
-    assert '"Retry Failed / Rejected (%d)"' in ui
-    assert '"Retry This PNG"' in ui
+    assert '"Retry (%d)"' in ui
+    assert '"Retry PNG"' in ui
     assert 'func _pending_gameplay_sources()' in ui
     assert '"Run Pending Batch (%d)"' in ui
     assert '_startup_source_inventory_loaded' in ui

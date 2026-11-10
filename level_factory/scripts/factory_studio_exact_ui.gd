@@ -1147,7 +1147,9 @@ func _refresh_owner_release_library_panel() -> void:
 			if retry_source_id.begins_with("owner-upload-") and retry_source_id not in retryable_ids:
 				retryable_ids.append(retry_source_id)
 		var selected_retry := _selected_import_source_id in retryable_ids
-		solve_again.text = "Retry This PNG" if selected_retry else "Retry Failed / Rejected (%d)" % retryable_ids.size() if not retryable_ids.is_empty() else "Solve Again"
+		# Captions must fit the 94 px master button (overlap observed in installed app 2026-11-10).
+		solve_again.text = "Retry PNG" if selected_retry else "Retry (%d)" % retryable_ids.size() if not retryable_ids.is_empty() else "Solve Again"
+		solve_again.tooltip_text = "Retry the selected FAILED/REJECTED PNG" if selected_retry else "Retry %d FAILED/REJECTED PNGs from Release Pool" % retryable_ids.size()
 		solve_again.disabled = _operation_running or not _owner_release_archive_loaded
 
 
