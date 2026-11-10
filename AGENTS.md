@@ -1,5 +1,17 @@
 # H!veAI TASKS-only control-plane adapter
 
+
+## OWNER EXECUTION TRANSFER, 2026-11-10: CLAUDE IS SOLE ACTIVE BUILDER
+
+The owner transferred all ongoing Level Factory development and root TASKS.md task selection from Codex to **CLAUDE**. This owner directive supersedes Codex-only and ChatGPT-handoff actor/continuation clauses below for NEW work, while preserving all historical evidence. Root TASKS.md Required Actor is now CLAUDE and the live task contract is `.hiveai/prompts/SB_LFX_OWNER_CLAUDE_AUTONOMOUS_RECOVERY_PIXEL_ART_BATCH_MISMATCH_20261110.md`. Read root CLAUDE.md first. Claude may edit current task priorities/dependencies/status/checkmarks with real proof and may select the next eligible existing open/partial task without Codex/ChatGPT. Claimed completion requires actual tests and real installed Windows application verification, with authentic screenshots when supported; otherwise report NOT_RUN. Use the existing controlled Windows Factory Studio launcher for repeated authorized GUI testing.
+
+**Priority P0:** (1) PixelLab 176-row batch stopped after first generated 4x4 atlas and 16 Final sprites, 175 remaining, STOPPED_AFTER_FAILURE / provider unspecified reason; fix true root cause and idempotent resume without double billing. (2) LEVEL FACTORY batch mismatch, stale 304 SOURCE_ONLY/imports and 180/116/6/2 projected batch after cleanup; fix actual installed data/source binding and pipeline. Test both real owner-facing pages before Release Pool redesign or remote publishing. Read-only inspection/hash of protected PixelLab Final and Grid Files is explicitly allowed; deletion/modification remains forbidden. Keep 30 main-game levels, 19 exact recovered source PNGs and other recovery manifests protected. No re-run of dangerous legacy reset.
+
+For all remaining genuine open/partial TASKS.md requirements, work through dependencies and measurable acceptance; avoid administrative blanket STOP states. Paid/unverified-provider requests, new beyond-queue billable operations, Production/R2 writes, ACL bypasses and data-destructive changes still need their actual scope permissions and must not be fabricated. No Github Actions, force push or secret disclosure. Do not mass-mark old tasks done; preserve canonical denominators and history. Installed UI screenshots must be authentic, not synthetic. Historical references to CODEX actor and older prompt URL are superseded only for new execution. No background/async promises beyond a live agent session.
+
+---
+
+
 ## OWNER 2026-11-06: RECOVER IN-FLIGHT DIRTY TRACKED WORK IN-PLACE
 
 Owner directly authorizes Codex to continue its existing PixelLab MCP/Factory Studio bug fix despite pre-existing tracked source/test/builder-log edits. Use `python -B scripts/codex/scrubbots_task_queue.py --json --allow-existing-work` from the sole canonical Desktop checkout. This read-only mode inventories existing modifications and PRESERVES canonical path, origin-main ancestry, and exact byte-matching TASKS.md/active-prompt authority checks. It does NOT allow overwriting, staging, deleting, auto-stashing or committing unknown owner changes.
