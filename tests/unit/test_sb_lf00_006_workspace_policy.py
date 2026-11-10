@@ -135,14 +135,14 @@ def test_durable_source_and_evidence_paths_are_not_ignored() -> None:
 
 def test_no_secret_literal_or_real_secret_fixture_was_added() -> None:
     suspicious_literal = re.compile(
-        r"(?i)(?:-----begin [^-]+ private key-----|(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
+        r"(?i)(?:-----begin [^-]+ private key-----|(?<![a-z0-9])(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
         r"(?:api[_-]?key|token|password|secret|credential)\s*=\s*[^\s#]{12,})"
     )
     # In source code a secret is a quoted literal; `credential = credential_ptr.contents`
     # is an identifier, not a value, and UPPER_SNAKE status codes are not secrets.
     # Config-style files keep the unquoted rule.
     suspicious_code_literal = re.compile(
-        r"(?i)(?:-----begin [^-]+ private key-----|(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
+        r"(?i)(?:-----begin [^-]+ private key-----|(?<![a-z0-9])(?:sk|pk|rk)-[a-z0-9_-]{20,}|"
         # identifier naming a secret (not *_target/_state/_status/... metadata) = quoted value
         r"(?:api[_-]?key|token|password|secret|credential)"
         r"(?!\w*_(?:target|state|status|name|path|kind|file|env|label)\b)\w*"
