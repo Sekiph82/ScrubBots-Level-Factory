@@ -9,9 +9,20 @@ from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
 
-_REPOSITORY_PALETTE_PATH = (
-    Path(__file__).resolve().parents[3] / "data" / "palette" / "scrubbots_palette_v3.json"
-)
+def _canonical_palette_path() -> Path:
+    # Owner data (including the locked palette whose SHA binds PixelLab request
+    # digests) always comes from the canonical Desktop checkout's data/, also
+    # when this code runs from the installed Release copy.
+    from ..owner_art_storage import OwnerArtStorageError, factory_repository_root
+
+    try:
+        root = factory_repository_root(__file__)
+    except OwnerArtStorageError:
+        root = Path(__file__).resolve().parents[3]
+    return root / "data" / "palette" / "scrubbots_palette_v3.json"
+
+
+_REPOSITORY_PALETTE_PATH = _canonical_palette_path()
 _INSTALLED_PALETTE_PATH = Path(sys.prefix) / "data" / "palette" / "scrubbots_palette_v3.json"
 PALETTE_DATA_PATH = (
     _REPOSITORY_PALETTE_PATH

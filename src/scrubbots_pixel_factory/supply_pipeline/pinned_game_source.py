@@ -31,7 +31,11 @@ class PinnedGameSourceError(ValueError):
 
 
 def repository_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    # The attested runtime lives in the canonical checkout's data/, never beside
+    # an installed Release copy of this module.
+    from ..owner_art_storage import factory_repository_root
+
+    return factory_repository_root(__file__)
 
 
 def expected_runtime_root() -> Path:

@@ -247,7 +247,7 @@ def _candidate_and_review(
     lineage = payload_data.get("source_lineage", {}) if isinstance(payload_data, Mapping) else {}
     source_record_path = owner_upload_root() / source_id / "source.json"
     try:
-        expected_record_ref = source_record_path.resolve().relative_to(Path(__file__).resolve().parents[4]).as_posix()
+        expected_record_ref = source_record_path.resolve().relative_to(__import__("scrubbots_pixel_factory.owner_art_storage", fromlist=["x"]).factory_repository_root(__file__)).as_posix()
     except ValueError:
         expected_record_ref = str(source_record_path.resolve())
     if (

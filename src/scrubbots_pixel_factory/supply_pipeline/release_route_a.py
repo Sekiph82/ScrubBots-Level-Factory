@@ -314,7 +314,9 @@ def _release_approved_campaign_impl(*, plan_hash: str, game_project: str | Path,
     if not studio_approval:
         raise RouteAError("Route A requires the explicit CampaignBuilder APPROVE action")
     if factory_commit_sha is None:
-        factory_root = Path(__file__).resolve().parents[3]
+        from ..owner_art_storage import factory_repository_root
+
+        factory_root = factory_repository_root(__file__)
         factory_commit_sha = _git(factory_root, "rev-parse", "HEAD").stdout.strip()
     if not re.fullmatch(r"[0-9a-fA-F]{40,64}", factory_commit_sha):
         raise RouteAError("Level Factory commit SHA is required for PR provenance")
