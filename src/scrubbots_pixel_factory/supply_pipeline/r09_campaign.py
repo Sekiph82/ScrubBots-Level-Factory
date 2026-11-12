@@ -9,7 +9,14 @@ from typing import Any
 import inspect
 
 from .game_rules import GameRules
-from .pinned_game_source import PINNED_MAIN_SHA, expected_runtime_root, verify_attested_runtime
+from .pinned_game_source import runtime_root, verify_attested_runtime
+
+# The r09 campaign evidence was produced with the 2026-10-12 runtime and stays bound to it.
+PINNED_MAIN_SHA = "aef60a616d4ac401e9dfac15df6fe56e671c0053"
+
+
+def expected_runtime_root():
+    return runtime_root(PINNED_MAIN_SHA)
 from .r09_solver_attempts import (
     MAX_PRIMARY_ATTEMPTS,
     MAX_NATIVE_TIMEOUT_SECONDS,

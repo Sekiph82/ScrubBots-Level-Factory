@@ -54,9 +54,10 @@ def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
     # Pinned runtime moved to the canonical data root (data/Level Factory/Runtime).
     assert root == pinned_game_source.repository_root() / "data" / "Level Factory" / "Runtime" / pinned_game_source.PINNED_MAIN_SHA
     manifest = pinned_game_source.verify_attested_runtime(root)
-    assert len(manifest["source_files"]) == 232
-    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 1_977_597
-    assert manifest["source_commit"] == "aef60a616d4ac401e9dfac15df6fe56e671c0053"
+    # Owner re-pin 2026-11-12 (game main dd54007a, ADR-030 D2 ratio dropped).
+    assert len(manifest["source_files"]) == 283
+    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_535_120
+    assert manifest["source_commit"] == "dd54007abb59863bc753c1a029b9db227fb4f89f"
     _require_saved_owner_uploads()
 
     source_png = _source_dir(PINNED_SOURCE_ID) / "source.png"
@@ -157,7 +158,11 @@ def test_pinned_file_manifest_and_release_root_fail_closed_when_tampered_or_stal
         with pytest.raises(pinned_game_source.PinnedGameSourceError, match="missing or redirected"):
             pinned_game_source.verify_attested_runtime(root)
 
+    # Only data/Level Factory/Runtime/<attested commit> is a runtime; the parent,
+    # or a folder named after an unregistered commit, is not.
+    with pytest.raises(pinned_game_source.PinnedGameSourceError, match="path is not"):
+        pinned_game_source.verify_attested_runtime(root.parent)
     with monkeypatch.context() as scoped:
-        scoped.setattr(pinned_game_source, "expected_runtime_root", lambda: root.parent)
+        scoped.setattr(pinned_game_source, "ATTESTED_RUNTIMES", {})
         with pytest.raises(pinned_game_source.PinnedGameSourceError, match="path is not"):
             pinned_game_source.verify_attested_runtime(root)

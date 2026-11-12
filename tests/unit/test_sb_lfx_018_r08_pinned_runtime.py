@@ -34,8 +34,12 @@ def test_pinned_runtime_is_hash_bound_and_not_full_game_or_publish_authority() -
     runtime = pinned_game_source.expected_runtime_root()
     manifest = pinned_game_source.verify_attested_runtime(runtime)
     assert manifest["source_commit"] == pinned_game_source.PINNED_MAIN_SHA
-    assert manifest["source_files_count"] == 232
-    assert manifest["source_files_bytes"] == 1_977_597
+    # Owner re-pin 2026-11-12: new solves use dd54007a; every attested runtime stays verifiable.
+    assert manifest["source_files_count"] == pinned_game_source.RUNTIME_SOURCE_FILES == 283
+    assert manifest["source_files_bytes"] == pinned_game_source.RUNTIME_SOURCE_BYTES == 2_535_120
+    for commit, expected in pinned_game_source.ATTESTED_RUNTIMES.items():
+        historical = pinned_game_source.verify_attested_runtime(pinned_game_source.runtime_root(commit))
+        assert historical["source_commit"] == commit and historical["source_files_count"] == expected["source_files"]
     assert manifest["full_game_checkout_verified"] is False
 
     gate = void_capability(runtime)
@@ -59,7 +63,7 @@ def test_attestation_rejects_modified_git_blob(tmp_path: Path, monkeypatch: pyte
         destination.write_bytes(source.read_bytes())
     (copy / "source-attestation.json").write_bytes(manifest_raw)
     (copy / "project.godot").write_bytes((runtime / "project.godot").read_bytes())
-    monkeypatch.setattr(pinned_game_source, "expected_runtime_root", lambda: copy)
+    monkeypatch.setattr(pinned_game_source, "runtime_root", lambda _commit: copy)
     entry = json.loads((copy / "source-attestation.json").read_text(encoding="utf-8"))["source_files"][0]
     source = copy / entry["path"]
     source.write_bytes(source.read_bytes() + b"# altered\n")

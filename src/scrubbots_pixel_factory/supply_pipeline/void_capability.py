@@ -9,7 +9,10 @@ from typing import Any
 
 
 REPOSITORY = "Sekiph82/Scrubbots"
-AUDITED_VOID_COMMIT = "7d0d148b8609ec04852fdee02f6b8ef37598c616"
+# 0b6dfc35 "audit(void): close SB-VOID-C001". The earlier anchor 7d0d148b was
+# rewritten out of the game history (owner re-pin decision 2026-11-12).
+AUDITED_VOID_COMMIT = "0b6dfc359d3bf34afa4e78d53a68b788088a863a"
+LEGACY_RATIO_RUNTIME = "aef60a616d4ac401e9dfac15df6fe56e671c0053"
 VOID_CELL = -1
 FORMAT_VERSION_VOID = 2
 _EXPECTED_ORIGINS = {
@@ -57,13 +60,13 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
             "branch": "main",
             "git_head": manifest["source_commit"],
             "git_tree": manifest["tree_sha"],
-            "audited_commit": AUDITED_VOID_COMMIT,
+            "audited_commit": manifest["void_compare"]["merge_base"],
             "level_data_version_void": FORMAT_VERSION_VOID,
             "void_cell": VOID_CELL,
             "adr": "docs/05_TECH_DECISIONS.md#ADR-030",
             "level_data_spec": "docs/03_LEVEL_DATA_SPEC.md",
             "d1": "VOID renders exactly like CLEARED/BG01",
-            "d2": {"minimum_artwork_cells": 200, "minimum_artwork_ratio": 0.25},
+            "d2": _d2(manifest["source_commit"] == LEGACY_RATIO_RUNTIME),
             "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME",
             "full_game_checkout_verified": False,
             "source_tree_attested": True,
@@ -123,7 +126,7 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
         and re.search(r"const\s+VOID_CELL\s*:?=\s*-1\b", code) is not None
         and "### ADR-030: VOID cells" in adr
         and "D1 presentation" in adr
-        and re.search(r">=\s*200\s+non-VOID\s+cells\s+AND\s+>=\s*25%", adr, re.IGNORECASE) is not None
+        and re.search(r">=\s*200\s+non-VOID\s+cells", adr, re.IGNORECASE) is not None
         and "Version 2: VOID cells" in spec
         and "version" in spec and "2" in spec and "VOID_CELL" in spec
         and "get_artwork_cell_count()" in spec
@@ -142,8 +145,13 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
         "adr": "docs/05_TECH_DECISIONS.md#ADR-030",
         "level_data_spec": "docs/03_LEVEL_DATA_SPEC.md",
         "d1": "VOID renders exactly like CLEARED/BG01",
-        "d2": {"minimum_artwork_cells": 200, "minimum_artwork_ratio": 0.25},
+        "d2": _d2(re.search(r">=\s*200\s+non-VOID\s+cells\s+AND\s+>=\s*25%", adr, re.IGNORECASE) is not None),
     }
+
+
+def _d2(with_ratio: bool) -> dict[str, Any]:
+    """ADR-030 D2 as enforced by that game commit (25% ratio dropped in dd54007a)."""
+    return {"minimum_artwork_cells": 200, "minimum_artwork_ratio": 0.25} if with_ratio else {"minimum_artwork_cells": 200}
 
 
 def _closed(

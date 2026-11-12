@@ -316,10 +316,10 @@ def _candidate_source_lineage(candidate: Mapping[str, Any]) -> dict[str, Any]:
     return dict(lineage)
 
 
-def _pinned_profile_from_godot(vector: list[float]) -> tuple[dict[str, Any], str]:
+def _pinned_profile_from_godot(vector: list[float], runtime: Path | None = None) -> tuple[dict[str, Any], str]:
     from .game_rules import find_godot
     from . import pinned_game_source
-    runtime = pinned_game_source.expected_runtime_root()
+    runtime = runtime or pinned_game_source.expected_runtime_root()
     pinned_game_source.verify_attested_runtime(runtime)
     executable = find_godot()
     if not executable:
@@ -370,7 +370,7 @@ def _resolve_official_profile(candidate: Mapping[str, Any], pipeline: Mapping[st
     authority = pipeline.get("primary", {}).get("authority", {})
     from . import pinned_game_source
     try:
-        attestation = pinned_game_source.verify_attested_runtime(pinned_game_source.expected_runtime_root())
+        attestation = pinned_game_source.verify_attested_runtime(pinned_game_source.runtime_root_for_run(pipeline.get("primary", {})))
     except (OSError, ValueError) as exc:
         raise ReleaseError("pinned game runtime authority is unavailable for historical profile proof") from exc
     analyzer_sha = next((item.get("sha256") for item in attestation["source_files"] if item.get("path") == "scripts/difficulty/level_difficulty_analyzer_v1.gd"), None)
@@ -422,12 +422,13 @@ def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: 
             raise ReleaseError("cannot bind profile supplement to the exact persisted pipeline")
     official = _canonical_official_difficulty(pipeline["primary"])
     vector = _official_challenge_vector(official)
-    first_profile, probe_sha = _pinned_profile_from_godot(vector)
-    second_profile, second_probe_sha = _pinned_profile_from_godot(vector)
+    from . import pinned_game_source
+    # A historical run is profiled with the exact runtime it was solved with.
+    runtime = pinned_game_source.runtime_root_for_run(pipeline["primary"])
+    first_profile, probe_sha = _pinned_profile_from_godot(vector, runtime)
+    second_profile, second_probe_sha = _pinned_profile_from_godot(vector, runtime)
     if first_profile != second_profile or probe_sha != second_probe_sha:
         raise ReleaseError("pinned Difficulty V1 profile computation was not repeatable")
-    from . import pinned_game_source
-    runtime = pinned_game_source.expected_runtime_root()
     attestation = pinned_game_source.verify_attested_runtime(runtime)
     analyzer_sha = next(item["sha256"] for item in attestation["source_files"] if item["path"] == "scripts/difficulty/level_difficulty_analyzer_v1.gd")
     source_id = pipeline.get("request", {}).get("source_id")
@@ -494,12 +495,14 @@ def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str,
     from .game_rules import GameRules
     column_count = int(primary.get("column_count", 3))
     try:
+        # Classify with the runtime this run was solved with (multi-runtime re-pin 2026-11-12).
+        runtime = pinned_game_source.runtime_root_for_run(primary)
         scope = getattr(_PINNED_RULES, "scope", None)
-        rules = scope.get(column_count) if scope is not None else None
+        rules = scope.get((str(runtime), column_count)) if scope is not None else None
         if rules is None:
-            rules = GameRules(pinned_game_source.expected_runtime_root(), column_count=column_count)
+            rules = GameRules(runtime, column_count=column_count)
             if scope is not None:
-                scope[column_count] = rules
+                scope[(str(runtime), column_count)] = rules
     except (OSError, RuntimeError, ValueError) as exc:
         raise ReleaseError("pinned Difficulty V1 class authority is unavailable") from exc
     if not isinstance(difficulty, Mapping) or difficulty.get("class") != rules.classify(float(score)):
