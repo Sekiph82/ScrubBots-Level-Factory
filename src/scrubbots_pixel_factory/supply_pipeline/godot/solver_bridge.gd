@@ -120,6 +120,13 @@ func _initialize() -> void:
 			out["results"].append(rec)
 			print("BRIDGE %d/%d %s REPLAY ok=%s solved=%s" % [i + 1, cands.size(), cand["id"], rp["ok"], rp["solved"]])
 			continue
+		if cand.has("analyze_trace"):  # official Difficulty V1 of an already proven trace
+			# measure() re-applies every placement and fails on any divergence.
+			rec["status"] = "ANALYZED"
+			rec["difficultyV1"] = _difficulty(level, eng, cand["analyze_trace"], level_number)
+			out["results"].append(rec)
+			print("BRIDGE %d/%d %s ANALYZED ok=%s" % [i + 1, cands.size(), cand["id"], rec["difficultyV1"].get("ok", false)])
+			continue
 		var t0 := Time.get_ticks_msec()
 		print("BRIDGE_NATIVE_START %s" % String(cand["id"]))
 		var res: Dictionary = solver.solve(_initial(level, eng), cfg)

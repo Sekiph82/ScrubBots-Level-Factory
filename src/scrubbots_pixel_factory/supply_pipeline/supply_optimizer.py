@@ -3,6 +3,7 @@
 import hashlib
 import json
 import random
+import time
 
 import numpy as np
 
@@ -12,10 +13,24 @@ from .contracts import DEFAULT_COLUMN_COUNT, validate_column_count
 from .difficulty_model import DifficultyModel
 from .pixel_analyzer import PixelAnalyzer
 from .screening import ScreeningSimulator
-from .scrubbots_solver import ScrubBotsSolver
+from .scrubbots_solver import ScrubBotsSolver, SolverBridgeError
 from .solver_budget import normalize_solver_budget
 from .solution_verifier import SolutionVerifier
 from .supply_scorer import SupplyScorer
+
+
+# Owner decision 2026-11-12: quality-ranked plans tried per PNG before it is
+# discarded because the game cannot win any of them with slots refilled at once.
+MAX_REAL_PLAY_ALTERNATIVES = 12
+
+
+def _export_shape(candidate, record, color_id):
+    """Exporter fields for one proven plan (also used by the real-play pre-check)."""
+    return {
+        "supply_columns": [[{"color": color_id(c), "amount": n} for c, n in column] for column in candidate["columns"]],
+        "solution_trace": [{"step": i + 1, "column": a["column"] + 1, "batch": {"color": color_id(a["color"]), "amount": a["count"]},
+                            "clears": a["clears"], "pixels_left": a["active_after"]} for i, a in enumerate(record["trace"])],
+    }
 
 
 class NoValidSupply(RuntimeError):
@@ -77,7 +92,8 @@ class SupplyOptimizer:
                  verify_top=1, screen_budget=3000, metric_top=12, viability_budget=3000,
                  real_max_visited=None, level_number=1, progress=print,
                  real_timeout_seconds=900, max_native_solver_invocations=None,
-                 auto_extend_solver_timeout=False, source_sha256=None):
+                 auto_extend_solver_timeout=False, source_sha256=None,
+                 real_play_precheck=None, alternative_budget_seconds=None):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,
@@ -88,13 +104,16 @@ class SupplyOptimizer:
             max_native_solver_invocations=max_native_solver_invocations,
             auto_extend_solver_timeout=auto_extend_solver_timeout,
             source_sha256=source_sha256,
+            real_play_precheck=real_play_precheck,
+            alternative_budget_seconds=alternative_budget_seconds,
         )
 
     def _run_prepared(self, grid, used, m, band, mean, total, rows, *, seed,
                       candidates, level_id, verify_top, screen_budget, metric_top,
                       viability_budget, real_max_visited, level_number, progress,
                       real_timeout_seconds, max_native_solver_invocations,
-                      auto_extend_solver_timeout, source_sha256):
+                      auto_extend_solver_timeout, source_sha256,
+                      real_play_precheck=None, alternative_budget_seconds=None):
         log = progress or (lambda *_: None)
         pinned_runtime = getattr(self.rules, "attestation", None) is not None
         if pinned_runtime:
@@ -107,6 +126,11 @@ class SupplyOptimizer:
             max_native_solver_invocations = min(
                 6, 6 if max_native_solver_invocations is None else max(0, int(max_native_solver_invocations))
             )
+        if real_play_precheck is not None:
+            # Owner decision 2026-11-12: a level ships only if the game wins it with
+            # slots refilled at once. Each extra quality-ranked plan costs one
+            # analysis-free native solve plus an ~11 s real-play pre-check.
+            max_native_solver_invocations = MAX_REAL_PLAY_ALTERNATIVES
         void_count = int(np.count_nonzero(np.asarray(grid) < 0))
         if void_count:
             gate_reader = getattr(self.rules, "void_capability", None)
@@ -177,28 +201,46 @@ class SupplyOptimizer:
         if isinstance(source_sha256, str) and len(source_sha256) == 64:
             level["source_sha256"] = source_sha256
         solver = self.solver or ScrubBotsSolver(self.rules)
-        accepted, real_runs = [], []
+        accepted, real_runs, real_play_prechecks = [], [], []
         native_solver_invocations = 0
-        batch_size = 1 if pinned_runtime else 4
+        batch_size = 1 if pinned_runtime or real_play_precheck is not None else 4
+        color_id = lambda local: self.rules.palette[used[local]][0]
+        deadline = (time.monotonic() + float(alternative_budget_seconds)
+                    if real_play_precheck is not None and alternative_budget_seconds else None)
         for start in range(0, len(scored), batch_size):
             if max_native_solver_invocations is not None and native_solver_invocations >= max_native_solver_invocations:
+                break
+            if deadline is not None and start > 0 and time.monotonic() >= deadline:
+                log(f"real-play alternatives stopped: {float(alternative_budget_seconds):g}s budget used after {start} plans")
                 break
             chunk = scored[start:start + batch_size]
             call_options = {
                 "stop_after": verify_top - len(accepted),
                 "max_visited": real_max_visited,
-                "analyze": True,
+                # With a real-play pre-check the expensive official analysis runs
+                # only for the plan the game actually wins.
+                "analyze": real_play_precheck is None,
                 "level_number": level_number,
                 "progress": lambda line: log("  game solver: " + line),
             }
             if isinstance(solver, ScrubBotsSolver):
                 call_options["timeout"] = real_timeout_seconds
                 call_options["auto_extend_timeout"] = auto_extend_solver_timeout
-            response = solver.run(
-                level,
-                [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
-                **call_options,
-            )
+            try:
+                response = solver.run(
+                    level,
+                    [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
+                    **call_options,
+                )
+            except SolverBridgeError as exc:
+                telemetry = getattr(exc, "telemetry", {}) or {}
+                if real_play_precheck is None or telemetry.get("cancelled"):
+                    raise
+                # One hard plan must not end the search over the alternatives.
+                native_solver_invocations += 1
+                real_runs.append({"id": chunk[0]["id"], "status": "SOLVER_ERROR", "reason": str(exc)[:240]})
+                log(f"alternative {chunk[0]['id']} solver error: {str(exc).splitlines()[0][:160]}")
+                continue
             native_solver_invocations += int(response.get("_runner", {}).get("invocation_count", 1))
             by_id = {p["id"]: p for p in chunk}
             for record in response["results"]:
@@ -209,11 +251,35 @@ class SupplyOptimizer:
                 verification = self.verifier.verify(
                     counts, m["playable_pixels"], candidate["columns"], record, self.column_count
                 )
+                if real_play_precheck is not None:
+                    if not verification["all_ok"]:
+                        continue
+                    shape = _export_shape(candidate, record, color_id)
+                    verdict = real_play_precheck(level, shape["supply_columns"], shape["solution_trace"])
+                    real_play_prechecks.append({"id": candidate["id"], **verdict})
+                    if not verdict.get("won"):
+                        log(f"real-play pre-check {candidate['id']}: {verdict.get('verdict')} at click {verdict.get('stuck_click')}")
+                        continue
+                    log(f"real-play pre-check {candidate['id']}: WON_CANONICAL; running official Difficulty V1")
+                    analysis = solver.run(
+                        level,
+                        [{"id": candidate["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in candidate["columns"]],
+                          "analyze_trace": record["trace"]}],
+                        **{**call_options, "analyze": True},
+                    )
+                    analyzed = analysis["results"][0] if analysis.get("results") else {}
+                    record = {**record, "difficultyV1": analyzed.get("difficultyV1")}
                 official = record.get("difficultyV1")
                 if verification["all_ok"] and isinstance(official, dict) and official.get("ok"):
                     accepted.append((candidate, record, verification, response))
             if len(accepted) >= verify_top:
                 break
+        if not accepted and real_play_precheck is not None and real_play_prechecks:
+            raise NoValidSupply(
+                "REAL_PLAY_NO_WINNING_PLAN: none of the "
+                f"{len(real_play_prechecks)} solver-proven plans is won by the game with slots refilled at once "
+                f"({len(real_runs)} plans tried)"
+            )
         if not accepted:
             raise NoValidSupply(
                 "no candidate was proven SOLVED by the game's solver with official Difficulty V1 "
@@ -224,8 +290,8 @@ class SupplyOptimizer:
         difficulty_class, difficulty_score, difficulty_basis = self.model.final(
             record.get("difficultyV1"), m["image_complexity_score"], gameplay_metrics
         )
-        color_id = lambda local: self.rules.palette[used[local]][0]
-        output_columns = [[{"color": color_id(c), "amount": n} for c, n in column] for column in candidate["columns"]]
+        shape = _export_shape(candidate, record, color_id)
+        output_columns = shape["supply_columns"]
         return {
             "image_width": m["width"], "image_height": m["height"], "playable_pixels": m["playable_pixels"],
             "color_count": m["color_count"], "exact_color_histogram": m["histogram"],
@@ -253,12 +319,13 @@ class SupplyOptimizer:
                 "supplyPlanLoaderPass": record.get("supplyPlanLoaderPass") is True,
                 "runner": solver_response.get("_runner"),
             },
-            "solution_trace": [{"step": i + 1, "column": a["column"] + 1, "batch": {"color": color_id(a["color"]), "amount": a["count"]}, "clears": a["clears"], "pixels_left": a["active_after"]} for i, a in enumerate(record["trace"])],
+            "solution_trace": shape["solution_trace"],
             "solution_final": "WIN" if record["replay"]["solved"] and record["replay"]["finalActive"] == 0 else "FAIL",
             "solution_length": len(record["trace"]), "solution_replay": record["replay"],
             "solver_metrics": {"game_solver": record["solver"], "trace_hash": record.get("traceHash"), "gameplay": gameplay_metrics, "gameplay_quality_score": candidate["score"], "gameplay_quality_parts": candidate["score_parts"], "official_difficulty_v1": record.get("difficultyV1")},
             "image": {key: value for key, value in m.items() if not key.startswith("_")},
             "generation_attempts": attempts, "screening_solvable_candidates": len(pool), "real_solver_runs": real_runs, "random_seed": seed,
+            "real_play_prechecks": real_play_prechecks,
             "real_solver_invocations": native_solver_invocations,
             "settings": {"candidates": candidates, "column_count": self.column_count, "visible_preview_depth": 3, "verify_top": verify_top, "screen_budget": screen_budget, "metric_top": metric_top, "viability_budget": viability_budget, "solver_timeout_policy": {"initial_budget_s": real_timeout_seconds, "hard_budget_s": 480 if pinned_runtime and auto_extend_solver_timeout else real_timeout_seconds, "auto_extend_if_running": bool(pinned_runtime and auto_extend_solver_timeout)}, "batch_cap": None, "slot_count": getattr(self.rules, "baseline_slot_count", 5), "batch_count_policy": "positive per-plan metadata bound; no global cap"},
             "export_notes": [], "_level": level,

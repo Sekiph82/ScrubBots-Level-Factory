@@ -1363,6 +1363,13 @@ def _primary_work_output_dir(requested: object, *, identity: str, activity_run_i
     return candidate
 
 
+# Wall-clock budget for trying further quality-ranked plans after the first one
+# (owner decision 2026-11-12). A typical analysis-free solve takes 1-3 min, so
+# 30 min covers the 12 plans in the common case while one PNG cannot hold a
+# batch worker for hours on hard plans.
+REAL_PLAY_ALTERNATIVE_BUDGET_SECONDS = 1800
+
+
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
                                  evidence: str, request: Mapping[str, Any], source_kind: str,
                                  activity_writer: Any = None,
@@ -1428,6 +1435,31 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             else:
                 emit("ANALYZE/PLAN", "RUNNING", line)
 
+        precheck_index = [0]
+
+        def real_play_precheck(level: Mapping[str, Any], supply_columns: list, solution_trace: list) -> dict[str, Any]:
+            # Owner decision 2026-11-12: a level ships only if the game wins it with
+            # slots refilled at once. One canonical real-play run (about 11 s, no
+            # order search) per solver-proven plan; the winning plan is exported again
+            # below and the authoritative real-play gate runs on that final export.
+            from .supply_pipeline.real_play_gate import RealPlayGateError, ensure_real_play_gate
+            precheck_index[0] += 1
+            scratch = output_dir / "real-play-precheck" / f"{precheck_index[0]:02d}"
+            shaped = {"_level": dict(level), "difficulty": "MEDIUM", "supply_columns": supply_columns,
+                      "solution_trace": solution_trace, "export_notes": []}
+            exported = SupplyExporter(rules).export(shaped, scratch, level_id)
+            try:
+                gate = ensure_real_play_gate(exported["level"], exported["supply_plan"], scratch / "real_play_result_v2.json",
+                                             source_sha256=source_sha256, search_on_loss=False)
+            except RealPlayGateError as exc:
+                return {"won": False, "verdict": "REJECTED", "reason": str(exc)[:240]}
+            played = gate["result"]
+            per_dt = played.get("perDt", {}).get("1/60", {}) if isinstance(played.get("perDt"), Mapping) else {}
+            emit("SOLVE", "RUNNING", f"Real-play pre-check {precheck_index[0]}: {played.get('verdict')}")
+            return {"won": played.get("verdict") == "WON_CANONICAL" and played.get("searched") is False,
+                    "verdict": played.get("verdict"), "stuck_click": per_dt.get("stuckClickIndex"),
+                    "clicks": per_dt.get("clicksPlaced"), "result_path": _relative(Path(gate["result_path"]))}
+
         emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
@@ -1440,6 +1472,8 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             max_native_solver_invocations=1,
             auto_extend_solver_timeout=auto_extend_solver_timeout,
             source_sha256=source_sha256,
+            real_play_precheck=real_play_precheck if isinstance(source_sha256, str) and re.fullmatch(r"[0-9a-f]{64}", source_sha256) else None,
+            alternative_budget_seconds=REAL_PLAY_ALTERNATIVE_BUDGET_SECONDS,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply

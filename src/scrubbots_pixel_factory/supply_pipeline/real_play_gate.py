@@ -425,8 +425,14 @@ def ensure_real_play_gate(
     studio_root: str | Path | None = None,
     environ: dict[str, str] | None = None,
     source_sha256: str | None = None,
+    search_on_loss: bool = True,
 ) -> dict[str, Any]:
-    """Run real_play_v1 in canonical-only mode and require a hash-bound game-host win."""
+    """Run real_play_v1 in canonical-only mode and require a hash-bound game-host win.
+
+    ``search_on_loss=False`` is the cheap pre-check (one canonical run, about 11 s):
+    a LOST verdict is returned with ``lost=True`` instead of starting the slow
+    real-play order search.
+    """
 
     from .. import studio_extensions as studio
 
@@ -485,6 +491,9 @@ def ensure_real_play_gate(
     )
     if initial.get("verdict") == "WON_CANONICAL" and initial.get("searched") is False:
         result = initial
+    elif initial.get("verdict") == "LOST" and not search_on_loss:
+        return {"result": initial, "result_path": str(result_path), "lost": True,
+                "level_sha256": level_sha, "plan_sha256": plan_sha, "settings": resolved}
     elif initial.get("verdict") == "LOST":
         searched = _invoke(
             executable,
