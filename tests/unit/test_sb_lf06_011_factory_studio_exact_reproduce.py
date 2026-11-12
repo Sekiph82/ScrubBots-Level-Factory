@@ -55,7 +55,7 @@ def test_studio_draft_and_manual_editor_values_do_not_cross_reproduce_boundary()
     assert "manual" not in gateway.split("func _reproduce_arguments", 1)[1].split("func _execute_core", 1)[0]
 
 
-def test_committed_real_exact_reproduce_integration_passes() -> None:
+def test_committed_real_exact_reproduce_integration_passes(run_isolated_godot_suite) -> None:
     source = INTEGRATION.read_text(encoding="utf-8")
     for marker in (
         "Reproduce unavailable before a successful canonical source exists",
@@ -69,20 +69,7 @@ def test_committed_real_exact_reproduce_integration_passes() -> None:
         "pre_source_reproduce.get(\"state\") == \"UNAVAILABLE\"",
     ):
         assert marker in source
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_exact_reproduce_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_isolated_godot_suite("factory_studio_exact_reproduce_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-011-C001 exact recorded seed/config reproduction integration PASS" in output

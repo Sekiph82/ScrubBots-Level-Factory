@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-014-C001 BATCH import integration PASS"
 var _errors: Array[String] = []
 var _fixture_root := ""
@@ -18,9 +20,9 @@ func _run_suite() -> void:
 	var first := _fixture_root.path_join("same.png"); var second := _fixture_root.path_join("second-dir").path_join("same.png"); var corrupt := _fixture_root.path_join("bad.png")
 	var image := Image.create(20, 20, false, Image.FORMAT_RGB8); image.fill(Color8(20, 120, 220)); image.save_png(first); image.fill(Color8(220, 120, 20)); image.save_png(second); FileAccess.open(corrupt, FileAccess.WRITE).store_string("not png")
 	var first_bytes := FileAccess.get_file_as_bytes(first); var second_bytes := FileAccess.get_file_as_bytes(second); var corrupt_bytes := FileAccess.get_file_as_bytes(corrupt)
-	_remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.imported(""))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
 	var result: Dictionary = gateway.call("run_studio_extension", "batch-import", {"paths": [first, second, first, corrupt]})
-	_require(result.get("batch_id", "") != "" and result.get("counts", {}).get("success") == 3 and result.get("counts", {}).get("failed") == 1, "batch did not preserve truthful partial outcomes: %s" % result)
+	_require(result.get("batch_id", "") != "" and result.get("counts", {}).get("success") == 3 and result.get("counts", {}).get("rejected") == 1 and result.get("counts", {}).get("failed") == 0, "batch did not preserve truthful partial outcomes (an undecodable PNG is REJECTED, not FAILED, since 2483a3a0): %s" % result)
 	var items: Array = result.get("items", []); _require(items.size() == 4 and items[0].get("source_id") != items[1].get("source_id") and items[0].get("source_id") == items[2].get("source_id") and items[3].get("source_id") == null, "batch per-item identities are not independent/truthful: %s" % [items])
 	var repeated: Dictionary = gateway.call("run_studio_extension", "batch-import", {"paths": [first, second, first, corrupt]}); _require(repeated.get("batch_id", "") != result.get("batch_id", ""), "identical batch execution reused a stable immutable run ID")
 	var reloaded: Dictionary = gateway.call("run_studio_extension", "batch-load", {"batch_id": result.get("batch_id", "")}); _require(reloaded.get("state") == "SUCCESS" and reloaded.get("batch", {}).get("items", []).size() == 4 and reloaded.get("batch", {}).get("counts", {}) == result.get("counts", {}), "persisted batch record did not reload with per-item identity/count/provenance")
@@ -30,7 +32,7 @@ func _run_suite() -> void:
 	_cleanup(instance)
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(_fixture_root); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.imported(""))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); _remove_tree(_fixture_root); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

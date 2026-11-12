@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE := "res://scenes/factory_studio.tscn"
 const PINNED_SOURCE_ID := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
 const PINNED_SOURCE_SHA := "49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
@@ -18,6 +20,7 @@ class FakeGateway extends RefCounted:
 		if operation == "validate-source-readonly" and str(request.get("source_id", "")) == FAKE_PINNED_SOURCE_ID:
 			return {
 				"source_sha256": FAKE_PINNED_SOURCE_SHA,
+				"source_authority": {"source_id": FAKE_PINNED_SOURCE_ID, "source_sha256": FAKE_PINNED_SOURCE_SHA},
 				"exact_logical_source": true,
 				"void_capability": {"state": "OPEN", "runtime_kind": "LF_PINNED_SOURCE_MINIMAL_RUNTIME"},
 				"structural": {"disposition": "PASS"},
@@ -27,12 +30,17 @@ class FakeGateway extends RefCounted:
 		return {}
 
 	func prepare_studio_extension_call(operation: String, request: Dictionary) -> Dictionary:
+		# Startup reads (restores, Release Pool/library loads) are not pipeline/solver workers.
+		if not (operation.contains("pipeline") or operation.contains("batch-run") or operation.contains("batch-create")):
+			return {"fake": true, "readonly": true}
 		prepare_count += 1
 		prepared_operation = operation
 		prepared_payload = request.duplicate(true)
-		return {"fake": true}
+		return {"fake": true, "worker": true}
 
-	func execute_prepared_studio_extension_call(_prepared: Dictionary) -> Dictionary:
+	func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
+		if not prepared.get("worker", false):
+			return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE"}
 		execute_count += 1
 		return {"disposition": "UNAVAILABLE", "state": "UNAVAILABLE", "stages": []}
 
@@ -115,7 +123,7 @@ func _run() -> void:
 	studio.call("_show_screen", "LEVEL FACTORY")
 	await process_frame
 	if int(gateway.prepare_count) != 0 or int(gateway.execute_count) != 0:
-		_fail("PNG restore or pin preflight invoked a pipeline worker")
+		_fail("PNG restore or pin preflight invoked a pipeline worker: %s prepare=%d execute=%d" % [gateway.prepared_operation, gateway.prepare_count, gateway.execute_count])
 		return
 	if not bool(studio.get("_pinned_source_preflight_ok")):
 		_fail("fake no-solver source/VOID preflight did not pass")
@@ -143,7 +151,7 @@ func _run() -> void:
 		return
 
 	var route: Dictionary = studio.call("_build_selected_source_pipeline_request")
-	var expected_root := ProjectSettings.globalize_path("res://output/current-game-runtime/%s" % PINNED_GAME_COMMIT).simplify_path()
+	var expected_root := TEST_PATHS.data("Level Factory/Runtime/%s" % PINNED_GAME_COMMIT).simplify_path()
 	var request: Dictionary = route.get("request", {})
 	if str(route.get("state", "")) != "AUTHORIZED_SOURCE_SCOPE" or str(route.get("source_id", "")) != PINNED_SOURCE_ID or str(route.get("source_sha256", "")) != PINNED_SOURCE_SHA or str(request.get("game_project", "")) != expected_root:
 		_fail("Run request builder did not bind selected source and task-owned pinned game root")
@@ -152,8 +160,10 @@ func _run() -> void:
 		_fail("source selection or request preparation invoked a solver/pipeline worker")
 		return
 	studio.set("_selected_import_source_id", "owner-upload-%064x" % 99)
+	# Selecting a source always re-runs the source preflight in the real UI.
+	studio.call("_refresh_pinned_source_preflight")
 	studio.call("_run_level_pipeline")
-	if gateway.prepare_count != 0 or str(studio.get("_pinned_source_preflight_message")) != "PINNED_SOURCE_SCOPE_NOT_VERIFIED":
+	if gateway.prepare_count != 0 or bool(studio.get("_pinned_source_preflight_ok")):
 		_fail("an unapproved upload was not blocked before the fake worker")
 		return
 

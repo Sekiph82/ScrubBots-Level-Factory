@@ -109,21 +109,8 @@ def test_owner_upload_operation_and_import_surface_are_bounded() -> None:
     assert INTEGRATION.is_file()
 
 
-def test_real_import_surface_integration_passes_headlessly() -> None:
-    result = subprocess.run(
-        [
-            "godot_console.exe",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_import_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_real_import_surface_integration_passes_headlessly(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_import_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LFX-002-C001 OWNER_UPLOAD import integration PASS" in output

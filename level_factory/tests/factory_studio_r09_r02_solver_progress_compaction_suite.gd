@@ -68,7 +68,8 @@ func _run() -> void:
 		return
 	studio.call("_append_activity_row", _event(5, 17500, "REPLAY", "PASS",
 		"Canonical replay result: WIN."))
-	if rows.get_child_count() != 2 or not str(rows.get_child(1).text).contains("REPLAY"):
+	# Activity rows list the newest event first since f3003d98 (2026-11-08).
+	if rows.get_child_count() != 2 or not str(rows.get_child(0).text).contains("REPLAY"):
 		_fail("Pipeline must continue appending other distinct phase events")
 		return
 	studio.call("_clear_activity_rows")

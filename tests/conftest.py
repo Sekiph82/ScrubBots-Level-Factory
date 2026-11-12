@@ -194,6 +194,68 @@ def forbid_real_pixellab_network(monkeypatch):
     yield
 
 
+_ISOLATED_FACTORY_ITEMS = ("level_factory", "src", "scripts", "content_pipeline", "TASKS.md")
+
+
+def build_isolated_factory_copy(destination):
+    """Copy the code needed by a headless Studio suite into a throw-away checkout.
+
+    The copy has its own TASKS.md and a .git marker, so FactoryDataPaths and
+    owner_art_storage resolve every mutable path to <copy>/data, never to the
+    owner's real data/. level_factory/output (legacy generated files) is left out.
+    """
+    import shutil
+    from pathlib import Path
+
+    destination = Path(destination)
+    destination.mkdir(parents=True, exist_ok=True)
+    legacy_output = _REAL_CHECKOUT / "level_factory"
+    caches = shutil.ignore_patterns("__pycache__", ".pytest_cache", "*.pyc")
+
+    def ignore(directory, names):
+        skipped = set(caches(directory, names))
+        if Path(directory) == legacy_output:
+            skipped.add("output")  # legacy generated files only, not the src/.../output package
+        return skipped
+
+    for name in _ISOLATED_FACTORY_ITEMS:
+        source = _REAL_CHECKOUT / name
+        if source.is_dir():
+            shutil.copytree(source, destination / name, ignore=ignore)
+        else:
+            shutil.copy2(source, destination / name)
+    (destination / ".git").write_text("gitdir: isolated-test-copy\n", encoding="utf-8")
+    (destination / "data" / "output").mkdir(parents=True)
+    # Tracked read-only reference data only (the canonical Palette V2/V3).
+    shutil.copytree(_REAL_CHECKOUT / "data" / "palette", destination / "data" / "palette",
+                    ignore=shutil.ignore_patterns("*.png"))
+    return destination
+
+
+@pytest.fixture
+def run_isolated_godot_suite(tmp_path):
+    """Run res://tests/<suite> headlessly inside an isolated Factory copy."""
+    import os
+    import subprocess
+
+    state = {}
+
+    def run(suite: str, *extra: str, timeout: int = _GODOT_SUBPROCESS_TIMEOUT_SECONDS):
+        if "root" not in state:
+            state["root"] = build_isolated_factory_copy(tmp_path / "isolated-factory")
+        root = state["root"]
+        environment = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+        result = subprocess.run(
+            ["godot_console.exe", "--headless", "--path", str(root / "level_factory"),
+             "--script", f"res://tests/{suite}", *extra],
+            cwd=root, check=False, capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=timeout, env=environment)
+        result.isolated_root = root
+        return result
+
+    return run
+
+
 @pytest.fixture
 def isolated_studio_repository(tmp_path, monkeypatch):
     """A throw-away repository in the canonical data layout for Studio tests.

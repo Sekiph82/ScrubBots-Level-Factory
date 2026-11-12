@@ -1,10 +1,12 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Navigation")
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
-const TEST_OUTPUT_PATH := "res://output/.lf06-008-revalidation-test"
+var TEST_OUTPUT_PATH: String = TEST_PATHS.output(".lf06-008-revalidation-test")
 const SCENE_LOADER_METHOD := "load"
 
 var failures: Array[String] = []
@@ -116,7 +118,7 @@ func _run_suite() -> void:
 	revalidate_button.pressed.emit()
 	await process_frame
 	var first_result: Dictionary = revalidation.call("snapshot")
-	_check(first_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"], "Real canonical revalidation did not return a structural result")
+	_check(first_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"], "Real canonical revalidation did not return a structural result: %s" % [first_result])
 	_check(first_result.get("scope") == "STRUCTURAL ART QA ONLY — NOT FULL GAMEPLAY VALIDATION", "Revalidation scope was not explicitly limited")
 	_check(first_result.get("source_candidate_id") == source_snapshot.get("source_candidate_id"), "Revalidation source candidate identity drifted")
 	_check(str(first_result.get("source_grid_hash", "")).length() == 64 and str(first_result.get("working_grid_hash", "")).length() == 64, "Revalidation did not return canonical source/working hashes")
@@ -128,7 +130,7 @@ func _run_suite() -> void:
 	_check(_source_files(source_bundle_path) == source_files_before, "Revalidation changed canonical source bundle bytes")
 	_check(preview.call("snapshot").get("artwork_path") == preview_before.get("artwork_path"), "Revalidation changed canonical preview identity")
 	_check(evidence.call("snapshot").get("metadata_path") == evidence_before.get("metadata_path"), "Revalidation changed canonical evidence identity")
-	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")), "Transient revalidation request directory was not removed")
+	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(TEST_PATHS.output(".lf06-008-revalidation"))), "Transient revalidation request directory was not removed")
 	_check(str(first_result.get("disposition", "")) == "ACCEPT" or not first_result.get("rejection_codes", []).is_empty(), "Structural REJECT did not carry canonical rejection codes")
 	var first_working_hash := str(first_result.get("working_grid_hash", ""))
 
@@ -148,7 +150,7 @@ func _run_suite() -> void:
 	_check(str(second_result.get("working_grid_hash", "")) != first_working_hash, "Second revalidation did not bind a different working-grid hash")
 	_check(editor.call("snapshot").get("state") == "DIRTY", "Second revalidation cleared the editor DIRTY state")
 	_check(second_result.get("source_bytes_unchanged") == true and _source_files(source_bundle_path) == source_files_before, "Second revalidation changed canonical source bytes")
-	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")), "Transient second revalidation request directory was not removed")
+	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(TEST_PATHS.output(".lf06-008-revalidation"))), "Transient second revalidation request directory was not removed")
 
 	var third_original := str(editor.call("canonical_color_id_for_pixel", source_image.get_pixel(2, 0))) if source_image != null else ""
 	editor.call("paint_cell", 2, 0, _different_color(third_original))
@@ -185,7 +187,7 @@ func _run_suite() -> void:
 	_check(rejected.get("state") == "STRUCTURAL REJECT", "Bad manual grid did not receive a real structural REJECT")
 	_check(not rejected.get("rejection_codes", []).is_empty(), "Bad manual grid did not expose canonical rejection codes")
 	_check(rejected.get("source_bytes_unchanged") == true and _source_files(source_bundle_path) == source_files_before, "Bad-grid revalidation changed canonical source bytes")
-	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path("res://output/.lf06-008-revalidation")), "Transient bad-grid request directory was not removed")
+	_check(not DirAccess.dir_exists_absolute(ProjectSettings.globalize_path(TEST_PATHS.output(".lf06-008-revalidation"))), "Transient bad-grid request directory was not removed")
 	_check(editor.call("snapshot").get("state") == "DIRTY", "Bad-grid revalidation cleared DIRTY state")
 	_check(str(rejected.get("scope", "")).contains("STRUCTURAL ART QA ONLY"), "Bad-grid result was not scope-qualified")
 	editor.call("reset_to_source")

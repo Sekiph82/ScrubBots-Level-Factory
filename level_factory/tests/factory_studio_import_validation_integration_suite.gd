@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const IMPORT_PATH := NodePath("Frame/Layout/Body/Workspace/Padding/Content/OperationsImport")
 const VALIDATION_PATH := NodePath("Frame/Layout/Body/Workspace/Padding/Content/ImportValidationWizard")
@@ -63,8 +65,10 @@ func _run_suite() -> void:
 	_require(alpha_report.get("logical_dimension_status") == "DERIVED_ARTIFACT_REQUIRED", "semi-alpha source did not require a derived artifact: %s" % alpha_report)
 	_require(alpha_report.get("alpha", {}).get("semi_alpha_count", 0) > 0, "semi-alpha fact was not reported: %s" % alpha_report)
 	_require("ALPHA_CONTRACT" in alpha_report.get("structural", {}).get("rejection_codes", []), "alpha contract rejection was not reported: %s" % alpha_report)
-	var alpha_root := ProjectSettings.globalize_path("res://output/owner-uploads").path_join(_source_ids[2])
-	var source_path := alpha_root.path_join("source.png")
+	var alpha_root := ProjectSettings.globalize_path(TEST_PATHS.imported("")).path_join(_source_ids[2])
+	# Imported sources keep their original filename (canonical layout since 2026-11-08).
+	var alpha_record: Variant = JSON.parse_string(FileAccess.get_file_as_string(alpha_root.path_join("source.json")))
+	var source_path := alpha_root.path_join(str(alpha_record.get("original_filename", "")) if alpha_record is Dictionary else "")
 	var record_path := alpha_root.path_join("source.json")
 	var source_before := FileAccess.get_file_as_bytes(source_path)
 	var record_before := FileAccess.get_file_as_bytes(record_path)
@@ -81,7 +85,7 @@ func _run_suite() -> void:
 	wizard.call("run_validation")
 	await process_frame
 	var evidence_report: Dictionary = wizard.call("snapshot")
-	_evidence_path = ProjectSettings.globalize_path("res://output/studio-extensions/validation").path_join("%s-%s.json" % [_source_ids[2], evidence_report.get("source_sha256", "")])
+	_evidence_path = ProjectSettings.globalize_path(TEST_PATHS.extensions("validation")).path_join("%s-%s.json" % [_source_ids[2], evidence_report.get("source_sha256", "")])
 	if FileAccess.file_exists(_evidence_path):
 		var evidence_before := FileAccess.get_file_as_bytes(_evidence_path)
 		var evidence_file := FileAccess.open(_evidence_path, FileAccess.WRITE)
@@ -120,8 +124,8 @@ func _write_alpha(path: String) -> void:
 
 
 func _cleanup(instance: Node) -> void:
-	for source_id in _source_ids: _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads").path_join(source_id))
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions/validation"))
+	for source_id in _source_ids: _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.imported("")).path_join(source_id))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("validation")))
 	_remove_tree(_fixture_root)
 	instance.queue_free()
 	_finish()

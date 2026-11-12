@@ -185,7 +185,7 @@ def _ensure_status_artwork(root: Path, status: str, source_id: str, artifact: Ma
     digest = str(artifact.get("sha256", ""))
     if _hash(source.read_bytes()) != digest: raise OwnerReleaseLibraryError("status artwork object SHA mismatch")
     folder = root / status.title(); _safe_directory(root, folder)
-    target = folder / _status_artwork_name(source_id, original_source_path)
+    target = _status_artwork_target(folder, source_id, original_source_path, digest)
     if _reparse(target): raise OwnerReleaseLibraryError("status artwork link is a reparse point")
     try: os.link(source, target)
     except FileExistsError:
@@ -222,7 +222,37 @@ def _status_artwork_candidates(root: Path, status: str, source_id: str,
         # still be recovered by their source-ID projection, but new verified
         # artwork writes remain strict in _ensure_status_artwork().
         return (legacy,)
-    return (readable,) if readable == legacy else (readable, legacy)
+    distinct = folder / _distinct_artwork_name(source_id, readable.name)
+    return (readable,) if readable == legacy else (readable, distinct, legacy)
+
+
+def _distinct_artwork_name(source_id: str, readable_name: str) -> str:
+    """Readable name for a source whose basename another source already holds."""
+    stem = Path(readable_name).stem
+    return f"{stem}--{source_id[-12:]}.png"
+
+
+def _status_artwork_target(folder: Path, source_id: str, original_source_path: str, digest: str) -> Path:
+    readable = folder / _status_artwork_name(source_id, original_source_path)
+    if _belongs_to_other_source(readable, source_id, original_source_path, {digest}):
+        return folder / _distinct_artwork_name(source_id, readable.name)
+    return readable
+
+
+def _belongs_to_other_source(path: Path, source_id: str, original_source_path: str, digests: set[str]) -> bool:
+    """True for an existing shared basename file holding another source's bytes.
+
+    Source identities are content hashes, so different bytes under the shared
+    readable basename belong to a different source: never claim, verify or
+    unlink them as this source's artwork. Source-ID-bound names are never shared.
+    """
+    try:
+        shared = path.name == _status_artwork_name(source_id, original_source_path)
+    except OwnerReleaseLibraryError:
+        return False
+    if not shared or path.name == f"{source_id}.png" or not path.is_file() or _reparse(path):
+        return False
+    return _hash(path.read_bytes()) not in digests
 
 
 def _recover_latest_status_projection(root: Path, source_id: str, events: list[dict[str, Any]]) -> bool:
@@ -236,6 +266,8 @@ def _recover_latest_status_projection(root: Path, source_id: str, events: list[d
     latest = events[-1]
     latest_digest = _hash(_json_bytes(latest))
     known_events = {_hash(_json_bytes(event)): event for event in events}
+    own_digests = {str(event["artifact"].get("sha256", "")) for event in events
+                   if isinstance(event.get("artifact"), Mapping) and event["artifact"].get("state") == "VERIFIED"}
     projection_digests: dict[str, str] = {}
     artwork_digests: dict[str, str] = {}
     changed = False
@@ -262,7 +294,8 @@ def _recover_latest_status_projection(root: Path, source_id: str, events: list[d
         if event_for_state is not None:
             for artwork_path in _status_artwork_candidates(
                     root, state, source_id, str(event_for_state.get("original_source_path", ""))):
-                if not artwork_path.exists():
+                if not artwork_path.exists() or _belongs_to_other_source(
+                        artwork_path, source_id, str(event_for_state.get("original_source_path", "")), own_digests):
                     continue
                 if _reparse(artwork_path) or not artwork_path.is_file():
                     raise OwnerReleaseLibraryError("owner release artwork projection is unsafe during recovery")
@@ -283,8 +316,9 @@ def _recover_latest_status_projection(root: Path, source_id: str, events: list[d
         raise OwnerReleaseLibraryError("latest owner release history status is unsupported")
     artifact = latest.get("artifact", {})
     if isinstance(artifact, Mapping) and artifact.get("state") == "VERIFIED":
-        expected_artwork_path = root / desired_state.title() / _status_artwork_name(
-            source_id, str(latest.get("original_source_path", "")))
+        expected_artwork_path = _status_artwork_target(
+            root / desired_state.title(), source_id, str(latest.get("original_source_path", "")),
+            str(artifact.get("sha256", "")))
         legacy_artwork_path = root / desired_state.title() / f"{source_id}.png"
         changed = changed or not expected_artwork_path.exists() or legacy_artwork_path.exists()
         _ensure_status_artwork(root, desired_state, source_id, artifact,
@@ -308,13 +342,14 @@ def _recover_latest_status_projection(root: Path, source_id: str, events: list[d
     for state in STATUSES - {desired_state}:
         for suffix in (".json", ".png"):
             stale_paths = [root / state.title() / f"{source_id}{suffix}"]
+            state_source_path = ""
             if suffix == ".png":
                 event_for_state = next((event for event in reversed(events) if event.get("status") == state), None)
                 if event_for_state is not None:
-                    stale_paths.extend(_status_artwork_candidates(
-                        root, state, source_id, str(event_for_state.get("original_source_path", ""))))
+                    state_source_path = str(event_for_state.get("original_source_path", ""))
+                    stale_paths.extend(_status_artwork_candidates(root, state, source_id, state_source_path))
             for stale in set(stale_paths):
-                if stale.exists():
+                if stale.exists() and not _belongs_to_other_source(stale, source_id, state_source_path, own_digests):
                     if _reparse(stale):
                         raise OwnerReleaseLibraryError("stale owner status projection is unsafe during recovery")
                     stale.unlink()
@@ -427,6 +462,7 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                 and previous["artifact"].get("state") == "VERIFIED"):
             artifact = dict(previous["artifact"])
         verified_sha = artifact.get("sha256", source_sha256)
+        own_digests = {str(value) for value in (verified_sha, artifact.get("sha256")) if value}
         if source_sha256 and verified_sha not in {None, source_sha256}: raise OwnerReleaseLibraryError("source object identity mismatch")
         prior_status = str(previous.get("status", "")) if previous else ""
         allowed = {"": {"PENDING", "FAILED", "REJECTED"}, "PENDING": STATUSES,
@@ -459,7 +495,7 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
         prior_path = str(previous.get("original_source_path", "")) if previous else original_source_path
         for prior_status_name in STATUSES:
             for prior_artwork in _status_artwork_candidates(root, prior_status_name, source_id, prior_path):
-                if not prior_artwork.exists():
+                if not prior_artwork.exists() or _belongs_to_other_source(prior_artwork, source_id, prior_path, own_digests):
                     continue
                 if prior_status_name != prior_status or _reparse(prior_artwork) or not prior_artwork.is_file():
                     raise OwnerReleaseLibraryError("owner release artwork projection collides with an unverified status record")
@@ -468,7 +504,8 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                 if not prior_digest or _hash(prior_artwork.read_bytes()) != prior_digest:
                     raise OwnerReleaseLibraryError("prior owner release artwork projection does not match immutable source bytes")
         if artifact.get("state") == "VERIFIED":
-            target = root / status.title() / _status_artwork_name(source_id, original_source_path)
+            target = _status_artwork_target(root / status.title(), source_id, original_source_path,
+                                            str(artifact.get("sha256", "")))
             if _reparse(target):
                 raise OwnerReleaseLibraryError("status artwork target is a reparse point")
             if target.exists() and (not target.is_file() or _hash(target.read_bytes()) != str(artifact.get("sha256", ""))):
@@ -484,11 +521,11 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                             expected_event_sha256=expected_previous_sha if status == prior_status else None)
         for old in STATUSES - {status}:
             stale_paths = [root / old.title() / f"{source_id}.json"]
+            previous_source_path = str(previous.get("original_source_path", original_source_path)) if previous else ""
             if previous is not None:
-                stale_paths.extend(_status_artwork_candidates(
-                    root, old, source_id, str(previous.get("original_source_path", original_source_path))))
+                stale_paths.extend(_status_artwork_candidates(root, old, source_id, previous_source_path))
             for stale in set(stale_paths):
-                if stale.exists():
+                if stale.exists() and not _belongs_to_other_source(stale, source_id, previous_source_path, own_digests):
                     if _reparse(stale): raise OwnerReleaseLibraryError("old status projection is unsafe; immutable history retained")
                     stale.unlink()
         if current_artwork is not None and previous is not None:
@@ -496,7 +533,8 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                 root, prior_status, source_id,
                 str(previous.get("original_source_path", original_source_path)))
             for stale in previous_paths:
-                if stale != current_artwork and stale.exists():
+                if stale != current_artwork and stale.exists() and not _belongs_to_other_source(
+                        stale, source_id, str(previous.get("original_source_path", original_source_path)), own_digests):
                     if _reparse(stale) or _hash(stale.read_bytes()) != str(artifact.get("sha256", "")):
                         raise OwnerReleaseLibraryError("legacy current-status artwork does not match immutable source bytes")
                     stale.unlink()

@@ -192,6 +192,17 @@ def enclosed_unsolvable():
 
 @unittest.skipUnless(HAVE_GAME, "Godot / ScrubBots project not available")
 class GameSolverTests(unittest.TestCase):
+    def setUp(self):
+        # The solver writes job plans under <repository>/data/Release Pool; keep
+        # them out of the owner's real checkout (blocked by tests/conftest.py).
+        from unittest import mock
+        from scrubbots_pixel_factory import owner_art_storage
+
+        repository = Path(tempfile.mkdtemp(prefix="sb_solver_repo_"))
+        patcher = mock.patch.object(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def level_of(self, idx, cids):
         hexes = dict(RULES.palette)
         return {"id": "t", "width": idx.shape[1], "height": idx.shape[0],

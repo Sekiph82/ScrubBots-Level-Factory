@@ -27,7 +27,7 @@ func _run() -> void:
 		if int(request.get("column_count", -1)) != columns:
 			_fail("selected supply columns changed while building the pipeline request")
 			return
-		if int(request.get("real_max_visited", -1)) != 25000 or int(request.get("solver_timeout_seconds", -1)) != 240:
+		if int(request.get("real_max_visited", -1)) != 25000 or int(request.get("solver_timeout_seconds", -1)) != 900:  # single 900 s solver budget (was 240/480)
 			_fail("the explicit pinned solver bounds are missing or changed")
 			return
 	studio.set("_column_count", 4)
@@ -36,9 +36,11 @@ func _run() -> void:
 		_fail("owner-selected 4-column request was not preserved")
 		return
 	studio.set("_selected_import_source_id", "owner-upload-" + "f".repeat(64))
-	if str(studio.call("_build_selected_source_pipeline_request").get("reason", "")) != "PINNED_SOURCE_SCOPE_NOT_VERIFIED":
+	# Selecting a source always re-runs the source preflight in the real UI.
+	studio.call("_refresh_pinned_source_preflight")
+	if str(studio.call("_build_selected_source_pipeline_request").get("state", "")) != "BLOCKED":
 		_fail("another owner PNG was not blocked by the exact source pin")
 		return
 	studio.free()
-	print("R09-R02-R03 budget request UI suite: PASS (3/4/5 columns, 25000 visits, 240 seconds, one pinned source; zero workers)")
+	print("R09-R02-R03 budget request UI suite: PASS (3/4/5 columns, 25000 visits, 900 seconds, one pinned source; zero workers)")
 	quit(0)

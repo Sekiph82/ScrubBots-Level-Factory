@@ -67,21 +67,8 @@ def test_committed_runtime_proves_unavailable_branch() -> None:
         assert marker in source
 
 
-def test_real_puzzle_config_gate_integration_passes() -> None:
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_puzzle_config_gate_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_real_puzzle_config_gate_integration_passes(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_puzzle_config_gate_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-007-C001 puzzle-config UNAVAILABLE integration PASS" in output

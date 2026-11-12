@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-008-C001 PRESETS integration PASS"
 var _errors: Array[String] = []
 
@@ -14,8 +16,8 @@ func _run_suite() -> void:
 	var gateway: RefCounted = instance.get("core_gateway")
 	_require(presets != null and gateway != null, "preset surface or gateway did not instantiate")
 	if presets == null or gateway == null: _cleanup(instance); return
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-preset-runs")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var settings_a := {"width": 20, "height": 20, "seed": 88008, "mode": "MASK"}
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.workspace("Preset Runs"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
+	var settings_a := {"width": 20, "height": 20, "seed": 88008, "mode": "MASK", "background_intent": "BACKGROUND"}
 	var saved: Dictionary = gateway.call("run_studio_extension", "preset-save", {"preset_id": "lfx008-runtime", "name": "Runtime recipe", "operation": "Generate", "settings": settings_a})
 	_require(_request_equal(saved.get("settings", {}), settings_a), "preset did not persist canonical settings: %s" % saved)
 	var applied: Dictionary = gateway.call("run_studio_extension", "preset-apply", {"preset_id": "lfx008-runtime"})
@@ -26,13 +28,14 @@ func _run_suite() -> void:
 	_require(metadata_a.get("generation", {}).get("request", {}) == execution_a.get("expanded_request", {}), "execution expanded request does not exactly equal bundle metadata request: %s" % execution_a)
 	_require(execution_a.get("expanded_request", {}).get("seed", {}).get("type") == "int", "expanded request did not persist typed seed")
 	_require(execution_a.get("expanded_request", {}).has("generator_options"), "expanded request omitted generator defaults/options")
-	var execution_path := ProjectSettings.globalize_path("res://output/studio-extensions/preset-executions").path_join("%s.json" % execution_a.get("execution_id", ""))
+	var execution_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("preset-executions")).path_join("%s.json" % execution_a.get("execution_id", ""))
 	var execution_before := FileAccess.get_file_as_bytes(execution_path)
-	var updated_settings := {"difficulty": "HARD", "width": 21, "height": 22, "seed": 88009, "mode": "RULES"}
+	# Difficulty is no longer a production preset setting (difficulty-free artwork contract).
+	var updated_settings := {"width": 21, "height": 22, "seed": 88009, "mode": "RULES", "background_intent": "BACKGROUND"}
 	gateway.call("run_studio_extension", "preset-save", {"preset_id": "lfx008-runtime", "name": "Updated recipe", "operation": "Generate", "settings": updated_settings})
 	var reapplied: Dictionary = gateway.call("run_studio_extension", "preset-apply", {"preset_id": "lfx008-runtime"})
 	var updated_request: Dictionary = reapplied.get("execution", {}).get("expanded_request", {})
-	_require(updated_request.get("difficulty") == "HARD" and updated_request.get("width") == 21 and updated_request.get("height") == 22 and updated_request.get("seed", {}).get("value") == 88009 and updated_request.get("generator_mode") == "RULES", "updated preset did not affect the new canonical execution: %s" % reapplied)
+	_require(not updated_request.has("difficulty") and updated_request.get("width") == 21 and updated_request.get("height") == 22 and updated_request.get("seed", {}).get("value") == 88009 and updated_request.get("generator_mode") == "RULES", "updated preset did not affect the new canonical execution: %s" % reapplied)
 	_require(FileAccess.get_file_as_bytes(execution_path) == execution_before, "updating preset changed prior execution evidence")
 	gateway.call("run_studio_extension", "preset-delete", {"preset_id": "lfx008-runtime"})
 	_require(FileAccess.get_file_as_bytes(execution_path) == execution_before, "deleting preset invalidated prior execution evidence")
@@ -54,7 +57,7 @@ func _request_equal(left: Dictionary, right: Dictionary) -> bool:
 	return true
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-preset-runs")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.workspace("Preset Runs"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

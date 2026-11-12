@@ -1536,9 +1536,12 @@ def _run_studio_revalidation(raw_request: object) -> dict[str, object]:
     request = _validate_studio_request(raw_request)
     from scrubbots_pixel_factory import QualityPolicy, evaluate_grid, logical_grid_hash, read_bundle
 
-    output_root = (_repository_root() / "data" / "Level Factory" / "Workspace" / "Candidates").resolve()
+    # Studio Generate bundles live in data/output (the gateway's approved output
+    # area); imported/derived candidates in Workspace/Candidates. Accept both.
+    output_roots = ((_repository_root() / "data" / "Level Factory" / "Workspace" / "Candidates").resolve(),
+                    (_repository_root() / "data" / "output").resolve())
     source_bundle = Path(str(request["source_bundle_path"])).resolve()
-    if not _inside_output(source_bundle, output_root):
+    if not any(_inside_output(source_bundle, output_root) for output_root in output_roots):
         raise ValueError("source bundle is outside the canonical Level Factory candidate workspace")
     bundle = read_bundle(source_bundle)
     source_width = int(request["source_width"])

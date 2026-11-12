@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-006-C001 CANDIDATE REVIEW integration PASS"
 var _errors: Array[String] = []
 
@@ -14,7 +16,7 @@ func _run_suite() -> void:
 	var gateway: RefCounted = instance.get("core_gateway")
 	_require(candidates != null and gateway != null, "Candidate Inbox or gateway did not instantiate")
 	if candidates == null or gateway == null: _cleanup(instance); return
-	var output_root := "res://output/.lfx006-candidate-review"
+	var output_root := TEST_PATHS.output(".lfx006-candidate-review")
 	_remove_tree(ProjectSettings.globalize_path(output_root))
 	var first: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "66006", "mode": "MASK"}, output_root)
 	var second: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "66007", "mode": "RULES"}, output_root)
@@ -35,8 +37,8 @@ func _run_suite() -> void:
 	_require(reloaded_by_id.get(first_id, {}).get("owner_review", {}).get("disposition") == "REJECT", "latest valid review was not derived after reload")
 	_require(reloaded_by_id.get(first_id, {}).get("owner_review_history", []).size() == 2, "review history was not retained")
 	_require(reloaded_by_id.get(second_id, {}).get("owner_review", {}).get("disposition") == "REJECT", "review crossed candidate identity")
-	_require(reloaded_by_id.get(first_id, {}).get("solver", {}).get("disposition") == "NOT AVAILABLE", "solver availability was fabricated")
-	var corrupt_path := ProjectSettings.globalize_path("res://output/studio-extensions/owner-review").path_join("review-%s-0002.json" % first_id)
+	_require(reloaded_by_id.get(first_id, {}).get("solver", {}).get("disposition") == "NOT_AVAILABLE", "solver availability was fabricated")
+	var corrupt_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("owner-review")).path_join("review-%s-0002.json" % first_id)
 	var corrupt_before := FileAccess.get_file_as_bytes(corrupt_path)
 	var corrupt_file := FileAccess.open(corrupt_path, FileAccess.WRITE); corrupt_file.store_string("{corrupt"); corrupt_file.close()
 	var corrupted: Dictionary = gateway.call("run_studio_extension", "candidate-inbox", {})
@@ -61,8 +63,8 @@ func _bundle_bytes(path: String) -> Dictionary:
 	return result
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx006-candidate-review"))
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx006-candidate-review")))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
 	instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:

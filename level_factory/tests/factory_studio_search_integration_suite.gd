@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-009-C001 SEARCH integration PASS"
 var _errors: Array[String] = []
 var _fixture_root := ""
@@ -15,12 +17,12 @@ func _run_suite() -> void:
 	var gateway: RefCounted = instance.get("core_gateway")
 	_require(search != null and gateway != null, "search surface or gateway did not instantiate")
 	if search == null or gateway == null: _cleanup(instance); return
-	_fixture_root = OS.get_temp_dir().path_join("scrubbots_lfx_009_search_fixture"); _remove_tree(_fixture_root); DirAccess.make_dir_recursive_absolute(_fixture_root)
-	var image := Image.create(20, 20, false, Image.FORMAT_RGB8); image.fill(Color8(233, 75, 75)); var source_path := _fixture_root.path_join("search-source.png"); image.save_png(source_path)
+	_fixture_root = TEST_PATHS.output("Pixellab/Final"); _remove_tree(_fixture_root); DirAccess.make_dir_recursive_absolute(_fixture_root)
+	var image := Image.create(56, 56, false, Image.FORMAT_RGB8); image.fill(Color8(233, 75, 75)); var source_path := _fixture_root.path_join("search-source.png"); image.save_png(source_path)
 	var imported: Dictionary = gateway.call("run_owner_import", source_path); var source_id := str(imported.get("source_id", "")); _require(imported.get("state") in ["IMPORTED", "ALREADY_IMPORTED"], "search source import failed")
 	gateway.call("run_studio_extension", "library-save", {"source_id": source_id, "label": "Search Alpha", "tags": ["alpha"]})
-	var left: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "99009", "mode": "RULES"}, "res://output/.lfx009-search")
-	var right: Dictionary = gateway.call("run_action", "Generate", {"width": 21, "height": 20, "seed": "99010", "mode": "RULES"}, "res://output/.lfx009-search")
+	var left: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "99009", "mode": "RULES"}, TEST_PATHS.output(".lfx009-search"))
+	var right: Dictionary = gateway.call("run_action", "Generate", {"width": 21, "height": 20, "seed": "99010", "mode": "RULES"}, TEST_PATHS.output(".lfx009-search"))
 	_require(left.get("state") == "SUCCESS" and right.get("state") == "SUCCESS", "search candidates did not generate: %s / %s" % [left, right])
 	var left_id := str(left.get("candidate_id", "")); var right_id := str(right.get("candidate_id", ""))
 	gateway.call("run_studio_extension", "owner-review", {"candidate_id": left_id, "disposition": "ACCEPT", "reason": "search accepted"})
@@ -31,7 +33,7 @@ func _run_suite() -> void:
 	var color_count: Dictionary = gateway.call("run_studio_extension", "discover", {"filters": {"record_type": "CANDIDATE", "used_color_count": int(combined.get("records", [])[0].get("used_color_count", 0))}})
 	_require(color_count.get("state") == "READY" and color_count.get("records", []).size() >= 1, "used_color_count filter did not match its advertised candidate field")
 	var imported_sources: Dictionary = gateway.call("run_studio_extension", "discover", {"query": "search alpha", "collection": "Imported Sources"})
-	_require(imported_sources.get("records", []).size() == 1 and imported_sources.get("records", [])[0].get("record_id") == source_id, "text search/imported source collection failed")
+	_require(imported_sources.get("records", []).size() == 1 and imported_sources.get("records", [])[0].get("record_id") == source_id, "text search/imported source collection failed: %s" % [imported_sources])
 	var needs_review: Dictionary = gateway.call("run_studio_extension", "discover", {"collection": "Needs Review"})
 	_require(not needs_review.get("records", []).any(func(record): return record.get("record_type") == "SOURCE"), "source-only NOT AVAILABLE review was inferred as Needs Review")
 	var unavailable: Dictionary = gateway.call("run_studio_extension", "discover", {"collection": "Ready for Production"})
@@ -50,7 +52,7 @@ func _run_suite() -> void:
 	_cleanup(instance)
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(ProjectSettings.globalize_path("res://output/.lfx009-search")); _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads")); _remove_tree(_fixture_root); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx009-search"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.imported(""))); _remove_tree(_fixture_root); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

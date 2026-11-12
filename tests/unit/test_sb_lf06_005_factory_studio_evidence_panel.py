@@ -90,21 +90,8 @@ def test_integration_contains_canonical_metadata_and_error_evidence() -> None:
         assert marker in source
 
 
-def test_real_studio_evidence_integration_passes() -> None:
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_action_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_real_studio_evidence_integration_passes(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_action_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-005-C001 canonical evidence integration PASS" in output

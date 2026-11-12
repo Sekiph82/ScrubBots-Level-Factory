@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-011-C001 EXACT REPRODUCE integration PASS"
 var _errors: Array[String] = []
 
@@ -15,8 +17,8 @@ func _run_suite() -> void:
 	var reproduce_surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/ExactReproduce")
 	_require(gateway != null and target != null and reproduce_surface != null, "target, reproduce surface, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx011-reproduce")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-reproductions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "11011", "mode": "MASK"}, "res://output/.lfx011-reproduce")
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx011-reproduce"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.workspace("Reproductions"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "11011", "mode": "MASK"}, TEST_PATHS.output(".lfx011-reproduce"))
 	_require(generated.get("state") == "SUCCESS", "canonical Generate fixture failed: %s" % generated)
 	var candidate_id := str(generated.get("candidate_id", ""))
 	var metadata_path := str(generated.get("metadata_path", ""))
@@ -41,7 +43,7 @@ func _run_suite() -> void:
 	_require(reproduced.get("state") == "SUCCESS" and reproduced.get("disposition") == "MATCH", "exact reproduction did not MATCH: %s" % reproduced)
 	var output_path := str(reproduced.get("output_path", ""))
 	var repository_root := ProjectSettings.globalize_path("res://" + ".." + "/")
-	_require(not output_path.is_empty() and output_path != bundle_root and output_path.contains("studio-reproductions") and DirAccess.dir_exists_absolute(repository_root.path_join(output_path)), "exact reproduction did not create a separate output bundle")
+	_require(not output_path.is_empty() and output_path != bundle_root and output_path.contains("Reproductions") and DirAccess.dir_exists_absolute(repository_root.path_join(output_path)), "exact reproduction did not create a separate output bundle: %s" % [output_path])
 	for name in original_files.keys(): _require(FileAccess.get_file_as_bytes(bundle_root.path_join(name)) == original_files[name], "source bundle changed after exact reproduction: %s" % name)
 	var metadata_before := FileAccess.get_file_as_bytes(bundle_root.path_join("metadata.json"))
 	var corrupt := FileAccess.open(bundle_root.path_join("metadata.json"), FileAccess.WRITE); corrupt.store_string("{\"tampered\":true}\n"); corrupt.close()
@@ -64,7 +66,9 @@ func _run_suite() -> void:
 func _set_draft(target: Node, seed_value: String, width: int, height: int, difficulty_index: int, mode_index: int, label_value: String) -> void:
 	var seed_control: LineEdit = target.get("seed_control"); var width_control: SpinBox = target.get("width_control"); var height_control: SpinBox = target.get("height_control")
 	var difficulty_control: OptionButton = target.get("difficulty_control"); var mode_control: OptionButton = target.get("mode_control"); var label_control: LineEdit = target.get("candidate_label_control")
-	seed_control.text = seed_value; width_control.value = width; height_control.value = height; difficulty_control.select(difficulty_index); mode_control.select(mode_index); label_control.text = label_value
+	seed_control.text = seed_value; width_control.value = width; height_control.value = height
+	if difficulty_control != null: difficulty_control.select(difficulty_index)  # removed with the difficulty-free artwork contract
+	mode_control.select(mode_index); label_control.text = label_value
 	target.call("_refresh_draft_readout")
 
 func _fixture_source(gateway: RefCounted) -> String:
@@ -74,7 +78,7 @@ func _fixture_source(gateway: RefCounted) -> String:
 	return str(imported.get("source_id", ""))
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx011-reproduce")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-reproductions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); _remove_tree(ProjectSettings.globalize_path("res://output/owner-uploads")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx011-reproduce"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.workspace("Reproductions"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.imported(""))); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

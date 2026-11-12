@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-010-C001 READINESS integration PASS"
 var _errors: Array[String] = []
 
@@ -14,7 +16,7 @@ func _run_suite() -> void:
 	var gateway: RefCounted = instance.get("core_gateway")
 	_require(readiness != null and gateway != null, "readiness surface or gateway did not instantiate")
 	if readiness == null or gateway == null: _cleanup(instance); return
-	var output_root := "res://output/.lfx010-readiness"; _remove_tree(ProjectSettings.globalize_path(output_root)); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
+	var output_root := TEST_PATHS.output(".lfx010-readiness"); _remove_tree(ProjectSettings.globalize_path(output_root)); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
 	var first: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "101010", "mode": "RULES"}, output_root)
 	var second: Dictionary = gateway.call("run_action", "Generate", {"width": 21, "height": 20, "seed": "101011", "mode": "RULES"}, output_root)
 	var first_id := str(first.get("candidate_id", "")); var second_id := str(second.get("candidate_id", "")); _require(first.get("state") == "SUCCESS" and second.get("state") == "SUCCESS", "readiness candidates did not generate")
@@ -30,7 +32,7 @@ func _run_suite() -> void:
 		_require(card.get("gates", {}).get("EXPORT", {}).get("disposition") == "NOT_AVAILABLE", "EXPORT fabricated authority from bundle presence")
 		_require(card.get("gates", {}).get("SOLVER", {}).get("disposition") == "NOT_AVAILABLE" and card.get("gates", {}).get("DIFFICULTY", {}).get("disposition") == "NOT_AVAILABLE", "solver/difficulty fabricated")
 		_require(card.get("overall") == "NOT READY", "readiness became READY with unavailable gates")
-	var review_path := ProjectSettings.globalize_path("res://output/studio-extensions/owner-review").path_join("review-%s-0001.json" % first_id)
+	var review_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("owner-review")).path_join("review-%s-0001.json" % first_id)
 	var review_before := FileAccess.get_file_as_bytes(review_path); var corrupt := FileAccess.open(review_path, FileAccess.WRITE); corrupt.store_string("{corrupt"); corrupt.close()
 	var stale: Dictionary = gateway.call("run_studio_extension", "readiness", {"candidate_id": first_id})
 	_require(stale.get("gates", {}).get("OWNER", {}).get("disposition") == "STALE", "tampered review was not stale in readiness")
@@ -46,7 +48,7 @@ func _bundle_bytes(path: String) -> Dictionary:
 	return result
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx010-readiness")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx010-readiness"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

@@ -11,7 +11,7 @@ const SEED_PATH := NodePath("SeedRow/Seed")
 const MODE_PATH := NodePath("ModeRow/Mode")
 const CANDIDATE_PATH := NodePath("CandidatepresentationlabelRow/CandidatePresentation")
 
-const EXPECTED_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO"]
+const EXPECTED_MODES: Array[String] = ["MASK", "RULES", "WFC", "HYBRID", "AUTO", "ART_FIRST"]
 const EXPECTED_PRIMARY_NAVIGATION: Array[String] = ["HOME", "CREATE", "BATCH", "SOLVE", "REVIEW", "LIBRARY", "PUBLISH", "SETTINGS"]
 const SCENE_LOADER_METHOD := "load"
 
@@ -82,6 +82,10 @@ func _run_suite() -> void:
 		instance.queue_free()
 		quit(1)
 		return
+	# Production opens the three-master UI ("No HOME", master UI V03); the hidden
+	# legacy shell builds its owner pages only when a route is shown (e432ba4a).
+	navigation.emit_signal("surface_selected", "HOME")
+	await process_frame
 	var owner_page := workspace.get_node_or_null("Padding/Content/OwnerPage") as VBoxContainer
 	var owner_heading := owner_page.get_node_or_null("OwnerPageTitle") as Label if owner_page != null else null
 	var owner_guidance := owner_page.get_node_or_null("OwnerPageGuidance") as Label if owner_page != null else null

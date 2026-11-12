@@ -451,9 +451,7 @@ func _globalize_path(path: String) -> String:
 
 
 func _safe_output_path(path: String) -> bool:
-	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
-	var candidate := _globalize_path(path).simplify_path().replace(char(92), "/").to_lower()
-	return candidate == project_output or candidate.begins_with(project_output + "/")
+	return DATA_PATHS.is_studio_bundle_path(_globalize_path(path))
 
 
 func _sha256(bytes: PackedByteArray) -> String:

@@ -275,14 +275,7 @@ func _validate_and_load_metadata(result: Dictionary, path: String) -> String:
 
 
 func _safe_output_path(path: String) -> bool:
-	if path.is_empty():
-		return false
-	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
-	var candidate := path
-	if candidate.begins_with("res://") or not candidate.is_absolute_path():
-		candidate = ProjectSettings.globalize_path(candidate)
-	var normalized := candidate.simplify_path().replace(char(92), "/").to_lower()
-	return normalized == project_output or normalized.begins_with(project_output + "/")
+	return DATA_PATHS.is_studio_bundle_path(path)
 
 
 func _parse_dimensions(value: String) -> Array[int]:

@@ -386,6 +386,24 @@ func _notification(what: int) -> void:
 		get_tree().quit()
 
 
+func _exit_tree() -> void:
+	# Freeing the Studio without a window-close request (scene teardown, forced
+	# quit) used to destroy live worker Threads; Godot then crashed with
+	# 0xC0000005. Ask the workers' child processes to stop and join the threads.
+	_shutdown_requested = true
+	_studio_read_queue.clear()
+	var workers := [_studio_read_thread, _pipeline_thread, _pixel_art_thread]
+	if workers.any(func(worker): return worker != null):
+		_signal_worker_cancel_marker()
+	for worker in workers:
+		if worker != null and worker.is_started():
+			worker.wait_to_finish()
+	_studio_read_thread = null
+	_pipeline_thread = null
+	_pixel_art_thread = null
+	_finish_worker_cancel_marker()
+
+
 func _prepare_worker_cancel_marker() -> void:
 	if not _studio_cancel_marker_path.is_empty():
 		return

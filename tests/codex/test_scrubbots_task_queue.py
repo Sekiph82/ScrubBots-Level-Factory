@@ -106,9 +106,9 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
     def test_rejects_duplicate_status_sections_and_non_codex_actor(self) -> None:
         with self.assertRaisesRegex(ValueError, "exactly one"):
             select_current_task(tracker() + "\n## Project Status\n")
-        with self.assertRaisesRegex(ValueError, "authorize CODEX"):
+        with self.assertRaisesRegex(ValueError, "authorize CLAUDE or legacy CODEX"):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "OWNER"))
-        with self.assertRaisesRegex(ValueError, "authorize CODEX"):
+        with self.assertRaisesRegex(ValueError, "authorize CLAUDE or legacy CODEX"):
             select_current_task(tracker().replace("CODEX, THEN CHATGPT", "CODEX - NOT AUTHORIZED"))
 
     def test_rejects_empty_actor_chain_segments(self) -> None:
@@ -119,7 +119,7 @@ class ScrubBotsTaskQueueTests(unittest.TestCase):
             "CODEX, CHATGPT, CHATGPT",
         ):
             with self.subTest(actor_chain=malformed):
-                with self.assertRaisesRegex(ValueError, "authorize CODEX"):
+                with self.assertRaisesRegex(ValueError, "authorize CLAUDE or legacy CODEX"):
                     select_current_task(tracker().replace("CODEX, THEN CHATGPT", malformed))
 
     def test_accepts_comma_and_then_actor_delimiters(self) -> None:

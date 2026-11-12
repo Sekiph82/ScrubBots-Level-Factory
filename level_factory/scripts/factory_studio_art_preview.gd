@@ -152,14 +152,12 @@ func _load_successful_artwork(result: Dictionary) -> void:
 func _load_canonical_image(output_path: String) -> Image:
 	if output_path.is_empty():
 		return null
-	var project_output := DATA_PATHS.data_path("Level Factory/Workspace").simplify_path().replace(char(92), "/").to_lower()
+	if not DATA_PATHS.is_studio_bundle_path(output_path):
+		return null
 	var candidate_output := output_path
 	if candidate_output.begins_with("res://") or not candidate_output.is_absolute_path():
 		candidate_output = ProjectSettings.globalize_path(candidate_output)
 	candidate_output = candidate_output.simplify_path().replace(char(92), "/")
-	var normalized_output := candidate_output.to_lower()
-	if normalized_output != project_output and not normalized_output.begins_with(project_output + "/"):
-		return null
 	var image := Image.load_from_file(candidate_output.path_join("artwork.png"))
 	if image == null or image.is_empty() or image.get_width() < 1 or image.get_height() < 1:
 		return null

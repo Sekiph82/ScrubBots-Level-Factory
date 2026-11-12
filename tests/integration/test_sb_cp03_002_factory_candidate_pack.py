@@ -5,6 +5,7 @@ import hashlib
 import sys
 from pathlib import Path
 
+import os
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -14,6 +15,7 @@ sys.path.insert(0, str(CONTENT_PIPELINE / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from scrubbots_content_pipeline import verify_solver_proven_scrubpack  # noqa: E402
+from scrubbots_pixel_factory import owner_art_storage  # noqa: E402
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio  # noqa: E402
 from scrubbots_pixel_factory.output.png import encode_logical_png  # noqa: E402
 from scrubbots_pixel_factory.supply_pipeline import scrubpack_identity  # noqa: E402
@@ -24,6 +26,12 @@ from build_accepted_factory_output_pack import (  # noqa: E402
 )
 from scrubbots_pixel_factory.supply_pipeline import release_pool  # noqa: E402
 
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("SCRUBBOTS_PROJECT"),
+    reason="needs an explicit SCRUBBOTS_PROJECT game checkout; the implicit Desktop fallback is disabled",
+)
+
+
 
 @pytest.fixture
 def accepted_factory_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[str, dict[str, object]]:
@@ -32,11 +40,14 @@ def accepted_factory_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     evidence_root = repository / "level_factory/output/studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda *_args, **_kwargs: evidence_root)
 
     source_path = tmp_path / "accepted-factory-source.png"
     source_path.write_bytes(encode_logical_png(20, 20, ["C01", "C02", "C03", "C04"] * 100))
@@ -123,7 +134,10 @@ def test_rejects_pipeline_source_path_outside_factory_root(
     repository.mkdir()
     outside = tmp_path / "untrusted-level.json"
     outside.write_text("{}", encoding="utf-8")
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
     pipeline = {
         "schema": "scrubbots-studio-pipeline-run",
         "version": 2,
@@ -171,7 +185,7 @@ def test_current_release_pool_projection_is_an_accepted_pack_source(
     }
     canonical = json.dumps(body, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     body["entry_digest"] = hashlib.sha256(canonical).hexdigest()
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [body])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args, **_kwargs: [body])
 
     result = build_accepted_factory_output_pack(
         (candidate_id,), pack_id="m14-release-pool", pack_version=2,

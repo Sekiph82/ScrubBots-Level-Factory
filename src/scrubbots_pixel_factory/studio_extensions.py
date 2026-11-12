@@ -322,6 +322,10 @@ def _sync_current_pixellab_final_sources(
     from . import owner_art_storage
     from .owner_folder_batch import scan_owner_source_folder
     paths = owner_art_storage.owner_art_paths(repository_root)
+    if not paths["pixellab_final"].is_dir():
+        # No PixelLab batch has produced Final art yet: an empty inventory, not
+        # a raw "[WinError 3] path not found" pipeline block.
+        return set(), [], {}
     scan = scan_owner_source_folder(
         paths["pixellab_final"], repository_root=repository_root,
         verify_existing_imports=False,
@@ -683,10 +687,26 @@ def validate_owner_source(
 def _candidate_roots() -> Iterable[Path]:
     from .owner_art_storage import owner_art_paths
 
-    output = (owner_art_paths(_repository_root())["workspace"] / "Candidates").resolve()
-    if not output.exists():
-        return ()
-    return (path.parent for path in output.rglob("metadata.json") if "Reproductions" not in path.parent.parts and path.parent.name and (path.parent / "artwork.json").is_file() and (path.parent / "artwork.png").is_file())
+    repository = _repository_root()
+    # Studio Generate writes canonical bundles to data/output (the gateway's
+    # only approved output area); imported/derived candidates live in
+    # Workspace/Candidates. Before 2026-11-12 only the latter was scanned, so
+    # every Studio-generated candidate was invisible to review and pipeline.
+    # PixelLab art under data/output/Pixellab is source art, never a candidate.
+    roots = ((owner_art_paths(repository)["workspace"] / "Candidates").resolve(),
+             (Path(repository) / "data" / "output").resolve())
+    found: list[Path] = []
+    for output in roots:
+        if not output.exists():
+            continue
+        for directory, subdirectories, files in os.walk(output):
+            if Path(directory) == output:
+                subdirectories[:] = [name for name in subdirectories if name != "Pixellab"]
+            bundle = Path(directory)
+            if ("metadata.json" in files and "artwork.json" in files and "artwork.png" in files
+                    and "Reproductions" not in bundle.parts and bundle.name):
+                found.append(bundle)
+    return found
 
 
 # Parsed candidate rows keyed by bundle root and the (mtime_ns, size) of its three
@@ -1678,7 +1698,10 @@ def _run_pipeline_impl(*, source_id: str | None = None, candidate_id: str | None
         }
         payload = _run_canonical_artwork_route(identity=derived_candidate_id, cells=bundle.artwork.cells, width=bundle.artwork.width, height=bundle.artwork.height, evidence=_relative(derived_bundle), request=derived_request, source_kind="CANDIDATE", activity_writer=activity_writer, owner_source_binding=source_binding)
         return payload
-    if candidate_id is not None and candidate is not None and quality_disposition == "PASS":
+    # An explicit durable interruption boundary must be honoured; the ZIP route
+    # used to run the whole pipeline and silently ignore it.
+    interrupt_requested = isinstance(request, Mapping) and request.get("interrupt_after") is not None
+    if candidate_id is not None and candidate is not None and quality_disposition == "PASS" and not interrupt_requested:
         return _run_canonical_artwork_route(identity=candidate_id, cells=candidate_bundle.artwork.cells, width=candidate_bundle.artwork.width, height=candidate_bundle.artwork.height, evidence=candidate["source_path"], request=request or {}, source_kind="CANDIDATE")
     requested_interrupt = request.get("interrupt_after") if isinstance(request, Mapping) else None
     if requested_interrupt is not None and requested_interrupt not in {"SOURCE", "NORMALIZE/DERIVE", "PALETTE/STRUCTURE VALIDATION", "CANDIDATE"}:
@@ -2135,9 +2158,9 @@ def _canonical_failure_records() -> list[dict[str, Any]]:
             value = _read_json(path)
             for stage in value.get("stages", []):
                 disposition = str(stage.get("disposition", ""))
-                if disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE", "NOT_AVAILABLE"}:
+                if disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE", "NOT_AVAILABLE", "UNAVAILABLE"}:
                     retryable = disposition in {"FAIL", "BLOCKED", "INCONCLUSIVE"} and str(stage.get("stage", "")) in _PIPELINE_STAGE_RETRY_CAPABILITIES
-                    add(evidence_id=str(value.get("run_id", path.stem)) + ":" + str(stage.get("stage", "")), evidence_path=path, operation="pipeline", stage=str(stage.get("stage", "")), disposition="INCONCLUSIVE" if disposition == "NOT_AVAILABLE" else disposition, reason=str(stage.get("reason", disposition)), inputs={"source_id": value.get("source_id"), "candidate_id": value.get("candidate_id")}, retryable=retryable, non_retryable_reason="Canonical stage is unavailable or is not safely retryable." if not retryable else "")
+                    add(evidence_id=str(value.get("run_id", path.stem)) + ":" + str(stage.get("stage", "")), evidence_path=path, operation="pipeline", stage=str(stage.get("stage", "")), disposition="INCONCLUSIVE" if disposition in {"NOT_AVAILABLE", "UNAVAILABLE"} else disposition, reason=str(stage.get("reason", disposition)), inputs={"source_id": value.get("source_id"), "candidate_id": value.get("candidate_id")}, retryable=retryable, non_retryable_reason="Canonical stage is unavailable or is not safely retryable." if not retryable else "")
                     break
         except (StudioExtensionError, OSError):
             continue
@@ -2821,8 +2844,7 @@ import os
 from pathlib import Path
 import time
 from typing import Any, Callable, Mapping
-from urllib.parse import urlparse
-from urllib.error import HTTPError, URLError
+from .provider_http import HTTPError, URLError, urlparse
 
 PIXELLAB_CREDENTIAL_TARGET = "ScrubBotsFactoryStudio/PIXELLAB_API_TOKEN"
 
@@ -2920,7 +2942,7 @@ def get_pixellab_secret() -> str:
     if token and legacy and token != legacy:
         return ""
     return token or legacy or _credential_manager_secret()
-from urllib.request import Request, urlopen
+from .provider_http import Request, urlopen
 from PIL import Image
 
 

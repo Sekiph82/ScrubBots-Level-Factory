@@ -1,8 +1,12 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const IMPORT_NODE_PATH := NodePath("Frame/Layout/Body/Workspace/Padding/Content/OperationsImport")
-const OWNER_UPLOADS_ROOT := "res://output/owner-uploads"
+var OWNER_UPLOADS_ROOT: String = TEST_PATHS.imported("")
+# Imported sources keep their original filename (canonical layout since 2026-11-08).
+const STORED_SOURCE_NAME := "owner-art.png"
 const PASS_MARKER := "SB-LFX-002-C001 OWNER_UPLOAD import integration PASS"
 
 var _errors: Array[String] = []
@@ -86,11 +90,11 @@ func _run_suite() -> void:
 	_require(str(first_result.get("source_only_notice", "")).begins_with("SOURCE ONLY"), "source-only notice is missing")
 	_require(first_result.get("original_filename") == "owner-art.png", "original filename display metadata is incorrect")
 	_require(first_result.get("original_width") == 4 and first_result.get("original_height") == 3, "decoded source dimensions are incorrect")
-	_require(FileAccess.get_file_as_bytes(_first_target.path_join("source.png")) == first_bytes, "stored source bytes differ from selected bytes")
+	_require(FileAccess.get_file_as_bytes(_first_target.path_join(STORED_SOURCE_NAME)) == first_bytes, "stored source bytes differ from selected bytes")
 	_require(FileAccess.get_file_as_bytes(first_path) == external_first_before, "external owner source was modified")
 	var first_record: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_first_target.path_join("source.json")))
 	_require(first_record.get("source_sha256") == _sha256(first_bytes), "source record hash does not bind selected bytes")
-	_require(first_record.get("immutable_relative_path") == "owner-uploads/%s/source.png" % first_id, "source record path binding is incorrect")
+	_require(first_record.get("immutable_relative_path") == "data/Level Factory/Imported/%s/owner-art.png" % first_id, "source record path binding is incorrect")
 	_require(not str(first_record).contains("candidate") and not str(first_record).contains("QA"), "source record contains downstream candidate/QA claims")
 
 	var first_record_before_reimport := FileAccess.get_file_as_bytes(_first_target.path_join("source.json"))
@@ -108,8 +112,8 @@ func _run_suite() -> void:
 	var second_result: Dictionary = import_surface.call("snapshot")
 	_require(second_result.get("state") == "IMPORTED", "same-name different-byte source did not import: %s" % second_result)
 	_require(second_result.get("source_id") == second_id and second_id != first_id, "same-name different-byte source collided")
-	_require(FileAccess.get_file_as_bytes(_first_target.path_join("source.png")) == first_bytes, "first source was overwritten by same-name collision")
-	_require(FileAccess.get_file_as_bytes(_second_target.path_join("source.png")) == second_bytes, "second source bytes are not exact")
+	_require(FileAccess.get_file_as_bytes(_first_target.path_join(STORED_SOURCE_NAME)) == first_bytes, "first source was overwritten by same-name collision")
+	_require(FileAccess.get_file_as_bytes(_second_target.path_join(STORED_SOURCE_NAME)) == second_bytes, "second source bytes are not exact")
 	_require(FileAccess.get_file_as_bytes(second_path) == external_second_before, "second external owner source was modified")
 
 	var corrupt_record_backup := FileAccess.get_file_as_bytes(_first_target.path_join("source.json"))
@@ -157,7 +161,7 @@ func _sha256(bytes: PackedByteArray) -> String:
 
 
 func _backup_target(path: String, first: bool) -> void:
-	var source_path := path.path_join("source.png")
+	var source_path := path.path_join(STORED_SOURCE_NAME)
 	var record_path := path.path_join("source.json")
 	if first:
 		_first_source_backup = FileAccess.get_file_as_bytes(source_path)
@@ -169,14 +173,14 @@ func _backup_target(path: String, first: bool) -> void:
 
 func _restore_target(path: String, first: bool) -> void:
 	if first and not _first_source_backup.is_empty():
-		var source_file := FileAccess.open(path.path_join("source.png"), FileAccess.WRITE)
+		var source_file := FileAccess.open(path.path_join(STORED_SOURCE_NAME), FileAccess.WRITE)
 		source_file.store_buffer(_first_source_backup)
 		source_file.close()
 		var record_file := FileAccess.open(path.path_join("source.json"), FileAccess.WRITE)
 		record_file.store_buffer(_first_record_backup)
 		record_file.close()
 	elif not first and not _second_source_backup.is_empty():
-		var source_file := FileAccess.open(path.path_join("source.png"), FileAccess.WRITE)
+		var source_file := FileAccess.open(path.path_join(STORED_SOURCE_NAME), FileAccess.WRITE)
 		source_file.store_buffer(_second_source_backup)
 		source_file.close()
 		var record_file := FileAccess.open(path.path_join("source.json"), FileAccess.WRITE)

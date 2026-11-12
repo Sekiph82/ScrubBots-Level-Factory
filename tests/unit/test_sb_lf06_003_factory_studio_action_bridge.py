@@ -88,21 +88,8 @@ def test_workspace_wording_stays_true_after_core_execution() -> None:
     assert "canonical execution evidence is shown separately" in source
 
 
-def test_real_studio_core_generate_and_reproduce_boundary() -> None:
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_action_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_real_studio_core_generate_and_reproduce_boundary(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_action_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-003-C001 Studio/Core action integration PASS" in output

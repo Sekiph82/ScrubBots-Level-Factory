@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const IMPORT_NODE_PATH := NodePath("Frame/Layout/Body/Workspace/Padding/Content/OperationsImport")
 const LIBRARY_NODE_PATH := NodePath("Frame/Layout/Body/Workspace/Padding/Content/SourceArtLibrary")
@@ -30,7 +32,8 @@ func _run_suite() -> void:
 	if navigation == null or import_surface == null or library == null:
 		_finish()
 		return
-	_fixture_root = OS.get_temp_dir().path_join("scrubbots_lfx_003_library_fixture")
+	# The Library lists active sources from data/output/Pixellab/Final (51-59 px) since 2026-11-08.
+	_fixture_root = TEST_PATHS.output("Pixellab/Final")
 	_remove_tree(_fixture_root)
 	DirAccess.make_dir_recursive_absolute(_fixture_root)
 	var first := _fixture_root.path_join("library-a.png")
@@ -49,7 +52,7 @@ func _run_suite() -> void:
 	library.call("refresh_library")
 	await process_frame
 	var view: Dictionary = library.call("snapshot")
-	_require(view.get("filtered_sources", []).size() >= 2, "Library did not show both verified sources")
+	_require(view.get("filtered_sources", []).size() >= 2, "Library did not show both verified sources: %s" % [view])
 	var selected := str(_source_ids[0])
 	library.call("select_source", selected)
 	library.call("save_selected_metadata", "Library Fixture", ["fixture", "owner"])
@@ -69,16 +72,16 @@ func _run_suite() -> void:
 
 
 func _write_fixture(path: String, color: Color) -> void:
-	var image := Image.create(20, 20, false, Image.FORMAT_RGBA8)
+	var image := Image.create(56, 56, false, Image.FORMAT_RGBA8)
 	image.fill(color)
 	image.save_png(path)
 
 
 func _cleanup(instance: Node) -> void:
 	for source_id in _source_ids:
-		var source_root := ProjectSettings.globalize_path("res://output/owner-uploads").path_join(source_id)
+		var source_root := ProjectSettings.globalize_path(TEST_PATHS.imported("")).path_join(source_id)
 		_remove_tree(source_root)
-		var metadata := ProjectSettings.globalize_path("res://output/studio-extensions/source-library/metadata").path_join(source_id + ".json")
+		var metadata := ProjectSettings.globalize_path(TEST_PATHS.extensions("source-library/metadata")).path_join(source_id + ".json")
 		if FileAccess.file_exists(metadata):
 			DirAccess.remove_absolute(metadata)
 	_remove_tree(_fixture_root)

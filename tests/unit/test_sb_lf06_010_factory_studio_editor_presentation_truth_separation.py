@@ -73,7 +73,7 @@ def test_dependency_gates_remain_truthful() -> None:
     assert '"controls_enabled": false' in puzzle_gate
 
 
-def test_committed_real_truth_separation_integration_passes() -> None:
+def test_committed_real_truth_separation_integration_passes(run_isolated_godot_suite) -> None:
     source = INTEGRATION.read_text(encoding="utf-8")
     for marker in (
         "Candidate A",
@@ -86,20 +86,7 @@ def test_committed_real_truth_separation_integration_passes() -> None:
         "changed-draft-label",
     ):
         assert marker in source
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_truth_separation_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_isolated_godot_suite("factory_studio_truth_separation_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-010-C001 editor presentation/truth separation integration PASS" in output

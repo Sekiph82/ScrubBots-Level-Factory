@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const OUTPUT_RELATIVE_ROOT := ".lfx-001-dashboard-test"
 const OUTPUT_RELATIVE_MANIFEST := OUTPUT_RELATIVE_ROOT + "/batch-manifest.json"
@@ -34,10 +36,10 @@ func _run() -> void:
 		_finish()
 		return
 
-	var output_root := ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_ROOT)
-	var policy_path := ProjectSettings.globalize_path("res://output/" + QUALITY_POLICY_RELATIVE_PATH)
+	var output_root := ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + OUTPUT_RELATIVE_ROOT)
+	var policy_path := ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + QUALITY_POLICY_RELATIVE_PATH)
 	_remove_tree(output_root)
-	_remove_tree(ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_ROOT + "-corrupt"))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + OUTPUT_RELATIVE_ROOT + "-corrupt"))
 	_write_quality_policy(policy_path)
 	var captured: Array[String] = []
 	var python_executable := str(_gateway.get("python_executable"))
@@ -55,7 +57,7 @@ func _run() -> void:
 		"--output", output_root,
 	]), captured, true, false)
 	_require(batch_exit == 7, "canonical bounded batch must exit 7 when exhausted, got %s (%s)" % [batch_exit, " ".join(captured)])
-	var manifest_path := ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_MANIFEST)
+	var manifest_path := ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + OUTPUT_RELATIVE_MANIFEST)
 	_require(FileAccess.file_exists(manifest_path), "canonical rejected batch did not create batch-manifest.json")
 	if not _errors.is_empty():
 		_cleanup_and_finish()
@@ -96,7 +98,7 @@ func _run() -> void:
 	_require(studio_evidence.get("state") == "NOT AVAILABLE", "Studio evidence was not kept separate and unavailable")
 	_require(FileAccess.get_file_as_bytes(manifest_path) == original_bytes, "dashboard inspection changed canonical manifest bytes")
 
-	var corrupt_path := ProjectSettings.globalize_path("res://output/" + CORRUPT_RELATIVE_MANIFEST)
+	var corrupt_path := ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + CORRUPT_RELATIVE_MANIFEST)
 	DirAccess.make_dir_recursive_absolute(corrupt_path.get_base_dir())
 	var corrupt_file := FileAccess.open(corrupt_path, FileAccess.WRITE)
 	corrupt_file.store_string("{\"batch_id\":\"corrupt\"}")
@@ -163,8 +165,8 @@ func _remove_tree(path: String) -> void:
 
 
 func _cleanup_and_finish() -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_ROOT))
-	_remove_tree(ProjectSettings.globalize_path("res://output/" + OUTPUT_RELATIVE_ROOT + "-corrupt"))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + OUTPUT_RELATIVE_ROOT))
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output() + "/" + OUTPUT_RELATIVE_ROOT + "-corrupt"))
 	_finish()
 
 

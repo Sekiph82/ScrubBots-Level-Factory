@@ -1,10 +1,12 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Navigation")
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
-const TEST_OUTPUT_PATH := "res://output/.lf06-010-truth-separation-test"
+var TEST_OUTPUT_PATH: String = TEST_PATHS.output(".lf06-010-truth-separation-test")
 const SEED_A := "77"
 const SEED_B := "78"
 const PRESENTATION_LABEL := "draft-label-only"
@@ -157,7 +159,7 @@ func _run_suite() -> void:
 		revalidate_button.pressed.emit()
 		await process_frame
 	var revalidation_a: Dictionary = revalidation.call("snapshot")
-	_check(revalidation_a.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"], "Manual A revalidation did not produce structural evidence after B")
+	_check(revalidation_a.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"], "Manual A revalidation did not produce structural evidence after B: %s" % [revalidation_a])
 	_check(revalidation_a.get("result_current") == true, "Manual A revalidation result was not current")
 	_check(revalidation_a.get("source_candidate_id") == editor_a_dirty.get("source_candidate_id"), "Manual revalidation bound to B instead of editor source A")
 	_check(int(revalidation_a.get("dirty_cell_count", 0)) == 1, "Manual A revalidation did not bind exact DIRTY count")

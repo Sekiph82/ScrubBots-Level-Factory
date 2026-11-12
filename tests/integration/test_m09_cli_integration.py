@@ -505,7 +505,12 @@ def test_coordinated_candidate_id_path_and_m08_binding_rewrite_is_rejected(tmp_p
     manifest["accepted"][0]["candidate_id"] = new_id
     manifest["accepted"][0]["relative_path"] = f"candidates/{new_id}"
     manifest_path.write_bytes(canonical_json_bytes(manifest))
-    assert read_bundle(new_dir).artwork.candidate_id == new_id
+    # Candidate classification now binds the candidate identity, so the forged
+    # bundle is rejected as soon as it is read, before any resume.
+    from scrubbots_pixel_factory.output.bundle import OutputContractError
+
+    with pytest.raises(OutputContractError, match="candidate classification"):
+        read_bundle(new_dir)
     resumed = _run("batch", "--resume", str(manifest_path))
     assert resumed.returncode != 0 and "Traceback" not in resumed.stderr
 

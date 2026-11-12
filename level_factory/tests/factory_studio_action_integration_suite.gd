@@ -1,10 +1,12 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Navigation")
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
-const TEST_OUTPUT_PATH := "res://output/.lf06-003-action-test"
+var TEST_OUTPUT_PATH: String = TEST_PATHS.output(".lf06-003-action-test")
 const CORE_GATEWAY_SCRIPT_PATH := "res://scripts/factory_core_gateway.gd"
 const SEED_VALUE := "77"
 const PRESENTATION_LABEL := "presentation-only-label"
@@ -453,7 +455,7 @@ func _run_suite() -> void:
 
 
 func _under_output_area(path: String) -> bool:
-	var output_root := ProjectSettings.globalize_path("res://output").simplify_path().replace(char(92), "/").to_lower()
+	var output_root := ProjectSettings.globalize_path(TEST_PATHS.output("")).simplify_path().replace(char(92), "/").to_lower()
 	var normalized := path.simplify_path().replace(char(92), "/").to_lower()
 	return normalized.begins_with(output_root + "/")
 

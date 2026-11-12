@@ -179,7 +179,7 @@ def test_python_bridge_rejects_clean_malformed_and_corrupt_inputs() -> None:
         shutil.rmtree(TEST_ROOT, ignore_errors=True)
 
 
-def test_committed_real_godot_revalidation_integration_passes() -> None:
+def test_committed_real_godot_revalidation_integration_passes(run_isolated_godot_suite) -> None:
     source = INTEGRATION.read_text(encoding="utf-8")
     for marker in (
         'second_result.get("state") in ["STRUCTURAL ACCEPT", "STRUCTURAL REJECT"]',
@@ -190,13 +190,7 @@ def test_committed_real_godot_revalidation_integration_passes() -> None:
         'reset.get("state") == "NOT_REQUIRED"',
     ):
         assert marker in source
-    result = subprocess.run(
-        ["godot", "--headless", "--path", "level_factory", "--script", "res://tests/factory_studio_art_revalidation_integration_suite.gd"],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    result = run_isolated_godot_suite("factory_studio_art_revalidation_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-008-C001 manual artwork structural revalidation integration PASS" in output

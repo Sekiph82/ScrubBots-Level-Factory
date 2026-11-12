@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-012-C001 REVISION lineage integration PASS"
 var _errors: Array[String] = []
 
@@ -15,15 +17,15 @@ func _run_suite() -> void:
 	var surface := instance.get_node_or_null("Frame/Layout/Body/Workspace/Padding/Content/ManualEditRevisions")
 	_require(gateway != null and surface != null and target != null, "revision surface, editor target, or gateway did not instantiate")
 	if gateway == null: _cleanup(instance); return
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx012-revisions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions"))
-	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "12012", "mode": "MASK"}, "res://output/.lfx012-revisions")
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx012-revisions"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions("")))
+	var generated: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "12012", "mode": "MASK"}, TEST_PATHS.output(".lfx012-revisions"))
 	_require(generated.get("state") == "SUCCESS", "canonical revision fixture failed: %s" % generated)
 	var candidate_id := str(generated.get("candidate_id", "")); var bundle := str(generated.get("output_path", "")); var artwork := JSON.parse_string(FileAccess.get_file_as_string(bundle.path_join("artwork.json"))) as Dictionary
 	var source_bytes := FileAccess.get_file_as_bytes(bundle.path_join("artwork.png"))
 	var editor: Node = target.call("manual_editor_reference"); editor.call("observe_action_result", generated); _require(editor.call("load_current_canonical_artwork", true), "manual editor did not load canonical source")
 	var owner_review: Dictionary = gateway.call("run_studio_extension", "owner-review", {"candidate_id": candidate_id, "disposition": "ACCEPT", "reason": "R03 revision matrix review"})
 	_require(owner_review.get("disposition") == "ACCEPT", "real owner-review evidence was not created")
-	var review_path := ProjectSettings.globalize_path("res://output/studio-extensions/owner-review").path_join(str(owner_review.get("review_id", "")) + ".json")
+	var review_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("owner-review")).path_join(str(owner_review.get("review_id", "")) + ".json")
 	var review_bytes := FileAccess.get_file_as_bytes(review_path)
 	surface.call("configure_editor", editor); surface.call("set_candidate_id", candidate_id)
 	var cells: Array = editor.call("working_logical_cells_snapshot"); var first: Dictionary = surface.call("save_revision")
@@ -54,7 +56,7 @@ func _run_suite() -> void:
 	surface_after_restart.call("set_compare_revisions", first_id, branch_id); surface_after_restart.call("compare_revisions"); await process_frame
 	_require(surface_after_restart.call("snapshot").get("projection", {}).get("comparison", {}).get("changed_cell_count") == 2, "restarted revision surface Compare did not reconstruct lineage")
 	var restarted_readiness: Dictionary = gateway_after_restart.call("run_studio_extension", "readiness", {"candidate_id": candidate_id}); _require(restarted_readiness.get("gates", {}).get("OWNER", {}).get("disposition") == "PASS" and restarted_readiness.get("gates", {}).get("EXPORT", {}).get("disposition") == "NOT_AVAILABLE", "restart changed review/promotion truth")
-	var corrupt_path := ProjectSettings.globalize_path("res://output/studio-extensions/revisions").path_join(candidate_id).path_join("revision-0001.json"); var corrupt_bytes := FileAccess.get_file_as_bytes(corrupt_path); var corrupt := FileAccess.open(corrupt_path, FileAccess.WRITE); corrupt.store_string("{\"corrupt\":true}\n"); corrupt.close(); var rejected: Dictionary = gateway_after_restart.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(rejected.get("state") == "ERROR", "corrupt revision lineage did not fail closed"); var restore := FileAccess.open(corrupt_path, FileAccess.WRITE); restore.store_buffer(corrupt_bytes); restore.close()
+	var corrupt_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("revisions")).path_join(candidate_id).path_join("revision-0001.json"); var corrupt_bytes := FileAccess.get_file_as_bytes(corrupt_path); var corrupt := FileAccess.open(corrupt_path, FileAccess.WRITE); corrupt.store_string("{\"corrupt\":true}\n"); corrupt.close(); var rejected: Dictionary = gateway_after_restart.call("run_studio_extension", "revision-list", {"candidate_id": candidate_id}); _require(rejected.get("state") == "ERROR", "corrupt revision lineage did not fail closed"); var restore := FileAccess.open(corrupt_path, FileAccess.WRITE); restore.store_buffer(corrupt_bytes); restore.close()
 	surface_after_restart.call("list_revisions"); await process_frame; _require(surface_after_restart.call("snapshot").get("projection", {}).get("state") == "SUCCESS", "restored revision history did not reload through the surface")
 	_require(FileAccess.get_file_as_bytes(review_path) == review_bytes, "restart/corruption recovery changed owner-review evidence bytes")
 	for revision in surface_after_restart.call("snapshot").get("projection", {}).get("revisions", []): _require(revision.get("validation", {}).get("disposition") != "PASS", "manual revision leaked validation acceptance")
@@ -63,7 +65,7 @@ func _run_suite() -> void:
 	_cleanup(restarted)
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx012-revisions")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx012-revisions"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

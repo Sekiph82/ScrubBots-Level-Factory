@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const PASS_MARKER := "SB-LFX-007-C001 COMPARISON integration PASS"
 var _errors: Array[String] = []
 
@@ -14,7 +16,7 @@ func _run_suite() -> void:
 	var gateway: RefCounted = instance.get("core_gateway")
 	_require(comparison != null and gateway != null, "comparison surface or gateway did not instantiate")
 	if comparison == null or gateway == null: _cleanup(instance); return
-	var output_root := "res://output/.lfx007-comparison"
+	var output_root := TEST_PATHS.output(".lfx007-comparison")
 	_remove_tree(ProjectSettings.globalize_path(output_root))
 	var left: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "77007", "mode": "MASK"}, output_root)
 	var right: Dictionary = gateway.call("run_action", "Generate", {"width": 20, "height": 20, "seed": "77008", "mode": "RULES"}, output_root)
@@ -30,10 +32,10 @@ func _run_suite() -> void:
 	_require(first_view.get("candidates", [])[1].get("owner_review", {}).get("disposition") == "NOT AVAILABLE", "left review crossed to right candidate")
 	for candidate in first_view.get("candidates", []):
 		_require(candidate.has("provenance") and candidate.has("structural") and candidate.has("evidence_references"), "comparison evidence surface is incomplete")
-		_require(candidate.get("solver", {}).get("disposition") == "NOT AVAILABLE" and candidate.get("difficulty", {}).get("disposition") == "NOT AVAILABLE", "unavailable domains were fabricated")
+		_require(candidate.get("solver", {}).get("disposition") == "NOT_AVAILABLE" and candidate.get("difficulty", {}).get("disposition") == "NOT_AVAILABLE", "unavailable domains were fabricated")
 	var refreshed: Dictionary = gateway.call("run_studio_extension", "comparison", {"candidate_ids": [right_id, left_id]})
 	_require(refreshed.get("candidates", [])[0].get("candidate_id") == right_id and refreshed.get("candidates", [])[1].get("candidate_id") == left_id, "refresh/reselection cross-wired comparison columns")
-	var review_path := ProjectSettings.globalize_path("res://output/studio-extensions/owner-review").path_join("review-%s-0001.json" % left_id)
+	var review_path := ProjectSettings.globalize_path(TEST_PATHS.extensions("owner-review")).path_join("review-%s-0001.json" % left_id)
 	var review_before := FileAccess.get_file_as_bytes(review_path)
 	var corrupt := FileAccess.open(review_path, FileAccess.WRITE); corrupt.store_string("{tampered"); corrupt.close()
 	var stale: Dictionary = gateway.call("run_studio_extension", "comparison", {"candidate_ids": [left_id, right_id]})
@@ -51,7 +53,7 @@ func _bundle_bytes(path: String) -> Dictionary:
 	return result
 
 func _cleanup(instance: Node) -> void:
-	_remove_tree(ProjectSettings.globalize_path("res://output/.lfx007-comparison")); _remove_tree(ProjectSettings.globalize_path("res://output/studio-extensions")); instance.queue_free(); _finish()
+	_remove_tree(ProjectSettings.globalize_path(TEST_PATHS.output(".lfx007-comparison"))); _remove_tree(ProjectSettings.globalize_path(TEST_PATHS.extensions(""))); instance.queue_free(); _finish()
 
 func _remove_tree(path: String) -> void:
 	if not DirAccess.dir_exists_absolute(path): return

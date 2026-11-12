@@ -10,6 +10,7 @@ import numpy as np
 from PIL import Image
 import pytest
 
+from scrubbots_pixel_factory import owner_art_storage  # noqa: E402
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio
 from scrubbots_pixel_factory.contracts import CANONICAL_PALETTE
 from scrubbots_pixel_factory.owner_upload import import_owner_upload
@@ -17,6 +18,12 @@ from scrubbots_pixel_factory.supply_pipeline.game_rules import GameRules
 from scrubbots_pixel_factory.supply_pipeline.scrubbots_solver import ScrubBotsSolver
 from scrubbots_pixel_factory.supply_pipeline.screening import ScreeningSimulator
 from scrubbots_pixel_factory.supply_pipeline.verify import verify_exported_supply
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("SCRUBBOTS_PROJECT"),
+    reason="needs an explicit SCRUBBOTS_PROJECT game checkout; the implicit Desktop fallback is disabled",
+)
+
 
 
 OWNER_OWL = Path(__file__).parents[1] / "fixtures" / "owner_void" / "017_a_single_brown_owl_centered_simple_clear_32px.png"
@@ -28,11 +35,14 @@ def _configure_studio_roots(repository: Path, monkeypatch) -> tuple[Path, Path]:
     evidence = repository / "level_factory" / "output" / "studio-extensions"
     uploads.mkdir(parents=True)
     evidence.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "extensions_root", lambda: evidence)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda *_args, **_kwargs: evidence)
     return uploads, evidence
 
 
@@ -123,7 +133,7 @@ def test_void_topology_fixtures_pass_the_current_game_pipeline(
     source_path.write_bytes(source_bytes)
     imported = import_owner_upload(source_path)
     source_id = str(imported["source_id"])
-    stored_source = uploads / source_id / "source.png"
+    stored_source = uploads / source_id / source_path.name  # original filename (canonical layout)
     assert stored_source.read_bytes() == source_bytes
     validation = studio.validate_owner_source(source_id, persist=False, game_project=os.environ["SCRUBBOTS_PROJECT"])
     assert validation["exact_logical_source"] is True, validation
@@ -191,11 +201,14 @@ def test_owner_upload_transparent_fixture_reaches_ready_with_three_four_five_col
     evidence = repository / "level_factory" / "output" / "studio-extensions"
     uploads.mkdir(parents=True)
     evidence.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: uploads)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "extensions_root", lambda: evidence)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: uploads)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda *_args, **_kwargs: evidence)
 
     source_path = OWNER_OWL
     source_bytes = source_path.read_bytes()
@@ -209,7 +222,7 @@ def test_owner_upload_transparent_fixture_reaches_ready_with_three_four_five_col
     assert len({pixel[:3] for pixel in source_pixels if pixel[3] == 255}) == 7
     imported = import_owner_upload(source_path)
     source_id = str(imported["source_id"])
-    stored_source = uploads / source_id / "source.png"
+    stored_source = uploads / source_id / source_path.name  # original filename (canonical layout)
     assert stored_source.read_bytes() == source_bytes
 
     request_base = {

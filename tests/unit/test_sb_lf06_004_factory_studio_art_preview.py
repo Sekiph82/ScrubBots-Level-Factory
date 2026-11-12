@@ -66,21 +66,8 @@ def test_committed_integration_contains_real_pixel_and_retention_assertions() ->
         assert marker in source
 
 
-def test_real_studio_preview_integration_passes() -> None:
-    result = subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_action_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_real_studio_preview_integration_passes(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_action_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LF06-004-C001 crisp preview integration PASS" in output

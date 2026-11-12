@@ -5,6 +5,7 @@ import json
 import sys
 from pathlib import Path
 
+import os
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,12 +21,19 @@ from scrubbots_content_pipeline import (  # noqa: E402
     verify_solver_proven_scrubpack,
 )
 from scrubbots_content_pipeline.scrubpack_builder import ScrubpackBuildError  # noqa: E402
+from scrubbots_pixel_factory import owner_art_storage  # noqa: E402
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio  # noqa: E402
 from scrubbots_pixel_factory.output.png import encode_logical_png  # noqa: E402
 from scrubbots_pixel_factory.supply_pipeline import release_pool  # noqa: E402
 from scrubbots_pixel_factory.supply_pipeline.scrubpack_identity import (  # noqa: E402
+
     current_solver_proof_for_candidate,
     revalidate_current_solver_proofs,
+)
+
+pytestmark = pytest.mark.skipif(
+    not os.environ.get("SCRUBBOTS_PROJECT"),
+    reason="needs an explicit SCRUBBOTS_PROJECT game checkout; the implicit Desktop fallback is disabled",
 )
 
 
@@ -135,11 +143,14 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
     evidence_root = repository / "level_factory/output/studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda *_args, **_kwargs: evidence_root)
 
     source_path = tmp_path / "current-factory-source.png"
     source_path.write_bytes(encode_logical_png(20, 20, ["C01", "C02", "C03", "C04"] * 100))
@@ -325,7 +336,7 @@ def test_real_ready_release_pool_solver_identity_binds_scrubpack_and_rejects_dri
         current_plan_bytes,
     )
     projection = [pool_entry]
-    monkeypatch.setattr(release_pool, "release_entries", lambda: list(projection))
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args, **_kwargs: list(projection))
     pool_pipeline_bytes, pool_source = current_solver_proof_for_candidate(candidate_id)
     assert pool_source["schema"] == "scrubbots-release-pool-entry/v1"
     pool_proof = ScrubpackSolverProof(pool_pipeline_bytes, pool_source)

@@ -18,23 +18,6 @@ LAUNCHER = FACTORY / "scripts" / "factory_core_launcher.py"
 STUDIO_PASS_MARKER = "SB-LF06-002-C001-R01 committed runtime suite PASS"
 
 
-def _run_godot_studio_smoke() -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [
-            "godot",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_runtime_suite.gd",
-        ],
-        cwd=ROOT,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
 def _run_core(*arguments: str) -> subprocess.CompletedProcess[str]:
     environment = dict(os.environ)
     environment.pop("PYTHONPATH", None)
@@ -56,8 +39,8 @@ def _bundle_files(root: Path) -> list[Path]:
     )
 
 
-def test_lf06_012_gate_runs_real_studio_smoke_and_canonical_core_reproduction() -> None:
-    studio = _run_godot_studio_smoke()
+def test_lf06_012_gate_runs_real_studio_smoke_and_canonical_core_reproduction(run_isolated_godot_suite) -> None:
+    studio = run_isolated_godot_suite("factory_studio_runtime_suite.gd")
     studio_output = studio.stdout + studio.stderr
     assert studio.returncode == 0, studio_output
     assert STUDIO_PASS_MARKER in studio_output, studio_output

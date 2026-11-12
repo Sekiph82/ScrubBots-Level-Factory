@@ -1,10 +1,12 @@
 extends SceneTree
 
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+
 const MAIN_SCENE_PATH := "res://scenes/factory_studio.tscn"
 const NAVIGATION_NODE_PATH := NodePath("Frame/Layout/Body/NavigationPanel/Navigation")
 const WORKSPACE_NODE_PATH := NodePath("Frame/Layout/Body/Workspace")
 const TARGET_NODE_PATH := NodePath("Padding/Content/TargetControls")
-const TEST_OUTPUT_PATH := "res://output/.lf06-011-exact-reproduce-test"
+var TEST_OUTPUT_PATH: String = TEST_PATHS.output(".lf06-011-exact-reproduce-test")
 const SOURCE_SEED_A := "77"
 const SOURCE_SEED_B := "78"
 const A_PRESENTATION_LABEL := "source-a-presentation-only"

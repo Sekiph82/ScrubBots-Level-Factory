@@ -70,21 +70,8 @@ def test_dashboard_integration_is_committed_and_uses_real_factory_studio() -> No
     assert INTEGRATION.is_file()
 
 
-def test_committed_dashboard_integration_passes_headlessly() -> None:
-    result = subprocess.run(
-        [
-            "godot_console.exe",
-            "--headless",
-            "--path",
-            "level_factory",
-            "--script",
-            "res://tests/factory_studio_dashboard_integration_suite.gd",
-        ],
-        cwd=ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+def test_committed_dashboard_integration_passes_headlessly(run_isolated_godot_suite) -> None:
+    result = run_isolated_godot_suite("factory_studio_dashboard_integration_suite.gd")
     output = result.stdout + result.stderr
     assert result.returncode == 0, output
     assert "SB-LFX-001-C001 Factory Operations Dashboard derived-view integration PASS" in output

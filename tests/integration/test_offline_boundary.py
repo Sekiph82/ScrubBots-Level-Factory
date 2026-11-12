@@ -84,7 +84,8 @@ def test_production_source_has_no_network_imports_outside_boundary() -> None:
         re.MULTILINE,
     )
     for source_path in SRC_ROOT.rglob("*.py"):
-        if source_path.name == "offline.py":
+        # offline.py and the PixelLab provider transport are the only network boundaries.
+        if source_path.name in {"offline.py", "provider_http.py"}:
             continue
         assert forbidden.search(source_path.read_text(encoding="utf-8")) is None, source_path
 

@@ -7,6 +7,7 @@ import subprocess
 
 import pytest
 
+from scrubbots_pixel_factory import owner_art_storage  # noqa: E402
 from scrubbots_pixel_factory import owner_upload, studio_extensions as studio
 from scrubbots_pixel_factory.headless_pipeline import JOB_SCHEMA, run_job, _read_events, load_job
 from scrubbots_pixel_factory.output.png import encode_logical_png
@@ -37,20 +38,23 @@ def test_headless_job_uses_the_same_canonical_route_and_review_queue(tmp_path: P
     evidence_root = repository / "level_factory" / "output" / "studio-extensions"
     source_root.mkdir(parents=True)
     evidence_root.mkdir(parents=True)
-    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(owner_upload, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "owner_upload_root", lambda: source_root)
-    monkeypatch.setattr(studio, "_repository_root", lambda: repository)
-    monkeypatch.setattr(studio, "extensions_root", lambda: evidence_root)
+    monkeypatch.setattr(owner_upload, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(owner_upload, "_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "owner_upload_root", lambda *_args, **_kwargs: source_root)
+    monkeypatch.setattr(studio, "_repository_root", lambda *_args, **_kwargs: repository)
+    # Solver jobs and Release Pool records resolve through owner_art_storage;
+    # without this they targeted the real checkout's data/ (blocked by tests/conftest.py).
+    monkeypatch.setattr(owner_art_storage, "factory_repository_root", lambda *_args, **_kwargs: repository)
+    monkeypatch.setattr(studio, "extensions_root", lambda *_args, **_kwargs: evidence_root)
 
     source_path = tmp_path / "producer-source.png"
     source_path.write_bytes(encode_logical_png(20, 20, ["C01", "C02", "C03", "C04"] * 100))
     imported = owner_upload.import_owner_upload(source_path)
     assert imported["state"] == "IMPORTED"
     source_id = str(imported["source_id"])
-    source_bytes_before = (source_root / source_id / "source.png").read_bytes()
+    source_bytes_before = (source_root / source_id / source_path.name).read_bytes()
     validation = studio.validate_owner_source(source_id)
-    candidate_id, bundle_path = studio._derive_owner_candidate(source_id, validation, source_root / source_id / "source.png")
+    candidate_id, bundle_path = studio._derive_owner_candidate(source_id, validation, source_root / source_id / source_path.name)
     bundle = studio.read_bundle(bundle_path)
     source_lineage = bundle.metadata.get("generator_metadata", {})
 
@@ -101,7 +105,7 @@ def test_headless_job_uses_the_same_canonical_route_and_review_queue(tmp_path: P
     assert cli_pipeline["primary"]["acceptance"] == studio_pipeline["primary"]["acceptance"]
     assert cli_pipeline["primary"]["difficulty"] == studio_pipeline["primary"]["difficulty"]
     assert cli_pipeline["primary"]["result"]["supply_columns"] == studio_pipeline["primary"]["result"]["supply_columns"]
-    assert (source_root / source_id / "source.png").read_bytes() == source_bytes_before
+    assert (source_root / source_id / source_path.name).read_bytes() == source_bytes_before
     assert job_path.read_bytes() == job_bytes
     inbox = studio.candidate_inbox()
     queued = next(item for item in inbox["candidates"] if item["candidate_id"] == candidate_id)
