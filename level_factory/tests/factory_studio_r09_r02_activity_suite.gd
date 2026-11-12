@@ -1,10 +1,26 @@
 extends SceneTree
 
+## R09-R02 Pipeline Activity panel: placement, structure and screen scope.
+##
+## Rewritten 2026-11-12 for the current owner ruling (R09-R02-R01, master UI
+## V03): the panel sits under Run Pipeline at x=27, y=412, width 334 and fills
+## the remaining left-workspace height; it shows a title, state chip, source
+## row, phase row and a scrollable newest-first event list (no single text
+## label any more), and it is visible only on LEVEL FACTORY.
+
 const MAIN_SCENE := "res://scenes/factory_studio.tscn"
+const PASS_MARKER := "R09-R02 Studio activity UI test: PASS"
+
+var _errors: Array[String] = []
 
 
 func _init() -> void:
 	call_deferred("_run")
+
+
+func _check(condition: bool, message: String) -> void:
+	if not condition:
+		_errors.append(message)
 
 
 func _run() -> void:
@@ -16,57 +32,55 @@ func _run() -> void:
 	var instance := packed.instantiate()
 	root.add_child(instance)
 	await process_frame
-	var studio := instance.get_node_or_null("MasterUI")
-	var panel := studio.get_node_or_null("PipelineActivityPanel") as Panel if studio != null else null
-	var label := studio.get_node_or_null("PipelineActivityText") as Label if studio != null else null
-	if panel == null or label == null:
-		push_error("R09-R02 activity test: approved panel controls are missing")
-		instance.queue_free()
+	var studio := instance.get_node_or_null("MasterUI") as Control
+	if studio == null:
+		push_error("R09-R02 activity test: MasterUI is missing")
+		instance.free()
 		quit(1)
 		return
 	studio.size = Vector2(1536, 1024)
 	studio.call("_apply_responsive_layout")
-	if panel.position != Vector2(27, 540) or panel.size != Vector2(334, 250):
-		push_error("R09-R02 activity test: panel geometry changed from owner-approved rectangle")
-		instance.queue_free()
-		quit(1)
+
+	var panel := studio.get_node_or_null("PipelineActivityPanel") as Panel
+	_check(panel != null, "PipelineActivityPanel is missing")
+	if panel == null:
+		_finish(instance)
 		return
-	if panel.visible or label.visible:
-		push_error("R09-R02 activity test: panel leaked into PIXEL ART")
-		instance.queue_free()
-		quit(1)
-		return
+	for child in ["PipelineActivityTitle", "PipelineActivityStateChip/PipelineActivityState", "PipelineActivitySource",
+			"PipelineActivityPhase", "PipelineActivityScroll/PipelineActivityRows", "PauseAfterCurrent", "StopAfterCurrent"]:
+		_check(panel.get_node_or_null(child) != null, "activity panel child %s is missing" % child)
+	var title := panel.get_node_or_null("PipelineActivityTitle") as Label
+	_check(title != null and title.text == "PIPELINE ACTIVITY", "activity title is not PIPELINE ACTIVITY")
+
+	# Responsive scaling may move edges by a fraction of a pixel.
+	_check(panel.position.distance_to(Vector2(27, 412)) <= 1.0 and absf(panel.size.x - 334.0) <= 1.0,
+		"activity panel left edge/top/width moved from Rect2(27,412,334,…): %s" % [Rect2(panel.position, panel.size)])
+	var left_panel := studio.get_node_or_null("RuntimeLeftPanel") as Control
+	_check(left_panel != null and absf(panel.position.y + panel.size.y - (left_panel.position.y + left_panel.size.y)) <= 1.0,
+		"activity panel does not fill the remaining left-workspace height")
+	var run_button := studio.get_node_or_null("RunLevelPipeline") as Button
+	_check(run_button != null and run_button.position.y + run_button.size.y <= panel.position.y,
+		"Run Pipeline is not directly above the activity panel")
+
+	_check(not panel.is_visible_in_tree(), "activity panel leaked into the initial PIXEL ART screen")
 	studio.call("_show_screen", "LEVEL FACTORY")
 	await process_frame
-	if not panel.visible or not label.visible or not label.text.begins_with("PIPELINE ACTIVITY"):
-		push_error("R09-R02 activity test: panel did not appear inside LEVEL FACTORY")
-		instance.queue_free()
-		quit(1)
-		return
-	if bool(studio.get("_operation_running")) or studio.get("_pipeline_thread") != null:
-		push_error("R09-R02 activity test: screen selection automatically executed the pipeline")
-		instance.queue_free()
-		quit(1)
-		return
+	_check(panel.is_visible_in_tree(), "activity panel did not appear inside LEVEL FACTORY")
+	# The startup Final-source restore is read-only; only a pipeline worker counts.
+	_check(studio.get("_pipeline_thread") == null, "opening LEVEL FACTORY automatically executed the pipeline")
 	for screen in ["PIXEL ART", "RELEASE POOL"]:
 		studio.call("_show_screen", screen)
 		await process_frame
-		if panel.visible or label.visible:
-			push_error("R09-R02 activity test: panel leaked outside LEVEL FACTORY")
-			instance.queue_free()
-			quit(1)
-			return
-	if OS.get_environment("SB_LFX_R09_R02_CAPTURE_RELEASE_UI") == "1":
-		studio.call("_show_screen", "LEVEL FACTORY")
-		await process_frame
-		await process_frame
-		var image := root.get_viewport().get_texture().get_image()
-		var evidence_path := ProjectSettings.globalize_path("res://../owner-visual-evidence/SB-LFX-018-C001-R02-R05-R09-R02-release-level-factory-viewport.png")
-		if image == null or image.is_empty() or FileAccess.file_exists(evidence_path) or image.save_png(evidence_path) != OK:
-			push_error("R09-R02 activity test: installed Release viewport screenshot could not be captured safely")
-			instance.queue_free()
-			quit(1)
-			return
-	instance.queue_free()
-	print("R09-R02 Studio activity UI test: PASS")
-	quit(0)
+		_check(not panel.is_visible_in_tree(), "activity panel leaked into %s" % screen)
+	_finish(instance)
+
+
+func _finish(instance: Node) -> void:
+	instance.free()
+	if _errors.is_empty():
+		print(PASS_MARKER)
+		quit(0)
+		return
+	for error in _errors:
+		push_error("R09-R02 activity test: " + error)
+	quit(1)

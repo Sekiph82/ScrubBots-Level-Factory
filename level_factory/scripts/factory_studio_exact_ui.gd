@@ -1745,7 +1745,7 @@ func _refresh_live_data() -> void:
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
-			"Solver %s   |   Replay %s" % [solver_text.left(10), replay_text.left(8)],
+			"Solver %s   |   Replay %s" % [solver_text.left(11), replay_text.left(8)],  # 11 fits UNAVAILABLE (was cut to UNAVAILABL)
 			"Difficulty %s   |   Pool %s" % [difficulty_text.left(10), pool_status.left(12)],
 			"PNG %s   |   Batch %s" % [selected_source_text.left(23) if not selected_source_text.is_empty() else "—", batch_caption if not batch_caption.is_empty() else "—"],
 		]

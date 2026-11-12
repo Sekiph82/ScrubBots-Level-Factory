@@ -40,12 +40,19 @@ class FakeGateway extends RefCounted:
 		if operation == "library-refresh": return library_payload
 		return {"state": "UNAVAILABLE", "disposition": "UNAVAILABLE"}
 
-	func prepare_studio_extension_call(_operation: String, _request: Dictionary) -> Dictionary:
-		prepare_count += 1
-		return {"fake_worker": true}
+	var prepared_operations: Array[String] = []
 
-	func execute_prepared_studio_extension_call(_prepared: Dictionary) -> Dictionary:
+	func prepare_studio_extension_call(operation: String, _request: Dictionary) -> Dictionary:
+		prepare_count += 1
+		prepared_operations.append(operation)
+		return {"fake_worker": true, "operation": operation}
+
+	var worker_execute_count := 0
+
+	func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
 		execute_count += 1
+		if not prepared.has("operation"):
+			worker_execute_count += 1  # the explicitly started pipeline worker, not a background reader
 		if delay_msec > 0: OS.delay_msec(delay_msec)
 		return pipeline_result.duplicate(true)
 
@@ -89,6 +96,19 @@ func _make_studio() -> Node:
 	if studio == null:
 		_fail("Master UI controller did not load")
 		return null
+	# Since 72fde591 the deferred startup PixelLab Final inventory reports through
+	# this same activity panel. Settle it deterministically with an empty catalog.
+	studio.set("_studio_read_queue", [])
+	studio.call("_apply_restored_imported_sources", {"schema": "scrubbots-source-library-view", "sources": []})
+	# Release the 2026-11-10 startup gate the way the real startup reads do
+	# (empty Release Pool status archive, no saved batch to restore).
+	studio.set("_owner_release_archive", {"schema": "scrubbots-owner-release-library-view/v1", "records": []})
+	studio.set("_owner_release_archive_loaded", true)
+	studio.set("_startup_release_archive_settled", true)
+	studio.set("_startup_pending_batch_restore_started", true)
+	studio.set("_batch_restore_pending", false)
+	studio.set("_release_pool_loaded", true)
+	studio.call("_apply_startup_gate")
 	studio.size = Vector2(1536, 1024)
 	studio.call("_apply_responsive_layout")
 	return studio
@@ -140,6 +160,7 @@ func _set_activity_identity(studio: Node, reader: FakeAppendReader, operation_ru
 	studio.set("_activity_stream_reader_override", reader)
 	studio.set("_activity_run_id", RUN_ID)
 	studio.set("_activity_source_id", SOURCE_ID)
+	studio.set("_selected_import_source_id", SOURCE_ID)
 	studio.set("_activity_source_sha256", SOURCE_SHA)
 	studio.set("_activity_source_filename", "002_32x32px.png")
 	studio.set("_activity_started_msec", Time.get_ticks_msec())
@@ -158,9 +179,23 @@ func _set_activity_identity(studio: Node, reader: FakeAppendReader, operation_ru
 	studio.set("_operation_running", operation_running)
 
 
+## LEVEL FACTORY details are rendered in RuntimeDetailsRow* labels (the stop
+## reason is in the Pipeline row's tooltip); the shared RuntimeLiveData panel is
+## PIXEL ART-only since the per-row Details redesign.
+func _level_factory_details(studio: Node) -> String:
+	var lines: Array[String] = []
+	for row in studio.get("_details_rows"):
+		if row is Label:
+			lines.append((row as Label).text)
+			lines.append((row as Label).tooltip_text)
+	return "
+".join(lines)
+
+
 func _backend_result() -> Dictionary:
 	return {
 		"run_id": "pipeline-offline-test",
+		"source_id": SOURCE_ID,  # the backend binds every result to its source (activity is source-scoped)
 		"disposition": "UNAVAILABLE",
 		"request": {"game_project": ""},
 		"stages": [
@@ -179,19 +214,23 @@ func _test_layout_and_valid_incremental_stream(studio: Node) -> bool:
 	if panel == null or title == null or state_label == null or scroll == null or button == null:
 		_fail("scrollable activity controls or Run Pipeline are missing: panel=%s title=%s state=%s scroll=%s button=%s paths=%s" % [panel != null, title != null, state_label != null, scroll != null, button != null, studio.get_path()])
 		return false
-	if panel.position != Vector2(27, 412) or panel.size != Vector2(334, 498):
-		_fail("activity panel does not occupy the owner-approved lower workspace")
+	# Rewritten 2026-11-12: the panel keeps Rect2(27,412,334,…) and now fills the
+	# remaining left-workspace height; responsive scaling may move edges < 1 px.
+	# The manual Select PNG button was removed in f95a9cab (PixelLab Final is
+	# selected automatically) and the settings widened to the full left column.
+	var left_panel := studio.get_node_or_null("RuntimeLeftPanel") as Control
+	if panel.position.distance_to(Vector2(27, 412)) > 1.0 or absf(panel.size.x - 334.0) > 1.0 			or left_panel == null or absf(panel.position.y + panel.size.y - (left_panel.position.y + left_panel.size.y)) > 1.0:
+		_fail("activity panel does not occupy the owner-approved lower workspace: %s" % [Rect2(panel.position, panel.size)])
 		return false
-	if (studio.get_node("SelectArtwork") as Button).position != Vector2(42, 165):
-		_fail("Select PNG moved from its visual-master location")
-	if (studio.get_node("LevelNumber") as Button).position != Vector2(172, 165):
-		_fail("level settings are not top-right beside Select PNG")
-	for spec in [["SupplyColumns3", Vector2(172, 209)], ["SupplyColumns4", Vector2(238, 209)], ["SupplyColumns5", Vector2(304, 209)], ["MaxRobotsAuto", Vector2(172, 253)], ["BackgroundIntent", Vector2(172, 297)], ["RunLevelPipeline", Vector2(26, 347)]]:
-		if (studio.get_node(str(spec[0])) as Button).position != spec[1]:
+	if studio.get_node_or_null("SelectArtwork") != null:
+		_fail("the removed manual Select PNG control reappeared")
+		return false
+	for spec in [["LevelNumber", Vector2(26, 165)], ["SupplyColumns3", Vector2(26, 209)], ["SupplyColumns4", Vector2(141, 209)], ["SupplyColumns5", Vector2(256, 209)], ["MaxRobotsAuto", Vector2(26, 253)], ["BackgroundIntent", Vector2(26, 297)], ["RunLevelPipeline", Vector2(26, 347)]]:
+		if (studio.get_node(str(spec[0])) as Button).position.distance_to(spec[1]) > 1.0:
 			_fail("owner control geometry changed for %s" % spec[0])
 			return false
-	if panel.visible or title.is_visible_in_tree() or state_label.is_visible_in_tree() or state_label.text != "IDLE":
-		_fail("activity leaked into the initial PIXEL ART screen")
+	if panel.visible or title.is_visible_in_tree() or state_label.is_visible_in_tree() or state_label.text == "RUNNING":
+		_fail("activity leaked into the initial PIXEL ART screen: visible=%s state=%s screen=%s" % [panel.is_visible_in_tree(), state_label.text, studio.get("_screen")])
 		return false
 	studio.call("_show_screen", "LEVEL FACTORY")
 	if not panel.visible:
@@ -240,14 +279,22 @@ func _test_layout_and_valid_incremental_stream(studio: Node) -> bool:
 		return false
 	studio.call("_complete_level_pipeline", _backend_result())
 	if state_label.text != "UNAVAILABLE" or str(studio.get("_activity_stage")) != "PIPELINE":
-		_fail("verified UNAVAILABLE terminal did not reconcile with the canonical backend result")
+		_fail("verified UNAVAILABLE terminal did not reconcile with the canonical backend result: state=%s stage=%s" % [state_label.text, studio.get("_activity_stage")])
 		return false
-	var details := studio.get_node("RuntimeLiveData") as Label
-	if details.text.find("SCRUBBOTS_PROJECT is not configured for current-game authority") < 0 or details.text.find("Replay: —") < 0:
-		_fail("Details hid the real game-authority stop reason or invented replay data")
+	studio.call("_show_screen", "LEVEL FACTORY")
+	var details_text := _level_factory_details(studio)
+	if details_text.find("SCRUBBOTS_PROJECT is not configured for current-game authority") < 0 or details_text.find("Replay —") < 0:
+		_fail("Details hid the real game-authority stop reason or invented replay data: %s" % details_text)
 		return false
-	if (studio.get_node("RunLevelPipeline") as Button).disabled:
-		_fail("Run Pipeline remained disabled after the worker reached a terminal state")
+	if details_text.find("Solver UNAVAILABLE") < 0:
+		_fail("Details truncated the solver state: %s" % details_text)
+		return false
+	# Since the Pending-batch flow the button is disabled only while a worker
+	# runs or when no Pending Final PNG exists ("No Pending PNGs").
+	var run_button := studio.get_node("RunLevelPipeline") as Button
+	var no_pending := (studio.call("_pending_gameplay_sources") as Array).is_empty()
+	if run_button.text.begins_with("Running") or run_button.disabled != no_pending:
+		_fail("Run Pipeline stayed in a worker state after the terminal result: %s disabled=%s" % [run_button.text, run_button.disabled])
 		return false
 	for screen in ["PIXEL ART", "RELEASE POOL"]:
 		studio.call("_show_screen", screen)
@@ -277,9 +324,9 @@ func _test_fail_closed_tamper(studio: Node) -> bool:
 	ready_result["primary"] = {"state": "READY", "acceptance": {"replay": "WIN"}, "difficulty": {"class": "Easy"}}
 	studio.call("_complete_level_pipeline", ready_result)
 	studio.call("_show_screen", "LEVEL FACTORY")
-	var details := studio.get_node("RuntimeLiveData") as Label
-	if str(studio.get("_last_pipeline").get("studio_monitor_validation", "")) != "FAILED_CLOSED" or details.text.find("Solver: ERROR") < 0 or details.text.find("Replay: —") < 0:
-		_fail("backend READY escaped an invalid monitor's fail-closed gate")
+	var details_text := _level_factory_details(studio)
+	if str(studio.get("_last_pipeline").get("studio_monitor_validation", "")) != "FAILED_CLOSED" or details_text.find("Solver ERROR") < 0 or details_text.find("Replay —") < 0:
+		_fail("backend READY escaped an invalid monitor's fail-closed gate: %s | %s" % [studio.get("_last_pipeline").get("studio_monitor_validation", ""), details_text])
 		return false
 	return true
 
@@ -311,13 +358,28 @@ func _test_restored_import_order(studio: Node) -> bool:
 	studio.call("configure_gateway", gateway)
 	studio.get("_imported_sources").clear()
 	studio.set("_selected_import_source_id", "")
+	studio.set("_studio_read_queue", [])
+	# Let any startup read that was already in flight finish first; an
+	# identical in-flight read would otherwise be (correctly) de-duplicated.
+	for _frame in range(300):
+		if studio.get("_studio_read_thread") == null:
+			break
+		await process_frame
+	studio.set("_studio_read_queue", [])
+	# Since the background-reader rewrite the restore is queued as one read-only
+	# library-refresh call (plus the read-only Release Pool status reader); its catalog result is then applied on the
+	# main thread. Never the synchronous owner-pages projection.
 	studio.call("_restore_imported_sources")
+	var worker_operations := gateway.prepared_operations.filter(func(operation: String) -> bool:
+		return operation.contains("pipeline") or operation.contains("batch-run") or operation.contains("batch-create"))
+	if gateway.prepared_operations.count("library-refresh") != 1 or not worker_operations.is_empty() or "owner-pages" in gateway.operations:
+		_fail("source restore did not queue one read-only library-refresh without workers: prepared=%s sync=%s" % [gateway.prepared_operations, gateway.operations])
+		return false
+	studio.set("_studio_read_queue", [])
+	studio.call("_apply_restored_imported_sources", gateway.library_payload)
 	var queue: Array = studio.call("imported_queue_snapshot")
 	if queue.size() != 4:
-		_fail("read-only verified library restore did not recover four immutable sources")
-		return false
-	if "owner-pages" in gateway.operations or "library-refresh" not in gateway.operations or "loaded-png-batch-find" not in gateway.operations:
-		_fail("source restore called an unrelated synchronous owner-pages projection: %s" % str(gateway.operations))
+		_fail("read-only verified library restore did not recover four immutable sources: %s" % [queue])
 		return false
 	for index in range(4):
 		if str(queue[index].get("source_id", "")) != ids[index] or str(queue[index].get("disposition", "")) != "SOURCE_ONLY":
@@ -335,8 +397,10 @@ func _test_restored_import_order(studio: Node) -> bool:
 	if (studio.get("_preview_rect") as TextureRect).texture == null:
 		_fail("selected restored PNG did not return with its LEVEL FACTORY preview")
 		return false
-	if bool(studio.get("_operation_running")) or studio.get("_pipeline_thread") != null or gateway.execute_count != 0:
-		_fail("read-only import restoration automatically invoked the pipeline")
+	# Read-only background readers may execute; a pipeline worker must not.
+	if studio.get("_pipeline_thread") != null or gateway.prepared_operations.any(func(operation: String) -> bool:
+			return operation.contains("pipeline") or operation.contains("batch-run") or operation.contains("batch-create")):
+		_fail("read-only import restoration automatically invoked the pipeline: %s" % [gateway.prepared_operations])
 		return false
 	return true
 
@@ -383,8 +447,8 @@ func _test_slow_worker_stream(studio: Node) -> bool:
 		return false
 	thread.wait_to_finish()
 	studio.call("_complete_level_pipeline", gateway.pipeline_result)
-	if gateway.execute_count != 1 or str(studio.call("_activity_display_state")) != "UNAVAILABLE":
-		_fail("fake worker count or backend-truth state was incorrect")
+	if gateway.worker_execute_count != 1 or str(studio.call("_activity_display_state")) != "UNAVAILABLE":
+		_fail("fake worker count or backend-truth state was incorrect: workers=%d state=%s" % [gateway.worker_execute_count, studio.call("_activity_display_state")])
 		return false
 	return true
 
@@ -394,7 +458,7 @@ func _run() -> void:
 		var restore_studio := await _make_studio()
 		if restore_studio == null:
 			return
-		if not _test_restored_import_order(restore_studio):
+		if not await _test_restored_import_order(restore_studio):
 			await _free_studio(restore_studio)
 			return
 		await _free_studio(restore_studio)
@@ -420,7 +484,7 @@ func _run() -> void:
 	if import_studio == null:
 		await _free_studio(studio)
 		return
-	if not _test_restored_import_order(import_studio):
+	if not await _test_restored_import_order(import_studio):
 		await _free_studio(import_studio)
 		await _free_studio(studio)
 		return

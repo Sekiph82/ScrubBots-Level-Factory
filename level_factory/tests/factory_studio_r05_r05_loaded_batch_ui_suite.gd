@@ -1,6 +1,15 @@
 extends SceneTree
 
+## Rewritten 2026-11-12 for the Pending flow: an explicit Run snapshots the
+## SHA-matched Release Pool PENDING sources ("pending-png-batch-create") against
+## the pinned game Runtime, and the saved-batch restore runs through the
+## background reader. Gallery, read-only thumbnail selection, SHA-bound result
+## rows and the nullable restore contract are unchanged.
+
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+const PINNED_GAME_COMMIT := "aef60a616d4ac401e9dfac15df6fe56e671c0053"
+const READ_OPERATIONS := ["loaded-png-batch-find", "png-batch-latest"]
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R05 loaded PNG batch UI PASS"
 
 class ReadOnlyGateway extends RefCounted:
@@ -11,12 +20,12 @@ class ReadOnlyGateway extends RefCounted:
 
 	func run_studio_extension(operation: String, request: Dictionary) -> Dictionary:
 		calls.append({"operation": operation, "request": request.duplicate(true)})
-		if operation == "loaded-png-batch-create":
+		if operation == "pending-png-batch-create":
 			source_ids = request.get("source_ids", []).duplicate()
 		if extension_responses.has(operation):
 			var response: Variant = extension_responses[operation]
 			return response.duplicate(true) if response is Dictionary else response
-		if operation == "loaded-png-batch-create":
+		if operation == "pending-png-batch-create":
 			return {"batch_id": "batch-loaded-fixture", "counts": {"success": source_ids.size(), "failed": 0}}
 		if operation == "png-batch-create":
 			return {"job": planned_job.duplicate(true)}
@@ -24,10 +33,13 @@ class ReadOnlyGateway extends RefCounted:
 
 	func prepare_studio_extension_call(operation: String, request: Dictionary) -> Dictionary:
 		calls.append({"operation": "prepare:" + operation, "request": request.duplicate(true)})
-		return {}
+		if operation in READ_OPERATIONS and extension_responses.has(operation):
+			return {"operation": operation}  # background read served below
+		return {}  # never start a worker
 
-	func execute_prepared_studio_extension_call(_prepared: Dictionary) -> Dictionary:
-		return {"state": "UNAVAILABLE"}
+	func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
+		var response: Variant = extension_responses.get(str(prepared.get("operation", "")), {"state": "UNAVAILABLE"})
+		return response.duplicate(true) if response is Dictionary else {"state": "UNAVAILABLE"}
 
 
 var _errors: Array[String] = []
@@ -97,13 +109,23 @@ func _run_suite() -> void:
 		"planned_quotas": {"3": 4, "4": 4, "5": 1}, "ready_mix": {"3": 0, "4": 0, "5": 0},
 	}
 	gateway.extension_responses = {
-		"loaded-png-batch-create": {
+		"pending-png-batch-create": {
 			"batch_id": "batch-loaded-fixture",
 			"items": composite_items.duplicate(true),
 			"counts": {"success": all_ids.size(), "failed": 0},
 		},
 	}
 	ui.call("configure_gateway", gateway)
+	ui.set("_studio_read_queue", [])
+	_set_release_statuses(ui, all_ids, "PENDING")
+	ui.set("_startup_source_inventory_loaded", true)
+	ui.set("_operation_running", false)
+	var runtime := TEST_PATHS.data("Level Factory/Runtime/%s" % PINNED_GAME_COMMIT)
+	DirAccess.make_dir_recursive_absolute(runtime)
+	var project := FileAccess.open(runtime.path_join("project.godot"), FileAccess.WRITE)
+	if project != null:
+		project.store_string("; isolated test stand-in for the pinned ScrubBots runtime")
+		project.close()
 	ui.call("_show_screen", "LEVEL FACTORY")
 	ui.set("_batch_job_id", "png-batch-historical-four")
 	ui.set("_batch_import_id", "batch-import-historical-four")
@@ -140,13 +162,15 @@ func _run_suite() -> void:
 	_check(str(ui.get("_selected_import_source_id")) == all_ids[8], "sliding-window thumbnail did not select the ninth source")
 	_check(str(ui.get("_batch_job_id")) == "png-batch-historical-four", "thumbnail selection replaced the active historical job identity")
 	_check(str(ui.get("_batch_snapshot").get("import_batch_id", "")) == "batch-import-historical-four", "thumbnail selection rewrote the active job snapshot")
-	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) in ["loaded-png-batch-create", "png-batch-create", "pipeline", "png-batch-run"]), "thumbnail selection created a batch or dispatched pipeline work")
+	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) in ["pending-png-batch-create", "loaded-png-batch-create", "png-batch-create", "pipeline", "png-batch-run", "prepare:png-batch-run"]), "thumbnail selection created a batch or dispatched pipeline work")
 	_check(gateway.source_ids.is_empty(), "thumbnail selection changed loaded batch scope")
 	for call in gateway.calls:
 		_check(not str(call.get("operation", "")).contains("pipeline") and not str(call.get("operation", "")).contains("batch-run"), "thumbnail selection dispatched solver work: %s" % str(call.get("operation", "")))
 
+	ui.set("_batch_job_id", "")
+	ui.set("_batch_snapshot", {})
 	ui.call("_run_level_pipeline")
-	_check(gateway.source_ids == all_ids, "explicit Run did not snapshot all nine loaded sources in gallery order")
+	_check(gateway.source_ids == all_ids, "explicit Run did not snapshot all nine Pending sources in gallery order: %s" % [gateway.calls.map(func(call: Dictionary) -> String: return str(call.get("operation", "")))])
 	_check(gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) == "prepare:png-batch-run"), "explicit Run did not prepare the canonical batch worker")
 	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) == "pipeline"), "UI fixture executed a native per-source pipeline")
 	_check(str(ui.get("_batch_job_id")) == "png-batch-fixture", "explicit Run did not retain the planned job identity")
@@ -198,9 +222,14 @@ func _run_suite() -> void:
 	rejected_job["counts"] = {"total": 9, "ready": 8, "failed": 0, "rejected": 1, "skipped": 0, "remaining": 0}
 	ui.set("_batch_snapshot", rejected_job)
 	ui.set("_batch_job_id", str(rejected_job["job_id"]))
+	# After completion nothing is Pending: 8 READY and 1 REJECTED in the Release Pool.
+	_set_release_statuses(ui, all_ids, "READY", "REJECTED")
 	ui.call("_refresh_run_button_caption")
-	_check((ui.get_node("RunLevelPipeline") as Button).text.contains("Finished With Failures"), "rejected-only completion was mislabeled as READY")
-	_test_loaded_batch_restore_nullable_contract(ui, gateway, all_ids)
+	var complete_caption := (ui.get_node("RunLevelPipeline") as Button).text
+	# With nothing Pending the button reads "No Pending PNGs"; it must never claim READY without the rejection.
+	_check(not complete_caption.contains("READY") or complete_caption.contains("1 REJECTED"), "rejected-only completion was mislabeled as READY: %s" % complete_caption)
+	_set_release_statuses(ui, all_ids, "PENDING")
+	await _test_loaded_batch_restore_nullable_contract(ui, gateway, all_ids)
 
 	ui.call("_show_screen", "PIXEL ART")
 	_check(not (ui.get_node("LevelVariation1") as Button).visible, "Level Factory thumbnail leaked into PIXEL ART")
@@ -256,7 +285,7 @@ func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnly
 		gateway.extension_responses = {"loaded-png-batch-find": test_case["resolved"]}
 		if latest is Dictionary:
 			gateway.extension_responses["png-batch-latest"] = latest
-		ui.call("_restore_loaded_png_batch_readonly")
+		await _restore(ui)
 		var case_name := str(test_case["name"])
 		_check(bool(ui.get("_batch_job_source_mismatch")) == bool(test_case["mismatch"]), "%s produced the wrong lineage gate" % case_name)
 		if bool(test_case["mismatch"]):
@@ -284,13 +313,13 @@ func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnly
 	}
 	var malformed_job: Dictionary = gateway.extension_responses["png-batch-latest"]["job"]
 	malformed_job["counts"] = null
-	ui.call("_restore_loaded_png_batch_readonly")
+	await _restore(ui)
 	var sanitized_snapshot: Dictionary = ui.get("_batch_snapshot")
 	_check(str(ui.get("_batch_job_id")) == "saved-restore-fixture", "malformed optional counts discarded a valid job")
 	_check(sanitized_snapshot.get("counts", null) is Dictionary and (sanitized_snapshot["counts"] as Dictionary).is_empty(), "malformed optional counts were not safely isolated in local UI state")
 	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "malformed counts started work")
 	_reset_restore_state(ui, gateway)
-	ui.call("_restore_loaded_png_batch_readonly")
+	await _restore(ui)
 	_check(str(ui.get("_batch_job_id")) == "", "fresh restore reused stale job identity")
 	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "fresh restore started work")
 
@@ -302,6 +331,9 @@ func _reset_restore_state(ui: Control, gateway: ReadOnlyGateway) -> void:
 	ui.set("_batch_snapshot", {})
 	ui.set("_batch_job_source_mismatch", false)
 	ui.set("_batch_legacy_reconciliation", false)
+	ui.set("_startup_pending_batch_restore_started", false)
+	ui.set("_batch_restore_pending", false)
+	ui.set("_studio_read_queue", [])
 	gateway.calls.clear()
 	gateway.extension_responses.clear()
 
@@ -316,3 +348,22 @@ func _dock_rect_snapshot(ui: Control) -> Dictionary:
 	for node_name in ["RuntimeBottomStrip", "RuntimeBottomHeading", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]:
 		result[node_name] = (ui.get_node(node_name) as Control).get_global_rect()
 	return result
+
+
+## Startup restore runs through the real background reader; wait for it.
+func _restore(ui: Control) -> void:
+	ui.call("_restore_loaded_png_batch_readonly")
+	for _frame in range(600):
+		if not bool(ui.get("_batch_restore_pending")):
+			return
+		await process_frame
+	_check(false, "saved batch lookup did not finish")
+
+
+func _set_release_statuses(ui: Control, source_ids: Array[String], status: String, last_status: String = "") -> void:
+	var records: Array = []
+	for index in range(source_ids.size()):
+		records.append({"source_id": source_ids[index], "source_sha256": source_ids[index].trim_prefix("owner-upload-"),
+			"status": last_status if not last_status.is_empty() and index == source_ids.size() - 1 else status})
+	ui.set("_owner_release_archive", {"schema": "scrubbots-owner-release-library-view/v1", "records": records})
+	ui.set("_owner_release_archive_loaded", true)
