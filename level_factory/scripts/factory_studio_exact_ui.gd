@@ -60,6 +60,7 @@ var _pixel_batch_monthly_used := 0
 var _pixel_art_activity_events: Array[Dictionary] = []
 var _pixel_art_activity_table: PanelContainer
 var _pixel_art_activity_grid: GridContainer
+var _pixel_art_activity_width := 0.0
 var _pixel_art_activity_scroll: ScrollContainer
 var _pixel_batch_source_sha256 := ""
 var _batch_resume := false
@@ -538,6 +539,19 @@ func _apply_responsive_layout() -> void:
 			_batch_pause_button.size = Vector2(action_width, 30.0 * scale_y)
 			_batch_stop_button.position = Vector2(_batch_pause_button.position.x + action_width + button_gap, 80.0 * scale_y)
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
+	if _pixel_art_activity_table != null and left_panel != null:
+		# Owner report 2026-11-13: the table was never laid out responsively (fixed
+		# 334x924 at y=538), so it covered the canvas and ran below the window.
+		var table_inset := 9.0 * left_scale
+		_pixel_art_activity_table.position = Vector2(left_panel.position.x + table_inset, 538.0 * scale_y)
+		var table_size := Vector2(maxf(120.0, left_panel.size.x - 2.0 * table_inset),
+			maxf(120.0, size.y - _pixel_art_activity_table.position.y - bottom_margin - table_inset))
+		# Rows built for a wider table keep the container's minimum width; rebuild
+		# them for the target width first, then apply the size.
+		_pixel_art_activity_width = table_size.x
+		_refresh_pixel_art_activity_table()
+		_pixel_art_activity_table.reset_size()
+		_pixel_art_activity_table.size = table_size
 	_layout_level_factory_thumbnail_dock(center_scale, scale_y)
 	_layout_release_pool_dashboard(left_scale, right_start, float(geometry.get("right_width", 313.0)), scale_y)
 	_layout_pixellab_details_artwork_gap()
@@ -1865,8 +1879,12 @@ func _set_runtime_button(button_name: String, caption: String, image_path: Strin
 	var button := get_node_or_null(button_name) as Button
 	if button == null: return
 	button.text = caption
+	# A Button widens to fit its caption; long candidate ids pushed the PIXEL ART
+	# cards past the Details panel in small windows (owner report 2026-11-13).
+	button.clip_text = true
+	button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	button.icon = _runtime_png_texture(image_path) if not image_path.is_empty() else null
-	button.tooltip_text = ""
+	button.tooltip_text = caption
 	button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
 	button.expand_icon = not image_path.is_empty()
@@ -2142,6 +2160,9 @@ func _refresh_runtime_cards() -> void:
 			var caption := str(candidate.get("candidate_id", "Artwork %d" % (index + 1)))
 			var image_path := str(candidate.get("artwork_path", ""))
 			_set_runtime_button(pixel_slots[index], caption.left(18), image_path)
+			var card := get_node_or_null(pixel_slots[index]) as Button
+			if card != null:
+				card.tooltip_text = caption
 		else:
 			_set_runtime_button(pixel_slots[index], "No artwork", "")
 	var max_start := maxi(0, level_sources.size() - level_slots.size())
@@ -2622,11 +2643,13 @@ func _build_pixel_art_activity_table() -> void:
 	content.add_theme_constant_override("separation", 8)
 	var title := Label.new()
 	title.text = "PIXEL ART ACTIVITY"
+	title.clip_text = true
 	title.add_theme_font_size_override("font_size", 16)
 	title.add_theme_color_override("font_color", Color("#9bb1cd"))
 	content.add_child(title)
 	var subheading := Label.new()
 	subheading.text = "IN-MEMORY · THIS SESSION"
+	subheading.clip_text = true
 	subheading.add_theme_font_size_override("font_size", 13)
 	subheading.add_theme_color_override("font_color", Color("#7188a6"))
 	content.add_child(subheading)
@@ -2657,15 +2680,19 @@ func _refresh_pixel_art_activity_table() -> void:
 		_pixel_art_activity_grid.remove_child(old_child)
 		old_child.queue_free()
 	var time_header := Label.new()
-	var grid_width := maxf(320.0, _pixel_art_activity_table.size.x - 20.0)
-	var time_width := clampf(grid_width * 0.34, 105.0, 155.0)
-	var detail_width := maxf(205.0, grid_width - time_width - 8.0)
+	# Column minimums follow the table width; fixed 320 px minimums made the
+	# container wider than the workspace panel in small windows.
+	var table_width := _pixel_art_activity_width if _pixel_art_activity_width > 0.0 else _pixel_art_activity_table.size.x
+	var grid_width := maxf(100.0, table_width - 20.0)
+	var time_width := clampf(grid_width * 0.34, 40.0, 155.0)
+	var detail_width := maxf(50.0, grid_width - time_width - 8.0)
 	time_header.custom_minimum_size = Vector2(time_width, 28)
 	time_header.text = "TIME / STATUS"
 	var detail_header := Label.new()
 	detail_header.custom_minimum_size = Vector2(detail_width, 28)
 	detail_header.text = "EVENT / DETAILS"
 	for header in [time_header, detail_header]:
+		header.clip_text = true
 		header.add_theme_font_size_override("font_size", 16)
 		header.add_theme_color_override("font_color", Color("#9bb1cd"))
 	_pixel_art_activity_grid.add_child(time_header)
