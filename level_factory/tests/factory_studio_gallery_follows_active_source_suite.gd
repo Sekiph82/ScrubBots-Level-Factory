@@ -83,6 +83,34 @@ func _run_suite() -> void:
 	_check(shown.any(func(text: String) -> bool: return text.contains("LF-000011") and text.contains("●")),
 		"selected LF-000011 is not visible and marked in the five-slot gallery: %s" % [shown])
 
+	# 2026-11-13: a Release Pool retry job the gallery cannot re-derive stayed
+	# "Running 2/6 · QUEUED" because progress results were rejected. A job this
+	# session dispatched and is running must be followed.
+	var retry_items: Array = []
+	for index in range(3):
+		retry_items.append({"index": index, "source_id": "owner-upload-%064x" % (700 + index), "source_sha256": "%064x" % (700 + index),
+			"source_record_sha256": "%064x" % (800 + index), "status": "QUEUED", "column_count": 3})
+	var retry_job := {"job_id": "job-retry", "import_batch_id": "batch-retry", "state": "RUNNING", "current_index": null, "items": retry_items,
+		"counts": {"total": 3, "ready": 0, "failed": 0, "rejected": 0, "skipped": 0, "remaining": 3}}
+	ui.set("_batch_job_id", "job-retry")
+	ui.set("_batch_import_id", "batch-retry")
+	ui.set("_batch_composite_snapshot", {"batch_id": "batch-retry", "items": retry_items})
+	ui.set("_batch_snapshot", retry_job.duplicate(true))
+	ui.set("_batch_job_source_mismatch", false)
+	ui.set("_operation_running", true)
+	ui.set("_batch_worker_active", true)
+	var progressed := retry_job.duplicate(true)
+	for item in progressed["items"]:
+		item["status"] = "RUNNING"
+	progressed["current_index"] = 0
+	ui.call("_apply_batch_progress_result", {"disposition": "MATCHED", "job": progressed}, "job-retry")
+	ui.call("_refresh_run_button_caption")
+	var retry_caption := (ui.get_node("RunLevelPipeline") as Button).text
+	_check(retry_caption == "Running 3/3 · 3 parallel", "dispatched retry progress was not followed: %s" % retry_caption)
+	_check(not bool(ui.get("_batch_job_source_mismatch")), "dispatched retry progress was treated as a lineage mismatch")
+	ui.set("_operation_running", false)
+	ui.set("_batch_worker_active", false)
+
 	instance.free()
 	if _errors.is_empty():
 		print(PASS_MARKER)

@@ -312,6 +312,41 @@ func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnly
 			var counts: Dictionary = restored.get("counts", {})
 			_check(int(counts.get("total", 0)) == 9 and int(counts.get("ready", 0)) == 7 and int(counts.get("failed", 0)) == 2, "valid saved job counts changed")
 			_check((ui.get_node("RunLevelPipeline") as Button).text.contains("Resume Batch · 2 remaining"), "valid saved job did not preserve resume status")
+	# Owner request 2026-11-13: a stopped job that does not cover every Pending PNG
+	# (a half-finished retry) is offered next to Run Pending Batch, and resuming it
+	# runs only that job.
+	_reset_restore_state(ui, gateway)
+	gateway.extension_responses = {
+		"loaded-png-batch-find": {"disposition": "NO_MATCHING_COMPOSITE", "batch": null, "resume_batch": composite,
+			"resume_job_id": "saved-restore-fixture", "resume_count": 2, "pending_count": 9},
+		"png-batch-latest": {"disposition": "MATCHED", "job": saved_job},
+	}
+	await _restore(ui)
+	var run_choice := ui.get_node("RunLevelPipeline") as Button
+	var resume_choice := ui.find_child("ResumeSavedBatch", true, false) as Button
+	_check(run_choice.text.begins_with("Run Pending Batch") and not run_choice.disabled, "Run Pending Batch was not offered next to the saved job: %s" % run_choice.text)
+	_check(resume_choice != null and resume_choice.visible and resume_choice.text.contains("2 remaining"), "saved job was not offered as Resume saved batch")
+	_check(str(ui.get("_batch_job_id")) == "", "offering the saved job already restored it")
+	if resume_choice != null:
+		ui.call("_resume_saved_batch")
+		for _frame in range(600):
+			if not bool(ui.get("_batch_restore_pending")):
+				break
+			await process_frame
+		await process_frame
+		_check(str(ui.get("_batch_job_id")) == "saved-restore-fixture", "Resume saved batch did not restore the saved job")
+		var operations: Array[String] = []
+		var started_saved_job := false
+		for call in gateway.calls:
+			var operation := str(call.get("operation", ""))
+			operations.append(operation)
+			var request: Dictionary = call.get("request", {})
+			if operation.contains("png-batch-run") and str(request.get("job_id", "")) == "saved-restore-fixture":
+				started_saved_job = true
+		_check(started_saved_job, "Resume saved batch did not start that job: %s" % [operations])
+		_check(not operations.any(func(operation: String) -> bool: return operation.contains("pending-png-batch-create")), "Resume saved batch created a new Pending batch")
+	ui.set("_operation_running", false)
+	ui.set("_batch_worker_active", false)
 	_reset_restore_state(ui, gateway)
 	gateway.extension_responses = {
 		"loaded-png-batch-find": {"disposition": "MATCHED", "batch": composite},

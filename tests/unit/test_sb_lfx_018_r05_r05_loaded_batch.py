@@ -409,3 +409,35 @@ def test_startup_resume_refuses_two_jobs_that_match_the_same_pending_sha(monkeyp
     assert result["disposition"] == "PENDING_BATCH_RESUME_AMBIGUOUS"
     assert result["batch"] is None
     assert result["mutated"] is False
+
+
+def test_stopped_job_is_offered_next_to_a_fresh_pending_batch(monkeypatch):
+    # Owner request 2026-11-13: after stopping a half-finished retry the owner must
+    # be able to choose that job or every Pending PNG.
+    source_ids = _source_ids(2)
+    records = [_record(source_id) for source_id in source_ids]
+    batch = {"version": 2, "kind": "COMPOSITE_LOADED_SOURCE_SNAPSHOT", "batch_id": "batch-retry",
+             "items": [{key: records[0][key] for key in ("source_id", "source_sha256", "source_record_sha256")}]}
+    path = MemoryPath("root/jobs/png-batch-retry.json")
+    job = {"job_id": "png-batch-retry", "import_batch_id": batch["batch_id"], "batch_digest": "c" * 64,
+           "state": "STOPPED", "items": [{"index": 0, "source_id": source_ids[0],
+           "source_sha256": records[0]["source_sha256"], "source_record_sha256": records[0]["source_record_sha256"],
+           "status": "QUEUED"}]}
+    monkeypatch.setattr(png_batch, "_root", lambda: MemoryPath("root", entries=[path]))
+    monkeypatch.setattr(png_batch, "_read_job", lambda _job_id: job)
+    monkeypatch.setattr(png_batch, "_job_lineage_matches_snapshot", lambda _job, _batch: True)
+    monkeypatch.setattr(studio_extensions, "batch_load", lambda _batch_id: {"batch": batch})
+    monkeypatch.setattr(studio_extensions, "_digest", lambda _value: "c" * 64)
+    monkeypatch.setattr(
+        "scrubbots_pixel_factory.owner_release_library.list_records",
+        lambda *_args, **_kwargs: {"records": [{"source_id": r["source_id"], "source_sha256": r["source_sha256"],
+                                                 "status": "PENDING"} for r in records]},
+    )
+
+    result = png_batch.find_resumable_pending_batch({"items": records}, source_ids)
+
+    assert result["disposition"] == "NO_MATCHING_COMPOSITE" and result["batch"] is None
+    assert result["pending_count"] == 2 and result["uncovered_pending_count"] == 1
+    assert result["resume_job_id"] == "png-batch-retry" and result["resume_count"] == 1
+    assert result["resume_batch"]["batch_id"] == "batch-retry"
+    assert result["mutated"] is False

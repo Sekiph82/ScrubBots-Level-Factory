@@ -1176,11 +1176,15 @@ def find_resumable_pending_batch(
     if len(resumable) == 1 and pending_candidate_ids - resumable[0][2]:
         # Newer Pending PNGs exist that this saved job does not contain. Offer a
         # fresh Pending batch over all of them; creating it supersedes this job.
-        job = resumable[0][0]
+        job, batch, needs_resume = resumable[0]
+        # Owner request 2026-11-13: also offer the stopped job itself (for example
+        # a half-finished retry) so the owner can choose it or all Pending PNGs.
         return {"state": "SUCCESS", "disposition": "NO_MATCHING_COMPOSITE", "batch": None,
                 "superseded_candidate_job_id": str(job.get("job_id", "")),
                 "pending_count": len(pending_candidate_ids),
-                "uncovered_pending_count": len(pending_candidate_ids - resumable[0][2]), "mutated": False}
+                "uncovered_pending_count": len(pending_candidate_ids - needs_resume),
+                "resume_batch": batch, "resume_job_id": str(job.get("job_id", "")),
+                "resume_count": len(needs_resume), "mutated": False}
     if len(resumable) == 1:
         job, batch, needs_resume = resumable[0]
         return {"state": "SUCCESS", "disposition": "RESUMABLE_PENDING_SUBSET", "batch": batch,

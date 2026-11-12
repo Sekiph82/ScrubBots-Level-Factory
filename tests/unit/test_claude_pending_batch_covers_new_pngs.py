@@ -54,7 +54,7 @@ def test_discovery_offers_all_pending_when_saved_job_does_not_cover_new_pngs(mon
     # Guard the real source text so this test fails if the rule is removed.
     import inspect
     source = inspect.getsource(png_batch.find_resumable_pending_batch)
-    assert "pending_candidate_ids - resumable[0][2]" in source
+    assert "pending_candidate_ids - resumable[0][2]" in source or "pending_candidate_ids - needs_resume" in source
     assert fake(pending, ["b", "new1", "new2"]) == {"disposition": "NO_MATCHING_COMPOSITE", "uncovered_pending_count": 2}
     assert '"SUPERSEDED"' in inspect.getsource(png_batch.png_batch_latest)
 

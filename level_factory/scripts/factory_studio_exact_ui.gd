@@ -100,6 +100,10 @@ var _batch_last_read_msec := 0
 var _batch_restore_pending := false
 var _batch_restore_token := ""
 var _batch_pause_button: Button
+## A stopped job offered next to Run Pending Batch (owner request 2026-11-13).
+var _resume_saved_button: Button
+var _alternate_resume: Dictionary = {}
+var _resume_after_restore := false
 var _batch_stop_button: Button
 var _prompt_dialog: ConfirmationDialog
 var _prompt_input: TextEdit
@@ -538,6 +542,9 @@ func _apply_responsive_layout() -> void:
 			_batch_pause_button.position = Vector2(10.0 * left_scale, 80.0 * scale_y)
 			_batch_pause_button.size = Vector2(action_width, 30.0 * scale_y)
 			_batch_stop_button.position = Vector2(_batch_pause_button.position.x + action_width + button_gap, 80.0 * scale_y)
+			if _resume_saved_button != null:
+				_resume_saved_button.position = _batch_pause_button.position
+				_resume_saved_button.size = Vector2(action_width * 2.0 + button_gap, 30.0 * scale_y)
 			_batch_stop_button.size = Vector2(action_width, 30.0 * scale_y)
 	if _pixel_art_activity_table != null and left_panel != null:
 		# Owner report 2026-11-13: the table was never laid out responsively (fixed
@@ -1432,6 +1439,16 @@ func _build_live_chrome() -> void:
 	_batch_stop_button.pressed.connect(_request_batch_stop)
 	_batch_stop_button.visible = false
 	_activity_panel.add_child(_batch_stop_button)
+	_resume_saved_button = Button.new()
+	_resume_saved_button.name = "ResumeSavedBatch"
+	_resume_saved_button.position = Vector2(10, 80)
+	_resume_saved_button.size = Vector2(314, 30)
+	_resume_saved_button.clip_text = true
+	_resume_saved_button.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_resume_saved_button.focus_mode = Control.FOCUS_ALL
+	_resume_saved_button.pressed.connect(_resume_saved_batch)
+	_resume_saved_button.visible = false
+	_activity_panel.add_child(_resume_saved_button)
 	_activity_scroll.position = Vector2(10, 116)
 	_activity_scroll.size = Vector2(314, 370)
 	_activity_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -1873,6 +1890,11 @@ func _refresh_run_button_caption() -> void:
 		_batch_pause_button.visible = _operation_running and not _batch_job_id.is_empty()
 	if _batch_stop_button != null:
 		_batch_stop_button.visible = _operation_running and not _batch_job_id.is_empty()
+	if _resume_saved_button != null:
+		_resume_saved_button.visible = (_screen == "LEVEL FACTORY" and not _operation_running and not _batch_restore_pending
+			and not _alternate_resume.is_empty())
+		_resume_saved_button.text = "Resume saved batch · %d remaining" % int(_alternate_resume.get("count", 0))
+		_resume_saved_button.tooltip_text = "Continue only the stopped job %s; Run Pending Batch above takes every Pending PNG." % str(_alternate_resume.get("job_id", ""))
 
 
 func _set_runtime_button(button_name: String, caption: String, image_path: String = "") -> void:
@@ -2064,6 +2086,11 @@ func _apply_loaded_png_batch_find(resolved: Dictionary, token: String) -> void:
 	var composite_value: Variant = resolved.get("batch", {})
 	var composite: Dictionary = composite_value if composite_value is Dictionary else {}
 	var resolution := str(resolved.get("disposition", ""))
+	var alternate_value: Variant = resolved.get("resume_batch", {})
+	_alternate_resume = {}
+	if resolution == "NO_MATCHING_COMPOSITE" and alternate_value is Dictionary and not (alternate_value as Dictionary).is_empty():
+		_alternate_resume = {"batch": alternate_value, "job_id": str(resolved.get("resume_job_id", "")),
+			"count": int(resolved.get("resume_count", 0))}
 	if resolution not in ["MATCHED", "LEGACY_EXACT_MATCH", "RESUMABLE_PENDING_SUBSET"] or composite.is_empty():
 		_batch_restore_pending = false
 		_batch_composite_snapshot.clear()
@@ -2149,6 +2176,22 @@ func _apply_restored_latest_batch(latest: Dictionary, token: String, batch_id: S
 	_refresh_activity_header()
 	_refresh_run_button_caption()
 	_refresh_live_data()
+	if _resume_after_restore:
+		_resume_after_restore = false
+		if str(_batch_snapshot.get("state", "")) in ["QUEUED", "PAUSED", "STOPPED", "INTERRUPTED", "PROJECTION_ERROR"]:
+			call_deferred("_run_png_batch")
+
+
+## Owner request 2026-11-13: continue a stopped job (for example a half-finished
+## retry) instead of starting a batch over every Pending PNG.
+func _resume_saved_batch() -> void:
+	if _operation_running or _alternate_resume.is_empty():
+		return
+	var resolved := {"disposition": "RESUMABLE_PENDING_SUBSET", "batch": _alternate_resume.get("batch", {})}
+	_resume_after_restore = true
+	_batch_restore_pending = true
+	_batch_restore_token = "%d-%d" % [Time.get_ticks_msec(), Time.get_ticks_usec()]
+	_apply_loaded_png_batch_find(resolved, _batch_restore_token)
 
 
 func _refresh_runtime_cards() -> void:
@@ -5505,6 +5548,12 @@ func _bind_displayed_batch_to_source(source_id: String) -> void:
 
 
 func _batch_job_matches_loaded_sources() -> bool:
+	# The job this session dispatched and is still running was verified by the
+	# backend when it was created. Following it must not depend on re-deriving it
+	# from the gallery (2026-11-13: a Release Pool retry stayed "Running 2/6 ·
+	# QUEUED" and its activity never updated while four PNGs were solving).
+	if _batch_worker_active and not _batch_job_id.is_empty() and str(_batch_snapshot.get("job_id", "")) == _batch_job_id:
+		return true
 	var items: Array = _batch_snapshot.get("items", [])
 	var composite_items: Array = _batch_composite_snapshot.get("items", [])
 	if items.is_empty() or composite_items.is_empty() or str(_batch_snapshot.get("import_batch_id", "")) != _batch_import_id:
