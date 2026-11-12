@@ -1,6 +1,10 @@
 extends SceneTree
 
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
+const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
+## 2026-11-12: the owner's 002 upload and saved nine-source job were deleted on
+## 2026-11-07. Equivalent canonical Imported records (PNG + source.json in the
+## data/Level Factory/Imported layout) are written inside the isolated copy.
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R07 five-slot release dashboard PASS"
 
 class ReadOnlyGateway extends RefCounted:
@@ -232,9 +236,10 @@ func _run_suite() -> void:
 	_check((ui.get_node("ReleaseCandidateScroll") as Control).visible, "Release candidate gallery did not return with Release Pool")
 
 	ui.call("_show_screen", "LEVEL FACTORY")
-	var source_id := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
+	var seeded := _seed_owner_source("002_32x32px.png", Color8(220, 60, 40))
+	var source_id := str(seeded["source_id"])
 	var repository_root := str(ui.call("_factory_repository_root"))
-	var source_relative_path := "level_factory/output/owner-uploads/%s/source.png" % source_id
+	var source_relative_path := str(seeded["relative"])
 	var source_path := str(ui.call("_factory_repository_path", source_relative_path))
 	_check(not repository_root.is_empty() and FileAccess.file_exists(repository_root.path_join("TASKS.md")), "canonical repository root was not found from the installed project path")
 	_check(source_path == repository_root.path_join(source_relative_path), "installed project did not resolve owner art beneath the canonical repository")
@@ -281,11 +286,19 @@ func _run_suite() -> void:
 	_check(str(ui.get("_batch_follow_item").get("status", "")) == "FAILED", "terminal authenticated status transition was not followed")
 	_check(str(ui.get("_activity_stage")) == "FAILED", "Pipeline Activity did not follow the terminal batch item state")
 
-	var real_job_path := repository_root.path_join("level_factory/output/studio-extensions/png-batches/jobs/png-batch-c898cfef80663a61e8246ea1e4da8e13.json")
-	var real_job_variant: Variant = JSON.parse_string(FileAccess.get_file_as_string(real_job_path)) if FileAccess.file_exists(real_job_path) else null
-	_check(real_job_variant is Dictionary and (real_job_variant as Dictionary).get("items", []).size() == 9, "read-only nine-source batch fixture is unavailable")
+	var nine_items: Array = []
+	for nine_index in range(9):
+		var nine_source := _seed_owner_source("%03d_32x32px.png" % (nine_index + 2), Color8(20 + nine_index * 20, 200 - nine_index * 15, 90 + nine_index * 10))
+		nine_items.append({"source_id": nine_source["source_id"], "source_sha256": nine_source["sha"],
+			"source_record_sha256": str(ui.call("_source_record_sha256_for_id", nine_source["source_id"])),
+			"original_filename": nine_source["name"], "column_count": [3, 4, 5][nine_index % 3]})
+	var real_job_variant: Variant = {"items": nine_items}
+	_check((real_job_variant as Dictionary).get("items", []).size() == 9, "nine-source batch fixture could not be seeded")
 	if real_job_variant is Dictionary and (real_job_variant as Dictionary).get("items", []).size() == 9:
 		var real_items: Array = (real_job_variant as Dictionary).get("items", [])
+		# The nine-source job is its own gallery scope (the earlier single 002 follow is done).
+		(ui.get("_imported_sources") as Array).clear()
+		ui.call("_refresh_gameplay_sources")
 		var composite_items: Array[Dictionary] = []
 		var fake_items: Array[Dictionary] = []
 		for index in range(real_items.size()):
@@ -293,7 +306,7 @@ func _run_suite() -> void:
 			var identity := str(saved.get("source_id", ""))
 			var sha := str(saved.get("source_sha256", ""))
 			var record_hash := str(saved.get("source_record_sha256", ""))
-			var path := str(ui.call("_factory_repository_path", "level_factory/output/owner-uploads/%s/source.png" % identity))
+			var path := str(ui.call("_factory_repository_path", "data/Level Factory/Imported/%s/%s" % [identity, str(saved.get("original_filename", ""))]))
 			_check(FileAccess.file_exists(path) and sha == identity.trim_prefix("owner-upload-"), "saved nine-source item %d has no matching read-only owner PNG" % index)
 			_check(str(ui.call("_source_record_sha256_for_id", identity)) == record_hash, "saved nine-source item %d source-record hash is not current" % index)
 			ui.call("_upsert_imported_source", {"path": path, "source_id": identity, "source_sha256": sha, "source_record_sha256": record_hash, "display_filename": str(saved.get("original_filename", "PNG")), "width": 32, "height": 32})
@@ -413,6 +426,29 @@ func _run_suite() -> void:
 	for error in _errors:
 		push_error(error)
 	quit(1)
+
+
+## Writes a canonical Imported record (PNG + source.json) inside the isolated copy.
+func _seed_owner_source(filename: String, color: Color) -> Dictionary:
+	var image := Image.create(32, 32, false, Image.FORMAT_RGBA8)
+	image.fill(color)
+	var png := image.save_png_to_buffer()
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(png)
+	var sha := context.finish().hex_encode()
+	var source_id := "owner-upload-" + sha
+	var folder := TEST_PATHS.imported(source_id)
+	DirAccess.make_dir_recursive_absolute(folder)
+	var png_file := FileAccess.open(folder.path_join(filename), FileAccess.WRITE)
+	png_file.store_buffer(png)
+	png_file.close()
+	var relative := "data/Level Factory/Imported/%s/%s" % [source_id, filename]
+	var record_file := FileAccess.open(folder.path_join("source.json"), FileAccess.WRITE)
+	record_file.store_string(JSON.stringify({"schema": "scrubbots-owner-upload-source", "source_id": source_id, "source_sha256": sha,
+		"original_filename": filename, "immutable_relative_path": relative, "origin": "OWNER_UPLOAD"}))
+	record_file.close()
+	return {"source_id": source_id, "sha": sha, "name": filename, "relative": relative, "path": folder.path_join(filename)}
 
 
 func _contains_with_padding(outer: Rect2, inner: Rect2, padding: float) -> bool:

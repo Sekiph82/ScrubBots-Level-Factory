@@ -6,6 +6,11 @@ const FIXTURE_DIR := "res://tests/fixtures/factory_studio_r04_r01"
 const FIXTURE_A := "import_01_20x20.png"
 const FIXTURE_B := "import_02_20x59.png"
 
+## Updated 2026-11-12: the saved per-source proof is restored through the
+## background reader (prepare/execute "restore-source-run-readonly"), and the
+## explicit batch action is "Run Pending Batch (N)" over Release Pool PENDING
+## sources (it was "Run Entire Loaded Batch (N)" over every loaded PNG).
+
 var _errors: Array[String] = []
 
 
@@ -33,10 +38,15 @@ class ReadOnlyGateway extends RefCounted:
 			return {"state": "READY", "entries": []}
 		return {"state": "UNAVAILABLE", "reason": "R09 UI test uses a read-only gateway."}
 
-	func prepare_studio_extension_call(_operation: String, _request: Dictionary) -> Dictionary:
-		return {}
+	func prepare_studio_extension_call(operation: String, request: Dictionary) -> Dictionary:
+		calls.append({"operation": "prepare:" + operation, "request": request.duplicate(true)})
+		if operation == "restore-source-run-readonly":
+			return {"operation": operation, "source_id": str(request.get("source_id", ""))}
+		return {}  # never start a worker
 
-	func execute_prepared_studio_extension_call(_prepared: Dictionary) -> Dictionary:
+	func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
+		if str(prepared.get("operation", "")) == "restore-source-run-readonly":
+			return proof_by_source.get(str(prepared.get("source_id", "")), {})
 		push_error("R09 navigation must never execute a solver worker")
 		return {}
 
@@ -70,6 +80,12 @@ func _run_suite() -> void:
 	var sources := _make_sources(140)
 	ui.set("_imported_sources", sources)
 	ui.call("_refresh_gameplay_sources")
+	ui.set("_studio_read_queue", [])
+	var pending_records: Array = []
+	for source in sources:
+		pending_records.append({"source_id": source["source_id"], "source_sha256": source["source_sha256"], "status": "PENDING"})
+	ui.set("_owner_release_archive", {"schema": "scrubbots-owner-release-library-view/v1", "records": pending_records})
+	ui.set("_owner_release_archive_loaded", true)
 	var composite_items := _make_composite_items(sources)
 	var prior_job := _make_job(sources.slice(0, 9), 9, "COMPLETE", 8, "old-nine-job")
 	var nine_run_ids := PackedStringArray()
@@ -101,6 +117,7 @@ func _run_suite() -> void:
 	}
 
 	ui.call("_select_imported_source_by_id", source_011)
+	await _settle(ui)
 	_check(str(ui.get("_selected_import_source_id")) == source_011, "selection did not stay on unsolved PNG 011")
 	_check(str(ui.get("_activity_state_label").text) == "SOURCE ONLY", "011 inherited READY or another status from the old nine-item job")
 	_check(str(ui.get("_activity_source_label").text).contains("011_32x32px.png"), "Activity header does not identify selected 011")
@@ -110,18 +127,22 @@ func _run_suite() -> void:
 	_check(_five_card_filenames(ui) == ["009", "010", "011", "012", "013"], "five-card gallery is not centered on 011")
 	_check(bool(ui.call("_batch_job_matches_loaded_sources")) == false, "old nine-item job incorrectly matches the loaded 140-source scope")
 	var entire_batch_button := ui.get_node_or_null("RunLevelPipeline") as Button
-	_check(entire_batch_button != null and entire_batch_button.text == "Run Entire Loaded Batch (140)" and not entire_batch_button.disabled, "the explicit 140-source batch action is not available after source-only selection")
+	_check(entire_batch_button != null and entire_batch_button.text == "Run Pending Batch (140)" and not entire_batch_button.disabled,
+		"the explicit 140-source batch action is not available after source-only selection: %s" % (entire_batch_button.text if entire_batch_button != null else "missing"))
 
 	ui.call("_select_imported_source_by_id", source_009)
+	await _settle(ui)
 	var selected_rows := _activity_row_texts(ui)
 	var selected_events: Array = ui.get("_activity_events")
 	_check(str(ui.get("_activity_state_label").text) == "READY", "verified historical source 009 did not restore its own READY status")
 	_check(selected_rows.size() == 1 and selected_rows[0].contains("Restored exact source-bound"), "009 view does not contain exactly its own source-bound proof")
 	_check(selected_events.size() == 1 and str(selected_events[0].get("source_id", "")) == source_009, "009 Activity proof is not bound to the selected source identity")
 	ui.call("_select_imported_source_by_id", source_012)
+	await _settle(ui)
 	_check(str(ui.get("_activity_state_label").text) == "SOURCE ONLY", "unsolved 012 inherited a previous source status")
 	_check(_activity_row_texts(ui).is_empty(), "012 Activity retained rows from another PNG")
 	ui.call("_select_imported_source_by_id", source_011)
+	await _settle(ui)
 	ui.call("_show_screen", "PIXEL ART")
 	ui.call("_show_screen", "LEVEL FACTORY")
 	_check(str(ui.get("_activity_state_label").text) == "SOURCE ONLY" and _activity_row_texts(ui).is_empty(), "tab switching restored unrelated old batch Activity")
@@ -129,8 +150,8 @@ func _run_suite() -> void:
 	_check(ui.get("_release_pool") == pool_before, "the existing nine READY Pool entries changed during source browsing")
 	_check(nine_run_ids.size() == 9 and str(prior_snapshot.get("state", "")) == "COMPLETE", "historical nine-source proof fixture was not preserved")
 
-	_test_active_source_follow(ui, gateway, 9)
-	_test_active_source_follow(ui, gateway, 140)
+	await _test_active_source_follow(ui, gateway, 9)
+	await _test_active_source_follow(ui, gateway, 140)
 	var forbidden_calls := _forbidden_gateway_calls(gateway)
 	_check(forbidden_calls.is_empty(), "navigation or render triggered prohibited gateway calls: %s" % ", ".join(forbidden_calls))
 	viewport.free()
@@ -189,9 +210,14 @@ func _test_active_source_follow(ui: Control, gateway: ReadOnlyGateway, source_co
 	}
 	ui.set("_batch_snapshot", job.duplicate(true))
 	ui.call("_sync_verified_batch_follow", job)
+	# The saved READY proof is restored asynchronously; the next progress poll records it.
+	await _settle(ui)
 	ui.call("_record_verified_batch_item_progress", job)
-	var completed_rows := _activity_row_texts(ui)
-	_check(completed_rows.size() == 2 and completed_rows[0].contains("READY") and completed_rows[1].contains("RUNNING"), "%d-item completed current item 005 did not retain newest-first RUNNING and READY Activity rows" % source_count)
+	# Since the follow-the-queue change, a finished item hands Activity/Details
+	# to the next source Resume will process instead of pinning the finished one.
+	_check(str(ui.get("_activity_source_id")) == active_source_006, "%d-item completion of 005 did not hand Activity off to the next source 006" % source_count)
+	for row_text in _activity_row_texts(ui):
+		_check(not row_text.contains("005_32x32px.png"), "%d-item Activity kept 005 rows after handing off to 006: %s" % [source_count, row_text])
 	job["current_index"] = 4
 	var next_item: Dictionary = items[4]
 	next_item["status"] = "RUNNING"
@@ -224,8 +250,13 @@ func _test_active_source_follow(ui: Control, gateway: ReadOnlyGateway, source_co
 	ready_006["run_id"] = ready_run_id
 	items[4] = ready_006
 	job["items"] = items
+	for index in range(5, items.size()):
+		var done: Dictionary = items[index]
+		done["status"] = "READY"
+		done["run_id"] = "run-%d-%03d" % [source_count, index]
+		items[index] = done
 	job["state"] = "COMPLETE"
-	job["counts"] = {"total": source_count, "ready": 2, "failed": 0, "rejected": 0, "skipped": 0, "remaining": source_count - 2}
+	job["counts"] = {"total": source_count, "ready": source_count, "failed": 0, "rejected": 0, "skipped": 0, "remaining": 0}
 	var source_006: Dictionary = sources[4]
 	gateway.proof_by_source[active_source_006] = {
 		"state": "READY", "source_sha256": str(source_006.get("source_sha256", "")),
@@ -238,10 +269,24 @@ func _test_active_source_follow(ui: Control, gateway: ReadOnlyGateway, source_co
 	ui.set("_operation_running", false)
 	ui.set("_batch_snapshot", job.duplicate(true))
 	ui.call("_sync_verified_batch_follow", job)
+	# The saved READY proof is restored asynchronously; the next progress poll records it.
+	await _settle(ui)
 	ui.call("_record_verified_batch_item_progress", job)
-	_check(str(ui.get("_activity_state_label").text) == "READY" and _activity_row_texts(ui).size() == 1 and _activity_row_texts(ui)[0].contains("006_32x32px.png"), "%d-item completed 006 did not show only its own authenticated READY activity" % source_count)
+	var final_rows := _activity_row_texts(ui)
+	_check(str(ui.get("_activity_state_label").text) == "READY" and not final_rows.is_empty() and final_rows[0].contains("READY") and final_rows[0].contains(ready_run_id)
+		and final_rows.all(func(row: String) -> bool: return row.contains("006_32x32px.png")),
+		"%d-item completed 006 did not show its own newest-first authenticated READY activity: %s %s" % [source_count, ui.get("_activity_state_label").text, final_rows])
 	ui.set("_operation_running", false)
 	ui.set("_batch_job_id", "")
+
+
+## Let queued background reads (saved-proof restores) finish and apply.
+func _settle(ui: Control) -> void:
+	for _frame in range(600):
+		if ui.get("_studio_read_thread") == null and (ui.get("_studio_read_queue") as Array).is_empty():
+			return
+		await process_frame
+	_check(false, "background reads did not settle")
 
 
 func _make_sources(count: int) -> Array[Dictionary]:
@@ -299,6 +344,9 @@ func _make_job(sources: Array, count: int, state: String, current_index: int, jo
 			"reason": "",
 		})
 	if state == "RUNNING" and current_index >= 0 and current_index < items.size():
+		for index in range(current_index):
+			items[index]["status"] = "READY"
+			items[index]["run_id"] = "%s-run-%03d" % [job_id, index]
 		items[current_index]["status"] = "RUNNING"
 	return {
 		"job_id": job_id, "import_batch_id": "current-140-import",

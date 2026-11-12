@@ -152,3 +152,15 @@ Real game run (`SCRUBBOTS_PROJECT` = temp clean clone of Sekiph82/Scrubbots orig
 2. `SupplyExporter` adds `source_sha256` to level JSON (7bf85b28) but the game Level Data Spec and content pipeline allow only 8 fields → `build_solver_proven_scrubpack` fails `UNKNOWN_PAYLOAD_FIELD` for every Factory READY level (owner's 117 READY levels carry the field, bound by SHA).
 
 Full `pytest tests` (no SCRUBBOTS_PROJECT): 2254 passed, 45 skipped, 2 failed — both are "TASKS.md must equal HEAD" checks that pass once this entry is committed. Owner `data/` + `level_factory/output` unchanged (18,129-file size/mtime listing identical before/after).
+
+## 2026-11-12 (later) — P0-J follow-up: 12 legacy Studio UI suites rewritten (owner chose "Rewrite") (CLAUDE)
+
+Rewritten against the current product, keeping each suite's intent (commits 6ddf16e7, aea850e5 and this entry's commit):
+- R09-R02 activity / R09-R02-R01 monitor: panel at Rect2(27,412,334,…) now filling the left workspace; title/state/source/phase/rows structure; hash-chained incremental JSONL stream, UTF-8 split, tamper fail-closed, slow worker; startup inventory + startup gate settled like the real reads; source-scoped results; per-row Details (stop reason in the Pipeline row tooltip); Run disabled only while a worker runs or nothing is Pending.
+- R05-R05, R06, R09-R02-R04-R03: Pending-only snapshots ("pending-png-batch-create") bound to the pinned Runtime and the 900 s budget; saved-batch restore through the real background reader; RUNNING→INTERRUPTED, PAUSED, explicit Resume; verified retry lineage; nullable restore contract; mismatched jobs never resume.
+- R04 responsive, R04-R01, R04-R04: region-based responsive geometry with the declared 1100×720 minimum (every master control inside 1100×720…2560×1440); single file = PixelLab Pro 4×4 import, multi-file intake statuses; sliding five-slot window; no per-source pipeline from Run.
+- R07, R09-R02-R04 source UI / R02 inline / R09 activity scope: deleted owner 002/003 data replaced by committed PNG fixtures, canonical Imported records (PNG + source.json) and a hash-bound READY pipeline (`level_factory/tests/factory_test_ready_fixture.gd`) written inside the isolated copy; inline results panel; follow-the-queue hand-off to the next source.
+
+Product fix found here: LEVEL FACTORY Details cut the solver state to 10 characters ("UNAVAILABL"); now 11 (the R09-R02-R01 suite checks it; seen failing first).
+
+Godot: all 41 Studio suites pass in isolation (41/43 scripts; the 2 non-suites are the screenshot tool and the game-runtime profile helper). New `tests/integration/test_claude_studio_godot_suites.py` runs the 33 suites without a dedicated wrapper so they cannot silently drift again (only 8 of 41 had wrappers).
