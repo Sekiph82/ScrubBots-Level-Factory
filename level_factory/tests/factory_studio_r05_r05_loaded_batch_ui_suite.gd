@@ -275,6 +275,9 @@ func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnly
 		{"name": "no matching composite", "resolved": {"disposition": "NO_MATCHING_COMPOSITE", "batch": null}, "latest": null, "mismatch": false},
 		{"name": "ambiguous null composite", "resolved": {"disposition": "LEGACY_COMPOSITE_AMBIGUOUS", "batch": null}, "latest": null, "mismatch": true},
 		{"name": "snapshot mismatch null composite", "resolved": {"disposition": "SOURCE_SNAPSHOT_MISMATCH", "batch": null}, "latest": null, "mismatch": true},
+		# 2026-11-13: several old jobs overlapping Pending locked Run as "Batch mismatch";
+		# none is resumed and a fresh Pending batch is offered instead.
+		{"name": "ambiguous pending resume", "resolved": {"disposition": "PENDING_BATCH_RESUME_AMBIGUOUS", "batch": null, "candidate_job_ids": ["a", "b"]}, "latest": null, "mismatch": false},
 		{"name": "no matching job", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "NO_MATCHING_JOB", "job": null}, "mismatch": false},
 		{"name": "batch job source mismatch", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "BATCH_JOB_SOURCE_MISMATCH", "job": null}, "mismatch": true},
 		{"name": "valid paused job", "resolved": {"disposition": "MATCHED", "batch": composite}, "latest": {"disposition": "MATCHED", "job": saved_job}, "mismatch": false},
@@ -294,7 +297,10 @@ func _test_loaded_batch_restore_nullable_contract(ui: Control, gateway: ReadOnly
 			ui.call("_run_level_pipeline")
 			_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "%s explicit Run created or started a new job" % case_name)
 		_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")).contains("create") or str(call.get("operation", "")).contains("run")), "%s created or started work" % case_name)
-		if case_name in ["no matching composite", "ambiguous null composite", "snapshot mismatch null composite"]:
+		if case_name == "ambiguous pending resume":
+			var offered := (ui.get_node("RunLevelPipeline") as Button)
+			_check(offered.text.begins_with("Run Pending Batch") and not offered.disabled, "ambiguous saved jobs did not offer Run Pending Batch: %s" % offered.text)
+		if case_name in ["no matching composite", "ambiguous null composite", "snapshot mismatch null composite", "ambiguous pending resume"]:
 			_check(str(ui.get("_batch_import_id")) == "" and str(ui.get("_batch_job_id")) == "", "%s fabricated restored batch/job identity" % case_name)
 			_check((ui.get("_batch_snapshot") as Dictionary).is_empty(), "%s changed saved job snapshot" % case_name)
 		elif case_name in ["no matching job", "batch job source mismatch"]:

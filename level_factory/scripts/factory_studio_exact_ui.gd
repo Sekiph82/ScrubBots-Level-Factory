@@ -2070,7 +2070,12 @@ func _apply_loaded_png_batch_find(resolved: Dictionary, token: String) -> void:
 		_batch_import_id = ""
 		_batch_job_id = ""
 		_batch_snapshot.clear()
-		if resolution not in ["NO_MATCHING_COMPOSITE", ""]:
+		if resolution == "PENDING_BATCH_RESUME_AMBIGUOUS":
+			# Several old jobs still claim Pending PNGs (2026-11-13: "Batch mismatch"
+			# locked Run). None is resumed; a fresh Pending batch supersedes them.
+			_batch_job_source_mismatch = false
+			_report("Several saved batches overlap the Pending PNGs; none was resumed. Run Pending Batch starts one batch and retires them.")
+		elif resolution not in ["NO_MATCHING_COMPOSITE", ""]:
 			_batch_job_source_mismatch = true
 			_report("Loaded PNG batch provenance could not be verified; resume and retry are blocked.")
 		else:

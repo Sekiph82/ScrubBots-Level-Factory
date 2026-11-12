@@ -12,8 +12,15 @@ def _job(job_id: str, state: str, statuses: dict[str, str]) -> dict:
             "state": state, "items": items, "counts": png_batch._counts(items), "updated_at": "t0"}
 
 
+def _pending(monkeypatch, *source_ids: str) -> None:
+    from scrubbots_pixel_factory import owner_release_library
+    monkeypatch.setattr(owner_release_library, "list_records", lambda *_args, **_kwargs: {
+        "records": [{"source_id": source_id, "status": "PENDING"} for source_id in source_ids]})
+
+
 def test_new_pending_batch_supersedes_only_fully_covered_unfinished_jobs(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
+    _pending(monkeypatch, "b", "c", "d", "z")
     covered = png_batch._write_job(_job("png-batch-old-covered", "PAUSED",
                                         {"a": "READY", "b": "QUEUED", "c": "QUEUED"}))
     partly = png_batch._write_job(_job("png-batch-old-partly", "QUEUED", {"b": "QUEUED", "z": "QUEUED"}))
@@ -50,3 +57,20 @@ def test_discovery_offers_all_pending_when_saved_job_does_not_cover_new_pngs(mon
     assert "pending_candidate_ids - resumable[0][2]" in source
     assert fake(pending, ["b", "new1", "new2"]) == {"disposition": "NO_MATCHING_COMPOSITE", "uncovered_pending_count": 2}
     assert '"SUPERSEDED"' in inspect.getsource(png_batch.png_batch_latest)
+
+
+def test_rows_finished_by_another_job_do_not_keep_an_old_job_alive(tmp_path, monkeypatch) -> None:
+    # Real app 2026-11-13: two 8 November jobs still had 99/100 QUEUED rows that
+    # other jobs had already made READY, so no new batch ever superseded them and
+    # startup discovery was ambiguous ("Batch mismatch").
+    monkeypatch.setattr(studio_extensions, "_repository_root", lambda *_args, **_kwargs: tmp_path)
+    _pending(monkeypatch, "b", "c", "q")
+    stale = png_batch._write_job(_job("png-batch-old-stale", "INTERRUPTED", {"b": "QUEUED", "y": "QUEUED"}))
+    dead = png_batch._write_job(_job("png-batch-old-dead", "QUEUED", {"x": "QUEUED", "y": "QUEUED"}))
+    live = png_batch._write_job(_job("png-batch-old-live", "STOPPED", {"q": "QUEUED"}))
+    new = png_batch._write_job(_job("png-batch-new", "QUEUED", {"b": "QUEUED", "c": "QUEUED"}))
+
+    superseded = png_batch._supersede_covered_jobs(new)
+
+    assert sorted(superseded) == [dead["job_id"], stale["job_id"]]
+    assert png_batch._read_job(live["job_id"])["state"] == "STOPPED"  # q is still Pending and not covered

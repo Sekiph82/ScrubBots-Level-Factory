@@ -800,6 +800,12 @@ def _supersede_covered_jobs(new_job: Mapping[str, Any]) -> list[str]:
     """
     covered = {str(item.get("source_id", "")) for item in new_job.get("items", [])
                if isinstance(item, Mapping) and item.get("status") == "QUEUED"}
+    # Rows another job already finished are no longer Pending. They must not keep
+    # an old job alive: on 2026-11-13 two 8 November jobs (99 and 100 such rows)
+    # were never superseded and made startup discovery ambiguous ("Batch mismatch").
+    from .owner_release_library import list_records
+    still_pending = {str(row.get("source_id", "")) for row in list_records().get("records", [])
+                     if isinstance(row, Mapping) and str(row.get("status", "")) == "PENDING"}
     superseded: list[str] = []
     job_root = _root() / "jobs"
     for path in sorted(job_root.glob("png-batch-*.json")) if job_root.exists() else []:
@@ -813,7 +819,7 @@ def _supersede_covered_jobs(new_job: Mapping[str, Any]) -> list[str]:
                     continue
                 unfinished = {str(item.get("source_id", "")) for item in old.get("items", [])
                               if isinstance(item, Mapping) and item.get("status") in _UNFINISHED_ITEM_STATES}
-                if not unfinished or not unfinished <= covered:
+                if not unfinished or not unfinished & still_pending <= covered:
                     continue
                 old["state"] = "SUPERSEDED"
                 old["superseded_by"] = str(new_job.get("job_id", ""))
