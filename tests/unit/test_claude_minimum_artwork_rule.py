@@ -45,3 +45,18 @@ def test_pixellab_intake_still_rejects_artwork_below_200_cells() -> None:
     # 13 rows x 14 = 182 (+1) cells.
     _frames, records = inspect_atlas(_atlas(13))
     assert all("MINIMUM_ARTWORK" in record["reasons"] for record in records)
+
+
+def test_rule_change_writes_new_validation_evidence_instead_of_conflicting() -> None:
+    # Real app 2026-11-12: 8 previously validated PNGs failed with "immutable evidence
+    # already exists with different content" because only minimum_rule changed.
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    base = {"analysis_policy": "p", "version": 2, "source_authority": {"source_record_sha256": "r"},
+            "game_authority": {"commit": "c"}, "alpha": {"transparent_count": 10},
+            "void_capability": {"state": "OPEN", "git_head": "aef60a616d4a", "void_contract": "PINNED_RUNTIME_V2"}}
+    legacy = {**base, "artwork": {"minimum_rule": ">=200 non-VOID and >=25% W*H"}}
+    current = {**base, "artwork": {"minimum_rule": ">=200 non-VOID"}}
+    legacy_path = extensions._validation_evidence_path("owner-upload-x", "x", legacy)
+    assert legacy_path == extensions._validation_evidence_path("owner-upload-x", "x", {**base, "artwork": {}})
+    assert extensions._validation_evidence_path("owner-upload-x", "x", current) != legacy_path

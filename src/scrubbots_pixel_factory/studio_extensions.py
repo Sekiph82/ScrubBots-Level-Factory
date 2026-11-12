@@ -182,6 +182,13 @@ def _validation_evidence_path(source_id: str, source_sha256: str, report: Mappin
         "game_authority": report.get("game_authority"),
         "void_contract": capability.get("void_contract", "NOT_USED") if isinstance(capability, Mapping) else "NOT_USED",
     }
+    # The minimum-artwork rule is part of the immutable report. When it changed
+    # (owner decision 2026-11-12: 25% ratio dropped) re-validating a source hit
+    # "immutable evidence already exists with different content"; a rule change
+    # now gets its own evidence file and old files stay untouched.
+    artwork_rule = report.get("artwork", {}).get("minimum_rule") if isinstance(report.get("artwork"), Mapping) else None
+    if artwork_rule not in (None, ">=200 non-VOID and >=25% W*H"):
+        context["artwork_rule"] = artwork_rule
     context_digest = _digest(context)[:20]
     return extensions_root() / "validation" / f"{source_id}-{source_sha256}{suffix}-v2-{context_digest}.json"
 
