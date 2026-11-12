@@ -27,7 +27,6 @@ DEFAULT_FRAME_SIZE = (56, 56)
 MIN_MAX_COLORS = 3
 MAX_MAX_COLORS = 12
 DEFAULT_MAX_COLORS = 12
-MIN_OCCUPANCY_RATIO = 0.25
 MIN_OPAQUE_PIXELS = 200
 
 
@@ -120,7 +119,7 @@ def _frame_records(atlas: Image.Image, max_colors: int) -> tuple[tuple[Image.Ima
     frames: list[Image.Image] = []
     records: list[dict[str, Any]] = []
     first_by_pixel_hash: dict[str, int] = {}
-    min_opaque = max(MIN_OPAQUE_PIXELS, int(width * height * MIN_OCCUPANCY_RATIO))
+    min_opaque = MIN_OPAQUE_PIXELS  # owner decision 2026-11-12: >= 200 artwork cells; the 25%-of-canvas ratio was dropped
     for row in range(4):
         for column in range(4):
             index = row * 4 + column + 1

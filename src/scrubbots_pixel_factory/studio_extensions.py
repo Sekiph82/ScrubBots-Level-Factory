@@ -641,7 +641,8 @@ def validate_owner_source(
             }
     gate_open = capability is None or capability.get("state") == "OPEN"
     artwork_count = width * height - transparent
-    minimum_artwork_ok = not transparent or (artwork_count >= 200 and artwork_count >= width * height * 0.25)
+    # owner decision 2026-11-12: >= 200 artwork cells; the 25%-of-canvas ratio was dropped.
+    minimum_artwork_ok = not transparent or artwork_count >= 200
     color_count_ok = 3 <= len(used) <= 12
     exact_logical = legal_dimensions and foreign == 0 and semi_alpha == 0 and gate_open and minimum_artwork_ok and color_count_ok
     structural: dict[str, Any]
@@ -669,7 +670,7 @@ def validate_owner_source(
         "exact_logical_source": exact_logical, "logical_dimension_status": "EXACT" if exact_logical else "DERIVED_ARTIFACT_REQUIRED",
         "palette": {"canonical_ids": sorted(used, key=lambda value: int(value[1:])), "used_color_count": len(used), "foreign_color_count": foreign},
         "alpha": {"transparent_count": transparent, "semi_alpha_count": semi_alpha, "opaque_count": width * height - transparent - semi_alpha},
-        "artwork": {"cell_count": artwork_count, "void_cell_count": transparent, "minimum_rule": ">=200 non-VOID and >=25% W*H", "minimum_rule_pass": minimum_artwork_ok},
+        "artwork": {"cell_count": artwork_count, "void_cell_count": transparent, "minimum_rule": ">=200 non-VOID", "minimum_rule_pass": minimum_artwork_ok},
         "void_capability": capability or {"state": "NOT_REQUIRED", "disposition": "NOT_REQUIRED"},
         "grid_hash": logical_grid_hash(width, height, cells) if exact_logical else None,
         "structural": structural,

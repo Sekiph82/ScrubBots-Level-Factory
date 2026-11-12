@@ -117,7 +117,7 @@ class SupplyOptimizer:
                 reason = gate.get("reason", "current-game VOID capability gate is closed") if isinstance(gate, dict) else "current-game VOID capability gate is invalid"
                 raise NoValidSupply(f"TRANSPARENT_UNAVAILABLE: {reason}")
             artwork_count = m["playable_pixels"]
-            if artwork_count < 200 or artwork_count < m["width"] * m["height"] * 0.25:
+            if artwork_count < 200:  # owner decision 2026-11-12: >= 200 artwork cells; the 25%-of-canvas ratio was dropped
                 raise NoValidSupply(
                     f"VOID minimum artwork rule failed: {artwork_count} non-VOID cells on {m['width']}x{m['height']}"
                 )

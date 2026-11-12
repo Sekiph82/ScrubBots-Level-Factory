@@ -104,7 +104,7 @@ def test_alpha_and_color_counts_ignore_void_and_keep_source_bytes(tmp_path: Path
     assert report["artwork"] == {
         "cell_count": 474,
         "void_cell_count": 550,
-        "minimum_rule": ">=200 non-VOID and >=25% W*H",
+        "minimum_rule": ">=200 non-VOID",
         "minimum_rule_pass": True,
     }
     assert report["palette"]["used_color_count"] == 3
@@ -181,7 +181,9 @@ def test_void_minimum_200_and_larger_board_quarter_boundary(tmp_path: Path, monk
     _repository, _uploads = _configure_upload_roots(tmp_path, monkeypatch)
     monkeypatch.setattr(void_module, "void_capability", lambda _project=None: {"state": "OPEN", "disposition": "READY", "git_head": "a" * 40})
 
-    cases = ((20, 20, 199, False), (20, 20, 200, True), (40, 20, 199, False), (40, 20, 200, True))
+    # Owner decision 2026-11-12: no 25%-of-canvas ratio; only the 200-cell floor.
+    cases = ((20, 20, 199, False), (20, 20, 200, True), (40, 20, 199, False), (40, 20, 200, True),
+             (56, 56, 199, False), (56, 56, 700, True))
     for width, height, artwork_count, accepted in cases:
         source = tmp_path / f"boundary-{width}x{height}-{artwork_count}.png"
         source.write_bytes(_png(width, height, _logical_rgba(width, height, artwork_count)))

@@ -185,7 +185,7 @@ def _load_source(source_id: str, expected_sha: str, expected_record_sha: str) ->
         raise ArtFirstUnavailable("UNAVAILABLE: logical source dimensions must independently be 20..59")
     if foreign or semi_alpha or not 3 <= len(used) <= 12:
         raise ArtFirstUnavailable("UNAVAILABLE: source must use 3..12 canonical colors and no foreign or semi-alpha pixels")
-    if transparent and (width * height - transparent < 200 or (width * height - transparent) < width * height * 0.25):
+    if transparent and width * height - transparent < 200:  # owner decision 2026-11-12: >= 200 artwork cells; the 25%-of-canvas ratio was dropped
         raise ArtFirstUnavailable("UNAVAILABLE: transparent source is below the existing minimum-artwork rule")
     if VOID_CELL_ID in cells:
         from ...supply_pipeline.void_capability import void_capability

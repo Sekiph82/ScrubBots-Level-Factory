@@ -10,8 +10,8 @@ from ...core.result import GenerationResult
 from ...quality.core import QualityPolicy, analyze_grid, evaluate_grid, logical_grid_hash
 
 
+# owner decision 2026-11-12: >= 200 artwork cells; the 25%-of-canvas ratio was dropped.
 MIN_VOID_ARTWORK_CELLS = 200
-MIN_VOID_ARTWORK_RATIO = 0.25
 
 
 class TransparentNegativeSpaceError(ValueError):
@@ -54,7 +54,7 @@ def derive_transparent_negative_space(
 
     cells = tuple(VOID_CELL_ID if color == background else color for color in source_grid)
     artwork_count = len(cells) - cells.count(VOID_CELL_ID)
-    required_count = max(MIN_VOID_ARTWORK_CELLS, math.ceil(result.width * result.height * MIN_VOID_ARTWORK_RATIO))
+    required_count = MIN_VOID_ARTWORK_CELLS
     if artwork_count < required_count:
         raise TransparentNegativeSpaceError(
             f"transparent artwork has {artwork_count} cells; current VOID V2 requires {required_count}"
@@ -92,7 +92,6 @@ def derive_transparent_negative_space(
 
 __all__ = [
     "MIN_VOID_ARTWORK_CELLS",
-    "MIN_VOID_ARTWORK_RATIO",
     "TransparentNegativeSpaceDerivation",
     "TransparentNegativeSpaceError",
     "derive_transparent_negative_space",
