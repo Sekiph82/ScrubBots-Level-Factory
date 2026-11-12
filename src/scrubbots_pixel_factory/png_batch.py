@@ -32,7 +32,7 @@ _PROCESS_LOCKS_GUARD = threading.Lock()
 MAX_PARALLEL_WORKERS = 8
 
 
-DEFAULT_PARALLEL_WORKERS_CAP = 6
+DEFAULT_PARALLEL_WORKERS_CAP = 8  # owner decision 2026-11-13: 8 workers overnight
 
 
 def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
