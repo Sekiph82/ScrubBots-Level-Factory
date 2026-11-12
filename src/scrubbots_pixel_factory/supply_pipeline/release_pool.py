@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
@@ -473,8 +474,9 @@ def write_historical_profile_supplement(candidate: Mapping[str, Any], pipeline: 
 
 # Within one release_entries() listing the attested runtime is verified once per
 # column count instead of once per entry (116 full manifest re-hashes took ~20 s).
-# Outside a listing every call still re-verifies the runtime.
-_PINNED_RULES_SCOPE: dict[int, Any] | None = None
+# Outside a listing every call still re-verifies the runtime. Thread-local:
+# parallel batch workers (2026-11-12) each run their own listing.
+_PINNED_RULES = threading.local()
 
 
 def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str, Any], provenance: Mapping[str, Any]) -> None:
@@ -492,11 +494,12 @@ def _validate_score_and_class(primary: Mapping[str, Any], official: Mapping[str,
     from .game_rules import GameRules
     column_count = int(primary.get("column_count", 3))
     try:
-        rules = _PINNED_RULES_SCOPE.get(column_count) if _PINNED_RULES_SCOPE is not None else None
+        scope = getattr(_PINNED_RULES, "scope", None)
+        rules = scope.get(column_count) if scope is not None else None
         if rules is None:
             rules = GameRules(pinned_game_source.expected_runtime_root(), column_count=column_count)
-            if _PINNED_RULES_SCOPE is not None:
-                _PINNED_RULES_SCOPE[column_count] = rules
+            if scope is not None:
+                scope[column_count] = rules
     except (OSError, RuntimeError, ValueError) as exc:
         raise ReleaseError("pinned Difficulty V1 class authority is unavailable") from exc
     if not isinstance(difficulty, Mapping) or difficulty.get("class") != rules.classify(float(score)):
@@ -978,13 +981,12 @@ def _cached_latest_review(
 
 
 def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
-    global _PINNED_RULES_SCOPE
-    outer_scope = _PINNED_RULES_SCOPE
-    _PINNED_RULES_SCOPE = {} if outer_scope is None else outer_scope
+    outer_scope = getattr(_PINNED_RULES, "scope", None)
+    _PINNED_RULES.scope = {} if outer_scope is None else outer_scope
     try:
         return _release_entries(candidate_id_filter)
     finally:
-        _PINNED_RULES_SCOPE = outer_scope
+        _PINNED_RULES.scope = outer_scope
 
 
 def _release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:

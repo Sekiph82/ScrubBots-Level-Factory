@@ -1,4 +1,4 @@
-"""Durable owner-triggered sequential PNG batch orchestration.
+"""Durable owner-triggered PNG batch orchestration (bounded parallel workers).
 
 This module contains no solver. Each queued source is dispatched exactly once
 at a time through the existing Studio ``run_pipeline`` contract after an
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -26,6 +27,17 @@ JOB_VERSION = 1
 MAX_JOB_BYTES = 1024 * 1024
 _PROCESS_LOCKS: dict[str, threading.Lock] = {}
 _PROCESS_LOCKS_GUARD = threading.Lock()
+
+
+MAX_PARALLEL_WORKERS = 8
+
+
+def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
+    """Concurrent canonical pipelines per batch: settings, env override, else cores // 4 (max 4)."""
+    requested = (settings or {}).get("parallel_workers") or os.environ.get("SCRUBBOTS_FACTORY_BATCH_WORKERS")
+    if requested:
+        return max(1, min(MAX_PARALLEL_WORKERS, int(requested)))
+    return max(1, min(4, (os.cpu_count() or 4) // 4))
 
 
 def _now() -> str:
@@ -1507,180 +1519,39 @@ def run_png_batch(
             if projection_error is not None:
                 return projection_error
             job = _write_job(job)
-        for item_index, item in enumerate(job["items"]):
-            from .studio_lifecycle import studio_shutdown_requested
-            if studio_shutdown_requested():
-                job["state"] = "INTERRUPTED"
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                _clear_control(job_id)
-                job = _write_job(job)
-                return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
-            if item.get("status") in {"READY", "FAILED", "REJECTED", "SKIPPED_DUPLICATE", "SKIPPED"}:
-                continue
-            action = _control_action(job_id)
-            if action:
-                job["state"] = "PAUSED" if action == "PAUSE_AFTER_CURRENT" else "INTERRUPTED" if action == "CANCEL_NOW" else "STOPPED"
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                _clear_control(job_id)
-                job = _write_job(job)
-                return {"state": "SUCCESS", "disposition": job["state"], "job": job}
-            try:
-                proof = extensions.validate_owner_source(
-                    str(item["source_id"]), persist=False,
-                    game_project=job.get("settings", {}).get("game_project"),
-                    source_directory=job.get("settings", {}).get("source_directory"),
-                )
-                if (proof.get("source_sha256") != item.get("source_sha256")
-                        or proof.get("structural", {}).get("disposition") != "PASS"
-                        or not proof.get("exact_logical_source")):
-                    raise ValueError("source changed or failed canonical pinned-runtime validation")
-                record_path, _source_path = extensions._source_record_paths(
-                    str(item["source_id"]), job.get("settings", {}).get("source_directory"))
-                if hashlib.sha256(record_path.read_bytes()).hexdigest() != item.get("source_record_sha256"):
-                    raise ValueError("source record SHA-256 changed after batch planning")
-            except Exception as exc:
-                item.update({"status": "REJECTED", "reason": f"SOURCE_REVALIDATION_FAILED: {str(exc)[:400]}", "finished_at": _now()})
-                job["counts"] = _counts(job["items"])
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                projection_error = _persist_projection_or_pause(job, item)
-                if projection_error is not None:
-                    return projection_error
-                job = _write_job(job)
-                continue
-            if item.get("status") == "RUNNING":
-                recovered = _recover_attempt(job, item)
-                if recovered is not None:
-                    pipeline = recovered["pipeline"]
-                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": recovered["release_pool"], "recovered_after_interruption": True, "finished_at": _now()})
-                    job["counts"] = _counts(job["items"])
-                    job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
-                    job["current_index"] = None
-                    job["updated_at"] = _now()
-                    job = _write_job(job)
-                    projection_error = _persist_projection_or_pause(job, item)
-                    if projection_error is not None:
-                        return projection_error
-                    job = _write_job(job)
-                    continue
-                item["status"] = "QUEUED"
-                item["reason"] = "PRIOR_ATTEMPT_INTERRUPTED_WITHOUT_COMPLETE_CANONICAL_RUN"
-                job["updated_at"] = _now()
-                job = _write_job(job)
-            item.update({"status": "VERIFYING_EXISTING", "reason": "Checking for already complete artifact-verified READY evidence."})
-            job["current_index"] = item_index
-            job["updated_at"] = _now()
-            job = _write_job(job)
-            try:
-                reused = _reuse_existing_ready(job, item)
-            except Exception as exc:
-                reused = None
-                item["existing_ready_check_error"] = str(exc)[:400]
-            if reused is not None and reused.get("pool_retryable_error"):
-                pipeline = reused.get("pipeline", {})
-                item.update({
-                    "status": "FAILED",
-                    "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None,
-                    "candidate_id": pipeline.get("candidate_id") if isinstance(pipeline, Mapping) else None,
-                    "release_pool": reused.get("release_pool", {}),
-                    "reason": f"READY_POOL_ENTRY_FAILED: {reused['pool_retryable_error']}",
-                    "finished_at": _now(),
-                })
-                job["counts"] = _counts(job["items"])
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                projection_error = _persist_projection_or_pause(job, item)
-                if projection_error is not None:
-                    return projection_error
-                job = _write_job(job)
-                continue
-            if reused is not None and reused.get("rejected"):
-                item.update({"status": "REJECTED", "reason": str(reused.get("reason", "SOURCE_CANDIDATE_IS_OWNER_REJECTED")), "finished_at": _now()})
-                job["counts"] = _counts(job["items"])
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                projection_error = _persist_projection_or_pause(job, item)
-                if projection_error is not None:
-                    return projection_error
-                job = _write_job(job)
-                continue
-            if reused is not None:
-                pipeline = reused["pipeline"]
-                item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": reused["release_pool"], "reused_existing_ready": True, "finished_at": _now()})
-                job["counts"] = _counts(job["items"])
-                job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
-                job["current_index"] = None
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                projection_error = _persist_projection_or_pause(job, item)
-                if projection_error is not None:
-                    return projection_error
-                job = _write_job(job)
-                continue
-            item["status"] = "QUEUED"
-            job["current_index"] = None
-            job["updated_at"] = _now()
-            job = _write_job(job)
-            attempt_id = "batch-%s-%03d-%s" % (job_id.removeprefix("png-batch-")[:12], item_index + 1, uuid.uuid4().hex[:12])
-            activity_id = "pipeline-ui-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + hashlib.sha256(attempt_id.encode()).hexdigest()[:12]
-            item.update({"status": "RUNNING", "attempt_id": attempt_id, "activity_run_id": activity_id, "started_at": _now(), "reason": ""})
-            job["state"] = "RUNNING"
-            job["current_index"] = item_index
-            job["counts"] = _counts(job["items"])
-            job["updated_at"] = _now()
-            job = _write_job(job)
-            request = dict(job.get("settings", {}))
-            request.update({
-                "column_count": int(item["column_count"]),
-                "png_batch_job_id": job_id,
-                "png_batch_item_index": item_index,
-                "png_batch_attempt_id": attempt_id,
-                "activity_run_id": activity_id,
-                "activity_source_sha256": str(item["source_sha256"]),
-                "activity_source_record_sha256": str(item["source_record_sha256"]),
-                # Batch runs use a smaller default search budget to keep one hard
-                # image from monopolizing the sequential queue. Explicit owner
-                # settings remain honored up to the existing canonical maximum.
-                "candidates": min(int(request.get("candidates", 48)), 300),
-                "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
-                "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 900)), 900),
-            })
-            try:
-                _persist_owner_release_attempt(job, item)
-                job["updated_at"] = _now()
-                job = _write_job(job)
-                control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"
-                previous_control_file = os.environ.get(control_env)
-                os.environ[control_env] = str(_control_path(job_id))
-                try:
-                    pipeline = runner(source_id=str(item["source_id"]), request=request)
-                finally:
-                    if previous_control_file is None:
-                        os.environ.pop(control_env, None)
-                    else:
-                        os.environ[control_env] = previous_control_file
-                if _control_action(job_id) == "CANCEL_NOW":
-                    job["state"] = "INTERRUPTED"
-                    job["current_index"] = item_index
-                    job["counts"] = _counts(job["items"])
-                    job["updated_at"] = _now()
-                    _clear_control(job_id)
-                    job = _write_job(job)
-                    return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
+        # Owner request 2026-11-12: one level took ~13 minutes, almost all of it
+        # inside one solver Godot process, so a sequential queue could not reach
+        # 100 levels a day. Up to ``workers`` items now solve concurrently. Every
+        # item still runs the identical canonical pipeline; solver jobs, run
+        # output folders, activity files and Release Pool entries are already
+        # per-item, and all job-state writes stay on this thread.
+        workers = parallel_workers(job.get("settings", {}))
+        in_flight: dict[Future, tuple[int, dict[str, Any]]] = {}
+        stop_state: str | None = None
+
+        def running_index() -> int | None:
+            return min((index for index, _item in in_flight.values()), default=None)
+
+        def finish(item_index: int, item: dict[str, Any], pipeline: Any, error: Exception | None) -> dict[str, Any] | None:
+            nonlocal job
+            if error is not None:
+                item.update({"status": "FAILED", "reason": str(error)[:512], "finished_at": _now()})
+            else:
                 primary = pipeline.get("primary", {}) if isinstance(pipeline, Mapping) else {}
                 pool = pipeline.get("release_pool", {}) if isinstance(pipeline, Mapping) else {}
-                ready = (
-                    _has_ready_pipeline_proof(
-                        pipeline, str(item["source_id"]), expected_columns=int(item["column_count"]),
-                        source_record_sha256=str(item["source_record_sha256"]), job=job, item=item)
-                    and _verify_column_artifacts(pipeline, int(item["column_count"]))
-                )
-                if ready and pool.get("readback_verified") is True:
+                try:
+                    ready = (
+                        _has_ready_pipeline_proof(
+                            pipeline, str(item["source_id"]), expected_columns=int(item["column_count"]),
+                            source_record_sha256=str(item["source_record_sha256"]), job=job, item=item)
+                        and _verify_column_artifacts(pipeline, int(item["column_count"]))
+                    )
+                except Exception as exc:
+                    item.update({"status": "FAILED", "reason": str(exc)[:512], "finished_at": _now()})
+                    ready = None
+                if ready is None:
+                    pass
+                elif ready and pool.get("readback_verified") is True:
                     item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": primary.get("files", {}), "release_pool": pool, "finished_at": _now()})
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                 elif ready:
@@ -1688,17 +1559,7 @@ def run_png_batch(
                     item.update({"status": "FAILED", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "release_pool": pool, "reason": f"READY_POOL_ENTRY_FAILED: {pool_reason[:400]}", "finished_at": _now()})
                 else:
                     item.update({"status": "FAILED", "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None, "reason": str(pipeline.get("error", pipeline.get("reason", pipeline.get("disposition", "CANONICAL_READY_PROOF_MISSING"))) if isinstance(pipeline, Mapping) else "CANONICAL_PIPELINE_RETURNED_NO_RESULT")[:512], "finished_at": _now()})
-            except Exception as exc:
-                if _control_action(job_id) == "CANCEL_NOW":
-                    job["state"] = "INTERRUPTED"
-                    job["current_index"] = item_index
-                    job["counts"] = _counts(job["items"])
-                    job["updated_at"] = _now()
-                    _clear_control(job_id)
-                    job = _write_job(job)
-                    return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
-                item.update({"status": "FAILED", "reason": str(exc)[:512], "finished_at": _now()})
-            job["current_index"] = None
+            job["current_index"] = running_index()
             job["counts"] = _counts(job["items"])
             job["updated_at"] = _now()
             job = _write_job(job)
@@ -1706,6 +1567,203 @@ def run_png_batch(
             if projection_error is not None:
                 return projection_error
             job = _write_job(job)
+            return None
+
+        def collect(return_when: str) -> dict[str, Any] | None:
+            """Record finished items; a CANCEL_NOW leaves the cancelled items RUNNING for recovery."""
+            nonlocal job
+            done, _pending = wait(list(in_flight), return_when=return_when)
+            if _control_action(job_id) == "CANCEL_NOW":
+                wait(list(in_flight))
+                job["state"] = "INTERRUPTED"
+                job["current_index"] = running_index()
+                job["counts"] = _counts(job["items"])
+                job["updated_at"] = _now()
+                _clear_control(job_id)
+                job = _write_job(job)
+                return {"state": "SUCCESS", "disposition": "INTERRUPTED", "job": job}
+            for future in sorted(done, key=lambda value: in_flight[value][0]):
+                item_index, item = in_flight.pop(future)
+                try:
+                    pipeline, error = future.result(), None
+                except Exception as exc:
+                    pipeline, error = None, exc
+                outcome = finish(item_index, item, pipeline, error)
+                if outcome is not None:
+                    return outcome
+            return None
+
+        control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"
+        previous_control_file = os.environ.get(control_env)
+        os.environ[control_env] = str(_control_path(job_id))
+        executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="png-batch")
+        try:
+            for item_index, item in enumerate(job["items"]):
+                from .studio_lifecycle import studio_shutdown_requested
+                if studio_shutdown_requested():
+                    stop_state = "INTERRUPTED"
+                    break
+                if item.get("status") in {"READY", "FAILED", "REJECTED", "SKIPPED_DUPLICATE", "SKIPPED"}:
+                    continue
+                action = _control_action(job_id)
+                if action:
+                    stop_state = "PAUSED" if action == "PAUSE_AFTER_CURRENT" else "INTERRUPTED" if action == "CANCEL_NOW" else "STOPPED"
+                    break
+                try:
+                    proof = extensions.validate_owner_source(
+                        str(item["source_id"]), persist=False,
+                        game_project=job.get("settings", {}).get("game_project"),
+                        source_directory=job.get("settings", {}).get("source_directory"),
+                    )
+                    if (proof.get("source_sha256") != item.get("source_sha256")
+                            or proof.get("structural", {}).get("disposition") != "PASS"
+                            or not proof.get("exact_logical_source")):
+                        raise ValueError("source changed or failed canonical pinned-runtime validation")
+                    record_path, _source_path = extensions._source_record_paths(
+                        str(item["source_id"]), job.get("settings", {}).get("source_directory"))
+                    if hashlib.sha256(record_path.read_bytes()).hexdigest() != item.get("source_record_sha256"):
+                        raise ValueError("source record SHA-256 changed after batch planning")
+                except Exception as exc:
+                    item.update({"status": "REJECTED", "reason": f"SOURCE_REVALIDATION_FAILED: {str(exc)[:400]}", "finished_at": _now()})
+                    job["counts"] = _counts(job["items"])
+                    job["current_index"] = running_index()
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                    projection_error = _persist_projection_or_pause(job, item)
+                    if projection_error is not None:
+                        return projection_error
+                    job = _write_job(job)
+                    continue
+                if item.get("status") == "RUNNING":
+                    recovered = _recover_attempt(job, item)
+                    if recovered is not None:
+                        pipeline = recovered["pipeline"]
+                        item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": recovered["release_pool"], "recovered_after_interruption": True, "finished_at": _now()})
+                        job["counts"] = _counts(job["items"])
+                        job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
+                        job["current_index"] = running_index()
+                        job["updated_at"] = _now()
+                        job = _write_job(job)
+                        projection_error = _persist_projection_or_pause(job, item)
+                        if projection_error is not None:
+                            return projection_error
+                        job = _write_job(job)
+                        continue
+                    item["status"] = "QUEUED"
+                    item["reason"] = "PRIOR_ATTEMPT_INTERRUPTED_WITHOUT_COMPLETE_CANONICAL_RUN"
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                item.update({"status": "VERIFYING_EXISTING", "reason": "Checking for already complete artifact-verified READY evidence."})
+                job["current_index"] = item_index if running_index() is None else running_index()
+                job["updated_at"] = _now()
+                job = _write_job(job)
+                try:
+                    reused = _reuse_existing_ready(job, item)
+                except Exception as exc:
+                    reused = None
+                    item["existing_ready_check_error"] = str(exc)[:400]
+                if reused is not None and reused.get("pool_retryable_error"):
+                    pipeline = reused.get("pipeline", {})
+                    item.update({
+                        "status": "FAILED",
+                        "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None,
+                        "candidate_id": pipeline.get("candidate_id") if isinstance(pipeline, Mapping) else None,
+                        "release_pool": reused.get("release_pool", {}),
+                        "reason": f"READY_POOL_ENTRY_FAILED: {reused['pool_retryable_error']}",
+                        "finished_at": _now(),
+                    })
+                    job["counts"] = _counts(job["items"])
+                    job["current_index"] = running_index()
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                    projection_error = _persist_projection_or_pause(job, item)
+                    if projection_error is not None:
+                        return projection_error
+                    job = _write_job(job)
+                    continue
+                if reused is not None and reused.get("rejected"):
+                    item.update({"status": "REJECTED", "reason": str(reused.get("reason", "SOURCE_CANDIDATE_IS_OWNER_REJECTED")), "finished_at": _now()})
+                    job["counts"] = _counts(job["items"])
+                    job["current_index"] = running_index()
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                    projection_error = _persist_projection_or_pause(job, item)
+                    if projection_error is not None:
+                        return projection_error
+                    job = _write_job(job)
+                    continue
+                if reused is not None:
+                    pipeline = reused["pipeline"]
+                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": reused["release_pool"], "reused_existing_ready": True, "finished_at": _now()})
+                    job["counts"] = _counts(job["items"])
+                    job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
+                    job["current_index"] = running_index()
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                    projection_error = _persist_projection_or_pause(job, item)
+                    if projection_error is not None:
+                        return projection_error
+                    job = _write_job(job)
+                    continue
+                attempt_id = "batch-%s-%03d-%s" % (job_id.removeprefix("png-batch-")[:12], item_index + 1, uuid.uuid4().hex[:12])
+                activity_id = "pipeline-ui-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + hashlib.sha256(attempt_id.encode()).hexdigest()[:12]
+                item.update({"status": "RUNNING", "attempt_id": attempt_id, "activity_run_id": activity_id, "started_at": _now(), "reason": ""})
+                job["state"] = "RUNNING"
+                job["current_index"] = item_index if running_index() is None else running_index()
+                job["counts"] = _counts(job["items"])
+                job["updated_at"] = _now()
+                job = _write_job(job)
+                request = dict(job.get("settings", {}))
+                request.update({
+                    "column_count": int(item["column_count"]),
+                    "png_batch_job_id": job_id,
+                    "png_batch_item_index": item_index,
+                    "png_batch_attempt_id": attempt_id,
+                    "activity_run_id": activity_id,
+                    "activity_source_sha256": str(item["source_sha256"]),
+                    "activity_source_record_sha256": str(item["source_record_sha256"]),
+                    # Batch runs use a smaller default search budget to keep one hard
+                    # image from monopolizing a worker. Explicit owner settings
+                    # remain honored up to the existing canonical maximum.
+                    "candidates": min(int(request.get("candidates", 48)), 300),
+                    "real_max_visited": min(int(request.get("real_max_visited", 25_000)), 25_000),
+                    "solver_timeout_seconds": min(float(request.get("solver_timeout_seconds", 900)), 900),
+                })
+                try:
+                    _persist_owner_release_attempt(job, item)
+                    job["updated_at"] = _now()
+                    job = _write_job(job)
+                except Exception as exc:
+                    outcome = finish(item_index, item, None, exc)
+                    if outcome is not None:
+                        return outcome
+                    continue
+                in_flight[executor.submit(runner, source_id=str(item["source_id"]), request=request)] = (item_index, item)
+                job["current_index"] = running_index()
+                job = _write_job(job)
+                while len(in_flight) >= workers:
+                    outcome = collect(FIRST_COMPLETED)
+                    if outcome is not None:
+                        return outcome
+            # Stop/Pause "after current" lets every already running item finish.
+            while in_flight:
+                outcome = collect(FIRST_COMPLETED)
+                if outcome is not None:
+                    return outcome
+        finally:
+            executor.shutdown(wait=True)
+            if previous_control_file is None:
+                os.environ.pop(control_env, None)
+            else:
+                os.environ[control_env] = previous_control_file
+        if stop_state is not None:
+            job["state"] = stop_state
+            job["current_index"] = None
+            job["counts"] = _counts(job["items"])
+            job["updated_at"] = _now()
+            _clear_control(job_id)
+            job = _write_job(job)
+            return {"state": "SUCCESS", "disposition": stop_state, "job": job}
         job["state"] = "COMPLETE"
         job["current_index"] = None
         job["counts"] = _counts(job["items"])

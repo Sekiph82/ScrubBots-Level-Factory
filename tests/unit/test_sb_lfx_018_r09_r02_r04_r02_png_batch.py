@@ -303,6 +303,9 @@ def test_resume_orchestration_only_retries_the_interrupted_item(tmp_path: Path, 
 
 
 def test_pause_orchestration_only_does_not_start_the_next_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # One worker: with parallel workers the next items may already be running
+    # (covered by test_claude_parallel_png_batch.py).
+    monkeypatch.setenv("SCRUBBOTS_FACTORY_BATCH_WORKERS", "1")
     batch_id, _items = _make_batch(tmp_path, monkeypatch, 3)
     monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
     job = png_batch.create_png_batch(batch_id)["job"]

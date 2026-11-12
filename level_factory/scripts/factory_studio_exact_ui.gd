@@ -1829,7 +1829,8 @@ func _refresh_run_button_caption() -> void:
 		var counts_value: Variant = _batch_snapshot.get("counts", {})
 		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
 		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
-		button.text = "Running %d/%d" % [completed + (1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", pending_count))]
+		var running := _batch_running_count()
+		button.text = ("Running %d/%d" % [completed + maxi(running, 1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", pending_count))]) + (" · %d parallel" % running if running > 1 else "")
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
@@ -4230,7 +4231,7 @@ func _sync_verified_batch_follow(job: Dictionary) -> void:
 	_last_candidate_id = ""
 	_last_pipeline.clear()
 	_owner_review_status = ""
-	_imported_window_start = clampi(batch_position - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+	_imported_window_start = _gallery_window_start_for(source_id)
 	_activity_source_id = source_id
 	_activity_source_filename = str(item.get("original_filename", item.get("display_name", source.get("display_filename", "PNG"))))
 	var visible_item_state := job_state if item_state == "RUNNING" and job_state in ["PAUSED", "INTERRUPTED"] else item_state
@@ -4637,6 +4638,15 @@ func _fail_activity_monitor(reason: String) -> void:
 	_refresh_activity_header()
 
 
+## PNG batch items solving at the same time (parallel workers, 2026-11-12).
+func _batch_running_count() -> int:
+	var running := 0
+	for item in _batch_snapshot.get("items", []):
+		if item is Dictionary and str(item.get("status", "")) == "RUNNING":
+			running += 1
+	return running
+
+
 func _refresh_activity_header() -> void:
 	if _activity_state_label == null:
 		return
@@ -4658,7 +4668,8 @@ func _refresh_activity_header() -> void:
 		_activity_state_label.text = activity_state
 		var activity_color := Color("#245478") if activity_state == "RUNNING" else Color("#7a5824") if activity_state in ["PAUSED", "STOPPED"] else Color("#743d3c")
 		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(activity_color, activity_color.lightened(0.22)))
-		_activity_source_label.text = "%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + (1 if current_index is int else 0), int(counts.get("total", 0))]
+		var parallel_running := _batch_running_count()
+		_activity_source_label.text = ("%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + maxi(parallel_running, 1 if current_index is int else 0), int(counts.get("total", 0))]) + (" · %d parallel" % parallel_running if parallel_running > 1 else "")
 		var release_counts := _current_release_status_counts()
 		_activity_source_label.tooltip_text = "Sequential batch %s · current PNG: %s · source SHA-256: %s · run: %s" % [_batch_job_id, str(_batch_follow_item.get("original_filename", _batch_follow_item.get("display_name", ""))), str(_batch_follow_item.get("source_sha256", "")), str(_batch_follow_item.get("run_id", "none"))]
 		_activity_phase_label.text = "%s · P%d R%d F%d X%d" % [phase_caption, int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0))]
@@ -5426,7 +5437,7 @@ func _select_imported_source_by_id(source_id: String) -> void:
 		_activity_backend_disposition = "SOURCE ONLY"
 		_activity_terminal_state = "SOURCE ONLY"
 		_activity_integrity_error = ""
-		_imported_window_start = clampi(index - 2, 0, maxi(0, _gameplay_sources.size() - 5))
+		_imported_window_start = _gallery_window_start_for(source_id)
 		_activity_source_id = source_id
 		_activity_source_filename = str(imported.get("display_filename", "Selected PNG"))
 		_batch_follow_item.clear()
@@ -5515,6 +5526,21 @@ func _batch_job_matches_loaded_sources() -> bool:
 		if not is_retry and str(item.get("source_id", "")) != str(composite_items[index].get("source_id", "")):
 			return false
 	return true
+
+
+## Five-slot window start that centres `source_id` in the list the dock actually
+## renders (_batch_ordered_gameplay_sources). The Pending batch snapshot is
+## usually a subset of all Final PNGs, so its index must not position the dock.
+func _gallery_window_start_for(source_id: String) -> int:
+	var rendered := _batch_ordered_gameplay_sources()
+	var position := -1
+	for index in range(rendered.size()):
+		if rendered[index] is Dictionary and str(rendered[index].get("source_id", "")) == source_id:
+			position = index
+			break
+	if position < 0:
+		return _imported_window_start
+	return clampi(position - 2, 0, maxi(0, rendered.size() - 5))
 
 
 func _batch_composite_index(source_id: String) -> int:

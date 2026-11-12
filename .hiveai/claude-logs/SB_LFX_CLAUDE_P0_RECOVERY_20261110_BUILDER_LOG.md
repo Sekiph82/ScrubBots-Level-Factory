@@ -164,3 +164,20 @@ Rewritten against the current product, keeping each suite's intent (commits 6ddf
 Product fix found here: LEVEL FACTORY Details cut the solver state to 10 characters ("UNAVAILABL"); now 11 (the R09-R02-R01 suite checks it; seen failing first).
 
 Godot: all 41 Studio suites pass in isolation (41/43 scripts; the 2 non-suites are the screenshot tool and the game-runtime profile helper). New `tests/integration/test_claude_studio_godot_suites.py` runs the 33 suites without a dedicated wrapper so they cannot silently drift again (only 8 of 41 had wrappers).
+
+## 2026-11-12 (evening) — P0-K: real-app run, 200-cell rule, parallel PNG batch (CLAUDE)
+
+Real installed app (owner present, Desktop LNK, Release = f58f5eec):
+- Run Batch works but the click froze the UI ~8.5 min: `png-batch-create` runs on the main thread and re-validates all 1299 Pending sources (`_verify_sources`). Not fixed yet (async/cached plan creation is open).
+- Batch LF-000099 reached READY in ~777 s: screening 50 plans ~25 s, solver Godot process 650 s, 1/60 replay + load check ~91 s, review ~11 s. The owner stopped the worker with Stop after current; job STOPPED cleanly (ready 1, rejected 23, remaining 1275).
+- Bottom gallery stayed on LF-000001..005 while LF-000099 solved: the five-slot window was positioned with the Pending-batch index (1299 items), not the rendered gallery index (1424 Final PNGs). Fixed with `_gallery_window_start_for()`; regression suite seen failing first.
+- 22 of 23 plan-time rejections were MINIMUM_ARTWORK (462..778 artwork cells < 25% of 3136). Owner decision: drop the ratio, keep >= 200 cells. Changed in studio_extensions, supply_optimizer, art_first router, transparent_negative_space, pixellab_pro_atlas (game-doc reporters void_capability/current_game_contract untouched). Commit 638d6208. LF-000397 (2 colours) stays rejected.
+
+Solver timing (temp copy of the pinned runtime + one real plan, game repo untouched): analyze OFF wall 99 s (native solve 66 s); analyze ON wall 513 s (solve 73 s). The official Difficulty V1 analyzer costs ~414 s per level. The screening simulator matched the engine on the solver trace (`screening_diverged_steps = 0`).
+
+Owner chose "Parallel batch first":
+- `png_batch.run_png_batch` keeps up to `parallel_workers(settings)` canonical pipelines in flight (ThreadPoolExecutor; setting `parallel_workers`, env `SCRUBBOTS_FACTORY_BATCH_WORKERS`, default `cpu_count // 4` capped at 4, hard cap 8). Preparation, revalidation, reuse checks and every job-state/Release Pool projection write stay on the orchestrating thread. Per-item solver job dirs, run output dirs, activity streams and Release Pool entry files were already unique. Pause/Stop after current: no new item starts; running ones finish and are recorded. CANCEL_NOW: solvers abort through the existing control file; unfinished items stay RUNNING for `_recover_attempt`. `current_index` = lowest running item (gallery/Details follow it).
+- Found while reviewing thread safety: `release_pool.release_entries` kept its per-listing pinned-rules cache in a module global; two overlapping listings left a stale dict installed forever. Now thread-local; regression `test_parallel_listings_do_not_leak_a_scope_into_later_calls` fails on the old code (`[{}] == [None]`).
+- UI: Run button and activity header show `· N parallel` when more than one item is RUNNING (gallery suite asserts `Running 5/8 · 2 parallel`).
+- Tests: `tests/unit/test_claude_parallel_png_batch.py` (peak concurrency = workers, Pause finishes in-flight and starts none, one worker crash fails only its item, worker bounds) — 8 of 9 fail on the old code. The old sequential pause test pins 1 worker. Existing batch suites: 81/81 with 1 worker.
+- Real benchmark: 4 concurrent solver+analysis Godot processes on the same plan: 537–544 s each, total 544 s vs 513 s alone → ~3.8x throughput on 16 cores; all SOLVED, results identical to the single run except `elapsedMs` (another session's Godot perf tests ran at the same time).
