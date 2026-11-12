@@ -1,8 +1,13 @@
 extends SceneTree
 
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
-const SOURCE_002 := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-const SOURCE_003 := "owner-upload-e26b81cc6cc364364e3bb1b5eefbb79b88556c49aabbb5d8ca8cdc6fabda8fe1"
+# 2026-11-12: the owner's saved 002 run and 002/003 uploads were deleted on
+# 2026-11-07; a hash-bound 51-batch READY fixture written inside the isolated
+# copy and committed 32×32 PNGs stand in for them.
+const READY_FIXTURE := preload("res://tests/factory_test_ready_fixture.gd")
+const SOURCE_002 := "owner-upload-%s" % "0000000000000000000000000000000000000000000000000000000000000b02"
+const SOURCE_003 := "owner-upload-%s" % "0000000000000000000000000000000000000000000000000000000000000b03"
+const FIXTURE_PNG := "res://tests/fixtures/factory_studio_r04_r01/import_03_32x32.png"
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R02 responsive inline PASS"
 
 var _errors: Array[String] = []
@@ -82,27 +87,13 @@ func _run_suite() -> void:
 	_check(results.visible and ui.get("_results_mode") == "ERROR", "missing trace proof was not reported in the inline Results panel")
 	_check(ui.get("_replay_dialog") == null and ui.get("_supply_dialog") == null, "Replay or Supply created an external modal")
 
-	var release_root := ProjectSettings.globalize_path("res://").path_join("..").path_join("Release/ScrubBots Factory Studio").simplify_path()
-	var source_002_path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % SOURCE_002)
-	var source_003_path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % SOURCE_003)
-	_check(FileAccess.file_exists(source_002_path) and FileAccess.file_exists(source_003_path), "read-only 002/003 owner PNG evidence is unavailable in the existing Release")
+	var source_002_path := ProjectSettings.globalize_path(FIXTURE_PNG)
+	var source_003_path := source_002_path
+	_check(FileAccess.file_exists(source_002_path), "32×32 PNG fixture is missing")
 	ui.call("_upsert_imported_source", {"path": source_002_path, "source_id": SOURCE_002, "display_filename": "002_32x32px.png", "width": 32, "height": 32})
 	ui.call("_upsert_imported_source", {"path": source_003_path, "source_id": SOURCE_003, "display_filename": "003_32x32px.png", "width": 32, "height": 32})
-	var pipeline_root := release_root.path_join("level_factory/output/studio-extensions/pipelines")
-	var pipeline_dir := DirAccess.open(pipeline_root)
-	var saved_002: Dictionary = {}
-	if pipeline_dir != null:
-		for filename in pipeline_dir.get_files():
-			if not filename.ends_with(".json"): continue
-			var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(pipeline_root.path_join(filename)))
-			if parsed is Dictionary and parsed.get("request", {}).get("source_id") == SOURCE_002 and parsed.get("disposition") == "READY":
-				var candidate_pipeline: Dictionary = parsed
-				candidate_pipeline["source_id"] = SOURCE_002
-				var candidate_proof: Dictionary = ui.call("_verify_saved_solver_artifacts", candidate_pipeline.get("primary", {}))
-				if candidate_proof.get("ok", false):
-					saved_002 = candidate_pipeline
-					break
-	_check(not saved_002.is_empty(), "no genuine saved READY/WIN 002 pipeline is available for read-only panel coverage")
+	var saved_002: Dictionary = READY_FIXTURE.build(SOURCE_002, "pipeline-r02-inline-fixture", 51)
+	_check(not saved_002.is_empty(), "hash-bound READY fixture could not be built")
 	if not saved_002.is_empty():
 		ui.set("_selected_import_source_id", SOURCE_002)
 		ui.set("_last_pipeline", saved_002)
@@ -111,10 +102,10 @@ func _run_suite() -> void:
 		var artifact_proof: Dictionary = ui.call("_verify_saved_solver_artifacts", saved_primary)
 		_check(bool(artifact_proof.get("ok", false)), "saved 002 artifacts failed read-only source binding: %s" % str(artifact_proof.get("reason", "unknown")))
 		ui.call("_preview_replay")
-		_check(str((ui.get("_results_summary") as Label).text).contains("TRACE-ONLY") and str((ui.get("_results_summary") as Label).text).contains("Step 1 / 51"), "inline replay did not show the authentic 002 trace: %s" % str((ui.get("_results_summary") as Label).text))
+		_check(str((ui.get("_results_summary") as Label).text).contains("TRACE-ONLY") and str((ui.get("_results_summary") as Label).text).contains("Step 1 / 51"), "inline replay did not show the saved 51-step trace: %s" % str((ui.get("_results_summary") as Label).text))
 		_check(results_scroll.get_child(0).get_child_count() >= 5, "inline replay step details are missing")
 		ui.call("_toggle_supply_plan")
-		_check(str((ui.get("_results_summary") as Label).text).contains("4 columns") and str((ui.get("_results_summary") as Label).text).contains("51 batches"), "inline supply preview did not show authentic 002 four-column / 51-batch data")
+		_check(str((ui.get("_results_summary") as Label).text).contains("4 columns") and str((ui.get("_results_summary") as Label).text).contains("51 batches"), "inline supply preview did not show the saved four-column / 51-batch data")
 		_check(results_scroll.get_child(0).get_child_count() >= 53, "inline supply content is not scrollable through all saved batches")
 		_check(ui.get("_replay_dialog") == null and ui.get("_supply_dialog") == null, "authentic Replay/Supply view created a modal")
 		ui.call("_select_imported_source_by_id", SOURCE_003)

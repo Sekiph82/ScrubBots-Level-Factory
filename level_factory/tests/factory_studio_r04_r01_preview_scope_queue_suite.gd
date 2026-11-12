@@ -4,6 +4,12 @@ const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
 const FIXTURE_DIR := "res://tests/fixtures/factory_studio_r04_r01/"
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R04-R01 preview scope queue PASS"
 
+## Updated 2026-11-12: the thumbnail dock is a sliding five-slot window (one
+## source per step) instead of pages, LEVEL FACTORY details are per-row labels,
+## 1100×720 is the minimum supported client size, and Run Pipeline only plans a
+## batch of Release Pool Pending sources (never a per-source pipeline for an
+## arbitrary thumbnail).
+
 class RecordingGateway extends RefCounted:
 	var calls: Array[Dictionary] = []
 	var imported_paths: Array[String] = []
@@ -60,6 +66,7 @@ func _run_suite() -> void:
 	await process_frame
 	var gateway := RecordingGateway.new()
 	ui.call("configure_gateway", gateway)
+	_release_startup_gate(ui)
 	ui.call("_show_screen", "LEVEL FACTORY")
 
 	var fixture_paths: Array[String] = []
@@ -81,7 +88,7 @@ func _run_suite() -> void:
 		_check(button.icon != null, "accepted PNG %d has no selectable thumbnail image" % (index + 1))
 		var visible_status := "REUSED" if str(queue[index].get("disposition", "")) == "ALREADY_IMPORTED" else str(queue[index].get("disposition", ""))
 		_check(button.text.contains(str(queue[index].get("display_filename", "")).get_basename().left(9)) and button.text.contains(visible_status), "thumbnail %d omits its filename or import/reuse status" % (index + 1))
-		_check(button.tooltip_text.contains(str(queue[index].get("display_filename", ""))), "thumbnail %d omits its full filename tooltip" % (index + 1))
+		_check(button.tooltip_text.contains(str(queue[index].get("display_filename", ""))), "thumbnail %d omits its full filename tooltip: %s vs %s" % [index + 1, button.tooltip_text, queue[index].get("display_filename", "")])
 		_check(button.tooltip_text.replace("\n", "").contains(str(queue[index].get("source_id", ""))), "thumbnail %d omits its source identity" % (index + 1))
 		ui.call("_select_variation", index)
 		var state: Dictionary = ui.call("preview_state_snapshot")
@@ -92,20 +99,24 @@ func _run_suite() -> void:
 
 	ui.call("_select_variation", 1)
 	var host_rect: Rect2 = (ui.call("preview_state_snapshot") as Dictionary).get("host_rect", Rect2())
-	var canvas_interior := Rect2(401, 160, 780, 640)
+	# The canvas panel grew when the dock moved down; bind to the live panel.
+	var canvas_interior := (ui.get_node("RuntimeCanvasPanel") as Control).get_global_rect()
 	_check((ui.call("preview_state_snapshot") as Dictionary).get("host_clip_contents", false), "Visual Review Canvas host does not clip child drawing")
-	_check(canvas_interior.encloses(host_rect), "preview clip host is outside the Visual Review Canvas interior: %s" % host_rect)
-	var live := ui.get_node("RuntimeLiveData") as Label
-	_check(live.text.contains("import_02_20x59.png") and live.text.replace("\n", "").contains(str(queue[1].get("source_id", ""))), "persistent selected filename/source status is incomplete")
+	_check(canvas_interior.encloses(host_rect), "preview clip host is outside the Visual Review Canvas interior: %s vs %s" % [host_rect, canvas_interior])
+	var details := ""
+	for row in ui.get("_details_rows"):
+		details += (row as Label).text + "\n" + (row as Label).tooltip_text + "\n"
+	_check(details.contains("import_02_20x59") and details.replace("\n", "").contains(str(queue[1].get("source_id", "")).trim_prefix("owner-upload-")),
+		"persistent selected filename/source status is incomplete: %s" % details)
 	var wide := Vector2(1920, 1080)
 	ui.size = wide
 	ui.call("_apply_responsive_layout")
 	var wide_host: Rect2 = (ui.call("preview_state_snapshot") as Dictionary).get("host_rect", Rect2())
 	_check(wide_host.position.x >= 0.0 and wide_host.position.y >= 0.0 and wide_host.end.x <= wide.x and wide_host.end.y <= wide.y, "responsive clipped canvas escaped 1920×1080 client bounds")
-	ui.size = Vector2(920, 610)
+	ui.size = Vector2(1100, 720)  # declared minimum supported client size
 	ui.call("_apply_responsive_layout")
 	var small_host: Rect2 = (ui.call("preview_state_snapshot") as Dictionary).get("host_rect", Rect2())
-	_check(small_host.position.x >= 0.0 and small_host.position.y >= 0.0 and small_host.end.x <= 920.0 and small_host.end.y <= 610.0, "responsive clipped canvas escaped 920×610 client bounds")
+	_check(small_host.position.x >= 0.0 and small_host.position.y >= 0.0 and small_host.end.x <= 1100.0 and small_host.end.y <= 720.0, "responsive clipped canvas escaped 1100×720 client bounds")
 	ui.size = Vector2(1536, 1024)
 	ui.call("_apply_responsive_layout")
 	var distinct_render_image := Image.create(20, 59, false, Image.FORMAT_RGBA8)
@@ -161,25 +172,40 @@ func _run_suite() -> void:
 	_close_import_dialog(ui)
 	queue = ui.call("imported_queue_snapshot")
 	_check(queue.size() == 10, "ten accepted source identities did not remain available for bounded paging")
-	ui.call("_page_imported_sources", 1)
-	var last_slot := ui.get_node("LevelVariation2") as Button
-	_check(last_slot.text.contains("import_10") and last_slot.tooltip_text.replace("\n", "").contains(str(queue[9].get("source_id", ""))), "second bounded thumbnail page does not expose the final queued source")
-	ui.call("_select_variation", 1)
+	for _step in range(5):
+		ui.call("_page_imported_sources", 1)
+	var last_slot := ui.get_node("LevelVariation5") as Button
+	_check(last_slot.text.contains("import_10") and last_slot.tooltip_text.replace("\n", "").contains(str(queue[9].get("source_id", ""))), "sliding thumbnail window does not expose the final queued source")
+	ui.call("_select_variation", 4)
 	var paged_selection: Dictionary = ui.call("preview_state_snapshot")
 	_check(str(paged_selection.get("source_id", "")) == str(queue[9].get("source_id", "")) and str(paged_selection.get("active_path", "")) == str(queue[9].get("path", "")), "paged thumbnail selected a mismatched preview/source pair")
 	_check(_count_calls(gateway, "pipeline") == 0, "paged thumbnail selection dispatched the solver")
-	ui.call("_page_imported_sources", -1)
+	for _step in range(5):
+		ui.call("_page_imported_sources", -1)
 	ui.call("_select_variation", 3)
 	var selected_for_run: String = str((ui.call("imported_queue_snapshot") as Array)[3].get("source_id", ""))
+	_check(str((ui.call("preview_state_snapshot") as Dictionary).get("source_id", "")) == selected_for_run, "thumbnail selection did not bind the selected immutable source id")
+	# None of these uploads is Pending in the Release Pool, so Run must not
+	# dispatch a per-source pipeline for the selected thumbnail.
 	ui.call("_run_level_pipeline")
 	await process_frame
-	_check(_count_calls(gateway, "pipeline") == 1, "explicit Run Pipeline did not invoke exactly one pipeline call")
-	for call in gateway.calls:
-		if call.get("operation") == "pipeline":
-			_check(str(call.get("request", {}).get("source_id", "")) == selected_for_run, "Run Pipeline did not use the thumbnail's selected immutable source id")
+	_check(_count_calls(gateway, "pipeline") == 0 and _count_calls(gateway, "pending-png-batch-create") == 0, "Run Pipeline dispatched work for a non-Pending thumbnail")
 	_close_import_dialog(ui)
 	viewport.queue_free()
 	_finish()
+
+
+## Release the 2026-11-10 startup gate the way the real startup reads do.
+func _release_startup_gate(ui: Control) -> void:
+	ui.set("_studio_read_queue", [])
+	ui.call("_apply_restored_imported_sources", {"schema": "scrubbots-source-library-view", "sources": []})
+	ui.set("_owner_release_archive", {"schema": "scrubbots-owner-release-library-view/v1", "records": []})
+	ui.set("_owner_release_archive_loaded", true)
+	ui.set("_startup_release_archive_settled", true)
+	ui.set("_startup_pending_batch_restore_started", true)
+	ui.set("_batch_restore_pending", false)
+	ui.set("_release_pool_loaded", true)
+	ui.call("_apply_startup_gate")
 
 
 func _find_fixture_bounds(image: Image, target: Color, clip_rect: Rect2) -> Dictionary:

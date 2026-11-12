@@ -194,7 +194,8 @@ def forbid_real_pixellab_network(monkeypatch):
     yield
 
 
-_ISOLATED_FACTORY_ITEMS = ("level_factory", "src", "scripts", "content_pipeline", "TASKS.md")
+_ISOLATED_FACTORY_ITEMS = ("level_factory", "src", "scripts", "content_pipeline", "TASKS.md",
+                          "tests/fixtures", "tests/golden/fixtures")  # read-only test fixtures
 
 
 def build_isolated_factory_copy(destination):

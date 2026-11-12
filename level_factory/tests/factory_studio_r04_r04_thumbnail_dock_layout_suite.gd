@@ -1,8 +1,12 @@
 extends SceneTree
 
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
-const SOURCE_002 := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-const SOURCE_003 := "owner-upload-e26b81cc6cc364364e3bb1b5eefbb79b88556c49aabbb5d8ca8cdc6fabda8fe1"
+# 2026-11-12: the owner's 002/003 Release uploads were deleted on 2026-11-07;
+# the dock layout is exercised with committed 32×32 fixtures instead.
+const SOURCE_002 := "owner-upload-r04dock-002"
+const SOURCE_003 := "owner-upload-r04dock-003"
+const FIXTURE_002 := "res://tests/fixtures/factory_studio_r04_r01/import_03_32x32.png"
+const FIXTURE_003 := "res://../tests/fixtures/owner_void/017_a_single_brown_owl_centered_simple_clear_32px.png"
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R04 thumbnail dock layout PASS"
 
 class ReadOnlyGateway extends RefCounted:
@@ -46,11 +50,11 @@ func _run_suite() -> void:
 
 	var gateway := ReadOnlyGateway.new()
 	ui.call("configure_gateway", gateway)
-	var release_root := ProjectSettings.globalize_path("res://").path_join("..").path_join("Release/ScrubBots Factory Studio").simplify_path()
-	var source_002_path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % SOURCE_002)
-	var source_003_path := release_root.path_join("level_factory/output/owner-uploads/%s/source.png" % SOURCE_003)
-	_check(FileAccess.file_exists(source_002_path), "read-only owner 002 fixture is unavailable")
-	_check(FileAccess.file_exists(source_003_path), "read-only owner 003 fixture is unavailable")
+	var source_002_path := ProjectSettings.globalize_path(FIXTURE_002).simplify_path()
+	var source_003_path := ProjectSettings.globalize_path(FIXTURE_003).simplify_path()
+	_check(FileAccess.file_exists(source_002_path), "32×32 dock fixture A is missing")
+	_check(FileAccess.file_exists(source_003_path), "32×32 dock fixture B is missing")
+	_release_startup_gate(ui)
 	ui.call("_upsert_imported_source", {"path": source_002_path, "source_id": SOURCE_002, "display_filename": "002_32x32px.png", "width": 32, "height": 32, "disposition": "IMPORTED"})
 	ui.call("_upsert_imported_source", {"path": source_003_path, "source_id": SOURCE_003, "display_filename": "003_32x32px.png", "width": 32, "height": 32, "disposition": "IMPORTED"})
 	for source_number in range(3, 9):
@@ -105,7 +109,7 @@ func _run_suite() -> void:
 	var first := ui.get_node("LevelVariation1") as Button
 	var second := ui.get_node("LevelVariation2") as Button
 	first.emit_signal("pressed")
-	_check(str(ui.get("_selected_import_source_id")) == SOURCE_002, "first thumbnail did not select the pinned 002 source")
+	_check(str(ui.get("_selected_import_source_id")) == SOURCE_002, "first thumbnail did not select the 002 source")
 	second.emit_signal("pressed")
 	_check(str(ui.get("_selected_import_source_id")) == SOURCE_003, "second thumbnail did not select the distinct 003 source")
 	var strip_for_wheel := (ui.get_node("RuntimeBottomStrip") as Control).get_global_rect()
@@ -137,6 +141,19 @@ func _run_suite() -> void:
 	for error in _errors:
 		push_error(error)
 	quit(1)
+
+
+## Release the 2026-11-10 startup gate the way the real startup reads do.
+func _release_startup_gate(ui: Control) -> void:
+	ui.set("_studio_read_queue", [])
+	ui.call("_apply_restored_imported_sources", {"schema": "scrubbots-source-library-view", "sources": []})
+	ui.set("_owner_release_archive", {"schema": "scrubbots-owner-release-library-view/v1", "records": []})
+	ui.set("_owner_release_archive_loaded", true)
+	ui.set("_startup_release_archive_settled", true)
+	ui.set("_startup_pending_batch_restore_started", true)
+	ui.set("_batch_restore_pending", false)
+	ui.set("_release_pool_loaded", true)
+	ui.call("_apply_startup_gate")
 
 
 func _contains_with_padding(outer: Rect2, inner: Rect2, padding: float) -> bool:
