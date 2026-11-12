@@ -32,12 +32,21 @@ _PROCESS_LOCKS_GUARD = threading.Lock()
 MAX_PARALLEL_WORKERS = 8
 
 
+DEFAULT_PARALLEL_WORKERS_CAP = 6
+
+
 def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
-    """Concurrent canonical pipelines per batch: settings, env override, else cores // 4 (max 4)."""
+    """Concurrent canonical pipelines per batch: settings, env override, else cores // 2 (max 6).
+
+    Owner request 2026-11-13: more levels per day without straining the laptop.
+    Each pipeline keeps one core busy (single-threaded Godot solver/analysis) and
+    holds ~0.5-1 GB; on the owner's i7-1260P (16 threads, 15.7 GB) six workers use
+    about 40% CPU and leave several GB of RAM free.
+    """
     requested = (settings or {}).get("parallel_workers") or os.environ.get("SCRUBBOTS_FACTORY_BATCH_WORKERS")
     if requested:
         return max(1, min(MAX_PARALLEL_WORKERS, int(requested)))
-    return max(1, min(4, (os.cpu_count() or 4) // 4))
+    return max(1, min(DEFAULT_PARALLEL_WORKERS_CAP, (os.cpu_count() or 4) // 2))
 
 
 def _now() -> str:

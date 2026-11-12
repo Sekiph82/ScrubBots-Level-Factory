@@ -101,7 +101,7 @@ def test_parallel_worker_failure_is_recorded_for_that_item_only(tmp_path: Path, 
 
 
 @pytest.mark.parametrize(("setting", "env", "cores", "expected"), [
-    (None, None, 16, 4), (None, None, 4, 1), (None, "2", 16, 2), (6, None, 16, 6), (99, None, 16, 8), (None, None, None, 1),
+    (None, None, 16, 6), (None, None, 8, 4), (None, None, 4, 2), (None, "2", 16, 2), (6, None, 16, 6), (99, None, 16, 8), (None, None, None, 2),
 ])
 def test_parallel_workers_default_and_bounds(monkeypatch: pytest.MonkeyPatch, setting, env, cores, expected) -> None:
     if env is None:
