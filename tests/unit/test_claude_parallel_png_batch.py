@@ -30,13 +30,17 @@ def test_parallel_batch_keeps_worker_count_pipelines_in_flight(tmp_path: Path, m
     # Arrange
     job, items = _prepare(tmp_path, monkeypatch, 8, workers=3)
     guard = threading.Lock()
+    three_running = threading.Event()
     active = {"now": 0, "peak": 0}
 
     def slow_runner(*, source_id: str, request: dict[str, object]) -> dict[str, object]:
         with guard:
             active["now"] += 1
             active["peak"] = max(active["peak"], active["now"])
-        time.sleep(0.3)
+            if active["now"] == 3:
+                three_running.set()
+        # The first items wait (bounded) until three run at once; timing-free.
+        three_running.wait(10)
         with guard:
             active["now"] -= 1
         return _ready_result(source_id, f"run-{request['png_batch_item_index']}", request)
@@ -106,3 +110,18 @@ def test_parallel_workers_default_and_bounds(monkeypatch: pytest.MonkeyPatch, se
         monkeypatch.setenv("SCRUBBOTS_FACTORY_BATCH_WORKERS", env)
     monkeypatch.setattr(png_batch.os, "cpu_count", lambda: cores)
     assert png_batch.parallel_workers({"parallel_workers": setting} if setting else {}) == expected
+
+
+def test_failed_item_reason_carries_the_solver_reason_not_a_bare_disposition(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Real app 2026-11-12: retry rows showed only "UNAVAILABLE" while the solver
+    # said the game validator rejected the artwork ratio.
+    job, _items = _prepare(tmp_path, monkeypatch, 1, workers=1)
+    solver_reason = ("solver bridge failed:\nGodot Engine v4.7.2.stable.official - https://godotengine.org\n\n"
+                     "ProductionLevelValidator rejected bridge LevelData: production artwork needs >= 200 non-VOID cells and >= 1/4 of the board; got 719 of 3136")
+
+    result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=lambda **_args: {
+        "disposition": "UNAVAILABLE", "primary": {"state": "UNAVAILABLE", "reason": solver_reason}})
+
+    reason = result["job"]["items"][0]["reason"]
+    assert reason.startswith("UNAVAILABLE: solver bridge failed:")
+    assert "got 719 of 3136" in reason and "Godot Engine" not in reason

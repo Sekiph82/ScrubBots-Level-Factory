@@ -196,6 +196,21 @@ def _job_lock(job_id: str):
         lock.release()
 
 
+def _failure_reason(pipeline: Any) -> str:
+    """Batch row reason: the pipeline error, else the solver's own reason, never a bare disposition."""
+    if not isinstance(pipeline, Mapping):
+        return "CANONICAL_PIPELINE_RETURNED_NO_RESULT"
+    primary = pipeline.get("primary", {})
+    primary_reason = primary.get("reason") if isinstance(primary, Mapping) else None
+    disposition = str(pipeline.get("disposition", "CANONICAL_READY_PROOF_MISSING"))
+    reason = pipeline.get("error") or pipeline.get("reason") or primary_reason
+    if not reason:
+        return disposition[:512]
+    # The Godot bridge prefixes its banner; keep only the meaningful lines.
+    lines = [line for line in str(reason).splitlines() if line.strip() and not line.startswith("Godot Engine v")]
+    return f"{disposition}: {' '.join(lines)}"[:512]
+
+
 def _counts(items: Sequence[Mapping[str, Any]]) -> dict[str, int]:
     states = Counter(str(item.get("status", "UNKNOWN")) for item in items)
     return {
@@ -1558,7 +1573,7 @@ def run_png_batch(
                     pool_reason = str(pool.get("reason") or pool.get("disposition") or "Release Pool did not confirm the exact READY_AUTO candidate/run row.")
                     item.update({"status": "FAILED", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "release_pool": pool, "reason": f"READY_POOL_ENTRY_FAILED: {pool_reason[:400]}", "finished_at": _now()})
                 else:
-                    item.update({"status": "FAILED", "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None, "reason": str(pipeline.get("error", pipeline.get("reason", pipeline.get("disposition", "CANONICAL_READY_PROOF_MISSING"))) if isinstance(pipeline, Mapping) else "CANONICAL_PIPELINE_RETURNED_NO_RESULT")[:512], "finished_at": _now()})
+                    item.update({"status": "FAILED", "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None, "reason": _failure_reason(pipeline), "finished_at": _now()})
             job["current_index"] = running_index()
             job["counts"] = _counts(job["items"])
             job["updated_at"] = _now()
