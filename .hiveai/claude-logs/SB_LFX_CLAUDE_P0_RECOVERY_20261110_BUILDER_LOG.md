@@ -181,3 +181,14 @@ Owner chose "Parallel batch first":
 - UI: Run button and activity header show `· N parallel` when more than one item is RUNNING (gallery suite asserts `Running 5/8 · 2 parallel`).
 - Tests: `tests/unit/test_claude_parallel_png_batch.py` (peak concurrency = workers, Pause finishes in-flight and starts none, one worker crash fails only its item, worker bounds) — 8 of 9 fail on the old code. The old sequential pause test pins 1 worker. Existing batch suites: 81/81 with 1 worker.
 - Real benchmark: 4 concurrent solver+analysis Godot processes on the same plan: 537–544 s each, total 544 s vs 513 s alone → ~3.8x throughput on 16 cores; all SOLVED, results identical to the single run except `elapsedMs` (another session's Godot perf tests ran at the same time).
+
+## 2026-11-12 (night) — P0-K real-app verification of the parallel batch (CLAUDE)
+
+Installed app (Release = 335705a6, Desktop LNK, owner watching):
+- Retry (Release Pool FAILED/REJECTED, 31 PNGs) ran with 2-3 parallel workers; result 0 READY / 29 FAILED / 2 REJECTED.
+  - 21 ratio PNGs: the GAME's `scripts/data/production_level_validator.gd:64` (ADR-030 D2) still enforces ">= 1/4 of the board" inside the solver bridge ("got 719 of 3136"). My earlier statement that the game did not enforce the ratio in code was WRONG; it is enforced in the game validator and in the pinned runtime copy. Owner asked for a handoff prompt: `.hiveai/prompts/SB_GAME_CLAUDE_D2_DROP_ARTWORK_RATIO_20261112.md` (game change + Factory runtime re-pin afterwards).
+  - 8 previously FAILED PNGs: "immutable evidence already exists with different content" — regression from 638d6208: the persisted validation report changed only in `minimum_rule`, the evidence path did not. Fixed in f7874352 (non-legacy rule enters the path context; legacy files keep their paths); regression test fails on the old code.
+  - Batch rows showed a bare "UNAVAILABLE"; now carry the solver reason (b2ce8cae).
+- Run Pending Batch (1279): plan creation froze the UI ~6 min (19:28 → 19:34; open item). Then 4 items RUNNING at once ("Running 4/1275 · 4 parallel", gallery marks the active PNG). First 4 READY: LF-000102 (10.4 min), LF-000100 (12.4), LF-000104 (14.3), LF-000103 (16.1) — 4 levels in 16.5 min wall vs ~52 min sequential. Screenshots: `docs/evidence/claude-gui-20261112-parallel/` (owner-local, not committed).
+- Profile of one Difficulty V1 measure (91 steps, temp runtime copy): 382 s = per-step decision states ~270 s (independent per step, parallelisable within one PNG) + 91 sequential placements ~74 s + peel ~35 s; score 2 ms.
+- Not yet deployed (app running): b2ce8cae, f7874352.
