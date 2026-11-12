@@ -125,3 +125,26 @@ def test_failed_item_reason_carries_the_solver_reason_not_a_bare_disposition(tmp
     reason = result["job"]["items"][0]["reason"]
     assert reason.startswith("UNAVAILABLE: solver bridge failed:")
     assert "got 719 of 3136" in reason and "Godot Engine" not in reason
+
+
+def test_resume_rebinds_a_batch_planned_with_the_previous_runtime(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Owner re-pin 2026-11-12: a STOPPED batch planned with aef60a61 must not keep
+    # solving its remaining items with the old game rules after Resume.
+    from scrubbots_pixel_factory.supply_pipeline import pinned_game_source as pins
+
+    job, _items = _prepare(tmp_path, monkeypatch, 2, workers=1)
+    old_root = pins.runtime_root("aef60a616d4ac401e9dfac15df6fe56e671c0053")
+    stored = png_batch._read_job(str(job["job_id"]))
+    stored["settings"]["game_project"] = str(old_root)
+    png_batch._write_job(stored)
+    seen: list[str] = []
+
+    def runner(*, source_id: str, request: dict[str, object]) -> dict[str, object]:
+        seen.append(str(request["game_project"]))
+        return _ready_result(source_id, f"run-{request['png_batch_item_index']}", request)
+
+    result = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=runner)
+
+    current = str(pins.expected_runtime_root().resolve())
+    assert seen == [current, current]
+    assert result["job"]["runtime_rebinds"][0]["from"] == old_root.name

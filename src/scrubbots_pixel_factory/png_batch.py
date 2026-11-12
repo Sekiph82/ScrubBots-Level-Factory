@@ -659,6 +659,29 @@ def _configured_game_project(settings: Mapping[str, Any]) -> str | None:
     return str(project_root)
 
 
+def _rebind_superseded_runtime(job: dict[str, Any]) -> None:
+    """Resume solves the remaining items with the current pinned runtime.
+
+    Owner re-pin 2026-11-12: a batch planned with the previous attested runtime
+    would otherwise keep solving with the old game rules. Finished items keep
+    their own evidence; only items solved from now on use the new pin.
+    """
+    from .supply_pipeline import pinned_game_source as pins
+
+    settings = job.setdefault("settings", {})
+    configured = settings.get("game_project")
+    if not configured:
+        return
+    try:
+        root = Path(str(configured)).expanduser().resolve()
+        current = pins.expected_runtime_root().resolve()
+    except OSError:
+        return
+    if root != current and pins.is_pinned_runtime(root):
+        settings["game_project"] = str(current)
+        job.setdefault("runtime_rebinds", []).append({"from": root.name, "to": current.name, "at": _now()})
+
+
 def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -> dict[str, Any]:
     from .studio_extensions import _digest, batch_load, create_loaded_png_batch
     from .owner_release_library import list_records as list_release_records
@@ -1518,6 +1541,7 @@ def run_png_batch(
         # terminal current outcomes; only the explicit Solve Again action may
         # move them back to Pending and create a retry snapshot.
         _record_legacy_resume_choice(job, batch)
+        _rebind_superseded_runtime(job)
         _clear_control(job_id)
         job["state"] = "RUNNING"
         job["updated_at"] = _now()
