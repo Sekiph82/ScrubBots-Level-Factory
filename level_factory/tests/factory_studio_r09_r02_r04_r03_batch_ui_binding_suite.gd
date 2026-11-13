@@ -10,7 +10,7 @@ extends SceneTree
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
 const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R03 batch UI binding PASS"
-const PINNED_GAME_COMMIT := "dd54007abb59863bc753c1a029b9db227fb4f89f"  # owner re-pin 2026-11-12
+const PINNED_GAME_COMMIT := "6534537ceb4c71c63286614b74e4801145d5fb4d"  # owner re-pin 2026-11-13
 
 var _errors: Array[String] = []
 

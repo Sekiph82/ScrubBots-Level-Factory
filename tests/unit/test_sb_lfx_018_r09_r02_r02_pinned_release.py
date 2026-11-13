@@ -54,10 +54,10 @@ def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
     # Pinned runtime moved to the canonical data root (data/Level Factory/Runtime).
     assert root == pinned_game_source.repository_root() / "data" / "Level Factory" / "Runtime" / pinned_game_source.PINNED_MAIN_SHA
     manifest = pinned_game_source.verify_attested_runtime(root)
-    # Owner re-pin 2026-11-12 (game main dd54007a, ADR-030 D2 ratio dropped).
+    # Owner re-pin 2026-11-13 (game 6534537c, faster ProofKernel / Difficulty V1).
     assert len(manifest["source_files"]) == 283
-    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_535_120
-    assert manifest["source_commit"] == "dd54007abb59863bc753c1a029b9db227fb4f89f"
+    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_540_029
+    assert manifest["source_commit"] == "6534537ceb4c71c63286614b74e4801145d5fb4d"
     _require_saved_owner_uploads()
 
     source_png = _source_dir(PINNED_SOURCE_ID) / "source.png"

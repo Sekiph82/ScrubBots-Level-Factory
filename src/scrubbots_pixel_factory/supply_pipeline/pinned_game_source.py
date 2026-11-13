@@ -40,8 +40,18 @@ ATTESTED_RUNTIMES: dict[str, dict[str, Any]] = {
         "source_bytes": 2_535_120,
         "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
     },
+    # Owner decision 2026-11-13: re-pin to game 6534537c (faster ProofKernel and
+    # Difficulty V1 with byte-identical output; also carries the slot pop hold
+    # 628ab240 that real play already used). Same VOID anchor as dd54007a.
+    "6534537ceb4c71c63286614b74e4801145d5fb4d": {
+        "tree_sha": "96a9806e94d80a51905680bd45f7a2fb4f2c0ab2",
+        "attestation_sha256": "1e41805de360e81814ed262d19e28dd89c85a039192f4ebe3179fc1c5d48c45e",
+        "source_files": 283,
+        "source_bytes": 2_540_029,
+        "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
+    },
 }
-PINNED_MAIN_SHA = "dd54007abb59863bc753c1a029b9db227fb4f89f"
+PINNED_MAIN_SHA = "6534537ceb4c71c63286614b74e4801145d5fb4d"
 PINNED_TREE_SHA = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["tree_sha"]
 ATTESTATION_SHA256 = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["attestation_sha256"]
 RUNTIME_SOURCE_BYTES = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["source_bytes"]

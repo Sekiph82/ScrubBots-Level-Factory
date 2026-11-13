@@ -236,3 +236,11 @@ Seen in the installed app (d31ad0ab) during the running batch, all fixed in `fac
 - Preview Replay / Supply Plan opened "Results unavailable … SOURCE_RUN_MISMATCH" for a PNG without a READY result: now disabled with a tooltip.
 - Owner request: Batch Issues lists the PNGs being solved first, in filename order, marked RUNNING (no duplicate Pending row); refreshed when the running set changes.
 - Regressions in `factory_studio_gallery_follows_active_source_suite.gd`; all new checks watched fail against d31ad0ab, then PASS. 18 related Godot suites PASS; `profile_derivation` suite not run (missing game analyzer file in the isolated copy, unrelated). Python UI tests 164 passed.
+
+## 2026-11-13 — Re-pin to game 6534537c (faster ProofKernel / Difficulty V1) (Claude)
+
+- Game Claude job 156: `6534537c` "perf: verdict-only target access for ProofKernel + Difficulty V1 analyzer, identical-output regression" (game CI run 43393264103 passed; game Desktop at f60cfa94).
+- Runtime built read-only with `scripts/build_pinned_game_runtime.py 6534537c 0b6dfc35 --apply`: 283 files, 2,540,029 bytes, tree 96a9806e, attestation sha256 1e41805d…, same VOID anchor 0b6dfc35. Registered in `ATTESTED_RUNTIMES`; dd54007a and aef60a61 stay attested for their existing runs.
+- Also carries game 628ab240 (finished slot takes no pick until its pop ends), which real play already used since 26d15718.
+- Real check on the new runtime (copies of LF-000147 / LF-000148 plans, `verify_exported_supply`, full native solve + official analysis): 35 s and 37 s; Difficulty V1 JSON byte-identical to the saved results (challengeScore 52.1888 / 43.8423).
+- Tests: re-pin unit tests 10 passed / 4 skipped; pin-bound Godot suites (r05 loaded batch, pinned authority, batch UI binding, gallery follow) PASS.
