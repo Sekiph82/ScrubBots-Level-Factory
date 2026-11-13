@@ -102,6 +102,7 @@ var _batch_restore_token := ""
 var _batch_pause_button: Button
 ## A stopped job offered next to Run Pending Batch (owner request 2026-11-13).
 var _resume_saved_button: Button
+var _release_status_counter: Label
 var _alternate_resume: Dictionary = {}
 var _resume_after_restore := false
 var _batch_stop_button: Button
@@ -1377,12 +1378,28 @@ func _build_live_chrome() -> void:
 	_build_inline_results()
 	_activity_panel = Panel.new()
 	_activity_panel.name = "PipelineActivityPanel"
-	_activity_panel.position = Vector2(27, 412)
-	_activity_panel.size = Vector2(334, 498)
+	# Owner layout 2026-11-13: Run Pipeline at the top, the live Release status
+	# counter under it, then the activity panel (Level/Columns/Robots/Background
+	# controls removed from LEVEL FACTORY).
+	_activity_panel.position = Vector2(27, 281)
+	_activity_panel.size = Vector2(334, 629)
 	_activity_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_activity_panel.add_theme_stylebox_override("panel", _control_style(Color("#0e192a"), Color("#30415e")))
 	_activity_panel.visible = false
 	add_child(_activity_panel)
+	_release_status_counter = Label.new()
+	_release_status_counter.name = "ReleaseStatusCounter"
+	_release_status_counter.position = Vector2(26, 229)
+	_release_status_counter.size = Vector2(335, 40)
+	_release_status_counter.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_release_status_counter.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_release_status_counter.clip_text = true
+	_release_status_counter.add_theme_font_size_override("font_size", 15)
+	_release_status_counter.add_theme_color_override("font_color", Color("#dce8f8"))
+	_release_status_counter.add_theme_stylebox_override("normal", _control_style(Color("#0e192a"), Color("#30415e")))
+	_release_status_counter.mouse_filter = Control.MOUSE_FILTER_PASS
+	_release_status_counter.visible = false
+	add_child(_release_status_counter)
 	_activity_title = Label.new()
 	_activity_title.name = "PipelineActivityTitle"
 	_activity_title.position = Vector2(12, 8)
@@ -1772,7 +1789,8 @@ func _refresh_live_data() -> void:
 			difficulty_text = str(follow_primary.get("difficulty", {}).get("class", "—"))
 			columns = int(_batch_follow_item.get("column_count", 0))
 			pool_status = str(item_release.get("disposition", "NOT ENTERED" if batch_item_state == "READY" else "—"))
-			batch_caption = "%d/%d · %s · %d P / %d R / %d F / %d X" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING", int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0))]
+			# The P/R/F/X totals moved to the counter under Run Pipeline (owner 2026-11-13).
+			batch_caption = "%d/%d · %s" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING"]
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
@@ -1890,6 +1908,11 @@ func _refresh_run_button_caption() -> void:
 		_batch_pause_button.visible = _operation_running and not _batch_job_id.is_empty()
 	if _batch_stop_button != null:
 		_batch_stop_button.visible = _operation_running and not _batch_job_id.is_empty()
+	if _release_status_counter != null:
+		var status_counts := _current_release_status_counts()
+		_release_status_counter.visible = _screen == "LEVEL FACTORY"
+		_release_status_counter.text = "%d P / %d R / %d F / %d X" % [int(status_counts.get("PENDING", 0)), int(status_counts.get("READY", 0)), int(status_counts.get("FAILED", 0)), int(status_counts.get("REJECTED", 0))]
+		_release_status_counter.tooltip_text = "Pending %d · READY %d · FAILED %d · REJECTED %d (current PixelLab Final PNGs)" % [int(status_counts.get("PENDING", 0)), int(status_counts.get("READY", 0)), int(status_counts.get("FAILED", 0)), int(status_counts.get("REJECTED", 0))]
 	if _resume_saved_button != null:
 		_resume_saved_button.visible = (_screen == "LEVEL FACTORY" and not _operation_running and not _batch_restore_pending
 			and not _alternate_resume.is_empty())
@@ -2402,7 +2425,7 @@ func _build_master_controls() -> void:
 	_place_control("SupplyColumns5", Rect2(256, 209, 105, 38), _set_columns.bind(5))
 	_place_control("MaxRobotsAuto", Rect2(26, 253, 335, 38), _keep_auto_robot_cap)
 	_place_control("BackgroundIntent", Rect2(26, 297, 335, 38), _toggle_background)
-	_place_control("RunLevelPipeline", Rect2(26, 347, 335, 52), _run_level_pipeline)
+	_place_control("RunLevelPipeline", Rect2(26, 165, 335, 52), _run_level_pipeline)
 	_place_control("PreviewReplay", Rect2(1207, 316, 142, 38), _preview_replay)
 	_place_control("ExpandSupplyPlan", Rect2(1356, 316, 142, 38), _toggle_supply_plan)
 	_place_control("SolveAgain", Rect2(1207, 362, 94, 38), _solve_again)
@@ -2616,12 +2639,16 @@ func _update_master_control_visibility() -> void:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
 	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
-	var level := ["LevelNumber", "SupplyColumns3", "SupplyColumns4", "SupplyColumns5", "MaxRobotsAuto", "BackgroundIntent", "RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
+	# Level/Columns/Max Robots/Background stay at their Auto/TRANSPARENT defaults and
+	# are hidden on LEVEL FACTORY (owner layout 2026-11-13).
+	var level := ["RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 	var release := ["RefreshReleasePool", "ReleaseSearch", "DifficultyFilter", "ColumnsFilter", "ManageSelection", "SelectAllRelease", "ClearRelease", "SelectedReleaseCard1", "SelectedReleaseCard2", "SelectedReleaseCard3", "RemoveSelected1", "RemoveSelected2", "RemoveSelected3", "AddMoreLevels", "ReleaseStaging", "ReleaseProduction", "PreflightRelease", "ValidateReleaseAssets", "BuildReleasePack", "UploadR2Status", "UploadSelected", "PreviewReleaseManifest", "ReleaseStagingHelp", "ReleaseProductionHelp", "PreflightReleaseHelp", "ValidateReleaseAssetsHelp", "BuildReleasePackHelp", "UploadR2StatusHelp", "UploadSelectedHelp", "PreviewReleaseManifestHelp"]
 	for button in _master_buttons:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
 	if _pixel_art_activity_table != null:
 		_pixel_art_activity_table.visible = _screen == "PIXEL ART"
+	if _release_status_counter != null:
+		_release_status_counter.visible = _screen == "LEVEL FACTORY"
 	_refresh_selected_size_value()
 	if _screen == "PIXEL ART":
 		var generate := get_node_or_null("GeneratePixelArt") as Button

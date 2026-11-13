@@ -111,6 +111,23 @@ func _run_suite() -> void:
 	ui.set("_operation_running", false)
 	ui.set("_batch_worker_active", false)
 
+	# Owner layout 2026-11-13: live Release status counter under Run Pipeline,
+	# only on LEVEL FACTORY; the P/R/F/X totals left the Details batch row.
+	ui.set("_owner_release_archive", {"records": [
+		{"source_id": str(sources[0]["source_id"]), "source_sha256": str(sources[0]["source_sha256"]), "status": "READY"},
+		{"source_id": str(sources[1]["source_id"]), "source_sha256": str(sources[1]["source_sha256"]), "status": "FAILED"},
+		{"source_id": str(sources[2]["source_id"]), "source_sha256": str(sources[2]["source_sha256"]), "status": "PENDING"}]})
+	ui.set("_owner_release_archive_loaded", true)
+	ui.call("_show_screen", "LEVEL FACTORY")
+	ui.call("_refresh_run_button_caption")
+	var counter := ui.get_node("ReleaseStatusCounter") as Label
+	var run_button := ui.get_node("RunLevelPipeline") as Control
+	_check(counter.visible and RegEx.create_from_string("^\\d+ P / \\d+ R / \\d+ F / \\d+ X$").search(counter.text) != null,
+		"status counter is missing or malformed: visible=%s text=%s" % [counter.visible, counter.text])
+	_check(counter.position.y > run_button.position.y + run_button.size.y, "status counter is not under Run Pipeline")
+	ui.call("_show_screen", "PIXEL ART")
+	_check(not counter.visible, "status counter leaked onto PIXEL ART")
+
 	instance.free()
 	if _errors.is_empty():
 		print(PASS_MARKER)

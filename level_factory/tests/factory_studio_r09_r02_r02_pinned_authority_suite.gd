@@ -81,8 +81,9 @@ func _run() -> void:
 		if level_button == null or level_button.text != "Level: Auto":
 			_fail("single Level: Auto caption is missing or duplicated on " + name)
 			return
-		if level_button.visible != (name == "LEVEL FACTORY"):
-			_fail("LevelNumber visibility leaked across master tabs")
+		if level_button.visible:
+			# Owner layout 2026-11-13: the Level control is hidden on every tab.
+			_fail("LevelNumber is visible on " + name)
 			return
 	var release_search := studio.get_node_or_null("ReleaseSearch") as Button
 	if release_search == null or release_search.text != "Search levels":

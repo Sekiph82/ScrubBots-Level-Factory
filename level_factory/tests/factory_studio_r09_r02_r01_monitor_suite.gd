@@ -219,14 +219,16 @@ func _test_layout_and_valid_incremental_stream(studio: Node) -> bool:
 	# The manual Select PNG button was removed in f95a9cab (PixelLab Final is
 	# selected automatically) and the settings widened to the full left column.
 	var left_panel := studio.get_node_or_null("RuntimeLeftPanel") as Control
-	if panel.position.distance_to(Vector2(27, 412)) > 1.0 or absf(panel.size.x - 334.0) > 1.0 			or left_panel == null or absf(panel.position.y + panel.size.y - (left_panel.position.y + left_panel.size.y)) > 1.0:
+	if panel.position.distance_to(Vector2(27, 281)) > 1.0 or absf(panel.size.x - 334.0) > 1.0 			or left_panel == null or absf(panel.position.y + panel.size.y - (left_panel.position.y + left_panel.size.y)) > 1.0:
 		_fail("activity panel does not occupy the owner-approved lower workspace: %s" % [Rect2(panel.position, panel.size)])
 		return false
 	if studio.get_node_or_null("SelectArtwork") != null:
 		_fail("the removed manual Select PNG control reappeared")
 		return false
-	for spec in [["LevelNumber", Vector2(26, 165)], ["SupplyColumns3", Vector2(26, 209)], ["SupplyColumns4", Vector2(141, 209)], ["SupplyColumns5", Vector2(256, 209)], ["MaxRobotsAuto", Vector2(26, 253)], ["BackgroundIntent", Vector2(26, 297)], ["RunLevelPipeline", Vector2(26, 347)]]:
-		if (studio.get_node(str(spec[0])) as Button).position.distance_to(spec[1]) > 1.0:
+	# Owner layout 2026-11-13: Run Pipeline at the top, status counter under it;
+	# Level/Columns/Robots/Background are hidden on LEVEL FACTORY.
+	for spec in [["RunLevelPipeline", Vector2(26, 165)], ["ReleaseStatusCounter", Vector2(26, 229)]]:
+		if (studio.get_node(str(spec[0])) as Control).position.distance_to(spec[1]) > 1.0:
 			_fail("owner control geometry changed for %s" % spec[0])
 			return false
 	if panel.visible or title.is_visible_in_tree() or state_label.is_visible_in_tree() or state_label.text == "RUNNING":

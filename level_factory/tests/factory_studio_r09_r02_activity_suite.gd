@@ -53,8 +53,9 @@ func _run() -> void:
 	_check(title != null and title.text == "PIPELINE ACTIVITY", "activity title is not PIPELINE ACTIVITY")
 
 	# Responsive scaling may move edges by a fraction of a pixel.
-	_check(panel.position.distance_to(Vector2(27, 412)) <= 1.0 and absf(panel.size.x - 334.0) <= 1.0,
-		"activity panel left edge/top/width moved from Rect2(27,412,334,…): %s" % [Rect2(panel.position, panel.size)])
+	# Owner layout 2026-11-13: the panel starts 12 px under the status counter (y=281).
+	_check(panel.position.distance_to(Vector2(27, 281)) <= 1.0 and absf(panel.size.x - 334.0) <= 1.0,
+		"activity panel left edge/top/width moved from Rect2(27,281,334,…): %s" % [Rect2(panel.position, panel.size)])
 	var left_panel := studio.get_node_or_null("RuntimeLeftPanel") as Control
 	_check(left_panel != null and absf(panel.position.y + panel.size.y - (left_panel.position.y + left_panel.size.y)) <= 1.0,
 		"activity panel does not fill the remaining left-workspace height")
