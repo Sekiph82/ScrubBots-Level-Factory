@@ -31,6 +31,7 @@ from .owner_art_storage import OwnerArtStorageError
 from . import owner_art_storage
 from .quality.core import QualityPolicy, evaluate_grid, logical_grid_hash
 from .semantic.normalization.core import SUPPORTED_MEDIA_TYPE, _decode_raw
+from . import fs_atomic
 
 
 EXTENSIONS_SCHEMA_VERSION = 1
@@ -164,7 +165,7 @@ def _write_json(path: Path, value: Mapping[str, object], *, immutable: bool = Fa
         return
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_bytes(payload)
-    temporary.replace(path)
+    fs_atomic.replace(temporary, path)
 
 
 def _validation_evidence_path(source_id: str, source_sha256: str, report: Mapping[str, Any]) -> Path:

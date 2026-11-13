@@ -210,6 +210,14 @@ func _run_suite() -> void:
 		_check(issues_top >= rect.end.y, "%s overlaps Batch Issues: button bottom %.0f, panel top %.0f" % [name, rect.end.y, issues_top])
 	ui.call("_show_screen", "PIXEL ART")
 	_check(not counter.visible, "status counter leaked onto PIXEL ART")
+	# 2026-11-13 18:36: the batch worker returned an ERROR and the screen only said the
+	# worker "stopped with the application". The real error must be shown.
+	ui.set("_batch_worker_active", true)
+	ui.set("_operation_running", true)
+	ui.call("_complete_png_batch", {"state": "ERROR", "disposition": "ERROR", "error": "ERROR — Studio extension: [WinError 5] Access is denied"})
+	var stopped_message := str(ui.get("_activity_message"))
+	_check(stopped_message.contains("WinError 5") and str(ui.get("_activity_backend_disposition")) == "ERROR",
+		"batch worker error is not shown: %s / %s" % [stopped_message, ui.get("_activity_backend_disposition")])
 
 	instance.free()
 	if _errors.is_empty():

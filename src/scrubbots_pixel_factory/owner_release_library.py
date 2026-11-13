@@ -13,6 +13,7 @@ import time
 from typing import Any, Iterator, Mapping
 
 from . import owner_art_storage
+from . import fs_atomic
 
 SCHEMA = "scrubbots-owner-release-library-event/v1"
 _ATLAS_TRANSACTION_SCHEMA = "scrubbots-pixellab-atlas-transaction/v1"
@@ -162,7 +163,7 @@ def _replace_projection(path: Path, raw: bytes, root: Path, *, expected_event_sh
     try:
         with temp.open("xb") as handle:
             handle.write(raw); handle.flush(); os.fsync(handle.fileno())
-        os.replace(temp, path)
+        fs_atomic.replace(temp, path)
     finally:
         temp.unlink(missing_ok=True)
 

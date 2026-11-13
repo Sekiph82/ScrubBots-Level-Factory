@@ -4450,6 +4450,13 @@ func _complete_png_batch(result: Dictionary) -> void:
 	else:
 		_activity_backend_disposition = "RETRY READY" if _batch_snapshot.has("parent_job_id") else "READY"
 		_activity_message = "%s · %d/%d READY · %d loaded" % ["RETRY FINISHED" if _batch_snapshot.has("parent_job_id") else "BATCH READY", ready, total, loaded]
+	# 2026-11-13: a worker that ended with an error was shown as "BATCH READY", then as
+	# "stopped with the application". Show and log the real error.
+	if str(result.get("state", "")) == "ERROR":
+		var worker_error := str(result.get("error", result.get("reason", "unknown error")))
+		print("BATCH_WORKER_ERROR " + worker_error.left(400))
+		_activity_backend_disposition = "ERROR"
+		_activity_message = "Batch worker stopped: %s · Finished PNGs are kept; press Resume Batch." % worker_error.left(200)
 	_activity_terminal_state = _activity_backend_disposition
 	_sync_verified_batch_follow(_batch_snapshot)
 	_record_verified_batch_item_progress(_batch_snapshot)

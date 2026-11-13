@@ -13,6 +13,7 @@ from typing import Any, Mapping
 from io import BytesIO
 
 from PIL import Image
+from . import fs_atomic
 
 
 _FOLDER_RELATIVE_PATHS = {
@@ -137,7 +138,7 @@ def _save_pixellab_name_map(repository_root: Path, value: Mapping[str, Any]) -> 
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temporary, path)
+        fs_atomic.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
 
@@ -268,7 +269,7 @@ def _write_atlas_transaction(path: Path, value: Mapping[str, Any], *, finalized:
                 handle.write(payload)
                 handle.flush()
                 os.fsync(handle.fileno())
-            os.replace(temporary, path)
+            fs_atomic.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
         return

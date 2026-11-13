@@ -328,3 +328,20 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   Studio restart took 909 s (restore-imported-sources 575 s for the first validation of 64 new PNGs). LEVEL FACTORY showed
   "Run Pending Batch (1013)" = 949 remaining + 64 new; pressed at 18:10; plan creation ~6.5 min; new job
   png-batch-ab2918ae (1013 items, runtime ec1e57a7) RUNNING at 18:17 with 6 workers.
+
+## 2026-11-13 18:36–19:10 local — batch coordinator died on a Windows file-sharing race
+
+- Job png-batch-ab2918ae: 27 READY in 20 min (median 3.0 min/PNG, screening median 10.5 s, ~88 READY/h). At 18:36 the
+  coordinator process (png-batch-run) was gone while six PNGs (LF-000499..504) logged "Backend pipeline completed with
+  disposition READY" at 18:36–18:38; job file last written 18:36:22, state RUNNING, 0.45 MB (not the size cap).
+  The Studio showed "INTERRUPTED · Previous batch worker stopped with the application" (the app had not stopped).
+- Cause: on Windows os.replace onto a file another process has open fails with PermissionError [WinError 5]
+  (reproduced in the scratchpad). The Studio reads the job file every 2.5 s (png-batch-latest) and the Release Pool status
+  projections while the batch writes them; my 60 s watch script also read the job file. One collision kills the run.
+- Fix: `fs_atomic.replace` retries os.replace on PermissionError for up to ~18 s; used for the batch job file, owner release
+  status projections, studio_extensions JSON evidence and owner_art_storage manifests. Regression
+  `test_claude_job_write_tolerates_reader.py` (reader holds the job file 0.4 s) failed with WinError 5 on the old code, passes.
+- UI: a batch worker that returned state ERROR was shown as "BATCH READY", then "stopped with the application". It now
+  shows "Batch worker stopped: <error> · Finished PNGs are kept; press Resume Batch." and logs BATCH_WORKER_ERROR to godot.log.
+  Gallery suite check failed on the old code ("BATCH READY · 1/3 READY"), passes; 4 batch UI suites PASS.
+- Full unit suite: 2154 passed, 15 skipped, 0 failed.

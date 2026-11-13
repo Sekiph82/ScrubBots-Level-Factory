@@ -21,6 +21,7 @@ from pathlib import Path
 import threading
 import uuid
 from typing import Any
+from . import fs_atomic
 
 
 JOB_SCHEMA = "scrubbots-studio-png-sequential-batch"
@@ -178,7 +179,7 @@ def _write_job(payload: Mapping[str, Any]) -> dict[str, Any]:
             stream.write(raw)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(write_path, path)
+        fs_atomic.replace(write_path, path)
     finally:
         if write_path.exists():
             write_path.unlink()
