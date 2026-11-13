@@ -689,3 +689,29 @@ def test_304_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp
     saved = json.loads(png_batch._job_path(str(job["job_id"])).read_text(encoding="utf-8"))
     assert saved["state_digest"] == result["job"]["state_digest"]
     assert png_batch.MAX_JOB_BYTES == 8 * 1024 * 1024
+
+
+def test_recovered_ready_item_keeps_only_the_release_pool_summary(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # 2026-11-13: an ALREADY_IN_RELEASE_POOL recovery stored the full 175 KB pool entry
+    # (candidate + pipeline) in the job file; normal finishes store a 7-field summary.
+    batch_id, _items = _make_batch(tmp_path, monkeypatch, 1)
+    monkeypatch.setattr(png_batch, "_verify_column_artifacts", lambda _pipeline, _columns: True)
+    job = png_batch.create_png_batch(batch_id)["job"]
+
+    def lost_runner(*, source_id: str, request: dict[str, object]) -> dict[str, object]:
+        raise KeyboardInterrupt("simulated process loss after durable RUNNING checkpoint")
+
+    monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: None)
+    with pytest.raises(KeyboardInterrupt):
+        png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=lost_runner)
+    source_id = str(job["items"][0]["source_id"])
+    full_entry = {"disposition": "ALREADY_IN_RELEASE_POOL", "candidate_id": "candidate-x", "readback_verified": True,
+                  "pipeline_run_id": "run-1", "candidate": {"blob": "c" * 50_000}, "pipeline": {"blob": "p" * 50_000}}
+    monkeypatch.setattr(png_batch, "_recover_attempt", lambda _job, _item: {"pipeline": _ready_result(source_id, "run-1"), "release_pool": full_entry})
+
+    resumed = png_batch.run_png_batch(str(job["job_id"]), pipeline_runner=lost_runner)
+
+    item = resumed["job"]["items"][0]
+    assert item["status"] == "READY" and item["recovered_after_interruption"] is True
+    assert item["release_pool"] == {"disposition": "ALREADY_IN_RELEASE_POOL", "candidate_id": "candidate-x",
+                                    "readback_verified": True, "pipeline_run_id": "run-1"}

@@ -66,6 +66,14 @@ def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
     return max(1, min(DEFAULT_PARALLEL_WORKERS_CAP, (os.cpu_count() or 4) // 2))
 
 
+_POOL_SUMMARY_KEYS = ("candidate_id", "disposition", "entry_digest", "pipeline_run_id", "pool_size", "publication", "readback_verified", "reason")
+
+
+def _pool_summary(pool: object) -> dict[str, Any]:
+    """Job items keep the Release Pool summary only; the pool row itself holds candidate and pipeline."""
+    return {key: pool[key] for key in _POOL_SUMMARY_KEYS if key in pool} if isinstance(pool, Mapping) else {}
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -1627,11 +1635,11 @@ def run_png_batch(
                 if ready is None:
                     pass
                 elif ready and pool.get("readback_verified") is True:
-                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": primary.get("files", {}), "release_pool": pool, "finished_at": _now()})
+                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": primary.get("files", {}), "release_pool": _pool_summary(pool), "finished_at": _now()})
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                 elif ready:
                     pool_reason = str(pool.get("reason") or pool.get("disposition") or "Release Pool did not confirm the exact READY_AUTO candidate/run row.")
-                    item.update({"status": "FAILED", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "release_pool": pool, "reason": f"READY_POOL_ENTRY_FAILED: {pool_reason[:400]}", "finished_at": _now()})
+                    item.update({"status": "FAILED", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "release_pool": _pool_summary(pool), "reason": f"READY_POOL_ENTRY_FAILED: {pool_reason[:400]}", "finished_at": _now()})
                 else:
                     item.update({"status": "FAILED", "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None, "reason": _failure_reason(pipeline), "finished_at": _now()})
             job["current_index"] = running_index()
@@ -1721,7 +1729,7 @@ def run_png_batch(
                     recovered = _recover_attempt(job, item)
                     if recovered is not None:
                         pipeline = recovered["pipeline"]
-                        item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": recovered["release_pool"], "recovered_after_interruption": True, "finished_at": _now()})
+                        item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": _pool_summary(recovered["release_pool"]), "recovered_after_interruption": True, "finished_at": _now()})
                         job["counts"] = _counts(job["items"])
                         job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                         job["current_index"] = running_index()
@@ -1751,7 +1759,7 @@ def run_png_batch(
                         "status": "FAILED",
                         "run_id": pipeline.get("run_id") if isinstance(pipeline, Mapping) else None,
                         "candidate_id": pipeline.get("candidate_id") if isinstance(pipeline, Mapping) else None,
-                        "release_pool": reused.get("release_pool", {}),
+                        "release_pool": _pool_summary(reused.get("release_pool", {})),
                         "reason": f"READY_POOL_ENTRY_FAILED: {reused['pool_retryable_error']}",
                         "finished_at": _now(),
                     })
@@ -1777,7 +1785,7 @@ def run_png_batch(
                     continue
                 if reused is not None:
                     pipeline = reused["pipeline"]
-                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": reused["release_pool"], "reused_existing_ready": True, "finished_at": _now()})
+                    item.update({"status": "READY", "run_id": pipeline.get("run_id"), "candidate_id": pipeline.get("candidate_id"), "artifact_refs": pipeline.get("primary", {}).get("files", {}), "release_pool": _pool_summary(reused["release_pool"]), "reused_existing_ready": True, "finished_at": _now()})
                     job["counts"] = _counts(job["items"])
                     job["ready_mix"][str(item["column_count"])] = int(job["ready_mix"].get(str(item["column_count"]), 0)) + 1
                     job["current_index"] = running_index()

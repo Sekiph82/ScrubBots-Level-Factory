@@ -274,3 +274,15 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   (52.1888 / 43.8423); full solve plus official analysis 20 s each (6534537c: 35–37 s).
 - Pin unit tests 8 passed / 4 skipped (pre-existing missing 002 source). Godot suites PASS: r05_r05 loaded batch UI,
   r09_r02_r02 pinned authority, r09_r02_r04_r03 batch UI binding, gallery follows active source.
+
+## 2026-11-13 ~15:30–15:50 local — installed app on 9a622485; job items keep only the pool summary
+
+- Deployed 9a622485 to Release (3 files; backup `Release\.claude-deploy-backup-20261112\pre-9a622485`), launched via the
+  Desktop LNK (STARTUP_READY 200 s), LEVEL FACTORY showed "Resume Batch · 1040 remaining"; owner-requested Resume pressed.
+- The job file crossed 1 MiB (1,205,501 bytes) and was written normally; LF-000379 was recovered READY from its finished run.
+- Found: a recovery of an ALREADY_IN_RELEASE_POOL item stored the full pool row (candidate + pipeline, 175 KB) in the job,
+  while normal finishes store a 7-field summary. `_pool_summary` now keeps only candidate_id, disposition, entry_digest,
+  pipeline_run_id, pool_size, publication, readback_verified and reason for finish, recovery and reuse paths.
+  Regression `test_recovered_ready_item_keeps_only_the_release_pool_summary` failed on the old code, passes now.
+- Full Python unit suite on 9a622485: 2070 passed, 15 skipped (2026-11-07 cleanup evidence), 0 failed.
+  Batch/pool subset after the summary change: 177 passed.
