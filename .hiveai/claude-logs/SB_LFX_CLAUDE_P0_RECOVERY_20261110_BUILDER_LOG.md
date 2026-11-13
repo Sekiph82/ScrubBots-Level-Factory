@@ -244,3 +244,9 @@ Seen in the installed app (d31ad0ab) during the running batch, all fixed in `fac
 - Also carries game 628ab240 (finished slot takes no pick until its pop ends), which real play already used since 26d15718.
 - Real check on the new runtime (copies of LF-000147 / LF-000148 plans, `verify_exported_supply`, full native solve + official analysis): 35 s and 37 s; Difficulty V1 JSON byte-identical to the saved results (challengeScore 52.1888 / 43.8423).
 - Tests: re-pin unit tests 10 passed / 4 skipped; pin-bound Godot suites (r05 loaded batch, pinned authority, batch UI binding, gallery follow) PASS.
+
+## 2026-11-13 — First real batch measurement on runtime 6534537c (Claude)
+
+- Installed 10e429df; owner approved resume 12:43 local. 21 PNGs finished 12:43–13:03: 21 READY / 0 FAILED.
+- READY median 4.3 min (was 17.6 min on dd54007a); stages median: screening 58 s, official analysis 58 s (was 594 s), tail 57 s. 49/49 kernel replays SOLVED, 0 native searches.
+- ~63 READY/h with 6 workers (was 14.1/h); CPU ~50 %, frequency ~71 %, free RAM 3.1–4.3 GB.
