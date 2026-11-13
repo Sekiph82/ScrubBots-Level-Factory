@@ -860,6 +860,11 @@ def record_batch_outcomes(job: Mapping[str, Any], *, repository_root: str | Path
     for item in job.get("items", []):
         if not isinstance(item, Mapping) or item.get("status") not in {"READY", "FAILED", "REJECTED"}:
             continue
+        # The batch engine records each terminal item when it finishes; re-projecting
+        # all of them after Stop took minutes on a 1256-PNG batch (2026-11-13).
+        projection = item.get("owner_release_projection")
+        if isinstance(projection, Mapping) and projection.get("state") == "RECORDED" and projection.get("status") == item.get("status"):
+            continue
         source_id = str(item.get("source_id", ""))
         run_id = str(item.get("run_id", "")) or None
         outcome = str(item.get("status"))

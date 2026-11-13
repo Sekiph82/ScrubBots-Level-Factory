@@ -291,3 +291,10 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   both READY on disk). Batch Issues now shows the batch outcome for a Pending archive row whose loaded-batch item is
   READY/FAILED/REJECTED. Gallery suite check failed on the old code (LF-000005..007 "PENDING"), passes now; 10 Godot
   suites touching the batch/archive panel PASS.
+- Stop after current at 15:37: job STOPPED at 232 READY / 5 FAILED, but the Studio kept "Running · 237/1256 done" and
+  the batch launcher (factory_core_launcher png-batch-run) stayed at one busy core for 6+ minutes. Cause: after
+  run_png_batch returns, the launcher calls record_batch_outcomes over every terminal item; each transition_pipeline
+  rescans all 1424 Release Pool records (list_records), although every item was already recorded when it finished.
+  Calls are idempotent (no new .history events after 15:41), only slow. record_batch_outcomes now skips items whose
+  owner_release_projection is RECORDED with the same status. Regression failed on the old code, passes now;
+  owner-release/batch subset 156 passed.
