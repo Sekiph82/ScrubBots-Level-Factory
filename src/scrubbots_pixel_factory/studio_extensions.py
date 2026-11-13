@@ -1363,11 +1363,10 @@ def _primary_work_output_dir(requested: object, *, identity: str, activity_run_i
     return candidate
 
 
-# Wall-clock budget for trying further quality-ranked plans after the first one
-# (owner decision 2026-11-12). A typical analysis-free solve takes 1-3 min, so
-# 30 min covers the 12 plans in the common case while one PNG cannot hold a
-# batch worker for hours on hard plans.
-REAL_PLAY_ALTERNATIVE_BUDGET_SECONDS = 1800
+# Superseded 2026-11-13 by the owner's total 30-minute limit per PNG
+# (supply_optimizer.PNG_SOLVE_TIME_LIMIT_SECONDS), which also covers screening,
+# the running solver and the official analysis.
+REAL_PLAY_ALTERNATIVE_BUDGET_SECONDS = None
 
 
 def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: int, height: int,
@@ -1461,6 +1460,9 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
                     "clicks": per_dt.get("clicksPlaced"), "result_path": _relative(Path(gate["result_path"]))}
 
         emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
+        from .supply_pipeline.supply_optimizer import PNG_SOLVE_TIME_LIMIT_SECONDS
+        import time as _time
+        wall_deadline = _time.time() + PNG_SOLVE_TIME_LIMIT_SECONDS
         result = SupplyOptimizer(rules).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
             level_id=level_id, verify_top=int(request_data.get("verify_top", 1)),
@@ -1474,6 +1476,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             source_sha256=source_sha256,
             real_play_precheck=real_play_precheck if isinstance(source_sha256, str) and re.fullmatch(r"[0-9a-f]{64}", source_sha256) else None,
             alternative_budget_seconds=REAL_PLAY_ALTERNATIVE_BUDGET_SECONDS,
+            wall_deadline=wall_deadline,
         )
         files = SupplyExporter(rules).export(result, output_dir, level_id)
         from .supply_pipeline.verify import verify_exported_supply

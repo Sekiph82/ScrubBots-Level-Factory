@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, ThreadPoolExecutor, wait
+import multiprocessing
 from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
@@ -32,7 +33,21 @@ _PROCESS_LOCKS_GUARD = threading.Lock()
 MAX_PARALLEL_WORKERS = 8
 
 
-DEFAULT_PARALLEL_WORKERS_CAP = 8  # owner decision 2026-11-13: 8 workers overnight
+# Owner decision 2026-11-13 (morning): 6 workers, each PNG in its own process.
+DEFAULT_PARALLEL_WORKERS_CAP = 6
+
+
+
+def _silence_child_stdout() -> None:
+    """Pool processes must never write into the launcher's JSON stdout channel."""
+    import sys
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")  # noqa: SIM115 - lives as long as the child
+
+
+def _run_pipeline_in_child(source_id: str, request: dict[str, Any]) -> dict[str, Any]:
+    from . import studio_extensions as extensions
+
+    return extensions.run_pipeline(source_id=source_id, request=request)
 
 
 def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
@@ -1654,7 +1669,15 @@ def run_png_batch(
         control_env = "SCRUBBOTS_FACTORY_BATCH_CONTROL_FILE"
         previous_control_file = os.environ.get(control_env)
         os.environ[control_env] = str(_control_path(job_id))
-        executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="png-batch")
+        # Owner decision 2026-11-13: threads shared one Python interpreter, so
+        # eight workers queued behind each other in Python screening (a 25 s step
+        # took 24 min). The real pipeline now runs each PNG in its own process;
+        # injected test runners keep using threads.
+        if pipeline_runner is None:
+            executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
+                                           initializer=_silence_child_stdout)
+        else:
+            executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="png-batch")
         try:
             for item_index, item in enumerate(job["items"]):
                 from .studio_lifecycle import studio_shutdown_requested
@@ -1796,7 +1819,11 @@ def run_png_batch(
                     if outcome is not None:
                         return outcome
                     continue
-                in_flight[executor.submit(runner, source_id=str(item["source_id"]), request=request)] = (item_index, item)
+                if pipeline_runner is None:
+                    future = executor.submit(_run_pipeline_in_child, str(item["source_id"]), request)
+                else:
+                    future = executor.submit(runner, source_id=str(item["source_id"]), request=request)
+                in_flight[future] = (item_index, item)
                 job["current_index"] = running_index()
                 job = _write_job(job)
                 while len(in_flight) >= workers:

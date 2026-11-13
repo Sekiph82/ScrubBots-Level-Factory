@@ -101,7 +101,7 @@ def test_parallel_worker_failure_is_recorded_for_that_item_only(tmp_path: Path, 
 
 
 @pytest.mark.parametrize(("setting", "env", "cores", "expected"), [
-    (None, None, 16, 8), (None, None, 8, 4), (None, None, 4, 2), (None, "2", 16, 2), (6, None, 16, 6), (99, None, 16, 8), (None, None, None, 2),
+    (None, None, 16, 6), (None, None, 8, 4), (None, None, 4, 2), (None, "2", 16, 2), (6, None, 16, 6), (99, None, 16, 8), (None, None, None, 2),
 ])
 def test_parallel_workers_default_and_bounds(monkeypatch: pytest.MonkeyPatch, setting, env, cores, expected) -> None:
     if env is None:
@@ -148,3 +148,34 @@ def test_resume_rebinds_a_batch_planned_with_the_previous_runtime(tmp_path: Path
     current = str(pins.expected_runtime_root().resolve())
     assert seen == [current, current]
     assert result["job"]["runtime_rebinds"][0]["from"] == old_root.name
+
+
+def test_real_pipeline_runs_each_png_in_its_own_process(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Owner decision 2026-11-13: threads shared one interpreter, so Python screening
+    # of eight PNGs queued behind each other (25 s became 24 min).
+    import pickle
+    job, _items = _prepare(tmp_path, monkeypatch, 2, workers=2)
+    used: dict[str, object] = {}
+
+    class InlineProcessPool:
+        def __init__(self, max_workers, mp_context=None, initializer=None):
+            used.update(max_workers=max_workers, context=mp_context.get_start_method(), initializer=initializer)
+
+        def submit(self, fn, *args):
+            from concurrent.futures import Future
+            used.setdefault("functions", []).append(fn)
+            future = Future()
+            future.set_result(_ready_result(args[0], f"run-{args[1]['png_batch_item_index']}", args[1]))
+            return future
+
+        def shutdown(self, wait=True):
+            used["shutdown"] = wait
+
+    monkeypatch.setattr(png_batch, "ProcessPoolExecutor", InlineProcessPool)
+    result = png_batch.run_png_batch(str(job["job_id"]))
+
+    assert result["disposition"] == "COMPLETE"
+    assert used["context"] == "spawn" and used["max_workers"] == 2 and used["shutdown"] is True
+    assert used["initializer"] is png_batch._silence_child_stdout
+    assert used["functions"] == [png_batch._run_pipeline_in_child] * 2
+    pickle.dumps(png_batch._run_pipeline_in_child)  # importable by reference in a spawned child

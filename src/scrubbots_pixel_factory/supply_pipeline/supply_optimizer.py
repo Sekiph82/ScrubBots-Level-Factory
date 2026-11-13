@@ -22,6 +22,9 @@ from .supply_scorer import SupplyScorer
 # Owner decision 2026-11-12: quality-ranked plans tried per PNG before it is
 # discarded because the game cannot win any of them with slots refilled at once.
 MAX_REAL_PLAY_ALTERNATIVES = 12
+# Owner decision 2026-11-13: a PNG not solved within 30 minutes counts as unsolvable.
+PNG_SOLVE_TIME_LIMIT_SECONDS = 1800
+MIN_SOLVER_SECONDS_LEFT = 30
 
 
 def _export_shape(candidate, record, color_id):
@@ -93,7 +96,7 @@ class SupplyOptimizer:
                  real_max_visited=None, level_number=1, progress=print,
                  real_timeout_seconds=900, max_native_solver_invocations=None,
                  auto_extend_solver_timeout=False, source_sha256=None,
-                 real_play_precheck=None, alternative_budget_seconds=None):
+                 real_play_precheck=None, alternative_budget_seconds=None, wall_deadline=None):
         return self._run_prepared(
             *self.prepare_grid(grid, used), seed=seed, candidates=candidates,
             level_id=level_id, verify_top=verify_top, screen_budget=screen_budget,
@@ -106,6 +109,7 @@ class SupplyOptimizer:
             source_sha256=source_sha256,
             real_play_precheck=real_play_precheck,
             alternative_budget_seconds=alternative_budget_seconds,
+            wall_deadline=wall_deadline,
         )
 
     def _run_prepared(self, grid, used, m, band, mean, total, rows, *, seed,
@@ -113,7 +117,7 @@ class SupplyOptimizer:
                       viability_budget, real_max_visited, level_number, progress,
                       real_timeout_seconds, max_native_solver_invocations,
                       auto_extend_solver_timeout, source_sha256,
-                      real_play_precheck=None, alternative_budget_seconds=None):
+                      real_play_precheck=None, alternative_budget_seconds=None, wall_deadline=None):
         log = progress or (lambda *_: None)
         pinned_runtime = getattr(self.rules, "attestation", None) is not None
         if pinned_runtime:
@@ -207,6 +211,25 @@ class SupplyOptimizer:
         color_id = lambda local: self.rules.palette[used[local]][0]
         deadline = (time.monotonic() + float(alternative_budget_seconds)
                     if real_play_precheck is not None and alternative_budget_seconds else None)
+        time_limited = False
+
+        def bounded(options):
+            # Owner decision 2026-11-13: one PNG may use at most 30 minutes in total
+            # (wall_deadline, epoch seconds). Every native solver/analysis call gets
+            # only the time that is left, so a running Godot job is stopped by its
+            # own timeout instead of holding a batch worker for an hour.
+            if wall_deadline is None:
+                return options
+            remaining = float(wall_deadline) - time.time()
+            if remaining < MIN_SOLVER_SECONDS_LEFT:
+                return None
+            if not isinstance(solver, ScrubBotsSolver):
+                return options
+            limited = dict(options)
+            limited["timeout"] = min(float(options.get("timeout", real_timeout_seconds)), remaining)
+            limited["auto_extend_timeout"] = bool(options.get("auto_extend_timeout")) and limited["timeout"] >= 900
+            return limited
+
         for start in range(0, len(scored), batch_size):
             if max_native_solver_invocations is not None and native_solver_invocations >= max_native_solver_invocations:
                 break
@@ -226,11 +249,16 @@ class SupplyOptimizer:
             if isinstance(solver, ScrubBotsSolver):
                 call_options["timeout"] = real_timeout_seconds
                 call_options["auto_extend_timeout"] = auto_extend_solver_timeout
+            limited_options = bounded(call_options)
+            if limited_options is None:
+                time_limited = True
+                log(f"PNG time limit reached after {start} plans; no further plan is solved")
+                break
             try:
                 response = solver.run(
                     level,
                     [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
-                    **call_options,
+                    **limited_options,
                 )
             except SolverBridgeError as exc:
                 telemetry = getattr(exc, "telemetry", {}) or {}
@@ -261,19 +289,35 @@ class SupplyOptimizer:
                         log(f"real-play pre-check {candidate['id']}: {verdict.get('verdict')} at click {verdict.get('stuck_click')}")
                         continue
                     log(f"real-play pre-check {candidate['id']}: WON_CANONICAL; running official Difficulty V1")
-                    analysis = solver.run(
-                        level,
-                        [{"id": candidate["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in candidate["columns"]],
-                          "analyze_trace": record["trace"]}],
-                        **{**call_options, "analyze": True},
-                    )
+                    analysis_options = bounded({**call_options, "analyze": True})
+                    if analysis_options is None:
+                        time_limited = True
+                        break
+                    try:
+                        analysis = solver.run(
+                            level,
+                            [{"id": candidate["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in candidate["columns"]],
+                              "analyze_trace": record["trace"]}],
+                            **analysis_options,
+                        )
+                    except SolverBridgeError as exc:
+                        if (getattr(exc, "telemetry", {}) or {}).get("cancelled") or wall_deadline is None:
+                            raise
+                        time_limited = True
+                        log(f"official Difficulty V1 did not finish inside the PNG time limit: {str(exc).splitlines()[0][:120]}")
+                        break
                     analyzed = analysis["results"][0] if analysis.get("results") else {}
                     record = {**record, "difficultyV1": analyzed.get("difficultyV1")}
                 official = record.get("difficultyV1")
                 if verification["all_ok"] and isinstance(official, dict) and official.get("ok"):
                     accepted.append((candidate, record, verification, response))
-            if len(accepted) >= verify_top:
+            if len(accepted) >= verify_top or time_limited:
                 break
+        if not accepted and time_limited:
+            raise NoValidSupply(
+                f"PNG_TIME_LIMIT: no shippable plan within {PNG_SOLVE_TIME_LIMIT_SECONDS // 60} minutes "
+                f"({len(real_runs)} plans solved, {len(real_play_prechecks)} real-play pre-checks)"
+            )
         if not accepted and real_play_precheck is not None and real_play_prechecks:
             raise NoValidSupply(
                 "REAL_PLAY_NO_WINNING_PLAN: none of the "

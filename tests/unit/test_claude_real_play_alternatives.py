@@ -124,3 +124,61 @@ def test_without_precheck_the_first_plan_is_solved_with_analysis_as_before() -> 
     result = _run(optimizer, grid, used, None)
     assert [call[1:] for call in optimizer.solver.calls] == [("SOLVE", True)]
     assert result["real_play_prechecks"] == []
+
+
+class Clock:
+    def __init__(self, start: float) -> None:
+        self.now = start
+
+    def time(self) -> float:
+        return self.now
+
+
+def test_png_stops_at_the_twenty_minute_limit(monkeypatch) -> None:
+    # Owner decision 2026-11-13: LF-000047 held a worker for 69 minutes; a PNG not
+    # solved within 30 minutes in total counts as unsolvable.
+    from scrubbots_pixel_factory.supply_pipeline import supply_optimizer
+    grid = _grid()
+    optimizer, solver, used = _optimizer(grid)
+    clock = Clock(1_000_000.0)
+    monkeypatch.setattr(supply_optimizer.time, "time", clock.time)
+    original_run = solver.run
+
+    def slow_run(level, candidates, **options):
+        clock.now += 400  # every plan takes 400 s
+        return original_run(level, candidates, **options)
+
+    solver.run = slow_run
+    with pytest.raises(NoValidSupply, match="PNG_TIME_LIMIT"):
+        optimizer.run_grid(grid, used, seed=3, candidates=60, level_id="alt_test", metric_top=12,
+                           real_max_visited=25_000, progress=None, real_timeout_seconds=900,
+                           max_native_solver_invocations=1, wall_deadline=clock.now + supply_optimizer.PNG_SOLVE_TIME_LIMIT_SECONDS,
+                           real_play_precheck=lambda *_args: {"won": False, "verdict": "LOST", "stuck_click": 3})
+    assert len([call for call in solver.calls if call[1] == "SOLVE"]) == 5  # 0..1600 s; at 2000 s (> 1800) no new plan
+
+
+def test_running_solver_gets_only_the_time_that_is_left(monkeypatch) -> None:
+    from scrubbots_pixel_factory.supply_pipeline import supply_optimizer
+    from scrubbots_pixel_factory.supply_pipeline.scrubbots_solver import ScrubBotsSolver
+    grid = _grid()
+    optimizer, fake, used = _optimizer(grid)
+    seen: list[dict] = []
+
+    class BoundedSolver(ScrubBotsSolver):
+        def __init__(self) -> None:  # no Godot lookup
+            pass
+
+        def run(self, level, candidates, **options):
+            seen.append(dict(options))
+            return fake.run(level, candidates, **options)
+
+    optimizer.solver = BoundedSolver()
+    clock = Clock(2_000_000.0)
+    monkeypatch.setattr(supply_optimizer.time, "time", clock.time)
+    optimizer.run_grid(grid, used, seed=3, candidates=60, level_id="alt_test", metric_top=12,
+                       real_max_visited=25_000, progress=None, real_timeout_seconds=900,
+                       max_native_solver_invocations=1, auto_extend_solver_timeout=True,
+                       wall_deadline=clock.now + 500,
+                       real_play_precheck=lambda *_args: {"won": True, "verdict": "WON_CANONICAL"})
+    assert seen[0]["timeout"] == 500 and seen[0]["auto_extend_timeout"] is False
+    assert seen[1]["timeout"] == 500 and seen[1]["analyze"] is True
