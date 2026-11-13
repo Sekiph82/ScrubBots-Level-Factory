@@ -120,6 +120,51 @@ func _initialize() -> void:
 			out["results"].append(rec)
 			print("BRIDGE %d/%d %s REPLAY ok=%s solved=%s" % [i + 1, cands.size(), cand["id"], rp["ok"], rp["solved"]])
 			continue
+		if cand.has("verify_trace"):  # KERNEL_REPLAY proof of a screening trace (owner decision 2026-11-13)
+			# The official proof kernel applies every placement of the given order and
+			# must reproduce each step's clears/active count and finish the board. This
+			# is the same certificate a native search returns, without the search.
+			var tv0 := Time.get_ticks_msec()
+			print("BRIDGE_TRACE_VERIFY_START %s" % String(cand["id"]))
+			var q: Dictionary = solver._kernel.quiesce(_initial(level, eng))
+			var actions: Array = []
+			var diverged := -1
+			if q.get("ok", false):
+				var state = q["state"]
+				for step in range(cand["verify_trace"].size()):
+					var expected: Dictionary = cand["verify_trace"][step]
+					var r: Dictionary = solver._kernel.apply_placement(state, int(expected["column"]))
+					if (not r.get("ok", false) or int(r["clears"]) != int(expected["clears"])
+							or r["state"].active_count() != int(expected["active_after"])):
+						diverged = step
+						break
+					actions.append({"column": int(expected["column"]), "placed": r["placed"], "clears": int(r["clears"]),
+						"active_after": r["state"].active_count()})
+					state = r["state"]
+				if diverged < 0 and not state.is_solved():
+					diverged = actions.size()
+			else:
+				diverged = 0
+			rec["solver"] = {"visited": 0, "memoHits": 0, "frontierPeak": 0, "maxDepthReached": actions.size(),
+				"decisions": actions.size(), "elapsedMs": Time.get_ticks_msec() - tv0, "proof": "KERNEL_REPLAY"}
+			if diverged < 0:
+				var trace: Array = []
+				for a in actions:
+					trace.append({"column": int(a["column"]), "color": int(a["placed"]["color"]),
+						"count": int(a["placed"]["count"]), "clears": int(a["clears"]),
+						"active_after": int(a["active_after"])})
+				rec["status"] = String(SolvabilitySolver.SOLVED)
+				rec["trace"] = trace
+				rec["traceHash"] = int(SolvabilitySolver._trace_hash(actions))
+				var rp: Dictionary = solver.replay(_initial(level, eng), actions)
+				rec["replay"] = {"ok": rp["ok"], "solved": rp["solved"], "finalActive": int(rp["final_active"]),
+					"steps": int(rp["steps"]), "divergedAt": int(rp["diverged_at"])}
+			else:
+				rec["status"] = "TRACE_DIVERGED"
+				rec["divergedAt"] = diverged
+			print("BRIDGE_TRACE_VERIFY_END %s status=%s" % [String(cand["id"]), rec["status"]])
+			out["results"].append(rec)
+			continue
 		if cand.has("analyze_trace"):  # official Difficulty V1 of an already proven trace
 			# measure() re-applies every placement and fails on any divergence.
 			rec["status"] = "ANALYZED"

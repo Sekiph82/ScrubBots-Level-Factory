@@ -57,8 +57,9 @@ def test_pixel_art_activity_log_is_bounded_and_provider_failures_stop_the_batch(
     assert '"PixelArtActivityTable"' in table
     assert '"TIME / STATUS"' in refresh and '"EVENT / DETAILS"' in refresh
     assert '"font_size", 16' in refresh
-    assert "var time_width := clampf(grid_width * 0.34, 105.0, 155.0)" in refresh
-    assert "var detail_width := maxf(205.0, grid_width - time_width - 8.0)" in refresh
+    # Column minimums follow the table width since 2026-11-13 (small-window overflow fix).
+    assert "var time_width := clampf(grid_width * 0.34, 40.0, 155.0)" in refresh
+    assert "var detail_width := maxf(50.0, grid_width - time_width - 8.0)" in refresh
     assert "detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL" in refresh
     layout = _function(source, "_apply_responsive_layout")
     assert '_screen == "PIXEL ART" and _pixel_art_activity_table != null' in layout

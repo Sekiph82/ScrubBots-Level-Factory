@@ -36,6 +36,10 @@ def _export_shape(candidate, record, color_id):
     }
 
 
+class _AlreadyProven(Exception):
+    """Control flow: the kernel replay already proved this plan."""
+
+
 class NoValidSupply(RuntimeError):
     pass
 
@@ -254,12 +258,44 @@ class SupplyOptimizer:
                 time_limited = True
                 log(f"PNG time limit reached after {start} plans; no further plan is solved")
                 break
+            if real_play_precheck is not None and len(chunk) == 1 and chunk[0].get("screen", {}).get("trace"):
+                # Owner decision 2026-11-13: first let the official kernel replay the
+                # screening order (seconds to ~1 min); the native search runs only if
+                # that order does not finish the board.
+                try:
+                    verified = solver.run(
+                        level,
+                        [{"id": chunk[0]["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in chunk[0]["columns"]],
+                          "verify_trace": chunk[0]["screen"]["trace"]}],
+                        **{**limited_options, "analyze": False},
+                    )
+                except SolverBridgeError as exc:
+                    if (getattr(exc, "telemetry", {}) or {}).get("cancelled"):
+                        raise
+                    verified = {"results": []}
+                record0 = (verified.get("results") or [{}])[0]
+                if record0.get("status") == "SOLVED":
+                    log(f"kernel replay {chunk[0]['id']}: SOLVED without native search")
+                    response = verified
+                else:
+                    log(f"kernel replay {chunk[0]['id']}: {record0.get('status', 'UNAVAILABLE')}; running native search")
+                    response = None
+                limited_options = bounded(call_options)
+                if response is None and limited_options is None:
+                    time_limited = True
+                    break
+            else:
+                response = None
             try:
+                if response is not None:
+                    raise _AlreadyProven
                 response = solver.run(
                     level,
                     [{"id": p["id"], "columns": [[{"color": c, "count": n} for c, n in column] for column in p["columns"]]} for p in chunk],
                     **limited_options,
                 )
+            except _AlreadyProven:
+                pass
             except SolverBridgeError as exc:
                 telemetry = getattr(exc, "telemetry", {}) or {}
                 if real_play_precheck is None or telemetry.get("cancelled"):
@@ -269,7 +305,8 @@ class SupplyOptimizer:
                 real_runs.append({"id": chunk[0]["id"], "status": "SOLVER_ERROR", "reason": str(exc)[:240]})
                 log(f"alternative {chunk[0]['id']} solver error: {str(exc).splitlines()[0][:160]}")
                 continue
-            native_solver_invocations += int(response.get("_runner", {}).get("invocation_count", 1))
+            # A kernel-replay proof (invocation_count 0) still uses one of the plan slots.
+            native_solver_invocations += max(1, int(response.get("_runner", {}).get("invocation_count", 1)))
             by_id = {p["id"]: p for p in chunk}
             for record in response["results"]:
                 real_runs.append({"id": record["id"], "status": record["status"], **record.get("solver", {})})

@@ -109,6 +109,8 @@ class ScrubBotsSolver:
         native_solve_started = False
         native_solve_completed = False
         native_solve_status = None
+        trace_verify_completed = False
+        trace_verify_status = None
         cancelled = False
         process_env = None
         if attested_runtime:
@@ -120,6 +122,7 @@ class ScrubBotsSolver:
 
         def drain_output(stream):
             nonlocal output_bytes, native_solve_started, native_solve_completed, native_solve_status, progress_disabled
+            nonlocal trace_verify_completed, trace_verify_status
             pending = ""
             try:
                 while True:
@@ -140,6 +143,9 @@ class ScrubBotsSolver:
                         elif line.startswith("BRIDGE_NATIVE_END "):
                             native_solve_completed = True
                             native_solve_status = line.split(" status=", 1)[-1].split(" ", 1)[0]
+                        elif line.startswith("BRIDGE_TRACE_VERIFY_END "):
+                            trace_verify_completed = True
+                            trace_verify_status = line.split(" status=", 1)[-1].split(" ", 1)[0]
                         if line.startswith("BRIDGE") and progress and not progress_disabled:
                             try:
                                 progress(line)
@@ -292,6 +298,7 @@ class ScrubBotsSolver:
             "process_exit_code": exit_code, "process_pid": p.pid if p is not None else None,
             "timed_out": timed_out, "cancelled": cancelled, "native_solve_started": native_solve_started,
             "native_solve_completed": native_solve_completed, "native_solve_status": native_solve_status,
+            "trace_verify_completed": trace_verify_completed, "trace_verify_status": trace_verify_status,
             "stdout_bytes": output_bytes, "stdout_tail": list(tail),
             "stdout_overflow": output_overflow, "stdout_errors": list(reader_error),
             "control_errors": list(control_errors), "extension_receipt_errors": list(receipt_errors),

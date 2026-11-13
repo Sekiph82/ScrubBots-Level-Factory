@@ -35,13 +35,25 @@ def _grid() -> np.ndarray:
 class FakeSolver:
     """Proves each plan with the screening trace; never runs Godot."""
 
-    def __init__(self, grid: np.ndarray, slot_count: int, broken: set[int] = frozenset()) -> None:
+    def __init__(self, grid: np.ndarray, slot_count: int, broken: set[int] = frozenset(), diverge: bool = True) -> None:
         self.sim = ScreeningSimulator(grid, slot_count)
         self.calls: list[tuple[str, str, bool]] = []
         self.broken = broken
+        self.diverge = diverge  # default: replay fails, so the native-search path is exercised
 
     def run(self, level, candidates, **options):
         candidate = candidates[0]
+        if "verify_trace" in candidate:
+            # Kernel replay of the screening order; every plan here replays cleanly
+            # unless the test marks it as diverging.
+            self.calls.append((candidate["id"], "VERIFY", bool(options.get("analyze"))))
+            if self.diverge:
+                return {"results": [{"id": candidate["id"], "status": "TRACE_DIVERGED", "divergedAt": 3}],
+                        "_runner": {"invocation_count": 0}}
+            response = self._solve(candidate)
+            response["results"][0]["solver"] = {"visited": 0, "proof": "KERNEL_REPLAY"}
+            response["_runner"] = {"invocation_count": 0, "trace_verify_completed": True, "trace_verify_status": "SOLVED"}
+            return response
         if "analyze_trace" in candidate:
             self.calls.append((candidate["id"], "ANALYZE", bool(options.get("analyze"))))
             return {"results": [{"id": candidate["id"], "status": "ANALYZED", "difficultyV1": dict(OFFICIAL)}],
@@ -49,6 +61,9 @@ class FakeSolver:
         self.calls.append((candidate["id"], "SOLVE", bool(options.get("analyze"))))
         if len([call for call in self.calls if call[1] == "SOLVE"]) in self.broken:
             raise SolverBridgeError("bounded Godot solver timed out after 900.0s (TIMEOUT_900)", {"cancelled": False})
+        return self._solve(candidate)
+
+    def _solve(self, candidate):
         columns = [[(batch["color"], batch["count"]) for batch in column] for column in candidate["columns"]]
         screened = self.sim.solve(columns, max_visited=3000)
         pointer, trace = [0] * len(columns), []
@@ -145,7 +160,8 @@ def test_png_stops_at_the_twenty_minute_limit(monkeypatch) -> None:
     original_run = solver.run
 
     def slow_run(level, candidates, **options):
-        clock.now += 400  # every plan takes 400 s
+        if "verify_trace" not in candidates[0]:
+            clock.now += 400  # every native search takes 400 s
         return original_run(level, candidates, **options)
 
     solver.run = slow_run
@@ -180,5 +196,22 @@ def test_running_solver_gets_only_the_time_that_is_left(monkeypatch) -> None:
                        max_native_solver_invocations=1, auto_extend_solver_timeout=True,
                        wall_deadline=clock.now + 500,
                        real_play_precheck=lambda *_args: {"won": True, "verdict": "WON_CANONICAL"})
-    assert seen[0]["timeout"] == 500 and seen[0]["auto_extend_timeout"] is False
-    assert seen[1]["timeout"] == 500 and seen[1]["analyze"] is True
+    # Kernel replay (diverges in this fixture), native search, then the analysis.
+    assert seen[0]["timeout"] == 500 and seen[0]["analyze"] is False
+    assert seen[1]["timeout"] == 500 and seen[1]["auto_extend_timeout"] is False
+    assert seen[2]["timeout"] == 500 and seen[2]["analyze"] is True
+
+
+def test_kernel_replay_proof_skips_the_native_search() -> None:
+    # Owner decision 2026-11-13: when the official kernel replays the screening order
+    # to a finished board, the plan needs no native search.
+    grid = _grid()
+    optimizer, solver, used = _optimizer(grid)
+    solver.diverge = False
+
+    result = _run(optimizer, grid, used, lambda *_args: {"won": True, "verdict": "WON_CANONICAL"})
+
+    kinds = [call[1] for call in solver.calls]
+    assert kinds == ["VERIFY", "ANALYZE"]
+    assert result["solver_evidence"]["solver"]["solver"]["proof"] == "KERNEL_REPLAY"
+    assert result["solver_evidence"]["runner"]["trace_verify_status"] == "SOLVED"

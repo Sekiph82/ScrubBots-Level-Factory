@@ -151,19 +151,33 @@ def _verify_export_against_solver_evidence(level_file, plan_file, level, plan, r
         return {"state": "ERROR", "disposition": "ERROR", "reason": "solver invocation proof is incomplete"}
     if evidence.get("level_id") != level.get("id") or proof.get("status") != "SOLVED":
         return {"state": "ERROR", "disposition": "ERROR", "reason": "solver proof does not bind a solved exported level"}
+    # Owner decision 2026-11-13: a KERNEL_REPLAY proof (the official proof kernel
+    # replays the screening order step by step and finishes the board, same trace
+    # and trace hash a native search returns) stands in for the native search.
+    native_proof = (
+        type(runner.get("invocation_count")) is int
+        and runner.get("invocation_count") == 1
+        and runner.get("native_solve_completed") is True
+        and runner.get("native_solve_status") == "SOLVED"
+    )
+    kernel_replay_proof = (
+        type(runner.get("invocation_count")) is int
+        and runner.get("invocation_count") == 0
+        and runner.get("trace_verify_completed") is True
+        and runner.get("trace_verify_status") == "SOLVED"
+        and isinstance(proof.get("solver"), dict)
+        and proof["solver"].get("proof") == "KERNEL_REPLAY"
+    )
     if (
         type(runner.get("process_invocation_count")) is not int
         or runner.get("process_invocation_count") != 1
-        or type(runner.get("invocation_count")) is not int
-        or runner.get("invocation_count") != 1
+        or not (native_proof or kernel_replay_proof)
         or type(runner.get("process_exit_code")) is not int
         or runner.get("process_exit_code") != 0
-        or runner.get("native_solve_completed") is not True
-        or runner.get("native_solve_status") != "SOLVED"
         or runner.get("timed_out") is True
         or runner.get("cancelled") is True
     ):
-        return {"state": "ERROR", "disposition": "ERROR", "reason": "solver proof is not one completed native invocation"}
+        return {"state": "ERROR", "disposition": "ERROR", "reason": "solver proof is not one completed native invocation or kernel replay"}
     if not all(evidence.get(key) is True for key in ("levelLoaderPass", "productionValidatorPass", "supplyPlanLoaderPass")):
         return {"state": "ERROR", "disposition": "ERROR", "reason": "the completed solver invocation did not pass all game loaders"}
     source_sha = evidence.get("source_sha256")
