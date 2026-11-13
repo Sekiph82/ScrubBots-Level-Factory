@@ -4181,9 +4181,20 @@ func _apply_batch_progress_result(verified: Dictionary, expected_job_id: String)
 		_batch_snapshot["state"] = "INTERRUPTED"
 	_sync_verified_batch_follow(_batch_snapshot)
 	_record_verified_batch_item_progress(_batch_snapshot)
+	# A PNG finished: re-read the Release Pool so the status counter and Batch
+	# Issues follow it during the batch, not only when the batch ends. Keep the
+	# loaded flag set; the old view stays on screen until the new read lands.
+	if _batch_finished_total(previous_snapshot) != _batch_finished_total(_batch_snapshot) and _owner_release_archive_loaded:
+		_queue_studio_read_extension("owner-release-library", {}, {"kind": "owner-release-library", "token": str(Time.get_ticks_usec())})
 	_refresh_activity_header()
 	_refresh_live_data()
 	_refresh_run_button_caption()
+
+
+func _batch_finished_total(job: Dictionary) -> int:
+	var counts_value: Variant = job.get("counts", {})
+	var counts: Dictionary = counts_value if counts_value is Dictionary else {}
+	return int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
 
 
 func _batch_follow_index(job: Dictionary) -> int:

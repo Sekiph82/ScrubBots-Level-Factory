@@ -108,6 +108,26 @@ func _run_suite() -> void:
 	var retry_caption := (ui.get_node("RunLevelPipeline") as Button).text
 	_check(retry_caption == "Running 3/3 · 3 parallel", "dispatched retry progress was not followed: %s" % retry_caption)
 	_check(not bool(ui.get("_batch_job_source_mismatch")), "dispatched retry progress was treated as a lineage mismatch")
+
+	# 2026-11-13: the status counter showed 180 R / 2 F while the Release Pool held
+	# 208 READY / 6 FAILED, and Batch Issues kept READY PNGs as "PENDING", because
+	# the Release Pool was re-read only when the whole batch ended. A PNG that
+	# finishes during the batch must trigger a re-read.
+	ui.set("_owner_release_archive", {"records": []})
+	ui.set("_owner_release_archive_loaded", true)
+	ui.get("_studio_read_queue").clear()
+	ui.set("_studio_read_context", {})
+	var finished := progressed.duplicate(true)
+	finished["items"][0]["status"] = "READY"
+	finished["counts"] = {"total": 3, "ready": 1, "failed": 0, "rejected": 0, "skipped": 0, "remaining": 2}
+	ui.call("_apply_batch_progress_result", {"disposition": "MATCHED", "job": finished}, "job-retry")
+	_check(_release_archive_read_requested(ui), "a PNG finished during the batch but the Release Pool was not re-read")
+	ui.get("_studio_read_queue").clear()
+	ui.set("_studio_read_context", {})
+	ui.call("_apply_batch_progress_result", {"disposition": "MATCHED", "job": finished.duplicate(true)}, "job-retry")
+	_check(not _release_archive_read_requested(ui), "Release Pool was re-read although no PNG finished")
+	ui.get("_studio_read_queue").clear()
+	ui.set("_studio_read_context", {})
 	ui.set("_operation_running", false)
 	ui.set("_batch_worker_active", false)
 
@@ -143,6 +163,13 @@ func _slot_texts(ui: Control) -> Array[String]:
 	for index in range(5):
 		texts.append((ui.get_node("LevelVariation%d" % (index + 1)) as Button).text)
 	return texts
+
+
+func _release_archive_read_requested(ui: Control) -> bool:
+	var contexts: Array = [ui.get("_studio_read_context")]
+	for queued in ui.get("_studio_read_queue"):
+		contexts.append(queued.get("context", {}))
+	return contexts.any(func(context: Variant) -> bool: return context is Dictionary and str(context.get("kind", "")) == "owner-release-library")
 
 
 func _check(condition: bool, message: String) -> void:

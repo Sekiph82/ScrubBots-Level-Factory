@@ -219,3 +219,11 @@ Owner chose option A from the game investigation (job 155): a level ships only i
 - 6338ac18: "Resume saved batch · k remaining" offered next to Run Pending Batch when a stopped job does not cover every Pending PNG; a running retry's progress is followed even when the gallery cannot re-derive it (screen stayed "Running 2/6 · QUEUED").
 - 6e496795 / ec22a77b: default batch workers 6, then 8 (owner decision for the overnight run; i7-1260P 16 threads, 15.7 GB).
 - Release = ec22a77b. Run Pending Batch (1256) started 00:58 on 2026-11-13 in the installed app (job png-batch-6cc4887a, dd54007a runtime, 8 workers); left running overnight by owner request.
+
+## 2026-11-13 — Live Release status during a batch (Claude)
+
+- Owner report: counter showed 180 R / 2 F while Release Pool held 208 READY / 6 FAILED; Batch Issues kept finished PNGs as "PENDING · Solver attempt started".
+- Root cause: the owner Release Pool archive (source of the status counter and Batch Issues) was re-read only when the whole batch ended.
+- Fix: `_apply_batch_progress_result` re-reads the archive whenever the batch finished total (ready+failed+rejected+skipped) changes; loaded flag kept, old view stays until the new read lands.
+- Regression in `factory_studio_gallery_follows_active_source_suite.gd`; watched fail on unfixed code ("a PNG finished during the batch but the Release Pool was not re-read"), then PASS. Related Godot suites PASS (monitor, activity, pinned authority, pixel cards, r05 loaded batch, batch UI binding, batch CSV). Python UI tests 164 passed.
+- 30-PNG measurement on installed c8c32430: 26 READY / 4 FAILED (PNG_TIME_LIMIT after a won plan), READY median 17.6 min, analysis median 594 s, 94/94 kernel replay SOLVED, 14.1 READY/h. Not yet installed: a9778a46, f08dcae1, this fix.
