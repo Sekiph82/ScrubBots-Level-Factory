@@ -24,6 +24,8 @@ from .supply_scorer import SupplyScorer
 MAX_REAL_PLAY_ALTERNATIVES = 12
 # Owner decision 2026-11-13: a PNG not solved within 30 minutes counts as unsolvable.
 PNG_SOLVE_TIME_LIMIT_SECONDS = 1800
+# Extra time for the official Difficulty V1 analysis of a plan real play already won.
+ANALYSIS_GRACE_SECONDS = 900
 MIN_SOLVER_SECONDS_LEFT = 30
 
 
@@ -217,14 +219,14 @@ class SupplyOptimizer:
                     if real_play_precheck is not None and alternative_budget_seconds else None)
         time_limited = False
 
-        def bounded(options):
+        def bounded(options, extra_seconds=0.0):
             # Owner decision 2026-11-13: one PNG may use at most 30 minutes in total
             # (wall_deadline, epoch seconds). Every native solver/analysis call gets
             # only the time that is left, so a running Godot job is stopped by its
             # own timeout instead of holding a batch worker for an hour.
             if wall_deadline is None:
                 return options
-            remaining = float(wall_deadline) - time.time()
+            remaining = float(wall_deadline) + float(extra_seconds) - time.time()
             if remaining < MIN_SOLVER_SECONDS_LEFT:
                 return None
             if not isinstance(solver, ScrubBotsSolver):
@@ -326,7 +328,10 @@ class SupplyOptimizer:
                         log(f"real-play pre-check {candidate['id']}: {verdict.get('verdict')} at click {verdict.get('stuck_click')}")
                         continue
                     log(f"real-play pre-check {candidate['id']}: WON_CANONICAL; running official Difficulty V1")
-                    analysis_options = bounded({**call_options, "analyze": True})
+                    # The 30-minute limit covers finding a plan; a plan the game already
+                    # won gets ANALYSIS_GRACE_SECONDS more for the official analysis
+                    # (owner decision 2026-11-13: LF-000047 won at minute 21).
+                    analysis_options = bounded({**call_options, "analyze": True}, ANALYSIS_GRACE_SECONDS)
                     if analysis_options is None:
                         time_limited = True
                         break

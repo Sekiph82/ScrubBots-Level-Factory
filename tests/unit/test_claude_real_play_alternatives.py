@@ -199,7 +199,8 @@ def test_running_solver_gets_only_the_time_that_is_left(monkeypatch) -> None:
     # Kernel replay (diverges in this fixture), native search, then the analysis.
     assert seen[0]["timeout"] == 500 and seen[0]["analyze"] is False
     assert seen[1]["timeout"] == 500 and seen[1]["auto_extend_timeout"] is False
-    assert seen[2]["timeout"] == 500 and seen[2]["analyze"] is True
+    # The analysis of a won plan gets the 15-minute grace on top (capped at 900 s per call).
+    assert seen[2]["timeout"] == 900 and seen[2]["analyze"] is True
 
 
 def test_kernel_replay_proof_skips_the_native_search() -> None:
@@ -215,3 +216,33 @@ def test_kernel_replay_proof_skips_the_native_search() -> None:
     assert kinds == ["VERIFY", "ANALYZE"]
     assert result["solver_evidence"]["solver"]["solver"]["proof"] == "KERNEL_REPLAY"
     assert result["solver_evidence"]["runner"]["trace_verify_status"] == "SOLVED"
+
+
+def test_a_won_plan_gets_fifteen_more_minutes_for_the_analysis(monkeypatch) -> None:
+    # Owner decision 2026-11-13: LF-000047 won real play at minute 21; the analysis
+    # must not be cut at minute 30 and throw the won level away.
+    from scrubbots_pixel_factory.supply_pipeline import supply_optimizer
+    from scrubbots_pixel_factory.supply_pipeline.scrubbots_solver import ScrubBotsSolver
+    grid = _grid()
+    optimizer, fake, used = _optimizer(grid)
+    seen: list[dict] = []
+
+    class BoundedSolver(ScrubBotsSolver):
+        def __init__(self) -> None:
+            pass
+
+        def run(self, level, candidates, **options):
+            seen.append(dict(options))
+            return fake.run(level, candidates, **options)
+
+    optimizer.solver = BoundedSolver()
+    clock = Clock(3_000_000.0)
+    monkeypatch.setattr(supply_optimizer.time, "time", clock.time)
+    result = optimizer.run_grid(grid, used, seed=3, candidates=60, level_id="alt_test", metric_top=12,
+                                real_max_visited=25_000, progress=None, real_timeout_seconds=900,
+                                max_native_solver_invocations=1, wall_deadline=clock.now + 60,
+                                real_play_precheck=lambda *_args: {"won": True, "verdict": "WON_CANONICAL"})
+    analysis = [options for options in seen if options.get("analyze")]
+    assert analysis
+    assert analysis[0]["timeout"] == min(900, 60 + supply_optimizer.ANALYSIS_GRACE_SECONDS)
+    assert result["difficulty_basis"].startswith("ScrubBots Difficulty V1")
