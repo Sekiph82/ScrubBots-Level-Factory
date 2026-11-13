@@ -320,3 +320,11 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Time (screening + scoring, machine busy with the 6-worker batch): LF-000410 22 s -> 10 s;
   LF-000408 107 s total vs 616 s screening in the real run.
 - Supply/screening/scorer/optimizer/r09/campaign unit subset: 203 passed, 10 skipped.
+- 17:20–18:17 local: b1075c4e deployed (backup pre-b1075c4e). Owner asked to bring in the PixelLab images made in the last
+  hour. Read-only PixelLab MCP (Studio credential, never printed): list_images showed 4 new 2026-11-13 gallery sheets
+  (1794578452172 cleaning liquids, 1794578538889 and 1794578714320 demon slayer characters, 1794578858079 football players),
+  each 224x224 4x4. Downloaded with the Studio's own validated sheet fetch (no generation, no paid call), imported with the
+  installed `pixellab-pro-4x4-import` operation: 4 x 16/16 PASS and imported (PX-ATLAS-000091..094, Final 1424 -> 1488).
+  Studio restart took 909 s (restore-imported-sources 575 s for the first validation of 64 new PNGs). LEVEL FACTORY showed
+  "Run Pending Batch (1013)" = 949 remaining + 64 new; pressed at 18:10; plan creation ~6.5 min; new job
+  png-batch-ab2918ae (1013 items, runtime ec1e57a7) RUNNING at 18:17 with 6 workers.
