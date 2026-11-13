@@ -298,3 +298,7 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   Calls are idempotent (no new .history events after 15:41), only slow. record_batch_outcomes now skips items whose
   owner_release_projection is RECORDED with the same status. Regression failed on the old code, passes now;
   owner-release/batch subset 156 passed.
+- Old launcher finished its re-projection at 16:02:42 (25 min after Stop). Studio closed with CloseMainWindow, c2d547dd
+  deployed (backup `Release\.claude-deploy-backup-20261112\pre-c2d547dd`), relaunched via the Desktop LNK
+  (STARTUP_READY 195 s), Resume pressed at 16:06. First finishes LF-000403/404/405 READY within 5 min; job item
+  release_pool 344 bytes; Batch Issues on screen: 5 RUNNING rows first, then READY LF-000403/405/404, no stale Pending.
