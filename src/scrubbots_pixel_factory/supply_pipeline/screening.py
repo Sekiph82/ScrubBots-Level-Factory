@@ -13,10 +13,16 @@ Mirrored rules (from the game source, see godot/solver_bridge.gd for the real th
   - a batch frees its slot when its last robot's clear lands;
   - SOLVED = board clear, slots empty, supply exhausted.
 """
+from bisect import bisect_left, insort
+
 import numpy as np
 
 
 class ScreeningSimulator:
+    """State arrays are bytearrays; per colour the reachable ACTIVE cells are kept as a
+    sorted list of TargetSelector ranks, updated as cells clear and open (2026-11-13:
+    the old per-lane numpy scan of every cell of a colour was 93% of screening time)."""
+
     def __init__(self, grid, slot_count=5):
         """grid: (h, w) int array of local color index, -1 = transparent (starts open)."""
         g = np.asarray(grid, dtype=np.int16)
@@ -31,6 +37,12 @@ class ScreeningSimulator:
         # per color: cell indices in TargetSelector priority order
         self.by_color = [np.flatnonzero(self.color == c)[np.argsort(key[self.color == c], kind="stable")]
                          for c in range(self.ncolors)]
+        self.cells_of = [[int(cell) for cell in cells] for cells in self.by_color]
+        self.colors = [int(c) for c in self.color]
+        self.rank = [0] * self.n
+        for cells in self.cells_of:
+            for r, cell in enumerate(cells):
+                self.rank[cell] = r
         self.nbrs = []
         for i in range(self.n):
             y, x = divmod(i, w)
@@ -42,19 +54,25 @@ class ScreeningSimulator:
     # ------------------------------------------------------------------ state --
     def initial(self, columns):
         """columns: 3 lists of (color, count). Returns a quiescent state dict."""
-        active = (self.color >= 0).astype(np.uint8)
-        opened = np.zeros(self.n, np.uint8)
-        reach = (active.astype(bool) & self.border).astype(np.uint8)
-        for i in np.flatnonzero((active == 0) & self.border):  # transparent edge -> open region
+        active = bytearray(1 if c >= 0 else 0 for c in self.colors)
+        opened = bytearray(self.n)
+        reach = bytearray(self.n)
+        elig = [[] for _ in range(self.ncolors)]
+        for i in np.flatnonzero((self.color >= 0) & self.border):
+            i = int(i)
+            reach[i] = 1
+            insort(elig[self.colors[i]], self.rank[i])
+        for i in np.flatnonzero((self.color < 0) & self.border):  # transparent edge -> open region
             if not opened[i]:
-                self._open(active, opened, reach, int(i))
-        st = {"active": active, "open": opened, "reach": reach, "ptr": [0] * len(columns),
-              "slots": [None] * self.slot_count, "seq": 1, "cols": columns, "left": int(active.sum())}
+                self._open(active, opened, reach, int(i), elig)
+        st = {"active": active, "open": opened, "reach": reach, "elig": elig, "ptr": [0] * len(columns),
+              "slots": [None] * self.slot_count, "seq": 1, "cols": columns, "left": sum(active)}
         self.quiesce(st)
         return st
 
     def copy(self, st):
-        return {"active": st["active"].copy(), "open": st["open"].copy(), "reach": st["reach"].copy(),
+        return {"active": st["active"][:], "open": st["open"][:], "reach": st["reach"][:],
+                "elig": [lst[:] for lst in st["elig"]],
                 "ptr": list(st["ptr"]), "slots": list(st["slots"]), "seq": st["seq"], "cols": st["cols"],
                 "left": st["left"]}
 
@@ -62,16 +80,20 @@ class ScreeningSimulator:
         occ = sorted((s[2], i) for i, s in enumerate(st["slots"]) if s)
         rank = {seq: r for r, (seq, _) in enumerate(occ)}
         slots = tuple(None if s is None else (s[0], s[1], rank[s[2]]) for s in st["slots"])
-        return st["active"].tobytes(), tuple(st["ptr"]), slots
+        return bytes(st["active"]), tuple(st["ptr"]), slots
 
-    def _open(self, active, opened, reach, start):
+    def _open(self, active, opened, reach, start, elig=None):
+        nbrs, colors, rank = self.nbrs, self.colors, self.rank
         opened[start] = 1
         stack = [start]
         while stack:
             c = stack.pop()
-            for nb in self.nbrs[c]:
+            for nb in nbrs[c]:
                 if active[nb]:
-                    reach[nb] = 1
+                    if not reach[nb]:
+                        reach[nb] = 1
+                        if elig is not None:
+                            insort(elig[colors[nb]], rank[nb])
                 elif not opened[nb]:
                     opened[nb] = 1
                     stack.append(nb)
@@ -92,7 +114,8 @@ class ScreeningSimulator:
         return self.quiesce(st)
 
     def quiesce(self, st):
-        active, reach, slots = st["active"], st["reach"], st["slots"]
+        active, reach, opened, elig, slots = st["active"], st["reach"], st["open"], st["elig"], st["slots"]
+        cells_of, colors, rank = self.cells_of, self.colors, self.rank
         clears = 0
         while True:
             lanes = sorted((s[2], i) for i, s in enumerate(slots) if s and s[1] > 0)
@@ -100,18 +123,18 @@ class ScreeningSimulator:
             taken = {}
             for _, i in lanes:
                 c = slots[i][0]
-                cells = self.by_color[c]
-                ok = np.flatnonzero(active[cells] & reach[cells])
                 k = taken.get(c, 0)
-                if k < len(ok):
-                    claims.append((i, int(cells[ok[k]])))
+                if k < len(elig[c]):
+                    claims.append((i, cells_of[c][elig[c][k]]))
                     taken[c] = k + 1
             if not claims:
                 return clears
             for i, cell in claims:
                 active[cell] = 0
                 reach[cell] = 0
-                self._open(active, st["open"], reach, cell)
+                lst = elig[colors[cell]]
+                del lst[bisect_left(lst, rank[cell])]
+                self._open(active, opened, reach, cell, elig)
                 color, rem, seq = slots[i]
                 slots[i] = (color, rem - 1, seq) if rem > 1 else None
             clears += len(claims)

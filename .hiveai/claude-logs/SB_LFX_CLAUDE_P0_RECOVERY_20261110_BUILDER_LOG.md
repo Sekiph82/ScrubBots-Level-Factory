@@ -302,3 +302,21 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   deployed (backup `Release\.claude-deploy-backup-20261112\pre-c2d547dd`), relaunched via the Desktop LNK
   (STARTUP_READY 195 s), Resume pressed at 16:06. First finishes LF-000403/404/405 READY within 5 min; job item
   release_pool 344 bytes; Batch Issues on screen: 5 RUNNING rows first, then READY LF-000403/405/404, no stale Pending.
+
+## 2026-11-13 ~17:00–17:45 local — Factory screening 5–9x faster, identical plans (owner: "Yes, speed it up")
+
+- Batch on ec1e57a7 (39 PNGs): median 4.2 min; screening median 61 s but 3–10 min on hard images
+  (LF-000408 56x56 VERY_HARD: 384 attempts, 616 s in the real run).
+- Benchmark `screen_bench.py` (scratchpad) reproduces SupplyOptimizer screening + scoring exactly
+  (best scores equal the real activity log for LF-000410 and LF-000408).
+- cProfile LF-000408: 933 of 1007 s in ScreeningSimulator.quiesce; 55 M small numpy calls (per lane per wave a scan of
+  every cell of that colour for active & reachable).
+- Rewrite: state arrays are bytearrays; per colour the reachable ACTIVE cells are a sorted list of TargetSelector ranks,
+  updated when a cell clears (remove) or becomes reachable (insort). Same claim order, same quiescence.
+- Identical: frozen previous class `tests/unit/_screening_reference_v1.py`; `test_claude_screening_identical.py`
+  compares solve/replay/peel/key on 80 random boards (72 SOLVED / 7 BOUND / 1 DEADLOCK) plus a forced DEADLOCK case;
+  a deliberate target-order change made 49 of them fail. Real levels: pool+scores digest identical
+  (LF-000410 60975357…, LF-000408 3a1c6c24…).
+- Time (screening + scoring, machine busy with the 6-worker batch): LF-000410 22 s -> 10 s;
+  LF-000408 107 s total vs 616 s screening in the real run.
+- Supply/screening/scorer/optimizer/r09/campaign unit subset: 203 passed, 10 skipped.
