@@ -227,3 +227,12 @@ Owner chose option A from the game investigation (job 155): a level ships only i
 - Fix: `_apply_batch_progress_result` re-reads the archive whenever the batch finished total (ready+failed+rejected+skipped) changes; loaded flag kept, old view stays until the new read lands.
 - Regression in `factory_studio_gallery_follows_active_source_suite.gd`; watched fail on unfixed code ("a PNG finished during the batch but the Release Pool was not re-read"), then PASS. Related Godot suites PASS (monitor, activity, pinned authority, pixel cards, r05 loaded batch, batch UI binding, batch CSV). Python UI tests 164 passed.
 - 30-PNG measurement on installed c8c32430: 26 READY / 4 FAILED (PNG_TIME_LIMIT after a won plan), READY median 17.6 min, analysis median 594 s, 94/94 kernel replay SOLVED, 14.1 READY/h. Not yet installed: a9778a46, f08dcae1, this fix.
+
+## 2026-11-13 — LEVEL FACTORY screen defects (Claude)
+
+Seen in the installed app (d31ad0ab) during the running batch, all fixed in `factory_studio_exact_ui.gd`:
+- Retry/Accept/Reject overlapped the Batch Issues heading and tabs: the Studio opens on PIXEL ART with these buttons hidden, so the panel kept its unscaled default top; `_show_screen` now lays the panel out again.
+- Run button "61/1256", Details "56/1256", activity "Starting next verified PNG": one shared `N/total done` text (`_batch_progress_text`); with parallel workers (no current_index) the activity header names the followed PNG; P/R/F/X no longer repeated in the activity header (counter shows them).
+- Preview Replay / Supply Plan opened "Results unavailable … SOURCE_RUN_MISMATCH" for a PNG without a READY result: now disabled with a tooltip.
+- Owner request: Batch Issues lists the PNGs being solved first, in filename order, marked RUNNING (no duplicate Pending row); refreshed when the running set changes.
+- Regressions in `factory_studio_gallery_follows_active_source_suite.gd`; all new checks watched fail against d31ad0ab, then PASS. 18 related Godot suites PASS; `profile_derivation` suite not run (missing game analyzer file in the isolated copy, unrelated). Python UI tests 164 passed.

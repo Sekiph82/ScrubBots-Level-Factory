@@ -1175,6 +1175,28 @@ func _refresh_owner_release_library_panel() -> void:
 			known_sources[source_id] = true
 			counts[status] += 1
 	var total := records.size()
+	# Owner request 2026-11-13: the PNGs being solved right now come first, in
+	# filename order, marked RUNNING; their Pending archive row is not repeated.
+	var running: Array = []
+	if _batch_job_matches_loaded_sources():
+		for item_variant in _batch_snapshot.get("items", []):
+			if item_variant is Dictionary and str(item_variant.get("status", "")) == "RUNNING":
+				running.append(item_variant)
+	running.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return str(a.get("original_filename", "")) < str(b.get("original_filename", "")))
+	var running_ids := {}
+	var running_rows: Array = []
+	for item in running:
+		var running_id := str(item.get("source_id", ""))
+		running_ids[running_id] = true
+		running_rows.append({"source_id": running_id, "source_sha256": item.get("source_sha256", ""),
+			"original_source_path": str(item.get("original_filename", running_id)), "status": "RUNNING",
+			"reason": "Solving now · %d columns" % int(item.get("column_count", 0)), "pipeline_run_id": item.get("run_id", ""),
+			"evidence": {"solution": {"state": "RUNNING"}, "plan": {"state": "RUNNING"}}})
+	var listed: Array = running_rows.duplicate()
+	for record in records:
+		if not str(record.get("source_id", "")) in running_ids:
+			listed.append(record)
+	records = listed
 	var title := _batch_issue_panel.get_node_or_null("VBoxContainer/BatchIssuesHeading") as Label
 	if title != null:
 		title.text = "PIXELLAB FINAL + RELEASE POOL · %d" % total if _startup_source_inventory_loaded else "PIXELLAB FINAL + RELEASE POOL · checking…"
@@ -1203,6 +1225,7 @@ func _refresh_owner_release_library_panel() -> void:
 		if _batch_issue_filter != "ALL" and state != _batch_issue_filter:
 			continue
 		var path := str(item.get("original_source_path", ""))
+		var is_running := state == "RUNNING"
 		var filename := path.get_file() if not path.is_empty() else str(item.get("source_id", "source"))
 		var reason := str(item.get("reason", ""))
 		var digest := str(item.get("source_sha256", "NOT_AVAILABLE"))
@@ -1217,7 +1240,7 @@ func _refresh_owner_release_library_panel() -> void:
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", 10)
 		button.add_theme_color_override("font_color", Color("#dce8f8"))
-		button.add_theme_stylebox_override("normal", _control_style(Color("#17243a"), Color("#30415e")))
+		button.add_theme_stylebox_override("normal", _control_style(Color("#173a5a") if is_running else Color("#17243a"), Color("#4f86b8") if is_running else Color("#30415e")))
 		button.add_theme_stylebox_override("hover", _control_style(Color("#233651"), Color("#6b8bb9")))
 		button.pressed.connect(_select_owner_archive_record.bind(item.duplicate(true)))
 		_batch_issue_rows.add_child(button)
@@ -1790,7 +1813,7 @@ func _refresh_live_data() -> void:
 			columns = int(_batch_follow_item.get("column_count", 0))
 			pool_status = str(item_release.get("disposition", "NOT ENTERED" if batch_item_state == "READY" else "—"))
 			# The P/R/F/X totals moved to the counter under Run Pipeline (owner 2026-11-13).
-			batch_caption = "%d/%d · %s" % [int(_batch_follow_item.get("index", 0)) + 1, int(_batch_snapshot.get("counts", {}).get("total", 0)), batch_item_state if not batch_item_state.is_empty() else "RUNNING"]
+			batch_caption = _batch_progress_text()
 		var facts := [
 			"Level %s   |   Columns %s" % ["Auto" if not _manual_level_override else str(_level_number), str(columns) if columns > 0 else "—"],
 			"Background %s   |   Pipeline %s" % [_background_intent, pipeline_state.left(11)],
@@ -1806,6 +1829,14 @@ func _refresh_live_data() -> void:
 				var full_sha := str(_batch_follow_item.get("source_sha256", "")) if batch_following else str(_selected_import_source_id.trim_prefix("owner-upload-"))
 				row.tooltip_text += "\nCurrent Final inventory: %d · Pending: %d · READY: %d · FAILED: %d · REJECTED: %d · untracked: %d" % [int(release_counts.get("total", 0)), int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0)), int(release_counts.get("untracked", 0))]
 				row.tooltip_text += "\nSource SHA-256: %s · Job: %s · Batch: %s · Run: %s" % [full_sha, _batch_job_id if not _batch_job_id.is_empty() else "none", _batch_import_id if not _batch_import_id.is_empty() else "none", str(_batch_follow_item.get("run_id", "none")) if batch_following else "none"]
+		# Replay/Supply Plan exist only for a READY run of the selected PNG; while it is
+		# running, pending or failed the buttons opened "Results unavailable" (2026-11-13).
+		var has_ready_run := not _pipeline_primary_for_selected_source().is_empty()
+		for result_button_name in ["PreviewReplay", "ExpandSupplyPlan"]:
+			var result_button := get_node_or_null(result_button_name) as Button
+			if result_button != null:
+				result_button.disabled = not has_ready_run
+				result_button.tooltip_text = "" if has_ready_run else "Available when the selected PNG has a READY result."
 		if _results_panel != null:
 			_results_panel.visible = not _results_mode.is_empty()
 	else:
@@ -1877,9 +1908,8 @@ func _refresh_run_button_caption() -> void:
 	elif _operation_running and not _batch_job_id.is_empty():
 		var counts_value: Variant = _batch_snapshot.get("counts", {})
 		var counts: Dictionary = counts_value if counts_value is Dictionary else {}
-		var completed := int(counts.get("ready", 0)) + int(counts.get("failed", 0)) + int(counts.get("rejected", 0)) + int(counts.get("skipped", 0))
 		var running := _batch_running_count()
-		button.text = ("Running %d/%d" % [completed + maxi(running, 1 if _batch_snapshot.get("current_index") != null else 0), int(counts.get("total", pending_count))]) + (" · %d parallel" % running if running > 1 else "")
+		button.text = "Running · " + _batch_progress_text() + (" · %d parallel" % running if running > 1 else "")
 		button.disabled = true
 	elif batch_mode:
 		var state := str(_batch_snapshot.get("state", ""))
@@ -2649,6 +2679,9 @@ func _update_master_control_visibility() -> void:
 		_pixel_art_activity_table.visible = _screen == "PIXEL ART"
 	if _release_status_counter != null:
 		_release_status_counter.visible = _screen == "LEVEL FACTORY"
+	# The Studio opens on PIXEL ART with these buttons hidden; place Batch Issues
+	# again now that LEVEL FACTORY shows them (overlap seen 2026-11-13).
+	_layout_batch_issue_panel()
 	_refresh_selected_size_value()
 	if _screen == "PIXEL ART":
 		var generate := get_node_or_null("GeneratePixelArt") as Button
@@ -4186,9 +4219,20 @@ func _apply_batch_progress_result(verified: Dictionary, expected_job_id: String)
 	# loaded flag set; the old view stays on screen until the new read lands.
 	if _batch_finished_total(previous_snapshot) != _batch_finished_total(_batch_snapshot) and _owner_release_archive_loaded:
 		_queue_studio_read_extension("owner-release-library", {}, {"kind": "owner-release-library", "token": str(Time.get_ticks_usec())})
+	elif _batch_running_ids(previous_snapshot) != _batch_running_ids(_batch_snapshot):
+		# The running rows at the top of Batch Issues changed.
+		_refresh_batch_issue_panel()
 	_refresh_activity_header()
 	_refresh_live_data()
 	_refresh_run_button_caption()
+
+
+func _batch_running_ids(job: Dictionary) -> Array[String]:
+	var ids: Array[String] = []
+	for item in job.get("items", []):
+		if item is Dictionary and str(item.get("status", "")) == "RUNNING":
+			ids.append(str(item.get("source_id", "")))
+	return ids
 
 
 func _batch_finished_total(job: Dictionary) -> int:
@@ -4752,6 +4796,13 @@ func _fail_activity_monitor(reason: String) -> void:
 
 
 ## PNG batch items solving at the same time (parallel workers, 2026-11-12).
+func _batch_progress_text() -> String:
+	# One progress number for the Run button, Details and Pipeline Activity.
+	var counts_value: Variant = _batch_snapshot.get("counts", {})
+	var counts: Dictionary = counts_value if counts_value is Dictionary else {}
+	return "%d/%d done" % [_batch_finished_total(_batch_snapshot), int(counts.get("total", 0))]
+
+
 func _batch_running_count() -> int:
 	var running := 0
 	for item in _batch_snapshot.get("items", []):
@@ -4771,21 +4822,23 @@ func _refresh_activity_header() -> void:
 		var job_state := str(_batch_snapshot.get("state", ""))
 		var activity_state := job_state if job_state in ["PAUSED", "INTERRUPTED", "STOPPED"] else "RUNNING"
 		var current_caption := "Starting next verified PNG"
-		var phase_caption := "Canonical pipeline"
+		var current: Dictionary = {}
 		if current_index is int and current_index >= 0 and current_index < items.size() and items[current_index] is Dictionary:
-			var current: Dictionary = items[current_index]
+			current = items[current_index]
+		elif not _batch_follow_item.is_empty():
+			# Parallel workers leave current_index null; show the followed PNG.
+			current = _batch_follow_item
+		if not current.is_empty():
 			var current_name := str(current.get("original_filename", current.get("display_name", "Selected PNG")))
-			var current_status := str(current.get("status", "QUEUED"))
-			current_caption = "%s · %s · %d columns" % [current_name.left(20), current_status, int(current.get("column_count", 0))]
-			phase_caption = "%s · %s · %d columns" % [current_name.left(20), current_status, int(current.get("column_count", 0))]
+			current_caption = "%s · %s · %d columns" % [current_name.left(20), str(current.get("status", "QUEUED")), int(current.get("column_count", 0))]
 		_activity_state_label.text = activity_state
 		var activity_color := Color("#245478") if activity_state == "RUNNING" else Color("#7a5824") if activity_state in ["PAUSED", "STOPPED"] else Color("#743d3c")
 		_activity_state_chip.add_theme_stylebox_override("panel", _control_style(activity_color, activity_color.lightened(0.22)))
 		var parallel_running := _batch_running_count()
-		_activity_source_label.text = ("%s · %d/%d" % [current_caption, int(counts.get("total", 0)) - int(counts.get("remaining", 0)) + maxi(parallel_running, 1 if current_index is int else 0), int(counts.get("total", 0))]) + (" · %d parallel" % parallel_running if parallel_running > 1 else "")
-		var release_counts := _current_release_status_counts()
+		_activity_source_label.text = current_caption
 		_activity_source_label.tooltip_text = "Sequential batch %s · current PNG: %s · source SHA-256: %s · run: %s" % [_batch_job_id, str(_batch_follow_item.get("original_filename", _batch_follow_item.get("display_name", ""))), str(_batch_follow_item.get("source_sha256", "")), str(_batch_follow_item.get("run_id", "none"))]
-		_activity_phase_label.text = "%s · P%d R%d F%d X%d" % [phase_caption, int(release_counts.get("PENDING", 0)), int(release_counts.get("READY", 0)), int(release_counts.get("FAILED", 0)), int(release_counts.get("REJECTED", 0))]
+		# P/R/F/X live in the counter under Run Pipeline; do not repeat them here.
+		_activity_phase_label.text = _batch_progress_text() + (" · %d parallel" % parallel_running if parallel_running > 1 else "")
 		_activity_phase_label.tooltip_text = "%s · job=%s · item=%s/%s · job counts READY=%d FAILED=%d REJECTED=%d remaining=%d · activity=%s" % [_activity_message, _batch_job_id, str(current_index if current_index is int else "—"), str(items.size()), int(counts.get("ready", 0)), int(counts.get("failed", 0)), int(counts.get("rejected", 0)), int(counts.get("remaining", 0)), str(_batch_follow_item.get("activity_run_id", ""))]
 		return
 	var activity_matches_selection := folder_activity_active or _activity_source_id.is_empty() or _activity_source_id == _selected_import_source_id

@@ -74,7 +74,49 @@ func _run_suite() -> void:
 	ui.set("_batch_snapshot", job.duplicate(true))
 	ui.call("_refresh_run_button_caption")
 	var caption := (ui.get_node("RunLevelPipeline") as Button).text
-	_check(caption == "Running 5/8 · 2 parallel", "parallel run caption is wrong: %s" % caption)
+	_check(caption == "Running · 3/8 done · 2 parallel", "parallel run caption is wrong: %s" % caption)
+
+	# Owner screen 2026-11-13: with parallel workers the job has no current_index.
+	# The button said 61/1256, Details 56/1256, and the activity header stayed on
+	# "Starting next verified PNG". One progress number everywhere, and the header
+	# names the followed PNG.
+	job["current_index"] = null
+	ui.set("_batch_snapshot", job.duplicate(true))
+	ui.set("_owner_release_archive_loaded", true)
+	ui.call("_sync_verified_batch_follow", job)
+	ui.call("_refresh_run_button_caption")
+	ui.call("_refresh_activity_header")
+	ui.call("_refresh_live_data")
+	var activity_source := (ui.get("_activity_source_label") as Label).text
+	var activity_phase := (ui.get("_activity_phase_label") as Label).text
+	_check(not activity_source.contains("Starting next"), "activity header is stuck on 'Starting next' while PNGs run: %s" % activity_source)
+	_check(activity_source.contains("LF-000008"), "activity header does not name the followed PNG: %s" % activity_source)
+	_check(activity_phase.contains("3/8 done") and not activity_phase.contains(" P"), "activity progress is not the shared done count or repeats P/R/F/X: %s" % activity_phase)
+	var details_texts: Array[String] = []
+	for row in ui.get("_details_rows"):
+		details_texts.append((row as Label).text)
+	# A RUNNING PNG has no result yet: Preview Replay / Supply Plan must not open
+	# a "Results unavailable" error panel.
+	_check((ui.get_node("PreviewReplay") as Button).disabled and (ui.get_node("ExpandSupplyPlan") as Button).disabled,
+		"Preview Replay / Supply Plan are clickable for a PNG without a READY result")
+	_check(details_texts.any(func(text: String) -> bool: return text.contains("Batch 3/8 done")), "Details batch progress differs from the button: %s" % [details_texts])
+
+	# Owner request 2026-11-13: Batch Issues lists the PNGs being solved first, in
+	# filename order (LF-000008, LF-000009), without repeating their Pending row.
+	var archive_records: Array = []
+	for source in sources:
+		archive_records.append({"source_id": source["source_id"], "source_sha256": source["source_sha256"], "provider": "PIXELLAB",
+			"status": "PENDING", "original_source_path": "C:/final/" + str(source["display_filename"])})
+	ui.set("_owner_release_archive", {"records": archive_records})
+	ui.set("_batch_issue_filter", "ALL")
+	ui.call("_refresh_batch_issue_panel")
+	var issue_texts: Array[String] = []
+	for child in (ui.get("_batch_issue_rows") as Node).get_children():
+		if child is Button and not child.is_queued_for_deletion():
+			issue_texts.append((child as Button).text)
+	_check(issue_texts.size() >= 2 and issue_texts[0].begins_with("RUNNING · LF-000008") and issue_texts[1].begins_with("RUNNING · LF-000009"),
+		"running PNGs are not listed first in filename order: %s" % [issue_texts.slice(0, 3)])
+	_check(issue_texts.filter(func(text: String) -> bool: return text.contains("LF-000008")).size() == 1, "running PNG is listed twice")
 
 	# Selecting a thumbnail by hand must also centre the window on that PNG.
 	ui.set("_operation_running", false)
@@ -106,7 +148,7 @@ func _run_suite() -> void:
 	ui.call("_apply_batch_progress_result", {"disposition": "MATCHED", "job": progressed}, "job-retry")
 	ui.call("_refresh_run_button_caption")
 	var retry_caption := (ui.get_node("RunLevelPipeline") as Button).text
-	_check(retry_caption == "Running 3/3 · 3 parallel", "dispatched retry progress was not followed: %s" % retry_caption)
+	_check(retry_caption == "Running · 0/3 done · 3 parallel", "dispatched retry progress was not followed: %s" % retry_caption)
 	_check(not bool(ui.get("_batch_job_source_mismatch")), "dispatched retry progress was treated as a lineage mismatch")
 
 	# 2026-11-13: the status counter showed 180 R / 2 F while the Release Pool held
@@ -145,6 +187,17 @@ func _run_suite() -> void:
 	_check(counter.visible and RegEx.create_from_string("^\\d+ P / \\d+ R / \\d+ F / \\d+ X$").search(counter.text) != null,
 		"status counter is missing or malformed: visible=%s text=%s" % [counter.visible, counter.text])
 	_check(counter.position.y > run_button.position.y + run_button.size.y, "status counter is not under Run Pipeline")
+	# Owner screen 2026-11-13: the Studio opens on PIXEL ART, where these buttons
+	# are hidden, so Batch Issues kept its unscaled default top. Opening LEVEL
+	# FACTORY on a large window put Retry/Accept/Reject over its heading and tabs.
+	ui.call("_show_screen", "PIXEL ART")
+	ui.size = Vector2(1920, 1130)
+	ui.call("_apply_responsive_layout")
+	ui.call("_show_screen", "LEVEL FACTORY")
+	var issues_top := (ui.get_node("RuntimeDetailsPanel/BatchIssuesPanel") as Control).get_global_rect().position.y
+	for name in ["SolveAgain", "AcceptLevel", "RejectLevel"]:
+		var rect := (ui.get_node(name) as Control).get_global_rect()
+		_check(issues_top >= rect.end.y, "%s overlaps Batch Issues: button bottom %.0f, panel top %.0f" % [name, rect.end.y, issues_top])
 	ui.call("_show_screen", "PIXEL ART")
 	_check(not counter.visible, "status counter leaked onto PIXEL ART")
 
