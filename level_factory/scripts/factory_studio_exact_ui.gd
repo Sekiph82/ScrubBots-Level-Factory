@@ -235,7 +235,7 @@ var _activity_backend_disposition := ""
 var _activity_event_backend_disposition := ""
 var _activity_integrity_error := ""
 const _PINNED_002_SOURCE_ID := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-const _PINNED_GAME_COMMIT := "6534537ceb4c71c63286614b74e4801145d5fb4d"
+const _PINNED_GAME_COMMIT := "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
 var _pinned_source_preflight_ok := false
 var _pinned_source_preflight_message := "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
 

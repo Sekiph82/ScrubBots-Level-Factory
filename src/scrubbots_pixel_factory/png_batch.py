@@ -25,7 +25,9 @@ from typing import Any
 
 JOB_SCHEMA = "scrubbots-studio-png-sequential-batch"
 JOB_VERSION = 1
-MAX_JOB_BYTES = 1024 * 1024
+# 2026-11-13: a READY item carries ~2 KB of proof refs; the owner's 1256-PNG batch
+# hit the old 1 MiB cap at 211 READY and the coordinator stopped. 8 MiB fits ~3500 items.
+MAX_JOB_BYTES = 8 * 1024 * 1024
 _PROCESS_LOCKS: dict[str, threading.Lock] = {}
 _PROCESS_LOCKS_GUARD = threading.Lock()
 
@@ -143,7 +145,7 @@ def _read_job(job_id: str) -> dict[str, Any]:
     path = _job_path(job_id)
     raw = path.read_bytes()
     if len(raw) > MAX_JOB_BYTES:
-        raise ValueError("PNG batch job exceeds the bounded one-megabyte state limit")
+        raise ValueError("PNG batch job exceeds the bounded 8 MiB state limit")
     value = json.loads(raw.decode("utf-8"))
     if not isinstance(value, dict) or value.get("schema") != JOB_SCHEMA or value.get("version") != JOB_VERSION or value.get("job_id") != job_id:
         raise ValueError("PNG batch job schema or identity is invalid")
@@ -159,7 +161,7 @@ def _write_job(payload: Mapping[str, Any]) -> dict[str, Any]:
     sealed = _seal(payload)
     raw = _canonical(sealed)
     if len(raw) > MAX_JOB_BYTES:
-        raise ValueError("PNG batch job exceeds the bounded one-megabyte state limit")
+        raise ValueError("PNG batch job exceeds the bounded 8 MiB state limit")
     path = _job_path(str(sealed.get("job_id", "")))
     path.parent.mkdir(parents=True, exist_ok=True)
     write_path = path.with_name(path.name + f".{uuid.uuid4().hex}.part")

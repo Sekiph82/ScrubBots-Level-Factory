@@ -250,3 +250,27 @@ Seen in the installed app (d31ad0ab) during the running batch, all fixed in `fac
 - Installed 10e429df; owner approved resume 12:43 local. 21 PNGs finished 12:43–13:03: 21 READY / 0 FAILED.
 - READY median 4.3 min (was 17.6 min on dd54007a); stages median: screening 58 s, official analysis 58 s (was 594 s), tail 57 s. 49/49 kernel replays SOLVED, 0 native searches.
 - ~63 READY/h with 6 workers (was 14.1/h); CPU ~50 %, frequency ~71 %, free RAM 3.1–4.3 GB.
+
+## 2026-11-13 15:15–15:45 local — batch stall at 211 READY; re-pin to game ec1e57a7
+
+**Studio check.** Batch job `png-batch-6cc4887a…` stood at 211 READY / 5 FAILED / 6 RUNNING / 1034 QUEUED.
+The job file was last written 14:47:01 and was 1,048,170 bytes. All six RUNNING PNGs (LF-000379..384)
+logged "Backend pipeline completed with disposition READY" between 14:47:31 and 14:51:04, but the job never
+recorded them. The Studio kept polling `batch-latest` until it closed at 15:14:38 (no error in godot.log).
+
+**Root cause.** `png_batch.MAX_JOB_BYTES = 1 MiB`. A READY item carries ~2 KB of proof refs
+(artifact_refs, release_pool). The first finish after 14:47:01 made `_write_job` exceed the cap; it raised
+`ValueError("PNG batch job exceeds the bounded one-megabyte state limit")` inside the coordinator, which
+stopped the whole batch. A full 1256-item batch needs ~3 MB.
+
+**Fix.** Cap raised to 8 MiB (~3500 items). Regression `tests/unit/test_claude_png_batch_job_size.py` writes
+and reads back a 1256-READY-item job; it failed on the old cap and passes now. Existing batch suite: 25/25.
+On resume, `_recover_attempt` marks the six finished PNGs READY from their complete canonical runs.
+
+**Re-pin to game ec1e57a7** (job 157: faster route-length measurement, byte-identical output, game CI green).
+- Runtime built read-only: tree c986e5b5, 283 files, 2,547,273 bytes, attestation sha256 f351d37c….
+- Registry entry added; PINNED_MAIN_SHA, UI const and 3 Godot suites set to ec1e57a7; 6534537c kept for old runs.
+- Probe on read-only copies: LF-000147 and LF-000148 Difficulty V1 JSON identical to the saved results
+  (52.1888 / 43.8423); full solve plus official analysis 20 s each (6534537c: 35–37 s).
+- Pin unit tests 8 passed / 4 skipped (pre-existing missing 002 source). Godot suites PASS: r05_r05 loaded batch UI,
+  r09_r02_r02 pinned authority, r09_r02_r04_r03 batch UI binding, gallery follows active source.

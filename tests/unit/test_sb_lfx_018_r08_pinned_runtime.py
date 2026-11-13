@@ -36,7 +36,7 @@ def test_pinned_runtime_is_hash_bound_and_not_full_game_or_publish_authority() -
     assert manifest["source_commit"] == pinned_game_source.PINNED_MAIN_SHA
     # Owner re-pin 2026-11-12: new solves use dd54007a; every attested runtime stays verifiable.
     assert manifest["source_files_count"] == pinned_game_source.RUNTIME_SOURCE_FILES == 283
-    assert manifest["source_files_bytes"] == pinned_game_source.RUNTIME_SOURCE_BYTES == 2_540_029
+    assert manifest["source_files_bytes"] == pinned_game_source.RUNTIME_SOURCE_BYTES == 2_547_273
     for commit, expected in pinned_game_source.ATTESTED_RUNTIMES.items():
         historical = pinned_game_source.verify_attested_runtime(pinned_game_source.runtime_root(commit))
         assert historical["source_commit"] == commit and historical["source_files_count"] == expected["source_files"]

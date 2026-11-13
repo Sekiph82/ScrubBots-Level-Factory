@@ -9,8 +9,9 @@ from scrubbots_pixel_factory.supply_pipeline.void_capability import void_capabil
 
 OLD = "aef60a616d4ac401e9dfac15df6fe56e671c0053"
 MID = "dd54007abb59863bc753c1a029b9db227fb4f89f"
-# Owner re-pin 2026-11-13: game 6534537c (faster ProofKernel / Difficulty V1).
-NEW = "6534537ceb4c71c63286614b74e4801145d5fb4d"
+PREV = "6534537ceb4c71c63286614b74e4801145d5fb4d"
+# Owner re-pin 2026-11-13 afternoon: game ec1e57a7 (faster route-length measurement).
+NEW = "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
 
 
 def test_new_solves_use_dd54007a_and_old_runs_keep_their_runtime() -> None:
@@ -18,6 +19,7 @@ def test_new_solves_use_dd54007a_and_old_runs_keep_their_runtime() -> None:
     assert pins.expected_runtime_root().name == NEW
     assert pins.runtime_root_for_run({"authority": {"git_head": OLD}}).name == OLD
     assert pins.runtime_root_for_run({"authority": {"git_head": MID}}).name == MID
+    assert pins.runtime_root_for_run({"authority": {"git_head": PREV}}).name == PREV
     assert pins.runtime_root_for_run({"authority": {"git_head": NEW}}).name == NEW
     # A run without a recorded or known authority falls back to the current pin.
     assert pins.runtime_root_for_run({}).name == NEW

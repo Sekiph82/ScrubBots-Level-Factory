@@ -688,4 +688,4 @@ def test_304_item_fake_campaign_orchestration_only_is_sequential_and_bounded(tmp
     assert result["job"]["ready_mix"] == {"3": 137, "4": 122, "5": 45}
     saved = json.loads(png_batch._job_path(str(job["job_id"])).read_text(encoding="utf-8"))
     assert saved["state_digest"] == result["job"]["state_digest"]
-    assert png_batch.MAX_JOB_BYTES == 1024 * 1024
+    assert png_batch.MAX_JOB_BYTES == 8 * 1024 * 1024

@@ -50,8 +50,17 @@ ATTESTED_RUNTIMES: dict[str, dict[str, Any]] = {
         "source_bytes": 2_540_029,
         "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
     },
+    # Owner decision 2026-11-13 (afternoon): re-pin to game ec1e57a7 (job 157:
+    # faster route-length measurement in Difficulty V1, byte-identical output).
+    "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e": {
+        "tree_sha": "c986e5b572ec9c36e47c4898e167973c6fead354",
+        "attestation_sha256": "f351d37c3b96bdd5b79121f14029685b5e2c7a1b6ecc3146af1930d86ed3371e",
+        "source_files": 283,
+        "source_bytes": 2_547_273,
+        "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
+    },
 }
-PINNED_MAIN_SHA = "6534537ceb4c71c63286614b74e4801145d5fb4d"
+PINNED_MAIN_SHA = "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
 PINNED_TREE_SHA = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["tree_sha"]
 ATTESTATION_SHA256 = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["attestation_sha256"]
 RUNTIME_SOURCE_BYTES = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["source_bytes"]
