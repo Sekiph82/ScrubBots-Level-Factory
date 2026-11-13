@@ -117,6 +117,16 @@ func _run_suite() -> void:
 	_check(issue_texts.size() >= 2 and issue_texts[0].begins_with("RUNNING · LF-000008") and issue_texts[1].begins_with("RUNNING · LF-000009"),
 		"running PNGs are not listed first in filename order: %s" % [issue_texts.slice(0, 3)])
 	_check(issue_texts.filter(func(text: String) -> bool: return text.contains("LF-000008")).size() == 1, "running PNG is listed twice")
+	# A PNG that just finished must not show its stale Pending archive row while the
+	# Release Pool re-read is still on its way.
+	var finished_names: Array[String] = []
+	for batch_item in (ui.get("_batch_snapshot") as Dictionary).get("items", []):
+		if str(batch_item.get("status", "")) == "READY":
+			finished_names.append(str(batch_item.get("original_filename", "")).get_basename())
+	_check(not finished_names.is_empty(), "fixture has no READY batch item")
+	for finished_name in finished_names:
+		_check(issue_texts.any(func(text: String) -> bool: return text.begins_with("READY · " + finished_name)),
+			"%s finished READY but Batch Issues still shows: %s" % [finished_name, issue_texts.filter(func(text: String) -> bool: return text.contains(finished_name))])
 
 	# Selecting a thumbnail by hand must also centre the window on that PNG.
 	ui.set("_operation_running", false)

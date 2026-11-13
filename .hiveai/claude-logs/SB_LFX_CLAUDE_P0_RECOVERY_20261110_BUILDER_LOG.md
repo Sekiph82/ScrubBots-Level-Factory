@@ -286,3 +286,8 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   Regression `test_recovered_ready_item_keeps_only_the_release_pool_summary` failed on the old code, passes now.
 - Full Python unit suite on 9a622485: 2070 passed, 15 skipped (2026-11-07 cleanup evidence), 0 failed.
   Batch/pool subset after the summary change: 177 passed.
+- Seen on screen 15:37: a PNG that just finished left the RUNNING rows of Batch Issues and showed
+  "PENDING · Solver attempt started" for a few seconds until the Release Pool re-read landed (LF-000395, LF-000398;
+  both READY on disk). Batch Issues now shows the batch outcome for a Pending archive row whose loaded-batch item is
+  READY/FAILED/REJECTED. Gallery suite check failed on the old code (LF-000005..007 "PENDING"), passes now; 10 Godot
+  suites touching the batch/archive panel PASS.

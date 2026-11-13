@@ -1141,10 +1141,22 @@ func _refresh_owner_release_library_panel() -> void:
 	var records: Array = []
 	var known_sources := {}
 	var counts := {"PENDING": 0, "READY": 0, "FAILED": 0, "REJECTED": 0}
+	# A PNG that just finished leaves the RUNNING rows before the Release Pool
+	# re-read lands; show its batch outcome instead of the stale Pending row.
+	var batch_finished := {}
+	if _batch_job_matches_loaded_sources():
+		for batch_variant in _batch_snapshot.get("items", []):
+			if batch_variant is Dictionary and str(batch_variant.get("status", "")) in ["READY", "FAILED", "REJECTED"]:
+				batch_finished[str(batch_variant.get("source_id", ""))] = batch_variant
 	for item_variant in _owner_release_archive.get("records", []):
 		if not item_variant is Dictionary:
 			continue
 		var item: Dictionary = item_variant
+		if str(item.get("status", "")) == "PENDING" and batch_finished.has(str(item.get("source_id", ""))):
+			var finished: Dictionary = batch_finished[str(item.get("source_id", ""))]
+			item = item.duplicate(true)
+			item["status"] = str(finished.get("status", ""))
+			item["reason"] = str(finished.get("reason", ""))
 		var source_id := str(item.get("source_id", ""))
 		var source_sha := str(item.get("source_sha256", ""))
 		if (str(item.get("provider", "")).to_upper() != "PIXELLAB"
