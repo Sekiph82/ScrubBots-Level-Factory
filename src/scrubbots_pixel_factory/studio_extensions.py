@@ -3228,10 +3228,24 @@ def _mcp_http_request(
         headers=headers,
         method="POST",
     )
+    # 2026-11-14 11:07: batch row 22/100 stopped on one dropped connection while
+    # opening the MCP session (free, no submission), and the cause was not kept.
+    # Free requests are retried; the paid create_image_pro is never resent.
+    paid_submission = str(message.get("method", "")) == "tools/call" and _mcp_tool_name(message) == "create_image_pro"
+    attempts = 1 if paid_submission else 3
     try:
-        with urlopen(request, timeout=timeout) as response:
-            body = response.read(PRO_4X4_MCP_MAX_RESPONSE_BYTES + 1)
-            response_headers = dict(response.headers.items())
+        for attempt in range(attempts):
+            try:
+                with urlopen(request, timeout=timeout) as response:
+                    body = response.read(PRO_4X4_MCP_MAX_RESPONSE_BYTES + 1)
+                    response_headers = dict(response.headers.items())
+                break
+            except HTTPError:
+                raise
+            except (TimeoutError, URLError):
+                if attempt == attempts - 1:
+                    raise
+                time.sleep(2.0 * (attempt + 1))
     except HTTPError as exc:
         messages = {
             401: "PixelLab rejected the configured MCP bearer token.",
@@ -3244,11 +3258,14 @@ def _mcp_http_request(
             messages.get(exc.code, f"PixelLab MCP returned HTTP {exc.code}."),
             http_status=exc.code,
         ) from None
-    except (TimeoutError, URLError):
-        method = str(message.get("method", ""))
-        code = "SUBMISSION_UNKNOWN" if method == "tools/call" and _mcp_tool_name(message) == "create_image_pro" else "MCP_NETWORK_ERROR"
-        text = ("PixelLab MCP create_image_pro submission outcome is unknown; check PixelLab before trying again."
-                if code == "SUBMISSION_UNKNOWN" else "Could not complete the PixelLab MCP request.")
+    except (TimeoutError, URLError) as exc:
+        code = "SUBMISSION_UNKNOWN" if paid_submission else "MCP_NETWORK_ERROR"
+        reason = exc.reason if isinstance(exc, URLError) else exc
+        detail = f"{type(reason).__name__}: {str(reason)[:160]}"
+        method = str(message.get("method", "")) + (f" {_mcp_tool_name(message)}" if _mcp_tool_name(message) else "")
+        text = (f"PixelLab MCP create_image_pro submission outcome is unknown ({detail}); check PixelLab before trying again."
+                if code == "SUBMISSION_UNKNOWN" else
+                f"Could not complete the PixelLab MCP request ({method}, {attempts} attempts): {detail}.")
         raise PixelLabProviderError(code, text) from None
     if len(body) > PRO_4X4_MCP_MAX_RESPONSE_BYTES:
         raise PixelLabProviderError("MCP_RESPONSE_TOO_LARGE", "PixelLab MCP response exceeded the local response limit.")

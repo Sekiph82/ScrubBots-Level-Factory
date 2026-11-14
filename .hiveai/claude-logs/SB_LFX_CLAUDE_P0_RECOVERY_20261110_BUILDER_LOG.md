@@ -382,3 +382,13 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   Startup at 10:12 took >11 min: release-pool read 150 s, candidate-inbox 85 s, library-refresh >7 min (Release Pool now
   ~1400 READY; every startup re-validates all bundles/entries in fresh processes). Not deployed yet: the owner needs
   the running Studio for PixelLab work.
+- 11:07:23-11:07:35 PixelLab CSV batch row 22/100 ("BIRD - volcanic") ended PRE_SUBMISSION_ERROR / MCP_NETWORK_ERROR after
+  2 MCP requests (initialize + notifications/initialized), no job id, paid_submission_possible false (no credit used).
+  The UI batch rule then stopped with 78 rows unsent. Root cause of the stop: `_mcp_http_request` had no retry for
+  free pre-submission requests (the existing 8-retry rule covers only polling/downloading an accepted job) and replaced
+  every URLError/TimeoutError by a generic text (`from None`), so the actual Windows/TLS reason was not recorded; it
+  failed after 12 s, i.e. a dropped/refused connection, not the 30 s timeout. A free read at 11:09 worked in 1.1 s.
+  Fix: free MCP requests retry 3 times (2 s, 4 s back-off); create_image_pro is still sent once (SUBMISSION_UNKNOWN);
+  the error text now carries the method and the exception, e.g. "ConnectionResetError: [WinError 10054] ...".
+  Tests: test_claude_mcp_network_retry.py 3 passed; PixelLab/MCP/launcher subset 134 passed.
+  598e4d89 (gallery button) was deployed at 11:10 by the close watcher; the Studio was relaunched for the owner.
