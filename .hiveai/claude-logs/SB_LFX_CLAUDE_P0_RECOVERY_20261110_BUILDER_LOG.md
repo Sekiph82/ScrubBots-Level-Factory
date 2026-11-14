@@ -403,3 +403,12 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   Test runner now gives Godot test processes their own APPDATA so they no longer rotate the live Studio's logs.
   Tests: old left-layout contract test updated to the owner layout; gallery suite checks credits panel, size caption,
   popup theme (PASS); 3 left-layout Godot suites PASS; full unit suite 2162 passed, 15 skipped, 0 failed.
+- Startup speed (owner: "Yes, speed it up"). Profiles on real data: release-pool read 399 s (296 s in list_candidates),
+  candidate-inbox 296 s (295 s in list_candidates): every Studio read is a fresh process, so all 1486 candidate bundles
+  were re-validated (read_bundle) on every startup. Fix: validated candidate rows persist in
+  `Workspace/Studio Extensions/cache/candidate-rows-v1.json`, keyed by the stat stamps of every file validation reads
+  (bundle files incl. preview, and the bound Imported owner-upload folder) plus a digest of the validation code;
+  any change re-validates that bundle in full; the cache is only an accelerator (write failures are ignored).
+  OWNER INSTRUCTION 2026-11-14 ("testlerini yapma ama kodu bitir, ben acinca kurulsun"): committed and installed
+  WITHOUT running the test suites; only an import check was run. Tests and a real startup measurement are still owed.
+  Also open: registering a new Final PNG in library-refresh takes ~4 min each (6 PNGs in 54 min today).

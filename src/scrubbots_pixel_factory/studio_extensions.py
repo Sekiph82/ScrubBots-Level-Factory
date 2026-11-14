@@ -739,20 +739,133 @@ def find_candidate(candidate_id: str) -> dict[str, Any] | None:
     if re.fullmatch(r"[A-Za-z0-9_-]+", str(candidate_id)):
         root = (owner_art_paths(_repository_root())["workspace"] / "Candidates" / str(candidate_id)).resolve()
         row = _candidate_row(root) if root.is_dir() else None
+        _save_candidate_disk_cache()
         if row is not None and row["candidate_id"] == candidate_id:
             return copy.deepcopy(row)
     return next((item for item in list_candidates() if item.get("candidate_id") == candidate_id), None)
 
 
-def _candidate_row(root: Path) -> dict[str, Any] | None:
+# 2026-11-14: every Studio read is a fresh process, so each startup re-validated all
+# ~1500 candidate bundles (~250 s of the ~300-400 s release-pool and candidate-inbox
+# reads). Validated rows are kept on disk, keyed by the stat stamps of every file the
+# validation reads (the bundle files and the bound Imported owner source) and by a
+# digest of the validation code; any change re-validates that bundle in full.
+_CANDIDATE_DISK_CACHE: dict[str, Any] | None = None
+_CANDIDATE_DISK_CACHE_DIRTY = False
+_CANDIDATE_CACHE_VERSION = 1
+_IMPORTED_BY_PREFIX: dict[str, Path] | None = None
+
+
+def _candidate_validation_code_digest() -> str:
+    package = Path(__file__).resolve().parent
+    digest = hashlib.sha256(str(_CANDIDATE_CACHE_VERSION).encode())
+    for relative in ("studio_extensions.py", "output/bundle.py", "output/png.py", "quality/core.py", "contracts/palette.py"):
+        try:
+            digest.update((package / relative).read_bytes())
+        except OSError:
+            digest.update(b"missing:" + relative.encode())
+    return digest.hexdigest()
+
+
+def _candidate_cache_path() -> Path:
+    return extensions_root() / "cache" / "candidate-rows-v1.json"
+
+
+def _candidate_disk_cache() -> dict[str, Any]:
+    global _CANDIDATE_DISK_CACHE
+    if _CANDIDATE_DISK_CACHE is None:
+        code = _candidate_validation_code_digest()
+        try:
+            loaded = json.loads(_candidate_cache_path().read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            loaded = {}
+        rows = loaded.get("rows") if isinstance(loaded, dict) and loaded.get("code") == code else None
+        _CANDIDATE_DISK_CACHE = {"code": code, "rows": rows if isinstance(rows, dict) else {}}
+    return _CANDIDATE_DISK_CACHE
+
+
+def _save_candidate_disk_cache(keep_roots: set[str] | None = None) -> None:
+    global _CANDIDATE_DISK_CACHE_DIRTY
+    if not _CANDIDATE_DISK_CACHE_DIRTY or _CANDIDATE_DISK_CACHE is None:
+        return
+    cache = _CANDIDATE_DISK_CACHE
+    if keep_roots is not None:
+        cache["rows"] = {key: value for key, value in cache["rows"].items() if key in keep_roots}
+    path = _candidate_cache_path()
     try:
-        stamps = tuple((stat.st_mtime_ns, stat.st_size) for stat in (
-            (root / name).stat() for name in ("metadata.json", "artwork.json", "artwork.png")))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.{time.time_ns()}.partial")
+        temporary.write_text(json.dumps(cache, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        fs_atomic.replace(temporary, path)
+        _CANDIDATE_DISK_CACHE_DIRTY = False
     except OSError:
+        pass  # the cache is only an accelerator
+
+
+def _imported_source_dir(candidate_name: str) -> Path | None:
+    """Imported owner-upload folder bound to a candidate-owner-<48 hex> bundle, if any."""
+    global _IMPORTED_BY_PREFIX
+    if not candidate_name.startswith("candidate-owner-"):
+        return None
+    if _IMPORTED_BY_PREFIX is None:
+        _IMPORTED_BY_PREFIX = {}
+        try:
+            from .owner_upload import owner_upload_root
+
+            for entry in os.scandir(owner_upload_root()):
+                if entry.is_dir() and entry.name.startswith("owner-upload-"):
+                    _IMPORTED_BY_PREFIX[entry.name[len("owner-upload-"):][:48]] = Path(entry.path)
+        except (OSError, ValueError):
+            pass
+    return _IMPORTED_BY_PREFIX.get(candidate_name[len("candidate-owner-"):])
+
+
+def _candidate_stamps(root: Path) -> tuple[tuple[str, int, int], ...] | None:
+    stamps: list[tuple[str, int, int]] = []
+    for name in ("metadata.json", "artwork.json", "artwork.png", "artwork.preview.png"):
+        try:
+            stat = (root / name).stat()
+        except FileNotFoundError:
+            if name == "artwork.preview.png":
+                continue
+            return None
+        except OSError:
+            return None
+        stamps.append((name, stat.st_mtime_ns, stat.st_size))
+    source_dir = _imported_source_dir(root.name)
+    if source_dir is not None:
+        try:
+            for entry in sorted(os.scandir(source_dir), key=lambda item: item.name):
+                if entry.is_file():
+                    stat = entry.stat()
+                    stamps.append(("source/" + entry.name, stat.st_mtime_ns, stat.st_size))
+        except OSError:
+            return None
+    return tuple(stamps)
+
+
+def _candidate_row(root: Path) -> dict[str, Any] | None:
+    global _CANDIDATE_DISK_CACHE_DIRTY
+    stamps = _candidate_stamps(root)
+    if stamps is None:
         return None
     cached = _CANDIDATE_ROW_CACHE.get(root)
     if cached is not None and cached[0] == stamps:
         return cached[1]
+    disk = _candidate_disk_cache()["rows"]
+    stored = disk.get(str(root))
+    stamp_key = [list(item) for item in stamps]
+    if isinstance(stored, dict) and stored.get("stamps") == stamp_key:
+        _CANDIDATE_ROW_CACHE[root] = (stamps, stored.get("row"))
+        return stored.get("row")
+    row = _validated_candidate_row(root)
+    _CANDIDATE_ROW_CACHE[root] = (stamps, row)
+    disk[str(root)] = {"stamps": stamp_key, "row": row}
+    _CANDIDATE_DISK_CACHE_DIRTY = True
+    return row
+
+
+def _validated_candidate_row(root: Path) -> dict[str, Any] | None:
     try:
         bundle = read_bundle(root)
         metadata = bundle.metadata
@@ -772,23 +885,25 @@ def _candidate_row(root: Path) -> dict[str, Any] | None:
             "candidate_classification": dict(generator_metadata.get("classification", {})) if isinstance(generator_metadata.get("classification", {}), Mapping) else None,
             "background_intent": request_payload.get("background_intent", "BACKGROUND"),
         }
-        _CANDIDATE_ROW_CACHE[root] = (stamps, row)
         return row
     except Exception:
-        _CANDIDATE_ROW_CACHE[root] = (stamps, None)
         return None
 
 
 def list_candidates() -> list[dict[str, Any]]:
     import copy
 
+    global _IMPORTED_BY_PREFIX
+    _IMPORTED_BY_PREFIX = None  # owner sources may have been imported since the last call
     candidates: list[dict[str, Any]] = []
     seen: set[str] = set()
-    for root in sorted(_candidate_roots(), key=lambda path: path.as_posix()):
+    roots = sorted(_candidate_roots(), key=lambda path: path.as_posix())
+    for root in roots:
         row = _candidate_row(root)
         if row is not None and row["candidate_id"] not in seen:
             seen.add(row["candidate_id"])
             candidates.append(copy.deepcopy(row))
+    _save_candidate_disk_cache({str(root) for root in roots})
     return candidates
 
 
