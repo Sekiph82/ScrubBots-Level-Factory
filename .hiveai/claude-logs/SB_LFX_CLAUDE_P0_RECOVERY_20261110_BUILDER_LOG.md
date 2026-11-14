@@ -364,3 +364,11 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   15 skipped, 0 failed.
 - Owner decision 2026-11-14: keep the grey/white background of atlas LF-001297..001312 as it is (a flood-fill clean was
   prepared in the scratchpad only; preview `docs/evidence/claude-arctic-background-20261114/before_after_preview.png`).
+- 10:09 the owner generated one PixelLab Pro 4x4 in the Studio (operation 1794640153-36642104599, provider job
+  a4334c55…, 10 credits). The record ended STUDIO_SHUTDOWN_CANCELLED ("Factory Studio closed; cancel_job sent"):
+  the Studio process ended before the result was downloaded, so nothing reached Final. PixelLab had completed it
+  (gallery 1b5647ad… "ELEMENTAL - desert", 16 frames). Fetched the sheet read-only (no new generation) and imported it
+  with the installed pixellab-pro-4x4-import: 16/16 PASS, PX-ATLAS-000095, Final 1488 -> 1504 (LF-001505..LF-001520).
+  c97f8b8d deployed (backup pre-c97f8b8d) and the Studio relaunched 10:12 for the owner. Note: my headless Godot test
+  runs share the Studio's app_userdata log folder; they rotated the owner's session logs, so why the Studio ended at
+  ~10:10 is not visible.
