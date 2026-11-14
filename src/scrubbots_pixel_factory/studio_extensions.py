@@ -3993,3 +3993,76 @@ __all__ = [
     "generate_pixellab_pro_4x4_frames", "generate_pixellab_pro_4x4_atlas_mcp",
     "reconcile_pixellab_pro_4x4_job", "reconcile_pixellab_pro_4x4_job_mcp",
 ]
+
+
+# Owner request 2026-11-14: a Studio button that brings the newest PixelLab gallery
+# sheets into the Factory when a generation finished at PixelLab but never reached
+# Final (e.g. the Studio closed while it ran). Only free read tools are allowed.
+PIXELLAB_GALLERY_SYNC_TOOLS = frozenset({"list_images", "get_image"})
+_GALLERY_LINE = re.compile(r"gallery:(\S+) \| (.*?) \| (\d+)x(\d+), (\d+) frames")
+
+
+def pixellab_recent_gallery_sheets(limit: int = 10, *, call_tool: Callable[[str, dict[str, object]], dict[str, object]] | None = None,
+                                   download: Callable[..., bytes] | None = None) -> list[dict[str, Any]]:
+    """Return the newest Creator gallery 4x4 sheets (bytes) or a skip reason each; never generates."""
+    if call_tool is None:
+        call_tool = _pixellab_free_tool_session()
+    download = download or _download_mcp_gallery_sheet
+    listed = call_tool("list_images", {"limit": max(1, min(int(limit), 50))})
+    text = "\n".join(str(part.get("text", "")) for part in listed.get("content", []) if isinstance(part, Mapping))
+    sheets: list[dict[str, Any]] = []
+    for asset_id, description, width, height, frames in _GALLERY_LINE.findall(text):
+        row: dict[str, Any] = {"asset_id": asset_id, "description": description.strip(), "width": int(width), "height": int(height)}
+        if int(frames) != 16 or not 51 <= int(width) <= 59 or int(width) != int(height):
+            sheets.append({**row, "skipped": f"not a 4x4 sheet of 51..59 px square frames ({width}x{height}, {frames} frames)"})
+            continue
+        result = call_tool("get_image", {"job_id": "gallery:" + asset_id})
+        structured = result.get("structuredContent", {}) if isinstance(result.get("structuredContent"), Mapping) else {}
+        url = str(structured.get("download_url", ""))
+        if not url:
+            sheets.append({**row, "skipped": "PixelLab returned no download link"})
+            continue
+        try:
+            row["png"] = download(url, expected_size=(int(width) * 4, int(height) * 4), job_id="gallery:" + asset_id,
+                                  asset_id=asset_id, request_count=0)
+        except PixelLabProviderError as exc:
+            row["skipped"] = f"{exc.code}: {exc}"
+        sheets.append(row)
+    return sheets
+
+
+def _pixellab_free_tool_session() -> Callable[[str, dict[str, object]], dict[str, object]]:
+    secret = get_pixellab_secret()
+    if not secret:
+        raise PixelLabProviderError("PIXELLAB_CREDENTIALS_MISSING", "PixelLab credential is not configured.")
+    state: dict[str, Any] = {"session": None, "version": PRO_4X4_MCP_PROTOCOL_VERSION, "id": 0}
+
+    def send(message: dict[str, object], *, initialize: bool = False) -> dict[str, object]:
+        response, headers = _mcp_http_request(secret=secret, message=message, session_id=state["session"],
+                                              protocol_version=None if initialize else state["version"])
+        returned = next((str(value) for key, value in headers.items() if str(key).lower() == "mcp-session-id" and value), None)
+        if returned:
+            state["session"] = returned
+        return response
+
+    def rpc(method: str, params: dict[str, object]) -> dict[str, object]:
+        state["id"] += 1
+        response = send({"jsonrpc": "2.0", "id": state["id"], "method": method, "params": params}, initialize=method == "initialize")
+        _mcp_result_error(response, str(params.get("name", method)))
+        result = response.get("result")
+        if not isinstance(result, dict):
+            raise PixelLabProviderError("MCP_INVALID_RESPONSE", "PixelLab MCP response had no result object.")
+        return result
+
+    initialized = rpc("initialize", {"protocolVersion": state["version"], "capabilities": {},
+                                     "clientInfo": {"name": "scrubbots-factory-studio", "version": "1"}})
+    if isinstance(initialized.get("protocolVersion"), str) and initialized["protocolVersion"]:
+        state["version"] = initialized["protocolVersion"]
+    send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+    def call_tool(name: str, arguments: dict[str, object]) -> dict[str, object]:
+        if name not in PIXELLAB_GALLERY_SYNC_TOOLS:
+            raise PixelLabProviderError("TOOL_NOT_ALLOWED", f"{name} is not a free read tool")
+        return rpc("tools/call", {"name": name, "arguments": arguments})
+
+    return call_tool

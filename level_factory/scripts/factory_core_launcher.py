@@ -697,6 +697,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = _inspect_pixellab_batch(request, extensions)
         elif operation == "pixellab-pro-4x4-import":
             payload = _semantic_import_pixellab_pro_4x4(request)
+        elif operation == "pixellab-gallery-sync":
+            payload = _pixellab_gallery_sync(request)
         elif operation == "provider-options":
             payload = _provider_options()
         elif operation == "canonical-palette":
@@ -1463,6 +1465,55 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
         "source_ids": source_ids, "pass_count": pass_count, "rejected_count": 16 - pass_count,
         "quality_scope": "SOURCE_ONLY; solver/WIN replay/difficulty/VOID/QA remain required for READY",
     }
+
+
+def _pixellab_gallery_sync(request: Mapping[str, object], *, sheets: Sequence[Mapping[str, object]] | None = None) -> dict[str, object]:
+    """Import the newest PixelLab gallery 4x4 sheets that are not in the Factory yet.
+
+    Owner request 2026-11-14. A sheet is known when Transactions holds
+    pixellab-atlas-<sha256 of its PNG>.json. Uses only free PixelLab reads.
+    """
+    import hashlib
+    import uuid
+    from scrubbots_pixel_factory import studio_extensions as extensions
+
+    if set(request) - {"limit"}:
+        raise ValueError("PixelLab gallery sync contains unsupported fields")
+    limit = _exact_int(request.get("limit", 10), "limit")
+    if not 1 <= limit <= 20:
+        raise ValueError("PIXELLAB_GALLERY_SYNC_LIMIT_OUT_OF_RANGE: choose 1..20.")
+    if sheets is None:
+        sheets = extensions.pixellab_recent_gallery_sheets(limit)
+    factory_output = (_repository_root() / "data" / "output").resolve()
+    transactions = factory_output / "Pixellab" / "Transactions"
+    staging = (factory_output / "Pixellab" / "Generation Staging" / f"pixellab-gallery-sync-{uuid.uuid4().hex}").resolve()
+    if not _inside_output(staging, factory_output):
+        raise ValueError("PixelLab gallery sync staging escaped Factory output")
+    rows: list[dict[str, object]] = []
+    for sheet in sheets:
+        row: dict[str, object] = {"asset_id": sheet.get("asset_id"), "description": sheet.get("description", "")}
+        png = sheet.get("png")
+        if sheet.get("skipped") or not isinstance(png, bytes):
+            rows.append({**row, "status": "SKIPPED", "reason": str(sheet.get("skipped", "no PNG"))})
+            continue
+        sha = hashlib.sha256(png).hexdigest()
+        if (transactions / f"pixellab-atlas-{sha}.json").is_file():
+            rows.append({**row, "status": "ALREADY_IN_FACTORY", "sha256": sha})
+            continue
+        staging.mkdir(parents=True, exist_ok=True)
+        path = staging / f"pixellab-gallery-{re.sub(r'[^A-Za-z0-9_-]', '_', str(sheet.get('asset_id')))}.png"
+        path.write_bytes(png)
+        try:
+            imported = _semantic_import_pixellab_pro_4x4({"path": str(path), "max_colors": 12})
+        except Exception as exc:
+            rows.append({**row, "status": "IMPORT_FAILED", "sha256": sha, "reason": str(exc)[:240]})
+            continue
+        rows.append({**row, "status": "IMPORTED", "sha256": sha, "pass_count": imported.get("pass_count"),
+                     "imported_count": len(imported.get("source_ids", [])), "atlas_path": imported.get("atlas_path")})
+    counts = {status: sum(1 for row in rows if row["status"] == status) for status in ("IMPORTED", "ALREADY_IN_FACTORY", "SKIPPED", "IMPORT_FAILED")}
+    return {"operation": STUDIO_EXTENSION_OPERATION, "state": "SUCCESS" if not counts["IMPORT_FAILED"] else "PARTIAL",
+            "checked": len(rows), "counts": counts, "rows": rows,
+            "new_sources": sum(int(row.get("imported_count", 0) or 0) for row in rows)}
 
 
 def _provider_options() -> dict[str, object]:

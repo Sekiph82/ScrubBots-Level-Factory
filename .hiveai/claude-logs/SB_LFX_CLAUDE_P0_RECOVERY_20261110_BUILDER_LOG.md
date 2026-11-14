@@ -372,3 +372,13 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   c97f8b8d deployed (backup pre-c97f8b8d) and the Studio relaunched 10:12 for the owner. Note: my headless Godot test
   runs share the Studio's app_userdata log folder; they rotated the owner's session logs, so why the Studio ended at
   ~10:10 is not visible.
+- Owner request: a Studio button that checks the newest 10 PixelLab productions and imports the missing ones.
+  PIXEL ART now has "Get Missing from PixelLab" (startup-gated). Backend `pixellab-gallery-sync`: list_images + get_image
+  only (allowlist PIXELLAB_GALLERY_SYNC_TOOLS; never generates), download via the existing validated sheet fetch, a sheet
+  is known when Transactions has pixellab-atlas-<sha256>.json (verified on the last 12 gallery sheets: 11 matched; the
+  one miss is real), unknown 4x4 sheets go through the existing pixellab-pro-4x4-import, then the Studio rescans Final.
+  Found while verifying: gallery dd88e4b0 "ELEMENTAL - skyborne" (2026-11-12) is not in the Factory.
+  Tests: test_claude_pixellab_gallery_sync.py 2 passed; gallery UI suite PASS; PixelLab/launcher subset 131 passed.
+  Startup at 10:12 took >11 min: release-pool read 150 s, candidate-inbox 85 s, library-refresh >7 min (Release Pool now
+  ~1400 READY; every startup re-validates all bundles/entries in fresh processes). Not deployed yet: the owner needs
+  the running Studio for PixelLab work.

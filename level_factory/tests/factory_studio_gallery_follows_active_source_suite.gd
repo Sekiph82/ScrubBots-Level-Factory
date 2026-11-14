@@ -226,6 +226,24 @@ func _run_suite() -> void:
 		"read queue keeps stale selection reads or delays batch progress: %s" % [queued_kinds])
 	ui.get("_studio_read_queue").clear()
 	ui.set("_studio_read_context", {})
+	# Owner request 2026-11-14: "Get Missing from PixelLab" on PIXEL ART queues the free
+	# gallery check and reports what it imported.
+	ui.call("_show_screen", "PIXEL ART")
+	_check((ui.get_node("SyncPixelLabGallery") as Button).visible, "PixelLab gallery button is not on PIXEL ART")
+	ui.get("_studio_read_queue").clear()
+	ui.call("_sync_pixellab_gallery")
+	var sync_queued := false
+	for queued in ui.get("_studio_read_queue"):
+		sync_queued = sync_queued or str(queued.get("context", {}).get("kind", "")) == "pixellab-gallery-sync"
+	_check(sync_queued, "PixelLab gallery check was not queued")
+	ui.call("_apply_pixellab_gallery_sync", {"checked": 10, "new_sources": 0, "counts": {"IMPORTED": 1, "ALREADY_IN_FACTORY": 9, "SKIPPED": 0},
+		"rows": [{"status": "IMPORTED", "description": "ELEMENTAL - desert", "imported_count": 16}]})
+	var sync_events: Array = ui.get("_pixel_art_activity_events")
+	_check(str(sync_events[-1].get("message", "")).contains("1 imported · 9 already in Final") and str(sync_events[-2].get("message", "")).contains("desert"),
+		"gallery check result is not reported: %s" % [sync_events.slice(-2)])
+	_check(not (ui.get_node("SyncPixelLabGallery") as Button).disabled, "gallery button stays disabled after the check")
+	ui.get("_studio_read_queue").clear()
+	ui.call("_show_screen", "LEVEL FACTORY")
 	# 2026-11-13 18:36: the batch worker returned an ERROR and the screen only said the
 	# worker "stopped with the application". The real error must be shown.
 	ui.set("_batch_worker_active", true)

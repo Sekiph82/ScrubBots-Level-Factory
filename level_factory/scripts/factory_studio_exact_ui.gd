@@ -47,7 +47,7 @@ var _startup_inventory_settled := false
 var _startup_release_archive_settled := false
 var _startup_release_archive_failed := false
 var _startup_gate_released := false
-const STARTUP_GATED_CORE := ["GeneratePixelArt", "BatchCsvPath", "RunBatch", "Regenerate", "AddToLevelFactory",
+const STARTUP_GATED_CORE := ["GeneratePixelArt", "BatchCsvPath", "RunBatch", "Regenerate", "AddToLevelFactory", "SyncPixelLabGallery",
 	"RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel",
 	"LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
 const STARTUP_GATED_RELEASE := ["RefreshReleasePool", "ManageSelection", "SelectAllRelease", "ClearRelease",
@@ -178,6 +178,7 @@ var _studio_read_done := false
 var _studio_read_result: Dictionary = {}
 var _studio_read_context: Dictionary = {}
 var _studio_read_queue: Array[Dictionary] = []
+var _pixellab_gallery_sync_running := false
 var _batch_issue_panel: PanelContainer
 var _batch_issue_tabs: HBoxContainer
 var _batch_issue_search: LineEdit
@@ -896,6 +897,7 @@ func _control_caption(control_name: String) -> String:
 		"SettingsGear": "Settings",
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
+		"SyncPixelLabGallery": "Get Missing from PixelLab",
 		"GenerationPrompt": "Prompt", "GenerationSize": "Size",
 		"GenerationProvider": "Provider: PixelLab Pro · 4×4",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
@@ -2439,6 +2441,7 @@ func _build_master_controls() -> void:
 	_place_control("Regenerate", Rect2(1208, 452, 294, 48), _generate_art)
 	_place_control("EditPrompt", Rect2(1208, 506, 294, 48), _edit_prompt)
 	_place_control("AddToLevelFactory", Rect2(1208, 560, 294, 48), _send_to_level_factory)
+	_place_control("SyncPixelLabGallery", Rect2(1208, 614, 294, 48), _sync_pixellab_gallery)
 	_place_control("GenerationPrompt", Rect2(26, 208, 334, 92), _edit_prompt)
 	_place_control("GenerationSize", Rect2(27, 312, 160, 42), _choose_size)
 	_build_selected_size_value_panel()
@@ -2680,7 +2683,7 @@ func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
-	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
+	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "SyncPixelLabGallery", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	# Level/Columns/Max Robots/Background stay at their Auto/TRANSPARENT defaults and
 	# are hidden on LEVEL FACTORY (owner layout 2026-11-13).
 	var level := ["RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
@@ -2736,6 +2739,38 @@ func _report(message: String) -> void:
 		if _status != null and _status.text == message:
 			_status.visible = false
 	)
+
+
+# Owner request 2026-11-14: a PixelLab generation can finish (and be charged) while
+# the Studio is closed. This checks the newest 10 PixelLab gallery sheets with free
+# reads only and imports the ones that are not in Final yet.
+func _sync_pixellab_gallery() -> void:
+	if _pixellab_gallery_sync_running:
+		return
+	if not _queue_studio_read_extension("pixellab-gallery-sync", {"limit": 10}, {"kind": "pixellab-gallery-sync", "token": str(Time.get_ticks_usec())}):
+		_report("PixelLab gallery check could not start.")
+		return
+	_pixellab_gallery_sync_running = true
+	var button := get_node_or_null("SyncPixelLabGallery") as Button
+	if button != null: button.disabled = true
+	_record_pixel_art_activity("PIXELLAB GALLERY", "RUNNING", "Checking the newest 10 PixelLab gallery sheets against Final (free reads, no generation).")
+
+
+func _apply_pixellab_gallery_sync(result: Dictionary) -> void:
+	_pixellab_gallery_sync_running = false
+	var button := get_node_or_null("SyncPixelLabGallery") as Button
+	if button != null: button.disabled = false
+	var counts: Dictionary = result.get("counts", {}) if result.get("counts", {}) is Dictionary else {}
+	if not result.has("rows"):
+		_record_pixel_art_activity("PIXELLAB GALLERY", "ERROR", "Gallery check failed: %s" % str(result.get("error", result.get("reason", "unknown error"))))
+		return
+	for row_variant in result.get("rows", []):
+		if row_variant is Dictionary and str(row_variant.get("status", "")) in ["IMPORTED", "IMPORT_FAILED"]:
+			var row: Dictionary = row_variant
+			_record_pixel_art_activity("PIXELLAB GALLERY", str(row.get("status", "")), "%s · %s" % [str(row.get("description", "")).left(60), "%d/16 imported" % int(row.get("imported_count", 0)) if str(row.get("status", "")) == "IMPORTED" else str(row.get("reason", ""))])
+	_record_pixel_art_activity("PIXELLAB GALLERY", "DONE", "%d checked · %d imported · %d already in Final · %d skipped · %d new PNGs" % [int(result.get("checked", 0)), int(counts.get("IMPORTED", 0)), int(counts.get("ALREADY_IN_FACTORY", 0)), int(counts.get("SKIPPED", 0)), int(result.get("new_sources", 0))])
+	if int(result.get("new_sources", 0)) > 0 and not _operation_running:
+		_restore_imported_sources()
 
 
 func _record_pixel_art_activity(stage: String, state: String, message: String) -> void:
@@ -5213,6 +5248,9 @@ func _poll_studio_read_extension() -> void:
 			return
 		var imported_paths: Array = context.get("paths", [])
 		_import_pngs(imported_paths, result)
+		return
+	if kind == "pixellab-gallery-sync":
+		_apply_pixellab_gallery_sync(result)
 		return
 	if kind == "candidate-inbox":
 		if str(result.get("schema", "")) == "scrubbots-candidate-inbox-view" and result.get("candidates", []) is Array:
