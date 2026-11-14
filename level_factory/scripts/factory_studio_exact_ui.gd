@@ -31,8 +31,8 @@ var _column_count := 4
 var _level_number := 11
 var _manual_level_override := false
 var _prompt := "pixel art owl"
-var _width := 32
-var _height := 32
+var _width := 56
+var _height := 56
 var _max_used_colors := 12
 var _provider_model := "PIXELLAB"
 var _generation_mode := "SINGLE"
@@ -178,6 +178,9 @@ var _studio_read_done := false
 var _studio_read_result: Dictionary = {}
 var _studio_read_context: Dictionary = {}
 var _studio_read_queue: Array[Dictionary] = []
+var _pixellab_credit_panel: PanelContainer
+var _pixellab_credit_label: Label
+var _popup_theme_cache: Theme
 var _pixellab_gallery_sync_running := false
 var _batch_issue_panel: PanelContainer
 var _batch_issue_tabs: HBoxContainer
@@ -296,6 +299,9 @@ func _ready() -> void:
 	_level_dialog.add_child(_level_number_input)
 	_level_dialog.confirmed.connect(_save_level_number)
 	add_child(_level_dialog)
+	get_tree().node_added.connect(_style_popup_window)
+	for existing in find_children("*", "Window", true, false):
+		_style_popup_window(existing)
 	_build_secondary_surfaces()
 	_build_master_controls()
 	_show_screen(_screen)
@@ -337,6 +343,7 @@ func _apply_startup_gate() -> void:
 	if core_ready and release_ready:
 		_startup_gate_released = true
 		print("STARTUP_READY ms=%d" % Time.get_ticks_msec())
+		_refresh_pixellab_credits()
 		if not is_inside_tree():
 			return
 		_refresh_run_button_caption()
@@ -552,7 +559,7 @@ func _apply_responsive_layout() -> void:
 		# Owner report 2026-11-13: the table was never laid out responsively (fixed
 		# 334x924 at y=538), so it covered the canvas and ran below the window.
 		var table_inset := 9.0 * left_scale
-		_pixel_art_activity_table.position = Vector2(left_panel.position.x + table_inset, 538.0 * scale_y)
+		_pixel_art_activity_table.position = Vector2(left_panel.position.x + table_inset, 376.0 * scale_y)
 		var table_size := Vector2(maxf(120.0, left_panel.size.x - 2.0 * table_inset),
 			maxf(120.0, size.y - _pixel_art_activity_table.position.y - bottom_margin - table_inset))
 		# Rows built for a wider table keep the container's minimum width; rebuild
@@ -897,8 +904,8 @@ func _control_caption(control_name: String) -> String:
 		"SettingsGear": "Settings",
 		"GeneratePixelArt": "Generate", "BatchCsvSelect": "Select CSV", "RunBatch": "Resume" if _batch_resume else "Run Batch",
 		"Regenerate": "Regenerate", "EditPrompt": "Edit Prompt", "AddToLevelFactory": "Use in Level Factory",
-		"SyncPixelLabGallery": "Get Missing from PixelLab",
-		"GenerationPrompt": "Prompt", "GenerationSize": "Size",
+		"SyncPixelLabGallery": "Get Missing\nfrom PixelLab",
+		"GenerationPrompt": "Prompt", "GenerationSize": _size_caption(),
 		"GenerationProvider": "Provider: PixelLab Pro · 4×4",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
@@ -927,6 +934,107 @@ func _level_number_caption() -> String:
 	return "Level: %s" % (str(_level_number) if _manual_level_override else "Auto")
 
 
+func _build_pixellab_credit_panel() -> void:
+	_pixellab_credit_panel = PanelContainer.new()
+	_pixellab_credit_panel.name = "PixelLabCreditPanel"
+	_pixellab_credit_panel.position = Vector2(27, 316)
+	_pixellab_credit_panel.size = Vector2(334, 50)
+	_pixellab_credit_panel.add_theme_stylebox_override("panel", _control_style(Color("#132034"), Color("#38584a")))
+	_pixellab_credit_label = Label.new()
+	_pixellab_credit_label.name = "PixelLabCreditLabel"
+	_pixellab_credit_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_pixellab_credit_label.add_theme_font_size_override("font_size", 13)
+	_pixellab_credit_label.add_theme_color_override("font_color", Color("#58be82"))
+	_pixellab_credit_label.text = "PIXELLAB · reading credits…"
+	_pixellab_credit_panel.add_child(_pixellab_credit_label)
+	add_child(_pixellab_credit_panel)
+
+
+# Owner request 2026-11-14: show the PixelLab allowance at startup and after every
+# generation. get_balance is a free, read-only PixelLab call.
+func _refresh_pixellab_credits() -> void:
+	_queue_studio_read_extension("pixellab-balance", {}, {"kind": "pixellab-balance", "token": str(Time.get_ticks_usec())})
+
+
+func _apply_pixellab_credits(result: Dictionary) -> void:
+	if _pixellab_credit_label == null:
+		return
+	if result.has("generations_remaining"):
+		var reset := str(result.get("generations_reset", ""))
+		_pixellab_credit_label.add_theme_color_override("font_color", Color("#58be82"))
+		_pixellab_credit_label.text = "PIXELLAB  %d / %d generations left\nresets %s · updated %s" % [
+			int(result.get("generations_remaining", 0)), int(result.get("generations_total", 0)),
+			reset if not reset.is_empty() else "-", Time.get_time_string_from_system().left(5)]
+	else:
+		_pixellab_credit_label.add_theme_color_override("font_color", Color("#d9a05b"))
+		_pixellab_credit_label.text = "PIXELLAB credits unavailable\n%s" % str(result.get("error", result.get("reason", "no answer"))).left(60)
+
+
+# Owner request 2026-11-14: every popup uses one dark, readable style instead of the
+# default grey theme (18 px text, 20 px titles, framed buttons and inputs).
+func _popup_theme() -> Theme:
+	if _popup_theme_cache != null:
+		return _popup_theme_cache
+	var theme := Theme.new()
+	theme.default_font_size = 18
+	var panel := StyleBoxFlat.new()
+	panel.bg_color = Color("#142034")
+	panel.border_color = Color("#4f86b8")
+	panel.set_border_width_all(2)
+	panel.set_corner_radius_all(10)
+	panel.content_margin_left = 22
+	panel.content_margin_right = 22
+	panel.content_margin_top = 18
+	panel.content_margin_bottom = 18
+	var frame := panel.duplicate() as StyleBoxFlat
+	frame.expand_margin_top = 34
+	frame.content_margin_top = 0
+	for type_name in ["AcceptDialog", "ConfirmationDialog", "FileDialog", "Window", "PopupPanel"]:
+		theme.set_stylebox("panel", type_name, panel)
+	theme.set_stylebox("embedded_border", "Window", frame)
+	theme.set_stylebox("embedded_unfocused_border", "Window", frame)
+	theme.set_font_size("title_font_size", "Window", 20)
+	theme.set_color("title_color", "Window", Color("#e8f1fc"))
+	theme.set_constant("title_height", "Window", 34)
+	theme.set_color("font_color", "Label", Color("#dce8f8"))
+	var button := StyleBoxFlat.new()
+	button.bg_color = Color("#1a2b45")
+	button.border_color = Color("#4f86b8")
+	button.set_border_width_all(2)
+	button.set_corner_radius_all(8)
+	button.content_margin_left = 18
+	button.content_margin_right = 18
+	button.content_margin_top = 8
+	button.content_margin_bottom = 8
+	var hover := button.duplicate() as StyleBoxFlat
+	hover.bg_color = Color("#23406a")
+	var input := button.duplicate() as StyleBoxFlat
+	input.bg_color = Color("#101a2b")
+	input.border_color = Color("#30415e")
+	for type_name in ["Button", "OptionButton", "CheckBox", "MenuButton"]:
+		theme.set_stylebox("normal", type_name, button)
+		theme.set_stylebox("hover", type_name, hover)
+		theme.set_stylebox("pressed", type_name, hover)
+		theme.set_stylebox("focus", type_name, hover)
+		theme.set_color("font_color", type_name, Color("#e8f1fc"))
+	for type_name in ["LineEdit", "TextEdit", "ItemList", "Tree"]:
+		theme.set_stylebox("normal", type_name, input)
+		theme.set_stylebox("focus", type_name, input)
+		theme.set_stylebox("panel", type_name, input)
+		theme.set_color("font_color", type_name, Color("#e8f1fc"))
+	var menu := panel.duplicate() as StyleBoxFlat
+	menu.set_content_margin_all(8)
+	theme.set_stylebox("panel", "PopupMenu", menu)
+	theme.set_color("font_color", "PopupMenu", Color("#dce8f8"))
+	_popup_theme_cache = theme
+	return theme
+
+
+func _style_popup_window(node: Node) -> void:
+	if node is Window and node != get_window() and (node as Window).theme == null:
+		(node as Window).theme = _popup_theme()
+
+
 func _build_selected_size_value_panel() -> void:
 	_selected_size_panel = PanelContainer.new()
 	_selected_size_panel.name = "SelectedSizeValuePanel"
@@ -944,7 +1052,14 @@ func _build_selected_size_value_panel() -> void:
 	_refresh_selected_size_value()
 
 
+func _size_caption() -> String:
+	return "Size · %d × %d\n4×4 / 16 · max %d colours" % [_width, _height, _max_used_colors]
+
+
 func _refresh_selected_size_value() -> void:
+	var size_button := get_node_or_null("GenerationSize") as Button
+	if size_button != null:
+		size_button.text = _size_caption()
 	if _selected_size_value != null:
 		_selected_size_value.text = "Selected Size\n%d × %d px%s" % [_width, _height, " · 4×4 / 16" if _provider_model == "PIXELLAB" else ""]
 	if _selected_size_panel != null:
@@ -2435,20 +2550,21 @@ func _build_master_controls() -> void:
 	_place_control("ReleasePoolTab", Rect2(918, 22, 270, 72), _show_screen.bind("RELEASE POOL"))
 	_place_control("SettingsGear", Rect2(1320, 15, 55, 60), _open_settings)
 	# PIXEL ART actions and Batch-CSV path.
-	_place_control("GeneratePixelArt", Rect2(27, 424, 334, 49), _generate_art)
+	# Owner layout 2026-11-14: two-column rows on the left: Single|Batch, Size|Get Missing,
+	# Prompt|Generate (CSV file|Run Batch in batch mode), PixelLab credits, then the activity log.
+	_place_control("GeneratePixelArt", Rect2(198, 261, 162, 45), _generate_art)
 	_place_control("BatchCsvSelect", Rect2(199, 155, 161, 43), _open_batch_csv)
-	_place_control("RunBatch", Rect2(27, 476, 334, 50), _run_batch)
+	_place_control("RunBatch", Rect2(198, 261, 162, 45), _run_batch)
 	_place_control("Regenerate", Rect2(1208, 452, 294, 48), _generate_art)
 	_place_control("EditPrompt", Rect2(1208, 506, 294, 48), _edit_prompt)
 	_place_control("AddToLevelFactory", Rect2(1208, 560, 294, 48), _send_to_level_factory)
-	_place_control("SyncPixelLabGallery", Rect2(1208, 614, 294, 48), _sync_pixellab_gallery)
-	_place_control("GenerationPrompt", Rect2(26, 208, 334, 92), _edit_prompt)
-	_place_control("GenerationSize", Rect2(27, 312, 160, 42), _choose_size)
-	_build_selected_size_value_panel()
-	_place_control("GenerationProvider", Rect2(27, 366, 334, 42), _choose_provider)
+	_place_control("SyncPixelLabGallery", Rect2(198, 206, 162, 45), _sync_pixellab_gallery)
+	_place_control("GenerationPrompt", Rect2(27, 261, 160, 45), _edit_prompt)
+	_place_control("GenerationSize", Rect2(27, 206, 160, 45), _choose_size)
+	_build_pixellab_credit_panel()
 	_place_control("SingleMode", Rect2(27, 151, 160, 45), _set_generation_mode.bind("SINGLE"))
 	_place_control("BatchMode", Rect2(198, 151, 162, 45), _set_generation_mode.bind("BATCH"))
-	_place_control("BatchCsvPath", Rect2(27, 424, 334, 42), _open_batch_csv)
+	_place_control("BatchCsvPath", Rect2(27, 261, 160, 45), _open_batch_csv)
 	_build_pixel_art_activity_table()
 	_place_control("ArtworkVariation1", Rect2(1208, 300, 92, 108), _select_artwork.bind(0))
 	_place_control("ArtworkVariation2", Rect2(1310, 300, 92, 108), _select_artwork.bind(1))
@@ -2683,7 +2799,7 @@ func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
-	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "SyncPixelLabGallery", "GenerationPrompt", "GenerationSize", "GenerationProvider", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
+	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "SyncPixelLabGallery", "GenerationPrompt", "GenerationSize", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	# Level/Columns/Max Robots/Background stay at their Auto/TRANSPARENT defaults and
 	# are hidden on LEVEL FACTORY (owner layout 2026-11-13).
 	var level := ["RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
@@ -2692,6 +2808,8 @@ func _update_master_control_visibility() -> void:
 		button.visible = button.name in shared or (_screen == "PIXEL ART" and button.name in pixel) or (_screen == "LEVEL FACTORY" and button.name in level) or (_screen == "RELEASE POOL" and button.name in release)
 	if _pixel_art_activity_table != null:
 		_pixel_art_activity_table.visible = _screen == "PIXEL ART"
+	if _pixellab_credit_panel != null:
+		_pixellab_credit_panel.visible = _screen == "PIXEL ART"
 	if _release_status_counter != null:
 		_release_status_counter.visible = _screen == "LEVEL FACTORY"
 	# The Studio opens on PIXEL ART with these buttons hidden; place Batch Issues
@@ -2791,8 +2909,8 @@ func _record_pixel_art_activity(stage: String, state: String, message: String) -
 func _build_pixel_art_activity_table() -> void:
 	_pixel_art_activity_table = PanelContainer.new()
 	_pixel_art_activity_table.name = "PixelArtActivityTable"
-	_pixel_art_activity_table.position = Vector2(27, 538)
-	_pixel_art_activity_table.size = Vector2(334, 924)
+	_pixel_art_activity_table.position = Vector2(27, 376)
+	_pixel_art_activity_table.size = Vector2(334, 1086)
 	_pixel_art_activity_table.add_theme_stylebox_override("panel", _control_style(Color("#111d30"), Color("#30415e")))
 	var content := VBoxContainer.new()
 	content.add_theme_constant_override("separation", 8)
@@ -3524,6 +3642,7 @@ func _poll_pixel_art_worker() -> void:
 		_semantic_progress = {"completed": 0, "failed": 1, "remaining": 0, "state": str(result.get("state", "ERROR"))}
 		_report("PIXELLAB PRO · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
 	var atlas_generated := _pixellab_atlas_generated(result)
+	_refresh_pixellab_credits()
 	_record_pixel_art_activity("PIXELLAB RESULT", str(result.get("state", "ERROR")), _pixellab_result_detail(result) if atlas_generated else str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
 	if _pixel_batch_active:
 		# A paid row is complete once its atlas was generated and all 16 slices were
@@ -5251,6 +5370,9 @@ func _poll_studio_read_extension() -> void:
 		return
 	if kind == "pixellab-gallery-sync":
 		_apply_pixellab_gallery_sync(result)
+		return
+	if kind == "pixellab-balance":
+		_apply_pixellab_credits(result)
 		return
 	if kind == "candidate-inbox":
 		if str(result.get("schema", "")) == "scrubbots-candidate-inbox-view" and result.get("candidates", []) is Array:

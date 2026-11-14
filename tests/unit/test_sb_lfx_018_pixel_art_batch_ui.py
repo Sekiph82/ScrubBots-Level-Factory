@@ -169,13 +169,19 @@ def test_pixel_art_left_controls_are_compact_and_prompt_refresh_is_removed() -> 
     table = _function(source, "_build_pixel_art_activity_table")
 
     assert '"RandomSeed"' not in source
-    assert '"GenerationSize", Rect2(27, 312, 160, 42)' in controls
-    assert '"GenerationProvider", Rect2(27, 366, 334, 42)' in controls
-    assert '"GeneratePixelArt", Rect2(27, 424, 334, 49)' in controls
-    assert '"BatchCsvPath", Rect2(27, 424, 334, 42)' in controls
-    assert '"RunBatch", Rect2(27, 476, 334, 50)' in controls
+    # Owner layout 2026-11-14: two-column rows Single|Batch, Size|Get Missing,
+    # Prompt|Generate (CSV file|Run Batch), then PixelLab credits and the activity log;
+    # the fixed-provider button is gone.
+    assert '"GenerationSize", Rect2(27, 206, 160, 45)' in controls
+    assert '"SyncPixelLabGallery", Rect2(198, 206, 162, 45)' in controls
+    assert '"GenerationPrompt", Rect2(27, 261, 160, 45)' in controls
+    assert '"GeneratePixelArt", Rect2(198, 261, 162, 45)' in controls
+    assert '"BatchCsvPath", Rect2(27, 261, 160, 45)' in controls
+    assert '"RunBatch", Rect2(198, 261, 162, 45)' in controls
+    assert '"GenerationProvider"' not in controls
+    assert '_build_pixellab_credit_panel()' in controls
     assert '"PixelArtActivityTable"' in table
-    assert 'Vector2(27, 538)' in table
+    assert 'Vector2(27, 376)' in table
 
 
 def test_pixellab_resume_inspection_is_read_only_and_reports_new_rows(tmp_path: Path, monkeypatch) -> None:

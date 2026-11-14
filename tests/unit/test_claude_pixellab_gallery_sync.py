@@ -43,4 +43,20 @@ def test_gallery_fetch_uses_only_free_reads_and_skips_non_4x4():
 
     assert calls == ["list_images", "get_image"]
     assert sheets[0]["png"] == b"PNG(224, 224)" and "skipped" in sheets[1]
-    assert se.PIXELLAB_GALLERY_SYNC_TOOLS == {"list_images", "get_image"}
+    assert se.PIXELLAB_GALLERY_SYNC_TOOLS == {"list_images", "get_image", "get_balance"}  # free reads only
+
+
+def test_balance_reads_remaining_generations_with_a_free_call():
+    calls = []
+    text = ("credits: $0.00\ngenerations_remaining: 790\ngenerations_used: 1210\ngenerations_total: 2000\n"
+            "subscription: active (Tier 1: Pixel Apprentice)\ngenerations_reset: 2026-11-20\n")
+
+    def call_tool(name, arguments):
+        calls.append(name)
+        return {"content": [{"type": "text", "text": text}]}
+
+    balance = se.pixellab_balance(call_tool=call_tool)
+
+    assert calls == ["get_balance"] and "get_balance" in se.PIXELLAB_GALLERY_SYNC_TOOLS
+    assert balance["generations_remaining"] == 790 and balance["generations_total"] == 2000
+    assert balance["generations_reset"] == "2026-11-20"

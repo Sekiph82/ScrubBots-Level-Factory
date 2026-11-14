@@ -699,6 +699,8 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             payload = _semantic_import_pixellab_pro_4x4(request)
         elif operation == "pixellab-gallery-sync":
             payload = _pixellab_gallery_sync(request)
+        elif operation == "pixellab-balance":
+            payload = extensions.pixellab_balance()
         elif operation == "provider-options":
             payload = _provider_options()
         elif operation == "canonical-palette":

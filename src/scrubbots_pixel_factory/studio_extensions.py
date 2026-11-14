@@ -4015,7 +4015,7 @@ __all__ = [
 # Owner request 2026-11-14: a Studio button that brings the newest PixelLab gallery
 # sheets into the Factory when a generation finished at PixelLab but never reached
 # Final (e.g. the Studio closed while it ran). Only free read tools are allowed.
-PIXELLAB_GALLERY_SYNC_TOOLS = frozenset({"list_images", "get_image"})
+PIXELLAB_GALLERY_SYNC_TOOLS = frozenset({"list_images", "get_image", "get_balance"})
 _GALLERY_LINE = re.compile(r"gallery:(\S+) \| (.*?) \| (\d+)x(\d+), (\d+) frames")
 
 
@@ -4083,3 +4083,22 @@ def _pixellab_free_tool_session() -> Callable[[str, dict[str, object]], dict[str
         return rpc("tools/call", {"name": name, "arguments": arguments})
 
     return call_tool
+
+
+def pixellab_balance(*, call_tool: Callable[[str, dict[str, object]], dict[str, object]] | None = None) -> dict[str, Any]:
+    """Remaining PixelLab subscription generations (free, read-only get_balance)."""
+    if call_tool is None:
+        call_tool = _pixellab_free_tool_session()
+    result = call_tool("get_balance", {})
+    text = "\n".join(str(part.get("text", "")) for part in result.get("content", []) if isinstance(part, Mapping))
+    fields = dict(re.findall(r"^\s*([a-z_]+):\s*(.+?)\s*$", text, re.MULTILINE))
+    balance: dict[str, Any] = {"state": "READY"}
+    for key in ("generations_remaining", "generations_used", "generations_total"):
+        if fields.get(key, "").isdigit():
+            balance[key] = int(fields[key])
+    for key in ("generations_reset", "credits", "subscription"):
+        if key in fields:
+            balance[key] = fields[key][:80]
+    if "generations_remaining" not in balance:
+        return {"state": "UNAVAILABLE", "reason": "PixelLab balance did not include generations_remaining."}
+    return balance

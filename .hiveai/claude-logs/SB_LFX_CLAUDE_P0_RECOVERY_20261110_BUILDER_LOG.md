@@ -392,3 +392,14 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   the error text now carries the method and the exception, e.g. "ConnectionResetError: [WinError 10054] ...".
   Tests: test_claude_mcp_network_retry.py 3 passed; PixelLab/MCP/launcher subset 134 passed.
   598e4d89 (gallery button) was deployed at 11:10 by the close watcher; the Studio was relaunched for the owner.
+- Owner layout 2026-11-14 (after a drawn mockup, docs/evidence/claude-pixel-art-layout-20261114/): PIXEL ART left nav in
+  two-column rows Single|Batch, Size|Get Missing, Prompt|Generate (CSV file|Run Batch in batch mode), then a PixelLab
+  credits panel and the activity log. Size is one button showing "Size · W × H / 4×4 / 16 · max N colours" and opens the
+  existing size popup; default size 56×56 (was 32×32, which PixelLab 4×4 rejects); the fixed-provider button and the
+  separate Selected Size box are removed. Credits: new `pixellab-balance` (free get_balance) read at STARTUP_READY and
+  after every PixelLab result; live value 790 / 2000 generations, reset 2026-11-20. Every popup Window gets one dark
+  theme (18 px text, 20 px titles, framed buttons/inputs) through a node_added hook. The earlier right-side placement of
+  "Get Missing" overlapped Edit Prompt because _layout_pixellab_details_artwork_gap moves only the three action buttons.
+  Test runner now gives Godot test processes their own APPDATA so they no longer rotate the live Studio's logs.
+  Tests: old left-layout contract test updated to the owner layout; gallery suite checks credits panel, size caption,
+  popup theme (PASS); 3 left-layout Godot suites PASS; full unit suite 2162 passed, 15 skipped, 0 failed.

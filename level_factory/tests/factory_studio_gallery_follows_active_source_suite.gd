@@ -242,6 +242,17 @@ func _run_suite() -> void:
 	_check(str(sync_events[-1].get("message", "")).contains("1 imported · 9 already in Final") and str(sync_events[-2].get("message", "")).contains("desert"),
 		"gallery check result is not reported: %s" % [sync_events.slice(-2)])
 	_check(not (ui.get_node("SyncPixelLabGallery") as Button).disabled, "gallery button stays disabled after the check")
+	# Owner layout 2026-11-14: PixelLab credits panel on PIXEL ART; every popup gets the dark theme.
+	var credit_panel := ui.get_node("PixelLabCreditPanel") as Control
+	_check(credit_panel.visible, "PixelLab credits panel is not on PIXEL ART")
+	ui.call("_apply_pixellab_credits", {"generations_remaining": 790, "generations_total": 2000, "generations_reset": "2026-11-20"})
+	_check(str((ui.get_node("PixelLabCreditPanel/PixelLabCreditLabel") as Label).text).begins_with("PIXELLAB  790 / 2000 generations left"),
+		"credits text: %s" % (ui.get_node("PixelLabCreditPanel/PixelLabCreditLabel") as Label).text)
+	_check(str((ui.get_node("GenerationSize") as Button).text).begins_with("Size · 56 × 56"), "size button does not show the selected size")
+	var probe := AcceptDialog.new()
+	ui.add_child(probe)
+	_check(probe.theme != null and probe.theme.default_font_size == 18, "popup did not get the readable dark theme")
+	probe.queue_free()
 	ui.get("_studio_read_queue").clear()
 	ui.call("_show_screen", "LEVEL FACTORY")
 	# 2026-11-13 18:36: the batch worker returned an ERROR and the screen only said the
