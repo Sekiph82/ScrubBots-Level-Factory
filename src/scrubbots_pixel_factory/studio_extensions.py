@@ -724,51 +724,71 @@ def _candidate_roots() -> Iterable[Path]:
 _CANDIDATE_ROW_CACHE: dict[Path, tuple[tuple[tuple[int, int], ...], dict[str, Any] | None]] = {}
 
 
+def find_candidate(candidate_id: str) -> dict[str, Any] | None:
+    """One candidate row without validating every bundle.
+
+    2026-11-14: each Studio read runs in a fresh process, so list_candidates()
+    re-validated all ~1500 bundles; restoring one selected PNG took ~2 min and
+    starved the batch progress read. The bundle folder is named by its id; the
+    full scan remains the fallback and the source of truth when absent.
+    """
+    import copy
+
+    from .owner_art_storage import owner_art_paths
+
+    if re.fullmatch(r"[A-Za-z0-9_-]+", str(candidate_id)):
+        root = (owner_art_paths(_repository_root())["workspace"] / "Candidates" / str(candidate_id)).resolve()
+        row = _candidate_row(root) if root.is_dir() else None
+        if row is not None and row["candidate_id"] == candidate_id:
+            return copy.deepcopy(row)
+    return next((item for item in list_candidates() if item.get("candidate_id") == candidate_id), None)
+
+
+def _candidate_row(root: Path) -> dict[str, Any] | None:
+    try:
+        stamps = tuple((stat.st_mtime_ns, stat.st_size) for stat in (
+            (root / name).stat() for name in ("metadata.json", "artwork.json", "artwork.png")))
+    except OSError:
+        return None
+    cached = _CANDIDATE_ROW_CACHE.get(root)
+    if cached is not None and cached[0] == stamps:
+        return cached[1]
+    try:
+        bundle = read_bundle(root)
+        metadata = bundle.metadata
+        quality = metadata.get("quality", {}) if isinstance(metadata.get("quality", {}), Mapping) else {}
+        generation = metadata.get("generation", {}) if isinstance(metadata.get("generation", {}), Mapping) else {}
+        generator_metadata = metadata.get("generator_metadata", {}) if isinstance(metadata.get("generator_metadata", {}), Mapping) else {}
+        generator_payload = generator_metadata.get("payload", {}) if isinstance(generator_metadata.get("payload", {}), Mapping) else {}
+        generator_data = generator_payload.get("data", {}) if isinstance(generator_payload.get("data", {}), Mapping) else {}
+        request_payload = generation.get("request", {}) if isinstance(generation.get("request", {}), Mapping) else {}
+        row = {
+            "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
+            "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
+            "used_colors": list(CANONICAL_PALETTE.used_ids(bundle.artwork.cells)), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
+            "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
+            "quality": dict(quality), "metadata": metadata,
+            "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
+            "candidate_classification": dict(generator_metadata.get("classification", {})) if isinstance(generator_metadata.get("classification", {}), Mapping) else None,
+            "background_intent": request_payload.get("background_intent", "BACKGROUND"),
+        }
+        _CANDIDATE_ROW_CACHE[root] = (stamps, row)
+        return row
+    except Exception:
+        _CANDIDATE_ROW_CACHE[root] = (stamps, None)
+        return None
+
+
 def list_candidates() -> list[dict[str, Any]]:
     import copy
 
     candidates: list[dict[str, Any]] = []
     seen: set[str] = set()
     for root in sorted(_candidate_roots(), key=lambda path: path.as_posix()):
-        try:
-            stamps = tuple((stat.st_mtime_ns, stat.st_size) for stat in (
-                (root / name).stat() for name in ("metadata.json", "artwork.json", "artwork.png")))
-        except OSError:
-            continue
-        cached = _CANDIDATE_ROW_CACHE.get(root)
-        if cached is not None and cached[0] == stamps:
-            row = cached[1]
-            if row is not None and row["candidate_id"] not in seen:
-                seen.add(row["candidate_id"])
-                candidates.append(copy.deepcopy(row))
-            continue
-        try:
-            bundle = read_bundle(root)
-            if bundle.artwork.candidate_id in seen:
-                continue
-            seen.add(bundle.artwork.candidate_id)
-            metadata = bundle.metadata
-            quality = metadata.get("quality", {}) if isinstance(metadata.get("quality", {}), Mapping) else {}
-            generation = metadata.get("generation", {}) if isinstance(metadata.get("generation", {}), Mapping) else {}
-            generator_metadata = metadata.get("generator_metadata", {}) if isinstance(metadata.get("generator_metadata", {}), Mapping) else {}
-            generator_payload = generator_metadata.get("payload", {}) if isinstance(generator_metadata.get("payload", {}), Mapping) else {}
-            generator_data = generator_payload.get("data", {}) if isinstance(generator_payload.get("data", {}), Mapping) else {}
-            request_payload = generation.get("request", {}) if isinstance(generation.get("request", {}), Mapping) else {}
-            row = {
-                "candidate_id": bundle.artwork.candidate_id, "artwork_sha256": hashlib.sha256(bundle.artwork_png).hexdigest(),
-                "grid_hash": bundle.artwork.grid_hash, "width": bundle.artwork.width, "height": bundle.artwork.height,
-                "used_colors": list(CANONICAL_PALETTE.used_ids(bundle.artwork.cells)), "origin": str(generation.get("generator_mode", "PROCEDURAL")),
-                "source_path": _relative(root), "artwork_path": _relative(root / "artwork.png"),
-                "quality": dict(quality), "metadata": metadata,
-                "source_lineage": dict(generator_data.get("source_lineage", {})) if isinstance(generator_data.get("source_lineage", {}), Mapping) else None,
-                "candidate_classification": dict(generator_metadata.get("classification", {})) if isinstance(generator_metadata.get("classification", {}), Mapping) else None,
-                "background_intent": request_payload.get("background_intent", "BACKGROUND"),
-            }
-            _CANDIDATE_ROW_CACHE[root] = (stamps, row)
+        row = _candidate_row(root)
+        if row is not None and row["candidate_id"] not in seen:
+            seen.add(row["candidate_id"])
             candidates.append(copy.deepcopy(row))
-        except Exception:
-            _CANDIDATE_ROW_CACHE[root] = (stamps, None)
-            continue
     return candidates
 
 
@@ -865,8 +885,8 @@ def validate_owner_review_chain(candidate: Mapping[str, Any], records: Iterable[
 
 
 def _latest_review(candidate_id: str, artwork_sha256: str | None = None) -> dict[str, Any] | None:
-    candidate = next((item for item in list_candidates() if item["candidate_id"] == candidate_id and (artwork_sha256 is None or item["artwork_sha256"] == artwork_sha256)), None)
-    if candidate is None:
+    candidate = find_candidate(candidate_id)
+    if candidate is None or (artwork_sha256 is not None and candidate["artwork_sha256"] != artwork_sha256):
         return None
     chain, _invalid = _validated_review_chain(candidate)
     return chain[-1] if chain else None
@@ -973,7 +993,7 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
     candidates.sort(key=lambda value: str(value.get("created_at", "")), reverse=True)
     for run in candidates:
         candidate_id = str(run.get("candidate_id", ""))
-        candidate = next((item for item in list_candidates() if item.get("candidate_id") == candidate_id), None)
+        candidate = find_candidate(candidate_id)
         if candidate is None:
             continue
         try:
@@ -1036,7 +1056,7 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
         )
         review_projection: dict[str, Any] = {"disposition": "NEEDS_REVIEW", "pool_state": "READY_AUTO_PENDING"}
         try:
-            entries = release_entries()
+            entries = release_entries(candidate_id)
             entry = next((item for item in entries if item.get("candidate_id") == candidate_id and item.get("pipeline_run_id") == run.get("run_id")), None)
             if entry is not None:
                 review_projection = {"disposition": str((review or {}).get("disposition", "NEEDS_REVIEW")), "pool_state": "IN_RELEASE_POOL", "entry_digest": entry.get("entry_digest"), "pipeline_run_id": run.get("run_id")}

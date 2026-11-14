@@ -345,3 +345,22 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   shows "Batch worker stopped: <error> · Finished PNGs are kept; press Resume Batch." and logs BATCH_WORKER_ERROR to godot.log.
   Gallery suite check failed on the old code ("BATCH READY · 1/3 READY"), passes; 4 batch UI suites PASS.
 - Full unit suite: 2154 passed, 15 skipped, 0 failed.
+
+## 2026-11-14 — frozen "8/903 done" screen; batch be7ea390 COMPLETE
+
+- Batch be7ea390 (903 PNGs, started 00:05 by the owner): COMPLETE 09:38, 900 READY / 3 FAILED (LF-001309, LF-001370,
+  LF-001414: REAL_PLAY_NO_WINNING_PLAN after 10-12 plans), ~94.5 READY/h over 9.55 h. Previous job ab2918ae stopped at
+  20:00 with four PNGs mid-solve when the Studio closed; its rest was carried into be7ea390.
+- Owner saw "Running · 8/903" for ~10 min at 00:19 while the job file said 21 READY. Cause: Studio reads run one at a time;
+  each click on a thumbnail queued a `restore-source-run-readonly` read that took 87-137 s, and the 2.5 s batch progress
+  read waited behind them. Profile: restore_source_run called list_candidates() three times (each re-validates all
+  ~1500 bundles, because every Studio read is a fresh process and the row cache is per process) plus an unfiltered
+  Release Pool scan.
+- Fix: `find_candidate(id)` reads only `Workspace/Candidates/<id>` (full scan stays as fallback); restore_source_run and
+  _latest_review use it; the Release Pool lookup there is filtered by candidate id. UI: a newer selection read replaces
+  queued ones; batch progress reads go to the front of the queue.
+- Tests: `test_claude_find_candidate_no_full_scan.py` 2 failed on old code, 2 pass; gallery suite queue check failed on the
+  old UI (3 stale selection reads ahead of batch-latest), passes; 6 related Godot suites PASS; full unit suite 2156 passed,
+  15 skipped, 0 failed.
+- Owner decision 2026-11-14: keep the grey/white background of atlas LF-001297..001312 as it is (a flood-fill clean was
+  prepared in the scratchpad only; preview `docs/evidence/claude-arctic-background-20261114/before_after_preview.png`).

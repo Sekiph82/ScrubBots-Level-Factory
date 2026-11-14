@@ -210,6 +210,22 @@ func _run_suite() -> void:
 		_check(issues_top >= rect.end.y, "%s overlaps Batch Issues: button bottom %.0f, panel top %.0f" % [name, rect.end.y, issues_top])
 	ui.call("_show_screen", "PIXEL ART")
 	_check(not counter.visible, "status counter leaked onto PIXEL ART")
+	# 2026-11-14: several queued ~2 min selection reads starved the batch progress
+	# read. A newer selection replaces queued ones; batch progress goes first.
+	ui.get("_studio_read_queue").clear()
+	ui.set("_studio_read_context", {"kind": "owner-release-library", "token": "busy"})
+	for index in range(3):
+		ui.call("_queue_studio_read_extension", "restore-source-run-readonly", {"source_id": "owner-upload-%064x" % index},
+			{"kind": "restore-selected-source", "token": "click-%d" % index})
+	ui.set("_batch_job_id", str(ui.get("_batch_snapshot").get("job_id", "job-retry")))
+	ui.call("_queue_studio_read_extension", "png-batch-latest", {"batch_id": "x"}, {"kind": "batch-latest", "job_id": ui.get("_batch_job_id")})
+	var queued_kinds: Array[String] = []
+	for queued in ui.get("_studio_read_queue"):
+		queued_kinds.append(str(queued.get("context", {}).get("kind", "")) + "|" + str(queued.get("context", {}).get("token", "")))
+	_check(queued_kinds == ["batch-latest|", "restore-selected-source|click-2"],
+		"read queue keeps stale selection reads or delays batch progress: %s" % [queued_kinds])
+	ui.get("_studio_read_queue").clear()
+	ui.set("_studio_read_context", {})
 	# 2026-11-13 18:36: the batch worker returned an ERROR and the screen only said the
 	# worker "stopped with the application". The real error must be shown.
 	ui.set("_batch_worker_active", true)

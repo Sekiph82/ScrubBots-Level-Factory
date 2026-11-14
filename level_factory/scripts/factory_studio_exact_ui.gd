@@ -5070,7 +5070,19 @@ func _queue_studio_read_extension(operation: String, request: Dictionary, contex
 			return true
 	var prepared: Dictionary = _gateway.call("prepare_studio_extension_call", operation, request)
 	if not prepared.is_empty():
-		_studio_read_queue.append({"prepared": prepared, "context": context.duplicate(true)})
+		# 2026-11-14: clicks on a frozen-looking screen queued several ~2 min
+		# selection reads and the batch progress read waited behind all of them
+		# ("8/903 done" while the batch was at 21+). A newer selection replaces
+		# older queued ones, and batch progress goes first.
+		if context_key in ["restore-selected-source", "restore-batch-run"]:
+			for index in range(_studio_read_queue.size() - 1, -1, -1):
+				if str(_studio_read_queue[index].get("context", {}).get("kind", "")) == context_key:
+					_studio_read_queue.remove_at(index)
+		var entry := {"prepared": prepared, "context": context.duplicate(true)}
+		if context_key == "batch-latest":
+			_studio_read_queue.push_front(entry)
+		else:
+			_studio_read_queue.append(entry)
 		return true
 	return false
 
