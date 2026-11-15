@@ -1415,12 +1415,17 @@ def _semantic_generate_pixellab_pro_4x4(
         job_record["provider_mcp_request_count"] = count
         persist_job()
 
+    style_path = _repository_root() / "data" / "input" / "pixellab_style_reference.png"
+    style_png = style_path.read_bytes() if style_path.is_file() else None
+    if style_png is not None:
+        job_record["style_image_sha256"] = hashlib.sha256(style_png).hexdigest()
     persist_job()
     try:
         generated = extensions.generate_pixellab_pro_4x4_atlas_mcp(
             description=normalized_description, width=width, height=height,
             max_colors=max_colors, seed=normalized_seed, on_submission_started=submission_started,
             on_job_accepted=accepted, on_mcp_request_started=mcp_request_started,
+            style_image_png=style_png,
         )
         return _finish_pixellab_atlas_job(
             job_record, persist_job, generated, resolved_operation_id=resolved_operation_id,

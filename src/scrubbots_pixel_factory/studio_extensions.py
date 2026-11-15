@@ -3588,6 +3588,7 @@ def generate_pixellab_pro_4x4_atlas_mcp(
     on_job_accepted: Callable[[str], None] | None = None,
     on_mcp_request_started: Callable[[int], None] | None = None,
     resume_job_id: str | None = None,
+    style_image_png: bytes | None = None,
 ) -> PixelLabPro4x4McpResult:
     """Generate and fetch one transparent 4x4 Pro atlas through PixelLab MCP.
 
@@ -3732,6 +3733,10 @@ def generate_pixellab_pro_4x4_atlas_mcp(
         "palette_name": "ScrubBots Palette V3",
         "max_colors": max_colors,
         "seed": actual_seed,
+        # Owner 2026-11-15: match the outline, detail and shading of a liked atlas
+        # (Palette V3 stays locked, so the style image's colours are not copied).
+        **({"style_image_url": "data:image/png;base64," + base64.b64encode(style_image_png).decode("ascii"),
+            "style_copy": ["outline", "detail", "shading"]} if style_image_png else {}),
     }}, tool_name="create_image_pro")
     job_id_value = _mcp_find_value(create_result, {"job_id", "jobId"})
     if not isinstance(job_id_value, str):

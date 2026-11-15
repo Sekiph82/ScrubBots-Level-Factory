@@ -536,3 +536,18 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   129/130 removed. After: REJECTED 0, Release Pool/Rejected empty, transaction index 1752 entries / 0 invalid groups,
   reconciliation repaired 0. Tests: test_claude_purge_rejected.py 3; PixelLab/atlas/Final/Release Pool suites 215
   passed, 3 skipped, 0 failed.
+
+## 2026-11-15 — Style image and richer prompts
+
+- Batch with the original short prompts (rows 0094-0100): 14, 0, 16, 15, 16, 0, 0 of 16 passed; three whole atlases
+  were white cards, so the card problem is PixelLab-side, not caused by the earlier suffix. Owner liked the arctic
+  (PX-ATLAS-000140) and volcanic (141) sets and found desert (139) plain; owner stopped the batch.
+- PixelLab MCP create_image_pro (tools/list, free) accepts style_image_url/base64 + style_copy and reference_images.
+  generate_pixellab_pro_4x4_atlas_mcp takes style_image_png; when data/input/pixellab_style_reference.png exists the
+  launcher sends it with style_copy outline/detail/shading (Palette V3 stays locked) and records style_image_sha256 in
+  the job. Style image = atlas 140 with its rejected card cell (frame 3) cleared.
+- Prompt CSV (owner data): produced rows 0094-0100 removed (150 left); each prompt gets "Charming characterful
+  creatures with expressive faces and distinctive outfits or accessories with rich detail and shading. Each creature
+  is an isolated sprite on a transparent background." (no commas: the Studio CSV reader splits on them; no
+  white/card wording). Copies in docs/evidence/claude-prompt-csv-20261115/.
+- Tests: test_claude_pixellab_style_image.py 2 (sent only when configured); PixelLab transport/poll/recovery 66 passed.
