@@ -551,3 +551,9 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   is an isolated sprite on a transparent background." (no commas: the Studio CSV reader splits on them; no
   white/card wording). Copies in docs/evidence/claude-prompt-csv-20261115/.
 - Tests: test_claude_pixellab_style_image.py 2 (sent only when configured); PixelLab transport/poll/recovery 66 passed.
+- Owner-approved cleaning of four batch atlases (sources from Generation Staging, same flood-clean as 130/136):
+  oceanic frames 4/6/8/9/10/12, skyborne 13 frames (2, 9, 11 excluded: the clean removed light body parts), the two
+  later 0/16 atlases (marshland and the dragon/lizard-warrior set) 16 + 16 frames. Row-7 frame 2 (naga mage):
+  enclosed white removed (27 px) and on request the staff joined (3 grey -> brown, 3 outline pixels).
+  51 sprites added as owner edits LF-002340..LF-002390 (PENDING); oceanic originals LF-002231/2235/2237/2239 (no
+  status yet) set REJECTED and purged. Evidence: docs/evidence/claude-batch-clean-20261115/.

@@ -1,0 +1,316 @@
+{
+ "added": [
+  {
+   "atlas": "oceanic",
+   "frame": 4,
+   "original": "LF-002231.png",
+   "new": "LF-002340.png"
+  },
+  {
+   "atlas": "oceanic",
+   "frame": 6,
+   "original": "LF-002233.png",
+   "new": "LF-002341.png"
+  },
+  {
+   "atlas": "oceanic",
+   "frame": 8,
+   "original": "LF-002235.png",
+   "new": "LF-002342.png"
+  },
+  {
+   "atlas": "oceanic",
+   "frame": 9,
+   "original": "LF-002236.png",
+   "new": "LF-002343.png"
+  },
+  {
+   "atlas": "oceanic",
+   "frame": 10,
+   "original": "LF-002237.png",
+   "new": "LF-002344.png"
+  },
+  {
+   "atlas": "oceanic",
+   "frame": 12,
+   "original": "LF-002239.png",
+   "new": "LF-002345.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 1,
+   "original": "LF-002244.png",
+   "new": "LF-002346.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 3,
+   "original": "LF-002246.png",
+   "new": "LF-002347.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 4,
+   "original": "LF-002247.png",
+   "new": "LF-002348.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 5,
+   "original": "LF-002248.png",
+   "new": "LF-002349.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 6,
+   "original": "LF-002249.png",
+   "new": "LF-002350.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 7,
+   "original": "LF-002250.png",
+   "new": "LF-002351.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 8,
+   "original": "LF-002251.png",
+   "new": "LF-002352.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 10,
+   "original": "LF-002253.png",
+   "new": "LF-002353.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 12,
+   "original": "LF-002255.png",
+   "new": "LF-002354.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 13,
+   "original": "LF-002256.png",
+   "new": "LF-002355.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 14,
+   "original": "LF-002257.png",
+   "new": "LF-002356.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 15,
+   "original": "LF-002258.png",
+   "new": "LF-002357.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 16,
+   "original": "LF-002259.png",
+   "new": "LF-002358.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 1,
+   "original": "LF-002308.png",
+   "new": "LF-002359.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 2,
+   "original": "LF-002309.png",
+   "new": "LF-002360.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 3,
+   "original": "LF-002310.png",
+   "new": "LF-002361.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 4,
+   "original": "LF-002311.png",
+   "new": "LF-002362.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 5,
+   "original": "LF-002312.png",
+   "new": "LF-002363.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 6,
+   "original": "LF-002313.png",
+   "new": "LF-002364.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 7,
+   "original": "LF-002314.png",
+   "new": "LF-002365.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 8,
+   "original": "LF-002315.png",
+   "new": "LF-002366.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 9,
+   "original": "LF-002316.png",
+   "new": "LF-002367.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 10,
+   "original": "LF-002317.png",
+   "new": "LF-002368.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 11,
+   "original": "LF-002318.png",
+   "new": "LF-002369.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 12,
+   "original": "LF-002319.png",
+   "new": "LF-002370.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 13,
+   "original": "LF-002320.png",
+   "new": "LF-002371.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 14,
+   "original": "LF-002321.png",
+   "new": "LF-002372.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 15,
+   "original": "LF-002322.png",
+   "new": "LF-002373.png"
+  },
+  {
+   "atlas": "row6",
+   "frame": 16,
+   "original": "LF-002323.png",
+   "new": "LF-002374.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 1,
+   "original": "LF-002324.png",
+   "new": "LF-002375.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 2,
+   "original": "LF-002325.png",
+   "new": "LF-002376.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 3,
+   "original": "LF-002326.png",
+   "new": "LF-002377.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 4,
+   "original": "LF-002327.png",
+   "new": "LF-002378.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 5,
+   "original": "LF-002328.png",
+   "new": "LF-002379.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 6,
+   "original": "LF-002329.png",
+   "new": "LF-002380.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 7,
+   "original": "LF-002330.png",
+   "new": "LF-002381.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 8,
+   "original": "LF-002331.png",
+   "new": "LF-002382.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 9,
+   "original": "LF-002332.png",
+   "new": "LF-002383.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 10,
+   "original": "LF-002333.png",
+   "new": "LF-002384.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 11,
+   "original": "LF-002334.png",
+   "new": "LF-002385.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 12,
+   "original": "LF-002335.png",
+   "new": "LF-002386.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 13,
+   "original": "LF-002336.png",
+   "new": "LF-002387.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 14,
+   "original": "LF-002337.png",
+   "new": "LF-002388.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 15,
+   "original": "LF-002338.png",
+   "new": "LF-002389.png"
+  },
+  {
+   "atlas": "row7",
+   "frame": 16,
+   "original": "LF-002339.png",
+   "new": "LF-002390.png"
+  }
+ ],
+ "failed": [],
+ "purged_originals": [],
+ "purge": {
+  "purged": 0,
+  "skipped": []
+ }
+}
