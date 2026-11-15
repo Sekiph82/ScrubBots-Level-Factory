@@ -566,3 +566,11 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   as full white-card atlases (0/16) and were cleaned removing only border-reachable pure #FFFFFF; owner approved and
   the 32 cleaned sprites were added as LF-002474..LF-002505 (PENDING). Rows 0101-0105 removed from the prompt CSV
   (146 left). Studio startup this time: 1109 s. Evidence: docs/evidence/claude-style-test-20261115/.
+
+## 2026-11-15 — Owner 48-row PixelLab batch review and cleanup
+
+- Owner ran 48 CSV rows in Studio (14:33–15:55 UTC). 35 atlases passed intake (560 frames PENDING); 13 came back with white cards (FRAMES_REJECTED).
+- Watcher cleaned all 208 frames of the 13 card atlases (pure-#FFFFFF flood from frame border + <=6 px speck removal), archived them as owner edits, imported and set PENDING; 0 archive failures. Rejected originals were auto-purged.
+- Scan of all 768 final frames: 25 passing frames contain border-reachable white, all reviewed visually as art pixels (snow, sparkles, bones, highlights) — no card fragments. Sheet: `docs/evidence/claude-batch48-20261115/residual-white-review.png`.
+- Detached-component scan of cleaned frames found 5 grey card-edge strips left by the first cleanup (LF-002569, LF-002678, LF-002681, LF-002854, LF-003198). Stripped, re-archived as LF-003482..003486 PENDING; superseded versions set REJECTED and purged. 3 detached sparkles kept as art. Sheet: `cleaned-detached-review.png`, mapping `refix-v2.json`.
+- Release Pool after: 2440 records — READY 1483, PENDING 955, FAILED 2, REJECTED 0. Final: 3048 PNGs.

@@ -1,0 +1,1343 @@
+{
+ "1794753215-4845305398": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794753363-4993290504": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794753463-5093160482": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002538.png",
+    "LF-002554.png"
+   ],
+   [
+    2,
+    "LF-002539.png",
+    "LF-002555.png"
+   ],
+   [
+    3,
+    "LF-002540.png",
+    "LF-002556.png"
+   ],
+   [
+    4,
+    "LF-002541.png",
+    "LF-002557.png"
+   ],
+   [
+    5,
+    "LF-002542.png",
+    "LF-002558.png"
+   ],
+   [
+    6,
+    "LF-002543.png",
+    "LF-002559.png"
+   ],
+   [
+    7,
+    "LF-002544.png",
+    "LF-002560.png"
+   ],
+   [
+    8,
+    "LF-002545.png",
+    "LF-002561.png"
+   ],
+   [
+    9,
+    "LF-002546.png",
+    "LF-002562.png"
+   ],
+   [
+    10,
+    "LF-002547.png",
+    "LF-002563.png"
+   ],
+   [
+    11,
+    "LF-002548.png",
+    "LF-002564.png"
+   ],
+   [
+    12,
+    "LF-002549.png",
+    "LF-002565.png"
+   ],
+   [
+    13,
+    "LF-002550.png",
+    "LF-002566.png"
+   ],
+   [
+    14,
+    "LF-002551.png",
+    "LF-002567.png"
+   ],
+   [
+    15,
+    "LF-002552.png",
+    "LF-002568.png"
+   ],
+   [
+    16,
+    "LF-002553.png",
+    "LF-002569.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794753532-5162266286": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002570.png",
+    "LF-002602.png"
+   ],
+   [
+    2,
+    "LF-002571.png",
+    "LF-002603.png"
+   ],
+   [
+    3,
+    "LF-002572.png",
+    "LF-002604.png"
+   ],
+   [
+    4,
+    "LF-002573.png",
+    "LF-002605.png"
+   ],
+   [
+    5,
+    "LF-002574.png",
+    "LF-002606.png"
+   ],
+   [
+    6,
+    "LF-002575.png",
+    "LF-002607.png"
+   ],
+   [
+    7,
+    "LF-002576.png",
+    "LF-002608.png"
+   ],
+   [
+    8,
+    "LF-002577.png",
+    "LF-002609.png"
+   ],
+   [
+    9,
+    "LF-002578.png",
+    "LF-002610.png"
+   ],
+   [
+    10,
+    "LF-002579.png",
+    "LF-002611.png"
+   ],
+   [
+    11,
+    "LF-002580.png",
+    "LF-002612.png"
+   ],
+   [
+    12,
+    "LF-002581.png",
+    "LF-002613.png"
+   ],
+   [
+    13,
+    "LF-002582.png",
+    "LF-002614.png"
+   ],
+   [
+    14,
+    "LF-002583.png",
+    "LF-002615.png"
+   ],
+   [
+    15,
+    "LF-002584.png",
+    "LF-002616.png"
+   ],
+   [
+    16,
+    "LF-002585.png",
+    "LF-002617.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794753606-5236646965": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794753715-5345236599": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794753815-5445301038": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002634.png",
+    "LF-002666.png"
+   ],
+   [
+    2,
+    "LF-002635.png",
+    "LF-002667.png"
+   ],
+   [
+    3,
+    "LF-002636.png",
+    "LF-002668.png"
+   ],
+   [
+    4,
+    "LF-002637.png",
+    "LF-002669.png"
+   ],
+   [
+    5,
+    "LF-002638.png",
+    "LF-002670.png"
+   ],
+   [
+    6,
+    "LF-002639.png",
+    "LF-002671.png"
+   ],
+   [
+    7,
+    "LF-002640.png",
+    "LF-002672.png"
+   ],
+   [
+    8,
+    "LF-002641.png",
+    "LF-002673.png"
+   ],
+   [
+    9,
+    "LF-002642.png",
+    "LF-002674.png"
+   ],
+   [
+    10,
+    "LF-002643.png",
+    "LF-002675.png"
+   ],
+   [
+    11,
+    "LF-002644.png",
+    "LF-002676.png"
+   ],
+   [
+    12,
+    "LF-002645.png",
+    "LF-002677.png"
+   ],
+   [
+    13,
+    "LF-002646.png",
+    "LF-002678.png"
+   ],
+   [
+    14,
+    "LF-002647.png",
+    "LF-002679.png"
+   ],
+   [
+    15,
+    "LF-002648.png",
+    "LF-002680.png"
+   ],
+   [
+    16,
+    "LF-002649.png",
+    "LF-002681.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794753889-5519911015": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002650.png",
+    "LF-002682.png"
+   ],
+   [
+    2,
+    "LF-002651.png",
+    "LF-002683.png"
+   ],
+   [
+    3,
+    "LF-002652.png",
+    "LF-002684.png"
+   ],
+   [
+    4,
+    "LF-002653.png",
+    "LF-002685.png"
+   ],
+   [
+    5,
+    "LF-002654.png",
+    "LF-002686.png"
+   ],
+   [
+    6,
+    "LF-002655.png",
+    "LF-002687.png"
+   ],
+   [
+    7,
+    "LF-002656.png",
+    "LF-002688.png"
+   ],
+   [
+    8,
+    "LF-002657.png",
+    "LF-002689.png"
+   ],
+   [
+    9,
+    "LF-002658.png",
+    "LF-002690.png"
+   ],
+   [
+    10,
+    "LF-002659.png",
+    "LF-002691.png"
+   ],
+   [
+    11,
+    "LF-002660.png",
+    "LF-002692.png"
+   ],
+   [
+    12,
+    "LF-002661.png",
+    "LF-002693.png"
+   ],
+   [
+    13,
+    "LF-002662.png",
+    "LF-002694.png"
+   ],
+   [
+    14,
+    "LF-002663.png",
+    "LF-002695.png"
+   ],
+   [
+    15,
+    "LF-002664.png",
+    "LF-002696.png"
+   ],
+   [
+    16,
+    "LF-002665.png",
+    "LF-002697.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794753963-5594008759": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754072-5702778096": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002714.png",
+    "LF-002746.png"
+   ],
+   [
+    2,
+    "LF-002715.png",
+    "LF-002747.png"
+   ],
+   [
+    3,
+    "LF-002716.png",
+    "LF-002748.png"
+   ],
+   [
+    4,
+    "LF-002717.png",
+    "LF-002749.png"
+   ],
+   [
+    5,
+    "LF-002718.png",
+    "LF-002750.png"
+   ],
+   [
+    6,
+    "LF-002719.png",
+    "LF-002751.png"
+   ],
+   [
+    7,
+    "LF-002720.png",
+    "LF-002752.png"
+   ],
+   [
+    8,
+    "LF-002721.png",
+    "LF-002753.png"
+   ],
+   [
+    9,
+    "LF-002722.png",
+    "LF-002754.png"
+   ],
+   [
+    10,
+    "LF-002723.png",
+    "LF-002755.png"
+   ],
+   [
+    11,
+    "LF-002724.png",
+    "LF-002756.png"
+   ],
+   [
+    12,
+    "LF-002725.png",
+    "LF-002757.png"
+   ],
+   [
+    13,
+    "LF-002726.png",
+    "LF-002758.png"
+   ],
+   [
+    14,
+    "LF-002727.png",
+    "LF-002759.png"
+   ],
+   [
+    15,
+    "LF-002728.png",
+    "LF-002760.png"
+   ],
+   [
+    16,
+    "LF-002729.png",
+    "LF-002761.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794754153-5783299232": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754255-5886028506": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754353-5983999298": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754469-6099258798": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754567-6197785829": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002810.png",
+    "LF-002842.png"
+   ],
+   [
+    2,
+    "LF-002811.png",
+    "LF-002843.png"
+   ],
+   [
+    3,
+    "LF-002812.png",
+    "LF-002844.png"
+   ],
+   [
+    4,
+    "LF-002813.png",
+    "LF-002845.png"
+   ],
+   [
+    5,
+    "LF-002814.png",
+    "LF-002846.png"
+   ],
+   [
+    6,
+    "LF-002815.png",
+    "LF-002847.png"
+   ],
+   [
+    7,
+    "LF-002816.png",
+    "LF-002848.png"
+   ],
+   [
+    8,
+    "LF-002817.png",
+    "LF-002849.png"
+   ],
+   [
+    9,
+    "LF-002818.png",
+    "LF-002850.png"
+   ],
+   [
+    10,
+    "LF-002819.png",
+    "LF-002851.png"
+   ],
+   [
+    11,
+    "LF-002820.png",
+    "LF-002852.png"
+   ],
+   [
+    12,
+    "LF-002821.png",
+    "LF-002853.png"
+   ],
+   [
+    13,
+    "LF-002822.png",
+    "LF-002854.png"
+   ],
+   [
+    14,
+    "LF-002823.png",
+    "LF-002855.png"
+   ],
+   [
+    15,
+    "LF-002824.png",
+    "LF-002856.png"
+   ],
+   [
+    16,
+    "LF-002825.png",
+    "LF-002857.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794754636-6266652559": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754758-6388856399": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794754868-6498673890": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755017-6647758664": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755122-6752929176": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755222-6852884367": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755328-6958642185": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755446-7076204923": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002954.png",
+    "LF-002986.png"
+   ],
+   [
+    2,
+    "LF-002955.png",
+    "LF-002987.png"
+   ],
+   [
+    3,
+    "LF-002956.png",
+    "LF-002988.png"
+   ],
+   [
+    4,
+    "LF-002957.png",
+    "LF-002989.png"
+   ],
+   [
+    5,
+    "LF-002958.png",
+    "LF-002990.png"
+   ],
+   [
+    6,
+    "LF-002959.png",
+    "LF-002991.png"
+   ],
+   [
+    7,
+    "LF-002960.png",
+    "LF-002992.png"
+   ],
+   [
+    8,
+    "LF-002961.png",
+    "LF-002993.png"
+   ],
+   [
+    9,
+    "LF-002962.png",
+    "LF-002994.png"
+   ],
+   [
+    10,
+    "LF-002963.png",
+    "LF-002995.png"
+   ],
+   [
+    11,
+    "LF-002964.png",
+    "LF-002996.png"
+   ],
+   [
+    12,
+    "LF-002965.png",
+    "LF-002997.png"
+   ],
+   [
+    13,
+    "LF-002966.png",
+    "LF-002998.png"
+   ],
+   [
+    14,
+    "LF-002967.png",
+    "LF-002999.png"
+   ],
+   [
+    15,
+    "LF-002968.png",
+    "LF-003000.png"
+   ],
+   [
+    16,
+    "LF-002969.png",
+    "LF-003001.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794755526-7156532358": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-002970.png",
+    "LF-003002.png"
+   ],
+   [
+    2,
+    "LF-002971.png",
+    "LF-003003.png"
+   ],
+   [
+    3,
+    "LF-002972.png",
+    "LF-003004.png"
+   ],
+   [
+    4,
+    "LF-002973.png",
+    "LF-003005.png"
+   ],
+   [
+    5,
+    "LF-002974.png",
+    "LF-003006.png"
+   ],
+   [
+    6,
+    "LF-002975.png",
+    "LF-003007.png"
+   ],
+   [
+    7,
+    "LF-002976.png",
+    "LF-003008.png"
+   ],
+   [
+    8,
+    "LF-002977.png",
+    "LF-003009.png"
+   ],
+   [
+    9,
+    "LF-002978.png",
+    "LF-003010.png"
+   ],
+   [
+    10,
+    "LF-002979.png",
+    "LF-003011.png"
+   ],
+   [
+    11,
+    "LF-002980.png",
+    "LF-003012.png"
+   ],
+   [
+    12,
+    "LF-002981.png",
+    "LF-003013.png"
+   ],
+   [
+    13,
+    "LF-002982.png",
+    "LF-003014.png"
+   ],
+   [
+    14,
+    "LF-002983.png",
+    "LF-003015.png"
+   ],
+   [
+    15,
+    "LF-002984.png",
+    "LF-003016.png"
+   ],
+   [
+    16,
+    "LF-002985.png",
+    "LF-003017.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794755601-7231727249": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755702-7332284158": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-003034.png",
+    "LF-003066.png"
+   ],
+   [
+    2,
+    "LF-003035.png",
+    "LF-003067.png"
+   ],
+   [
+    3,
+    "LF-003036.png",
+    "LF-003068.png"
+   ],
+   [
+    4,
+    "LF-003037.png",
+    "LF-003069.png"
+   ],
+   [
+    5,
+    "LF-003038.png",
+    "LF-003070.png"
+   ],
+   [
+    6,
+    "LF-003039.png",
+    "LF-003071.png"
+   ],
+   [
+    7,
+    "LF-003040.png",
+    "LF-003072.png"
+   ],
+   [
+    8,
+    "LF-003041.png",
+    "LF-003073.png"
+   ],
+   [
+    9,
+    "LF-003042.png",
+    "LF-003074.png"
+   ],
+   [
+    10,
+    "LF-003043.png",
+    "LF-003075.png"
+   ],
+   [
+    11,
+    "LF-003044.png",
+    "LF-003076.png"
+   ],
+   [
+    12,
+    "LF-003045.png",
+    "LF-003077.png"
+   ],
+   [
+    13,
+    "LF-003046.png",
+    "LF-003078.png"
+   ],
+   [
+    14,
+    "LF-003047.png",
+    "LF-003079.png"
+   ],
+   [
+    15,
+    "LF-003048.png",
+    "LF-003080.png"
+   ],
+   [
+    16,
+    "LF-003049.png",
+    "LF-003081.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794755793-7423154290": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-003050.png",
+    "LF-003082.png"
+   ],
+   [
+    2,
+    "LF-003051.png",
+    "LF-003083.png"
+   ],
+   [
+    3,
+    "LF-003052.png",
+    "LF-003084.png"
+   ],
+   [
+    4,
+    "LF-003053.png",
+    "LF-003085.png"
+   ],
+   [
+    5,
+    "LF-003054.png",
+    "LF-003086.png"
+   ],
+   [
+    6,
+    "LF-003055.png",
+    "LF-003087.png"
+   ],
+   [
+    7,
+    "LF-003056.png",
+    "LF-003088.png"
+   ],
+   [
+    8,
+    "LF-003057.png",
+    "LF-003089.png"
+   ],
+   [
+    9,
+    "LF-003058.png",
+    "LF-003090.png"
+   ],
+   [
+    10,
+    "LF-003059.png",
+    "LF-003091.png"
+   ],
+   [
+    11,
+    "LF-003060.png",
+    "LF-003092.png"
+   ],
+   [
+    12,
+    "LF-003061.png",
+    "LF-003093.png"
+   ],
+   [
+    13,
+    "LF-003062.png",
+    "LF-003094.png"
+   ],
+   [
+    14,
+    "LF-003063.png",
+    "LF-003095.png"
+   ],
+   [
+    15,
+    "LF-003064.png",
+    "LF-003096.png"
+   ],
+   [
+    16,
+    "LF-003065.png",
+    "LF-003097.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794755873-7503698909": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794755989-7619919988": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756095-7726004539": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756208-7838238958": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-003146.png",
+    "LF-003178.png"
+   ],
+   [
+    2,
+    "LF-003147.png",
+    "LF-003179.png"
+   ],
+   [
+    3,
+    "LF-003148.png",
+    "LF-003180.png"
+   ],
+   [
+    4,
+    "LF-003149.png",
+    "LF-003181.png"
+   ],
+   [
+    5,
+    "LF-003150.png",
+    "LF-003182.png"
+   ],
+   [
+    6,
+    "LF-003151.png",
+    "LF-003183.png"
+   ],
+   [
+    7,
+    "LF-003152.png",
+    "LF-003184.png"
+   ],
+   [
+    8,
+    "LF-003153.png",
+    "LF-003185.png"
+   ],
+   [
+    9,
+    "LF-003154.png",
+    "LF-003186.png"
+   ],
+   [
+    10,
+    "LF-003155.png",
+    "LF-003187.png"
+   ],
+   [
+    11,
+    "LF-003156.png",
+    "LF-003188.png"
+   ],
+   [
+    12,
+    "LF-003157.png",
+    "LF-003189.png"
+   ],
+   [
+    13,
+    "LF-003158.png",
+    "LF-003190.png"
+   ],
+   [
+    14,
+    "LF-003159.png",
+    "LF-003191.png"
+   ],
+   [
+    15,
+    "LF-003160.png",
+    "LF-003192.png"
+   ],
+   [
+    16,
+    "LF-003161.png",
+    "LF-003193.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794756296-7926171242": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-003162.png",
+    "LF-003194.png"
+   ],
+   [
+    2,
+    "LF-003163.png",
+    "LF-003195.png"
+   ],
+   [
+    3,
+    "LF-003164.png",
+    "LF-003196.png"
+   ],
+   [
+    4,
+    "LF-003165.png",
+    "LF-003197.png"
+   ],
+   [
+    5,
+    "LF-003166.png",
+    "LF-003198.png"
+   ],
+   [
+    6,
+    "LF-003167.png",
+    "LF-003199.png"
+   ],
+   [
+    7,
+    "LF-003168.png",
+    "LF-003200.png"
+   ],
+   [
+    8,
+    "LF-003169.png",
+    "LF-003201.png"
+   ],
+   [
+    9,
+    "LF-003170.png",
+    "LF-003202.png"
+   ],
+   [
+    10,
+    "LF-003171.png",
+    "LF-003203.png"
+   ],
+   [
+    11,
+    "LF-003172.png",
+    "LF-003204.png"
+   ],
+   [
+    12,
+    "LF-003173.png",
+    "LF-003205.png"
+   ],
+   [
+    13,
+    "LF-003174.png",
+    "LF-003206.png"
+   ],
+   [
+    14,
+    "LF-003175.png",
+    "LF-003207.png"
+   ],
+   [
+    15,
+    "LF-003176.png",
+    "LF-003208.png"
+   ],
+   [
+    16,
+    "LF-003177.png",
+    "LF-003209.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794756383-8014043832": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756484-8114540133": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756585-8215914324": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756698-8328780157": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756800-8430497050": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794756903-8533983292": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757011-8641580078": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757163-8793864127": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757260-8890564467": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757370-9000689245": {
+  "state": "FRAMES_REJECTED",
+  "pass": 0,
+  "added": [
+   [
+    1,
+    "LF-003354.png",
+    "LF-003370.png"
+   ],
+   [
+    2,
+    "LF-003355.png",
+    "LF-003371.png"
+   ],
+   [
+    3,
+    "LF-003356.png",
+    "LF-003372.png"
+   ],
+   [
+    4,
+    "LF-003357.png",
+    "LF-003373.png"
+   ],
+   [
+    5,
+    "LF-003358.png",
+    "LF-003374.png"
+   ],
+   [
+    6,
+    "LF-003359.png",
+    "LF-003375.png"
+   ],
+   [
+    7,
+    "LF-003360.png",
+    "LF-003376.png"
+   ],
+   [
+    8,
+    "LF-003361.png",
+    "LF-003377.png"
+   ],
+   [
+    9,
+    "LF-003362.png",
+    "LF-003378.png"
+   ],
+   [
+    10,
+    "LF-003363.png",
+    "LF-003379.png"
+   ],
+   [
+    11,
+    "LF-003364.png",
+    "LF-003380.png"
+   ],
+   [
+    12,
+    "LF-003365.png",
+    "LF-003381.png"
+   ],
+   [
+    13,
+    "LF-003366.png",
+    "LF-003382.png"
+   ],
+   [
+    14,
+    "LF-003367.png",
+    "LF-003383.png"
+   ],
+   [
+    15,
+    "LF-003368.png",
+    "LF-003384.png"
+   ],
+   [
+    16,
+    "LF-003369.png",
+    "LF-003385.png"
+   ]
+  ],
+  "failed": []
+ },
+ "1794757435-9065429004": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757556-9186090848": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757671-9301197016": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757796-9426282450": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757899-9530007751": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ },
+ "1794757999-9629818879": {
+  "state": "SOURCES_IMPORTED_NOT_READY",
+  "pass": 16,
+  "added": [],
+  "failed": []
+ }
+}
