@@ -82,3 +82,20 @@ def test_partial_white_card_inside_frame_is_rejected_but_outlined_white_art_is_n
     _, animal = inspect_atlas(_card_atlas(True), max_colors=12)
     assert all("OPAQUE_BACKGROUND" in record["reasons"] for record in card)
     assert not any("OPAQUE_BACKGROUND" in record["reasons"] for record in animal)
+
+
+def test_card_behind_two_frames_rejects_only_those_frames():
+    """Gallery sheet of row 0094: a white card behind frames 1 and 12 only."""
+    from io import BytesIO
+    from PIL import Image
+
+    outlined = Image.open(BytesIO(_card_atlas(True))).convert("RGBA")
+    bare = Image.open(BytesIO(_card_atlas(False))).convert("RGBA")
+    for index in (0, 11):
+        box = ((index % 4) * 56, (index // 4) * 56, (index % 4) * 56 + 56, (index // 4) * 56 + 56)
+        outlined.paste(bare.crop(box), box[:2])
+    buffer = BytesIO()
+    outlined.save(buffer, format="PNG")
+    _, records = inspect_atlas(buffer.getvalue(), max_colors=12)
+    rejected = [record["index"] for record in records if "OPAQUE_BACKGROUND" in record["reasons"]]
+    assert rejected == [1, 12]

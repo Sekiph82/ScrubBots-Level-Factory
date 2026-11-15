@@ -78,6 +78,42 @@ LIGHT_BACKGROUND_MIN_FRAMES = 6
 # animal atlases such as 019 (max 2 frames) stay accepted.
 UNOUTLINED_LIGHT_FRAME_PIXELS = 40
 UNOUTLINED_LIGHT_MIN_FRAMES = 5
+# Owner 2026-11-15 (gallery sheet of row 0094): a card can sit behind only two or three
+# frames. A card has a long perfectly straight outline-less white border; drawn smoke,
+# wind or spirit art does not (those reach up to 220 outline-less pixels but their
+# straight runs stay short). Measured over 132 atlases: atlas 130 card frames 20-46 px,
+# 117 (white water/rock blocks under birds) 27, all other art <= 18 except one bust cut
+# flat at the frame bottom (28, atlas 122). One frame with a run >= 20 is rejected alone.
+LIGHT_CARD_EDGE_PIXELS = 20
+
+
+def light_card_edge(frame: Image.Image) -> int:
+    """Longest straight run of opaque white/#D4D7D9 pixels bordering transparency on one side."""
+    rgba = frame.convert("RGBA")
+    width, height = rgba.size
+    pixels = rgba.load()
+
+    def light(x: int, y: int) -> bool:
+        red, green, blue, alpha = pixels[x, y]
+        return alpha == 255 and (red, green, blue) in LIGHT_BACKGROUND_RGB
+
+    def clear(x: int, y: int) -> bool:
+        return not (0 <= x < width and 0 <= y < height) or pixels[x, y][3] == 0
+
+    best = 0
+    for x in range(width):
+        for side in (-1, 1):
+            run = 0
+            for y in range(height):
+                run = run + 1 if light(x, y) and clear(x + side, y) else 0
+                best = max(best, run)
+    for y in range(height):
+        for side in (-1, 1):
+            run = 0
+            for x in range(width):
+                run = run + 1 if light(x, y) and clear(x, y + side) else 0
+                best = max(best, run)
+    return best
 
 
 def unoutlined_light_pixels(frame: Image.Image) -> int:
@@ -324,12 +360,17 @@ def _frame_records(atlas: Image.Image, max_colors: int) -> tuple[tuple[Image.Ima
                 "reasons": reasons,
                 "light_background_ratio": round(light_background_ratio(frame), 4),
                 "unoutlined_light_pixels": unoutlined_light_pixels(frame),
+                "light_card_edge": light_card_edge(frame),
             })
+            if records[-1]["light_card_edge"] >= LIGHT_CARD_EDGE_PIXELS:
+                records[-1]["reasons"].append("OPAQUE_BACKGROUND")
+                records[-1]["intake_status"] = "REJECTED"
 
     if (sum(record["light_background_ratio"] > LIGHT_BACKGROUND_FRAME_RATIO for record in records) >= LIGHT_BACKGROUND_MIN_FRAMES
             or sum(record["unoutlined_light_pixels"] >= UNOUTLINED_LIGHT_FRAME_PIXELS for record in records) >= UNOUTLINED_LIGHT_MIN_FRAMES):
         for record in records:
-            record["reasons"].append("OPAQUE_BACKGROUND")
+            if "OPAQUE_BACKGROUND" not in record["reasons"]:
+                record["reasons"].append("OPAQUE_BACKGROUND")
             record["intake_status"] = "REJECTED"
 
     reconstructed = Image.new("RGBA", atlas.size, (0, 0, 0, 0))

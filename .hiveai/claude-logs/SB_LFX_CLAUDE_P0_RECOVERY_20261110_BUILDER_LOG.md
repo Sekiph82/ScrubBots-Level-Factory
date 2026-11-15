@@ -504,3 +504,9 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   owner's original text from the pre-suffix backup (byte check: every current prompt started with its original).
   Backup of the suffix version: docs/evidence/claude-prompt-csv-20261115/before-revert-to-original.csv.
 - New detector on atlases 128-135: 129 and 130 rejected (OPAQUE_BACKGROUND), the other six 16/16 PASS.
+- Owner screenshot: PixelLab gallery sheet of row 0094 (REPTILE oceanic) with white cards behind frames 1 and 12.
+  PixelLab finished it although the shutdown sent cancel_job; it is not in the Factory (Grid Files end at 135 =
+  REPTILE row 0093; 133-135 are clean). The atlas rule (>= 5 frames) would have let it pass. Added a per-frame rule:
+  light_card_edge = longest straight outline-less white border; >= 20 px rejects that frame (OPAQUE_BACKGROUND).
+  Calibration over 132 atlases: 130 card frames 20-46, 117 white blocks 27, legit smoke/wind/spirit art <= 18, one
+  flat-cut bust in 122 = 28 (accepted cost). Test: card behind frames 1 and 12 rejects exactly those (old code: none).
