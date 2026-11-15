@@ -70,6 +70,31 @@ def pad_atlas_frames(raw_png: bytes) -> bytes:
 LIGHT_BACKGROUND_RGB = frozenset({(255, 255, 255), (212, 215, 217)})
 LIGHT_BACKGROUND_FRAME_RATIO = 0.15
 LIGHT_BACKGROUND_MIN_FRAMES = 6
+# Owner 2026-11-15 (PX-ATLAS-000130): PixelLab can also leave partial white cards that
+# do not reach the frame edge, so the ratio above misses them. PixelLab sprites have a
+# dark outline; a card (or an outline-less white blob) shows opaque white/#D4D7D9
+# pixels directly on the silhouette border. Calibrated on atlases 001-132: >= 5 frames
+# with >= 40 such pixels flags only 082 (kept arctic set), 129 and 130; clean white-
+# animal atlases such as 019 (max 2 frames) stay accepted.
+UNOUTLINED_LIGHT_FRAME_PIXELS = 40
+UNOUTLINED_LIGHT_MIN_FRAMES = 5
+
+
+def unoutlined_light_pixels(frame: Image.Image) -> int:
+    """Opaque white/#D4D7D9 pixels with a transparent (or off-frame) 4-neighbour."""
+    rgba = frame.convert("RGBA")
+    width, height = rgba.size
+    pixels = rgba.load()
+    count = 0
+    for y in range(height):
+        for x in range(width):
+            red, green, blue, alpha = pixels[x, y]
+            if alpha != 255 or (red, green, blue) not in LIGHT_BACKGROUND_RGB:
+                continue
+            if any(not (0 <= nx < width and 0 <= ny < height) or pixels[nx, ny][3] == 0
+                   for nx, ny in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1))):
+                count += 1
+    return count
 
 
 def light_background_ratio(frame: Image.Image) -> float:
@@ -298,9 +323,11 @@ def _frame_records(atlas: Image.Image, max_colors: int) -> tuple[tuple[Image.Ima
                 "intake_status": "PASS" if not reasons else "REJECTED",
                 "reasons": reasons,
                 "light_background_ratio": round(light_background_ratio(frame), 4),
+                "unoutlined_light_pixels": unoutlined_light_pixels(frame),
             })
 
-    if sum(record["light_background_ratio"] > LIGHT_BACKGROUND_FRAME_RATIO for record in records) >= LIGHT_BACKGROUND_MIN_FRAMES:
+    if (sum(record["light_background_ratio"] > LIGHT_BACKGROUND_FRAME_RATIO for record in records) >= LIGHT_BACKGROUND_MIN_FRAMES
+            or sum(record["unoutlined_light_pixels"] >= UNOUTLINED_LIGHT_FRAME_PIXELS for record in records) >= UNOUTLINED_LIGHT_MIN_FRAMES):
         for record in records:
             record["reasons"].append("OPAQUE_BACKGROUND")
             record["intake_status"] = "REJECTED"

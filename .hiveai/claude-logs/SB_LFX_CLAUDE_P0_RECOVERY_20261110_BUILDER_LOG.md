@@ -481,3 +481,18 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   cleaned/, before-after.png, asset-name-manifest.before.json).
 - Tests: test_claude_owner_edited_sprites.py 3 (cleaner rules, archive naming/refusal, EDGE_CLIPPED -> REJECTED; the
   old function returned 0 for EDGE_CLIPPED-only manifests). PixelLab/atlas/Final/Release Pool/batch suites: 158 passed, 0 failed.
+
+## 2026-11-15 — Partial white cards (PX-ATLAS-000130) and poor arctic set (129)
+
+- Owner: the latest two Studio batch atlases look bad. 129 (SB_ATLAS_0087 MAMMAL arctic): small outline-less white
+  animals, 15/16 PASS. 130 (SB_ATLAS_0088 MAMMAL volcanic): partial white cards behind ~8 frames, 16/16 PASS. 128, 131,
+  132 are clean with 16/16 PASS and the 52->56 margin (no edge contact).
+- Why the background check missed 130: the cards stop a few pixels inside the frame, so the edge-connected light ratio
+  stayed under 0.15 in all but 4 frames (threshold 6).
+- Fix: unoutlined_light_pixels counts opaque white/#D4D7D9 pixels directly on the silhouette border (PixelLab animals
+  have a dark outline). >= 5 frames with >= 40 such pixels -> OPAQUE_BACKGROUND on the atlas. Calibration over 132
+  atlases: flags only 082 (owner-kept arctic set, not re-processed), 129, 130; the white-animal atlas 019 stays
+  accepted. Test: partial card without outline rejected, same block with an outline accepted (fails on old code: the
+  card is not edge-connected).
+- Not deployed yet: the owner's Studio batch is running. 129/130 frames are imported but have no Release Pool status
+  yet; their status and the prompt suffix are owner decisions.

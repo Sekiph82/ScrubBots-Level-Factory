@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "level_factory" / "scripts"))
 import factory_core_launcher as launcher  # noqa: E402
 from scrubbots_pixel_factory.pixellab_pro_atlas import inspect_atlas  # noqa: E402
+from scrubbots_pixel_factory.contracts import CANONICAL_PALETTE  # noqa: E402
 
 
 def _atlas(card: bool) -> bytes:
@@ -46,3 +47,38 @@ def test_background_atlas_slices_get_a_rejected_status(monkeypatch):
     assert launcher._reject_background_atlas_frames({"atlas_path": "PX-ATLAS-000999.png"}, manifest) == 1
     assert calls == [("owner-upload-" + "a" * 64, "REJECTED")]
     assert launcher._reject_background_atlas_frames({}, {"frames": [{"index": 1, "sha256": "c" * 64, "reasons": []}]}) == 0
+
+
+def _card_atlas(outlined: bool) -> bytes:
+    """A white 20x30 block in every frame, away from the frame edge (PX-ATLAS-000130 pattern).
+
+    outlined=True draws a black outline around it, like a white PixelLab animal.
+    """
+    from io import BytesIO
+    from PIL import Image
+
+    black = CANONICAL_PALETTE.colors[0].rgb
+    atlas = Image.new("RGBA", (224, 224), (0, 0, 0, 0))
+    for index in range(16):
+        left, top = (index % 4) * 56 + 10, (index // 4) * 56 + 10
+        for x in range(left, left + 20):
+            for y in range(top, top + 30):
+                atlas.putpixel((x, y), (255, 255, 255, 255))
+        if outlined:
+            for x in range(left - 1, left + 21):
+                for y in (top - 1, top + 30):
+                    atlas.putpixel((x, y), (*black, 255))
+            for y in range(top - 1, top + 31):
+                for x in (left - 1, left + 20):
+                    atlas.putpixel((x, y), (*black, 255))
+        atlas.putpixel((left + 5 + index, top + 5), (*black, 255))   # 16 different frames
+    buffer = BytesIO()
+    atlas.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def test_partial_white_card_inside_frame_is_rejected_but_outlined_white_art_is_not():
+    _, card = inspect_atlas(_card_atlas(False), max_colors=12)
+    _, animal = inspect_atlas(_card_atlas(True), max_colors=12)
+    assert all("OPAQUE_BACKGROUND" in record["reasons"] for record in card)
+    assert not any("OPAQUE_BACKGROUND" in record["reasons"] for record in animal)
