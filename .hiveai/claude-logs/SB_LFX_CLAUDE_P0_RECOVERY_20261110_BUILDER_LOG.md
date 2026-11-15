@@ -560,3 +560,9 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Skyborne 2/9/11 fixed by hand on request: the card is pure #FFFFFF while the animals' light parts are #D4D7D9, so
   only border-reachable pure white was removed (2-7 enclosed white highlight pixels kept). Owner approved; added as
   owner edits (PENDING). All 64 frames of the four atlases are now in Final (10 untouched oceanic + 54 cleaned).
+- Style-image test (owner-approved 5 generations, Studio GUI: 3 Single + 2 via a 2-row batch CSV
+  data/input/pixellab_batch_test_2_rows.csv): AMPHIBIAN natural variety / woodland / cavern / oceanic / skyborne.
+  Design matched the arctic style in all five. Cavern, oceanic, skyborne 16/16 PASS; natural variety and woodland came
+  as full white-card atlases (0/16) and were cleaned removing only border-reachable pure #FFFFFF; owner approved and
+  the 32 cleaned sprites were added as LF-002474..LF-002505 (PENDING). Rows 0101-0105 removed from the prompt CSV
+  (146 left). Studio startup this time: 1109 s. Evidence: docs/evidence/claude-style-test-20261115/.

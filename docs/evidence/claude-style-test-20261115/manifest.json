@@ -1,0 +1,197 @@
+{
+ "added": [
+  {
+   "atlas": "natural",
+   "frame": 1,
+   "original": "LF-002394.png",
+   "new": "LF-002474.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 2,
+   "original": "LF-002395.png",
+   "new": "LF-002475.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 3,
+   "original": "LF-002396.png",
+   "new": "LF-002476.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 4,
+   "original": "LF-002397.png",
+   "new": "LF-002477.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 5,
+   "original": "LF-002398.png",
+   "new": "LF-002478.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 6,
+   "original": "LF-002399.png",
+   "new": "LF-002479.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 7,
+   "original": "LF-002400.png",
+   "new": "LF-002480.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 8,
+   "original": "LF-002401.png",
+   "new": "LF-002481.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 9,
+   "original": "LF-002402.png",
+   "new": "LF-002482.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 10,
+   "original": "LF-002403.png",
+   "new": "LF-002483.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 11,
+   "original": "LF-002404.png",
+   "new": "LF-002484.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 12,
+   "original": "LF-002405.png",
+   "new": "LF-002485.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 13,
+   "original": "LF-002406.png",
+   "new": "LF-002486.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 14,
+   "original": "LF-002407.png",
+   "new": "LF-002487.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 15,
+   "original": "LF-002408.png",
+   "new": "LF-002488.png"
+  },
+  {
+   "atlas": "natural",
+   "frame": 16,
+   "original": "LF-002409.png",
+   "new": "LF-002489.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 1,
+   "original": "LF-002410.png",
+   "new": "LF-002490.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 2,
+   "original": "LF-002411.png",
+   "new": "LF-002491.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 3,
+   "original": "LF-002412.png",
+   "new": "LF-002492.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 4,
+   "original": "LF-002413.png",
+   "new": "LF-002493.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 5,
+   "original": "LF-002414.png",
+   "new": "LF-002494.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 6,
+   "original": "LF-002415.png",
+   "new": "LF-002495.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 7,
+   "original": "LF-002416.png",
+   "new": "LF-002496.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 8,
+   "original": "LF-002417.png",
+   "new": "LF-002497.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 9,
+   "original": "LF-002418.png",
+   "new": "LF-002498.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 10,
+   "original": "LF-002419.png",
+   "new": "LF-002499.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 11,
+   "original": "LF-002420.png",
+   "new": "LF-002500.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 12,
+   "original": "LF-002421.png",
+   "new": "LF-002501.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 13,
+   "original": "LF-002422.png",
+   "new": "LF-002502.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 14,
+   "original": "LF-002423.png",
+   "new": "LF-002503.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 15,
+   "original": "LF-002424.png",
+   "new": "LF-002504.png"
+  },
+  {
+   "atlas": "woodland",
+   "frame": 16,
+   "original": "LF-002425.png",
+   "new": "LF-002505.png"
+  }
+ ],
+ "failed": []
+}
