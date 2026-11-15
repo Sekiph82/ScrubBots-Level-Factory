@@ -520,3 +520,19 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Owner approved the cleaned 130 set: 14 frames added as LF-002212..002225; squirrel (LF-002101) and deer (LF-002108)
   additionally had enclosed white pixels removed on request (31 and 5 px) and were added after owner approval. All 16
   PENDING; the 130 originals stay REJECTED. Manifest: docs/evidence/claude-atlas130-clean-20261115/manifest.json.
+
+## 2026-11-15 — Rejected art is deleted, not kept
+
+- Owner: "rejected olan ... pngleri sistemde tutmak icin israr ediyorsun ... rejected is sil. sistemde yer kaplamasin".
+- Why a plain file delete was not enough: reconcile_status_projections rebuilds Release Pool projections from
+  .history, and the Final scan marks every slice of an atlas invalid when one listed slice is missing.
+- Code: owner_folder_batch accepts a transaction "purged_slices" list (other slices stay a valid group; a fully purged
+  atlas no longer needs its Grid Files PNG); owner_art_storage.purge_final_slice; owner_release_library.
+  purge_rejected_source (REJECTED only: projection, artwork copy, .objects blob, history); launcher
+  _purge_rejected_sources (also Imported folder and Level Factory candidate, emptied file by file, no recursion).
+  Atlas intake now purges its rejected slices right after marking them REJECTED.
+- Run: 122 REJECTED sources purged (624 files hashed beforehand in
+  docs/evidence/claude-purge-rejected-20261115/pre-purge-manifest.json; 941 deleted paths in purge-result.json), atlases
+  129/130 removed. After: REJECTED 0, Release Pool/Rejected empty, transaction index 1752 entries / 0 invalid groups,
+  reconciliation repaired 0. Tests: test_claude_purge_rejected.py 3; PixelLab/atlas/Final/Release Pool suites 215
+  passed, 3 skipped, 0 failed.

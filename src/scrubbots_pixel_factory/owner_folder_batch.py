@@ -70,8 +70,16 @@ def _pixellab_transaction_index(paths: dict[str, Path]) -> dict[str, dict[str, s
             expected[filename] = frame_sha
         if set(expected) != {str(frame.get("filename", "")) for frame in slices} or {frame.get("index") for frame in slices} != set(range(1, 17)):
             raise OwnerFolderBatchError("PixelLab atlas transaction must cover all sixteen row-major identities")
+        # Owner 2026-11-15: rejected slices are deleted, not kept. The transaction names
+        # them in purged_slices; the remaining slices stay a valid group, and a group
+        # whose slices are all purged no longer needs its Grid Files atlas.
+        purged = value.get("purged_slices", [])
+        if not isinstance(purged, list) or any(name not in expected for name in purged):
+            raise OwnerFolderBatchError("PixelLab atlas transaction purged slice list is invalid")
+        for name in purged:
+            expected.pop(name)
         group_valid = state == "FINALIZED"
-        if group_valid:
+        if group_valid and expected:
             atlas_path = paths["pixellab_grid_files"] / str(value["atlas_filename"])
             group_valid = not _is_reparse_point(atlas_path) and atlas_path.is_file()
             if group_valid:

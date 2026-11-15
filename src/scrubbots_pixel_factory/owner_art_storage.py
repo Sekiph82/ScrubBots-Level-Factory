@@ -316,6 +316,46 @@ def _write_content_addressed(directory: Path, filename: str, raw: bytes, expecte
         temporary.unlink(missing_ok=True)
 
 
+def purge_final_slice(filename: str, sha256: str, *, repository_root: str | Path | None = None) -> list[str]:
+    """Delete one rejected PNG from PixelLab Final (owner 2026-11-15: rejected art is not kept).
+
+    An atlas slice is first listed in its transaction's purged_slices so the other
+    slices stay a valid group; when every slice is purged the Grid Files atlas goes too.
+    """
+    canonical_root = factory_repository_root(repository_root)
+    paths = owner_art_paths(canonical_root)
+    target = paths["pixellab_final"] / filename
+    if Path(filename).name != filename or _is_reparse_point(target):
+        raise OwnerArtStorageError("purge target is unsafe")
+    deleted: list[str] = []
+    for transaction_path in sorted(paths["pixellab_transactions"].glob("pixellab-atlas-*.json")):
+        value = json.loads(transaction_path.read_text(encoding="utf-8"))
+        slices = {item.get("filename"): item.get("sha256") for item in value.get("slices", []) if isinstance(item, Mapping)}
+        if slices.get(filename) != sha256:
+            continue
+        purged = sorted(set(value.get("purged_slices", [])) | {filename})
+        value["purged_slices"] = purged
+        raw = (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, indent=2) + "\n").encode("utf-8")
+        temporary = transaction_path.with_name(f".{transaction_path.name}.{os.getpid()}.{os.urandom(6).hex()}.partial")
+        try:
+            temporary.write_bytes(raw)
+            fs_atomic.replace(temporary, transaction_path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        if len(purged) == len(slices):
+            atlas = paths["pixellab_grid_files"] / str(value.get("atlas_filename", ""))
+            if atlas.is_file() and not _is_reparse_point(atlas) and _hash(atlas.read_bytes()) == value.get("source_atlas_sha256"):
+                atlas.unlink()
+                deleted.append(str(atlas))
+        break
+    if target.is_file():
+        if _hash(target.read_bytes()) != sha256:
+            raise OwnerArtStorageError("Final PNG bytes do not match the rejected source")
+        target.unlink()
+        deleted.append(str(target))
+    return deleted
+
+
 def archive_owner_edited_sprite(raw_png: bytes, *, replaces: str, original_filename: str,
                                 repository_root: str | Path | None = None) -> dict[str, Any]:
     """Put one owner-edited sprite into PixelLab Final under a new LF name (owner 2026-11-15).

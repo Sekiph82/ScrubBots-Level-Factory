@@ -70,6 +70,7 @@ def test_edge_clipped_slices_get_a_rejected_status(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(library, "list_records", lambda: {"records": []})
     monkeypatch.setattr(library, "transition", lambda source_id, status, **kwargs: calls.append((source_id, status, kwargs["reason"])))
     monkeypatch.setattr(launcher, "_pixellab_final_slice_path", lambda catalog, frame: Path("Final") / f"LF-{frame['index']:06d}.png")
+    monkeypatch.setattr(launcher, "_purge_rejected_sources", lambda ids: {"purged": len(ids)})
     manifest = {"frames": [{"index": 1, "sha256": "a" * 64, "intake_status": "REJECTED", "reasons": ["EDGE_CLIPPED"]},
                            {"index": 2, "sha256": "b" * 64, "intake_status": "PASS", "reasons": []}]}
 

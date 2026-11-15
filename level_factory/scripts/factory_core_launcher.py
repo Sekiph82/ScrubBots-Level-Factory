@@ -1067,6 +1067,55 @@ def _pixellab_final_slice_path(owner_catalog: Mapping[str, object], frame: Mappi
     return Path(str(final_slice["path"]))
 
 
+def _purge_rejected_sources(source_ids: Sequence[str]) -> dict[str, object]:
+    """Delete everything the Factory holds for REJECTED sources (owner 2026-11-15).
+
+    Final PNG (and the atlas when all its slices are gone), Imported source folder,
+    Level Factory candidate bundle and the Release Pool status, copy and history. A
+    source whose status is not REJECTED is refused; folders are emptied file by file
+    and skipped when they hold anything unexpected (no recursive deletion).
+    """
+    from scrubbots_pixel_factory.owner_art_storage import purge_final_slice
+    from scrubbots_pixel_factory.owner_release_library import list_records, purge_rejected_source
+    from scrubbots_pixel_factory.owner_upload import owner_upload_root
+
+    status = {str(row.get("source_id", "")): row for row in list_records("REJECTED").get("records", []) if isinstance(row, Mapping)}
+    candidates_root = (_repository_root() / "data" / "Level Factory" / "Workspace" / "Candidates").resolve()
+    deleted: list[str] = []
+    skipped: list[dict[str, str]] = []
+
+    def empty_folder(folder: Path) -> bool:
+        if not folder.is_dir():
+            return True
+        entries = list(os.scandir(folder))
+        if any(not entry.is_file(follow_symlinks=False) for entry in entries):
+            return False
+        for entry in entries:
+            Path(entry.path).unlink()
+            deleted.append(entry.path)
+        folder.rmdir()
+        deleted.append(str(folder))
+        return True
+
+    for source_id in source_ids:
+        row = status.get(source_id)
+        if row is None:
+            skipped.append({"source_id": source_id, "reason": "not REJECTED"})
+            continue
+        sha = source_id[len("owner-upload-"):]
+        final_path = Path(str(row.get("original_source_path", "")))
+        try:
+            if final_path.name.lower().endswith(".png") and final_path.parent.name == "Final":
+                deleted += purge_final_slice(final_path.name, sha)
+            for folder in (owner_upload_root() / source_id, candidates_root / f"candidate-owner-{sha[:48]}"):
+                if not empty_folder(folder):
+                    skipped.append({"source_id": source_id, "reason": f"unexpected content in {folder.name}"})
+            deleted += purge_rejected_source(source_id)
+        except (OSError, ValueError) as exc:
+            skipped.append({"source_id": source_id, "reason": str(exc)[:240]})
+    return {"purged": len(source_ids) - len(skipped), "skipped": skipped, "deleted": deleted}
+
+
 def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifest: Mapping[str, object]) -> int:
     """Keep every intake-rejected atlas slice out of the solver queue (owner 2026-11-15).
 
@@ -1096,6 +1145,8 @@ def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifes
                    original_source_path=str(_pixellab_final_slice_path(owner_catalog, frame)),
                    reason=reason, evidence={"intake_reasons": reasons, "atlas": atlas_name})
         rejected += 1
+    # Owner 2026-11-15: rejected slices are deleted, not kept in Final.
+    _purge_rejected_sources([f"owner-upload-{frame['sha256']}" for frame in frames])
     return rejected
 
 

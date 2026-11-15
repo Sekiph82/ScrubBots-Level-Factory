@@ -584,6 +584,47 @@ def record_review_outcome(candidate_id: str, disposition: str, publication: Mapp
             evidence={"owner_review_id": publication.get("review_id"), "owner_review": "ACCEPT"})
     return None
 
+def purge_rejected_source(source_id: str, *, repository_root: str | Path | None = None) -> list[str]:
+    """Delete every Release Pool file of a source whose current status is REJECTED (owner 2026-11-15).
+
+    The owner does not keep rejected art: the status projection, its artwork copy, the
+    immutable history (otherwise reconcile_status_projections would rebuild them) and
+    the content object go. Any other status is refused. Returns the deleted paths.
+    """
+    if not isinstance(source_id, str) or not _ID.fullmatch(source_id): raise OwnerReleaseLibraryError("source identity is malformed")
+    root = _root(repository_root)
+    deleted: list[str] = []
+    with _lock(root / ".locks" / f"{source_id}.lock", root):
+        events = _history(root, source_id)
+        if not events or events[-1].get("status") != "REJECTED":
+            raise OwnerReleaseLibraryError("only a REJECTED source can be purged")
+        folder = root / "Rejected"
+        projection = folder / f"{source_id}.json"
+        targets = [projection] if projection.is_file() else []
+        for path in folder.glob("*.png"):
+            sidecar = path.with_suffix(".json")
+            if path.is_file() and not sidecar.exists() and any(
+                    isinstance(event.get("artifact"), Mapping) and event["artifact"].get("sha256") == _hash(path.read_bytes())
+                    for event in events):
+                targets.append(path)
+        for event in events:
+            artifact = event.get("artifact")
+            if isinstance(artifact, Mapping) and str(artifact.get("relative_path", "")).startswith(".objects/"):
+                obj = root / str(artifact["relative_path"])
+                if obj.is_file() and _hash(obj.read_bytes()) == artifact.get("sha256") and obj not in targets:
+                    targets.append(obj)
+        history = root / ".history" / source_id
+        targets += sorted(history.glob("*.json")) if history.is_dir() else []
+        for path in targets:
+            if _reparse(path): raise OwnerReleaseLibraryError("purge target is a reparse point")
+            path.unlink()
+            deleted.append(str(path))
+        if history.is_dir() and not any(history.iterdir()):
+            history.rmdir()
+            deleted.append(str(history))
+    return deleted
+
+
 def list_records(status: str | None = None, *, repository_root: str | Path | None = None) -> dict[str, Any]:
     if status is not None and status not in STATUSES: raise OwnerReleaseLibraryError("status filter is unsupported")
     root = _root(repository_root); states = {status} if status else STATUSES; rows = []

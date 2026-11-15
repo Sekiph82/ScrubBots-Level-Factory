@@ -41,6 +41,7 @@ def test_background_atlas_slices_get_a_rejected_status(monkeypatch):
     monkeypatch.setattr(library, "list_records", lambda: {"records": [{"source_id": "owner-upload-" + "b" * 64}]})
     monkeypatch.setattr(library, "transition", lambda source_id, status, **kwargs: calls.append((source_id, status)))
     monkeypatch.setattr(launcher, "_pixellab_final_slice_path", lambda catalog, frame: Path("Final") / f"LF-{frame['index']:06d}.png")
+    monkeypatch.setattr(launcher, "_purge_rejected_sources", lambda ids: {"purged": len(ids)})
     manifest = {"frames": [{"index": 1, "sha256": "a" * 64, "reasons": ["OPAQUE_BACKGROUND"]},
                            {"index": 2, "sha256": "b" * 64, "reasons": ["OPAQUE_BACKGROUND"]}]}
 
