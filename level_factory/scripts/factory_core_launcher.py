@@ -1067,6 +1067,34 @@ def _pixellab_final_slice_path(owner_catalog: Mapping[str, object], frame: Mappi
     return Path(str(final_slice["path"]))
 
 
+def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifest: Mapping[str, object]) -> int:
+    """Keep an atlas PixelLab drew on a background out of the solver queue (owner 2026-11-15).
+
+    All 16 slices stay in Final (original-output rule), but each gets a REJECTED
+    Release Pool status so the Final inventory scan never turns it into Pending.
+    """
+    frames = manifest.get("frames", [])
+    if not any("OPAQUE_BACKGROUND" in frame.get("reasons", []) for frame in frames if isinstance(frame, Mapping)):
+        return 0
+    from scrubbots_pixel_factory.owner_release_library import list_records, transition
+
+    known = {str(row.get("source_id", "")) for row in list_records().get("records", []) if isinstance(row, Mapping)}
+    atlas_name = Path(str(owner_catalog.get("atlas_path", ""))).name
+    rejected = 0
+    for frame in frames:
+        if not isinstance(frame, Mapping):
+            continue
+        source_id = f"owner-upload-{frame['sha256']}"
+        if source_id in known:
+            continue
+        transition(source_id, "REJECTED", source_sha256=str(frame["sha256"]), provider="PIXELLAB",
+                   original_source_path=str(_pixellab_final_slice_path(owner_catalog, frame)),
+                   reason=f"PixelLab drew a background behind the frames of {atlas_name} (no_background was requested).",
+                   evidence={"intake_reasons": list(frame.get("reasons", [])), "atlas": atlas_name})
+        rejected += 1
+    return rejected
+
+
 def _finish_pixellab_atlas_job(
     job_record: dict[str, object], persist_job: Callable[[], None], generated: object, *,
     resolved_operation_id: str, width: int, height: int, max_colors: int,
@@ -1085,6 +1113,7 @@ def _finish_pixellab_atlas_job(
         raise ValueError("PixelLab Pro 4x4 source directory escaped Factory output")
     manifest = export_atlas(generated.atlas_png, source_root, max_colors=max_colors)
     owner_catalog = archive_pixellab_export(source_root, manifest)
+    background_rejected = _reject_background_atlas_frames(owner_catalog, manifest)
     imported_sources: list[dict[str, object]] = []
     for frame in manifest["frames"]:
         if frame["intake_status"] != "PASS":
@@ -1108,6 +1137,7 @@ def _finish_pixellab_atlas_job(
         "owner_catalog_path": owner_catalog["catalog_path"],
         "pass_count": pass_count, "rejected_count": rejected_count,
         "provider_mcp_request_count": generated.mcp_request_count,
+        "background_rejected_frames": background_rejected,
         "quality_scope": "SOURCE_ONLY; no solver/WIN replay/difficulty/VOID/QA readiness established",
     })
     persist_job()
@@ -1435,6 +1465,7 @@ def _semantic_import_pixellab_pro_4x4(request: Mapping[str, object]) -> dict[str
         else export_atlas(raw, output_directory, max_colors=max_colors)
     )
     owner_catalog = archive_pixellab_export(output_directory, manifest)
+    _reject_background_atlas_frames(owner_catalog, manifest)
     imported_sources: list[dict[str, object]] = []
     for frame in manifest["frames"]:
         if frame["intake_status"] != "PASS":

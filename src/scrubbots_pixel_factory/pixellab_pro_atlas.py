@@ -28,6 +28,35 @@ MIN_MAX_COLORS = 3
 MAX_MAX_COLORS = 12
 DEFAULT_MAX_COLORS = 12
 MIN_OPAQUE_PIXELS = 200
+# Owner 2026-11-15: PixelLab sometimes ignores no_background=True and draws a white /
+# light-grey card behind every frame (atlases PX-ATLAS-000118..120, the arctic set).
+# A frame's light-background ratio is the share of its pixels that are opaque white or
+# #D4D7D9 and connect to the frame edge through transparent or such light pixels.
+# Measured: clean atlases 100-117 have at most 2 frames above 0.15; the background
+# atlases have 12-14. An atlas with >= 6 such frames is rejected as a whole.
+LIGHT_BACKGROUND_RGB = frozenset({(255, 255, 255), (212, 215, 217)})
+LIGHT_BACKGROUND_FRAME_RATIO = 0.15
+LIGHT_BACKGROUND_MIN_FRAMES = 6
+
+
+def light_background_ratio(frame: Image.Image) -> float:
+    rgba = frame.convert("RGBA")
+    width, height = rgba.size
+    pixels = rgba.load()
+    seen: set[tuple[int, int]] = set()
+    stack = [(x, y) for x in range(width) for y in (0, height - 1)] + [(x, y) for y in range(height) for x in (0, width - 1)]
+    light = 0
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in seen or not (0 <= x < width and 0 <= y < height):
+            continue
+        red, green, blue, alpha = pixels[x, y]
+        if alpha != 0 and (red, green, blue) not in LIGHT_BACKGROUND_RGB:
+            continue
+        seen.add((x, y))
+        light += alpha != 0
+        stack += [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
+    return light / float(width * height)
 
 
 def validate_frame_size(width: int, height: int) -> tuple[int, int]:
@@ -187,7 +216,13 @@ def _frame_records(atlas: Image.Image, max_colors: int) -> tuple[tuple[Image.Ima
                 "foreign_rgb_count": len(foreign),
                 "intake_status": "PASS" if not reasons else "REJECTED",
                 "reasons": reasons,
+                "light_background_ratio": round(light_background_ratio(frame), 4),
             })
+
+    if sum(record["light_background_ratio"] > LIGHT_BACKGROUND_FRAME_RATIO for record in records) >= LIGHT_BACKGROUND_MIN_FRAMES:
+        for record in records:
+            record["reasons"].append("OPAQUE_BACKGROUND")
+            record["intake_status"] = "REJECTED"
 
     reconstructed = Image.new("RGBA", atlas.size, (0, 0, 0, 0))
     for record, frame in zip(records, frames):

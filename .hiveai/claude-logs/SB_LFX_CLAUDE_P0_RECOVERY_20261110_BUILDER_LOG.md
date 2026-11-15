@@ -412,3 +412,22 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   OWNER INSTRUCTION 2026-11-14 ("testlerini yapma ama kodu bitir, ben acinca kurulsun"): committed and installed
   WITHOUT running the test suites; only an import check was run. Tests and a real startup measurement are still owed.
   Also open: registering a new Final PNG in library-refresh takes ~4 min each (6 PNGs in 54 min today).
+
+## 2026-11-15 — PixelLab atlases with a white background (118, 119, 120)
+
+- Owner: the last three Studio productions had a white background. The Studio sent no_background=True; PixelLab drew a
+  white card behind every frame anyway (also visible in the PixelLab gallery). Our intake had no background check
+  (118: 16/16 PASS), so the frames entered Final as normal sources. Same pattern as the arctic atlas PX-ATLAS-000082.
+- Owner-approved PixelLab remove_background (data URL of each 224x224 sheet; the gallery reference was refused because
+  the gallery item has 16 frames, no charge): 3 calls, 3 generations (750 -> 747). Results: 118 16/16 PASS, 119 15/16
+  (one USED_COLOR_COUNT, as in the original), 120 16/16; palette exact, no semi-alpha. Imported with the installed
+  pixellab-pro-4x4-import as PX-ATLAS-000121/122/123 (LF-001921..LF-001968, 47 new sources).
+- The 48 old frames got a REJECTED Release Pool status (reason: white background, replaced by 121-123); on the owner's
+  instruction ("eski 48 kareyi sil") the 48 Final PNGs, their 45 Imported folders and atlases 118-120 were moved (not
+  deleted) to data/output/Pixellab/Removed/2026-11-15-white-background-originals/ with a hash manifest; 0 mismatches.
+- Fix: pixellab_pro_atlas measures each frame's light-background ratio (opaque #FFFFFF/#D4D7D9 connected to the frame
+  edge); an atlas with >= 6 frames above 0.15 gets OPAQUE_BACKGROUND on all frames (intake REJECTED). Both atlas import
+  paths give such slices a REJECTED Release Pool status so the Final scan never makes them Pending (all 16 slices
+  still land in Final). Calibration: 122 atlases, flagged exactly 082 (arctic, owner kept it; already READY, not
+  affected), 118, 119, 120. Tests: test_claude_pixellab_background_atlas.py 2 passed (detector failed on old code);
+  PixelLab/atlas/launcher/release subset 141 passed.
