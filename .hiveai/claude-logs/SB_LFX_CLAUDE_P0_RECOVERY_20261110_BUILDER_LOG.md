@@ -574,3 +574,9 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Scan of all 768 final frames: 25 passing frames contain border-reachable white, all reviewed visually as art pixels (snow, sparkles, bones, highlights) — no card fragments. Sheet: `docs/evidence/claude-batch48-20261115/residual-white-review.png`.
 - Detached-component scan of cleaned frames found 5 grey card-edge strips left by the first cleanup (LF-002569, LF-002678, LF-002681, LF-002854, LF-003198). Stripped, re-archived as LF-003482..003486 PENDING; superseded versions set REJECTED and purged. 3 detached sparkles kept as art. Sheet: `cleaned-detached-review.png`, mapping `refix-v2.json`.
 - Release Pool after: 2440 records — READY 1483, PENDING 955, FAILED 2, REJECTED 0. Final: 3048 PNGs.
+
+## 2026-11-15 — Owner-approved fixes after full Final white scan
+
+- Full scan of Final (3048 PNG) for border-reachable pure white: 29 hits, 26 are art (snow, waves, white bodies). 3 real card fragments cleaned: LF-001864 -> LF-003487, LF-001869 -> LF-003488, LF-002289 -> LF-003489 (old versions REJECTED and purged). Sheet: `final-white-scan.png`.
+- 9 frames rejected earlier today were never in the system (`earlier-rejected-not-in-system.png`). Owner approved adding 5: four EDGE_CLIPPED frames (LF-002018/2021/2023/2026) got a 1-px transparent border (58x58) and detached 1-2 px specks removed -> LF-003495..003498; dragon LF-002278 had its white bottom line flood-cleaned -> LF-003494. Badger, raccoon, beaver and tiny chick stay out.
+- Release Pool: READY 1483, PENDING 960, FAILED 2, REJECTED 0. Evidence: `docs/evidence/claude-batch48-20261115/fix8/`.
