@@ -496,3 +496,11 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   card is not edge-connected).
 - Not deployed yet: the owner's Studio batch is running. 129/130 frames are imported but have no Release Pool status
   yet; their status and the prompt suffix are owner decisions.
+- Owner chose to stop the batch and return to the original prompts. The PixelLab CSV batch has no stop control in the
+  UI (the "Stop after current" button belongs to the PNG/Level Factory batch), so the Studio was closed with
+  CloseMainWindow while row 0094 was POLLING: the shutdown path sent PixelLab cancel_job (job 104e6238...,
+  STUDIO_SHUTDOWN_CANCELLED). cb44e4d1 installed afterwards (installed file == HEAD blob).
+- Prompt CSV (owner data): rows with a produced or accepted job (0086-0093) removed; the other 157 rows restored to the
+  owner's original text from the pre-suffix backup (byte check: every current prompt started with its original).
+  Backup of the suffix version: docs/evidence/claude-prompt-csv-20261115/before-revert-to-original.csv.
+- New detector on atlases 128-135: 129 and 130 rejected (OPAQUE_BACKGROUND), the other six 16/16 PASS.
