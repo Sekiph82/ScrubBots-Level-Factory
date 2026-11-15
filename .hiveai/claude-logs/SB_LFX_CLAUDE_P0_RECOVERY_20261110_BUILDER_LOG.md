@@ -517,3 +517,6 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   <= 6 px) and added as owner edits LF-002209/2210 (PENDING) and LF-002211 (gecko; owner rejected the result ->
   REJECTED). Evidence: docs/evidence/claude-atlas136-clean-20261115/. Same cleaning previewed for all 16 frames of
   130 in docs/evidence/claude-atlas130-clean-20261115/ (not imported; waiting for the owner).
+- Owner approved the cleaned 130 set: 14 frames added as LF-002212..002225; squirrel (LF-002101) and deer (LF-002108)
+  additionally had enclosed white pixels removed on request (31 and 5 px) and were added after owner approval. All 16
+  PENDING; the 130 originals stay REJECTED. Manifest: docs/evidence/claude-atlas130-clean-20261115/manifest.json.
