@@ -510,3 +510,10 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   light_card_edge = longest straight outline-less white border; >= 20 px rejects that frame (OPAQUE_BACKGROUND).
   Calibration over 132 atlases: 130 card frames 20-46, 117 white blocks 27, legit smoke/wind/spirit art <= 18, one
   flat-cut bust in 122 = 28 (accepted cost). Test: card behind frames 1 and 12 rejects exactly those (old code: none).
+- Owner decisions: all 32 slices of 129/130 REJECTED (31 transitions + 1 already rejected). Gallery sheet of row 0094
+  imported via the free gallery path (pixellab_recent_gallery_sheets(1) + _pixellab_gallery_sync) as PX-ATLAS-000136:
+  14 PASS, frames 1 and 12 auto-rejected by the new card rule; frame 4 REJECTED by the owner. On the owner's request
+  the white card was removed from 1, 4, 12 (flood from the frame border through transparent/light pixels + specks
+  <= 6 px) and added as owner edits LF-002209/2210 (PENDING) and LF-002211 (gecko; owner rejected the result ->
+  REJECTED). Evidence: docs/evidence/claude-atlas136-clean-20261115/. Same cleaning previewed for all 16 frames of
+  130 in docs/evidence/claude-atlas130-clean-20261115/ (not imported; waiting for the owner).
