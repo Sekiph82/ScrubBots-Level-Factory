@@ -557,3 +557,6 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   enclosed white removed (27 px) and on request the staff joined (3 grey -> brown, 3 outline pixels).
   51 sprites added as owner edits LF-002340..LF-002390 (PENDING); oceanic originals LF-002231/2235/2237/2239 (no
   status yet) set REJECTED and purged. Evidence: docs/evidence/claude-batch-clean-20261115/.
+- Skyborne 2/9/11 fixed by hand on request: the card is pure #FFFFFF while the animals' light parts are #D4D7D9, so
+  only border-reachable pure white was removed (2-7 enclosed white highlight pixels kept). Owner approved; added as
+  owner edits (PENDING). All 64 frames of the four atlases are now in Final (10 untouched oceanic + 54 cleaned).

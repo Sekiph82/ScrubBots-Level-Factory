@@ -305,6 +305,24 @@
    "frame": 16,
    "original": "LF-002339.png",
    "new": "LF-002390.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 2,
+   "original": "LF-002245.png",
+   "new": "LF-002391.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 9,
+   "original": "LF-002252.png",
+   "new": "LF-002392.png"
+  },
+  {
+   "atlas": "skyborne",
+   "frame": 11,
+   "original": "LF-002254.png",
+   "new": "LF-002393.png"
   }
  ],
  "failed": [],
