@@ -1,0 +1,722 @@
+{
+ "reason": "Owner 2026-11-15: remove the white-background originals of PX-ATLAS-000118..120 (replaced by background-removed PX-ATLAS-000121..123).",
+ "items": [
+  {
+   "from": "data\\output\\Pixellab\\Grid Files\\PX-ATLAS-000118.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Grid Files\\PX-ATLAS-000118.png",
+   "files": {
+    "PX-ATLAS-000118.png": "6bb910186ed212cab7fd806ec165f6e3e7196071b9105ac21a8cd7f7313c7a0b"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001873.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001873.png",
+   "files": {
+    "LF-001873.png": "8d4c349b3016ace1b7ec0c779186918c1cfcb926cbf309dab316d610d059a0c9"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-8d4c349b3016ace1b7ec0c779186918c1cfcb926cbf309dab316d610d059a0c9",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-8d4c349b3016ace1b7ec0c779186918c1cfcb926cbf309dab316d610d059a0c9",
+   "files": {
+    "LF-001873.png": "8d4c349b3016ace1b7ec0c779186918c1cfcb926cbf309dab316d610d059a0c9",
+    "source.json": "ad7996d5da06d9c7df0ce57cbdd94701296ea9033f27f1a58ec1e055f1a79403"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001874.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001874.png",
+   "files": {
+    "LF-001874.png": "de5bf50320efe426840822da95eac82bd0b053e180f988a3bafdbcc244a655b4"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-de5bf50320efe426840822da95eac82bd0b053e180f988a3bafdbcc244a655b4",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-de5bf50320efe426840822da95eac82bd0b053e180f988a3bafdbcc244a655b4",
+   "files": {
+    "LF-001874.png": "de5bf50320efe426840822da95eac82bd0b053e180f988a3bafdbcc244a655b4",
+    "source.json": "07229f65be374ddd5c8c78ac2ce1cdca45e73f3e703a947844d69caa264a1329"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001875.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001875.png",
+   "files": {
+    "LF-001875.png": "0eed897cea2b4e0508eeb7af0a097f2fd41b75bd11cd0badc40783d800389748"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-0eed897cea2b4e0508eeb7af0a097f2fd41b75bd11cd0badc40783d800389748",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-0eed897cea2b4e0508eeb7af0a097f2fd41b75bd11cd0badc40783d800389748",
+   "files": {
+    "LF-001875.png": "0eed897cea2b4e0508eeb7af0a097f2fd41b75bd11cd0badc40783d800389748",
+    "source.json": "c8624a480bd8009a47fa8e051a9aced57509858758b4117a5b3ccc89b267a12b"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001876.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001876.png",
+   "files": {
+    "LF-001876.png": "ca60858ed48e3203e6f4feae8a82fe89634128878ba0970295b42f78725dac23"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-ca60858ed48e3203e6f4feae8a82fe89634128878ba0970295b42f78725dac23",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-ca60858ed48e3203e6f4feae8a82fe89634128878ba0970295b42f78725dac23",
+   "files": {
+    "LF-001876.png": "ca60858ed48e3203e6f4feae8a82fe89634128878ba0970295b42f78725dac23",
+    "source.json": "10de163c7265ba9ba8c223c300fb71d46f1b8e1595d3b961a45d2e233a251281"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001877.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001877.png",
+   "files": {
+    "LF-001877.png": "371cf8f5b8574fd8fe71d650d6b6f539db7f23a8410055643c3f4e78869fabcd"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-371cf8f5b8574fd8fe71d650d6b6f539db7f23a8410055643c3f4e78869fabcd",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-371cf8f5b8574fd8fe71d650d6b6f539db7f23a8410055643c3f4e78869fabcd",
+   "files": {
+    "LF-001877.png": "371cf8f5b8574fd8fe71d650d6b6f539db7f23a8410055643c3f4e78869fabcd",
+    "source.json": "93eb6f952e16f12b41db7ab65d25096f480b624283ae39c3e15b671c7bd5bed0"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001878.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001878.png",
+   "files": {
+    "LF-001878.png": "cb8ef039ec48793e8b25d4fcf849edb11e5c9c227879768aa62f9e98d5946249"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-cb8ef039ec48793e8b25d4fcf849edb11e5c9c227879768aa62f9e98d5946249",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-cb8ef039ec48793e8b25d4fcf849edb11e5c9c227879768aa62f9e98d5946249",
+   "files": {
+    "LF-001878.png": "cb8ef039ec48793e8b25d4fcf849edb11e5c9c227879768aa62f9e98d5946249",
+    "source.json": "5a654bf6f802fc5e76a7c3983ed5568324cb92b4ebaefe07c39b2acc9383d525"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001879.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001879.png",
+   "files": {
+    "LF-001879.png": "b323a239dc1c95d576820bcca14a7f9c806511507300c874a3093a7ac67fc639"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-b323a239dc1c95d576820bcca14a7f9c806511507300c874a3093a7ac67fc639",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-b323a239dc1c95d576820bcca14a7f9c806511507300c874a3093a7ac67fc639",
+   "files": {
+    "LF-001879.png": "b323a239dc1c95d576820bcca14a7f9c806511507300c874a3093a7ac67fc639",
+    "source.json": "f1bdba2a349b8ed1cb8320b9c982bf21302b626abd21d90ac5e4bad9a8f4758f"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001880.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001880.png",
+   "files": {
+    "LF-001880.png": "5dfe00c5ee343cd88707aa0994c1f2c55101b94090774a0e6d3f774c24df34a4"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-5dfe00c5ee343cd88707aa0994c1f2c55101b94090774a0e6d3f774c24df34a4",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-5dfe00c5ee343cd88707aa0994c1f2c55101b94090774a0e6d3f774c24df34a4",
+   "files": {
+    "LF-001880.png": "5dfe00c5ee343cd88707aa0994c1f2c55101b94090774a0e6d3f774c24df34a4",
+    "source.json": "480a15de88dcf8825a726c0ed324d7678aa7b244847510d8d2d389886b5b502f"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001881.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001881.png",
+   "files": {
+    "LF-001881.png": "44e7c7f5d6df2886998ef0a5bf95fc88d2d5030b937eda25dcb1b456a445c2f4"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-44e7c7f5d6df2886998ef0a5bf95fc88d2d5030b937eda25dcb1b456a445c2f4",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-44e7c7f5d6df2886998ef0a5bf95fc88d2d5030b937eda25dcb1b456a445c2f4",
+   "files": {
+    "LF-001881.png": "44e7c7f5d6df2886998ef0a5bf95fc88d2d5030b937eda25dcb1b456a445c2f4",
+    "source.json": "4f0f23e1021f9b83dfb6db5c08b7a956de050a915e7a1d7a7e14e937d38729d9"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001882.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001882.png",
+   "files": {
+    "LF-001882.png": "32634654fed2cb459b46a86b0bccec95fb91db39aa23e7c1989fb55a9a7c35d7"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-32634654fed2cb459b46a86b0bccec95fb91db39aa23e7c1989fb55a9a7c35d7",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-32634654fed2cb459b46a86b0bccec95fb91db39aa23e7c1989fb55a9a7c35d7",
+   "files": {
+    "LF-001882.png": "32634654fed2cb459b46a86b0bccec95fb91db39aa23e7c1989fb55a9a7c35d7",
+    "source.json": "76c30ef9a035695028c4d40471e0c73537f068e8d8ef820b6362162579868c97"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001883.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001883.png",
+   "files": {
+    "LF-001883.png": "2e704094fddf3fb62c6e60db03179bba925fa883999df046f15891dcaf9d7c45"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-2e704094fddf3fb62c6e60db03179bba925fa883999df046f15891dcaf9d7c45",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-2e704094fddf3fb62c6e60db03179bba925fa883999df046f15891dcaf9d7c45",
+   "files": {
+    "LF-001883.png": "2e704094fddf3fb62c6e60db03179bba925fa883999df046f15891dcaf9d7c45",
+    "source.json": "e8647beb60cbeb79ee352a560f488f696ad4de1d465cb19a671246ff068d8a45"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001884.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001884.png",
+   "files": {
+    "LF-001884.png": "fa8842270f2aa4b7311c00802124855f97817943acd1de81889d4bb10293985a"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-fa8842270f2aa4b7311c00802124855f97817943acd1de81889d4bb10293985a",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-fa8842270f2aa4b7311c00802124855f97817943acd1de81889d4bb10293985a",
+   "files": {
+    "LF-001884.png": "fa8842270f2aa4b7311c00802124855f97817943acd1de81889d4bb10293985a",
+    "source.json": "339441fb3f0b77338946f872d1cb4a48c2b8551d278619a04358098a0299fc21"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001885.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001885.png",
+   "files": {
+    "LF-001885.png": "7b6dc453b39b44713caae1098704a33ab9c88835e59d2b4ed7cec24217f58a78"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-7b6dc453b39b44713caae1098704a33ab9c88835e59d2b4ed7cec24217f58a78",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-7b6dc453b39b44713caae1098704a33ab9c88835e59d2b4ed7cec24217f58a78",
+   "files": {
+    "LF-001885.png": "7b6dc453b39b44713caae1098704a33ab9c88835e59d2b4ed7cec24217f58a78",
+    "source.json": "77450a231c542ff01fe4a03fc8d3bcabb7a808a31e2bb101c1ec302a48fa605e"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001886.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001886.png",
+   "files": {
+    "LF-001886.png": "132d99b6e4f75ffcfb0c47538b02761253b2498661fac1f8907a4319f97dee9c"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-132d99b6e4f75ffcfb0c47538b02761253b2498661fac1f8907a4319f97dee9c",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-132d99b6e4f75ffcfb0c47538b02761253b2498661fac1f8907a4319f97dee9c",
+   "files": {
+    "LF-001886.png": "132d99b6e4f75ffcfb0c47538b02761253b2498661fac1f8907a4319f97dee9c",
+    "source.json": "b57ca3e03e87f6209632d4afa08ebc8c89bbc68c41cc454b2c6d330620c35e95"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001887.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001887.png",
+   "files": {
+    "LF-001887.png": "2986b657f7d78defb48878e85a7647218d33c269595150a99c5c750610e6645e"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-2986b657f7d78defb48878e85a7647218d33c269595150a99c5c750610e6645e",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-2986b657f7d78defb48878e85a7647218d33c269595150a99c5c750610e6645e",
+   "files": {
+    "LF-001887.png": "2986b657f7d78defb48878e85a7647218d33c269595150a99c5c750610e6645e",
+    "source.json": "6ba08394ff831588abdad877c8a882eabdf97e315b1a8845a1820f214e301062"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001888.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001888.png",
+   "files": {
+    "LF-001888.png": "73041bab434c60444f13f52280584e6f280b58390bb04048a010dad5dce643bd"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-73041bab434c60444f13f52280584e6f280b58390bb04048a010dad5dce643bd",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-73041bab434c60444f13f52280584e6f280b58390bb04048a010dad5dce643bd",
+   "files": {
+    "LF-001888.png": "73041bab434c60444f13f52280584e6f280b58390bb04048a010dad5dce643bd",
+    "source.json": "83cc6058f357e7b5fef5dc5fbff174d82093942cdd24b59b6a951b1312651b0d"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Grid Files\\PX-ATLAS-000119.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Grid Files\\PX-ATLAS-000119.png",
+   "files": {
+    "PX-ATLAS-000119.png": "5df1c846ec856bd51b99ebd06126342a0761d668fd7c0603bed0f10e9083ebd4"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001889.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001889.png",
+   "files": {
+    "LF-001889.png": "3cc3f0aa0fbb385f4983e6e8114f15c50143bf3e3b689c101a98240749a377ad"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-3cc3f0aa0fbb385f4983e6e8114f15c50143bf3e3b689c101a98240749a377ad",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-3cc3f0aa0fbb385f4983e6e8114f15c50143bf3e3b689c101a98240749a377ad",
+   "files": {
+    "LF-001889.png": "3cc3f0aa0fbb385f4983e6e8114f15c50143bf3e3b689c101a98240749a377ad",
+    "source.json": "14ec24d2637d3a9e59a35a9c44cae509fd219a17671b5ce3600988a7f090dbb9"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001890.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001890.png",
+   "files": {
+    "LF-001890.png": "94cb2ef4919761a52c842d4904ce891500a49c45573e2e4b73ba01fe39fef794"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-94cb2ef4919761a52c842d4904ce891500a49c45573e2e4b73ba01fe39fef794",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-94cb2ef4919761a52c842d4904ce891500a49c45573e2e4b73ba01fe39fef794",
+   "files": {
+    "LF-001890.png": "94cb2ef4919761a52c842d4904ce891500a49c45573e2e4b73ba01fe39fef794",
+    "source.json": "b94d9d05f436985995207667b6fc0e588fd219062a78dd30ccb25f9b3b1b0f45"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001891.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001891.png",
+   "files": {
+    "LF-001891.png": "d3a0d9c87a76592c48075e55b4b3cbbaf18058ef3e3c7819955e50df4ada829b"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-d3a0d9c87a76592c48075e55b4b3cbbaf18058ef3e3c7819955e50df4ada829b",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-d3a0d9c87a76592c48075e55b4b3cbbaf18058ef3e3c7819955e50df4ada829b",
+   "files": {
+    "LF-001891.png": "d3a0d9c87a76592c48075e55b4b3cbbaf18058ef3e3c7819955e50df4ada829b",
+    "source.json": "df2e228cd52e5092c1901c217feefb5ca3c2ad5f064039f7a2924a4d0f5ea8a8"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001892.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001892.png",
+   "files": {
+    "LF-001892.png": "91d2503d1b848612eaf1bd647b70819bde57cefc55b5748f4d04627dc239fbf8"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-91d2503d1b848612eaf1bd647b70819bde57cefc55b5748f4d04627dc239fbf8",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-91d2503d1b848612eaf1bd647b70819bde57cefc55b5748f4d04627dc239fbf8",
+   "files": {
+    "LF-001892.png": "91d2503d1b848612eaf1bd647b70819bde57cefc55b5748f4d04627dc239fbf8",
+    "source.json": "139809f9bcdebcc25777d9dd4c2d4196f4c35171cc91fdb9fc9c1d553156a275"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001893.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001893.png",
+   "files": {
+    "LF-001893.png": "468143cb350cfbc6d92cfdfbeb6baeda081843f61acbe1c5122fff4ce883911e"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-468143cb350cfbc6d92cfdfbeb6baeda081843f61acbe1c5122fff4ce883911e",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-468143cb350cfbc6d92cfdfbeb6baeda081843f61acbe1c5122fff4ce883911e",
+   "files": {
+    "LF-001893.png": "468143cb350cfbc6d92cfdfbeb6baeda081843f61acbe1c5122fff4ce883911e",
+    "source.json": "c90798a79ca9421e46782b86c0a3377274ade6cf3de4d5e261d67cd5d431aa83"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001894.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001894.png",
+   "files": {
+    "LF-001894.png": "67928e9b43a266905c91dabd4efa3afe26b5e5521d0137b74963a62017ff492a"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-67928e9b43a266905c91dabd4efa3afe26b5e5521d0137b74963a62017ff492a",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-67928e9b43a266905c91dabd4efa3afe26b5e5521d0137b74963a62017ff492a",
+   "files": {
+    "LF-001894.png": "67928e9b43a266905c91dabd4efa3afe26b5e5521d0137b74963a62017ff492a",
+    "source.json": "26f695a9a3510a50509dfb095a961e98f027fa2df12f8151d9e4c98d43020892"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001895.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001895.png",
+   "files": {
+    "LF-001895.png": "34c86636de331be458b3c7b44832292afd8ecf29de4560be21c7fb95456ef99d"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-34c86636de331be458b3c7b44832292afd8ecf29de4560be21c7fb95456ef99d",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-34c86636de331be458b3c7b44832292afd8ecf29de4560be21c7fb95456ef99d",
+   "files": {
+    "LF-001895.png": "34c86636de331be458b3c7b44832292afd8ecf29de4560be21c7fb95456ef99d",
+    "source.json": "802aff5a141bb20f68abc9160f5e1ae09c78b133e2da689be784e91bf1257a2c"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001896.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001896.png",
+   "files": {
+    "LF-001896.png": "a240ce24c88f93a1be15243ddabb78455b44f737c91a7e0829e1ae718a3512fc"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-a240ce24c88f93a1be15243ddabb78455b44f737c91a7e0829e1ae718a3512fc",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-a240ce24c88f93a1be15243ddabb78455b44f737c91a7e0829e1ae718a3512fc",
+   "files": {
+    "LF-001896.png": "a240ce24c88f93a1be15243ddabb78455b44f737c91a7e0829e1ae718a3512fc",
+    "source.json": "f5fe311b871fcd8e751aea7226cd6d1f486b14b5cc08e90265d574d4c7eeeef9"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001897.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001897.png",
+   "files": {
+    "LF-001897.png": "e67c1b548c9c67b4ae5fc73436d82d212229a1cb891efc4b25e8fc52eb83dae4"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-e67c1b548c9c67b4ae5fc73436d82d212229a1cb891efc4b25e8fc52eb83dae4",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-e67c1b548c9c67b4ae5fc73436d82d212229a1cb891efc4b25e8fc52eb83dae4",
+   "files": {
+    "LF-001897.png": "e67c1b548c9c67b4ae5fc73436d82d212229a1cb891efc4b25e8fc52eb83dae4",
+    "source.json": "41c08a90ef2672e1cf10465375fb57511e464826cbcc58186530b9fe5abb8a60"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001898.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001898.png",
+   "files": {
+    "LF-001898.png": "95fa41b8eae647b3637e032f87b920b4e94f8bf2500804aacbe5f5d3d56c5594"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-95fa41b8eae647b3637e032f87b920b4e94f8bf2500804aacbe5f5d3d56c5594",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-95fa41b8eae647b3637e032f87b920b4e94f8bf2500804aacbe5f5d3d56c5594",
+   "files": {
+    "LF-001898.png": "95fa41b8eae647b3637e032f87b920b4e94f8bf2500804aacbe5f5d3d56c5594",
+    "source.json": "343e09f4da534c556a998a2439e0bee4d399a962bca31ba14afe95e88400e71a"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001899.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001899.png",
+   "files": {
+    "LF-001899.png": "206b9984df23d7c5f64442603b913d4afcc9cf786ea917b71d6c1007853a29d0"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001900.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001900.png",
+   "files": {
+    "LF-001900.png": "814b4154967814bca294664f63a285501193301d4e9c1f9ea8f95cfa3cd1bfa0"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-814b4154967814bca294664f63a285501193301d4e9c1f9ea8f95cfa3cd1bfa0",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-814b4154967814bca294664f63a285501193301d4e9c1f9ea8f95cfa3cd1bfa0",
+   "files": {
+    "LF-001900.png": "814b4154967814bca294664f63a285501193301d4e9c1f9ea8f95cfa3cd1bfa0",
+    "source.json": "8483a90c2a0e436d2b63bae3882eeea417686e611aade69301cad7010c9a470a"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001901.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001901.png",
+   "files": {
+    "LF-001901.png": "59ef4424c570801f927490c919e51f23752020f0510344eddaa44890f16330ac"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-59ef4424c570801f927490c919e51f23752020f0510344eddaa44890f16330ac",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-59ef4424c570801f927490c919e51f23752020f0510344eddaa44890f16330ac",
+   "files": {
+    "LF-001901.png": "59ef4424c570801f927490c919e51f23752020f0510344eddaa44890f16330ac",
+    "source.json": "48e451522d70839045fe72826b4da0fedb7848fd46b97f7da3b6a03aeb1e4e92"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001902.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001902.png",
+   "files": {
+    "LF-001902.png": "1e0d17009160fd8e20d0523f25e2faa925517f316116292603e1328088975973"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-1e0d17009160fd8e20d0523f25e2faa925517f316116292603e1328088975973",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-1e0d17009160fd8e20d0523f25e2faa925517f316116292603e1328088975973",
+   "files": {
+    "LF-001902.png": "1e0d17009160fd8e20d0523f25e2faa925517f316116292603e1328088975973",
+    "source.json": "de7f8a08dacb16488c63c6aa68c3f6a958ca9e4371ecd264f70936240d73dc89"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001903.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001903.png",
+   "files": {
+    "LF-001903.png": "887b8ed51bdbf7c19acfa4f2bd594fbcca29fa8023bcecfed60104256aef5a1f"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-887b8ed51bdbf7c19acfa4f2bd594fbcca29fa8023bcecfed60104256aef5a1f",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-887b8ed51bdbf7c19acfa4f2bd594fbcca29fa8023bcecfed60104256aef5a1f",
+   "files": {
+    "LF-001903.png": "887b8ed51bdbf7c19acfa4f2bd594fbcca29fa8023bcecfed60104256aef5a1f",
+    "source.json": "5af08f85c84059fdaeb07ab1a4b83183e01f4e852f7c786659937bbfa65fea18"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001904.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001904.png",
+   "files": {
+    "LF-001904.png": "bca21733195a3e606874ac881c617e0049a21f35e3b963cd6e692a4b96b1ce55"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-bca21733195a3e606874ac881c617e0049a21f35e3b963cd6e692a4b96b1ce55",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-bca21733195a3e606874ac881c617e0049a21f35e3b963cd6e692a4b96b1ce55",
+   "files": {
+    "LF-001904.png": "bca21733195a3e606874ac881c617e0049a21f35e3b963cd6e692a4b96b1ce55",
+    "source.json": "6e3da680ceb26bef220aea5850cbfe9f30ea33ac914637989d6ef945e271c6fb"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Grid Files\\PX-ATLAS-000120.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Grid Files\\PX-ATLAS-000120.png",
+   "files": {
+    "PX-ATLAS-000120.png": "f9e417254f56db3f15c27634a82587622e0ab896f34e0cd4cfe2ae22f06a376a"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001905.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001905.png",
+   "files": {
+    "LF-001905.png": "288bb5d361d9c10d6f4000923a06545b15ae8121d77ac761526821971f1efd72"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-288bb5d361d9c10d6f4000923a06545b15ae8121d77ac761526821971f1efd72",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-288bb5d361d9c10d6f4000923a06545b15ae8121d77ac761526821971f1efd72",
+   "files": {
+    "LF-001905.png": "288bb5d361d9c10d6f4000923a06545b15ae8121d77ac761526821971f1efd72",
+    "source.json": "e8c6f174f6a8396e24adc56b07723d8ef03c593d0767ccf9c6e7f0e7c45bf667"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001906.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001906.png",
+   "files": {
+    "LF-001906.png": "a64d768c06ddcbffe19416134787727dddaa89b6b28b65ac490578743ebc2da0"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-a64d768c06ddcbffe19416134787727dddaa89b6b28b65ac490578743ebc2da0",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-a64d768c06ddcbffe19416134787727dddaa89b6b28b65ac490578743ebc2da0",
+   "files": {
+    "LF-001906.png": "a64d768c06ddcbffe19416134787727dddaa89b6b28b65ac490578743ebc2da0",
+    "source.json": "b65e94c156583eeb40d15e65edbf8295a2813383c2aac6c385c37b1fcdce3678"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001907.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001907.png",
+   "files": {
+    "LF-001907.png": "e77117ff24350cf09be2800baa08a802a307151dd7fdceed6f2b199181e3d943"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-e77117ff24350cf09be2800baa08a802a307151dd7fdceed6f2b199181e3d943",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-e77117ff24350cf09be2800baa08a802a307151dd7fdceed6f2b199181e3d943",
+   "files": {
+    "LF-001907.png": "e77117ff24350cf09be2800baa08a802a307151dd7fdceed6f2b199181e3d943",
+    "source.json": "7c95b10017b95abbaca8344466eb9385b6a8c633d26b4c0f0c4aa710c9029954"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001908.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001908.png",
+   "files": {
+    "LF-001908.png": "9906c24e9ec1cf021f2fc93c917dd53e3a72082fc4999c72cdc5fd1d0810fa85"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-9906c24e9ec1cf021f2fc93c917dd53e3a72082fc4999c72cdc5fd1d0810fa85",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-9906c24e9ec1cf021f2fc93c917dd53e3a72082fc4999c72cdc5fd1d0810fa85",
+   "files": {
+    "LF-001908.png": "9906c24e9ec1cf021f2fc93c917dd53e3a72082fc4999c72cdc5fd1d0810fa85",
+    "source.json": "6e004b15b0e7fccec4bccbd966c769288197cf38f92f335718fa020a2516b5c5"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001909.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001909.png",
+   "files": {
+    "LF-001909.png": "f9ce6887f573566ba2adf53390343bc4f4107ff3b894a2b25d59209d8b64b47a"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001910.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001910.png",
+   "files": {
+    "LF-001910.png": "94bf09f025b78d4d19ed9c4e4304d3a86eb43eff32c749e1c9460ba25bc58f52"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-94bf09f025b78d4d19ed9c4e4304d3a86eb43eff32c749e1c9460ba25bc58f52",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-94bf09f025b78d4d19ed9c4e4304d3a86eb43eff32c749e1c9460ba25bc58f52",
+   "files": {
+    "LF-001910.png": "94bf09f025b78d4d19ed9c4e4304d3a86eb43eff32c749e1c9460ba25bc58f52",
+    "source.json": "d8a5dd89c0c870104e5af185906393e823b876821afcbbfb0c23784215feea0d"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001911.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001911.png",
+   "files": {
+    "LF-001911.png": "bee28ec7c70a619ecc6b73bd7de04d45b17b647261282bf7c5a6512c01188eac"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-bee28ec7c70a619ecc6b73bd7de04d45b17b647261282bf7c5a6512c01188eac",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-bee28ec7c70a619ecc6b73bd7de04d45b17b647261282bf7c5a6512c01188eac",
+   "files": {
+    "LF-001911.png": "bee28ec7c70a619ecc6b73bd7de04d45b17b647261282bf7c5a6512c01188eac",
+    "source.json": "5be6e11be8ee03243e55e2d71cbabc6abcdcd41de0b30a335bc2e34db7d700d0"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001912.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001912.png",
+   "files": {
+    "LF-001912.png": "e62f805cb7cb53f0aee21bbc4cd91c9307d39927e9c4fcb42f31c06f072418c3"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-e62f805cb7cb53f0aee21bbc4cd91c9307d39927e9c4fcb42f31c06f072418c3",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-e62f805cb7cb53f0aee21bbc4cd91c9307d39927e9c4fcb42f31c06f072418c3",
+   "files": {
+    "LF-001912.png": "e62f805cb7cb53f0aee21bbc4cd91c9307d39927e9c4fcb42f31c06f072418c3",
+    "source.json": "bdf0eb0b440a8b945c48dfb875efb60d3affaf6c129c1b7a31c52dbf9709d0e1"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001913.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001913.png",
+   "files": {
+    "LF-001913.png": "77625f2d3ea5b255d9e5b6170f47a46bedc9b371f2ed25ac0a558ca0c0e6145a"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-77625f2d3ea5b255d9e5b6170f47a46bedc9b371f2ed25ac0a558ca0c0e6145a",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-77625f2d3ea5b255d9e5b6170f47a46bedc9b371f2ed25ac0a558ca0c0e6145a",
+   "files": {
+    "LF-001913.png": "77625f2d3ea5b255d9e5b6170f47a46bedc9b371f2ed25ac0a558ca0c0e6145a",
+    "source.json": "e97fa69f4118bc190f932d5f9972c54f2c9ce223d88dd021f1ceaa93b22c5bca"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001914.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001914.png",
+   "files": {
+    "LF-001914.png": "78b54bf2ee95108c9b67ae047d59aefca6ebfabf73358bf5b5a9eddc5b2c5049"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001915.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001915.png",
+   "files": {
+    "LF-001915.png": "1703e0bee5194070de424bf3019a311cb1fd1e4c5d537d13864a44671dff334d"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-1703e0bee5194070de424bf3019a311cb1fd1e4c5d537d13864a44671dff334d",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-1703e0bee5194070de424bf3019a311cb1fd1e4c5d537d13864a44671dff334d",
+   "files": {
+    "LF-001915.png": "1703e0bee5194070de424bf3019a311cb1fd1e4c5d537d13864a44671dff334d",
+    "source.json": "f51192fb44b71e37a25dbfec787ef2883fc804f673f3208da96ad5b9f5d7394a"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001916.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001916.png",
+   "files": {
+    "LF-001916.png": "82707100e4de2d14a68e0b1bc9cbea6059bb872d58730cd0ac0469764ddba8be"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-82707100e4de2d14a68e0b1bc9cbea6059bb872d58730cd0ac0469764ddba8be",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-82707100e4de2d14a68e0b1bc9cbea6059bb872d58730cd0ac0469764ddba8be",
+   "files": {
+    "LF-001916.png": "82707100e4de2d14a68e0b1bc9cbea6059bb872d58730cd0ac0469764ddba8be",
+    "source.json": "78cf10e25463ad80d7d199ce76349c5912ee48b3176ecd6becc9a00e923e276e"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001917.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001917.png",
+   "files": {
+    "LF-001917.png": "fb1a4513ac2e2c9237b20e9b59ee070f208ee0da7ec2fb0015a7c5fa18845e69"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-fb1a4513ac2e2c9237b20e9b59ee070f208ee0da7ec2fb0015a7c5fa18845e69",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-fb1a4513ac2e2c9237b20e9b59ee070f208ee0da7ec2fb0015a7c5fa18845e69",
+   "files": {
+    "LF-001917.png": "fb1a4513ac2e2c9237b20e9b59ee070f208ee0da7ec2fb0015a7c5fa18845e69",
+    "source.json": "fe6ba3966d2f62eafb32ac0526d0e339f6ad9951919ec2165479773248c1eff8"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001918.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001918.png",
+   "files": {
+    "LF-001918.png": "2d127b1c4c154cd0501cc0f54e28529d5010d2f48f08ffe5e91bccd13da2e281"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-2d127b1c4c154cd0501cc0f54e28529d5010d2f48f08ffe5e91bccd13da2e281",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-2d127b1c4c154cd0501cc0f54e28529d5010d2f48f08ffe5e91bccd13da2e281",
+   "files": {
+    "LF-001918.png": "2d127b1c4c154cd0501cc0f54e28529d5010d2f48f08ffe5e91bccd13da2e281",
+    "source.json": "b3c9f785845d6fd28d618d5813b58b46f29f90bfd7cf22686afb9bfea2725edf"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001919.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001919.png",
+   "files": {
+    "LF-001919.png": "249dc30ae77ac0e0034ace3c35c1e0ee49a329082feffae14c0d5e22e68fb4cb"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-249dc30ae77ac0e0034ace3c35c1e0ee49a329082feffae14c0d5e22e68fb4cb",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-249dc30ae77ac0e0034ace3c35c1e0ee49a329082feffae14c0d5e22e68fb4cb",
+   "files": {
+    "LF-001919.png": "249dc30ae77ac0e0034ace3c35c1e0ee49a329082feffae14c0d5e22e68fb4cb",
+    "source.json": "c91b566e59ed2f9a7033fe24781a28ca3300fadac36d0b3701d3a698ea27f240"
+   }
+  },
+  {
+   "from": "data\\output\\Pixellab\\Final\\LF-001920.png",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Final\\LF-001920.png",
+   "files": {
+    "LF-001920.png": "2e59358155cdcd55f614b74db3c6aee14123333f0b294c3abe4654019099033b"
+   }
+  },
+  {
+   "from": "data\\Level Factory\\Imported\\owner-upload-2e59358155cdcd55f614b74db3c6aee14123333f0b294c3abe4654019099033b",
+   "to": "data\\output\\Pixellab\\Removed\\2026-11-15-white-background-originals\\Imported\\owner-upload-2e59358155cdcd55f614b74db3c6aee14123333f0b294c3abe4654019099033b",
+   "files": {
+    "LF-001920.png": "2e59358155cdcd55f614b74db3c6aee14123333f0b294c3abe4654019099033b",
+    "source.json": "1e5cc7e274775f31258e0ffcadd9999b18c4b9af0b2ac948f73f2e0b5506f520"
+   }
+  }
+ ]
+}

@@ -431,3 +431,9 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   still land in Final). Calibration: 122 atlases, flagged exactly 082 (arctic, owner kept it; already READY, not
   affected), 118, 119, 120. Tests: test_claude_pixellab_background_atlas.py 2 passed (detector failed on old code);
   PixelLab/atlas/launcher/release subset 141 passed.
+- Owner confirmed permanent deletion ("Delete it"): the 141 files of
+  data/output/Pixellab/Removed/2026-11-15-white-background-originals/ (48 Final PNGs, 45 Imported folders, 3 atlases)
+  were deleted one by one after re-verifying each SHA-256 against the move manifest (no unlisted files); the empty
+  folders were removed. The manifest with every path and hash is kept in
+  docs/evidence/claude-atlas-background-20261115/deleted-originals-manifest.json. The 48 REJECTED Release Pool history
+  records remain (append-only history).
