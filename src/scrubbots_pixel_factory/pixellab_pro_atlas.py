@@ -28,6 +28,39 @@ MIN_MAX_COLORS = 3
 MAX_MAX_COLORS = 12
 DEFAULT_MAX_COLORS = 12
 MIN_OPAQUE_PIXELS = 200
+# Owner 2026-11-15 (EDGE_CLIPPED): PixelLab ignores prompt requests for an empty margin;
+# 36 of 64 frames in atlases 124-127 touched the frame edge. The Factory now asks PixelLab
+# for 52x52 frames and pads every cell with a 2-px transparent ring back to 56x56, so a
+# sprite can never touch the 56x56 frame edge. Same price (PixelLab bills 51..64 alike).
+PROVIDER_FRAME_MARGIN = 2
+
+
+def provider_frame_size(width: int, height: int) -> tuple[int, int]:
+    """Frame size to request from PixelLab for a wanted Factory frame size."""
+    margin = 2 * PROVIDER_FRAME_MARGIN
+    if width - margin < MIN_FRAME_SIZE or height - margin < MIN_FRAME_SIZE:
+        return width, height
+    return width - margin, height - margin
+
+
+def pad_atlas_frames(raw_png: bytes) -> bytes:
+    """Centre each cell of a 4x4 atlas with frames smaller than 56x56 on a transparent 56x56 cell.
+
+    Deterministic: the same provider sheet always yields the same padded bytes, so a
+    gallery re-import is recognised as the atlas already in the Factory.
+    """
+    atlas = _decode_png(raw_png, "Input atlas")
+    width, height = atlas.width // 4, atlas.height // 4
+    target_width, target_height = DEFAULT_FRAME_SIZE
+    if atlas.width % 4 or atlas.height % 4 or width >= target_width or height >= target_height:
+        return raw_png
+    padded = Image.new("RGBA", (4 * target_width, 4 * target_height), (0, 0, 0, 0))
+    offset_x, offset_y = (target_width - width) // 2, (target_height - height) // 2
+    for row in range(4):
+        for column in range(4):
+            cell = atlas.crop((column * width, row * height, (column + 1) * width, (row + 1) * height))
+            padded.paste(cell, (column * target_width + offset_x, row * target_height + offset_y))
+    return _encode_png(padded)
 # Owner 2026-11-15: PixelLab sometimes ignores no_background=True and draws a white /
 # light-grey card behind every frame (atlases PX-ATLAS-000118..120, the arctic set).
 # A frame's light-background ratio is the share of its pixels that are opaque white or
@@ -369,7 +402,12 @@ def export_atlas(
 ) -> dict[str, Any]:
     """Always slice an imported atlas into 16 exact independent PNGs."""
     output = Path(new_output_directory).resolve()
-    return _persist_atlas(raw_png, output, max_colors=max_colors, source_kind="IMPORTED_ATLAS")
+    manifest = _persist_atlas(pad_atlas_frames(raw_png), output, max_colors=max_colors, source_kind="IMPORTED_ATLAS")
+    if manifest["source_atlas_sha256"] != sha256(raw_png).hexdigest():
+        manifest["provider_atlas_sha256"] = sha256(raw_png).hexdigest()
+        manifest["provider_frame_padding"] = PROVIDER_FRAME_MARGIN
+        (output / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return manifest
 
 
 def export_frames(

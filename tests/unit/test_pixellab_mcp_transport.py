@@ -15,7 +15,7 @@ from scrubbots_pixel_factory.studio_extensions import (
 )
 
 
-def _atlas_png(width: int = 224, height: int = 224) -> bytes:
+def _atlas_png(width: int = 208, height: int = 208) -> bytes:  # 4 x 52: a 56 frame is requested as 52 (edge margin)
     image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
     color = CANONICAL_PALETTE.colors[0].rgb + (255,)
     image.putpixel((0, 0), color)
@@ -67,8 +67,8 @@ def test_mcp_pro_generation_uses_locked_palette_and_fetches_inline_4x4_atlas(mon
         if params["name"] == "create_image_pro":
             assert params["arguments"] == {
                 "description": "a blue slime",
-                "width": 56,
-                "height": 56,
+                "width": 52,
+                "height": 52,
                 "no_background": True,
                 "palette": [color.hex.upper() for color in CANONICAL_PALETTE.colors],
                 "palette_name": "ScrubBots Palette V3",
@@ -193,7 +193,7 @@ def test_mcp_downloads_saved_224_gallery_sheet_instead_of_using_first_56_frame(
 
     assert result.atlas_png == sheet
     with Image.open(BytesIO(result.atlas_png)) as decoded:
-        assert decoded.size == (224, 224)
+        assert decoded.size == (208, 208)  # provider sheet: 4 x 52
     assert result.mcp_request_count == 5
     assert [call.get("params", {}).get("arguments", {}).get("job_id")
             for call in calls if call.get("method") == "tools/call"] == [
@@ -281,7 +281,7 @@ def test_mcp_recovers_saved_charged_gallery_asset_after_cancel_status(
         )
         assert result.atlas_png == sheet
         with Image.open(BytesIO(result.atlas_png)) as decoded:
-            assert decoded.size == (224, 224)
+            assert decoded.size == (208, 208)  # provider sheet: 4 x 52
     else:
         with pytest.raises(PixelLabProviderError) as caught:
             generate_pixellab_pro_4x4_atlas_mcp(

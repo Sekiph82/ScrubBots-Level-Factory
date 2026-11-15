@@ -1529,8 +1529,13 @@ def _pixellab_gallery_sync(request: Mapping[str, object], *, sheets: Sequence[Ma
         if sheet.get("skipped") or not isinstance(png, bytes):
             rows.append({**row, "status": "SKIPPED", "reason": str(sheet.get("skipped", "no PNG"))})
             continue
+        from scrubbots_pixel_factory.pixellab_pro_atlas import pad_atlas_frames
         sha = hashlib.sha256(png).hexdigest()
-        if (transactions / f"pixellab-atlas-{sha}.json").is_file():
+        try:
+            padded_sha = hashlib.sha256(pad_atlas_frames(png)).hexdigest()
+        except ValueError:   # unreadable sheet: the import below reports why
+            padded_sha = sha
+        if any((transactions / f"pixellab-atlas-{key}.json").is_file() for key in {sha, padded_sha}):
             rows.append({**row, "status": "ALREADY_IN_FACTORY", "sha256": sha})
             continue
         staging.mkdir(parents=True, exist_ok=True)

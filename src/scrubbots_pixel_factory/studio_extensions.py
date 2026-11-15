@@ -3607,6 +3607,10 @@ def generate_pixellab_pro_4x4_atlas_mcp(
         raise PixelLabProviderError("CREDENTIALS_NOT_CONFIGURED", "PIXELLAB_API_TOKEN_NOT_CONFIGURED: configure the PixelLab MCP bearer token in Windows Credential Manager.")
 
     actual_seed = _resolved_seed(seed)
+    # Owner 2026-11-15: request 52x52 for a 56x56 Factory frame; export_atlas pads it back
+    # with a transparent ring so no sprite touches the frame edge (EDGE_CLIPPED).
+    from .pixellab_pro_atlas import provider_frame_size
+    width, height = provider_frame_size(width, height)
     request_count = 0
     message_id = 0
     session_id: str | None = None

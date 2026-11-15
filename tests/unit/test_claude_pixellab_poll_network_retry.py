@@ -13,7 +13,7 @@ from scrubbots_pixel_factory.studio_extensions import PixelLabProviderError, gen
 
 
 def _atlas_png() -> bytes:
-    image = Image.new("RGBA", (224, 224), (0, 0, 0, 0))
+    image = Image.new("RGBA", (208, 208), (0, 0, 0, 0))  # 4 x 52: 56 frames are requested as 52
     image.putpixel((0, 0), CANONICAL_PALETTE.colors[0].rgb + (255,))
     output = BytesIO()
     image.save(output, format="PNG")

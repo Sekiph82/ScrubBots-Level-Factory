@@ -437,3 +437,25 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   folders were removed. The manifest with every path and hash is kept in
   docs/evidence/claude-atlas-background-20261115/deleted-originals-manifest.json. The 48 REJECTED Release Pool history
   records remain (append-only history).
+
+## 2026-11-15 — Background-free prompts, 4 generations, startup time, EDGE_CLIPPED margin
+
+- Prompt CSV (owner data, untracked): produced rows removed, every remaining prompt gets a no-backdrop / 3-px-margin
+  suffix without commas (backups in docs/evidence/claude-prompt-csv-20261115/). Rows 0084/0085 removed after their GUI
+  generation; 165 rows left.
+- 4 owner-approved paid generations (40 generations): 124 BIRD volcanic (CLI, owner objected: must use the Studio),
+  125 MAMMAL cavern (CLI), 126 MAMMAL oceanic and 127 MAMMAL skyborne (Studio GUI Single/Prompt/Generate, credits panel
+  727 -> 717). Backgrounds all clean (light-background ratio <= 0.065). Passes 1/13/8/6 of 16; every rejection was
+  EDGE_CLIPPED. Mistake on my side: 126/127 were run before the owner-requested EDGE_CLIPPED fix existed.
+- Edge analysis 124-127: 36 of 64 frames touch the 1-px ring; only 15 of them with <= 8 px, so a pixel tolerance would
+  not fix it and the margin wording in the prompt is ignored by PixelLab.
+- Fix: a 56x56 Factory frame is now requested from PixelLab as 52x52 (provider_frame_size) and export_atlas pads every
+  cell with a centred 2-px transparent ring (pad_atlas_frames, deterministic; only when both frame sides are < 56, so
+  59x52 manual imports are not cropped). Manifest records provider_atlas_sha256 / provider_frame_padding; Grid Files and
+  Final keep 224x224 / 56x56. Gallery sync recognises a known sheet by the raw or the padded SHA. No job was in flight
+  (172 job records, none POLLING), so no accepted 56-px job is resumed with the new size. Same PixelLab price.
+- Tests: new test_claude_pixellab_edge_margin.py (3; fails on old code: pad_atlas_frames missing). Old transport/poll
+  fixtures updated from 224 to the 208 provider sheet; the old 59x52 import test caught a cropping bug in the first
+  padding version (fixed). Targeted PixelLab/atlas/launcher/batch suites: 229 passed, 0 failed.
+- Startup measured 1468 s: restore-imported-sources 1095 s (new Final PNG registration ~4 min each), release-pool
+  122 s + 105 s, candidate-inbox 48 s (296 s before the candidate cache). Registration slowness still open.
