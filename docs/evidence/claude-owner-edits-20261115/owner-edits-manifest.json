@@ -1,0 +1,386 @@
+[
+  {
+    "owner_file": "1.png",
+    "owner_file_sha256": "1dfdd83bbd5de3dde076773c24c73df115cdd7ac052355b3476265c6f07fa560",
+    "new": "LF-002033.png",
+    "new_sha256": "65a14c1fc1367547d282068d010b8d1bcbd8ef38e2349c6325b7087dd2bf9fa2",
+    "size": [
+      56,
+      56
+    ],
+    "replaces": "LF-001981.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "2.png",
+    "owner_file_sha256": "ddc4349dfa32d98916b8739a3a073dbe8aa9ecf76eb700d7ea55b2616d79388b",
+    "new": "LF-002034.png",
+    "new_sha256": "42e0250285f8920151b39ba947e6503a0e7915d2a4494d977fb94c9adfeae27a",
+    "size": [
+      58,
+      58
+    ],
+    "replaces": "LF-001982.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "3.png",
+    "owner_file_sha256": "38b6d8d5bd9ff900aebf693ffc614ce84768e82a9ce698b7913da26e6359a8fc",
+    "new": "LF-002035.png",
+    "new_sha256": "142db8125d1bdb273ad7730060d653e25afeb316d04099fa63e9f51e62414315",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001983.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "4.png",
+    "owner_file_sha256": "c879a9b6eeea2694b614c2af09077cadfa607af0cfe34b4dc6caebf2aed490ff",
+    "new": "LF-002036.png",
+    "new_sha256": "ad2f8968d3b4e067af87738bef4b3cc51291b54786f61b32606bab635e0c3b2d",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001984.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "5.png",
+    "owner_file_sha256": "40e1ee45a2867a8a42f3463869240ce41edf46e10c5a920592d41c471534fcc8",
+    "new": "LF-002037.png",
+    "new_sha256": "0382852a4eb6c017b307381c3c835a73bed578408890588e3a0df50a531eef67",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001980.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "6.png",
+    "owner_file_sha256": "a21d94a01c22e53d8efea3e53c50dd84e674deb3d19b3de5195e304568a3b757",
+    "new": "LF-002038.png",
+    "new_sha256": "8fd7b0345d6f9f3be2e24d06f3a107bb92cdd99c777d32246826eec84beeffd5",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001979.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "8.png",
+    "owner_file_sha256": "dd5cd8c2cb6caa5e250abc5526098d2ab85868e2bff0eaca2d23176e08464ac5",
+    "new": "LF-002039.png",
+    "new_sha256": "4fe93ea9ac178dfac13b7cb0b706ac1a58f807775126c04c0c52dfbf4534d144",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001977.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "9.png",
+    "owner_file_sha256": "bea16b2e8f9f89935db8b6c70383de90bee01a17b2a565924b32e1f5a34c5fc4",
+    "new": "LF-002040.png",
+    "new_sha256": "ce849fcfaf4ae5f94f8bb0dd0b40ea3bbd5fe6d0da3a7c01d7f6ebccd31ad90c",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001973.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "10.png",
+    "owner_file_sha256": "06aebbc93d6016f7d9e52b4c3091e8795094896123a8f3575ac44c9c0edb622b",
+    "new": "LF-002041.png",
+    "new_sha256": "21bf224677e1c971f13296f5071c21347860d0e352dc243d53350d9fcdc3daae",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001974.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "11.png",
+    "owner_file_sha256": "aad799c42607ace1b849b289045e6885efecad0455143af2ab381aa2ec795440",
+    "new": "LF-002042.png",
+    "new_sha256": "4851328bfa424e9b1de754b10ff1ec9a395dd00e505939dfd623a6b3e2d2a505",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001975.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "12.png",
+    "owner_file_sha256": "9276d2e10974f78ff16848165770d8f1f05e2b3b654eee492ccf62f6afb4f5db",
+    "new": "LF-002043.png",
+    "new_sha256": "98c8e928f9ad43e196c7fb8eef86080fe1263006a0875c3a711a859e7a6bfc5a",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001976.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "13.png",
+    "owner_file_sha256": "4b69d92e24b080c35a3cfa06d0700c7ff0d5f4962540ea198be16ec7ee6b4512",
+    "new": "LF-002044.png",
+    "new_sha256": "67d8c241d3c2f7ab8b7034900bafcfb1cb150ea4cccdf592c92f911f59c0a569",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001972.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "14.png",
+    "owner_file_sha256": "935c0ed2d87c1ebc606ee80cc6a6ef8ece2aa2d6b1b11b08e523c07f8f508ae8",
+    "new": "LF-002045.png",
+    "new_sha256": "30e67490e182861a5efb0877821f71c92aab6382faed9894f2012d1234033b6b",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001971.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "15.png",
+    "owner_file_sha256": "6196e80940bea89d0b8cf653609050bd374aed2eb0651f8fda025fb3ca1e6ad1",
+    "new": "LF-002046.png",
+    "new_sha256": "8f0da65fd48070b5b87fd8bab97cc4c1d10930a7cac4b82902f7069841e670fe",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001970.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "16.png",
+    "owner_file_sha256": "88a563384766c3a5d776ef31d12ba63889e64b60555e8a330a4870b103f505de",
+    "new": "LF-002047.png",
+    "new_sha256": "236d25065338af6cbb86ea77d2101736e8968e0b314ef7acd9147a5e34a8c5ab",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001969.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "17.png",
+    "owner_file_sha256": "eeb9ff24237fe6dbf4cd66e3b93cd888677e80aeb19cfdfe70faa5db7bfb09a0",
+    "new": "LF-002048.png",
+    "new_sha256": "9c64bdfe405952a71f5a705398a8ba38e0a8b8588ed84661a90b8206639c2a63",
+    "size": [
+      56,
+      56
+    ],
+    "replaces": "LF-001990.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "18.png",
+    "owner_file_sha256": "edb0c252db1ffeff53954c15f603fdb0f42e0fbfa011acfda0d1c6c76550afd8",
+    "new": "LF-002049.png",
+    "new_sha256": "bdee9b13888153e75bcc0df9021b315124a750d9619505e99081f6dd908d0997",
+    "size": [
+      56,
+      56
+    ],
+    "replaces": "LF-001987.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "19.png",
+    "owner_file_sha256": "7b82ff74b6a05b552953dc0cf5bc9db469e8e5ac16a87b501ded99f223cd902f",
+    "new": "LF-002050.png",
+    "new_sha256": "a0787b0f8713e369fd1445fa1948e155ee50e8cc2828beb5c723efeff6175247",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-001986.png",
+    "replaced_previous_status": "PENDING"
+  },
+  {
+    "owner_file": "20.png",
+    "owner_file_sha256": "7ac0ba549c42713bfb75eb46319c5f6a2dacd9039bb5d9d6be0ef4518180a153",
+    "new": "LF-002051.png",
+    "new_sha256": "07d5afcf947eaa98386493f7d80e51423f9a798a694d9136bbee2a9e75f96a12",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002002.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "21.png",
+    "owner_file_sha256": "bf5aea98025cdf9bd496704ddb4fe5fb73b85d50f09e2f40d0aba1ad5245a57d",
+    "new": "LF-002052.png",
+    "new_sha256": "878371bb9bb6d8a48a768b8cae05f12267d209abfcd640857c782c0f2f71a8c3",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002003.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "22.png",
+    "owner_file_sha256": "1572c74cf6c85de0f2173da62a8eac14e786971acb51af6b6af46bf1ef946b09",
+    "new": "LF-002053.png",
+    "new_sha256": "d195b3b3e660a111c46a646b59d412b1bb710a627c6f35a51cc15434caa3620b",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002004.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "23.png",
+    "owner_file_sha256": "b1281b799bb9e5ba27d931c5d459b4ade9c106f874a344e9f06f89d53ed29969",
+    "new": "LF-002054.png",
+    "new_sha256": "df33fc7c25ee6b0224e842b5ae69b875936fa2567617f399e17e8b0736c97c4e",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002007.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "24.png",
+    "owner_file_sha256": "4dcb0fcaf39592efceef2faee04986d51fb0420e09cad5f367d12696d5e07a7f",
+    "new": "LF-002055.png",
+    "new_sha256": "7d3fe5a7fbb69f7cf2a934a9d12b219be476a3d28928bfc4c40ef217c04e515c",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002005.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "25.png",
+    "owner_file_sha256": "dc9ae0fcecfcb6599adeab7eafb5f1c00b0642ac2e0204afb4374cf131ec20e8",
+    "new": "LF-002056.png",
+    "new_sha256": "77a8b64d2c67435fd17b303ab37ffc3eec5945d9a5cd143301364b61401addcb",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002010.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "26.png",
+    "owner_file_sha256": "3b64fdbb74cdd27aa5c788d62f7ee0e3e57fb818e9f100f3e8ce78ae995206b8",
+    "new": "LF-002057.png",
+    "new_sha256": "3fe48db55798c58236d45ca795dd9045ba957a92ea081a9923c5ce402db4f8f5",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002012.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "27.png",
+    "owner_file_sha256": "f3189212d7539138fd469052963352480415d327daa87b299f9c451cfb52f99a",
+    "new": "LF-002058.png",
+    "new_sha256": "5115883ae534ebf23fe5f53420f3bcd204db9f064958b6a6534d8b2a71133af5",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002015.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "28.png",
+    "owner_file_sha256": "91dd515bbbe1cac97bbf894c31b09e1a21632a5896b9d77c95a46d028f83d0b0",
+    "new": "LF-002059.png",
+    "new_sha256": "7ab97be5c38c0518ca5eee2a38dc80d7319043bcfcfa7603eca64461c2fb0fdf",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002019.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "29.png",
+    "owner_file_sha256": "b2d4b593a082df15f76147951fa0d239e349e49e7fd105009e07f25253f8c8d4",
+    "new": "LF-002060.png",
+    "new_sha256": "ad9a260047004fbf38429e2c39627f01fd2ed40f3efe8e7a18028694200eb2c9",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002022.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "30.png",
+    "owner_file_sha256": "f80efcfd8e843c0ab40b6cf48a81b2da681bb2859f78e38810639d1021aa9e99",
+    "new": "LF-002061.png",
+    "new_sha256": "6f42bc36d8e5b910f60a2670de30abd54c7f8808530a37fa7d9309e6fea251ef",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002025.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "31.png",
+    "owner_file_sha256": "8b2459d6a1e27cc842c026e620a08b62603caa2969a3dfb6f637ddd70f3f4b4d",
+    "new": "LF-002062.png",
+    "new_sha256": "b04dbdf0a59c398683d341cf052b016eb19e5186915332cf33e080348415682e",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002031.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "32.png",
+    "owner_file_sha256": "ad8996ab6d21eb7f909043552ff75ba1331436bc4731bbcae504c20d63644f8b",
+    "new": "LF-002063.png",
+    "new_sha256": "ce59a0bbce3bc802b92815676e15c9afd08e4d2960830996cf1830e0a70fdec2",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002030.png",
+    "replaced_previous_status": "-"
+  },
+  {
+    "owner_file": "33.png",
+    "owner_file_sha256": "b0cbd85dec546b571e1b6a3b9780be96a2cf10a05190e6c8430de6a05bbd29d8",
+    "new": "LF-002064.png",
+    "new_sha256": "97fe603cc7bd2430ae1e136ff442e074a86c1e59acaf55c3a5ee932b859684bd",
+    "size": [
+      59,
+      59
+    ],
+    "replaces": "LF-002029.png",
+    "replaced_previous_status": "-"
+  }
+]

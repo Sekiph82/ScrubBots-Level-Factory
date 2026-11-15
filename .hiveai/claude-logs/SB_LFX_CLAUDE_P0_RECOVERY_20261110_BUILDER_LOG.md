@@ -459,3 +459,25 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
   padding version (fixed). Targeted PixelLab/atlas/launcher/batch suites: 229 passed, 0 failed.
 - Startup measured 1468 s: restore-imported-sources 1095 s (new Final PNG registration ~4 min each), release-pool
   122 s + 105 s, candidate-inbox 48 s (296 s before the candidate cache). Registration slowness still open.
+
+## 2026-11-15 — Owner-edited EDGE_CLIPPED frames into Final; rejected slices no longer become Pending
+
+- Edge-margin build 1cb6646c installed (Studio closed via CloseMainWindow; deploy_release.py --apply; the 3 installed
+  files are byte-identical to the HEAD blobs).
+- Bug found: the Final inventory scan registers every Final PNG without a Release Pool status as PENDING ("New
+  SHA-verified PixelLab Final source discovered during inventory reconciliation"). Only OPAQUE_BACKGROUND slices got a
+  REJECTED status at atlas time, so all 18 EDGE_CLIPPED slices of atlases 124/125 were PENDING. Fix:
+  _reject_background_atlas_frames now gives every intake-rejected slice (any reason) a REJECTED status in both atlas
+  paths.
+- Owner redrew the clipped frames in Downloads\1..33.png (7.png = LF-001978, already in the system, skipped by owner
+  decision). 20 of 32 had editor leftovers: semi-transparent pixels (1-98), near-palette colours (6 files), edge contact
+  (8 files). New pixellab_pro_atlas.clean_owner_edited_frame (alpha >=128 opaque else clear; nearest Palette V3 colour;
+  square canvas <= 59 with an empty 1-px ring, clearing the thinner outer column/row only when the art is wider than
+  57 px). New owner_art_storage.archive_owner_edited_sprite puts a strict sprite into Final under the next LF name with
+  a name-map record "owner-edit:<sha>" naming the frame it replaces (idempotent by SHA).
+- Result: LF-002033..LF-002064 (32 files, sizes 56/58/59) imported and PENDING; the 32 replaced slices REJECTED (18 were
+  PENDING, 14 had no status); the 4 un-edited EDGE_CLIPPED slices of 127 (LF-002018/2021/2023/2026) REJECTED.
+  Evidence: docs/evidence/claude-owner-edits-20261115/ (owner-edits-manifest.json with owner-file and new SHA-256,
+  cleaned/, before-after.png, asset-name-manifest.before.json).
+- Tests: test_claude_owner_edited_sprites.py 3 (cleaner rules, archive naming/refusal, EDGE_CLIPPED -> REJECTED; the
+  old function returned 0 for EDGE_CLIPPED-only manifests). PixelLab/atlas/Final/Release Pool/batch suites: 158 passed, 0 failed.

@@ -92,6 +92,54 @@ def light_background_ratio(frame: Image.Image) -> float:
     return light / float(width * height)
 
 
+def clean_owner_edited_frame(image: Image.Image) -> Image.Image:
+    """Make an owner-edited sprite pass intake without redrawing it (owner 2026-11-15).
+
+    Editors leave a few anti-aliased pixels: alpha >= 128 becomes opaque and < 128
+    transparent; an opaque colour outside Palette V3 snaps to the nearest V3 colour;
+    the sprite is centred on a square canvas (max 59) with an empty 1-px ring. Only
+    when the artwork is wider/taller than 57 px is the thinner outermost column/row
+    cleared.
+    """
+    palette = [color.rgb for color in CANONICAL_PALETTE.colors]
+    exact = set(palette)
+    source = image.convert("RGBA")
+    cleaned = Image.new("RGBA", source.size, (0, 0, 0, 0))
+    snapped: dict[tuple[int, int, int], tuple[int, int, int]] = {}
+    for y in range(source.height):
+        for x in range(source.width):
+            red, green, blue, alpha = source.getpixel((x, y))
+            if alpha < 128:
+                continue
+            rgb = (red, green, blue)
+            if rgb not in exact:
+                rgb = snapped.setdefault(rgb, min(palette, key=lambda c: sum((a - b) ** 2 for a, b in zip(c, rgb))))
+            cleaned.putpixel((x, y), (*rgb, 255))
+    limit = MAX_FRAME_SIZE - 2
+    while True:
+        box = cleaned.getchannel("A").getbbox()
+        if box is None:
+            raise ValueError("OWNER_EDIT_EMPTY: the sprite has no opaque pixels")
+        left, top, right, bottom = box
+        if right - left > limit:
+            counts = [sum(cleaned.getpixel((column, y))[3] > 0 for y in range(cleaned.height)) for column in (left, right - 1)]
+            column = left if counts[0] <= counts[1] else right - 1
+            for y in range(cleaned.height):
+                cleaned.putpixel((column, y), (0, 0, 0, 0))
+        elif bottom - top > limit:
+            counts = [sum(cleaned.getpixel((x, row))[3] > 0 for x in range(cleaned.width)) for row in (top, bottom - 1)]
+            row = top if counts[0] <= counts[1] else bottom - 1
+            for x in range(cleaned.width):
+                cleaned.putpixel((x, row), (0, 0, 0, 0))
+        else:
+            break
+    art = cleaned.crop(box)
+    side = min(MAX_FRAME_SIZE, max(source.width, source.height, art.width + 2, art.height + 2, MIN_FRAME_SIZE))
+    framed = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    framed.paste(art, ((side - art.width) // 2, (side - art.height) // 2))
+    return framed
+
+
 def validate_frame_size(width: int, height: int) -> tuple[int, int]:
     """Validate one Pro 4x4 sprite size, not its 4x4 composite dimensions."""
     if type(width) is not int or type(height) is not int:

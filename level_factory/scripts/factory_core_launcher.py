@@ -1068,13 +1068,16 @@ def _pixellab_final_slice_path(owner_catalog: Mapping[str, object], frame: Mappi
 
 
 def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifest: Mapping[str, object]) -> int:
-    """Keep an atlas PixelLab drew on a background out of the solver queue (owner 2026-11-15).
+    """Keep every intake-rejected atlas slice out of the solver queue (owner 2026-11-15).
 
-    All 16 slices stay in Final (original-output rule), but each gets a REJECTED
-    Release Pool status so the Final inventory scan never turns it into Pending.
+    All 16 slices stay in Final (original-output rule), but a slice intake rejected
+    (OPAQUE_BACKGROUND, EDGE_CLIPPED, ...) gets a REJECTED Release Pool status so the
+    Final inventory scan never turns it into Pending. Before this, only background
+    atlases were covered: the EDGE_CLIPPED frames of atlases 124/125 became Pending.
     """
-    frames = manifest.get("frames", [])
-    if not any("OPAQUE_BACKGROUND" in frame.get("reasons", []) for frame in frames if isinstance(frame, Mapping)):
+    frames = [frame for frame in manifest.get("frames", [])
+              if isinstance(frame, Mapping) and (frame.get("intake_status") == "REJECTED" or frame.get("reasons"))]
+    if not frames:
         return 0
     from scrubbots_pixel_factory.owner_release_library import list_records, transition
 
@@ -1082,15 +1085,16 @@ def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifes
     atlas_name = Path(str(owner_catalog.get("atlas_path", ""))).name
     rejected = 0
     for frame in frames:
-        if not isinstance(frame, Mapping):
-            continue
         source_id = f"owner-upload-{frame['sha256']}"
         if source_id in known:
             continue
+        reasons = list(frame.get("reasons", []))
+        reason = (f"PixelLab drew a background behind the frames of {atlas_name} (no_background was requested)."
+                  if "OPAQUE_BACKGROUND" in reasons else
+                  f"PixelLab intake rejected this slice of {atlas_name}: {', '.join(reasons) or 'REJECTED'}.")
         transition(source_id, "REJECTED", source_sha256=str(frame["sha256"]), provider="PIXELLAB",
                    original_source_path=str(_pixellab_final_slice_path(owner_catalog, frame)),
-                   reason=f"PixelLab drew a background behind the frames of {atlas_name} (no_background was requested).",
-                   evidence={"intake_reasons": list(frame.get("reasons", [])), "atlas": atlas_name})
+                   reason=reason, evidence={"intake_reasons": reasons, "atlas": atlas_name})
         rejected += 1
     return rejected
 

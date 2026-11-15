@@ -316,6 +316,52 @@ def _write_content_addressed(directory: Path, filename: str, raw: bytes, expecte
         temporary.unlink(missing_ok=True)
 
 
+def archive_owner_edited_sprite(raw_png: bytes, *, replaces: str, original_filename: str,
+                                repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Put one owner-edited sprite into PixelLab Final under a new LF name (owner 2026-11-15).
+
+    The owner redraws PixelLab frames that intake rejected. The edit is not an atlas
+    slice, so it gets its own LF-xxxxxx.png name and a name-map record that names the
+    Final frame it replaces. Idempotent by SHA-256. Only strict sprites are accepted:
+    51..59 px, alpha 0/255, Palette V3 colours, an empty 1-px ring, >= 200 opaque px.
+    """
+    from .contracts import CANONICAL_PALETTE
+
+    sha = _hash(raw_png)
+    width, height = _image_dimensions(raw_png, "owner-edited sprite")
+    if not (51 <= width <= 59 and 51 <= height <= 59):
+        raise OwnerArtStorageError("owner-edited sprite must be 51..59 pixels per side")
+    with Image.open(BytesIO(raw_png)) as image:
+        rgba = image.convert("RGBA")
+    palette = {color.rgb for color in CANONICAL_PALETTE.colors}
+    opaque = 0
+    for y in range(height):
+        for x in range(width):
+            red, green, blue, alpha = rgba.getpixel((x, y))
+            if alpha not in (0, 255) or (alpha and (red, green, blue) not in palette):
+                raise OwnerArtStorageError("owner-edited sprite has semi-transparent or non-Palette-V3 pixels")
+            if alpha and (x in (0, width - 1) or y in (0, height - 1)):
+                raise OwnerArtStorageError("owner-edited sprite touches the frame edge")
+            opaque += alpha == 255
+    if opaque < 200:
+        raise OwnerArtStorageError("owner-edited sprite has fewer than 200 opaque pixels")
+    if not re.fullmatch(r"LF-[0-9]{6,}\.png", replaces):
+        raise OwnerArtStorageError("owner-edited sprite must name the LF frame it replaces")
+    canonical_root = factory_repository_root(repository_root)
+    paths = ensure_owner_art_layout(canonical_root)
+    name_map = _load_pixellab_name_map(canonical_root)
+    key = f"owner-edit:{sha}"
+    entry = name_map["sprites"].get(key)
+    if entry is None:
+        entry = {"filename": _next_asset_name(name_map["sprites"], "LF-"), "sha256": sha, "source": "OWNER_EDIT",
+                 "replaces": replaces, "original_filename": Path(original_filename).name, "dimensions": [width, height]}
+    target = _write_content_addressed(paths["pixellab_final"], str(entry["filename"]), raw_png, sha)
+    if key not in name_map["sprites"]:
+        name_map["sprites"][key] = entry
+        _save_pixellab_name_map(canonical_root, name_map)
+    return {"filename": str(entry["filename"]), "sha256": sha, "path": str(target), "replaces": replaces}
+
+
 def archive_pixellab_export(
     output_directory: str | Path,
     manifest: Mapping[str, Any],
