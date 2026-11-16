@@ -625,8 +625,13 @@ def purge_rejected_source(source_id: str, *, repository_root: str | Path | None 
     return deleted
 
 
-def list_records(status: str | None = None, *, repository_root: str | Path | None = None) -> dict[str, Any]:
+def list_records(status: str | None = None, *, source_id: str | None = None,
+                 repository_root: str | Path | None = None) -> dict[str, Any]:
+    """Status rows; ``source_id`` limits the scan to that one source's projections
+    (a full scan re-verifies every history, far too slow to repeat per source)."""
     if status is not None and status not in STATUSES: raise OwnerReleaseLibraryError("status filter is unsupported")
+    if source_id is not None and not _ID.fullmatch(source_id): raise OwnerReleaseLibraryError("source identity is malformed")
+    pattern = f"{source_id}.json" if source_id else "*.json"
     root = _root(repository_root); states = {status} if status else STATUSES; rows = []
     if not root.exists():
         return {"schema": "scrubbots-owner-release-library-view/v1", "state": "READY", "read_only": True,
@@ -634,7 +639,7 @@ def list_records(status: str | None = None, *, repository_root: str | Path | Non
     for state in sorted(states):
         folder = root / state.title()
         _verify_existing_path(root, folder)
-        for path in sorted(folder.glob("*.json"), key=lambda p: p.name.casefold()) if folder.exists() else []:
+        for path in sorted(folder.glob(pattern), key=lambda p: p.name.casefold()) if folder.exists() else []:
             if _reparse(path): raise OwnerReleaseLibraryError("status projection is unsafe")
             value = json.loads(path.read_text(encoding="utf-8"))
             # PixelLab's durable atlas transaction manifests also live directly

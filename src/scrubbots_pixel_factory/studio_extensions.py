@@ -419,7 +419,7 @@ def _sync_current_pixellab_final_sources(
         if current_status is None:
             # import_owner_upload may already have emitted the initial Pending
             # projection; refresh this one row before creating another event.
-            latest = list_owner_release_records(repository_root=repository_root)
+            latest = list_owner_release_records(source_id=source_id, repository_root=repository_root)
             current_status = next((row for row in latest.get("records", [])
                                    if isinstance(row, Mapping) and row.get("source_id") == source_id), None)
             if current_status is not None:
