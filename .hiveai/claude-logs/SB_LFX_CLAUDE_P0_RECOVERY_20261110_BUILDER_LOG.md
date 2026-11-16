@@ -580,3 +580,10 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Full scan of Final (3048 PNG) for border-reachable pure white: 29 hits, 26 are art (snow, waves, white bodies). 3 real card fragments cleaned: LF-001864 -> LF-003487, LF-001869 -> LF-003488, LF-002289 -> LF-003489 (old versions REJECTED and purged). Sheet: `final-white-scan.png`.
 - 9 frames rejected earlier today were never in the system (`earlier-rejected-not-in-system.png`). Owner approved adding 5: four EDGE_CLIPPED frames (LF-002018/2021/2023/2026) got a 1-px transparent border (58x58) and detached 1-2 px specks removed -> LF-003495..003498; dragon LF-002278 had its white bottom line flood-cleaned -> LF-003494. Badger, raccoon, beaver and tiny chick stay out.
 - Release Pool: READY 1483, PENDING 960, FAILED 2, REJECTED 0. Evidence: `docs/evidence/claude-batch48-20261115/fix8/`.
+
+## 2026-11-16 — Startup hang: per-source full Release Pool rescan
+
+- Symptom: Studio buttons stayed disabled for hours; worker `library-refresh` read 54 GB from disk.
+- Root cause: `_sync_current_pixellab_final_sources` called `list_records()` (reads and re-verifies every projection + history, ~2,500 rows) once per Final PNG without a status. ~600 PNGs lacked status (passing slices of the 48-row batch), ~18 s each.
+- Fix (commit 03cd8ed6): `list_records(source_id=...)` globs only that source's projections; inventory uses it. Test `tests/unit/test_claude_inventory_single_source_lookup.py`; full unit suite 2179 passed, 15 skipped, 0 failed. Deployed to Release.
+- Real app relaunch 23:42 local: inventory complete in 333 s (3053 active PNGs, 1 invalid), buttons active. An orphaned worker from the previous Studio window (PID 3412, old code) kept running after close; owner ended it manually.
