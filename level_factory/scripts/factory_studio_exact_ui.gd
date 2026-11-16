@@ -4056,7 +4056,36 @@ func _report_batch_start_failure(message: String) -> void:
 	_report(message)
 
 
+var _batch_preparing := false
+var _batch_prep_seq := 0
+var _batch_prep_started_msec := 0
+
+
+# 2026-11-17: snapshot and planning are blocking worker calls that can take
+# minutes; each step is written to Pipeline Activity and painted before it runs,
+# and a second click while preparing is ignored.
+func _batch_prep_step(message: String) -> void:
+	_batch_prep_seq += 1
+	_activity_stage = "BATCH PREPARING"
+	_activity_message = message
+	_append_activity_row({"seq": _batch_prep_seq, "elapsed_ms": Time.get_ticks_msec() - _batch_prep_started_msec, "stage": "BATCH", "state": "PREPARING", "message": message})
+	_refresh_activity_header()
+	await get_tree().process_frame
+	await get_tree().process_frame
+
+
 func _run_png_batch() -> void:
+	if _batch_preparing:
+		_report("Batch is already being prepared; see Pipeline Activity.")
+		return
+	_batch_preparing = true
+	_batch_prep_seq = 0
+	_batch_prep_started_msec = Time.get_ticks_msec()
+	await _run_png_batch_inner()
+	_batch_preparing = false
+
+
+func _run_png_batch_inner() -> void:
 	if _gateway == null or _operation_running:
 		return
 	if not _owner_release_archive_loaded:
@@ -4088,6 +4117,7 @@ func _run_png_batch() -> void:
 	if source_ids.size() != pending_sources.size():
 		_report("Pending PNG inventory changed during snapshot; no batch was created.")
 		return
+	await _batch_prep_step("Batch worker started: saving a snapshot of %d Pending PNGs." % source_ids.size())
 	var composite := _extension("pending-png-batch-create", {"source_ids": source_ids})
 	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
@@ -4099,6 +4129,7 @@ func _run_png_batch() -> void:
 		"background_intent": _background_intent,
 		"solver_timeout_seconds": 900,
 	}
+	await _batch_prep_step("Batch worker is planning: checking READY history and validating %d PNGs before the first solve." % source_ids.size())
 	var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
 	var job: Dictionary = created.get("job", {})
 	if str(created.get("disposition", "")) == "ALL_SOURCES_ALREADY_READY":
@@ -4125,6 +4156,7 @@ func _run_png_batch() -> void:
 					_report("READY-excluded batch source list is malformed; no solver was started.")
 					return
 				job_source_ids.append(job_source_id)
+		await _batch_prep_step("%d PNGs already READY were left out; saving the remaining %d as the batch snapshot." % [source_ids.size() - job_source_ids.size(), job_source_ids.size()])
 		var job_composite := _extension("loaded-png-batch-create", {"source_ids": job_source_ids})
 		if str(job_composite.get("batch_id", "")) != job_batch_id:
 			_report("READY-excluded source snapshot did not match the persisted job; no solver was started.")

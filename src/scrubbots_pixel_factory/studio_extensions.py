@@ -757,9 +757,16 @@ _IMPORTED_BY_PREFIX: dict[str, Path] | None = None
 
 
 def _candidate_validation_code_digest() -> str:
+    # 2026-11-17: this used to hash the whole studio_extensions.py, so any
+    # unrelated edit there threw away all ~1500 validated rows and the first
+    # Studio run after every update re-validated each bundle (~4 min). Only the
+    # row builder in this file feeds the cached row; hash just that function.
+    import inspect
+
     package = Path(__file__).resolve().parent
     digest = hashlib.sha256(str(_CANDIDATE_CACHE_VERSION).encode())
-    for relative in ("studio_extensions.py", "output/bundle.py", "output/png.py", "quality/core.py", "contracts/palette.py"):
+    digest.update(inspect.getsource(_validated_candidate_row).encode("utf-8"))
+    for relative in ("output/bundle.py", "output/png.py", "quality/core.py", "contracts/palette.py"):
         try:
             digest.update((package / relative).read_bytes())
         except OSError:

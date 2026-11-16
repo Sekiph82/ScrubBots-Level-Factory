@@ -573,16 +573,25 @@ def _verified_ready_sources(imported_items: Sequence[Mapping[str, Any]]) -> dict
         return {}
 
     try:
-        candidates_by_id = {str(row.get("candidate_id", "")): row for row in studio.list_candidates()}
+        # 2026-11-17: only the candidates named by READY history matter here.
+        # Projecting and re-validating every candidate and every Release Pool
+        # entry (twice) took ~7 minutes before each Run Pending Batch.
         from .supply_pipeline import release_pool as release_pool_store
         from .supply_pipeline.release_pool import release_entries
 
-        entries_by_pair = {
-            (str(row.get("candidate_id", "")), str(row.get("pipeline_run_id", ""))): row
-            for row in release_entries()
-        }
+        needed = sorted({str(item.get("candidate_id", "")) for _job, item in ready_history if item.get("candidate_id")})
+        candidates_by_id = {}
+        entries_by_pair = {}
+        pool_entry_paths: list[Path] = []
+        for candidate_key in needed:
+            found = studio.find_candidate(candidate_key)
+            if found is not None:
+                candidates_by_id[candidate_key] = found
+            for row in release_entries(candidate_key):
+                entries_by_pair[(str(row.get("candidate_id", "")), str(row.get("pipeline_run_id", "")))] = row
+            pool_entry_paths.extend(release_pool_store.entry_paths(candidate_key))
         pool_paths_by_pair: dict[tuple[str, str], Path] = {}
-        for pool_path in release_pool_store.entry_paths():
+        for pool_path in pool_entry_paths:
             try:
                 saved_entry = studio._read_json(pool_path)
             except Exception:

@@ -1001,10 +1001,17 @@ def _release_entries(candidate_id_filter: str | None = None) -> list[dict[str, A
     # Candidate discovery is a full canonical projection. Build it once for the
     # pool snapshot instead of repeating the same scan and validation for each
     # immutable entry (which made larger pools scale quadratically).
-    current_candidates = {
-        str(item.get("candidate_id", "")): item
-        for item in studio.list_candidates()
-    } if paths else {}
+    if not paths:
+        current_candidates = {}
+    elif candidate_id_filter is not None:
+        # A filtered read needs one candidate, not a projection of all of them.
+        one = studio.find_candidate(candidate_id_filter)
+        current_candidates = {candidate_id_filter: one} if one is not None else {}
+    else:
+        current_candidates = {
+            str(item.get("candidate_id", "")): item
+            for item in studio.list_candidates()
+        }
     pipeline_paths = studio._pipeline_paths() if paths else ()
     latest_ready_by_candidate = _latest_ready_pipeline_index(pipeline_paths, studio)
     latest_review_by_candidate: dict[str, dict[str, Any] | None] = {}
