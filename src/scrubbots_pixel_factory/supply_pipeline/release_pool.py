@@ -1008,7 +1008,17 @@ def slim_release_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
     slim["pipeline"]["primary"]["difficulty_class"] = (primary.get("difficulty") or {}).get("class")         if isinstance(primary.get("difficulty"), Mapping) else entry.get("difficulty_class")
     slim["candidate"] = {"level_id": candidate.get("level_id"), "candidate_id": candidate.get("candidate_id")}
     slim["slim"] = True
-    return slim
+    return _without_nulls(slim)
+
+
+def _without_nulls(entry: dict[str, Any]) -> dict[str, Any]:
+    """GDScript ``get(key, default)`` returns null for a present null key; omit such keys so defaults apply."""
+    for key in ("pipeline", "candidate"):
+        nested = entry[key]
+        if key == "pipeline":
+            nested["primary"] = {k: v for k, v in nested["primary"].items() if v is not None}
+        entry[key] = {k: v for k, v in nested.items() if v is not None}
+    return entry
 
 
 def slim_release_entries() -> list[dict[str, Any]]:

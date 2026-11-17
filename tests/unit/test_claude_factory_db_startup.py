@@ -172,3 +172,5 @@ def test_studio_release_list_is_slim_and_matches_the_python_projection(tmp_path,
 
     assert slim == [release_pool.slim_release_entry(e) for e in release_pool.release_entries()]
     assert slim[0]["slim"] is True and "candidate_classification" not in slim[0]
+    # GDScript get(key, default) shows "<null>" for a present null key: none may be sent.
+    assert None not in slim[0]["candidate"].values() and None not in slim[0]["pipeline"]["primary"].values()

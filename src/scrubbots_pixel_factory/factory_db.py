@@ -320,6 +320,10 @@ def slim_release_entry_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             "difficulty_class": difficulty if difficulty is not None else entry.get("difficulty_class")}}
         entry["candidate"] = {"level_id": candidate_level, "candidate_id": candidate_inner}
         entry["slim"] = True
+        # GDScript get(key, default) returns null for a present null key: omit them.
+        entry["pipeline"]["primary"] = {k: v for k, v in entry["pipeline"]["primary"].items() if v is not None}
+        entry["pipeline"] = {k: v for k, v in entry["pipeline"].items() if v is not None}
+        entry["candidate"] = {k: v for k, v in entry["candidate"].items() if v is not None}
         current = best.get(entry["candidate_id"])
         if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT") >= (current.get("eligibility_source") == "OWNER_ACCEPT"):
             best[entry["candidate_id"]] = entry
