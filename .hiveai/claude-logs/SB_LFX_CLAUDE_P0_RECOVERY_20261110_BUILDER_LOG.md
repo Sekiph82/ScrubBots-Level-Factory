@@ -651,3 +651,30 @@ Godot suites pass; focused DB/pool tests pass.
 the live game (head 40b38a5f, CI green, gameplay identical to 28741ed1): 1479/1479 WON_CANONICAL, 0 lost.
 44 READY rows whose entry has no run id are replayed in a second pass (results.jsonl under
 `data/Level Factory/Workspace/Revalidation/40b38a5f…`).
+
+## 2026-11-17 afternoon — P0-P S4 and re-pin to game 1de7a7f6
+
+**S4 service** (9af80a35, installed): `factory_core_launcher.py serve`; gateway routes 11 read-only operations to
+≤3 long-lived processes; writers/solvers/paid providers keep one process each. After closing the Studio no service
+process remained. Per-operation timings now go to `data/Level Factory/Runtime/studio-service.log`.
+
+**Measured in the installed app** (Godot "Responding" sampled every second; service log):
+- after 9af80a35: buttons ~85 s; Godot busy ~16 s after the Release Pool list and ~12 s after the source catalog.
+- causes fixed in e94c3793 (installed): O(n²) `_release_entry_for_id` (1764×1764), 1764 synchronous icon loads,
+  per-source linear upsert + source.json re-read for 3053 sources, Array `in` membership. Next launch: 0 frozen
+  samples; STARTUP_READY 51.9 s (gate waits for loaded-png-batch-find 7.9 s, restore-source-run 3.6 s).
+- candidate cache digest hashed CRLF (checkout) vs LF (Release) bytes → each side discarded the other's 1766-row
+  cache (~2.5 min); normalized (89b539bf, installed).
+
+**Owner batch (14:04)**: Run Pending Batch froze the window ~22 min (owner could not minimize it to reach the
+Desktop) while png-batch-create validated 1286 PNGs on Godot's main thread. Cause: `verify_attested_runtime`
+re-hashed the 284 runtime files per PNG (0.71 s each). Fixed (950812de): verified once per process, re-checked when
+a file's size/mtime or the file set changes (stamp re-taken ≤ every 30 s); 40 PNGs 35 s → 6.6 s. Composite lookup
+no longer loads ~2400 v1 import files. Planning calls moved off the main thread (fa0d42c0). Both not installed
+while the batch runs. Batch at 15:05: 23 READY, 0 failed, 5 running, 1256 queued.
+
+**Re-pin** (game agent via owner): game 1de7a7f6 attested runtime (284 files, 2,620,577 B). vs 28741ed1 only Home
+screen/UI text changed; gameplay, gameplay shell and tools/real_play_file.gd identical; real play already ran on the
+live checkout at 1de7a7f6. CI "Android Family First10 APK" success. Committed in 950812de.
+
+**Tests**: all 37 Godot suites pass on fa0d42c0; focused unit tests pass. Full unit suite not re-run this round.
