@@ -960,22 +960,43 @@ def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: A
 
     latest: dict[str, dict[str, Any]] = {}
     for path in pipeline_paths:
-        try:
-            pipeline = studio._read_json(path)
-        except (studio.StudioExtensionError, OSError):
+        summary = _ready_pipeline_summary(Path(path), studio)
+        if summary is None:
             continue
-        primary = pipeline.get("primary", {})
-        if (pipeline.get("disposition") != "READY"
-                or not isinstance(primary, Mapping)
-                or primary.get("state") != "READY"):
-            continue
-        candidate_id = str(pipeline.get("candidate_id", ""))
-        if not candidate_id:
-            continue
+        candidate_id = summary["candidate_id"]
         current = latest.get(candidate_id)
-        if current is None or str(pipeline.get("created_at", "")) > str(current.get("created_at", "")):
-            latest[candidate_id] = pipeline
+        if current is None or summary["created_at"] > current["created_at"]:
+            latest[candidate_id] = summary
     return latest
+
+
+# path -> (mtime_ns, size, summary|None). Pipeline records are written once; a batch re-read all
+# ~1900 of them (129 MB) for every verified Release Pool read, several times per PNG (~19 s each),
+# and the cost grew with the pool. Each record is now parsed once per process.
+_PIPELINE_SUMMARIES: dict[str, tuple[int, int, dict[str, Any] | None]] = {}
+
+
+def _ready_pipeline_summary(path: Path, studio: Any) -> dict[str, Any] | None:
+    """{candidate_id, run_id, created_at} of a READY pipeline record, else None."""
+    try:
+        info = path.stat()
+    except OSError:
+        return None
+    cached = _PIPELINE_SUMMARIES.get(str(path))
+    if cached is not None and cached[0] == info.st_mtime_ns and cached[1] == info.st_size:
+        return cached[2]
+    try:
+        pipeline = studio._read_json(path)
+    except (studio.StudioExtensionError, OSError):
+        return None
+    primary = pipeline.get("primary", {})
+    summary: dict[str, Any] | None = None
+    if (pipeline.get("disposition") == "READY" and isinstance(primary, Mapping)
+            and primary.get("state") == "READY" and str(pipeline.get("candidate_id", ""))):
+        summary = {"candidate_id": str(pipeline["candidate_id"]), "run_id": pipeline.get("run_id"),
+                   "created_at": str(pipeline.get("created_at", ""))}
+    _PIPELINE_SUMMARIES[str(path)] = (info.st_mtime_ns, info.st_size, summary)
+    return summary
 
 
 def _cached_latest_review(
