@@ -8,7 +8,7 @@ extends SceneTree
 
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
 const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
-const PINNED_GAME_COMMIT := "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"  # owner re-pin 2026-11-13
+const PINNED_GAME_COMMIT := "28741ed18c12e0e4e42523e7af1a0c5b6764453c"  # owner re-pin 2026-11-17
 const READ_OPERATIONS := ["loaded-png-batch-find", "png-batch-latest"]
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R05 loaded PNG batch UI PASS"
 
@@ -169,7 +169,7 @@ func _run_suite() -> void:
 
 	ui.set("_batch_job_id", "")
 	ui.set("_batch_snapshot", {})
-	ui.call("_run_level_pipeline")
+	await ui.call("_run_level_pipeline")
 	_check(gateway.source_ids == all_ids, "explicit Run did not snapshot all nine Pending sources in gallery order: %s" % [gateway.calls.map(func(call: Dictionary) -> String: return str(call.get("operation", "")))])
 	_check(gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) == "prepare:png-batch-run"), "explicit Run did not prepare the canonical batch worker")
 	_check(not gateway.calls.any(func(call: Dictionary) -> bool: return str(call.get("operation", "")) == "pipeline"), "UI fixture executed a native per-source pipeline")

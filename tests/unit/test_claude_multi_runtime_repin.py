@@ -11,7 +11,9 @@ OLD = "aef60a616d4ac401e9dfac15df6fe56e671c0053"
 MID = "dd54007abb59863bc753c1a029b9db227fb4f89f"
 PREV = "6534537ceb4c71c63286614b74e4801145d5fb4d"
 # Owner re-pin 2026-11-13 afternoon: game ec1e57a7 (faster route-length measurement).
-NEW = "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
+EC1 = "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
+# Owner re-pin 2026-11-17: game 28741ed1 (latest CI-green main, new gameplay shell routes).
+NEW = "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
 
 
 def test_new_solves_use_dd54007a_and_old_runs_keep_their_runtime() -> None:
@@ -20,6 +22,7 @@ def test_new_solves_use_dd54007a_and_old_runs_keep_their_runtime() -> None:
     assert pins.runtime_root_for_run({"authority": {"git_head": OLD}}).name == OLD
     assert pins.runtime_root_for_run({"authority": {"git_head": MID}}).name == MID
     assert pins.runtime_root_for_run({"authority": {"git_head": PREV}}).name == PREV
+    assert pins.runtime_root_for_run({"authority": {"git_head": EC1}}).name == EC1
     assert pins.runtime_root_for_run({"authority": {"git_head": NEW}}).name == NEW
     # A run without a recorded or known authority falls back to the current pin.
     assert pins.runtime_root_for_run({}).name == NEW

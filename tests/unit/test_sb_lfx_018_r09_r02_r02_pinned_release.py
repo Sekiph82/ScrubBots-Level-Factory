@@ -55,9 +55,9 @@ def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
     assert root == pinned_game_source.repository_root() / "data" / "Level Factory" / "Runtime" / pinned_game_source.PINNED_MAIN_SHA
     manifest = pinned_game_source.verify_attested_runtime(root)
     # Owner re-pin 2026-11-13 (game 6534537c, faster ProofKernel / Difficulty V1).
-    assert len(manifest["source_files"]) == 283
-    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_547_273
-    assert manifest["source_commit"] == "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
+    assert len(manifest["source_files"]) == 284  # owner re-pin 2026-11-17 (game 28741ed1)
+    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_618_857
+    assert manifest["source_commit"] == "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
     _require_saved_owner_uploads()
 
     source_png = _source_dir(PINNED_SOURCE_ID) / "source.png"

@@ -587,3 +587,27 @@ On resume, `_recover_attempt` marks the six finished PNGs READY from their compl
 - Root cause: `_sync_current_pixellab_final_sources` called `list_records()` (reads and re-verifies every projection + history, ~2,500 rows) once per Final PNG without a status. ~600 PNGs lacked status (passing slices of the 48-row batch), ~18 s each.
 - Fix (commit 03cd8ed6): `list_records(source_id=...)` globs only that source's projections; inventory uses it. Test `tests/unit/test_claude_inventory_single_source_lookup.py`; full unit suite 2179 passed, 15 skipped, 0 failed. Deployed to Release.
 - Real app relaunch 23:42 local: inventory complete in 333 s (3053 active PNGs, 1 invalid), buttons active. An orphaned worker from the previous Studio window (PID 3412, old code) kept running after close; owner ended it manually.
+
+## 2026-11-17 — re-pin solver runtime to game 28741ed1 (game agent note)
+
+**Note received (via owner).** The game agent said the Factory real-play precheck is pinned to game ec1e57a7
+and robot routes changed with the new gameplay shell, so it suggested moving to latest CI-green main 28741ed1.
+
+**What is actually pinned.** Only the attested solver runtime (`pinned_game_source.PINNED_MAIN_SHA`,
+`data/Level Factory/Runtime/<commit>`). Real-play (`real_play_gate.ensure_real_play_gate`, precheck and
+final gate) runs `tools/real_play_file.gd` in the live game checkout `C:\Users\sekip\Desktop\ScrubBots`,
+whatever its HEAD is; no setting overrides it. The newest run (candidate e4709c39…, 07:58 today) already
+recorded `gameCommit` 28741ed1 in both prechecks and the final gate.
+`git diff ec1e57a7 28741ed1 -- scripts/gameplay scripts/data tools` is empty: solver/ProofKernel output
+cannot change. The shell change (bf997e10, CI fix 37f08b70 `gameplay_shell_geometry.gd`, which re-ordered
+game L30 real-play clicks) reaches real play through `production_gameplay_host.gd -> gameplay_screen.gd`.
+
+**Change.** Built runtime 28741ed1 with `scripts/build_pinned_game_runtime.py 28741ed1 0b6dfc35 --apply`
+(284 files, 2,618,857 bytes, tree 666d9641, attestation 875cded7…; new file data/config/events_v02_catalog.json).
+Added it to `ATTESTED_RUNTIMES`, set `PINNED_MAIN_SHA`; older runtimes stay attested for their runs.
+UI const and 3 Godot suites + 3 pytest files updated. Game CI for 28741ed1: "Android Family First10 APK" success.
+
+**Residual (not done).** Final real-play results under data/Release Pool by gameCommit (all runs, incl. repeats):
+87b11906 1117, 28741ed1 237, 9f1ada33 162(+15 LOST, 1 SEARCH_BUDGET), f60cfa94 152, 26d15718 53,
+4cd72401 27, 4bb2b0bd 13, 1ba76a00 3. Everything before 37f08b70 was played with the old shell geometry, so
+existing READY levels are not proven on the current game. Re-verifying them is an owner decision (CPU time).

@@ -59,8 +59,18 @@ ATTESTED_RUNTIMES: dict[str, dict[str, Any]] = {
         "source_bytes": 2_547_273,
         "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
     },
+    # Owner decision 2026-11-17: re-pin to game 28741ed1 (latest CI-green main
+    # after the plaza gameplay shell; robot routes changed, so real-play
+    # verdicts from ec1e57a7 no longer match the shipped game).
+    "28741ed18c12e0e4e42523e7af1a0c5b6764453c": {
+        "tree_sha": "666d9641cd72c9f5ebd95be17ba104362e4d3c46",
+        "attestation_sha256": "875cded7f0ec11d9cc18a0bf309bc063abdac95bcbc79cf83398e452a491e066",
+        "source_files": 284,
+        "source_bytes": 2_618_857,
+        "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
+    },
 }
-PINNED_MAIN_SHA = "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"
+PINNED_MAIN_SHA = "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
 PINNED_TREE_SHA = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["tree_sha"]
 ATTESTATION_SHA256 = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["attestation_sha256"]
 RUNTIME_SOURCE_BYTES = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["source_bytes"]

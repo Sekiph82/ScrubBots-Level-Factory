@@ -10,7 +10,7 @@ extends SceneTree
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
 const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R03 batch UI binding PASS"
-const PINNED_GAME_COMMIT := "ec1e57a7cc8a680cc670d274a472a21f78bc2a0e"  # owner re-pin 2026-11-13
+const PINNED_GAME_COMMIT := "28741ed18c12e0e4e42523e7af1a0c5b6764453c"  # owner re-pin 2026-11-17
 
 var _errors: Array[String] = []
 
@@ -80,7 +80,7 @@ func _run_suite() -> void:
 
 	# 1. Before the Release Pool statuses load, Run must not plan anything.
 	ui.set("_owner_release_archive_loaded", false)
-	ui.call("_run_png_batch")
+	await ui.call("_run_png_batch")
 	_check(not gateway.calls.has("pending-png-batch-create") and not gateway.calls.has("png-batch-create"),
 		"Run planned a batch before Release Pool statuses were loaded: %s" % [gateway.calls])
 
@@ -89,7 +89,7 @@ func _run_suite() -> void:
 	ui.set("_owner_release_archive_loaded", true)
 	gateway.calls.clear()
 	gateway.requests.clear()
-	ui.call("_run_png_batch")
+	await ui.call("_run_png_batch")
 	_check(gateway.calls == ["pending-png-batch-create", "png-batch-create"],
 		"explicit Run did not plan one Pending snapshot and one job: %s" % [gateway.calls])
 	if gateway.requests.size() >= 2:
@@ -119,7 +119,7 @@ func _run_suite() -> void:
 	ui.set("_batch_job_id", "png-batch-other")
 	var calls_before_mismatch := gateway.calls.size()
 	var prepared_before_mismatch := gateway.prepared.size()
-	ui.call("_run_png_batch")
+	await ui.call("_run_png_batch")
 	_check(gateway.calls.size() == calls_before_mismatch and gateway.prepared.size() == prepared_before_mismatch,
 		"mismatched job reached create/run dispatch")
 

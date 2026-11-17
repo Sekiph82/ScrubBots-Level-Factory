@@ -71,7 +71,7 @@ func _run_suite() -> void:
 		"startup did not use exactly the read-only composite/job lookups: %s" % [running_gateway.reads])
 	_check(running_gateway.workers.is_empty() and running_gateway.sync_calls.is_empty(),
 		"startup prepared a worker or a synchronous call without an owner click: %s %s" % [running_gateway.workers, running_gateway.sync_calls])
-	running_ui.call("_run_png_batch")
+	await running_ui.call("_run_png_batch")
 	_check(running_gateway.workers == ["png-batch-run"], "explicit Resume Batch did not dispatch the same persisted job: %s" % [running_gateway.workers])
 	_check(not running_gateway.sync_calls.has("pending-png-batch-create") and not running_gateway.sync_calls.has("png-batch-create"),
 		"resume created a new snapshot or plan instead of reusing the saved job")
