@@ -38,3 +38,25 @@ def test_run_pending_batch_writes_preparation_activity():
     assert "func _batch_prep_step(message: String)" in gd
     assert 'await _batch_prep_step("Batch worker started' in gd
     assert 'await _batch_prep_step("Batch worker is planning' in gd
+
+
+def test_candidate_cache_digest_ignores_line_endings(tmp_path, monkeypatch):
+    # The Git checkout (CRLF) and the installed Release copy (LF) must share one candidate cache.
+    import shutil
+    from pathlib import Path
+    from scrubbots_pixel_factory import studio_extensions
+    package = Path(studio_extensions.__file__).resolve().parent
+    copies = {}
+    for ending in (b"\n", b"\r\n"):
+        root = tmp_path / ("crlf" if ending == b"\r\n" else "lf")
+        for relative in ("output/bundle.py", "output/png.py", "quality/core.py", "contracts/palette.py"):
+            target = root / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            text = (package / relative).read_bytes().replace(b"\r\n", b"\n")
+            target.write_bytes(text.replace(b"\n", ending))
+        copies[ending] = root
+    digests = []
+    for root in copies.values():
+        monkeypatch.setattr(studio_extensions, "__file__", str(root / "studio_extensions.py"))
+        digests.append(studio_extensions._candidate_validation_code_digest())
+    assert digests[0] == digests[1]

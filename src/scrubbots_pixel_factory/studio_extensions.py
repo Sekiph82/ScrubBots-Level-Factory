@@ -885,7 +885,10 @@ def _candidate_validation_code_digest() -> str:
     digest.update(inspect.getsource(_validated_candidate_row).encode("utf-8"))
     for relative in ("output/bundle.py", "output/png.py", "quality/core.py", "contracts/palette.py"):
         try:
-            digest.update((package / relative).read_bytes())
+            # Line endings normalized: the Git checkout has CRLF, the installed Release copy LF.
+            # Raw bytes gave the two different digests, so every source-side run threw away the
+            # installed Studio's cache and vice versa (~2.5 min revalidation each time).
+            digest.update((package / relative).read_bytes().replace(b"\r\n", b"\n"))
         except OSError:
             digest.update(b"missing:" + relative.encode())
     return digest.hexdigest()
