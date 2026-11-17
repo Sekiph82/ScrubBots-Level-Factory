@@ -1,0 +1,67 @@
+{
+ "batch_records": {
+  "db": 2437,
+  "different": 0,
+  "extra": 0,
+  "files": 2437,
+  "missing": 0
+ },
+ "candidates": {
+  "db": 1766,
+  "folders": 1766,
+  "folders_without_valid_row": [],
+  "rows_without_folder": []
+ },
+ "chain_errors": 0,
+ "differences": {},
+ "final_images": {
+  "db": 3053,
+  "different": 0,
+  "extra": 0,
+  "files": 3053,
+  "missing": 0
+ },
+ "history_events": {
+  "db": 6763,
+  "different": 0,
+  "extra": 0,
+  "files": 6763,
+  "missing": 0
+ },
+ "ok": true,
+ "release_entries": {
+  "db": 1764,
+  "different": 0,
+  "extra": 0,
+  "files": 1764,
+  "missing": 0
+ },
+ "sources": {
+  "db": 3053,
+  "different": 0,
+  "extra": 0,
+  "files": 3053,
+  "missing": 0
+ },
+ "status": {
+  "db": 3053,
+  "different": 0,
+  "extra": 0,
+  "files": 3053,
+  "missing": 0
+ },
+ "status_counts": {
+  "db": {
+   "FAILED": 2,
+   "PENDING": 1286,
+   "READY": 1760,
+   "REJECTED": 5
+  },
+  "files": {
+   "FAILED": 2,
+   "PENDING": 1286,
+   "READY": 1760,
+   "REJECTED": 5
+  }
+ }
+}
