@@ -21,6 +21,12 @@ var _owner_review_status := ""
 var _selected_release_ids: Array[String] = []
 var _release_selection_manage_mode := false
 var _release_pool: Dictionary = {}
+# P0-P S4: candidate_id -> entry (a linear scan per row made the 1764-row list O(n^2)),
+# and Release Pool row icons waiting to be loaded a few per frame instead of all at once.
+var _release_entry_index: Dictionary = {}
+var _release_entry_index_source: Array = []
+var _release_icon_queue: Array = []
+const RELEASE_ICONS_PER_FRAME := 24
 var _release_pool_loaded := false
 var _release_pool_loading := false
 var _release_pool_last_success_msec := -1
@@ -354,6 +360,7 @@ func _apply_startup_gate() -> void:
 func _process(_delta: float) -> void:
 	if not _startup_gate_released:
 		_apply_startup_gate()
+	_load_queued_release_icons()
 	_poll_studio_read_extension()
 	if not _shutdown_requested:
 		_start_next_studio_read_extension()
@@ -2198,20 +2205,30 @@ func _apply_restored_imported_sources(catalog: Dictionary) -> void:
 			"disposition": "SOURCE_ONLY", "display_filename": str(source.get("original_filename", "image.png")),
 			"width": width, "height": height
 		}
+		var catalog_record_sha := str(source.get("source_record_sha256", ""))
+		if catalog_record_sha.length() == 64:
+			source_by_id[catalog_source_id]["source_record_sha256"] = catalog_record_sha
 	# Startup restore needs only the source catalog. owner-pages also validates
 	# every pipeline, candidate, failure, and Release Pool entry; running it here
 	# synchronously blocks Godot's main thread and is unrelated to source display.
 	# Preserve the catalog's own order and let the explicit batch-composite lookup
 	# below restore batch/job state when an exact source match exists.
 	var order_ids: Array[String] = []
+	var ordered: Dictionary = {}
 	_source_batch_by_id.clear()
 	for source_variant in sources:
 		if source_variant is Dictionary:
 			var remaining_source_id := str(source_variant.get("source_id", ""))
-			if source_by_id.has(remaining_source_id) and remaining_source_id not in order_ids:
+			if source_by_id.has(remaining_source_id) and not ordered.has(remaining_source_id):
+				ordered[remaining_source_id] = true
 				order_ids.append(remaining_source_id)
+	# One index for the whole startup catalog: a per-source scan of _imported_sources was
+	# O(n^2) on the main thread (3053 sources -> ~4.6 M comparisons).
+	var existing_index: Dictionary = {}
+	for index in range(_imported_sources.size()):
+		existing_index[str(_imported_sources[index].get("source_id", ""))] = index
 	for ordered_source_id in order_ids:
-		_upsert_imported_source(source_by_id[ordered_source_id], false)
+		_upsert_imported_source(source_by_id[ordered_source_id], false, existing_index)
 	_refresh_gameplay_sources()
 	if _gameplay_sources.is_empty():
 		_refresh_live_data()
@@ -2241,15 +2258,19 @@ func _restore_loaded_png_batch_readonly() -> void:
 		return
 	var source_ids: Array[String] = []
 	var active_source_ids: Array[String] = []
+	var seen_active: Dictionary = {}
 	for source in _gameplay_sources:
 		var active_source_id := str(source.get("source_id", ""))
-		if active_source_id.is_empty() or active_source_id in active_source_ids:
+		if active_source_id.is_empty() or seen_active.has(active_source_id):
 			return
+		seen_active[active_source_id] = true
 		active_source_ids.append(active_source_id)
+	var seen_pending: Dictionary = {}
 	for source in pending_sources:
 		var source_id := str(source.get("source_id", ""))
-		if source_id.is_empty() or source_id in source_ids:
+		if source_id.is_empty() or seen_pending.has(source_id):
 			return
+		seen_pending[source_id] = true
 		source_ids.append(source_id)
 	_batch_restore_pending = true
 	_batch_restore_token = "%d-%d" % [Time.get_ticks_msec(), Time.get_ticks_usec()]
@@ -3392,14 +3413,17 @@ func _show_import_results(selected_count: int, lines: Array[String]) -> void:
 	dialog.popup_centered()
 
 
-func _upsert_imported_source(record: Dictionary, refresh_gameplay := true) -> void:
+func _upsert_imported_source(record: Dictionary, refresh_gameplay := true, existing_index: Variant = null) -> void:
 	var source_id := str(record.get("source_id", ""))
 	if source_id.is_empty():
 		return
 	var identity_sha := source_id.trim_prefix("owner-upload-")
 	if source_id.begins_with("owner-upload-") and identity_sha.length() == 64:
 		record["source_sha256"] = identity_sha
-		var canonical_record_sha := _source_record_sha256_for_id(source_id)
+		# The startup catalog carries the record SHA from factory.db; read source.json only otherwise.
+		var canonical_record_sha := str(record.get("source_record_sha256", ""))
+		if canonical_record_sha.length() != 64:
+			canonical_record_sha = _source_record_sha256_for_id(source_id)
 		if not canonical_record_sha.is_empty():
 			record["source_record_sha256"] = canonical_record_sha
 	var image_path := str(record.get("path", ""))
@@ -3408,16 +3432,25 @@ func _upsert_imported_source(record: Dictionary, refresh_gameplay := true) -> vo
 		if image.load(image_path) == OK:
 			record["width"] = image.get_width()
 			record["height"] = image.get_height()
-	for index in range(_imported_sources.size()):
-		if str(_imported_sources[index].get("source_id", "")) == source_id:
-			var existing: Dictionary = _imported_sources[index]
-			for key in ["path", "source_sha256", "source_record_sha256", "display_filename", "width", "height"]:
-				if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
-			existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
-			_imported_sources[index] = existing
-			if refresh_gameplay:
-				_refresh_gameplay_sources()
-			return
+	var found := -1
+	if existing_index is Dictionary:
+		found = int(existing_index.get(source_id, -1))
+	else:
+		for index in range(_imported_sources.size()):
+			if str(_imported_sources[index].get("source_id", "")) == source_id:
+				found = index
+				break
+	if found >= 0:
+		var existing: Dictionary = _imported_sources[found]
+		for key in ["path", "source_sha256", "source_record_sha256", "display_filename", "width", "height"]:
+			if not str(record.get(key, "")).is_empty(): existing[key] = record[key]
+		existing["disposition"] = record.get("disposition", existing.get("disposition", "IMPORTED"))
+		_imported_sources[found] = existing
+		if refresh_gameplay:
+			_refresh_gameplay_sources()
+		return
+	if existing_index is Dictionary:
+		existing_index[source_id] = _imported_sources.size()
 	_imported_sources.append(record.duplicate(true))
 	# Bulk startup restore refreshes (and sorts) once after the loop instead of
 	# once per source; 1,376 sorted rebuilds blocked the UI for ~40 s.
@@ -6372,10 +6405,27 @@ func _apply_release_projection() -> void:
 
 
 func _release_entry_for_id(candidate_id: String) -> Dictionary:
-	for entry_variant in _release_pool.get("entries", []):
-		if entry_variant is Dictionary and str(entry_variant.get("candidate_id", "")) == candidate_id:
-			return entry_variant
-	return {}
+	var entries: Array = _release_pool.get("entries", [])
+	if not is_same(entries, _release_entry_index_source):
+		_release_entry_index.clear()
+		for entry_variant in entries:
+			if entry_variant is Dictionary:
+				var key := str(entry_variant.get("candidate_id", ""))
+				if not _release_entry_index.has(key):
+					_release_entry_index[key] = entry_variant
+		_release_entry_index_source = entries
+	return _release_entry_index.get(candidate_id, {})
+
+
+func _load_queued_release_icons() -> void:
+	var loaded := 0
+	while loaded < RELEASE_ICONS_PER_FRAME and not _release_icon_queue.is_empty():
+		var pending: Array = _release_icon_queue.pop_front()
+		var row: Button = pending[0] if is_instance_valid(pending[0]) else null
+		if row == null or not row.is_inside_tree():
+			continue
+		row.icon = _runtime_png_texture(str(pending[1]))
+		loaded += 1
 
 
 func _refresh_release_candidate_rows() -> void:
@@ -6393,6 +6443,7 @@ func _refresh_release_candidate_rows() -> void:
 	for child in _release_candidate_rows.get_children():
 		_release_candidate_rows.remove_child(child)
 		child.queue_free()
+	_release_icon_queue.clear()
 	for index in range(_visible_release_ids.size()):
 		var candidate_id := _visible_release_ids[index]
 		var entry := _release_entry_for_id(candidate_id)
@@ -6408,7 +6459,8 @@ func _refresh_release_candidate_rows() -> void:
 		var row := Button.new()
 		row.name = "ReleaseCandidate_%d_%d" % [_release_activity_events.size(), index]
 		row.text = "%s%s  ·  %s" % [selected_mark, title.left(28), state.left(12)]
-		row.icon = _runtime_png_texture(artwork) if not artwork.is_empty() else null
+		if not artwork.is_empty():
+			_release_icon_queue.append([row, artwork])
 		row.icon_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.vertical_icon_alignment = VERTICAL_ALIGNMENT_CENTER
 		row.expand_icon = not artwork.is_empty()

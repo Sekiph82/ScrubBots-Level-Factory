@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import sys
+import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 
@@ -801,7 +802,10 @@ def _serve_main(arguments: Sequence[str]) -> int:
                 raise ValueError(f"operation is not served by the Studio service: {operation}")
             if not isinstance(request, dict):
                 raise ValueError("request must be an object")
+            started = time.monotonic()
             payload, exit_code = _run_studio_extension(operation, request)
+            print(f"{datetime.now().strftime('%H:%M:%S')} {os.getpid()} {operation} {time.monotonic() - started:.2f}s exit={exit_code}",
+                  file=sys.stderr)
         except Exception as exc:
             payload, exit_code = {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR",
                                   "error": f"ERROR — Studio service: {str(exc)[:512]}"}, 2

@@ -523,7 +523,7 @@ def _library_refresh_from_db(conn: Any, repository_root: str | Path | None,
     with_metadata = {path.stem for path in metadata_folder.glob("*.json")} if metadata_folder.is_dir() else set()
     sources: list[dict[str, Any]] = []
     historical: list[dict[str, Any]] = []
-    for source_id, sha, text in conn.execute("SELECT source_id, source_sha256, record_json FROM sources"):
+    for source_id, sha, record_sha, text in conn.execute("SELECT source_id, source_sha256, record_sha256, record_json FROM sources"):
         record = json.loads(text)
         try:
             metadata = (_read_catalog_metadata(source_id) if source_id in with_metadata else
@@ -538,6 +538,8 @@ def _library_refresh_from_db(conn: Any, repository_root: str | Path | None,
             "validation_state": record.get("validation_state"),
             "immutable_source_path": record.get("immutable_relative_path"),
             "source_record_path": record.get("source_record_relative_path"), "catalog": metadata,
+            # SHA-256 of the exact source.json bytes, so the Studio need not re-read 3000+ records.
+            "source_record_sha256": record_sha,
             "owner_review": {"disposition": "NOT AVAILABLE", "reason": "No canonical owner-review evidence is connected."},
             "derived_dimensions": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
             "palette": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
