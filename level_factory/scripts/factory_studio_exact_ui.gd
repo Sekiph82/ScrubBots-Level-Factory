@@ -200,6 +200,8 @@ var _selected_issue: Dictionary = {}
 var _selected_size_value: Label
 var _selected_size_panel: PanelContainer
 var _pixel_art_thread: Thread
+# P0-P S4: a long batch-planning call runs here so the window keeps drawing (it froze ~22 min).
+var _batch_plan_thread: Thread
 var _pixel_art_mutex := Mutex.new()
 var _pixel_art_worker_done := false
 var _pixel_art_worker_result: Dictionary = {}
@@ -385,9 +387,9 @@ func _process(_delta: float) -> void:
 				_operation_running = false
 			else:
 				_complete_level_pipeline(result if completed else {"state": "ERROR", "error": "Pipeline worker exited without returning a result."})
-	if _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
+	if _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null and _batch_plan_thread == null:
 		_finish_worker_cancel_marker()
-	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null:
+	if _shutdown_requested and _studio_read_thread == null and _pipeline_thread == null and _pixel_art_thread == null and _batch_plan_thread == null:
 		get_tree().quit()
 
 
@@ -395,7 +397,7 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		_shutdown_requested = true
 		_studio_read_queue.clear()
-		var active_worker := _studio_read_thread != null or _pipeline_thread != null or _pixel_art_thread != null
+		var active_worker := _studio_read_thread != null or _pipeline_thread != null or _pixel_art_thread != null or _batch_plan_thread != null
 		if active_worker:
 			_signal_worker_cancel_marker()
 			if _batch_worker_active and not _batch_job_id.is_empty():
@@ -414,7 +416,7 @@ func _exit_tree() -> void:
 	# 0xC0000005. Ask the workers' child processes to stop and join the threads.
 	_shutdown_requested = true
 	_studio_read_queue.clear()
-	var workers := [_studio_read_thread, _pipeline_thread, _pixel_art_thread]
+	var workers := [_studio_read_thread, _pipeline_thread, _pixel_art_thread, _batch_plan_thread]
 	if workers.any(func(worker): return worker != null):
 		_signal_worker_cancel_marker()
 	for worker in workers:
@@ -423,6 +425,7 @@ func _exit_tree() -> void:
 	_studio_read_thread = null
 	_pipeline_thread = null
 	_pixel_art_thread = null
+	_batch_plan_thread = null
 	_finish_worker_cancel_marker()
 
 
@@ -4152,7 +4155,7 @@ func _run_png_batch_inner() -> void:
 		_report("Pending PNG inventory changed during snapshot; no batch was created.")
 		return
 	await _batch_prep_step("Batch worker started: saving a snapshot of %d Pending PNGs." % source_ids.size())
-	var composite := _extension("pending-png-batch-create", {"source_ids": source_ids})
+	var composite := await _extension_off_main_thread("pending-png-batch-create", {"source_ids": source_ids})
 	_batch_import_id = str(composite.get("batch_id", ""))
 	if _batch_import_id.is_empty():
 		_report_batch_start_failure("Pending snapshot could not be created: %s" % str(composite.get("error", composite.get("reason", "UNAVAILABLE"))))
@@ -4164,7 +4167,7 @@ func _run_png_batch_inner() -> void:
 		"solver_timeout_seconds": 900,
 	}
 	await _batch_prep_step("Batch worker is planning: checking READY history and validating %d PNGs before the first solve." % source_ids.size())
-	var created: Dictionary = _gateway.call("run_studio_extension", "png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
+	var created: Dictionary = await _extension_off_main_thread("png-batch-create", {"batch_id": _batch_import_id, "settings": settings})
 	var job: Dictionary = created.get("job", {})
 	if str(created.get("disposition", "")) == "ALL_SOURCES_ALREADY_READY":
 		_batch_job_id = ""
@@ -4191,7 +4194,7 @@ func _run_png_batch_inner() -> void:
 					return
 				job_source_ids.append(job_source_id)
 		await _batch_prep_step("%d PNGs already READY were left out; saving the remaining %d as the batch snapshot." % [source_ids.size() - job_source_ids.size(), job_source_ids.size()])
-		var job_composite := _extension("loaded-png-batch-create", {"source_ids": job_source_ids})
+		var job_composite := await _extension_off_main_thread("loaded-png-batch-create", {"source_ids": job_source_ids})
 		if str(job_composite.get("batch_id", "")) != job_batch_id:
 			_report("READY-excluded source snapshot did not match the persisted job; no solver was started.")
 			return
@@ -6631,6 +6634,27 @@ func _preview_release_manifest() -> void:
 	var dialog := AcceptDialog.new(); dialog.title = "Release Manifest Preview"
 	var label := RichTextLabel.new(); label.custom_minimum_size = Vector2(680, 380); label.text = JSON.stringify(result, "  "); label.fit_content = true
 	dialog.add_child(label); add_child(dialog); dialog.confirmed.connect(func(): dialog.queue_free()); dialog.popup_centered()
+
+
+## P0-P S4: the same call as _extension, on a worker thread; the caller awaits it while the
+## window keeps drawing. One at a time (batch planning); falls back to the direct call.
+func _extension_off_main_thread(operation: String, request: Dictionary) -> Dictionary:
+	if _gateway == null or not _gateway.has_method("run_studio_extension") or _batch_plan_thread != null or not is_inside_tree():
+		return _extension(operation, request)
+	var holder := {"result": null}
+	var gateway := _gateway
+	_batch_plan_thread = Thread.new()
+	var started := _batch_plan_thread.start(func() -> void: holder["result"] = gateway.call("run_studio_extension", operation, request))
+	if started != OK:
+		_batch_plan_thread = null
+		return _extension(operation, request)
+	while _batch_plan_thread != null and _batch_plan_thread.is_alive():
+		await get_tree().process_frame
+	if _batch_plan_thread != null:
+		_batch_plan_thread.wait_to_finish()
+		_batch_plan_thread = null
+	var result: Variant = holder["result"]
+	return result if result is Dictionary else {"state": "ERROR", "reason": "Canonical operation returned no structured result."}
 
 
 func _extension(operation: String, request: Dictionary) -> Dictionary:
