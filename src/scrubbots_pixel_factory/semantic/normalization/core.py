@@ -555,6 +555,7 @@ def _load_png_verdicts() -> dict[str, list[int]]:
 
 
 def _save_png_verdicts() -> None:
+    global _png_verdicts_dirty
     path = _png_verdict_path()
     if path is None or not _png_verdicts_dirty or _png_verdicts is None:
         return
@@ -573,6 +574,7 @@ def _save_png_verdicts() -> None:
         temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
         temporary.write_text(json.dumps({"schema": _PNG_VERDICT_SCHEMA, "verdicts": merged}, separators=(",", ":")), encoding="utf-8")
         os.replace(temporary, path)
+        _png_verdicts_dirty = False  # a long-lived Studio service saves after every request
     except OSError:
         pass   # a cache write failure only costs speed on the next start
 

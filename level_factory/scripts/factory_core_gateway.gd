@@ -37,6 +37,21 @@ var _last_result: Dictionary = {}
 var _default_output_root := ""
 var _probe_launcher_path := LAUNCHER_PATH
 
+## P0-P S4: read-only operations answered by long-lived `factory_core_launcher.py serve`
+## processes (warm imports and caches; no Python start per call). Must match the
+## launcher's SERVICE_OPERATIONS. Writers, solvers and paid providers keep one process each.
+const SERVICE_OPERATIONS := [
+	"library-refresh", "owner-release-library", "release-pool", "candidate-inbox",
+	"loaded-png-batch-find", "png-batch-latest", "restore-source-run-readonly",
+	"validate-source-readonly", "provider-options", "pixellab-balance", "batch-load",
+]
+## A background read and a main-thread call can run at once without waiting on each other.
+const MAX_SERVICE_PROCESSES := 3
+var _service_mutex := Mutex.new()
+var _idle_services: Array[Dictionary] = []
+var _service_total := 0
+var _service_next_id := 0
+
 
 func _init(configured_executable: String = "", probe_launcher_path: String = LAUNCHER_PATH) -> void:
 	_probe_launcher_path = probe_launcher_path if _safe_probe_launcher(probe_launcher_path) else LAUNCHER_PATH
@@ -45,6 +60,11 @@ func _init(configured_executable: String = "", probe_launcher_path: String = LAU
 		var configured_from_environment := OS.get_environment(PYTHON_ENVIRONMENT_NAME).strip_edges()
 		python_executable = configured_from_environment if _safe_executable(configured_from_environment) else _discover_executable()
 	_refresh_connection()
+	# Start one service now so its imports load while the Studio builds its pages.
+	var warm := _spawn_service()
+	if not warm.is_empty():
+		_service_total = 1
+		_idle_services.append(warm)
 
 
 func status_name() -> String:
@@ -251,12 +271,15 @@ func prepare_studio_extension_call(operation: String, request: Dictionary = {}) 
 	if _connection_status != ConnectionStatus.AVAILABLE:
 		return {}
 	var request_base64 := Marshalls.raw_to_base64(JSON.stringify(request).to_utf8_buffer())
-	return {"operation": operation, "executable": python_executable, "launcher": ProjectSettings.globalize_path(LAUNCHER_PATH), "request_base64": request_base64}
+	return {"operation": operation, "executable": python_executable, "launcher": ProjectSettings.globalize_path(LAUNCHER_PATH), "request_base64": request_base64, "request": request.duplicate(true)}
 
 
 func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
 	if prepared.is_empty():
 		return {"operation": STUDIO_EXTENSION_OPERATION, "state": "UNAVAILABLE", "disposition": "UNAVAILABLE", "error": "UNAVAILABLE — canonical Python Factory Core is not executable in this workspace."}
+	var served := _call_service(str(prepared.get("operation", "")), prepared.get("request", {}))
+	if not served.is_empty():
+		return served
 	var captured: Array[String] = []
 	var request_base64 := str(prepared.get("request_base64", ""))
 	var request_arguments := PackedStringArray(["--request-base64", request_base64])
@@ -295,6 +318,76 @@ func execute_prepared_studio_extension_call(prepared: Dictionary) -> Dictionary:
 		}
 	payload["exit_code"] = exit_code
 	payload["captured_output"] = process_output.left(4096)
+	return payload
+
+
+func _spawn_service() -> Dictionary:
+	if _connection_status != ConnectionStatus.AVAILABLE or not OS.has_method("execute_with_pipe"):
+		return {}
+	var launched: Dictionary = OS.execute_with_pipe(python_executable, PackedStringArray([ProjectSettings.globalize_path(LAUNCHER_PATH), "serve"]))
+	if launched.is_empty() or not (launched.get("stdio") is FileAccess):
+		return {}
+	return {"stdio": launched["stdio"], "stderr": launched.get("stderr"), "pid": int(launched.get("pid", -1))}
+
+
+func _acquire_service() -> Dictionary:
+	_service_mutex.lock()
+	if not _idle_services.is_empty():
+		var idle: Dictionary = _idle_services.pop_back()
+		_service_mutex.unlock()
+		return idle
+	if _service_total >= MAX_SERVICE_PROCESSES:
+		_service_mutex.unlock()
+		return {}
+	_service_total += 1
+	_service_mutex.unlock()
+	var spawned := _spawn_service()
+	if spawned.is_empty():
+		_service_mutex.lock()
+		_service_total -= 1
+		_service_mutex.unlock()
+	return spawned
+
+
+func _release_service(service: Dictionary) -> void:
+	_service_mutex.lock()
+	_idle_services.append(service)
+	_service_mutex.unlock()
+
+
+func _discard_service(service: Dictionary) -> void:
+	var pid := int(service.get("pid", -1))
+	if pid > 0 and OS.is_process_running(pid):
+		OS.kill(pid)
+	_service_mutex.lock()
+	_service_total = maxi(0, _service_total - 1)
+	_service_mutex.unlock()
+
+
+## Ask a long-lived service; {} means "not served" and the caller runs its own process.
+func _call_service(operation: String, request: Variant) -> Dictionary:
+	if not SERVICE_OPERATIONS.has(operation) or not (request is Dictionary):
+		return {}
+	var service := _acquire_service()
+	if service.is_empty():
+		return {}
+	_service_mutex.lock()
+	_service_next_id += 1
+	var message_id := _service_next_id
+	_service_mutex.unlock()
+	var io: FileAccess = service["stdio"]
+	io.store_line(JSON.stringify({"id": message_id, "operation": operation, "request": request}))
+	io.flush()
+	var reply := io.get_line()
+	var parsed: Variant = JSON.parse_string(reply) if not reply.is_empty() else null
+	if not (parsed is Dictionary) or int(parsed.get("id", -1)) != message_id or not (parsed.get("payload") is Dictionary):
+		_discard_service(service)
+		return {}
+	_release_service(service)
+	var payload: Dictionary = parsed["payload"]
+	payload["exit_code"] = int(parsed.get("exit_code", 0))
+	payload["captured_output"] = ""
+	payload["served_by"] = "studio-service"
 	return payload
 
 
