@@ -25,7 +25,7 @@ def test_runtime_rules_built_once_per_listing_and_every_time_outside(monkeypatch
         return []
 
     monkeypatch.setattr(release_pool, "_release_entries", listing)
-    release_pool.release_entries()
+    release_pool.release_entries(verify=True)
     assert built == [4]
     assert getattr(release_pool._PINNED_RULES, "scope", None) is None
 

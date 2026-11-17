@@ -513,7 +513,7 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
                 source_directory=request.get("source_directory"),
             )
         elif operation == "candidate-inbox":
-            payload = extensions.candidate_inbox()
+            payload = extensions.candidate_inbox(slim=request.get("slim") is True)
         elif operation == "owner-review":
             payload = extensions.record_owner_review(str(request["candidate_id"]), str(request["disposition"]), str(request.get("reason", "")), str(request.get("note", "")))
             from scrubbots_pixel_factory.owner_release_library import record_review_outcome

@@ -943,6 +943,15 @@ def enter_release_pool(candidate: Mapping[str, Any], pipeline: Mapping[str, Any]
                     raise ReleaseError("concurrent Release Pool evidence has different immutable bytes")
         finally:
             temporary.unlink(missing_ok=True)
+    # The DB beside this entry's own data root (<root>/data/Release Pool/Ready -> <root>/data/Level Factory).
+    database = path.resolve().parents[1].parent / "Level Factory" / "factory.db"
+    if database.is_file():
+        from .. import factory_db
+        conn = factory_db.connect(database)
+        try:
+            factory_db.insert_release_entry(conn, path)
+        finally:
+            conn.close()
     return {"disposition": "ENTERED_RELEASE_POOL", "candidate_id": candidate["candidate_id"], "entry_digest": payload["entry_digest"], "pool_size": len(entry_paths())}
 
 
@@ -983,7 +992,26 @@ def _cached_latest_review(
     return cache[candidate_id]
 
 
-def release_entries(candidate_id_filter: str | None = None) -> list[dict[str, Any]]:
+def _factory_db():
+    from .. import factory_db
+    from .. import studio_extensions as studio
+    return factory_db, factory_db.open_existing(studio._repository_root())
+
+
+def release_entries(candidate_id_filter: str | None = None, *, verify: bool = False) -> list[dict[str, Any]]:
+    """Current Release Pool entries.
+
+    P0-P S2: with a factory.db the entries come from the DB; each was fully verified when
+    ``enter_release_pool`` wrote it. ``verify=True`` re-runs the old full read-time check
+    (integrity check), which re-hashes every file and re-derives every Difficulty profile.
+    """
+    if not verify:
+        factory_db, conn = _factory_db()
+        if conn is not None:
+            try:
+                return factory_db.release_entry_rows(conn, candidate_id_filter)
+            finally:
+                conn.close()
     outer_scope = getattr(_PINNED_RULES, "scope", None)
     _PINNED_RULES.scope = {} if outer_scope is None else outer_scope
     try:
@@ -1115,7 +1143,7 @@ def _production_release_entries() -> list[dict[str, Any]]:
     from .. import studio_extensions as studio
 
     eligible: list[dict[str, Any]] = []
-    for entry in release_entries():
+    for entry in release_entries(verify=True):
         classification = entry.get("candidate_classification")
         candidate_id = str(entry.get("candidate_id", ""))
         latest = studio._latest_review(candidate_id)

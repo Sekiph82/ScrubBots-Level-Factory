@@ -256,6 +256,23 @@ def _result(record: Mapping[str, object], state: str) -> dict[str, object]:
     return payload
 
 
+def _mirror_source_record(record_path: Path, repository_root: str | Path | None) -> None:
+    """P0-P S2: keep factory.db's source row equal to source.json when the data root has a DB.
+
+    The DB is the one beside this record's own Imported folder (<root>/data/Level Factory),
+    never a default root: a record written under a test or other root must not reach it.
+    """
+    from . import factory_db
+    database = record_path.resolve().parents[2] / "factory.db"
+    if not database.is_file():
+        return
+    conn = factory_db.connect(database)
+    try:
+        factory_db.upsert_source_record(conn, record_path)
+    finally:
+        conn.close()
+
+
 def align_owner_upload_filename(source_id: str, canonical_filename: str, *,
                                 repository_root: str | Path | None = None) -> dict[str, object]:
     """Give one Imported record the canonical PixelLab Final filename; bytes never change.
@@ -291,7 +308,9 @@ def align_owner_upload_filename(source_id: str, canonical_filename: str, *,
     temporary.write_bytes(_canonical_json_bytes(expected))
     temporary.replace(record_path)
     old_file.unlink()
-    return _verify_existing(destination, expected, raw)
+    verified = _verify_existing(destination, expected, raw)
+    _mirror_source_record(record_path, repository_root)
+    return verified
 
 
 def import_owner_upload(source_path: str | Path, *, repository_root: str | Path | None = None) -> dict[str, object]:
@@ -319,6 +338,7 @@ def import_owner_upload(source_path: str | Path, *, repository_root: str | Path 
         source_path.write_bytes(raw)
         (destination / "source.json").write_bytes(_canonical_json_bytes(expected))
         record = _verify_concurrent_existing(destination, expected, raw)
+        _mirror_source_record(destination / "source.json", repository_root)
         return _result(record, "IMPORTED")
     except OwnerUploadError as exc:
         return _error(str(exc))

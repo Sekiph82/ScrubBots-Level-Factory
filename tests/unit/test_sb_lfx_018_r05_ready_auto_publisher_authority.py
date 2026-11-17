@@ -69,7 +69,7 @@ def test_current_accepted_ready_pipeline_supersedes_stale_release_pool_pipeline(
     current_path = tmp_path / "pipeline-current-main.json"
     current_path.write_text(json.dumps(current_pipeline, sort_keys=True), encoding="utf-8")
     stale_entry = _entry(candidate_id)
-    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id=None: (stale_entry,))
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id=None, **_k: (stale_entry,))
     monkeypatch.setattr(studio, "list_candidates", lambda: [{"candidate_id": candidate_id}])
     monkeypatch.setattr(studio, "_latest_review", lambda _candidate: {
         "disposition": "ACCEPT", "review_id": "review-current"})

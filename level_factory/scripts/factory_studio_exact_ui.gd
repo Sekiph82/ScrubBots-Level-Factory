@@ -5286,7 +5286,7 @@ func _request_candidate_inbox_refresh(force: bool = false) -> void:
 	if not force and now - _candidate_inbox_last_request_msec < 10000:
 		return
 	_candidate_inbox_last_request_msec = now
-	_queue_studio_read_extension("candidate-inbox", {}, {"kind": "candidate-inbox"})
+	_queue_studio_read_extension("candidate-inbox", {"slim": true}, {"kind": "candidate-inbox"})
 
 
 func _start_next_studio_read_extension() -> void:

@@ -188,7 +188,7 @@ def current_solver_proof_for_candidate(candidate_id: str) -> tuple[bytes, dict[s
     if not isinstance(candidate_id, str) or not candidate_id:
         raise SolverSupplyIdentityError("candidate identity is required")
     entry = next(
-        (item for item in release_pool.release_entries(candidate_id) if item.get("candidate_id") == candidate_id),
+        (item for item in release_pool.release_entries(candidate_id, verify=True) if item.get("candidate_id") == candidate_id),
         None,
     )
     candidate = next((item for item in studio.list_candidates() if item.get("candidate_id") == candidate_id), None)

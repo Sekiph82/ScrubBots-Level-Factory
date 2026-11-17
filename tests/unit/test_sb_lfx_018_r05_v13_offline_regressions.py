@@ -1151,12 +1151,12 @@ def test_owner_release_ready_verification_requires_exact_source_run_entry(monkey
     source_id = "owner-upload-" + "a" * 64
     good = {"candidate": {"source_lineage": {"source_id": source_id}}, "pipeline_run_id": "run-exact",
             "pipeline": {"disposition": "READY", "primary": {"state": "READY"}}}
-    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [good])
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None, **_k: [good])
     assert owner_release_library._verified_ready_entry(source_id, "run-exact") == good
     with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
         owner_release_library._verified_ready_entry(source_id, "different-run")
     bad = {**good, "pipeline": {"disposition": "FAILED", "primary": {"state": "FAILED"}}}
-    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None: [bad])
+    monkeypatch.setattr(release_pool, "release_entries", lambda _candidate_id_filter=None, **_k: [bad])
     with pytest.raises(owner_release_library.OwnerReleaseLibraryError, match="exact canonical"):
         owner_release_library._verified_ready_entry(source_id, "run-exact")
 

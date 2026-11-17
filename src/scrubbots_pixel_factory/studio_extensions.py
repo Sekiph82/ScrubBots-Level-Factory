@@ -324,6 +324,7 @@ def _sync_current_pixellab_final_sources(
     *,
     game_project: str | Path | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    only_names: set[str] | None = None,
 ) -> tuple[set[str], list[dict[str, str]], dict[str, dict[str, Any]]]:
     """Idempotently register only validated direct PNGs currently in PixelLab Final."""
 
@@ -338,6 +339,7 @@ def _sync_current_pixellab_final_sources(
         paths["pixellab_final"], repository_root=repository_root,
         verify_existing_imports=False,
         progress_callback=progress_callback,
+        only_names=only_names,
     )
     if scan.get("provider") != "PIXELLAB":
         raise StudioExtensionError("canonical PixelLab Final source authority could not be established")
@@ -447,12 +449,127 @@ def _sync_current_pixellab_final_sources(
     return active, invalid, verified_sources
 
 
+def _library_refresh_from_db(conn: Any, repository_root: str | Path | None,
+                             progress_callback: Callable[[dict[str, Any]], None] | None) -> dict[str, Any]:
+    """P0-P S2 startup: read factory.db, validate only new or changed Final files (by name/size/mtime).
+
+    Status history is verified when it is written; a ~0.3 s drift check copies any event the DB
+    missed (for example after a crash) from the file chain. No reconciliation passes run here.
+    """
+    from . import factory_db, owner_art_storage
+    from .owner_release_library import _root as release_pool_root
+
+    def emit(stage: str, state: str, message: str, **extra: Any) -> None:
+        if progress_callback is not None:
+            progress_callback({"stage": stage, "state": state, "message": message, **extra})
+
+    paths = owner_art_storage.owner_art_paths(repository_root)
+    emit("INVENTORY", "RUNNING", "Reading the factory database and checking PixelLab Final by name, size and date.")
+    heal = factory_db.heal_from_files(conn, release_pool_root(repository_root))
+    emit("RELEASE POOL STATUS RECOVERY", "COMPLETE" if not heal["errors"] else "ERROR",
+         "Status history check: %d sources, %d out of date in the database, %d events copied; %d conflicts." % (
+             heal["sources"], heal["drifted"], heal["events_healed"], len(heal["errors"])))
+    imported = paths["imported"]
+    on_disk = {entry.name for entry in os.scandir(imported) if entry.is_dir()} if imported.is_dir() else set()
+    stored = {sid for (sid,) in conn.execute("SELECT source_id FROM sources")}
+    unreadable: list[dict[str, str]] = []
+    for source_id in sorted(on_disk - stored):
+        if (imported / source_id / "source.json").is_file():
+            factory_db.upsert_source_record(conn, imported / source_id / "source.json")
+        else:
+            unreadable.append({"source_id": source_id, "disposition": "INVALID / QUARANTINED",
+                               "reason": "Imported folder has no source.json record."})
+    for source_id in sorted(stored - on_disk):
+        conn.execute("DELETE FROM sources WHERE source_id = ?", (source_id,))
+
+    final = paths["pixellab_final"]
+    on_final: dict[str, tuple[int, int]] = {}
+    if final.is_dir():
+        with os.scandir(final) as entries:
+            for entry in entries:
+                if entry.name.lower().endswith(".png") and entry.is_file(follow_symlinks=False):
+                    info = entry.stat(follow_symlinks=False)
+                    on_final[entry.name] = (info.st_size, info.st_mtime_ns)
+    known = {name: (sha, size, mtime) for name, sha, size, mtime in
+             conn.execute("SELECT final_name, source_sha256, bytes, mtime_ns FROM images")}
+    source_by_sha = {sha: sid for sid, sha in conn.execute("SELECT source_id, source_sha256 FROM sources")}
+    changed = {name for name, stamp in on_final.items()
+               if name not in known or known[name][1:] != stamp or known[name][0] not in source_by_sha}
+    for name in sorted(set(known) - set(on_final)):
+        conn.execute("DELETE FROM images WHERE final_name = ?", (name,))
+    emit("DISCOVERY", "RUNNING", "Found %d PixelLab Final PNGs; %d are new or changed and will be validated." % (
+        len(on_final), len(changed)), completed=0, total=len(changed))
+    active_ids = {source_by_sha[known[name][0]] for name in on_final if name not in changed}
+    invalid: list[dict[str, str]] = list(unreadable)
+    if changed:
+        new_ids, new_invalid, _verified = _sync_current_pixellab_final_sources(
+            repository_root, progress_callback=progress_callback, only_names=changed)
+        invalid.extend(new_invalid)
+        active_ids |= new_ids
+        for name in sorted(changed):
+            raw = (final / name).read_bytes()
+            sha = hashlib.sha256(raw).hexdigest()
+            if f"owner-upload-{sha}" in new_ids:
+                size, mtime = on_final[name]
+                conn.execute("INSERT INTO images VALUES (?, ?, ?, ?) ON CONFLICT(final_name) DO UPDATE SET"
+                             " source_sha256 = excluded.source_sha256, bytes = excluded.bytes, mtime_ns = excluded.mtime_ns",
+                             (name, sha, size, mtime))
+        for source_id in new_ids:  # import/alignment rewrote these source.json files
+            record = imported / source_id / "source.json"
+            if record.is_file():
+                factory_db.upsert_source_record(conn, record)
+
+    metadata_folder = extensions_root() / "source-library" / "metadata"
+    with_metadata = {path.stem for path in metadata_folder.glob("*.json")} if metadata_folder.is_dir() else set()
+    sources: list[dict[str, Any]] = []
+    historical: list[dict[str, Any]] = []
+    for source_id, sha, text in conn.execute("SELECT source_id, source_sha256, record_json FROM sources"):
+        record = json.loads(text)
+        try:
+            metadata = (_read_catalog_metadata(source_id) if source_id in with_metadata else
+                        {"schema": CATALOG_SCHEMA, "version": 1, "source_id": source_id, "label": "", "tags": []})
+        except StudioExtensionError as exc:
+            invalid.append({"source_id": source_id, "disposition": "INVALID / QUARANTINED", "reason": str(exc)[:512]})
+            continue
+        row = {
+            "source_id": source_id, "origin": record.get("origin"), "source_sha256": sha,
+            "original_filename": record.get("original_filename"), "original_width": record.get("original_width"),
+            "original_height": record.get("original_height"), "status": record.get("status"),
+            "validation_state": record.get("validation_state"),
+            "immutable_source_path": record.get("immutable_relative_path"),
+            "source_record_path": record.get("source_record_relative_path"), "catalog": metadata,
+            "owner_review": {"disposition": "NOT AVAILABLE", "reason": "No canonical owner-review evidence is connected."},
+            "derived_dimensions": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
+            "palette": {"disposition": "NOT AVAILABLE", "reason": "Pending SB-LFX-004 validation evidence."},
+            "usages": {"disposition": "NOT AVAILABLE", "reason": "No canonical candidate/level usage index is connected."},
+        }
+        (sources if source_id in active_ids else historical).append(row)
+    order = lambda item: (str(item.get("original_filename", "")).casefold(), str(item.get("original_filename", "")))
+    sources.sort(key=order); historical.sort(key=order)
+    skipped = {"state": "SKIPPED", "reason": "factory.db is the status authority (P0-P S2); use the integrity check for a full re-verification."}
+    return {
+        "schema": "scrubbots-source-library-view", "version": 2, "state": "READY", "disposition": "DERIVED_CATALOG",
+        "sources": sources, "historical_sources": historical, "invalid_sources": invalid,
+        "release_pool_status_reconciliation": {"state": "RECONCILED" if not heal["errors"] else "ERROR", **heal},
+        "release_pool_reconciliation": skipped, "release_pool_terminal_batch_reconciliation": skipped,
+        "source_policy": "ACTIVE_SOLVER_INPUTS_FROM_CURRENT_DATA_OUTPUT_PIXELLAB_FINAL_ONLY",
+        "notice": "ACTIVE SOURCES ARE THE SHA-VERIFIED CURRENT PIXELLAB FINAL INVENTORY. New files enter Pending once; only Pending sources enter new solver queues. Historical source records remain separate.",
+    }
+
+
 def library_refresh(
     *, repository_root: str | Path | None = None,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Expose only current PixelLab Final art as active sources; retain old provenance separately."""
 
+    from . import factory_db
+    conn = factory_db.open_existing(repository_root)
+    if conn is not None:
+        try:
+            return _library_refresh_from_db(conn, repository_root, progress_callback)
+        finally:
+            conn.close()
     sources: list[dict[str, Any]] = []
     historical: list[dict[str, Any]] = []
     invalid: list[dict[str, str]] = []
@@ -897,7 +1014,9 @@ def _validated_candidate_row(root: Path) -> dict[str, Any] | None:
         return None
 
 
-def list_candidates() -> list[dict[str, Any]]:
+def list_candidates(*, shared: bool = False) -> list[dict[str, Any]]:
+    """Validated candidate rows. ``shared=True`` returns the cached rows themselves (no deep
+    copy of ~116 MB); only read-only callers that never mutate a row may pass it."""
     import copy
 
     global _IMPORTED_BY_PREFIX
@@ -909,7 +1028,7 @@ def list_candidates() -> list[dict[str, Any]]:
         row = _candidate_row(root)
         if row is not None and row["candidate_id"] not in seen:
             seen.add(row["candidate_id"])
-            candidates.append(copy.deepcopy(row))
+            candidates.append(row if shared else copy.deepcopy(row))
     _save_candidate_disk_cache({str(root) for root in roots})
     return candidates
 
@@ -1053,7 +1172,7 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
     run = pipeline if isinstance(pipeline, Mapping) else max(runs, key=lambda value: str(value.get("created_at", "")))
     from .supply_pipeline.release_pool import ReleaseError, enter_release_pool, release_entries
     try:
-        existing = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")))
+        existing = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")), verify=True)
                          if entry.get("pipeline_run_id") == run.get("run_id")), None)
     except (ReleaseError, OSError, ValueError) as exc:
         return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
@@ -1069,7 +1188,7 @@ def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Map
         return {"disposition": "NOT_ENTERED", "reason": str(exc)[:512], "pipeline_run_id": run["run_id"]}
     from .supply_pipeline.release_pool import release_entries
     try:
-        exact = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")))
+        exact = next((entry for entry in release_entries(str(candidate.get("candidate_id", "")), verify=True)
                       if entry.get("pipeline_run_id") == run.get("run_id")), None)
     except (ReleaseError, OSError, ValueError) as exc:
         return {"disposition": "NOT_ENTERED", "reason": f"Release Pool read-back failed: {str(exc)[:400]}", "pipeline_run_id": run["run_id"]}
@@ -1221,7 +1340,18 @@ def restore_source_run(source_id: str, *, game_project: str | Path | None = None
     return {"state": "SOURCE_ONLY", "source_id": source_id, "source_sha256": source_sha, "validation": validation, "pipeline": {}}
 
 
-def candidate_inbox() -> dict[str, Any]:
+_INBOX_UI_FIELDS = ("candidate_id", "artwork_path", "source_path", "origin", "width", "height", "used_colors")
+
+
+def candidate_inbox(*, slim: bool = False) -> dict[str, Any]:
+    """``slim=True`` is the Studio art strip: per candidate only the fields the UI reads."""
+    if slim:
+        items = []
+        for candidate in list_candidates(shared=True):
+            chain, _invalid = _validated_review_chain(candidate)
+            review = chain[-1] if chain else {"disposition": "NEEDS_REVIEW", "reason": "No valid owner-review evidence exists."}
+            items.append({**{key: candidate.get(key) for key in _INBOX_UI_FIELDS}, "owner_review": review})
+        return {"schema": "scrubbots-candidate-inbox-view", "version": 1, "state": "READY", "slim": True, "candidates": items}
     items = []
     for candidate in list_candidates():
         # Same result as _latest_review(candidate_id, artwork_sha256) without

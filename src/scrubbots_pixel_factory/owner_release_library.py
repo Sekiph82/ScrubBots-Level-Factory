@@ -28,6 +28,17 @@ class OwnerReleaseLibraryError(ValueError):
 def _root(repository_root: str | Path | None = None) -> Path:
     return owner_art_storage.owner_art_paths(repository_root)["release_pool"]
 
+def _mirror_to_db(source_id: str, repository_root: str | Path | None) -> None:
+    """P0-P S2: copy this source's new history events into factory.db when the data root has one."""
+    from . import factory_db
+    conn = factory_db.open_existing(repository_root)
+    if conn is None:
+        return
+    try:
+        factory_db.sync_source_history(conn, _root(repository_root), source_id)
+    finally:
+        conn.close()
+
 def _json_bytes(value: object) -> bytes:
     return (json.dumps(value, ensure_ascii=False, allow_nan=False, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
 
@@ -386,7 +397,7 @@ def _verified_ready_entry(source_id: str, run_id: str | None, candidate_id: str 
     from .supply_pipeline.release_pool import release_entries
     # Restrict the read to the candidate bound by this solver result. A single
     # unrelated/corrupt Ready receipt must not hide every other verified level.
-    entries = release_entries(candidate_id_filter=candidate_id) if candidate_id else release_entries()
+    entries = release_entries(candidate_id_filter=candidate_id, verify=True) if candidate_id else release_entries(verify=True)
     for entry in entries:
         candidate = entry.get("candidate", {})
         lineage = candidate.get("source_lineage", candidate.get("provenance", {})) if isinstance(candidate, Mapping) else {}
@@ -539,6 +550,7 @@ def transition(source_id: str, status: str, *, source_sha256: str | None, provid
                     if _reparse(stale) or _hash(stale.read_bytes()) != str(artifact.get("sha256", "")):
                         raise OwnerReleaseLibraryError("legacy current-status artwork does not match immutable source bytes")
                     stale.unlink()
+        _mirror_to_db(source_id, repository_root)
         return projection
 
 def record_import_items(batch: Mapping[str, Any], *, repository_root: str | Path | None = None) -> dict[str, Any]:
@@ -622,15 +634,28 @@ def purge_rejected_source(source_id: str, *, repository_root: str | Path | None 
         if history.is_dir() and not any(history.iterdir()):
             history.rmdir()
             deleted.append(str(history))
+        _mirror_to_db(source_id, repository_root)
     return deleted
 
 
 def list_records(status: str | None = None, *, source_id: str | None = None,
-                 repository_root: str | Path | None = None) -> dict[str, Any]:
+                 repository_root: str | Path | None = None, from_files: bool = False) -> dict[str, Any]:
     """Status rows; ``source_id`` limits the scan to that one source's projections
-    (a full scan re-verifies every history, far too slow to repeat per source)."""
+    (a full scan re-verifies every history, far too slow to repeat per source).
+    With a factory.db the rows come from the DB; ``from_files`` forces the verified file scan
+    (parity and integrity checks)."""
     if status is not None and status not in STATUSES: raise OwnerReleaseLibraryError("status filter is unsupported")
     if source_id is not None and not _ID.fullmatch(source_id): raise OwnerReleaseLibraryError("source identity is malformed")
+    from . import factory_db
+    conn = None if from_files else factory_db.open_existing(repository_root)
+    if conn is not None:
+        # P0-P S2: status is verified when written (history chain in the DB); reads are a query.
+        try:
+            rows = factory_db.status_rows(conn, status, source_id)
+        finally:
+            conn.close()
+        counts = {key: sum(row.get("status") == key for row in rows) for key in sorted(STATUSES)}
+        return {"schema": "scrubbots-owner-release-library-view/v1", "state": "READY", "read_only": True, "counts": counts, "records": rows}
     pattern = f"{source_id}.json" if source_id else "*.json"
     root = _root(repository_root); states = {status} if status else STATUSES; rows = []
     if not root.exists():
@@ -676,7 +701,7 @@ def reconcile_ready_projections(*, repository_root: str | Path | None = None) ->
     from . import studio_extensions
     from .supply_pipeline.release_pool import release_entries
 
-    entries = release_entries()
+    entries = release_entries(verify=True)
     entry_by_source: dict[str, dict[str, Any]] = {}
     for entry in entries:
         candidate = entry.get("candidate", {})

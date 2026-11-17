@@ -630,7 +630,7 @@ def test_pool_reentry_returns_existing_exact_row_without_rewriting_immutable_fil
 
     monkeypatch.setattr(extensions, "_pipeline_paths", lambda: [Path("pipeline-idempotent.json")])
     monkeypatch.setattr(extensions, "_read_json", lambda _path: pipeline)
-    monkeypatch.setattr(release_pool, "release_entries", lambda *_args: [existing_entry])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_args, **_kwargs: [existing_entry])
     monkeypatch.setattr(release_pool, "enter_release_pool", lambda *_args, **_kwargs: pytest.fail("immutable existing row must not be rewritten"))
 
     result = extensions._enter_candidate_release_pool(
@@ -659,7 +659,7 @@ def test_candidate_filtered_release_pool_read_scans_only_that_candidate(monkeypa
     monkeypatch.setattr("scrubbots_pixel_factory.owner_art_storage._is_reparse_point", lambda _path: False)
     candidate_id = "candidate-owner-" + "a" * 48
 
-    assert release_pool.release_entries(candidate_id) == []
+    assert release_pool.release_entries(candidate_id, verify=True) == []
     assert observed == [f"{candidate_id}-*.json"]
 
 

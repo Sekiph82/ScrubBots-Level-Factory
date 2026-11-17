@@ -169,8 +169,12 @@ def scan_owner_source_folder(
     explicit_alternative: bool = False,
     verify_existing_imports: bool = True,
     progress_callback: Callable[[dict[str, Any]], None] | None = None,
+    only_names: set[str] | None = None,
 ) -> dict[str, Any]:
     """List direct-child PNG candidates; the canonical importer validates bytes.
+
+    ``only_names`` limits validation to those file names (the factory.db startup passes only
+    new or changed files; every other file is already known by name, size and mtime).
 
     Only the three canonical owner folders are accepted. The legacy explicit
     alternative flag is retained for wire compatibility but grants no access to
@@ -232,6 +236,8 @@ def scan_owner_source_folder(
             continue
         mode = entry.stat().st_mode
         if not stat.S_ISREG(mode):
+            continue
+        if only_names is not None and entry.name not in only_names:
             continue
         png_files.append(entry)
     png_files.sort(key=lambda item: (item.name.casefold(), item.name))

@@ -195,6 +195,124 @@ def verify_chains(conn: sqlite3.Connection) -> list[str]:
     return errors
 
 
+# --- S2: the DB is the read authority; status writes still land in the files first -----------
+
+def open_existing(repository_root: str | Path | None = None) -> sqlite3.Connection | None:
+    """The installed database, or None when this data root has none (tests, old layouts)."""
+    path = db_path(repository_root)
+    return connect(path) if path.is_file() else None
+
+
+def _file_history_names(pool: Path, source_id: str) -> list[str]:
+    folder = pool / ".history" / source_id
+    return sorted(p.name for p in folder.glob("*.json")) if folder.is_dir() else []
+
+
+def sync_source_history(conn: sqlite3.Connection, pool: Path, source_id: str) -> int:
+    """Bring one source's DB history level with its file chain; returns events appended (-n when purged).
+
+    Appends only events the DB lacks; a DB event that differs from the file at the same
+    sequence is a conflict, never overwritten. A history the owner purged (rejected art)
+    is removed from the DB only when the DB also says REJECTED.
+    """
+    names = _file_history_names(pool, source_id)
+    stored = [row[0] for row in conn.execute(
+        "SELECT event_sha256 FROM status_events WHERE source_id = ? ORDER BY sequence", (source_id,))]
+    if not names and stored:
+        conn.execute("BEGIN IMMEDIATE")
+        try:
+            conn.execute("DELETE FROM status_events WHERE source_id = ?", (source_id,))
+            conn.execute("DELETE FROM status WHERE source_id = ?", (source_id,))
+            conn.execute("COMMIT")
+        except BaseException:
+            conn.execute("ROLLBACK"); raise
+        return -len(stored)
+    for name, sha in zip(names, stored):
+        if not name.endswith(f"-{sha}.json"):
+            raise FactoryDbError(f"{source_id}: DB history differs from the file chain at {name}")
+    if len(stored) > len(names):
+        raise FactoryDbError(f"{source_id}: DB holds events the file chain does not")
+    if len(stored) == len(names):
+        return 0
+    events = library._history(pool, source_id)  # verifies the whole file chain before copying
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        for event in events[len(stored):]:
+            append_status_event(conn, library._json_bytes(event).decode("utf-8"))
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK"); raise
+    return len(events) - len(stored)
+
+
+def heal_from_files(conn: sqlite3.Connection, pool: Path) -> dict[str, Any]:
+    """Cheap startup drift check (~0.3 s): per-source event counts in the files versus the DB."""
+    files: dict[str, int] = {}
+    history = pool / ".history"
+    if history.is_dir():
+        with os.scandir(history) as entries:
+            for entry in entries:
+                if entry.is_dir():
+                    files[entry.name] = sum(1 for name in os.listdir(entry.path) if name.endswith(".json"))
+    stored = dict(conn.execute("SELECT source_id, MAX(sequence) FROM status_events GROUP BY source_id"))
+    drift = sorted(sid for sid in set(files) | set(stored) if files.get(sid, 0) != stored.get(sid, 0))
+    healed, errors = 0, []
+    for source_id in drift:
+        try:
+            healed += abs(sync_source_history(conn, pool, source_id))
+        except (FactoryDbError, library.OwnerReleaseLibraryError, sqlite3.Error) as exc:
+            errors.append(f"{source_id}: {exc}"[:300])
+    return {"sources": len(files), "drifted": len(drift), "events_healed": healed, "errors": errors}
+
+
+def status_rows(conn: sqlite3.Connection, status: str | None = None, source_id: str | None = None) -> list[dict[str, Any]]:
+    """The owner release library view (current event of each source + its SHA), newest first."""
+    sql = ("SELECT e.event_json, e.event_sha256 FROM status s JOIN status_events e"
+           " ON e.source_id = s.source_id AND e.sequence = s.sequence")
+    clauses, args = [], []
+    if status is not None:
+        clauses.append("s.status = ?"); args.append(status)
+    if source_id is not None:
+        clauses.append("s.source_id = ?"); args.append(source_id)
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    rows = []
+    for text, sha in conn.execute(sql, args):
+        row = json.loads(text); row["event_sha256"] = sha; rows.append(row)
+    rows.sort(key=lambda row: (str(row.get("created_at", "")), str(row.get("source_id", ""))), reverse=True)
+    return rows
+
+
+def insert_release_entry(conn: sqlite3.Connection, path: Path) -> None:
+    """Mirror one immutable Release Pool entry file (validated by name and entry digest)."""
+    status = next(s for s in STATUSES if s.title() == path.parent.name)
+    conn.execute("INSERT OR IGNORE INTO release_entries VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", _release_entry_row(path, status))
+
+
+def release_entry_rows(conn: sqlite3.Connection, candidate_id: str | None = None) -> list[dict[str, Any]]:
+    """Current Release Pool entries, one per candidate (owner-accepted first, then newest run)."""
+    sql = "SELECT entry_json FROM release_entries WHERE folder = 'Ready'"
+    args: tuple = ()
+    if candidate_id is not None:
+        sql += " AND candidate_id = ?"; args = (candidate_id,)
+    best: dict[str, dict[str, Any]] = {}
+    for (text,) in conn.execute(sql + " ORDER BY candidate_id, pipeline_run_id", args):
+        entry = json.loads(text)
+        current = best.get(entry["candidate_id"])
+        if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT") >= (current.get("eligibility_source") == "OWNER_ACCEPT"):
+            best[entry["candidate_id"]] = entry
+    return [best[key] for key in sorted(best)]
+
+
+def upsert_source_record(conn: sqlite3.Connection, record_path: Path) -> None:
+    text, digest = _read_text(record_path)
+    value = json.loads(text)
+    conn.execute("INSERT INTO sources VALUES (?, ?, ?, ?, ?) ON CONFLICT(source_id) DO UPDATE SET"
+                 " source_sha256 = excluded.source_sha256, original_filename = excluded.original_filename,"
+                 " record_sha256 = excluded.record_sha256, record_json = excluded.record_json",
+                 (value["source_id"], value["source_sha256"], str(value.get("original_filename", "")), digest, text))
+
+
 # --- one-shot import from today's files (S1) -------------------------------------------------
 
 def _files(folder: Path, pattern: str) -> list[Path]:
@@ -221,16 +339,20 @@ def _sources(paths: dict[str, Path]) -> Iterable[tuple[str, str, str, str, str]]
         yield value["source_id"], value["source_sha256"], str(value.get("original_filename", "")), digest, text
 
 
+def _release_entry_row(path: Path, status: str) -> tuple:
+    text, digest = _read_text(path)
+    value = json.loads(text)
+    # Validates name, schema and entry digest exactly as the status library does.
+    library._is_release_pool_entry_projection(path, status, value)
+    play = value.get("real_play") if isinstance(value.get("real_play"), dict) else {}
+    return (path.name, status.title(), value["candidate_id"], value["pipeline_run_id"], value["entry_digest"],
+            play.get("gameCommit"), play.get("verdict"), digest, text)
+
+
 def _release_entries(pool: Path) -> Iterable[tuple]:
     for status in STATUSES:
         for path in _files(pool / status.title(), "candidate-owner-*.json"):
-            text, digest = _read_text(path)
-            value = json.loads(text)
-            # Validates name, schema and entry digest exactly as the status library does.
-            library._is_release_pool_entry_projection(path, status, value)
-            play = value.get("real_play") if isinstance(value.get("real_play"), dict) else {}
-            yield (path.name, status.title(), value["candidate_id"], value["pipeline_run_id"], value["entry_digest"],
-                   play.get("gameCommit"), play.get("verdict"), digest, text)
+            yield _release_entry_row(path, status)
 
 
 def _batch_records(paths: dict[str, Path]) -> Iterable[tuple[str, str, str, str]]:
@@ -309,7 +431,7 @@ def parity_report(conn: sqlite3.Connection, repository_root: str | Path | None =
         {p.parent.name: _sha(p.read_bytes()) for p in _files(paths["imported"], "*/source.json")},
         dict(conn.execute("SELECT source_id, record_sha256 FROM sources")))
     # Current status: the library's own full verified view versus the trigger-maintained table.
-    view = library.list_records(repository_root=repository_root)
+    view = library.list_records(repository_root=repository_root, from_files=True)
     report["status"] = compare("status",
         {r["source_id"]: (r["status"], r["event_sha256"]) for r in view["records"]},
         {sid: (st, sha) for sid, st, sha in conn.execute("SELECT source_id, status, event_sha256 FROM status")})

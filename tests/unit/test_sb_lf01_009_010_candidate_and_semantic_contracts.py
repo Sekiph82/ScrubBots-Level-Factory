@@ -515,7 +515,7 @@ def test_legacy_ready_auto_is_visible_but_cannot_enter_plan_or_approval(monkeypa
 
     legacy = _release_entry("legacy-ready-auto", production=False)
     accepted = _release_entry("owner-accepted", production=True)
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [legacy, accepted])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_a, **_k: [legacy, accepted])
     monkeypatch.setattr(
         studio,
         "_latest_review",
@@ -537,7 +537,7 @@ def test_legacy_ready_auto_is_visible_but_cannot_enter_plan_or_approval(monkeypa
     assert [entry["candidate_id"] for entry in planned["pool"]] == ["owner-accepted"]
 
     legacy_plan = {"plan_hash": "legacy-plan", "K": 1, "slots": [{"n": 1, "chosen_id": "legacy-ready-auto"}]}
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [legacy])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_a, **_k: [legacy])
     monkeypatch.setattr(release_pool, "_json", lambda _path: legacy_plan)
     with pytest.raises(ReleaseError, match="legacy or no-longer-eligible"):
         release_pool.validate_release_plan(plan_hash="legacy-plan", game_project="synthetic-game")
@@ -562,7 +562,7 @@ def test_nonproduction_class_cannot_be_selected_for_approval(
     entry = _release_entry("not-production", production=True)
     entry["candidate_classification"] = {"candidate_class": candidate_class.value}
     plan = {"plan_hash": "nonproduction-plan", "K": 1, "slots": [{"n": 1, "chosen_id": "not-production"}]}
-    monkeypatch.setattr(release_pool, "release_entries", lambda: [entry])
+    monkeypatch.setattr(release_pool, "release_entries", lambda *_a, **_k: [entry])
     monkeypatch.setattr(studio, "_latest_review", lambda _candidate_id: {"disposition": "ACCEPT", "review_id": "review-current"})
     monkeypatch.setattr(studio, "extensions_root", lambda: Path("synthetic-extensions"))
     monkeypatch.setattr(release_pool, "discover_game_project", lambda _game: Path("synthetic-game"))
