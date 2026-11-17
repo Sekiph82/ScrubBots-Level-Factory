@@ -686,8 +686,9 @@ def _studio_extension_main(arguments: Sequence[str]) -> int:
             from scrubbots_pixel_factory.owner_release_library import list_records
             payload = list_records(str(request.get("status")) if request.get("status") else None)
         elif operation == "release-pool":
-            from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries
-            entries = release_entries()
+            from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries, slim_release_entries
+            # The Studio list needs ids, titles, artwork and states, not 250 MB of proofs.
+            entries = slim_release_entries() if request.get("slim") is True else release_entries()
             payload = {"state": "READY", "pool_size": len(entries), "entries": entries}
         elif operation == "semantic-generate":
             payload = _semantic_generate(request)

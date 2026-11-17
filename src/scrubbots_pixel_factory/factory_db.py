@@ -304,6 +304,28 @@ def release_entry_rows(conn: sqlite3.Connection, candidate_id: str | None = None
     return [best[key] for key in sorted(best)]
 
 
+def slim_release_entry_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
+    """The Studio list projection of ``release_entry_rows`` built inside SQLite (~1.6 s, no 250 MB parse)."""
+    best: dict[str, dict[str, Any]] = {}
+    for text, disposition, state, columns, level_id, difficulty, candidate_level, candidate_inner in conn.execute(
+            "SELECT json_remove(entry_json, '$.candidate', '$.pipeline', '$.candidate_classification', '$.signature'),"
+            " json_extract(entry_json, '$.pipeline.primary.disposition'), json_extract(entry_json, '$.pipeline.primary.state'),"
+            " json_extract(entry_json, '$.pipeline.primary.column_count'), json_extract(entry_json, '$.pipeline.primary.level_id'),"
+            " json_extract(entry_json, '$.pipeline.primary.difficulty.class'), json_extract(entry_json, '$.candidate.level_id'),"
+            " json_extract(entry_json, '$.candidate.candidate_id')"
+            " FROM release_entries WHERE folder = 'Ready' ORDER BY candidate_id, pipeline_run_id"):
+        entry = json.loads(text)
+        entry["pipeline"] = {"run_id": entry.get("pipeline_run_id"), "primary": {
+            "disposition": disposition, "state": state, "column_count": columns, "level_id": level_id,
+            "difficulty_class": difficulty if difficulty is not None else entry.get("difficulty_class")}}
+        entry["candidate"] = {"level_id": candidate_level, "candidate_id": candidate_inner}
+        entry["slim"] = True
+        current = best.get(entry["candidate_id"])
+        if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT") >= (current.get("eligibility_source") == "OWNER_ACCEPT"):
+            best[entry["candidate_id"]] = entry
+    return [best[key] for key in sorted(best)]
+
+
 def upsert_source_record(conn: sqlite3.Connection, record_path: Path) -> None:
     text, digest = _read_text(record_path)
     value = json.loads(text)

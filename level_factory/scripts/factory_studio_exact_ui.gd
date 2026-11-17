@@ -5181,7 +5181,7 @@ func _review_candidate(disposition: String) -> void:
 		_report("Owner review requires the selected PNG's completed canonical READY run.")
 		return
 	var result := _extension("owner-review", {"candidate_id": _last_candidate_id, "disposition": disposition})
-	_release_pool = _extension("release-pool", {})
+	_release_pool = _extension("release-pool", {"slim": true})
 	_apply_release_projection()
 	var publication: Dictionary = result.get("publication", {})
 	var exact_readback := false
@@ -5210,7 +5210,7 @@ func _refresh_release_pool(show_status: bool = true) -> void:
 		_append_release_pool_activity("REFRESH POOL", "STARTED", "read-only Release Pool projection", _selected_release_ids)
 	_release_pool_loading = true
 	_release_pool_load_error = ""
-	if not _queue_studio_read_extension("release-pool", {}, {"kind": "release-pool", "show_status": show_status}):
+	if not _queue_studio_read_extension("release-pool", {"slim": true}, {"kind": "release-pool", "show_status": show_status}):
 		_release_pool_loading = false
 		_release_pool_load_error = "Canonical Release Pool read could not be queued. Check the local Factory Core connection and select Refresh to retry."
 		_refresh_live_data()

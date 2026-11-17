@@ -992,6 +992,36 @@ def _cached_latest_review(
     return cache[candidate_id]
 
 
+_HEAVY_ENTRY_KEYS = {"candidate", "pipeline", "candidate_classification", "signature"}
+
+
+def slim_release_entry(entry: Mapping[str, Any]) -> dict[str, Any]:
+    """What the Studio Release Pool list and cards read from an entry (~3 KB instead of ~150 KB).
+
+    The full immutable entry stays in the DB/file; the UI asks for it by candidate when needed.
+    """
+    primary = entry.get("pipeline", {}).get("primary", {}) if isinstance(entry.get("pipeline"), Mapping) else {}
+    candidate = entry.get("candidate", {}) if isinstance(entry.get("candidate"), Mapping) else {}
+    slim = {key: value for key, value in entry.items() if key not in _HEAVY_ENTRY_KEYS}
+    slim["pipeline"] = {"run_id": entry.get("pipeline_run_id"), "primary": {
+        key: primary.get(key) for key in ("disposition", "state", "column_count", "level_id")}}
+    slim["pipeline"]["primary"]["difficulty_class"] = (primary.get("difficulty") or {}).get("class")         if isinstance(primary.get("difficulty"), Mapping) else entry.get("difficulty_class")
+    slim["candidate"] = {"level_id": candidate.get("level_id"), "candidate_id": candidate.get("candidate_id")}
+    slim["slim"] = True
+    return slim
+
+
+def slim_release_entries() -> list[dict[str, Any]]:
+    """Studio Release Pool list: ``slim_release_entry`` of every current entry."""
+    factory_db, conn = _factory_db()
+    if conn is not None:
+        try:
+            return factory_db.slim_release_entry_rows(conn)
+        finally:
+            conn.close()
+    return [slim_release_entry(entry) for entry in release_entries()]
+
+
 def _factory_db():
     from .. import factory_db
     from .. import studio_extensions as studio

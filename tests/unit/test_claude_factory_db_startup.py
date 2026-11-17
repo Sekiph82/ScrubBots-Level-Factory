@@ -158,3 +158,17 @@ def test_source_record_written_under_another_root_never_reaches_this_db(tmp_path
         assert conn.execute("SELECT COUNT(*) FROM sources").fetchone()[0] == 0
     finally:
         conn.close()
+
+
+def test_studio_release_list_is_slim_and_matches_the_python_projection(tmp_path, monkeypatch):
+    from scrubbots_pixel_factory import owner_art_storage
+    from scrubbots_pixel_factory.supply_pipeline import release_pool
+    repository, _final = _repository(tmp_path, monkeypatch)
+    ready = owner_art_storage.ensure_owner_art_layout(repository)["ready"]
+    _entry(ready, "candidate-owner-aaa", "pipeline-1")
+    factory_db.import_from_files(factory_db.db_path(repository), repository, candidate_rows=[], progress=lambda *_: None)
+
+    slim = release_pool.slim_release_entries()
+
+    assert slim == [release_pool.slim_release_entry(e) for e in release_pool.release_entries()]
+    assert slim[0]["slim"] is True and "candidate_classification" not in slim[0]
