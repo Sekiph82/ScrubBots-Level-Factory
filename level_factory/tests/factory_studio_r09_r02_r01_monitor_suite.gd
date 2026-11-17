@@ -443,8 +443,11 @@ func _test_slow_worker_stream(studio: Node) -> bool:
 		thread.wait_to_finish()
 		return false
 	studio.call("_run_level_pipeline")
-	if gateway.prepare_count != 0:
-		_fail("a second Run Pipeline click dispatched another worker while the first was active")
+	# Read-only readers may be prepared (their order changed with P0-P S4); no worker may be.
+	var background := ["release-pool", "candidate-inbox", "pixellab-balance", "owner-release-library",
+		"png-batch-latest", "loaded-png-batch-find", "restore-source-run-readonly", "validate-source-readonly"]
+	if gateway.prepared_operations.any(func(operation: String) -> bool: return operation not in background):
+		_fail("a second Run Pipeline click dispatched another worker while the first was active: %s" % [gateway.prepared_operations])
 		thread.wait_to_finish()
 		return false
 	thread.wait_to_finish()

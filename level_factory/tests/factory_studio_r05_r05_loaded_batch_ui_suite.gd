@@ -8,7 +8,7 @@ extends SceneTree
 
 const UI_SCRIPT := preload("res://scripts/factory_studio_exact_ui.gd")
 const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
-const PINNED_GAME_COMMIT := "28741ed18c12e0e4e42523e7af1a0c5b6764453c"  # owner re-pin 2026-11-17
+const PINNED_GAME_COMMIT := "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd"  # owner re-pin 2026-11-17
 const READ_OPERATIONS := ["loaded-png-batch-find", "png-batch-latest"]
 const PASS_MARKER := "SB-LFX-018-C001-R02-R05-R09-R02-R04-R05 loaded PNG batch UI PASS"
 

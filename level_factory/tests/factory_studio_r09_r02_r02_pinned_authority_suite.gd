@@ -5,7 +5,7 @@ const TEST_PATHS := preload("res://tests/factory_test_paths.gd")
 const MAIN_SCENE := "res://scenes/factory_studio.tscn"
 const PINNED_SOURCE_ID := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
 const PINNED_SOURCE_SHA := "49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-const PINNED_GAME_COMMIT := "28741ed18c12e0e4e42523e7af1a0c5b6764453c"  # owner re-pin 2026-11-17
+const PINNED_GAME_COMMIT := "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd"  # owner re-pin 2026-11-17
 
 
 class FakeGateway extends RefCounted:

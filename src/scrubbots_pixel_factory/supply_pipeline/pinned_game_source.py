@@ -69,8 +69,17 @@ ATTESTED_RUNTIMES: dict[str, dict[str, Any]] = {
         "source_bytes": 2_618_857,
         "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
     },
+    # Owner relay of the game agent, 2026-11-17: re-pin to game 1de7a7f6 (latest CI-green main;
+    # gameplay and gameplay-shell code identical to 28741ed1, Home/UI text only).
+    "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd": {
+        "tree_sha": "2d87d0fcdc31de18da241f6c7a076c4119211610",
+        "attestation_sha256": "6a5edfea280b831d6e81120831dad31390c3b4afc6936a6478d862fe2cf7707b",
+        "source_files": 284,
+        "source_bytes": 2_620_577,
+        "void_anchor": "0b6dfc359d3bf34afa4e78d53a68b788088a863a",
+    },
 }
-PINNED_MAIN_SHA = "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
+PINNED_MAIN_SHA = "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd"
 PINNED_TREE_SHA = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["tree_sha"]
 ATTESTATION_SHA256 = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["attestation_sha256"]
 RUNTIME_SOURCE_BYTES = ATTESTED_RUNTIMES[PINNED_MAIN_SHA]["source_bytes"]
@@ -126,10 +135,55 @@ def is_pinned_runtime(project: str | Path) -> bool:
         return False
 
 
+# Full verifications in this process, keyed by runtime root and a stamp (size + mtime) of every
+# file the verification reads plus the set of script/config paths present.
+_VERIFIED_RUNTIMES: dict[str, tuple[tuple, dict[str, Any], float]] = {}
+# ponytail: the stamp itself is ~300 stats; re-take it at most every 30 s (a batch plan validates
+# ~1300 PNGs in a few minutes). A tampered runtime is still caught within 30 s, and in full by
+# every fresh process and the integrity check.
+_STAMP_RECHECK_SECONDS = 30.0
+
+
+def _runtime_stamp(root: Path) -> tuple:
+    entries = []
+    for folder in (root, root / "scripts", root / "data" / "config", root / "data" / "palettes"):
+        if not folder.exists():
+            continue
+        files = [folder / "project.godot", folder / "source-attestation.json"] if folder == root else (
+            p for p in folder.rglob("*") if p.suffix in {".gd", ".json"})
+        for path in files:
+            try:
+                info = path.stat()
+            except OSError:
+                continue
+            entries.append((path.relative_to(root).as_posix(), info.st_size, info.st_mtime_ns))
+    return tuple(sorted(entries))
+
+
 def verify_attested_runtime(project: str | Path) -> dict[str, Any]:
-    """Revalidate the complete pinned source manifest before every runtime use."""
+    """Revalidate the complete pinned source manifest before every runtime use.
+
+    A batch validates ~1300 PNGs against the same runtime; re-hashing its 284 files for each one
+    cost ~0.7 s per PNG (~15 min per batch). The full check now runs once per process and again
+    whenever any verified file's size or mtime, or the set of script/config files, changes.
+    """
+    import time
 
     root = Path(project).expanduser().resolve()
+    cached = _VERIFIED_RUNTIMES.get(str(root))
+    now = time.monotonic()
+    if cached is not None and now - cached[2] < _STAMP_RECHECK_SECONDS:
+        return json.loads(json.dumps(cached[1]))
+    stamp = _runtime_stamp(root) if root.is_dir() else ()
+    if cached is not None and stamp and cached[0] == stamp:
+        _VERIFIED_RUNTIMES[str(root)] = (stamp, cached[1], now)
+        return json.loads(json.dumps(cached[1]))
+    manifest = _verify_attested_runtime_files(root)
+    _VERIFIED_RUNTIMES[str(root)] = (stamp, json.loads(json.dumps(manifest)), now)
+    return manifest
+
+
+def _verify_attested_runtime_files(root: Path) -> dict[str, Any]:
     commit = _attested_commit(root)
     if commit is None:
         raise PinnedGameSourceError("pinned runtime path is not a canonical data/Level Factory/Runtime/<attested commit> directory")

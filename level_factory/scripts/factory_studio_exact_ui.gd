@@ -27,6 +27,7 @@ var _release_entry_index: Dictionary = {}
 var _release_entry_index_source: Array = []
 var _release_icon_queue: Array = []
 const RELEASE_ICONS_PER_FRAME := 24
+const BACKGROUND_READ_KINDS := ["release-pool", "candidate-inbox", "pixellab-balance"]
 var _release_pool_loaded := false
 var _release_pool_loading := false
 var _release_pool_last_success_msec := -1
@@ -245,7 +246,7 @@ var _activity_backend_disposition := ""
 var _activity_event_backend_disposition := ""
 var _activity_integrity_error := ""
 const _PINNED_002_SOURCE_ID := "owner-upload-49667ba3a1018b4b6739ce42a9644eca291390970b2e251adda72a1c3c90e8aa"
-const _PINNED_GAME_COMMIT := "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
+const _PINNED_GAME_COMMIT := "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd"
 var _pinned_source_preflight_ok := false
 var _pinned_source_preflight_message := "PINNED_SOURCE_SCOPE_NOT_VERIFIED"
 
@@ -5325,7 +5326,14 @@ func _request_candidate_inbox_refresh(force: bool = false) -> void:
 func _start_next_studio_read_extension() -> void:
 	if _shutdown_requested or _studio_read_thread != null or _studio_read_queue.is_empty():
 		return
-	var queued: Dictionary = _studio_read_queue.pop_front()
+	# Reads the startup button gate and the Level Factory page wait for go first; the Release
+	# Pool list, art strip and credit label load after them (they only fill other screens).
+	var pick := 0
+	for index in range(_studio_read_queue.size()):
+		if str(_studio_read_queue[index].get("context", {}).get("kind", "")) not in BACKGROUND_READ_KINDS:
+			pick = index
+			break
+	var queued: Dictionary = _studio_read_queue.pop_at(pick)
 	_prepare_worker_cancel_marker()
 	_studio_read_mutex.lock()
 	_studio_read_done = false
@@ -6430,6 +6438,11 @@ func _load_queued_release_icons() -> void:
 
 func _refresh_release_candidate_rows() -> void:
 	if _release_candidate_rows == null:
+		return
+	if _screen != "RELEASE POOL":
+		# 1764 rows are built when the owner opens RELEASE POOL (_apply_release_projection
+		# runs on that screen switch), not while another page is loading.
+		_release_candidate_signature = ""
 		return
 	var signature_parts := PackedStringArray()
 	for candidate_id in _visible_release_ids:

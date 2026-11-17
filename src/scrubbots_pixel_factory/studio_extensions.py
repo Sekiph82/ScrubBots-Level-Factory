@@ -2787,7 +2787,9 @@ def find_loaded_png_batch(
         ]
         legacy_matches: list[dict[str, Any]] = []
         batch_root = _batch_import_root()
-        for legacy_path in sorted(batch_root.glob("*.json")) if batch_root.exists() else []:
+        # batch_load accepts a version-2 composite only under its digest name batch-loaded-<digest>;
+        # skip the ~2400 version-1 folder imports instead of loading each one at every startup.
+        for legacy_path in sorted(batch_root.glob("batch-loaded-*.json")) if batch_root.exists() else []:
             try:
                 legacy = batch_load(legacy_path.stem)["batch"]
             except (StudioExtensionError, OSError, ValueError):

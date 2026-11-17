@@ -56,8 +56,8 @@ def test_installed_release_pin_and_002_source_preflight_are_read_only() -> None:
     manifest = pinned_game_source.verify_attested_runtime(root)
     # Owner re-pin 2026-11-13 (game 6534537c, faster ProofKernel / Difficulty V1).
     assert len(manifest["source_files"]) == 284  # owner re-pin 2026-11-17 (game 28741ed1)
-    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_618_857
-    assert manifest["source_commit"] == "28741ed18c12e0e4e42523e7af1a0c5b6764453c"
+    assert sum(entry["bytes"] for entry in manifest["source_files"]) == 2_620_577
+    assert manifest["source_commit"] == "1de7a7f6cf1b01c8836c1346168976a0c8ae2fbd"
     _require_saved_owner_uploads()
 
     source_png = _source_dir(PINNED_SOURCE_ID) / "source.png"
@@ -139,6 +139,9 @@ def test_pinned_file_manifest_and_release_root_fail_closed_when_tampered_or_stal
         raw = original_read_bytes(path)
         return raw + b" " if path.resolve() == manifest_path.resolve() else raw
 
+    # The tampering below is simulated in memory (file stamps unchanged), so drop the
+    # per-process verification cache to exercise the full check itself.
+    monkeypatch.setattr(pinned_game_source, "_VERIFIED_RUNTIMES", {})
     with monkeypatch.context() as scoped:
         scoped.setattr(Path, "read_bytes", read_tampered_manifest)
         with pytest.raises(pinned_game_source.PinnedGameSourceError, match="attestation digest mismatch"):
@@ -153,6 +156,7 @@ def test_pinned_file_manifest_and_release_root_fail_closed_when_tampered_or_stal
             return False
         return original_is_file(path)
 
+    pinned_game_source._VERIFIED_RUNTIMES.clear()
     with monkeypatch.context() as scoped:
         scoped.setattr(Path, "is_file", report_missing_source)
         with pytest.raises(pinned_game_source.PinnedGameSourceError, match="missing or redirected"):
