@@ -611,3 +611,43 @@ UI const and 3 Godot suites + 3 pytest files updated. Game CI for 28741ed1: "And
 87b11906 1117, 28741ed1 237, 9f1ada33 162(+15 LOST, 1 SEARCH_BUDGET), f60cfa94 152, 26d15718 53,
 4cd72401 27, 4bb2b0bd 13, 1ba76a00 3. Everything before 37f08b70 was played with the old shell geometry, so
 existing READY levels are not proven on the current game. Re-verifying them is an owner decision (CPU time).
+
+## 2026-11-17 — P0-P factory database (S0–S2) and P0-O replay
+
+**Owner request.** Write the redesign (one SQLite store, verify on write, fast startup, persistent backend,
+LF↔RP one table) into TASKS.md as a detailed plan and work on it (TASKS › P0-P, S0..S5).
+
+**S0 baseline** (`docs/evidence/claude-factory-db-20261117/baseline.md`): startup 333.1 s, of which
+sync + READY reconcile 269.9 s; batch prep READY check 432 s → 10.1 s (ea57f002).
+
+**S1** (d382e2a1): `src/scrubbots_pixel_factory/factory_db.py`. Tables images, sources, status_events
+(exact owner-release-library event bytes), status (trigger-maintained), candidates, release_entries,
+batch_records. Triggers: inserts must extend the chain, no updates, history deletable only when REJECTED,
+status changes only through an event. Real import 192.5 s; parity 0 differences (3053/3053/3053, 6763
+events, 1764 entries, 2437 batch records, 1766 candidates, 0 chain errors).
+
+**S2** (d5833243, 2ad92d70, d86223e4; installed and launched via the Desktop LNK):
+- Startup inventory from the DB: 0.3 s drift check (per-source event counts) heals missed events; Final by
+  name/size/mtime, only new/changed files validated. Installed app: 2.0 s (was 333.1 s).
+- `list_records` / `release_entries` answer from the DB; `verify=True` keeps the full read check on READY
+  transition, pool entry, production plan and scrubpack identity. Release listing identical (1764 = 1764).
+- Writes mirrored: transition/purge (status), import/alignment (source row), enter_release_pool (entry). Each
+  mirror finds the DB beside its own data root. Found while testing: with a default-root mirror the unit suite
+  wrote 17 tmp source rows into the owner's DB (rows only, no files); removed, parity PASS again; regression
+  test watched failing on the old code.
+- Found in the real app: after the fast backend the Studio froze ~1 min parsing 250 MB of full Release Pool
+  entries (7.8 GB RAM). Studio list now gets slim rows built in SQLite (7.2 MB, 1.6 s). First slim version
+  showed '<null>' titles (GDScript get() on present null keys); fixed and re-checked in the app.
+- Not met: buttons usable ~106 s after launch. Remaining: Godot main-thread gallery work (~35 s frozen) and
+  serial one-process-per-read ops (candidate-inbox ~15 s, restore-source-run ~12 s, loaded-png-batch-find
+  ~12 s). That is S4 (persistent backend, async UI).
+
+**Tests.** Full suite on the S2 code: 2430 passed / 12 failed; the 12 were 2 Godot suites needing the full
+inbox (fixed: slim only on request), 7 tests whose patched release_entries lacked the new keyword (fixed),
+1 legacy-scan test (now verify=True), 2 TASKS.md-dirty checks (clear after commit). After fixes: all 36
+Godot suites pass; focused DB/pool tests pass.
+
+**P0-O replay** (owner "Evet, oynat"): every READY level whose real play predated game 37f08b70 replayed on
+the live game (head 40b38a5f, CI green, gameplay identical to 28741ed1): 1479/1479 WON_CANONICAL, 0 lost.
+44 READY rows whose entry has no run id are replayed in a second pass (results.jsonl under
+`data/Level Factory/Workspace/Revalidation/40b38a5f…`).
