@@ -678,3 +678,20 @@ screen/UI text changed; gameplay, gameplay shell and tools/real_play_file.gd ide
 live checkout at 1de7a7f6. CI "Android Family First10 APK" success. Committed in 950812de.
 
 **Tests**: all 37 Godot suites pass on fa0d42c0; focused unit tests pass. Full unit suite not re-run this round.
+
+## 2026-11-18 — cleaned atlases saved to Grid Files; 18 Pending vs 16 solved
+
+**Owner gallery check.** The owner sent 20 PixelLab gallery sheets. Matching only against Grid Files found 2 (136, 137)
+and I wrongly said 18 were missing. Matching against Generation Staging originals and Final frames: all 20 are in
+the system (316/320 frames in Final, almost all READY; 4 frames were owner-rejected and purged). 18 originals had
+been purged as rejected art after their frames were cleaned (2026-11-15), so only loose LF PNGs remained.
+**New owner rule:** after cleaning, always save the clean 4x4 atlas in Grid Files. Applied to the 18: assembled from
+their current Final frames (58 px edge-padded frames cropped back to 56 after checking the empty ring; purged
+frames left empty) as PX-ATLAS-000198..000215, registered in asset-name-manifest.json so new atlas numbers do not
+collide. Evidence: docs/evidence/claude-clean-atlases-to-grid-20261118/ (manifest.json, before-after-1..3.png).
+
+**18 Pending, 16 solved.** LF-000581 and LF-001785 had a verified READY pipeline and Release Pool entry but stayed
+PENDING ("Solver attempt started") because their batches were interrupted before the outcome was recorded. Planning
+skipped them as already READY but never fixed the status. create_png_batch now records READY for such sources via
+transition_pipeline (test_claude_ready_excluded_status.py); the two were recorded the same way (PENDING 18 -> 16).
+Not installed yet (batch running).
