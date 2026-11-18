@@ -535,6 +535,26 @@ def _verify_sources(items: Sequence[Mapping[str, Any]], settings: Mapping[str, A
     return result
 
 
+def _record_verified_ready(excluded_ready: Sequence[Mapping[str, Any]]) -> None:
+    """Give a still-PENDING source whose READY run is verified its READY status.
+
+    A batch interrupted after a pipeline wrote its Release Pool entry, but before the
+    coordinator recorded the outcome, leaves the source PENDING ("Solver attempt started").
+    Planning then rightly skips it, yet the Pending counter kept showing it (owner
+    2026-11-18: "18 Pending, the batch solves 16"). The proof was just verified, so record it.
+    """
+    from . import studio_extensions as studio
+    from .owner_release_library import list_records, transition_pipeline
+
+    for item in excluded_ready:
+        source_id = str(item.get("source_id", ""))
+        rows = list_records("PENDING", source_id=source_id).get("records", []) if source_id else []
+        if not rows:
+            continue
+        pipeline = studio._read_json(studio._pipeline_path(str(item.get("pipeline_run_id", ""))))
+        transition_pipeline(source_id, pipeline)
+
+
 def _verified_ready_sources(imported_items: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, str]]:
     """Find current source SHAs with prior READY status and intact canonical proof.
 
@@ -776,6 +796,7 @@ def create_png_batch(batch_id: str, settings: Mapping[str, Any] | None = None) -
         {"source_sha256": sha, **previously_ready[sha]}
         for sha in sorted(previously_ready)
     ]
+    _record_verified_ready(excluded_ready)
     if previously_ready:
         remaining_source_ids = [
             str(item.get("source_id", "")) for item in imported["items"]
