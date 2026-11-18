@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 import threading
 import uuid
@@ -551,8 +552,11 @@ def _record_verified_ready(excluded_ready: Sequence[Mapping[str, Any]]) -> None:
         rows = list_records("PENDING", source_id=source_id).get("records", []) if source_id else []
         if not rows:
             continue
-        pipeline = studio._read_json(studio._pipeline_path(str(item.get("pipeline_run_id", ""))))
-        transition_pipeline(source_id, pipeline)
+        try:
+            pipeline = studio._read_json(studio._pipeline_path(str(item.get("pipeline_run_id", ""))))
+            transition_pipeline(source_id, pipeline)
+        except (OSError, ValueError) as exc:  # a status repair never blocks planning
+            print(f"READY status of {source_id} not recorded: {exc}"[:300], file=sys.stderr)
 
 
 def _verified_ready_sources(imported_items: Sequence[Mapping[str, Any]]) -> dict[str, dict[str, str]]:

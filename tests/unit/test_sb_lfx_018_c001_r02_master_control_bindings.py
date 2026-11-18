@@ -49,7 +49,7 @@ def test_pipeline_review_and_replay_bind_to_canonical_studio_operations() -> Non
 
 
 def test_release_projection_and_publish_stay_within_canonical_boundaries() -> None:
-    assert '_extension("release-pool", {})' in UI
+    assert '_extension("release-pool", {"slim": true})' in UI  # P0-P S2: the Studio list reads slim rows
     assert 'func _apply_release_projection()' in UI
     assert 'func _select_all_release()' in UI
     assert 'func _clear_release_selection()' in UI

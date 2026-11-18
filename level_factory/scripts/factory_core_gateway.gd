@@ -37,14 +37,10 @@ var _last_result: Dictionary = {}
 var _default_output_root := ""
 var _probe_launcher_path := LAUNCHER_PATH
 
-## P0-P S4: read-only operations answered by long-lived `factory_core_launcher.py serve`
-## processes (warm imports and caches; no Python start per call). Must match the
-## launcher's SERVICE_OPERATIONS. Writers, solvers and paid providers keep one process each.
-const SERVICE_OPERATIONS := [
-	"library-refresh", "owner-release-library", "release-pool", "candidate-inbox",
-	"loaded-png-batch-find", "png-batch-latest", "restore-source-run-readonly",
-	"validate-source-readonly", "provider-options", "pixellab-balance", "batch-load",
-]
+## P0-P S4: long-lived `factory_core_launcher.py serve` processes answer the read-only
+## operations (warm imports and caches; no Python start per call). The launcher alone
+## decides which operations it serves; it answers {"served": false} for the rest, which
+## then run in their own process as before.
 ## A background read and a main-thread call can run at once without waiting on each other.
 const MAX_SERVICE_PROCESSES := 3
 var _service_mutex := Mutex.new()
@@ -325,7 +321,7 @@ func _spawn_service() -> Dictionary:
 	if _connection_status != ConnectionStatus.AVAILABLE or not OS.has_method("execute_with_pipe"):
 		return {}
 	var launched: Dictionary = OS.execute_with_pipe(python_executable, PackedStringArray([ProjectSettings.globalize_path(LAUNCHER_PATH), "serve"]))
-	if launched.is_empty() or not (launched.get("stdio") is FileAccess):
+	if launched.is_empty() or launched.get("stdio") == null:
 		return {}
 	return {"stdio": launched["stdio"], "stderr": launched.get("stderr"), "pid": int(launched.get("pid", -1))}
 
@@ -366,7 +362,7 @@ func _discard_service(service: Dictionary) -> void:
 
 ## Ask a long-lived service; {} means "not served" and the caller runs its own process.
 func _call_service(operation: String, request: Variant) -> Dictionary:
-	if not SERVICE_OPERATIONS.has(operation) or not (request is Dictionary):
+	if operation.is_empty() or not (request is Dictionary):
 		return {}
 	var service := _acquire_service()
 	if service.is_empty():
@@ -375,15 +371,17 @@ func _call_service(operation: String, request: Variant) -> Dictionary:
 	_service_next_id += 1
 	var message_id := _service_next_id
 	_service_mutex.unlock()
-	var io: FileAccess = service["stdio"]
+	var io = service["stdio"]
 	io.store_line(JSON.stringify({"id": message_id, "operation": operation, "request": request}))
 	io.flush()
-	var reply := io.get_line()
+	var reply: String = io.get_line()
 	var parsed: Variant = JSON.parse_string(reply) if not reply.is_empty() else null
-	if not (parsed is Dictionary) or int(parsed.get("id", -1)) != message_id or not (parsed.get("payload") is Dictionary):
+	if not (parsed is Dictionary) or int(parsed.get("id", -1)) != message_id:
 		_discard_service(service)
 		return {}
 	_release_service(service)
+	if parsed.get("served", true) == false or not (parsed.get("payload") is Dictionary):
+		return {}
 	var payload: Dictionary = parsed["payload"]
 	payload["exit_code"] = int(parsed.get("exit_code", 0))
 	payload["captured_output"] = ""

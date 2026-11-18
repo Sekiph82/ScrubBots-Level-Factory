@@ -749,77 +749,6 @@ def _run_studio_extension(operation: str, request: dict[str, object]) -> tuple[d
         return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": f"ERROR — Studio extension: {str(exc)[:512]}"}, 2
 
 
-# P0-P S4: read-only operations a long-lived Studio service may answer. Everything that
-# writes owner data, starts solvers or calls paid providers keeps its own process.
-SERVICE_OPERATIONS = frozenset({
-    "library-refresh", "owner-release-library", "release-pool", "candidate-inbox",
-    "loaded-png-batch-find", "png-batch-latest", "restore-source-run-readonly",
-    "validate-source-readonly", "provider-options", "pixellab-balance", "batch-load",
-})
-
-
-def _reset_per_request_state() -> None:
-    """Long-lived service: drop caches that are not keyed by file stamps or content hashes."""
-    from scrubbots_pixel_factory import studio_extensions
-    from scrubbots_pixel_factory.semantic.normalization import core
-    studio_extensions._IMPORTED_BY_PREFIX = None
-    core._save_png_verdicts()
-
-
-def _serve_main(arguments: Sequence[str]) -> int:
-    """Answer JSON-line requests on stdin with JSON-line results on stdout until stdin closes.
-
-    Request:  {"id": n, "operation": "...", "request": {...}}
-    Response: {"id": n, "exit_code": 0|2, "payload": {...}}
-    The protocol owns the original stdout; fd 1 and fd 2 are redirected (to nothing and to a
-    log file) so stray prints or child processes can never corrupt a response line. The
-    service exits when Factory Studio closes the pipe, so it cannot outlive the Studio.
-    """
-    protocol = os.fdopen(os.dup(1), "wb", buffering=0)
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    os.dup2(devnull, 1)
-    log_path = _repository_root() / "data" / "Level Factory" / "Runtime" / "studio-service.log"
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log = open(log_path, "ab", buffering=0)
-    os.dup2(log.fileno(), 2)
-    sys.stdout = open(os.devnull, "w", encoding="utf-8")
-    sys.stderr = open(log_path, "a", encoding="utf-8", buffering=1)
-    os.environ.setdefault("SCRUBBOTS_PNG_VERDICT_CACHE",
-                          str(_repository_root() / "data" / "Level Factory" / "Runtime" / "png-decode-verdicts.json"))
-    # Warm the imports once so the first answer is as fast as the rest.
-    from scrubbots_pixel_factory import studio_extensions  # noqa: F401
-    from scrubbots_pixel_factory.supply_pipeline import release_pool  # noqa: F401
-    for raw in sys.stdin.buffer:
-        if not raw.strip():
-            continue
-        message_id: object = None
-        try:
-            message = json.loads(raw)
-            message_id = message.get("id")
-            operation = str(message.get("operation", ""))
-            request = message.get("request", {})
-            if operation not in SERVICE_OPERATIONS:
-                raise ValueError(f"operation is not served by the Studio service: {operation}")
-            if not isinstance(request, dict):
-                raise ValueError("request must be an object")
-            started = time.monotonic()
-            payload, exit_code = _run_studio_extension(operation, request)
-            print(f"{datetime.now().strftime('%H:%M:%S')} {os.getpid()} {operation} {time.monotonic() - started:.2f}s exit={exit_code}",
-                  file=sys.stderr)
-        except Exception as exc:
-            payload, exit_code = {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR",
-                                  "error": f"ERROR — Studio service: {str(exc)[:512]}"}, 2
-        finally:
-            try:
-                _reset_per_request_state()
-            except Exception as exc:  # an accelerator only
-                print(f"service cache reset failed: {exc}", file=sys.stderr)
-        line = json.dumps({"id": message_id, "exit_code": exit_code, "payload": payload},
-                          ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        protocol.write(line.encode("utf-8") + b"\n")
-    return 0
-
-
 def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:
     """Run an explicitly selected registered semantic provider and import its bytes.
 
@@ -1889,6 +1818,79 @@ def _primary_supply_verify_main(arguments: Sequence[str]) -> int:
     payload = verify_exported_supply(args.level, args.plan)
     print(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     return 0 if payload.get("state") == "READY" else 2
+
+
+# P0-P S4: read-only operations a long-lived Studio service may answer. Everything that
+# writes owner data, starts solvers or calls paid providers keeps its own process.
+SERVICE_OPERATIONS = frozenset({
+    "library-refresh", "owner-release-library", "release-pool", "candidate-inbox",
+    "loaded-png-batch-find", "png-batch-latest", "restore-source-run-readonly",
+    "validate-source-readonly", "provider-options", "pixellab-balance", "batch-load",
+})
+
+
+def _reset_per_request_state() -> None:
+    """Long-lived service: drop caches that are not keyed by file stamps or content hashes."""
+    from scrubbots_pixel_factory import studio_extensions
+    from scrubbots_pixel_factory.semantic.normalization import core
+    studio_extensions._IMPORTED_BY_PREFIX = None
+    core._save_png_verdicts()
+
+
+def _serve_main(arguments: Sequence[str]) -> int:
+    """Answer JSON-line requests on stdin with JSON-line results on stdout until stdin closes.
+
+    Request:  {"id": n, "operation": "...", "request": {...}}
+    Response: {"id": n, "exit_code": 0|2, "payload": {...}}
+    The protocol owns the original stdout; fd 1 and fd 2 are redirected (to nothing and to a
+    log file) so stray prints or child processes can never corrupt a response line. The
+    service exits when Factory Studio closes the pipe, so it cannot outlive the Studio.
+    """
+    protocol = os.fdopen(os.dup(1), "wb", buffering=0)
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, 1)
+    log_path = _repository_root() / "data" / "Level Factory" / "Runtime" / "studio-service.log"
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log = open(log_path, "ab", buffering=0)
+    os.dup2(log.fileno(), 2)
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+    sys.stderr = open(log_path, "a", encoding="utf-8", buffering=1)
+    os.environ.setdefault("SCRUBBOTS_PNG_VERDICT_CACHE",
+                          str(_repository_root() / "data" / "Level Factory" / "Runtime" / "png-decode-verdicts.json"))
+    # Warm the imports once so the first answer is as fast as the rest.
+    from scrubbots_pixel_factory import studio_extensions  # noqa: F401
+    from scrubbots_pixel_factory.supply_pipeline import release_pool  # noqa: F401
+    for raw in sys.stdin.buffer:
+        if not raw.strip():
+            continue
+        message_id: object = None
+        try:
+            message = json.loads(raw)
+            message_id = message.get("id")
+            operation = str(message.get("operation", ""))
+            request = message.get("request", {})
+            if operation not in SERVICE_OPERATIONS:
+                # Not an error: the Studio runs this operation in its own process instead.
+                protocol.write((json.dumps({"id": message_id, "served": False}) + "\n").encode("utf-8"))
+                continue
+            if not isinstance(request, dict):
+                raise ValueError("request must be an object")
+            started = time.monotonic()
+            payload, exit_code = _run_studio_extension(operation, request)
+            print(f"{datetime.now().strftime('%H:%M:%S')} {os.getpid()} {operation} {time.monotonic() - started:.2f}s exit={exit_code}",
+                  file=sys.stderr)
+        except Exception as exc:
+            payload, exit_code = {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR",
+                                  "error": f"ERROR — Studio service: {str(exc)[:512]}"}, 2
+        finally:
+            try:
+                _reset_per_request_state()
+            except Exception as exc:  # an accelerator only
+                print(f"service cache reset failed: {exc}", file=sys.stderr)
+        line = json.dumps({"id": message_id, "exit_code": exit_code, "payload": payload},
+                          ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        protocol.write(line.encode("utf-8") + b"\n")
+    return 0
 
 
 def _main() -> int:

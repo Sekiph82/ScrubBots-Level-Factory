@@ -960,7 +960,7 @@ def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: A
 
     latest: dict[str, dict[str, Any]] = {}
     for path in pipeline_paths:
-        summary = _ready_pipeline_summary(Path(path), studio)
+        summary = _ready_pipeline_summary(path, studio)
         if summary is None:
             continue
         candidate_id = summary["candidate_id"]
@@ -976,13 +976,13 @@ def _latest_ready_pipeline_index(pipeline_paths: Iterable[Path | str], studio: A
 _PIPELINE_SUMMARIES: dict[str, tuple[int, int, dict[str, Any] | None]] = {}
 
 
-def _ready_pipeline_summary(path: Path, studio: Any) -> dict[str, Any] | None:
+def _ready_pipeline_summary(path: Path | str, studio: Any) -> dict[str, Any] | None:
     """{candidate_id, run_id, created_at} of a READY pipeline record, else None."""
     try:
-        info = path.stat()
+        info = Path(str(path)).stat()
     except OSError:
-        return None
-    cached = _PIPELINE_SUMMARIES.get(str(path))
+        info = None  # not a plain file (or gone): read it uncached and let _read_json decide
+    cached = _PIPELINE_SUMMARIES.get(str(path)) if info is not None else None
     if cached is not None and cached[0] == info.st_mtime_ns and cached[1] == info.st_size:
         return cached[2]
     try:
@@ -995,7 +995,8 @@ def _ready_pipeline_summary(path: Path, studio: Any) -> dict[str, Any] | None:
             and primary.get("state") == "READY" and str(pipeline.get("candidate_id", ""))):
         summary = {"candidate_id": str(pipeline["candidate_id"]), "run_id": pipeline.get("run_id"),
                    "created_at": str(pipeline.get("created_at", ""))}
-    _PIPELINE_SUMMARIES[str(path)] = (info.st_mtime_ns, info.st_size, summary)
+    if info is not None:
+        _PIPELINE_SUMMARIES[str(path)] = (info.st_mtime_ns, info.st_size, summary)
     return summary
 
 

@@ -25,8 +25,7 @@ def test_service_answers_in_order_refuses_writers_and_exits_with_the_pipe():
         assert options["id"] == 1 and options["exit_code"] == 0 and isinstance(options["payload"], dict)
         # A writer is never served by the long-lived process.
         refused = _ask(process, {"id": 2, "operation": "png-batch-run", "request": {}})
-        assert refused["id"] == 2 and refused["exit_code"] == 2
-        assert "not served" in refused["payload"]["error"]
+        assert refused == {"id": 2, "served": False}  # the Studio runs it in its own process
         # A malformed line does not end the service.
         process.stdin.write(b"not json\n"); process.stdin.flush()
         assert json.loads(process.stdout.readline())["exit_code"] == 2
