@@ -37,7 +37,11 @@ def test_csv_selection_is_retained_until_run_batch_and_batch_is_confirmed() -> N
     inspection = _function(source, "_confirm_pixellab_batch_after_inspection")
     assert "dialog.confirmed.connect" in inspection
     assert '"PixelLabBatchRequestCount"' in inspection
-    assert "count * 10" in inspection
+    assert "count * PIXELLAB_GENERATIONS_PER_ATLAS" in inspection
+    # Owner 2026-11-22: the live PixelLab balance (resets on the 20th) sets the run limit;
+    # the local 200-per-UTC-month count is only the fallback when no balance was read.
+    assert "int(_pixellab_generations_remaining / PIXELLAB_GENERATIONS_PER_ATLAS)" in inspection
+    assert "const PIXELLAB_GENERATIONS_PER_ATLAS := 10" in source
     assert "_pixel_batch_rows.resize(confirmed_count)" in inspection
     assert "ALREADY_ATTEMPTED" in inspection
     assert "200 - _pixel_batch_monthly_used" in inspection

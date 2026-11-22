@@ -64,6 +64,11 @@ const STARTUP_GATED_RELEASE := ["RefreshReleasePool", "ManageSelection", "Select
 var _pixel_batch_skipped := 0
 var _pixel_batch_source_count := 0
 var _pixel_batch_monthly_used := 0
+# Owner 2026-11-22: the CSV run limit follows the live PixelLab balance (it resets on the plan's
+# renewal day, the 20th), not a fixed 200 per calendar month. -1 = balance not read yet.
+var _pixellab_generations_remaining := -1
+var _pixellab_generations_reset := ""
+const PIXELLAB_GENERATIONS_PER_ATLAS := 10
 var _pixel_art_activity_events: Array[Dictionary] = []
 var _pixel_art_activity_table: PanelContainer
 var _pixel_art_activity_grid: GridContainer
@@ -970,6 +975,8 @@ func _refresh_pixellab_credits() -> void:
 func _apply_pixellab_credits(result: Dictionary) -> void:
 	if _pixellab_credit_label == null:
 		return
+	_pixellab_generations_remaining = int(result.get("generations_remaining", -1)) if result.has("generations_remaining") else -1
+	_pixellab_generations_reset = str(result.get("generations_reset", ""))
 	if result.has("generations_remaining"):
 		var reset := str(result.get("generations_reset", ""))
 		_pixellab_credit_label.add_theme_color_override("font_color", Color("#58be82"))
@@ -3870,10 +3877,16 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 			eligible.append(row)
 	_pixel_batch_skipped = attempted_count
 	_pixel_batch_monthly_used = int(inspection.get("monthly_paid_requests", 0))
+	# The live PixelLab balance decides how many atlases this run may request (10 generations
+	# each); the local 200-per-UTC-month count is only the fallback when no balance was read.
 	var monthly_remaining := maxi(0, 200 - _pixel_batch_monthly_used)
+	var limit_text := "local monthly usage %d/200 (PixelLab balance not read)" % _pixel_batch_monthly_used
+	if _pixellab_generations_remaining >= 0:
+		monthly_remaining = int(_pixellab_generations_remaining / PIXELLAB_GENERATIONS_PER_ATLAS)
+		limit_text = "PixelLab balance %d generations left (resets %s) = %d atlases" % [_pixellab_generations_remaining, _pixellab_generations_reset if not _pixellab_generations_reset.is_empty() else "-", monthly_remaining]
 	if monthly_remaining == 0:
-		_record_pixel_art_activity("CSV RESUME CHECK", "MONTHLY LIMIT REACHED", "%d of 200 Factory-recorded paid requests are already marked this UTC month; %d previously attempted CSV rows will not be repeated." % [_pixel_batch_monthly_used, attempted_count])
-		_report("PixelLab monthly limit reached · %d/200 Factory-recorded requests · %d CSV rows already attempted" % [_pixel_batch_monthly_used, attempted_count])
+		_record_pixel_art_activity("CSV RESUME CHECK", "LIMIT REACHED", "No atlas fits the limit: %s; %d previously attempted CSV rows will not be repeated." % [limit_text, attempted_count])
+		_report("PixelLab limit reached · %s · %d CSV rows already attempted" % [limit_text, attempted_count])
 		return
 	var queue_count := mini(eligible.size(), monthly_remaining)
 	_pixel_batch_rows.clear()
@@ -3884,7 +3897,7 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 		_report("All CSV rows were already attempted; no request was repeated.")
 		return
 	var later_count := eligible.size() - queue_count
-	_record_pixel_art_activity("CSV RESUME CHECK", "READY", "Queued CSV rows %d–%d of %d; %d prior rows will be skipped, %d later rows remain for next month, local monthly usage is %d/200." % [int(_pixel_batch_rows[0].row_index), int(_pixel_batch_rows[-1].row_index), source_rows.size(), attempted_count, later_count, _pixel_batch_monthly_used])
+	_record_pixel_art_activity("CSV RESUME CHECK", "READY", "Queued CSV rows %d–%d of %d; %d prior rows will be skipped, %d later rows remain for a later run; %s." % [int(_pixel_batch_rows[0].row_index), int(_pixel_batch_rows[-1].row_index), source_rows.size(), attempted_count, later_count, limit_text])
 	var dialog := ConfirmationDialog.new()
 	dialog.title = "Confirm PixelLab Pro 4×4 batch"
 	dialog.dialog_text = ""
@@ -3914,7 +3927,7 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 		var first_row_index := int(_pixel_batch_rows[0].row_index)
 		var last_row_index := int(_pixel_batch_rows[count - 1].row_index)
 		var deferred_count := eligible.size() - attempted_count - count
-		quote_label.text = "This submits %d separate paid PixelLab Pro requests for CSV rows %d–%d at 56×56.\nEstimated use: %d credits at the owner-reported rate of 10 per atlas.\nFactory-recorded usage: %d/200 requests in %s UTC; %d previously attempted rows will be skipped.\nOther PixelLab routes or purchases are not included. %d eligible prompts will remain for a later run. No request is retried automatically. Continue?" % [count, first_row_index, last_row_index, count * 10, _pixel_batch_monthly_used, str(inspection.get("current_month_utc", "current month")), attempted_count, deferred_count]
+		quote_label.text = "This submits %d separate paid PixelLab Pro requests for CSV rows %d–%d at 56×56.\nEstimated use: %d credits at the owner-reported rate of 10 per atlas.\nLimit: %s; %d previously attempted rows will be skipped.\nOther PixelLab routes or purchases are not included. %d eligible prompts will remain for a later run. No request is retried automatically. Continue?" % [count, first_row_index, last_row_index, count * PIXELLAB_GENERATIONS_PER_ATLAS, limit_text, attempted_count, deferred_count]
 	request_count_input.value_changed.connect(update_batch_quote)
 	update_batch_quote.call(request_count_input.value)
 	confirm_content.add_child(quote_label)
