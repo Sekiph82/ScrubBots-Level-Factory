@@ -695,3 +695,7 @@ PENDING ("Solver attempt started") because their batches were interrupted before
 skipped them as already READY but never fixed the status. create_png_batch now records READY for such sources via
 transition_pipeline (test_claude_ready_excluded_status.py); the two were recorded the same way (PENDING 18 -> 16).
 Not installed yet (batch running).
+
+## 2026-11-22 — Owner Release Pool review: arctic atlas + tornado purged; deploy 7f8f631f/9f36b287
+- Owner reversed the 2026-11-14 keep decision: 16 opaque white-background frames LF-001297..001312 (only opaque READY frames in a 3060 scan) and tornado LF-001213 set REJECTED and purged (279 paths; arctic Grid Files atlas removed with its last slice). Evidence: docs/evidence/claude-reject-arctic-tornado-20261122/.
+- Deployed launcher + exact UI (new slices Pending at slicing; balance-based CSV limit). Relaunch counts: READY 3043, PENDING 736, FAILED 4, REJECTED 5.
