@@ -1086,6 +1086,7 @@ def _purge_rejected_sources(source_ids: Sequence[str]) -> dict[str, object]:
     from scrubbots_pixel_factory.owner_art_storage import purge_final_slice
     from scrubbots_pixel_factory.owner_release_library import list_records, purge_rejected_source
     from scrubbots_pixel_factory.owner_upload import owner_upload_root
+    from scrubbots_pixel_factory.supply_pipeline.release_pool import purge_candidate_entries
 
     status = {str(row.get("source_id", "")): row for row in list_records("REJECTED").get("records", []) if isinstance(row, Mapping)}
     candidates_root = (_repository_root() / "data" / "Level Factory" / "Workspace" / "Candidates").resolve()
@@ -1119,6 +1120,7 @@ def _purge_rejected_sources(source_ids: Sequence[str]) -> dict[str, object]:
                 if not empty_folder(folder):
                     skipped.append({"source_id": source_id, "reason": f"unexpected content in {folder.name}"})
             deleted += purge_rejected_source(source_id)
+            deleted += purge_candidate_entries(f"candidate-owner-{sha[:48]}")
         except (OSError, ValueError) as exc:
             skipped.append({"source_id": source_id, "reason": str(exc)[:240]})
     return {"purged": len(source_ids) - len(skipped), "skipped": skipped, "deleted": deleted}

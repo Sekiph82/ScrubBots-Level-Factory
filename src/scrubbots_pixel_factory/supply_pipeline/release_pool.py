@@ -1054,6 +1054,30 @@ def slim_release_entries() -> list[dict[str, Any]]:
     return [slim_release_entry(entry) for entry in release_entries()]
 
 
+def purge_candidate_entries(candidate_id: str) -> list[str]:
+    """Delete a purged candidate's Release Pool Ready entries, files and DB rows (owner 2026-11-22).
+
+    Called only for a source the owner rejected and purged; otherwise its old READY
+    entry keeps the level listed in the Release Pool.
+    """
+    from ..owner_art_storage import _is_reparse_point
+    if not re.fullmatch(r"candidate-owner-[0-9a-f]{48}", candidate_id):
+        raise ReleaseError("candidate identity is malformed")
+    deleted: list[str] = []
+    for path in sorted(_pool_root().glob(f"{candidate_id}-*.json")):
+        if path.is_file() and not _is_reparse_point(path):
+            path.unlink()
+            deleted.append(str(path))
+    factory_db, conn = _factory_db()
+    if conn is not None:
+        try:
+            with conn:
+                conn.execute("DELETE FROM release_entries WHERE candidate_id = ?", (candidate_id,))
+        finally:
+            conn.close()
+    return deleted
+
+
 def _factory_db():
     from .. import factory_db
     from .. import studio_extensions as studio
