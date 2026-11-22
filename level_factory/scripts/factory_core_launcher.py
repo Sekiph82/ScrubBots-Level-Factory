@@ -1158,6 +1158,36 @@ def _reject_background_atlas_frames(owner_catalog: Mapping[str, object], manifes
     return rejected
 
 
+def _register_new_final_sources_pending(owner_catalog: Mapping[str, object], manifest: Mapping[str, object],
+                                        imported_sources: list[dict[str, object]], job_id: str) -> None:
+    """Put each freshly sliced Final PNG in Release Pool PENDING right away (owner 2026-11-22).
+
+    Before, new slices became PENDING only in the next Studio startup inventory, so after a
+    46-atlas run Level Factory still showed 0 Pending for 736 new PNGs until a restart. Same
+    transition, provider and evidence as the startup inventory; a source that already has a
+    status is left alone, and a failure is recorded on the item without failing the paid job.
+    """
+    from scrubbots_pixel_factory.owner_release_library import list_records, transition
+
+    frames = {int(frame["index"]): frame for frame in manifest["frames"]}
+    for item in imported_sources:
+        source_id = str(item.get("source_id") or "")
+        if not source_id.startswith("owner-upload-"):
+            continue
+        try:
+            if list_records(source_id=source_id).get("records"):
+                continue
+            final_path = _pixellab_final_slice_path(owner_catalog, frames[int(item["index"])]).resolve()
+            transition(source_id, "PENDING", source_sha256=source_id.removeprefix("owner-upload-"), provider="PIXELLAB",
+                       original_source_path=str(final_path),
+                       reason="New SHA-verified PixelLab Final source registered when its atlas was sliced.",
+                       evidence={"inventory_source": "data/output/Pixellab/Final", "source_sha256_verified": True,
+                                 "pixellab_job_id": job_id})
+            item["release_pool_status"] = "PENDING"
+        except Exception as exc:  # the startup inventory registers it later
+            item["release_pool_status"] = f"NOT_REGISTERED: {str(exc)[:200]}"
+
+
 def _finish_pixellab_atlas_job(
     job_record: dict[str, object], persist_job: Callable[[], None], generated: object, *,
     resolved_operation_id: str, width: int, height: int, max_colors: int,
@@ -1189,6 +1219,7 @@ def _finish_pixellab_atlas_job(
             "source_id": item.get("source_id"), "reason": item.get("error", item.get("reason")),
             "sha256": frame["sha256"],
         })
+    _register_new_final_sources_pending(owner_catalog, manifest, imported_sources, generated.job_id)
     pass_count = sum(item.get("intake_status") == "PASS" for item in manifest["frames"])
     rejected_count = 16 - pass_count
     imported_source_ids = [item["source_id"] for item in imported_sources if item.get("source_id")]

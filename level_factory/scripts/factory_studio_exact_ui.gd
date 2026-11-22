@@ -3687,6 +3687,10 @@ func _poll_pixel_art_worker() -> void:
 		_report("PIXELLAB PRO · %s · %s" % [str(result.get("state", "ERROR")), str(result.get("error", result.get("reason", "No image was imported.")))])
 	var atlas_generated := _pixellab_atlas_generated(result)
 	_refresh_pixellab_credits()
+	# The backend registers each new slice as Pending when its atlas is sliced; re-read the
+	# statuses so Level Factory's Pending count follows the run, not the next startup.
+	if atlas_generated:
+		_refresh_owner_release_archive()
 	_record_pixel_art_activity("PIXELLAB RESULT", str(result.get("state", "ERROR")), _pixellab_result_detail(result) if atlas_generated else str(result.get("error", result.get("reason", "Provider returned no detailed reason."))))
 	if _pixel_batch_active:
 		# A paid row is complete once its atlas was generated and all 16 slices were
