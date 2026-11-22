@@ -2,7 +2,7 @@
 
 ## Özet (sahip için)
 
-- Kaynak: `https://colony-flow.com/all-level-walkthrough`. Sayfa engellemeden açıldı; 824 seviye görseli listeliyor (1–610 arası tam, 611–1317 arası seyrek). 824 görselin küçük kopyası geçici olarak (repo dışında) kontakt sayfalarına dizildi; bunların **576 tanesi gözle tek tek incelendi** (seviye 1–432, 481–528, 660–816 arasındaki listelenen 48 seviye, 1134–1290 arasındaki listelenen 48 seviye). Görsellerin hiçbiri repoya kopyalanmadı, geçici dosyalar silindi.
+- Kaynak: `https://colony-flow.com/all-level-walkthrough`. Sayfa engellemeden açıldı; 824 seviye görseli listeliyor (1–610 arası tam, 611–1317 arası seyrek). 824 görselin küçük kopyası geçici olarak (repo dışında) kontakt sayfalarına dizildi; bunların **576 tanesi gözle tek tek incelendi** (seviye 1–432, 481–528, 660–816 arasındaki listelenen 48 seviye, 1134–1290 arasındaki listelenen 48 seviye). Görsellerin hiçbiri repoya kopyalanmadı; geçici küçük kopyalar yalnızca Claude oturumunun geçici klasöründe (`%TEMP%\claude\...\scratchpad\cf`) duruyor, otomatik silme izni verilmedi.
 - Ortak stil: her piksel **kabartmalı, parlak bir oyuncak blok / boncuk** gibi görünüyor (her hücrede küçük üst ışık ve alt gölge). Resim kareye yakın, tek bir **ortalanmış, kalın koyu konturlu sevimli nesne** (ilk ~150 seviye) ya da arka planı tamamen dolu **sahne** (sonraki seviyeler).
 - Renk: canlı, doygun, şeker renkleri (kırmızı, turuncu, sarı, pembe, turkuaz, çimen yeşili, mor). Erken seviyelerde nesne başına ~5–10 renk, düz dolgu + 1 açık + 1 koyu ton; geç seviyelerde 15–25+ renk ve degrade.
 - Konular: meyve ve tatlılar, sevimli hayvanlar (kedi, köpek, hamster, tavşan, kurbağa, tilki, penguen, ahtapot), çiçek ve bitkiler, evler, oyuncak/eşya (TV, oyun kolu, kamera, kupa), doğa ikonları (güneş, ay, yıldız, gökkuşağı, kalp), bayram temaları ve desen/mandalalar. Çok sayıda seviye lisanslı karakter, futbol arması, bayrak ve ünlü portresi içeriyor — bunlar **bilinçli olarak dışarıda bırakıldı**.
@@ -11,7 +11,7 @@
 ## Method
 
 - Read the walkthrough page (HTTP 200, no login). It lists 824 level cards; each card is a "Colony Flow Level N Screenshot" image hosted on `gl.imgbear.xyz`. Group sub-pages `/group/100` … `/group/1400` and per-level pages `/level/N` exist; the walkthrough page already embeds every listed card, so no further pagination was needed.
-- 256 px thumbnails of all 824 cards were fetched through the site's own image endpoint into a temporary scratchpad (outside the repo), tiled into 18 contact sheets of 48, and 12 sheets (576 levels) were inspected visually. The remaining 6 sheets (levels 433–480, 529–657, 817–1131 sparse, 1294–1317; 248 cards) were not inspected. All temporary images were deleted afterwards.
+- 256 px thumbnails of all 824 cards were fetched through the site's own image endpoint into a temporary scratchpad (outside the repo), tiled into 18 contact sheets of 48, and 12 sheets (576 levels) were inspected visually. The remaining 6 sheets (levels 433–480, 529–657, 817–1131 sparse, 1294–1317; 248 cards) were not inspected. The temporary thumbnails stay in the session scratchpad (outside the repo); deleting them was not permitted in this session.
 - Per-level records are summarised by category below (level numbers are examples, not exhaustive).
 
 ## Common visual style
