@@ -38,8 +38,9 @@ MAX_PARALLEL_WORKERS = 12
 
 
 # Owner decision 2026-11-13 (morning): 6 workers, each PNG in its own process.
-# Owner trial 2026-11-23: 10 workers once a READY finish no longer holds ~2-4 GB per child.
-DEFAULT_PARALLEL_WORKERS_CAP = 10
+# Owner trial 2026-11-23: 10 workers once a READY finish no longer holds ~2-4 GB per child
+# (143 PNG/h, CPU 68%, 3.5 GB free), then 12.
+DEFAULT_PARALLEL_WORKERS_CAP = 12
 
 
 
@@ -56,7 +57,7 @@ def _run_pipeline_in_child(source_id: str, request: dict[str, Any]) -> dict[str,
 
 
 def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
-    """Concurrent canonical pipelines per batch: settings, env override, else 5/8 of the cores (max 10).
+    """Concurrent canonical pipelines per batch: settings, env override, else 3/4 of the cores (max 12).
 
     Owner request 2026-11-13: more levels per day without straining the laptop.
     Each pipeline keeps one core busy (single-threaded Godot solver/analysis) and
@@ -66,7 +67,7 @@ def parallel_workers(settings: Mapping[str, Any] | None = None) -> int:
     requested = (settings or {}).get("parallel_workers") or os.environ.get("SCRUBBOTS_FACTORY_BATCH_WORKERS")
     if requested:
         return max(1, min(MAX_PARALLEL_WORKERS, int(requested)))
-    return max(1, min(DEFAULT_PARALLEL_WORKERS_CAP, (os.cpu_count() or 4) * 5 // 8))
+    return max(1, min(DEFAULT_PARALLEL_WORKERS_CAP, (os.cpu_count() or 4) * 3 // 4))
 
 
 _POOL_SUMMARY_KEYS = ("candidate_id", "disposition", "entry_digest", "pipeline_run_id", "pool_size", "publication", "readback_verified", "reason")
