@@ -704,3 +704,9 @@ Not installed yet (batch running).
 - Root cause: _purge_rejected_sources removed status/history, Final, Imported and candidate folders but not Release Pool Ready entry files nor factory.db release_entries rows; the Release Pool list reads those. Never surfaced before because earlier purged sources were never READY.
 - Fix: release_pool.purge_candidate_entries, called by the purge. Regression test tests/unit/test_claude_purge_release_entries.py (function absent at HEAD before the fix).
 - Cleanup: 17 stale entries removed (docs/evidence/claude-reject-arctic-tornado-20261122/release-entries-purge.json). Deployed; relaunch: Release Pool 3043, READY 3043, PENDING 1550 (owner's new PixelLab output), FAILED 4, REJECTED 5.
+
+## 2026-11-23 — Batch rate 57 PNG/h traced to memory paging; worker recycling deployed (783497dc)
+- Per-PNG time unchanged vs 2026-11-17/18 (mean 335 s vs 313 s; real-play LOST retries ~2/PNG in both). Sustained rate then was 60-67/h; earlier "100-135/h" figures were short peaks.
+- Machine: CPU 22-27% of 16 threads, 0.2 GB of 15.7 GB RAM free, commit 43 GB, ~115k pages/s. Each long-lived ProcessPool child held ~3.7 GB private (an idle one 3.8 GB private / 94 MB working set); Studio UI 4.1 GB private.
+- Fix: ProcessPoolExecutor(max_tasks_per_child=PNGS_PER_WORKER_PROCESS=4); regression test seen failing before the fix; 13/13 tests in test_claude_parallel_png_batch.py pass.
+- Batch stopped with "Stop after current" (no in-flight loss), deployed, relaunched: 6.0 GB free at idle; READY 3489, PENDING 2158, FAILED 9, REJECTED 5. Rate gain not yet measured. Studio UI 4.1 GB not investigated.
