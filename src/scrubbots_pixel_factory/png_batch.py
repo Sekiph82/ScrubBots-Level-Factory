@@ -40,12 +40,6 @@ MAX_PARALLEL_WORKERS = 8
 # Owner decision 2026-11-13 (morning): 6 workers, each PNG in its own process.
 DEFAULT_PARALLEL_WORKERS_CAP = 6
 
-# Owner 2026-11-23: a long-lived child kept ~3.7 GB after its solves (Python does not
-# return freed arenas) and six of them made the 16 GB machine page (~115k pages/s,
-# ~57 PNG/h). Each child is replaced after this many PNGs; a fresh spawn costs seconds
-# against ~5 minutes per PNG.
-PNGS_PER_WORKER_PROCESS = 4
-
 
 
 def _silence_child_stdout() -> None:
@@ -1726,8 +1720,7 @@ def run_png_batch(
         # injected test runners keep using threads.
         if pipeline_runner is None:
             executor = ProcessPoolExecutor(max_workers=workers, mp_context=multiprocessing.get_context("spawn"),
-                                           initializer=_silence_child_stdout,
-                                           max_tasks_per_child=PNGS_PER_WORKER_PROCESS)
+                                           initializer=_silence_child_stdout)
         else:
             executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="png-batch")
         try:

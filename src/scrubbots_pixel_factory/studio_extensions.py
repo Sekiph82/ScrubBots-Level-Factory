@@ -1164,14 +1164,21 @@ def record_owner_review(candidate_id: str, disposition: str, reason: str = "", n
 def _enter_candidate_release_pool(candidate: Mapping[str, Any], *, pipeline: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Include a true READY candidate; owner ACCEPT is optional and never publishes."""
 
-    runs = []
-    for path in _pipeline_paths():
-        try:
-            value = _read_json(path)
-        except StudioExtensionError:
-            continue
-        if value.get("candidate_id") == candidate.get("candidate_id") and value.get("disposition") == "READY" and value.get("primary", {}).get("state") == "READY":
-            runs.append(value)
+    def ready_run(value: Mapping[str, Any]) -> bool:
+        return (value.get("candidate_id") == candidate.get("candidate_id") and value.get("disposition") == "READY"
+                and isinstance(value.get("primary"), Mapping) and value["primary"].get("state") == "READY")
+
+    # Owner 2026-11-23: a just-finished READY run is passed in; re-reading all ~3500
+    # pipeline records for it cost ~150 s and ~3.5 GB per PNG and paged the machine.
+    runs = [pipeline] if isinstance(pipeline, Mapping) and ready_run(pipeline) else []
+    if not runs:
+        for path in _pipeline_paths():
+            try:
+                value = _read_json(path)
+            except StudioExtensionError:
+                continue
+            if ready_run(value):
+                runs.append(value)
     if not runs:
         return {"disposition": "NOT_ENTERED_NOT_READY", "reason": "ACCEPT recorded, but no READY canonical ZIP run with official Difficulty V1 evidence exists."}
     run = pipeline if isinstance(pipeline, Mapping) else max(runs, key=lambda value: str(value.get("created_at", "")))
@@ -1850,7 +1857,7 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
     payload = {"schema": PIPELINE_SCHEMA, "version": 2, "run_id": run_id, "route": "ZIP_PRIMARY_SUPPLY_SOLVER_DIFFICULTY", "source_id": source_identity, "candidate_id": candidate_identity, "derived_candidate_id": candidate_identity if binding else None, "source_lineage": request_data.get("source_lineage") if binding else None, "owner_source_binding": binding or None, "request": request_data, "stages": stages, "disposition": disposition, "primary": primary, "created_at": datetime.now(timezone.utc).isoformat()}
     _write_pipeline_record(payload)
     if disposition == "READY":
-        candidate = next((item for item in list_candidates() if item.get("candidate_id") == identity), None)
+        candidate = find_candidate(identity)
         if candidate is not None:
             payload["release_pool"] = _enter_candidate_release_pool(candidate, pipeline=payload)
     emit("REVIEW", "NOT_AVAILABLE", "Owner review remains an independent decision.")

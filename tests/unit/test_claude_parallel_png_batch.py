@@ -178,8 +178,7 @@ def test_real_pipeline_runs_each_png_in_its_own_process(tmp_path: Path, monkeypa
     assert result["disposition"] == "COMPLETE"
     assert used["context"] == "spawn" and used["max_workers"] == 2 and used["shutdown"] is True
     assert used["initializer"] is png_batch._silence_child_stdout
-    # Owner 2026-11-23: long-lived children kept ~3.7 GB each and the machine paged;
-    # each child is replaced after a bounded number of PNGs.
-    assert used["max_tasks_per_child"] == png_batch.PNGS_PER_WORKER_PROCESS
+    # Children stay alive for the batch: their per-process caches are reused across PNGs.
+    assert used["max_tasks_per_child"] is None
     assert used["functions"] == [png_batch._run_pipeline_in_child] * 2
     pickle.dumps(png_batch._run_pipeline_in_child)  # importable by reference in a spawned child
