@@ -857,8 +857,7 @@ def find_candidate(candidate_id: str) -> dict[str, Any] | None:
 
     if re.fullmatch(r"[A-Za-z0-9_-]+", str(candidate_id)):
         root = (owner_art_paths(_repository_root())["workspace"] / "Candidates" / str(candidate_id)).resolve()
-        row = _candidate_row(root) if root.is_dir() else None
-        _save_candidate_disk_cache()
+        row = _candidate_row(root, disk=False) if root.is_dir() else None
         if row is not None and row["candidate_id"] == candidate_id:
             return copy.deepcopy(row)
     return next((item for item in list_candidates() if item.get("candidate_id") == candidate_id), None)
@@ -973,7 +972,7 @@ def _candidate_stamps(root: Path) -> tuple[tuple[str, int, int], ...] | None:
     return tuple(stamps)
 
 
-def _candidate_row(root: Path) -> dict[str, Any] | None:
+def _candidate_row(root: Path, *, disk: bool = True) -> dict[str, Any] | None:
     global _CANDIDATE_DISK_CACHE_DIRTY
     stamps = _candidate_stamps(root)
     if stamps is None:
@@ -981,6 +980,12 @@ def _candidate_row(root: Path) -> dict[str, Any] | None:
     cached = _CANDIDATE_ROW_CACHE.get(root)
     if cached is not None and cached[0] == stamps:
         return cached[1]
+    if not disk:
+        # One bundle validates in ~0.05 s; loading the whole 232 MB row cache for it
+        # cost ~7 s and ~2.1 GB that every batch child then kept (owner 2026-11-23).
+        row = _validated_candidate_row(root)
+        _CANDIDATE_ROW_CACHE[root] = (stamps, row)
+        return row
     disk = _candidate_disk_cache()["rows"]
     stored = disk.get(str(root))
     stamp_key = [list(item) for item in stamps]
