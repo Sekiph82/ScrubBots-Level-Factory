@@ -710,3 +710,9 @@ Not installed yet (batch running).
 - Machine: CPU 22-27% of 16 threads, 0.2 GB of 15.7 GB RAM free, commit 43 GB, ~115k pages/s. Each long-lived ProcessPool child held ~3.7 GB private (an idle one 3.8 GB private / 94 MB working set); Studio UI 4.1 GB private.
 - Fix: ProcessPoolExecutor(max_tasks_per_child=PNGS_PER_WORKER_PROCESS=4); regression test seen failing before the fix; 13/13 tests in test_claude_parallel_png_batch.py pass.
 - Batch stopped with "Stop after current" (no in-flight loss), deployed, relaunched: 6.0 GB free at idle; READY 3489, PENDING 2158, FAILED 9, REJECTED 5. Rate gain not yet measured. Studio UI 4.1 GB not investigated.
+
+## 2026-11-23 — Real cause of batch slowdown found and measured; 10 workers (08381ed7, c8225225)
+- 783497dc (worker recycling) was a wrong diagnosis: first post-deploy hour measured 46 PNG/h. Per-child memory stayed at ~525 MB through 8 real-play pre-checks and jumped to ~4 GB only in the READY finish (QA -> "pipeline completed READY", ~150 s).
+- Read-only measurements on real data, fresh process each: list_candidates() lookup 57.3 s / +3.5 GB; full pipeline scan 5.4 s; find_candidate() 7.2 s / +2.1 GB (it loaded the whole 232 MB candidate-rows cache, which every child then kept); release_entries(verify) x2 16.3 s / +2.1 GB.
+- Fix: READY finish uses find_candidate(); _enter_candidate_release_pool uses the passed READY pipeline; find_candidate validates the one bundle without the disk cache (0.05 s). After fix: lookup 0.1 s / +4 MB, verify x2 9.5 s / +13 MB. Recycling reverted.
+- Owner: default 10 parallel workers, upper bound 12. Tests: 124 passed, 4 skipped (removed 2026-11-07 evidence) + 13/13 batch tests. Deployed; Studio relaunched; Resume Batch (1967 remaining) started by Claude via GUI; 10 workers confirmed, 4.1 GB free at start. Rate measurement scheduled after one hour.
