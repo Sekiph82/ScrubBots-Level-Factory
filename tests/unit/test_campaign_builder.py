@@ -58,13 +58,13 @@ def test_plan_is_deterministic_hard_tolerance_tier_and_shortage_is_reported():
     assert all(abs(float(row["D"]) - float(row["target"])) <= 5 for row in one["slots"] if row["D"] is not None)
 
 
-def test_class_mismatch_and_invalid_owner_lock_fail_closed():
-    pool = _pool([50]); pool[0]["difficulty_class"] = "MEDIUM"
+def test_slot_is_filled_by_score_within_tolerance_not_by_stored_label_and_invalid_lock_fails_closed():
+    # Owner decision 2026-11-24: the stored label is the nearest fixed lane base; growing slot
+    # targets make it disagree with the cadence class, so only the score window decides.
+    pool = _pool([50, 60]); pool[0]["difficulty_class"] = "MEDIUM"; pool[1]["difficulty_class"] = "EASY"
     plan = build_campaign_plan(catalog={"entries": []}, authority=_authority(), pool=pool, k=1)
-    assert plan["slots"][0]["chosen_id"] is None
-    assert plan["unassigned_ready_candidates"] == ["level-000"]
+    assert plan["slots"][0]["chosen_id"] == "level-000"  # MEDIUM label, score on the EASY target
     assert pool[0]["difficulty_class"] == "MEDIUM"
-    assert any("class mismatch" in reason for candidate in plan["shortages"][0]["nearest_unused_candidates"] for reason in candidate["reasons"])
     with pytest.raises(CampaignError, match="hard-tolerance eligibility"):
         build_campaign_plan(catalog={"entries": []}, authority=_authority(), pool=_pool([60]), k=1, locks={1: "level-000"})
 

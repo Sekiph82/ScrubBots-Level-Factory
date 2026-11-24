@@ -125,13 +125,12 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         raise PublicationError(f"explicit campaign order is not valid under current progression authority: {exc}") from exc
     if abs(float(score) - float(progression["target_challenge"])) > tolerance:
         raise PublicationError("official Difficulty V1 score does not fit its explicit CampaignBuilder target")
-    difficulty_class = primary.get("difficulty", {}).get("class") if isinstance(primary.get("difficulty"), Mapping) else None
-    if difficulty_class != progression["class"]:
-        raise PublicationError("official Difficulty V1 class does not match the explicit CampaignBuilder cadence class")
+    # Owner decision 2026-11-24: the published class is the slot's cadence class; the official
+    # score must fit that slot's target (checked above), the fixed-base label is not required.
     metadata = {
         "schema": "scrubbots.level.metadata.v1", "version": 1, "builderVersion": "LevelFactory-ZIP-V02-R01/v1",
         "id": level_id, "width": level.get("width"), "height": level.get("height"), "cellCount": len(level.get("cells", [])),
-        "difficulty": primary.get("difficulty", {}).get("class") if isinstance(primary.get("difficulty"), Mapping) else None,
+        "difficulty": progression["class"],
         "challengeScore": score, "columnCount": plan.get("columnCount"), "visiblePreviewDepth": plan.get("visiblePreviewDepth"),
         "sourceCandidateId": candidate_id, "sourceArtworkSha256": candidate.get("artwork_sha256"), "sourceGridHash": candidate.get("grid_hash"),
         "sourceLineage": candidate.get("source_lineage"),

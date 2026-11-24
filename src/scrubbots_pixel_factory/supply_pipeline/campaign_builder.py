@@ -80,11 +80,14 @@ def _similarity(left: Mapping[str, Any], right: Mapping[str, Any]) -> float:
 
 
 def _eligible(item: Mapping[str, Any], target: Mapping[str, Any], tolerance: float, envelope: Mapping[str, int]) -> bool:
+    # Owner decision 2026-11-24: a slot is filled by official challenge score within the hard
+    # tolerance of its own target; the stored label (nearest fixed lane base) no longer has to
+    # match. Targets grow with the cycle, so a level-300 EASY slot wants ~32, which the fixed
+    # bases label MEDIUM; the published class is the slot's cadence class.
     score = item.get("challenge_score")
-    label = item.get("difficulty_class")
     width, height = item.get("width"), item.get("height")
     colors = item.get("used_colors", item.get("palette", []))
-    return (type(score) in {int, float} and math.isfinite(float(score)) and abs(float(score) - float(target["target_challenge"])) <= tolerance and label == target["class"]
+    return (type(score) in {int, float} and math.isfinite(float(score)) and abs(float(score) - float(target["target_challenge"])) <= tolerance
         and type(width) is int and type(height) is int and envelope["min_dimension"] <= width <= envelope["max_dimension"] and envelope["min_dimension"] <= height <= envelope["max_dimension"]
         and isinstance(colors, Sequence) and envelope["min_colors"] <= len(set(colors)) <= envelope["max_colors"])
 
@@ -248,7 +251,6 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
             prior_item = next((candidate for candidate in candidates if rows and candidate["candidate_id"] == rows[-1].get("chosen_id")), previous_catalog if not rows else None)
             for candidate in nearest[:5]:
                 score = float(candidate["challenge_score"]); reasons = []
-                if candidate.get("difficulty_class") != slot["class"]: reasons.append("class mismatch")
                 if abs(score - float(slot["target_challenge"])) > hard: reasons.append("outside hard tolerance")
                 colors = candidate.get("used_colors", candidate.get("palette", []))
                 if type(candidate.get("width")) is not int or type(candidate.get("height")) is not int or not (envelope["min_dimension"] <= candidate["width"] <= envelope["max_dimension"] and envelope["min_dimension"] <= candidate["height"] <= envelope["max_dimension"]) or not isinstance(colors, Sequence) or not (envelope["min_colors"] <= len(set(colors)) <= envelope["max_colors"]): reasons.append("outside current production envelope")
