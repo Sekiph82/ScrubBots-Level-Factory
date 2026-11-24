@@ -64,9 +64,9 @@ def _solve_variant(candidate_id: str, mean_batch: float, columns: int, keep_belo
             "reason": (payload.get("primary") or {}).get("reason"), "seconds": round(time.time() - started)}
 
 
-def _candidate(candidate_id: str, keep_below: float, dry_run: bool) -> list[dict]:
+def _candidate(candidate_id: str, keep_below: float, dry_run: bool, variants=VARIANTS) -> list[dict]:
     results = []
-    for mean_batch, columns in VARIANTS:
+    for mean_batch, columns in variants:
         try:
             result = _solve_variant(candidate_id, mean_batch, columns, keep_below, dry_run)
         except Exception as exc:  # one level must not stop the run
@@ -84,7 +84,12 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=600)
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--keep-below", type=float, default=EASY_MAX,
+                        help="keep a re-solve only below this score (43.9 = EASY, 52.4 = MEDIUM or easier)")
+    parser.add_argument("--variants", default="7:3,7:5", help="mean_batch:columns tried in order until one is kept")
+    parser.add_argument("--results", default="results.jsonl")
     args = parser.parse_args()
+    variants = tuple((float(m), int(c)) for m, c in (item.split(":") for item in args.variants.split(",")))
     db = sqlite3.connect(f"file:{REPO / 'data/Level Factory/factory.db'}?mode=ro", uri=True)
     from scrubbots_pixel_factory import factory_db
     pool = factory_db.release_entry_rows(db)
@@ -92,13 +97,14 @@ def main() -> int:
     out_dir = REPO / "data" / "Level Factory" / "Workspace" / "easy-variants"
     out_dir.mkdir(parents=True, exist_ok=True)
     done = set()
-    results_path = out_dir / "results.jsonl"
+    results_path = out_dir / args.results
     if results_path.is_file():
         done = {json.loads(line)["candidate"] for line in results_path.read_text(encoding="utf-8").splitlines() if line.strip()}
     queue = [e["candidate_id"] for e in targets if e["candidate_id"] not in done][: args.limit]
     print(f"{len(targets)} levels in [{args.min}, {args.max}); {len(queue)} queued", flush=True)
     with ProcessPoolExecutor(args.workers) as pool_executor, results_path.open("a", encoding="utf-8") as out:
-        for results in pool_executor.map(_candidate, queue, [EASY_MAX] * len(queue), [args.dry_run] * len(queue)):
+        for results in pool_executor.map(_candidate, queue, [args.keep_below] * len(queue), [args.dry_run] * len(queue),
+                                         [variants] * len(queue)):
             for result in results:
                 out.write(json.dumps(result) + "\n")
             out.flush()
