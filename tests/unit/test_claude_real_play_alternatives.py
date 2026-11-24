@@ -246,3 +246,33 @@ def test_a_won_plan_gets_fifteen_more_minutes_for_the_analysis(monkeypatch) -> N
     assert analysis
     assert analysis[0]["timeout"] == min(900, 60 + supply_optimizer.ANALYSIS_GRACE_SECONDS)
     assert result["difficulty_basis"].startswith("ScrubBots Difficulty V1")
+
+
+def test_a_slot_jammed_plan_is_repaired_and_accepted_instead_of_dropped() -> None:
+    # Owner idea 2026-11-23: the first plan jams; its WAITING batch keeps the robots it used,
+    # the rest move to its column end, the repaired order is kernel-replayed and real play wins.
+    grid = _grid()
+    optimizer, solver, used = _optimizer(grid)
+    solver.diverge = False
+    seen: list[list[list[dict]]] = []
+
+    def precheck(level, supply_columns, solution_trace):
+        seen.append(supply_columns)
+        if len(seen) == 1:
+            ci, ri, batch = next((ci, ri, b) for ci, column in enumerate(supply_columns)
+                                 for ri, b in enumerate(column) if b["amount"] >= 2)
+            slots = [{"batchId": f"alt_test-K{ci + 1}-{ri + 1:02d}", "occupied": True, "state": "WAITING",
+                      "remaining": batch["amount"] // 2}]
+            return {"won": False, "verdict": "LOST", "stuck_click": 4, "slots": slots}
+        return {"won": True, "verdict": "WON_CANONICAL"}
+
+    result = _run(optimizer, grid, used, precheck)
+
+    assert [check["won"] for check in result["real_play_prechecks"]] == [False, True]
+    assert result["real_play_prechecks"][1]["id"].endswith("-jam1")
+    first, repaired = seen
+    per_color = lambda columns: sorted((b["color"], b["amount"]) for column in columns for b in column)
+    assert sum(len(column) for column in repaired) == sum(len(column) for column in first) + 1
+    assert {c for c, _ in per_color(first)} == {c for c, _ in per_color(repaired)}
+    totals = lambda columns: {c: sum(b["amount"] for col in columns for b in col if b["color"] == c) for c, _ in per_color(columns)}
+    assert totals(first) == totals(repaired)  # robots per colour conserved

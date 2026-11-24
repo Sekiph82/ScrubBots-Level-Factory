@@ -1747,7 +1747,8 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
             emit("SOLVE", "RUNNING", f"Real-play pre-check {precheck_index[0]}: {played.get('verdict')}")
             return {"won": played.get("verdict") == "WON_CANONICAL" and played.get("searched") is False,
                     "verdict": played.get("verdict"), "stuck_click": per_dt.get("stuckClickIndex"),
-                    "clicks": per_dt.get("clicksPlaced"), "result_path": _relative(Path(gate["result_path"]))}
+                    "clicks": per_dt.get("clicksPlaced"), "slots": per_dt.get("slots"),
+                    "result_path": _relative(Path(gate["result_path"]))}
 
         emit("ANALYZE/PLAN", "RUNNING", "Canonical supply planning and bounded solver route is running.")
         from .supply_pipeline.supply_optimizer import PNG_SOLVE_TIME_LIMIT_SECONDS
