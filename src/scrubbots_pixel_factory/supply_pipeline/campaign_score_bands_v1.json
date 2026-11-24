@@ -2,19 +2,55 @@
   "schema": "scrubbots-campaign-score-bands/v1",
   "decidedBy": "owner",
   "decidedAt": "2026-11-24",
-  "reason": "The game's fixed lane bases (EASY 20, MEDIUM 40, HARD 58, VERY_HARD 76) with +/-5 tolerance leave gaps and need scores the Release Pool does not have (5655 READY levels score 19.9-62.6, none above 62.6). Contiguous bands were cut from the pool's own score distribution so a 1000-level campaign (6 EASY, 2 MEDIUM, 1 HARD, 1 VERY_HARD per 10) can be filled, with 100 VERY_HARD levels available.",
+  "reason": "Owner target for the whole pool (~6250 levels): ~3750 EASY, ~1250 MEDIUM, ~625 HARD, ~625 VERY_HARD. The game's fixed lane bases (20/40/58/76, +/-5) leave gaps and need scores the Release Pool lacks (6222 READY, max 62.6; supply changes only lower scores). VERY_HARD and HARD are the top 625 + 625 official scores (>=55.3, 53.7-55.3); the owner set the EASY edge at 49; MEDIUM levels 49-53.7 are being re-solved with small batches into EASY. Raise the edges again when new VERY_HARD art arrives after 2026-12-20.",
   "fromLevel": 201,
-  "toLevel": 1200,
+  "toLevel": 6450,
   "bands": {
-    "EASY": {"min": 0.0, "max": 43.9, "targetFrom": 36.0, "targetTo": 43.9},
-    "MEDIUM": {"min": 43.9, "max": 52.4, "targetFrom": 43.9, "targetTo": 52.4},
-    "HARD": {"min": 52.4, "max": 57.9, "targetFrom": 52.4, "targetTo": 57.9},
-    "VERY_HARD": {"min": 57.9, "max": 100.0, "targetFrom": 57.9, "targetTo": 62.6}
+    "EASY": {
+      "min": 0.0,
+      "max": 49.0,
+      "targetFrom": 42.0,
+      "targetTo": 48.9
+    },
+    "MEDIUM": {
+      "min": 49.0,
+      "max": 53.7,
+      "targetFrom": 49.0,
+      "targetTo": 53.7
+    },
+    "HARD": {
+      "min": 53.7,
+      "max": 55.3,
+      "targetFrom": 53.7,
+      "targetTo": 55.3
+    },
+    "VERY_HARD": {
+      "min": 55.3,
+      "max": 100.0,
+      "targetFrom": 55.3,
+      "targetTo": 62.6
+    }
   },
   "recoveryGuards": [
-    {"fromSlot": 3, "toSlot": 4, "minimumChallengeDrop": 3.0},
-    {"fromSlot": 5, "toSlot": 6, "minimumChallengeDrop": 8.0},
-    {"fromSlot": 8, "toSlot": 9, "minimumChallengeDrop": 3.0},
-    {"fromSlot": 10, "toNextCycleSlot": 1, "minimumChallengeDrop": 12.0}
+    {
+      "fromSlot": 3,
+      "toSlot": 4,
+      "minimumChallengeDrop": 1.0
+    },
+    {
+      "fromSlot": 5,
+      "toSlot": 6,
+      "minimumChallengeDrop": 4.0
+    },
+    {
+      "fromSlot": 8,
+      "toSlot": 9,
+      "minimumChallengeDrop": 1.0
+    },
+    {
+      "fromSlot": 10,
+      "toNextCycleSlot": 1,
+      "minimumChallengeDrop": 6.0
+    }
   ]
 }
