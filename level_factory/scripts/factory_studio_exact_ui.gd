@@ -509,7 +509,8 @@ func _apply_responsive_layout() -> void:
 			var control := node as Control
 			var position: Vector2 = base.position
 			var item_scale := center_scale
-			if position.y < 100.0:
+			var header_zoned := control.name in ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear"]
+			if position.y < 100.0 and not header_zoned:
 				position.x *= scale_x
 				item_scale = scale_x
 			elif position.x < 380.0:
@@ -1083,6 +1084,9 @@ func _refresh_selected_size_value() -> void:
 	var size_button := get_node_or_null("GenerationSize") as Button
 	if size_button != null:
 		size_button.text = _size_caption()
+		# Keep the same width as Single/Prompt: the caption must not grow the button.
+		size_button.clip_text = true
+		size_button.add_theme_font_size_override("font_size", 11)
 	if _selected_size_value != null:
 		_selected_size_value.text = "Selected Size\n%d × %d px%s" % [_width, _height, " · 4×4 / 16" if _provider_model == "PIXELLAB" else ""]
 	if _selected_size_panel != null:
@@ -2582,10 +2586,12 @@ func _verified_batch_item_for_source(source_id: String) -> Dictionary:
 
 func _build_master_controls() -> void:
 	# Header tabs are explicit, visible Godot Button controls.
-	_place_control("PixelArtTab", Rect2(365, 22, 255, 72), _show_screen.bind("PIXEL ART"))
-	_place_control("LevelFactoryTab", Rect2(633, 22, 270, 72), _show_screen.bind("LEVEL FACTORY"))
-	_place_control("ReleasePoolTab", Rect2(918, 22, 270, 72), _show_screen.bind("RELEASE POOL"))
-	_place_control("SettingsGear", Rect2(1320, 15, 55, 60), _open_settings)
+	# Owner 2026-11-24: tabs span exactly the Visual Review Canvas (389..1193, 12 px gaps);
+	# Settings sits at the far right over the Details panel, on the tabs' row.
+	_place_control("PixelArtTab", Rect2(389, 22, 260, 72), _show_screen.bind("PIXEL ART"))
+	_place_control("LevelFactoryTab", Rect2(661, 22, 260, 72), _show_screen.bind("LEVEL FACTORY"))
+	_place_control("ReleasePoolTab", Rect2(933, 22, 260, 72), _show_screen.bind("RELEASE POOL"))
+	_place_control("SettingsGear", Rect2(1398, 22, 120, 72), _open_settings)
 	# PIXEL ART actions and Batch-CSV path.
 	# Owner layout 2026-11-14: two-column rows on the left: Single|Batch, Size|Get Missing,
 	# Prompt|Generate (CSV file|Run Batch in batch mode), PixelLab credits, then the activity log.
@@ -2612,7 +2618,7 @@ func _build_master_controls() -> void:
 	_place_control("ArtworkCarouselLeft", Rect2(1208, 840, 50, 62), _page_artwork.bind(-1))
 	_place_control("ArtworkCarouselRight", Rect2(1452, 840, 50, 62), _page_artwork.bind(1))
 	# Shared canvas presentation controls are UI-only and never mutate source bytes.
-	_place_control("ZoomOut", Rect2(650, 124, 34, 34), _adjust_zoom.bind(-1.0))
+	_place_control("ZoomOut", Rect2(697, 124, 34, 34), _adjust_zoom.bind(-1.0))
 	_place_control("ZoomSlider", Rect2(735, 123, 136, 32), _set_zoom_from_pointer)
 	_place_control("ZoomIn", Rect2(875, 124, 34, 34), _adjust_zoom.bind(1.0))
 	_place_control("ZoomOneToOne", Rect2(910, 124, 50, 32), _zoom_one_to_one)
