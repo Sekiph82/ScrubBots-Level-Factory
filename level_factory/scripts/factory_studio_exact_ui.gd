@@ -49,6 +49,9 @@ var _pixel_batch_index := 0
 var _pixel_batch_succeeded := 0
 var _pixel_batch_failed := 0
 var _pixel_batch_active := false
+## Owner request 2026-11-24: "" | "PAUSE" | "STOP"; applied when the running paid row finishes.
+var _pixel_batch_control := ""
+var _pixel_batch_paused := false
 var _pixel_batch_start_after_startup := false
 var _startup_inventory_settled := false
 var _startup_release_archive_settled := false
@@ -924,6 +927,8 @@ func _control_caption(control_name: String) -> String:
 		"GenerationPrompt": "Prompt", "GenerationSize": _size_caption(),
 		"GenerationProvider": "Provider: PixelLab Pro · 4×4",
 		"SingleMode": "Single", "BatchMode": "Batch", "BatchCsvPath": "CSV file…",
+		"PausePixelBatch": "Pausing…" if _pixel_batch_control == "PAUSE" else "Pause after current",
+		"StopPixelBatch": "Stopping…" if _pixel_batch_control == "STOP" else "Stop after current",
 		"ArtworkVariation1": "Variation 1", "ArtworkVariation2": "Variation 2", "ArtworkVariation3": "Variation 3",
 		"RemoveSelected1": "×", "RemoveSelected2": "×", "RemoveSelected3": "×",
 		"ArtworkCarouselLeft": "‹", "ArtworkCarouselRight": "›", "ZoomOut": "−", "ZoomIn": "+",
@@ -2597,6 +2602,9 @@ func _build_master_controls() -> void:
 	_place_control("SingleMode", Rect2(27, 151, 160, 45), _set_generation_mode.bind("SINGLE"))
 	_place_control("BatchMode", Rect2(198, 151, 162, 45), _set_generation_mode.bind("BATCH"))
 	_place_control("BatchCsvPath", Rect2(27, 261, 160, 45), _open_batch_csv)
+	# Owner request 2026-11-24: while a CSV batch runs, CSV file|Run Batch become Pause|Stop after current.
+	_place_control("PausePixelBatch", Rect2(27, 261, 160, 45), _request_pixel_batch_control.bind("PAUSE"))
+	_place_control("StopPixelBatch", Rect2(198, 261, 162, 45), _request_pixel_batch_control.bind("STOP"))
 	_build_pixel_art_activity_table()
 	_place_control("ArtworkVariation1", Rect2(1208, 300, 92, 108), _select_artwork.bind(0))
 	_place_control("ArtworkVariation2", Rect2(1310, 300, 92, 108), _select_artwork.bind(1))
@@ -2831,7 +2839,7 @@ func _update_master_control_visibility() -> void:
 	for button in _master_buttons:
 		button.text = _control_caption(button.name)
 	var shared := ["PixelArtTab", "LevelFactoryTab", "ReleasePoolTab", "SettingsGear", "ZoomOut", "ZoomSlider", "ZoomIn", "ZoomOneToOne", "ZoomFit", "ToggleGrid"]
-	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "SyncPixelLabGallery", "GenerationPrompt", "GenerationSize", "SingleMode", "BatchMode", "BatchCsvPath", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
+	var pixel := ["GeneratePixelArt", "BatchCsvSelect", "RunBatch", "Regenerate", "EditPrompt", "AddToLevelFactory", "SyncPixelLabGallery", "GenerationPrompt", "GenerationSize", "SingleMode", "BatchMode", "BatchCsvPath", "PausePixelBatch", "StopPixelBatch", "ArtworkVariation1", "ArtworkVariation2", "ArtworkVariation3", "ArtworkCarouselLeft", "ArtworkCarouselRight"]
 	# Level/Columns/Max Robots/Background stay at their Auto/TRANSPARENT defaults and
 	# are hidden on LEVEL FACTORY (owner layout 2026-11-13).
 	var level := ["RunLevelPipeline", "SolveAgain", "PreviewReplay", "ExpandSupplyPlan", "AcceptLevel", "RejectLevel", "LevelVariation1", "LevelVariation2", "LevelVariation3", "LevelVariation4", "LevelVariation5"]
@@ -2854,8 +2862,14 @@ func _update_master_control_visibility() -> void:
 		var run_batch := get_node_or_null("RunBatch") as Button
 		var batch_select := get_node_or_null("BatchCsvSelect") as Button
 		if generate != null: generate.visible = _generation_mode == "SINGLE"
-		if batch_path != null: batch_path.visible = _generation_mode == "BATCH"
-		if run_batch != null: run_batch.visible = _generation_mode == "BATCH"
+		var batch_running := _pixel_batch_active
+		if batch_path != null: batch_path.visible = _generation_mode == "BATCH" and not batch_running
+		if run_batch != null: run_batch.visible = _generation_mode == "BATCH" and not batch_running
+		for control_name in ["PausePixelBatch", "StopPixelBatch"]:
+			var control := get_node_or_null(control_name) as Button
+			if control != null:
+				control.visible = _generation_mode == "BATCH" and batch_running
+				control.disabled = not _pixel_batch_control.is_empty()
 		if batch_select != null: batch_select.visible = false
 		_refresh_batch_csv_button()
 	if _release_candidate_scroll != null:
@@ -3700,9 +3714,12 @@ func _poll_pixel_art_worker() -> void:
 		if not row_succeeded:
 			_pixel_batch_failed += 1
 			_pixel_batch_active = false
+			call_deferred("_update_master_control_visibility")
 			var remaining := maxi(0, _pixel_batch_rows.size() - _pixel_batch_index - 1)
 			_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "STOPPED_AFTER_FAILURE"}
 			_record_pixel_art_activity("BATCH", "STOPPED_AFTER_FAILURE", "Stopped after the first unsuccessful row; %d prompts remain. No retry or additional paid request was sent." % remaining)
+			_pixel_batch_control = ""
+			_pixel_batch_paused = false
 			_report("PixelLab batch stopped after first failure · %d succeeded · %d failed · %d not sent" % [_pixel_batch_succeeded, _pixel_batch_failed, remaining])
 			_batch_csv_path = ""
 			_pixel_batch_rows.clear()
@@ -3712,6 +3729,8 @@ func _poll_pixel_art_worker() -> void:
 		_pixel_batch_succeeded += 1
 		_pixel_batch_index += 1
 		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": 0, "remaining": _pixel_batch_rows.size() - _pixel_batch_index, "state": "RUNNING"}
+		if _apply_pixel_batch_control():
+			return
 		_start_next_pixellab_batch_row()
 		return
 	if _shutdown_requested:
@@ -3736,6 +3755,15 @@ static func _pixellab_result_detail(result: Dictionary) -> String:
 
 
 func _run_batch() -> void:
+	if _pixel_batch_paused and not _pixel_batch_active and not _operation_running and _pixel_batch_index < _pixel_batch_rows.size():
+		_pixel_batch_paused = false
+		_pixel_batch_control = ""
+		_pixel_batch_active = true
+		_set_batch_action_label(false)
+		_record_pixel_art_activity("BATCH", "RESUMED", "Resumed at row %d/%d; %d prompts remain." % [_pixel_batch_index + 1, _pixel_batch_rows.size(), _pixel_batch_rows.size() - _pixel_batch_index])
+		_update_master_control_visibility()
+		_start_next_pixellab_batch_row()
+		return
 	if not _pixel_batch_active and _operation_running and not _startup_source_inventory_loaded:
 		# The Level Factory startup Final scan holds the shared flag for a minute
 		# or so; remember the press instead of silently rejecting it.
@@ -3944,6 +3972,10 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 		_pixel_batch_succeeded = 0
 		_pixel_batch_failed = 0
 		_pixel_batch_active = true
+		_pixel_batch_control = ""
+		_pixel_batch_paused = false
+		_set_batch_action_label(false)
+		_update_master_control_visibility()
 		_record_pixel_art_activity("BATCH", "CONFIRMED", "Confirmed %d PixelLab Pro requests, CSV rows %d–%d; estimated %d credits." % [_pixel_batch_rows.size(), int(_pixel_batch_rows[0].row_index), int(_pixel_batch_rows[-1].row_index), _pixel_batch_rows.size() * 10])
 		_start_next_pixellab_batch_row()
 	)
@@ -3955,9 +3987,44 @@ func _confirm_pixellab_batch_after_inspection(inspection: Dictionary, source_row
 	dialog.popup_centered()
 
 
+func _request_pixel_batch_control(action: String) -> void:
+	if not _pixel_batch_active or not _pixel_batch_control.is_empty():
+		return
+	_pixel_batch_control = action
+	var verb := "pause" if action == "PAUSE" else "stop"
+	_record_pixel_art_activity("BATCH", action + "_REQUESTED", "The running paid row finishes and is saved first; the batch will %s before sending the next request." % verb)
+	_update_master_control_visibility()
+
+
+## Applies a Pause/Stop request after a finished row. Returns true when no further row starts.
+func _apply_pixel_batch_control() -> bool:
+	if _pixel_batch_control.is_empty():
+		return false
+	var remaining := maxi(0, _pixel_batch_rows.size() - _pixel_batch_index)
+	var action := _pixel_batch_control
+	_pixel_batch_control = ""
+	_pixel_batch_active = false
+	if action == "PAUSE" and remaining > 0:
+		_pixel_batch_paused = true
+		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "PAUSED"}
+		_set_batch_action_label(true)
+		_record_pixel_art_activity("BATCH", "PAUSED", "Paused after row %d/%d; %d prompts remain. Press Resume to continue; no request was sent." % [_pixel_batch_index, _pixel_batch_rows.size(), remaining])
+	else:
+		_pixel_batch_paused = false
+		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "STOPPED_BY_OWNER"}
+		_record_pixel_art_activity("BATCH", "STOPPED_BY_OWNER", "Stopped after row %d/%d; %d prompts were not sent." % [_pixel_batch_index, _pixel_batch_rows.size(), remaining])
+		_batch_csv_path = ""
+		_pixel_batch_rows.clear()
+		_refresh_batch_csv_button()
+	_report("PixelLab batch %s · %d succeeded · %d not sent" % ["paused" if _pixel_batch_paused else "stopped", _pixel_batch_succeeded, remaining])
+	_update_master_control_visibility()
+	return true
+
+
 func _start_next_pixellab_batch_row() -> void:
 	if not _pixel_batch_active or _pixel_batch_index >= _pixel_batch_rows.size():
 		_pixel_batch_active = false
+		call_deferred("_update_master_control_visibility")
 		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": 0, "state": "COMPLETE" if _pixel_batch_failed == 0 else "COMPLETE_WITH_FAILURES"}
 		_record_pixel_art_activity("BATCH", str(_semantic_progress.state), "Batch complete: %d succeeded, %d failed, 0 remaining. No automatic retry was attempted." % [_pixel_batch_succeeded, _pixel_batch_failed])
 		_report("PixelLab batch: %d succeeded · %d failed · no retries" % [_pixel_batch_succeeded, _pixel_batch_failed])
@@ -3975,6 +4042,7 @@ func _start_next_pixellab_batch_row() -> void:
 	_record_pixel_art_activity("BATCH ROW %d/%d" % [_pixel_batch_index + 1, _pixel_batch_rows.size()], "PREPARING", "Local worker started; provider acceptance is not confirmed yet. %s" % str(row.get("prompt", "")).left(180))
 	if not _start_pixel_art_worker({"prompt": row.get("prompt", ""), "width": 56, "height": 56, "max_colors": 12, "provider": "PIXELLAB", "seed": row.get("seed", ""), "background_intent": "TRANSPARENT"}):
 		_pixel_batch_active = false
+		call_deferred("_update_master_control_visibility")
 		_pixel_batch_failed += 1
 		var remaining := maxi(0, _pixel_batch_rows.size() - _pixel_batch_index)
 		_semantic_progress = {"completed": _pixel_batch_succeeded, "failed": _pixel_batch_failed, "remaining": remaining, "state": "STOPPED_BEFORE_SUBMISSION"}
