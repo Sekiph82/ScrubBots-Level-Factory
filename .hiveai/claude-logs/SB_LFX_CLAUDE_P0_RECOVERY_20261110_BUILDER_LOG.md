@@ -737,3 +737,9 @@ Not installed yet (batch running).
 - VERY_HARD trial (row 1, LF-006379..006394) solved alone via pending-png-batch-create / png-batch-create / png-batch-run with the installed backend: 16/16 READY, official scores 35.1-55.2 (mean 46.1); none reaches the VERY_HARD band (>=57.9). Owls 48.0-55.2, foxes 45.3-52.4, stags 35.1-41.5 (FLOW). Prompt v2 written (rows 2-30, row 1 unchanged).
 - VERY_HARD trial 2 (prompt v2 row 2, LF-006395..006410): 16/16 READY, mean 53.2 (trial 1: 46.1, pool ~50), max 61.1; 2 in VERY_HARD band >=57.9 (LF-006406 61.1, LF-006409 58.9, both curled foxes), 7 HARD (52.4-57.9), LF-006401 57.7. Coverage 50% vs 36%; colour count unchanged (6.2).
 - VERY_HARD trial 3 (row 3 dressed characters, LF-006411..006426): 16/16 READY, mean 53.8, max 58.0; 1 VERY_HARD (LF-006415 58.0), 11 HARD (52.4-57.9), 3 MEDIUM, 1 EASY-band (44.6). Colours 7.7 (6-9), coverage 49%, regions 130.
+- Supply difficulty experiment (scratch harness: `_run_canonical_artwork_route` with pipeline-record and pool-entry writes disabled; forced mean batch / columns; 6 HARD 54-58 and 6 low-MEDIUM 45-47 READY levels):
+  - mean 7, 3 cols on HARD: 54.3/57.8/54.6/55.4/57.7/55.4 -> 47.3/47.9/54.4/49.9/LOST/49.2 (avg -5.7).
+  - mean 26, 5 cols on low-MEDIUM: -> 47.6/41.1/42.3/45.7/44.7/46.9 (avg -1.3).
+  - mean 26, 3 cols on HARD: -> 53.7/56.5/55.0/56.9/58.5/49.3 (avg -0.4; one into VERY_HARD band).
+  - mean 7, 5 cols on low-MEDIUM: -> 43.0/39.5/46.1/47.2/40.8/48.4 (avg -1.4; 3 of 6 into EASY band <43.9).
+  Small batches lower the official score; supply shape barely raises it. VERY_HARD must come from art; EASY can come from small-batch re-solves.
