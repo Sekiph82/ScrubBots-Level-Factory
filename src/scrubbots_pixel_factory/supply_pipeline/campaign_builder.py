@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from .progression import describe_target
+from .progression import describe_target, score_in_band
 
 
 class CampaignError(ValueError):
@@ -87,7 +87,9 @@ def _eligible(item: Mapping[str, Any], target: Mapping[str, Any], tolerance: flo
     score = item.get("challenge_score")
     width, height = item.get("width"), item.get("height")
     colors = item.get("used_colors", item.get("palette", []))
-    return (type(score) in {int, float} and math.isfinite(float(score)) and abs(float(score) - float(target["target_challenge"])) <= tolerance
+    band = target.get("band")
+    return (type(score) in {int, float} and math.isfinite(float(score))
+        and (score_in_band(float(score), {"min": band[0], "max": band[1]}) if band else abs(float(score) - float(target["target_challenge"])) <= tolerance)
         and type(width) is int and type(height) is int and envelope["min_dimension"] <= width <= envelope["max_dimension"] and envelope["min_dimension"] <= height <= envelope["max_dimension"]
         and isinstance(colors, Sequence) and envelope["min_colors"] <= len(set(colors)) <= envelope["max_colors"])
 
@@ -209,7 +211,8 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
                 same_run += 1
             recovery = int(slot["slot"]) in recovery_targets
             guard_ok = True
-            guards = authority.get("recoveryGuards", [])
+            band_policy = authority.get("campaignScoreBands")
+            guards = band_policy["recoveryGuards"] if slot.get("band") and isinstance(band_policy, Mapping) else authority.get("recoveryGuards", [])
             for guard in guards:
                 from_slot = guard.get("fromSlot")
                 previous_slot = slots[i - 1]["slot"] if i > 0 else (previous_catalog.get("slot") if previous_catalog else None)
@@ -251,14 +254,15 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
             prior_item = next((candidate for candidate in candidates if rows and candidate["candidate_id"] == rows[-1].get("chosen_id")), previous_catalog if not rows else None)
             for candidate in nearest[:5]:
                 score = float(candidate["challenge_score"]); reasons = []
-                if abs(score - float(slot["target_challenge"])) > hard: reasons.append("outside hard tolerance")
+                if slot.get("band") and not score_in_band(score, {"min": slot["band"][0], "max": slot["band"][1]}): reasons.append("outside class score band")
+                elif not slot.get("band") and abs(score - float(slot["target_challenge"])) > hard: reasons.append("outside hard tolerance")
                 colors = candidate.get("used_colors", candidate.get("palette", []))
                 if type(candidate.get("width")) is not int or type(candidate.get("height")) is not int or not (envelope["min_dimension"] <= candidate["width"] <= envelope["max_dimension"] and envelope["min_dimension"] <= candidate["height"] <= envelope["max_dimension"]) or not isinstance(colors, Sequence) or not (envelope["min_colors"] <= len(set(colors)) <= envelope["max_colors"]): reasons.append("outside current production envelope")
                 if (i, str(candidate["candidate_id"])) in blocked: reasons.append("recovery/profile/similarity constraint")
                 if prior_item is not None and 1.0 - _similarity(prior_item, candidate) < float(slot.get("novelty_target", 0.0)): reasons.append("below slot novelty target")
                 if not reasons: reasons.append("sequential guard or similarity constraint")
                 rejected.append({"candidate_id": candidate["candidate_id"], "score": score, "reasons": reasons})
-            shortages.append({"n": slot["level"], "class": slot["class"], "target": slot["target_challenge"], "allowed_range": [float(slot["target_challenge"])-hard, float(slot["target_challenge"])+hard], "nearest_unused_candidates": rejected})
+            shortages.append({"n": slot["level"], "class": slot["class"], "target": slot["target_challenge"], "allowed_range": list(slot["band"]) if slot.get("band") else [float(slot["target_challenge"])-hard, float(slot["target_challenge"])+hard], "nearest_unused_candidates": rejected})
             rows.append({"n": slot["level"], "slot": slot["slot"], "class": slot["class"], "role": slot["role"], "target": slot["target_challenge"], "chosen_id": None, "D": None, "delta": None, "tier": None, "checks": checks.get(i, {})})
             continue
         used.add(str(item["candidate_id"])); delta = abs(float(item["challenge_score"]) - float(slot["target_challenge"]))

@@ -12,7 +12,7 @@ import subprocess
 import tempfile
 from collections.abc import Mapping
 
-from .progression import ProgressionAuthorityError, challenge_tolerance, describe_target, load_progression_authority
+from .progression import ProgressionAuthorityError, challenge_tolerance, describe_target, load_progression_authority, score_in_band
 
 
 class PublicationError(ValueError):
@@ -123,7 +123,10 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
         progression = describe_target(order, authority)
     except ProgressionAuthorityError as exc:
         raise PublicationError(f"explicit campaign order is not valid under current progression authority: {exc}") from exc
-    if abs(float(score) - float(progression["target_challenge"])) > tolerance:
+    band = progression.get("band")
+    if band is not None and not score_in_band(float(score), {"min": band[0], "max": band[1]}):
+        raise PublicationError("official Difficulty V1 score is outside its CampaignBuilder class score band")
+    if band is None and abs(float(score) - float(progression["target_challenge"])) > tolerance:
         raise PublicationError("official Difficulty V1 score does not fit its explicit CampaignBuilder target")
     # Owner decision 2026-11-24: the published class is the slot's cadence class; the official
     # score must fit that slot's target (checked above), the fixed-base label is not required.
