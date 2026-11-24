@@ -103,11 +103,13 @@ class NoValidSupply(RuntimeError):
 class SupplyOptimizer:
     """Deterministic ZIP-derived pipeline for an image or exact logical cells."""
 
-    def __init__(self, rules, solver=None, column_count=None, mean_batch=None):
+    def __init__(self, rules, solver=None, column_count=None, mean_batch=None, score_band=None):
         self.rules = rules
         # Owner 2026-11-24: an EASY difficulty variant re-solves a READY level with small
         # batches (the experiment lowered official scores by ~2-10 points).
         self.mean_batch = float(mean_batch) if mean_batch is not None else None
+        # Owner 2026-11-24: rank screened plans for an explicit band (e.g. VERY_HARD_PLUS).
+        self.score_band = score_band
         self.column_count = validate_column_count(
             getattr(rules, "column_count", DEFAULT_COLUMN_COUNT)
             if column_count is None else column_count
@@ -304,7 +306,7 @@ class SupplyOptimizer:
         metric_top = max(4, min(metric_top, 2400 // max(steps, 1)))
         for candidate in pool[:metric_top]:
             candidate["metrics"] = scorer.metrics(candidate["columns"], candidate["screen"]["trace"])
-            candidate["score"], candidate["score_parts"] = scorer.score(candidate["metrics"], band)
+            candidate["score"], candidate["score_parts"] = scorer.score(candidate["metrics"], self.score_band or band)
             scored.append(candidate)
         scored.sort(key=lambda item: (-item["score"], item["id"]))
         log("best screening scores: " + ", ".join(f"{p['id']}={p['score']}" for p in scored[:5]))

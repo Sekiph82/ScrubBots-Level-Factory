@@ -11,6 +11,9 @@ TARGETS = {  # (low, high) seeds
     "MEDIUM":    {"dead": (0.08, 0.25), "forced": (0.20, 0.45), "slot": (0.30, 0.60)},
     "HARD":      {"dead": (0.18, 0.38), "forced": (0.30, 0.55), "slot": (0.40, 0.70)},
     "VERY_HARD": {"dead": (0.28, 0.50), "forced": (0.35, 0.65), "slot": (0.50, 0.80)},
+    # Owner 2026-11-24: VERY_HARD variants of upper HARD levels prefer the most pressuring
+    # plans (official B and S separate VERY_HARD from HARD); slot-jam repair rescues them.
+    "VERY_HARD_PLUS": {"dead": (0.40, 0.65), "forced": (0.50, 0.80), "slot": (0.65, 0.95)},
 }
 
 
