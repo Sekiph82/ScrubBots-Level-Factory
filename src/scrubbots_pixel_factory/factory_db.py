@@ -296,7 +296,9 @@ def release_entry_rows(conn: sqlite3.Connection, candidate_id: str | None = None
     if candidate_id is not None:
         sql += " AND candidate_id = ?"; args = (candidate_id,)
     best: dict[str, dict[str, Any]] = {}
-    for (text,) in conn.execute(sql + " ORDER BY candidate_id, pipeline_run_id", args):
+    # Newest READY run wins (an EASY difficulty variant re-solve supersedes the older run), as in
+    # the verified read; the random run id alone made the choice arbitrary.
+    for (text,) in conn.execute(sql + " ORDER BY candidate_id, json_extract(entry_json, '$.pipeline.created_at'), pipeline_run_id", args):
         entry = json.loads(text)
         current = best.get(entry["candidate_id"])
         if current is None or (entry.get("eligibility_source") == "OWNER_ACCEPT") >= (current.get("eligibility_source") == "OWNER_ACCEPT"):
@@ -313,7 +315,8 @@ def slim_release_entry_rows(conn: sqlite3.Connection) -> list[dict[str, Any]]:
             " json_extract(entry_json, '$.pipeline.primary.column_count'), json_extract(entry_json, '$.pipeline.primary.level_id'),"
             " json_extract(entry_json, '$.pipeline.primary.difficulty.class'), json_extract(entry_json, '$.candidate.level_id'),"
             " json_extract(entry_json, '$.candidate.candidate_id')"
-            " FROM release_entries WHERE folder = 'Ready' ORDER BY candidate_id, pipeline_run_id"):
+            " FROM release_entries WHERE folder = 'Ready'"
+            " ORDER BY candidate_id, json_extract(entry_json, '$.pipeline.created_at'), pipeline_run_id"):
         entry = json.loads(text)
         entry["pipeline"] = {"run_id": entry.get("pipeline_run_id"), "primary": {
             "disposition": disposition, "state": state, "column_count": columns, "level_id": level_id,

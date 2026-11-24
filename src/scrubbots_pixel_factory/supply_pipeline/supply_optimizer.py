@@ -103,8 +103,11 @@ class NoValidSupply(RuntimeError):
 class SupplyOptimizer:
     """Deterministic ZIP-derived pipeline for an image or exact logical cells."""
 
-    def __init__(self, rules, solver=None, column_count=None):
+    def __init__(self, rules, solver=None, column_count=None, mean_batch=None):
         self.rules = rules
+        # Owner 2026-11-24: an EASY difficulty variant re-solves a READY level with small
+        # batches (the experiment lowered official scores by ~2-10 points).
+        self.mean_batch = float(mean_batch) if mean_batch is not None else None
         self.column_count = validate_column_count(
             getattr(rules, "column_count", DEFAULT_COLUMN_COUNT)
             if column_count is None else column_count
@@ -166,7 +169,7 @@ class SupplyOptimizer:
     def prepare_grid(self, grid, used):
         m = self.analyzer.analyze(grid, used)
         band = self.model.band_for(m["image_complexity_score"])
-        mean = self.model.mean_batch_size(m["image_complexity_score"], band)
+        mean = self.mean_batch if self.mean_batch is not None else self.model.mean_batch_size(m["image_complexity_score"], band)
         total, rows = self.model.plan_size(m["playable_pixels"], mean, self.column_count)
         return grid, used, m, band, mean, total, rows
 

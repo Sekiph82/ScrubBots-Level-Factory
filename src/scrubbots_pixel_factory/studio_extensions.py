@@ -1754,7 +1754,8 @@ def _run_canonical_artwork_route(*, identity: str, cells: Sequence[str], width: 
         from .supply_pipeline.supply_optimizer import PNG_SOLVE_TIME_LIMIT_SECONDS
         import time as _time
         wall_deadline = _time.time() + PNG_SOLVE_TIME_LIMIT_SECONDS
-        result = SupplyOptimizer(rules).run_grid(
+        mean_batch = request_data.get("mean_batch")
+        result = SupplyOptimizer(rules, mean_batch=float(mean_batch) if mean_batch is not None else None).run_grid(
             grid, used, seed=int(request_data.get("seed", 0)), candidates=int(request_data.get("candidates", 300)),
             level_id=level_id, verify_top=int(request_data.get("verify_top", 1)),
             screen_budget=int(request_data.get("screen_budget", 3000)), metric_top=int(request_data.get("metric_top", 12)),
