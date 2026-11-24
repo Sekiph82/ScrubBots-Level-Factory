@@ -743,3 +743,4 @@ Not installed yet (batch running).
   - mean 26, 3 cols on HARD: -> 53.7/56.5/55.0/56.9/58.5/49.3 (avg -0.4; one into VERY_HARD band).
   - mean 7, 5 cols on low-MEDIUM: -> 43.0/39.5/46.1/47.2/40.8/48.4 (avg -1.4; 3 of 6 into EASY band <43.9).
   Small batches lower the official score; supply shape barely raises it. VERY_HARD must come from art; EASY can come from small-batch re-solves.
+- VERY_HARD trial 4 (row 4 sleeping dressed animals, LF-006427..006442): 16/16 READY, mean 53.9 (best), max 59.6; 2 VERY_HARD (LF-006427 59.6, LF-006439 58.5), 10 HARD, 4 MEDIUM. Deployed b75c84fd/c29e0a0d with Studio closed after the atlas; Studio relaunched.
