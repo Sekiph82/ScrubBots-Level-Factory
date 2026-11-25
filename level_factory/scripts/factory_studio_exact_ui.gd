@@ -127,6 +127,12 @@ var _settings_python: LineEdit
 var _settings_game: LineEdit
 var _settings_godot: LineEdit
 var _settings_real_play_timeout: LineEdit
+var _game_release_count := 800
+var _game_release_plan: Dictionary = {}
+var _game_release_busy := false
+var _game_release_count_dialog: ConfirmationDialog
+var _game_release_count_spin: SpinBox
+var _game_release_send_dialog: ConfirmationDialog
 var _release_search: LineEdit
 var _release_filter_dialog: ConfirmationDialog
 var _filter_difficulty: OptionButton
@@ -941,8 +947,8 @@ func _control_caption(control_name: String) -> String:
 		"RefreshReleasePool": "Refresh", "SelectReleaseLevel": "Select level", "ReleaseSearch": "Search levels",
 		"DifficultyFilter": "Difficulty", "ColumnsFilter": "Columns", "ManageSelection": "Manage Selection",
 		"SelectAllRelease": "Select All", "ClearRelease": "Clear", "ReleaseStaging": "STAGING",
-		"ReleaseProduction": "PRODUCTION", "PreflightRelease": "Preflight", "ValidateReleaseAssets": "Validate Assets",
-		"BuildReleasePack": "Build Scrubpack", "UploadR2Status": "Upload Status",
+		"ReleaseProduction": "PRODUCTION", "PreflightRelease": "Preflight", "ValidateReleaseAssets": "Levels to add: %d" % _game_release_count,
+		"BuildReleasePack": "Plan Game Release", "UploadR2Status": "Send to Game",
 		"UploadSelected": "Upload Selected", "PreviewReleaseManifest": "Preview Manifest",
 		"ReleaseStagingHelp": "ⓘ", "ReleaseProductionHelp": "ⓘ", "PreflightReleaseHelp": "ⓘ",
 		"ValidateReleaseAssetsHelp": "ⓘ", "BuildReleasePackHelp": "ⓘ", "UploadR2StatusHelp": "ⓘ",
@@ -2661,9 +2667,9 @@ func _build_master_controls() -> void:
 	_place_control("ReleaseStaging", Rect2(1215, 398, 280, 36), _set_release_target.bind("STAGING"))
 	_place_control("ReleaseProduction", Rect2(1215, 438, 280, 36), _set_release_target.bind("PRODUCTION"))
 	_place_control("PreflightRelease", Rect2(1207, 485, 291, 40), _preflight_release)
-	_place_control("ValidateReleaseAssets", Rect2(1207, 530, 291, 36), _show_publish_stage.bind("VALIDATE_ASSETS"))
-	_place_control("BuildReleasePack", Rect2(1207, 568, 291, 36), _show_publish_stage.bind("BUILD_SCRUBPACK"))
-	_place_control("UploadR2Status", Rect2(1207, 606, 291, 36), _show_publish_stage.bind("UPLOAD_R2"))
+	_place_control("ValidateReleaseAssets", Rect2(1207, 530, 291, 36), _open_game_release_count)
+	_place_control("BuildReleasePack", Rect2(1207, 568, 291, 36), _plan_game_release)
+	_place_control("UploadR2Status", Rect2(1207, 606, 291, 36), _confirm_send_to_game)
 	_place_control("UploadSelected", Rect2(1207, 648, 291, 54), _upload_selected)
 	_place_control("PreviewReleaseManifest", Rect2(1207, 713, 291, 50), _preview_release_manifest)
 	_place_release_help_control("ReleaseStagingHelp", "ReleaseStaging", Rect2(1466, 398, 32, 36))
@@ -2689,9 +2695,9 @@ func _show_release_action_help(action_name: String) -> void:
 		"ReleaseStaging": "Selects STAGING as the next release target. This does not upload or publish anything.",
 		"ReleaseProduction": "Selects PRODUCTION as the target. A real promotion still requires a verified STAGING manifest and explicit owner confirmation.",
 		"PreflightRelease": "Runs the canonical release preflight for the currently selected READY candidate IDs and target. A passing result is shown only when returned by the backend.",
-		"ValidateReleaseAssets": "Status only: displays the most recent preflight validation state. It does not start asset validation.",
-		"BuildReleasePack": "Status only: displays the most recent preflight pack-build state. It does not build or upload a pack.",
-		"UploadR2Status": "Status only: displays the most recent preflight upload state. It does not upload to R2.",
+		"ValidateReleaseAssets": "Sets how many Release Pool levels the next game release adds after the game's current last level.",
+		"BuildReleasePack": "Builds the release plan: picks that many Release Pool levels in the game's EASY/MEDIUM/HARD/VERY_HARD cadence. Nothing is written to the game.",
+		"UploadR2Status": "After your confirmation, writes the planned levels into the local ScrubBots game (one catalog commit, checked with Godot). Players get them in the next game build.",
 		"UploadSelected": "Submits the selected READY candidate IDs to the selected target. STAGING uploads through the canonical publisher; PRODUCTION requires the exact owner-confirmation flow.",
 		"PreviewReleaseManifest": "Shows the most recent verified preflight manifest. It does not run preflight or publish; run Preflight separately first."
 	}
@@ -5591,6 +5597,10 @@ func _poll_studio_read_extension() -> void:
 			var entries: Array = _release_pool.get("entries", [])
 			_append_release_pool_activity("REFRESH POOL", str(_release_pool.get("state", _release_pool.get("disposition", "UNAVAILABLE"))), "entries=%d; visible after filters=%d" % [entries.size(), _visible_release_ids.size()], _selected_release_ids)
 			_report("READY levels: %s" % str(_release_pool.get("pool_size", 0)))
+	elif kind == "game-release-plan":
+		_apply_game_release_plan(result)
+	elif kind == "game-release-send":
+		_apply_game_release_send(result)
 	elif kind == "restore-batch-run":
 		_apply_restored_batch_run(result, context)
 	elif kind == "restore-selected-source":
@@ -5700,6 +5710,117 @@ func _publish_staging() -> void:
 	})
 	_append_release_pool_activity("STAGING UPLOAD", str(result.get("state", result.get("disposition", "UNAVAILABLE"))), _release_activity_result_detail(result), _selected_release_ids)
 	_report("STAGING: %s" % str(result.get("state", result.get("disposition", "UNAVAILABLE"))))
+
+
+# Owner 2026-11-25: Release Pool sends an owner-chosen number of levels into the game build.
+func _open_game_release_count() -> void:
+	if _game_release_count_dialog == null:
+		_game_release_count_dialog = ConfirmationDialog.new()
+		_game_release_count_dialog.title = "Levels to add to the game"
+		_game_release_count_spin = SpinBox.new()
+		_game_release_count_spin.min_value = 1
+		_game_release_count_spin.max_value = 1000
+		_game_release_count_spin.step = 1
+		_game_release_count_dialog.add_child(_game_release_count_spin)
+		_game_release_count_dialog.confirmed.connect(_apply_game_release_count)
+		add_child(_game_release_count_dialog)
+	_game_release_count_spin.value = _game_release_count
+	_game_release_count_dialog.popup_centered(Vector2i(360, 120))
+
+
+func _apply_game_release_count() -> void:
+	_game_release_count = int(_game_release_count_spin.value)
+	_game_release_plan = {}
+	var button := get_node_or_null("ValidateReleaseAssets") as Button
+	if button != null:
+		button.text = _control_caption("ValidateReleaseAssets")
+	_append_release_pool_activity("GAME RELEASE", "COUNT SET", "levels to add=%d; build the plan next" % _game_release_count)
+
+
+func _plan_game_release() -> void:
+	if _game_release_busy:
+		_report("A game release step is already running.")
+		return
+	_game_release_busy = true
+	_game_release_plan = {}
+	_append_release_pool_activity("GAME RELEASE PLAN", "STARTED", "levels to add=%d; reading the Release Pool (about a minute)" % _game_release_count)
+	_report("Planning %d levels for the game..." % _game_release_count)
+	if not _queue_studio_read_extension("campaign-build", {"k": _game_release_count, "locks": {}}, {"kind": "game-release-plan"}):
+		_game_release_busy = false
+		_append_release_pool_activity("GAME RELEASE PLAN", "UNAVAILABLE", "Studio service could not start the planner.")
+
+
+func _game_release_summary(plan: Dictionary) -> String:
+	var classes := {}
+	var first := 0
+	var last := 0
+	for row in plan.get("slots", []):
+		if row.get("chosen_id") == null:
+			continue
+		var cls := str(row.get("class", "?"))
+		classes[cls] = int(classes.get(cls, 0)) + 1
+		if first == 0:
+			first = int(row.get("n", 0))
+		last = int(row.get("n", 0))
+	var parts := PackedStringArray()
+	for cls in ["EASY", "MEDIUM", "HARD", "VERY_HARD"]:
+		parts.append("%s %d" % [cls, int(classes.get(cls, 0))])
+	return "levels %d..%d (%d) · %s · shortages %d" % [first, last, plan.get("publishable_prefix", []).size(), " · ".join(parts), plan.get("shortages", []).size()]
+
+
+func _apply_game_release_plan(result: Dictionary) -> void:
+	_game_release_busy = false
+	if str(result.get("plan_hash", "")).is_empty():
+		var reason := str(result.get("error", result.get("reason", result.get("state", "planner returned no plan"))))
+		_append_release_pool_activity("GAME RELEASE PLAN", "FAILED", reason.left(300))
+		_report("Game release plan failed: %s" % reason.left(160))
+		return
+	_game_release_plan = result
+	var summary := _game_release_summary(result)
+	_append_release_pool_activity("GAME RELEASE PLAN", "READY", summary)
+	_report("Plan ready: %s" % summary)
+
+
+func _confirm_send_to_game() -> void:
+	if _game_release_busy:
+		_report("A game release step is already running.")
+		return
+	if str(_game_release_plan.get("plan_hash", "")).is_empty() or _game_release_plan.get("publishable_prefix", []).is_empty():
+		_append_release_pool_activity("SEND TO GAME", "BLOCKED", "Build the game release plan first.")
+		_report("Build the game release plan first.")
+		return
+	if _game_release_send_dialog == null:
+		_game_release_send_dialog = ConfirmationDialog.new()
+		_game_release_send_dialog.title = "Send levels to the game"
+		_game_release_send_dialog.confirmed.connect(_send_to_game)
+		add_child(_game_release_send_dialog)
+	_game_release_send_dialog.dialog_text = "Write these levels into the ScrubBots game?\n\n%s\n\nPlayers get them in the next game build." % _game_release_summary(_game_release_plan)
+	_game_release_send_dialog.popup_centered(Vector2i(620, 200))
+
+
+func _send_to_game() -> void:
+	_game_release_busy = true
+	_append_release_pool_activity("SEND TO GAME", "STARTED", _game_release_summary(_game_release_plan))
+	_report("Sending levels to the game...")
+	if not _queue_studio_read_extension("campaign-publish", {"plan_hash": str(_game_release_plan.get("plan_hash", ""))}, {"kind": "game-release-send"}):
+		_game_release_busy = false
+		_append_release_pool_activity("SEND TO GAME", "UNAVAILABLE", "Studio service could not start the publisher.")
+
+
+func _apply_game_release_send(result: Dictionary) -> void:
+	_game_release_busy = false
+	_game_release_plan = {}
+	if str(result.get("disposition", "")) != "PUBLISHED":
+		var reason := str(result.get("error", result.get("reason", result.get("state", "publisher returned no result"))))
+		_append_release_pool_activity("SEND TO GAME", "FAILED", reason.left(300))
+		_report("Send to game failed: %s" % reason.left(160))
+		return
+	var orders: Array = result.get("orders", [])
+	var first := str(orders.front()) if not orders.is_empty() else "-"
+	var last := str(orders.back()) if not orders.is_empty() else "-"
+	var detail := "%d levels written: %s..%s · catalog %s" % [orders.size(), first, last, str(result.get("catalog_sha256", "")).left(12)]
+	_append_release_pool_activity("SEND TO GAME", "PUBLISHED", detail)
+	_report("Sent to game: %s" % detail)
 
 
 func _finish_generation(result: Dictionary) -> void:

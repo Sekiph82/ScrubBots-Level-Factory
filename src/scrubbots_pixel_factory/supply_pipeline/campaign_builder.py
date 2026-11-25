@@ -94,35 +94,6 @@ def _eligible(item: Mapping[str, Any], target: Mapping[str, Any], tolerance: flo
         and isinstance(colors, Sequence) and envelope["min_colors"] <= len(set(colors)) <= envelope["max_colors"])
 
 
-def _assignment(costs: list[list[int]]) -> list[int]:
-    """Rectangular Hungarian algorithm. Returns one column for each row."""
-    n = len(costs)
-    if not n: return []
-    m = len(costs[0])
-    u = [0] * (n + 1); v = [0] * (m + 1); p = [0] * (m + 1); way = [0] * (m + 1)
-    for i in range(1, n + 1):
-        p[0] = i; j0 = 0; minv = [10**30] * (m + 1); used = [False] * (m + 1)
-        while True:
-            used[j0] = True; i0 = p[j0]; delta = 10**30; j1 = 0
-            for j in range(1, m + 1):
-                if used[j]: continue
-                cur = costs[i0 - 1][j - 1] - u[i0] - v[j]
-                if cur < minv[j]: minv[j] = cur; way[j] = j0
-                if minv[j] < delta or minv[j] == delta and j < j1: delta = minv[j]; j1 = j
-            for j in range(m + 1):
-                if used[j]: u[p[j]] += delta; v[j] -= delta
-                else: minv[j] -= delta
-            j0 = j1
-            if p[j0] == 0: break
-        while True:
-            j1 = way[j0]; p[j0] = p[j1]; j0 = j1
-            if j0 == 0: break
-    result = [-1] * n
-    for j in range(1, m + 1):
-        if p[j]: result[p[j] - 1] = j - 1
-    return result
-
-
 def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, Any], pool: Sequence[Mapping[str, Any]], k: int = 100, locks: Mapping[int, str] | None = None) -> dict[str, Any]:
     if type(k) is not int or not 1 <= k <= 1000: raise CampaignError("K must be an integer from 1 through 1000")
     entries = catalog.get("entries")
@@ -179,28 +150,34 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
     candidate_indices = {identity: i for i, identity in enumerate(ids)}
     for number, identity in lock_map.items():
         if identity not in candidate_indices or not _eligible(candidates[candidate_indices[identity]], slots[slot_indices[number]], hard, envelope): raise CampaignError("locked candidate fails current class, envelope, or hard-tolerance eligibility")
-    assigned: list[int] = []
+    def metric(candidate: Mapping[str, Any], index: int) -> float:
+        values = candidate.get("challenge_vector", [])
+        return float(values[index]) if isinstance(values, Sequence) and len(values) > index else 0.0
+    # Profile rotation/recovery use measured pool medians, not copied score bands.
+    w_median = sorted(metric(c, 0) for c in candidates)[len(candidates)//2] if candidates else 0.0
+    u_median = sorted(metric(c, 3) for c in candidates)[len(candidates)//2] if candidates else 0.0
+    b_median = sorted(metric(c, 4) for c in candidates)[len(candidates)//2] if candidates else 0.0
+    # ponytail: greedy slot-by-slot pick (nearest eligible score that passes the sequence checks);
+    # a global optimum is not needed with thousands of candidates and the old Hungarian+retry did not finish.
+    by_score = sorted(range(len(candidates)), key=lambda ci: float(candidates[ci]["challenge_score"]))
+    scores = [float(candidates[ci]["challenge_score"]) for ci in by_score]
+    import bisect
+    chosen: list[dict[str, Any] | None] = []
     checks: dict[int, dict[str, Any]] = {}
-    # Resolve sequential constraints by excluding the offending edge, then re-run
-    # the global assignment. Every retry strictly removes an edge, so it ends.
-    for _ in range(max(1, k * max(1, len(candidates)) + 1)):
-        width = len(candidates) + len(slots)
-        costs: list[list[int]] = []
-        for si, target in enumerate(slots):
-            row = []
-            for ci, item in enumerate(candidates):
-                delta = abs(float(item["challenge_score"]) - float(target["target_challenge"]))
-                tier_penalty = 0 if delta <= preferred else 2000 if delta <= default else 8000
-                lock_for_slot = lock_map.get(int(target["level"]))
-                locked_elsewhere = ids[ci] in lock_map.values() and lock_for_slot != ids[ci]
-                row.append(10**12 if not _eligible(item, target, hard, envelope) or (si, ids[ci]) in blocked or locked_elsewhere or lock_for_slot is not None and ids[ci] != lock_for_slot else round(delta * 1000) * 100 + tier_penalty + ci)
-            row.extend([10**9 + di for di in range(len(slots))])
-            costs.append(row)
-        assigned = _assignment(costs)
-        chosen: list[dict[str, Any] | None] = [candidates[col] if 0 <= col < len(candidates) and costs[i][col] < 10**9 else None for i, col in enumerate(assigned)]
-        violation = None; checks = {}
-        for i, (slot, item) in enumerate(zip(slots, chosen)):
-            if item is None: continue
+    taken: set[str] = set(lock_map.values())
+    for i, slot in enumerate(slots):
+        lock = lock_map.get(int(slot["level"]))
+        if lock is not None:
+            options = [candidate_indices[lock]]
+        else:
+            band = slot.get("band")
+            low, high = (float(band[0]), float(band[1])) if band else (float(slot["target_challenge"]) - hard, float(slot["target_challenge"]) + hard)
+            window = by_score[bisect.bisect_left(scores, low):bisect.bisect_right(scores, high)]
+            options = sorted((ci for ci in window if ids[ci] not in taken and _eligible(candidates[ci], slot, hard, envelope)),
+                             key=lambda ci: (abs(float(candidates[ci]["challenge_score"]) - float(slot["target_challenge"])), ci))
+        pick = None
+        for ci in options:
+            item = candidates[ci]
             prev = chosen[i - 1] if i else previous_catalog
             profile = str(item["dominant_profile"])
             prior_sequence = catalog_history + [entry for entry in chosen[:i]]
@@ -219,14 +196,6 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
                 destinations = [guard[key] for key in ("toSlot", "toNextCycleSlot") if key in guard]
                 if slot["slot"] in destinations and previous_slot == from_slot and prev is not None:
                     guard_ok &= float(prev["challenge_score"]) - float(item["challenge_score"]) >= float(guard["minimumChallengeDrop"])
-            # Profile rotation/recovery use measured pool medians, not copied score bands.
-            vector = item.get("challenge_vector", [0] * 7)
-            def metric(candidate: Mapping[str, Any], index: int) -> float:
-                values = candidate.get("challenge_vector", [])
-                return float(values[index]) if isinstance(values, Sequence) and len(values) > index else 0.0
-            w_median = sorted(metric(c, 0) for c in candidates)[len(candidates)//2] if candidates else 0.0
-            u_median = sorted(metric(c, 3) for c in candidates)[len(candidates)//2] if candidates else 0.0
-            b_median = sorted(metric(c, 4) for c in candidates)[len(candidates)//2] if candidates else 0.0
             low_b_recovery_ok = not recovery or metric(item, 4) <= b_median
             low_u_recovery_ok = not recovery or metric(item, 3) <= u_median
             high_w_adjacency_ok = prev is None or not (metric(item, 0) > w_median and metric(prev, 0) > w_median)
@@ -237,13 +206,18 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
             novelty_ok = novelty + 1e-12 >= float(slot.get("novelty_target", 0.0))
             limit = authority.get("campaignBuilder", {}).get("maxConsecutiveSimilarity") if isinstance(authority.get("campaignBuilder"), Mapping) else None
             similarity_ok = True if limit is None else similarity < float(limit)
-            checks[i] = {"recovery_guard": guard_ok, "recovery_profile_target_slot": recovery, "profile": profile_ok, "profile_run_ok": same_run <= 2, "high_w_adjacency_ok": high_w_adjacency_ok, "high_b_adjacency_ok": high_b_adjacency_ok, "low_u_recovery_ok": low_u_recovery_ok, "low_b_recovery_ok": low_b_recovery_ok, "profile_medians": {"W": w_median, "U": u_median, "B": b_median}, "similarity": similarity, "novelty_score": novelty, "novelty_target": float(slot.get("novelty_target", 0.0)), "novelty_ok": novelty_ok, "similarity_ok": similarity_ok, "similarity_limit_configured": limit is not None}
-            if not guard_ok or not profile_ok or not similarity_ok or not novelty_ok:
-                if int(slot["level"]) in lock_map: raise CampaignError("locked candidate violates a current sequence constraint")
-                violation = (i, str(item["candidate_id"])); break
-        if violation is None: break
-        blocked.add(violation)
-    chosen = [candidates[col] if 0 <= col < len(candidates) and costs[i][col] < 10**9 else None for i, col in enumerate(assigned)]
+            check = {"recovery_guard": guard_ok, "recovery_profile_target_slot": recovery, "profile": profile_ok, "profile_run_ok": same_run <= 2, "high_w_adjacency_ok": high_w_adjacency_ok, "high_b_adjacency_ok": high_b_adjacency_ok, "low_u_recovery_ok": low_u_recovery_ok, "low_b_recovery_ok": low_b_recovery_ok, "profile_medians": {"W": w_median, "U": u_median, "B": b_median}, "similarity": similarity, "novelty_score": novelty, "novelty_target": float(slot.get("novelty_target", 0.0)), "novelty_ok": novelty_ok, "similarity_ok": similarity_ok, "similarity_limit_configured": limit is not None}
+            # Owner decision 2026-11-25: novelty is reported, not a gate. Every pool image is 56x56, so the
+            # dimension term alone makes similarity >= 1/3 and no adjacent pair reaches novelty 0.55.
+            if guard_ok and profile_ok and similarity_ok:
+                pick = item; checks[i] = check; break
+            if lock is not None: raise CampaignError("locked candidate violates a current sequence constraint")
+            blocked.add((i, ids[ci]))
+        chosen.append(pick)
+        if pick is None:
+            chosen.extend([None] * (len(slots) - len(chosen)))
+            break
+        taken.add(str(pick["candidate_id"]))
     used: set[str] = set(); rows = []; shortages = []; stopped = False
     for i, (slot, item) in enumerate(zip(slots, chosen)):
         if item is not None and str(item["candidate_id"]) in used: item = None
@@ -272,6 +246,8 @@ def build_campaign_plan(*, catalog: Mapping[str, Any], authority: Mapping[str, A
     body = {"schema": "scrubbots-campaign-plan/v1", "inputs": {"catalog_digest": _digest(catalog), "authority_digest": _digest(authority), "pool_digest": pool_digest}, "K": k, "slots": rows, "shortages": shortages, "publishable_prefix": [r["n"] for r in rows if r["chosen_id"] is not None][:next((i for i,r in enumerate(rows) if r["chosen_id"] is None),len(rows))], "unassigned_ready_candidates": [str(item["candidate_id"]) for item in candidates if str(item["candidate_id"]) not in used], "warnings": []}
     if any(not row.get("checks", {}).get("similarity_limit_configured", True) for row in rows if row.get("chosen_id")):
         body["warnings"].append("Current game authority does not configure a consecutive similarity maximum; similarity is reported using the game analyzer formula without rejecting candidates.")
+    if any(not row.get("checks", {}).get("novelty_ok", True) for row in rows if row.get("chosen_id")):
+        body["warnings"].append("Novelty target is reported only: some adjacent levels are below the slot novelty target.")
     body["warnings"].append("Current game analysis authority does not provide a supported scalar Frustration Risk; high-F sequencing cannot be enforced from available official data.")
     body["plan_hash"] = _digest(body)
     return body

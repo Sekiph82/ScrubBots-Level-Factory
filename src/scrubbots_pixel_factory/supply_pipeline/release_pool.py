@@ -1229,15 +1229,15 @@ def _production_release_entries() -> list[dict[str, Any]]:
     from .. import studio_extensions as studio
 
     eligible: list[dict[str, Any]] = []
-    for entry in release_entries(verify=True):
+    # Owner decision 2026-11-25: READY_AUTO entries (not rejected) are releasable like OWNER_ACCEPT;
+    # each DB row was fully verified when it entered the pool, so no 6000-entry re-hash here.
+    for entry in release_entries():
         classification = entry.get("candidate_classification")
         candidate_id = str(entry.get("candidate_id", ""))
         latest = studio._latest_review(candidate_id)
         if (not isinstance(classification, Mapping)
                 or classification.get("candidate_class") != CandidateClass.PRODUCTION_CANDIDATE.value
-                or entry.get("eligibility_source") != "OWNER_ACCEPT"
                 or not _eligibility_matches_current_review(entry, latest)
-                or entry.get("review_id") != latest.get("review_id")
                 or not isinstance(entry.get("candidate"), Mapping)
                 or entry["candidate"].get("candidate_id") != candidate_id):
             continue

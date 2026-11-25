@@ -721,7 +721,14 @@ def _run_studio_extension(operation: str, request: dict[str, object]) -> tuple[d
             ]}
         elif operation == "campaign-build":
             from scrubbots_pixel_factory.supply_pipeline.release_pool import build_release_plan
-            payload = build_release_plan(k=int(request.get("k", 100)), locks=request.get("locks", {}))
+            payload = build_release_plan(game_project=_game_project(), k=int(request.get("k", 100)), locks=request.get("locks", {}))
+        elif operation == "campaign-publish":
+            # Owner 2026-11-25: Release Pool sends the planned levels into the local game build
+            # (one transactional catalog commit, staged Godot catalog check); no git/PR/R2.
+            from scrubbots_pixel_factory.supply_pipeline.release_pool import approve_release_plan
+            payload = approve_release_plan(plan_hash=str(request["plan_hash"]), game_project=_game_project())
+            payload["published_count"] = len(payload.get("orders", []))
+            payload.pop("levels", None)
         elif operation == "campaign-approve":
             from scrubbots_pixel_factory.supply_pipeline.release_route_a import release_approved_campaign
             from scrubbots_pixel_factory import studio_extensions as extensions
@@ -747,6 +754,12 @@ def _run_studio_extension(operation: str, request: dict[str, object]) -> tuple[d
         return payload, 0
     except Exception as exc:
         return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": f"ERROR — Studio extension: {str(exc)[:512]}"}, 2
+
+
+def _game_project() -> str:
+    """SCRUBBOTS_PROJECT, else the owner's Desktop game checkout."""
+    configured = os.environ.get("SCRUBBOTS_PROJECT", "").strip()
+    return configured or str(Path.home() / "Desktop" / "ScrubBots")
 
 
 def _semantic_generate(request: Mapping[str, object]) -> dict[str, object]:

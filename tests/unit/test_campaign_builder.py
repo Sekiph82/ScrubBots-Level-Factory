@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import itertools
 import json
 from pathlib import Path
 
 import pytest
 
-from scrubbots_pixel_factory.supply_pipeline.campaign_builder import CampaignError, _assignment, build_campaign_plan
+from scrubbots_pixel_factory.supply_pipeline.campaign_builder import CampaignError, build_campaign_plan
 
 
 def _authority():
@@ -33,14 +32,6 @@ def _tail(order, profile, vector=None, *, slot=1, score=50):
 def _set_vector(candidate, vector):
     candidate["challenge_vector"] = vector
     candidate["signature"]["challengeVector"] = vector
-
-
-def test_hungarian_global_assignment_matches_bruteforce_small_pool():
-    costs = [[4, 1, 3, 99], [2, 0, 5, 99], [3, 2, 2, 99]]
-    assignment = _assignment(costs)
-    actual = sum(costs[i][j] for i, j in enumerate(assignment))
-    expected = min(sum(costs[i][j] for i, j in enumerate(cols)) for cols in itertools.permutations(range(4), 3))
-    assert actual == expected
 
 
 def test_plan_is_deterministic_hard_tolerance_tier_and_shortage_is_reported():
@@ -218,15 +209,18 @@ def test_configured_similarity_limit_blocks_consecutive_near_duplicates():
     assert plan["shortages"][0]["n"] == 2
 
 
-def test_slot_novelty_target_is_applied_against_prior_signature():
+def test_slot_novelty_target_is_reported_not_enforced_against_prior_signature():
+    # Owner decision 2026-11-25: novelty is advisory (uniform 56x56 art cannot reach the targets).
     authority = _authority()
     pool = _pool([50, 50])
     pool[0]["signature"] = pool[1]["signature"] = {"paletteSet": ["C01"], "dimensions": [20, 20], "challengeVector": [0.1] * 7}
     authority["cadence"][0]["noveltyTarget"] = 0.5
     plan = build_campaign_plan(catalog={"entries": []}, authority=authority, pool=pool, k=2)
     assert plan["slots"][0]["checks"]["novelty_ok"]
-    assert plan["slots"][1]["chosen_id"] is None
-    assert any("below slot novelty target" in reason for item in plan["shortages"][0]["nearest_unused_candidates"] for reason in item["reasons"])
+    assert plan["slots"][1]["chosen_id"] is not None
+    assert plan["slots"][1]["checks"]["novelty_ok"] is False
+    assert not plan["shortages"]
+    assert any("Novelty target is reported only" in warning for warning in plan["warnings"])
 
 
 def test_k100_synthetic_example_is_deterministic_and_complete():
