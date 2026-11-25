@@ -1231,10 +1231,19 @@ def _production_release_entries() -> list[dict[str, Any]]:
     eligible: list[dict[str, Any]] = []
     # Owner decision 2026-11-25: READY_AUTO entries (not rejected) are releasable like OWNER_ACCEPT;
     # each DB row was fully verified when it entered the pool, so no 6000-entry re-hash here.
+    # _latest_review re-validates the candidate bundle (~60 ms); only candidates that have a
+    # review record can have a latest review, so look those up and skip the other ~6000.
+    reviewed: set[str] = set()
+    review_root = studio._review_root()
+    for path in review_root.glob("*.json") if review_root.exists() else ():
+        try:
+            reviewed.add(str(json.loads(path.read_text(encoding="utf-8")).get("candidate_id", "")))
+        except (OSError, ValueError, AttributeError):
+            reviewed.add("*")  # unreadable record: fall back to the full lookup for everyone
     for entry in release_entries():
         classification = entry.get("candidate_classification")
         candidate_id = str(entry.get("candidate_id", ""))
-        latest = studio._latest_review(candidate_id)
+        latest = studio._latest_review(candidate_id) if candidate_id in reviewed or "*" in reviewed else None
         if (not isinstance(classification, Mapping)
                 or classification.get("candidate_class") != CandidateClass.PRODUCTION_CANDIDATE.value
                 or not _eligibility_matches_current_review(entry, latest)
