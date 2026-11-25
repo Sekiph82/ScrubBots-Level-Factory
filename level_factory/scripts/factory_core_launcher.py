@@ -699,7 +699,13 @@ def _run_studio_extension(operation: str, request: dict[str, object]) -> tuple[d
             from scrubbots_pixel_factory.supply_pipeline.release_pool import release_entries, slim_release_entries
             # The Studio list needs ids, titles, artwork and states, not 250 MB of proofs.
             entries = slim_release_entries() if request.get("slim") is True else release_entries()
-            payload = {"state": "READY", "pool_size": len(entries), "entries": entries}
+            # Owner 2026-11-25: levels already sent to the game show PUBLISHED; plans pick READY only.
+            published = _published_level_ids()
+            for entry in entries:
+                if str(entry.get("candidate_id")) in published:
+                    primary = entry.setdefault("pipeline", {}).setdefault("primary", {})
+                    primary["disposition"] = "PUBLISHED"
+            payload = {"state": "READY", "pool_size": len(entries), "published_count": sum(str(e.get("candidate_id")) in published for e in entries), "entries": entries}
         elif operation == "semantic-generate":
             payload = _semantic_generate(request)
         elif operation == "pixellab-pro-4x4-reconcile":
@@ -754,6 +760,14 @@ def _run_studio_extension(operation: str, request: dict[str, object]) -> tuple[d
         return payload, 0
     except Exception as exc:
         return {"operation": STUDIO_EXTENSION_OPERATION, "state": "ERROR", "disposition": "ERROR", "error": f"ERROR — Studio extension: {str(exc)[:512]}"}, 2
+
+
+def _published_level_ids() -> set[str]:
+    catalog = Path(_game_project()) / "data" / "levels" / "catalog" / "production_catalog_v1.json"
+    try:
+        return {str(item.get("id")) for item in json.loads(catalog.read_text(encoding="utf-8")).get("entries", [])}
+    except (OSError, ValueError, AttributeError):
+        return set()
 
 
 def _game_project() -> str:

@@ -2009,7 +2009,7 @@ func _refresh_live_data() -> void:
 		elif entries.is_empty() and not _release_pool_load_error.is_empty():
 			live.text = _release_pool_load_error.left(180)
 		else:
-			live.text = "READY levels: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size(), _visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
+			live.text = "READY levels: %d\nPublished to game: %d\nVisible: %d\nSelected: %d\nTarget: %s\nPreflight: %s" % [entries.size() - int(_release_pool.get("published_count", 0)), int(_release_pool.get("published_count", 0)),_visible_release_ids.size(), _selected_release_ids.size(), _release_target, str(_release_pool.get("publish_preflight", {}).get("state", "Not run"))]
 			if not _release_pool_load_error.is_empty():
 				live.text += "\nRefresh issue: %s" % _release_pool_load_error.trim_prefix("Release Pool refresh failed: ").left(96)
 	_refresh_run_button_caption()

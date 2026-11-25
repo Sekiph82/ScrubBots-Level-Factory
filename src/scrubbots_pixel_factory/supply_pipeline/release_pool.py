@@ -1368,10 +1368,21 @@ def _game_authority(game: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     return catalog, authority
 
 
+def _unpublished(entries: list[dict[str, Any]], catalog: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Pool entries not already in the game catalog (a second send would collide on the level ID)."""
+    published = {str(item.get("id")) for item in catalog.get("entries", []) if isinstance(item, Mapping)}
+    return [entry for entry in entries if str(entry.get("candidate_id")) not in published]
+
+
+def _published_catalog(game: Path) -> Mapping[str, Any]:
+    path = game / "data/levels/catalog/production_catalog_v1.json"
+    return _json(path) if path.is_file() else {}
+
+
 def build_release_plan(*, game_project: str | Path | None = None, k: int = 100, locks: Mapping[int, str] | None = None) -> dict[str, Any]:
     game = discover_game_project(game_project)
     catalog, authority = _game_authority(game)
-    entries = _production_release_entries()
+    entries = _unpublished(_production_release_entries(), catalog)
     plan = build_campaign_plan(catalog=catalog, authority=authority, pool=entries, k=k, locks=locks)
     from .. import studio_extensions as studio
     plan_path = studio.extensions_root() / "release" / "campaign_plan.json"
@@ -1388,7 +1399,7 @@ def validate_release_plan(*, plan_hash: str, game_project: str | Path | None = N
     plan_path = studio.extensions_root() / "release" / "campaign_plan.json"
     plan = _json(plan_path)
     if plan.get("plan_hash") != plan_hash: raise ReleaseError("APPROVE requires the current exact campaign plan hash")
-    entries = {entry["candidate_id"]: entry for entry in _production_release_entries()}
+    entries = {entry["candidate_id"]: entry for entry in _unpublished(_production_release_entries(), _published_catalog(game))}
     rows = plan.get("slots", [])
     prefix = []
     for row in rows:

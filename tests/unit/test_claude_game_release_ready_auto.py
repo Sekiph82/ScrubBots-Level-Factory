@@ -32,3 +32,9 @@ def test_review_lookup_runs_only_for_candidates_with_review_records(monkeypatch,
     ids = [e["candidate_id"] for e in release_pool._production_release_entries()]
     assert looked_up == ["candidate-b"]
     assert ids == ["candidate-a"]
+
+
+def test_levels_already_in_the_game_are_not_planned_again():
+    entries = [_entry("candidate-a"), _entry("candidate-b")]
+    catalog = {"entries": [{"id": "candidate-a", "order": 201}]}
+    assert [e["candidate_id"] for e in release_pool._unpublished(entries, catalog)] == ["candidate-b"]
