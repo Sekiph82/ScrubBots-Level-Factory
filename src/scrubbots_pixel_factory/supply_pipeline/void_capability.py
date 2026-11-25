@@ -82,7 +82,10 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
         branch = _git(root, "branch", "--show-current")
         head = _git(root, "rev-parse", "HEAD")
         current_main = _git(root, "rev-parse", "refs/remotes/origin/main")
-        status = _git(root, "status", "--porcelain")
+        # Owner 2026-11-25: unrelated local work in the game checkout (scenes, project.godot, notes)
+        # must not block releases; only the VOID contract files themselves must be unmodified.
+        status = _git(root, "status", "--porcelain", "--untracked-files=no", "--",
+                      "scripts/data/level_data.gd", "docs/05_TECH_DECISIONS.md", "docs/03_LEVEL_DATA_SPEC.md")
         shallow = _git(root, "rev-parse", "--is-shallow-repository") == "true"
         audited_object_available = subprocess.run(
             ["git", "-C", str(root), "cat-file", "-e", f"{AUDITED_VOID_COMMIT}^{{commit}}"],
@@ -101,7 +104,7 @@ def void_capability(project: str | Path | None = None) -> dict[str, Any]:
     if top != root or origin.casefold() not in {value.casefold() for value in _EXPECTED_ORIGINS}:
         return _closed("Configured project root or canonical ScrubBots origin does not match.")
     if branch not in {"main", ""} or head != current_main or status:
-        return _closed("Configured ScrubBots authority must be clean and equal exact origin/main.", head=head)
+        return _closed("Configured ScrubBots authority must equal exact origin/main with unmodified VOID contract files.", head=head)
     if shallow and (not audited_object_available or ancestor_result == 1):
         return _closed(
             "Configured current ScrubBots history is shallow and cannot prove audited VOID ancestry.",

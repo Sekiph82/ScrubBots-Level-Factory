@@ -362,3 +362,29 @@ def test_void_capability_distinguishes_shallow_history_from_missing_ancestor(tmp
     report = void_module.void_capability(game)
     assert report["state"] == "CLOSED"
     assert report["reason_code"] == "AUDITED_VOID_ANCESTOR_MISSING"
+
+
+def test_void_capability_ignores_unrelated_local_changes_but_not_contract_edits(tmp_path: Path) -> None:
+    # Owner 2026-11-25: unrelated local game work must not close the VOID gate.
+    game = tmp_path / "game"
+    (game / "scripts" / "data").mkdir(parents=True)
+    (game / "project.godot").write_text("config_version=5\n", encoding="utf-8")
+    (game / "scripts" / "data" / "level_data.gd").write_text("const VOID_CELL := -1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-b", "main", str(game)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(game), "config", "user.name", "Fixture"], check=True)
+    subprocess.run(["git", "-C", str(game), "config", "user.email", "fixture@example.invalid"], check=True)
+    subprocess.run(["git", "-C", str(game), "remote", "add", "origin", "https://github.com/Sekiph82/Scrubbots.git"], check=True)
+    subprocess.run(["git", "-C", str(game), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(game), "commit", "-m", "fixture"], check=True, capture_output=True)
+    head = subprocess.check_output(["git", "-C", str(game), "rev-parse", "HEAD"], text=True).strip()
+    subprocess.run(["git", "-C", str(game), "update-ref", "refs/remotes/origin/main", head], check=True)
+    (game / "project.godot").write_text("config_version=5\n# local edit\n", encoding="utf-8")
+    (game / "notes.md").write_text("untracked\n", encoding="utf-8")
+
+    report = void_module.void_capability(game)
+    assert report["reason_code"] == "AUDITED_VOID_ANCESTOR_MISSING"  # got past the cleanliness check
+
+    (game / "scripts" / "data" / "level_data.gd").write_text("const VOID_CELL := -2\n", encoding="utf-8")
+    report = void_module.void_capability(game)
+    assert report["state"] == "CLOSED"
+    assert "unmodified VOID contract files" in report["reason"]

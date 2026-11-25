@@ -55,7 +55,7 @@ def _load(path: Path) -> object:
         raise PublicationError(f"publication input is unreadable: {path}") from exc
 
 
-def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, object], pipeline: Mapping[str, object], source_bundle: str | Path, level_number: int | None = None) -> dict[str, object]:
+def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, object], pipeline: Mapping[str, object], source_bundle: str | Path, level_number: int | None = None, void_gate: Mapping[str, object] | None = None) -> dict[str, object]:
     """Publish one validated batch member at its explicitly assigned catalog order."""
 
     if type(level_number) is not int or level_number < 1:
@@ -99,7 +99,8 @@ def publish_level(*, game_project: str | Path | None, candidate: Mapping[str, ob
     if background_intent == "TRANSPARENT" or void_count:
         from .void_capability import void_capability
 
-        gate = void_capability(root)
+        # publish_batch stages into a temp copy (no git); it passes the real game's gate.
+        gate = void_gate if void_gate is not None else void_capability(root)
         if gate.get("state") != "OPEN":
             raise PublicationError(f"TRANSPARENT_UNAVAILABLE: {gate.get('reason', 'current-game VOID capability gate is closed')}")
     if void_count and background_intent != "TRANSPARENT":
@@ -212,9 +213,12 @@ def publish_batch(*, game_project: str | Path | None, items: list[Mapping[str, o
         stage = Path(temporary) / "project"
         stage.mkdir()
         _stage_current_game_authority(root, stage, catalog)
+        from .void_capability import void_capability
+
+        void_gate = void_capability(root)
         staged_results = []
         for item in items:
-            staged_results.append(publish_level(game_project=stage, candidate=item["candidate"], pipeline=item["pipeline"], source_bundle=item["source_bundle"], level_number=int(item["level_number"])))
+            staged_results.append(publish_level(game_project=stage, candidate=item["candidate"], pipeline=item["pipeline"], source_bundle=item["source_bundle"], level_number=int(item["level_number"]), void_gate=void_gate))
         base_catalog = _load(catalog_path)
         final_catalog = _load(stage / "data/levels/catalog/production_catalog_v1.json")
         base_ids = {entry.get("id") for entry in base_catalog["entries"] if isinstance(entry, Mapping)}

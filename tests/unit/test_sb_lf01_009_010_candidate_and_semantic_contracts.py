@@ -508,10 +508,13 @@ def _release_entry(candidate_id: str, *, production: bool) -> dict[str, object]:
     }
 
 
-def test_legacy_ready_auto_is_visible_but_cannot_enter_plan_or_approval(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_legacy_ready_auto_is_visible_but_cannot_enter_plan_or_approval(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
     from pathlib import Path
 
     from scrubbots_pixel_factory import studio_extensions as studio
+    # Reviews are looked up only for candidates that have a review record (2026-11-25).
+    (tmp_path / "owner-accepted.json").write_text('{"candidate_id": "owner-accepted"}', encoding="utf-8")
+    monkeypatch.setattr(studio, "_review_root", lambda: tmp_path)
 
     legacy = _release_entry("legacy-ready-auto", production=False)
     accepted = _release_entry("owner-accepted", production=True)
