@@ -31,8 +31,10 @@ def _project(tmp_path: Path):
         identity = f"batch-level-{i}"
         bundle = tmp_path / f"bundle-{i}"; bundle.mkdir(); (bundle / "artwork.png").write_bytes(b"pixels" + bytes([i]))
         level = tmp_path / f"level-{i}.json"; level.write_text(json.dumps({"version": 1, "id": identity, "width": 20, "height": 20, "name": identity, "difficulty": "EASY", "palette": ["#3690EAFF"], "cells": [0] * 400}), encoding="utf-8")
-        supply = tmp_path / f"supply-{i}.json"; supply.write_text(json.dumps({"levelId": identity, "columnCount": 4, "visiblePreviewDepth": 3}), encoding="utf-8")
-        items.append({"level_number": number, "candidate": {"candidate_id": identity, "artwork_sha256": "a" * 64, "grid_hash": "b" * 64, "source_lineage": {"source_sha256": "c" * 64}, "background_intent": "BACKGROUND"}, "pipeline": {"run_id": f"run-{i}", "disposition": "READY", "primary": {"state": "READY", "load_check": {"state": "READY", "disposition": "READY"}, "files": {"level": str(level), "supply_plan": str(supply)}, "difficulty": {"score": 50, "class": "EASY"}}}, "source_bundle": bundle})
+        supply = tmp_path / f"supply-{i}.json"; supply.write_text(json.dumps({"levelId": identity, "columnCount": 4, "visiblePreviewDepth": 3, "intendedColumnClicks": [1, 2, i + 1]}), encoding="utf-8")
+        # Level Factory's own canonical real play of this exact plan (the game's real_play_v1 at 1/60).
+        real_play = tmp_path / f"real-play-{i}.json"; real_play.write_text(json.dumps({"verdict": "WON_CANONICAL", "model": "real_play_v1", "canonicalDt": "1/60", "searched": False, "levelId": identity, "planClicks": [1, 2, i + 1], "planSha256": game_publisher._text_sha256(supply), "perDt": {"1/60": {"won": True, "frames": 1000 + i}}}), encoding="utf-8")
+        items.append({"level_number": number, "candidate": {"candidate_id": identity, "artwork_sha256": "a" * 64, "grid_hash": "b" * 64, "source_lineage": {"source_sha256": "c" * 64}, "background_intent": "BACKGROUND"}, "pipeline": {"run_id": f"run-{i}", "disposition": "READY", "primary": {"state": "READY", "load_check": {"state": "READY", "disposition": "READY"}, "files": {"level": str(level), "supply_plan": str(supply), "real_play_result": str(real_play)}, "difficulty": {"score": 50, "class": "EASY"}}}, "source_bundle": bundle})
     return root, catalog_path, catalog, items
 
 
@@ -46,6 +48,22 @@ def test_batch_publishes_one_contiguous_catalog_update_and_preserves_existing_en
     assert [entry["order"] for entry in current["entries"][-2:]] == [8, 9]
     assert all((root / "data/levels" / f"batch-level-{i}.json").is_file() for i in range(2))
     assert all((root / "data/levels/supply" / f"batch-level-{i}_supply_v1.json").is_file() for i in range(2))
+    provenance = json.loads((root / game_publisher.REAL_PLAY_PROVENANCE).read_text(encoding="utf-8"))
+    assert [(r["levelId"], r["order"], r["status"], r["framesAtCanonical"], r["clicks"]) for r in provenance["records"]] == [
+        ("batch-level-0", 8, "WON", 1000, [1, 2, 1]), ("batch-level-1", 9, "WON", 1001, [1, 2, 2])]
+    assert provenance["records"][0]["planSha256"] == game_publisher._text_sha256(root / "data/levels/supply/batch-level-0_supply_v1.json")
+
+
+def test_batch_refuses_a_level_without_a_canonical_real_play_win(tmp_path: Path, monkeypatch):
+    root, catalog_path, _original, items = _project(tmp_path)
+    monkeypatch.setattr(game_publisher, "_validate_proposed_catalog", lambda _project: None)
+    bad = Path(items[1]["pipeline"]["primary"]["files"]["real_play_result"])
+    bad.write_text(bad.read_text(encoding="utf-8").replace("WON_CANONICAL", "LOST"), encoding="utf-8")
+    catalog_bytes = catalog_path.read_bytes()
+    with pytest.raises(PublicationError, match="real-play"):
+        publish_batch(game_project=root, items=items)
+    assert catalog_path.read_bytes() == catalog_bytes
+    assert not (root / game_publisher.REAL_PLAY_PROVENANCE).exists()
 
 
 def test_batch_failure_rolls_back_every_new_file_and_catalog(tmp_path: Path, monkeypatch):
@@ -70,6 +88,7 @@ def test_batch_failure_rolls_back_every_new_file_and_catalog(tmp_path: Path, mon
     assert catalog_path.read_bytes() == catalog_bytes
     assert not list((root / "data/levels").glob("batch-level-*.json"))
     assert not list((root / "data/levels/supply").glob("batch-level-*_supply_v1.json"))
+    assert not (root / game_publisher.REAL_PLAY_PROVENANCE).exists()
 
 
 def test_batch_rejects_later_compatible_order_across_catalog_gap_before_writes(tmp_path: Path, monkeypatch):
