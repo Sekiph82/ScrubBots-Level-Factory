@@ -1,0 +1,58 @@
+[
+ {
+  "name": "pl0_LF-005100",
+  "png": "data\\output\\Pixellab\\Final\\LF-005100.png",
+  "baseline": 54.2203689328903,
+  "colors": 7,
+  "striped": [
+   "c",
+   "d"
+  ],
+  "new": [
+   "a",
+   "b"
+  ]
+ },
+ {
+  "name": "pl1_LF-004678",
+  "png": "data\\output\\Pixellab\\Final\\LF-004678.png",
+  "baseline": 54.1788985581965,
+  "colors": 10,
+  "striped": [
+   "g",
+   "h"
+  ],
+  "new": [
+   "a",
+   "d"
+  ]
+ },
+ {
+  "name": "pl2_LF-001571",
+  "png": "data\\output\\Pixellab\\Final\\LF-001571.png",
+  "baseline": 53.9464943664231,
+  "colors": 5,
+  "striped": [
+   "n",
+   "k"
+  ],
+  "new": [
+   "a",
+   "d"
+  ]
+ },
+ {
+  "name": "pl3_LF-005353",
+  "png": "data\\output\\Pixellab\\Final\\LF-005353.png",
+  "baseline": 54.9319842444326,
+  "colors": 6,
+  "striped": [
+   "k",
+   "g"
+  ],
+  "new": [
+   "a",
+   "b"
+  ]
+ }
+]

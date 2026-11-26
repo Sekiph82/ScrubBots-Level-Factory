@@ -1,0 +1,2 @@
+{"candidate": "candidate-owner-d4c0701f7cfed766983e5c349c85b346400288a620872b77", "baseline": 48.5078327784139, "mean_batch": 4.0, "columns": 3, "disposition": "READY", "score": 44.9628961908547, "reason": null, "seconds": 585}
+{"candidate": "candidate-owner-d4c0701f7cfed766983e5c349c85b346400288a620872b77", "baseline": 48.5078327784139, "mean_batch": 4.0, "columns": 5, "disposition": "READY", "score": 39.5002622562684, "reason": null, "seconds": 488}
